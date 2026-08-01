@@ -381,14 +381,21 @@ header {
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); /* ظل ناعم */
     font-family: var(--font-cabin);
 }
-.why article .box h2{
-    font-size: 18px;
-    margin-top: 20px;
+.why article .box .icon-h2 h2{
+    font-size: 26px;
     font-family: var(--font-cabin);
     font-weight: 500;
+    width: 70%;
+    text-align: right;
+}
+.why article .box .icon-h2 i{
+    width: 30%;
 }
 .why article .box h4{
     margin-top: 20px;
-    font-size: 12px;
+    font-size: 15px;
     line-height: 1.3;
+}
+.why article .box .icon-h2{
+    padding: 0 10px;
 }
