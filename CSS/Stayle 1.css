@@ -370,8 +370,8 @@ header {
 .why article .box{
     width: 45%;
     max-width: 200px;
-    height: 200px;
-    padding: 20px;
+    height: 180px;
+    padding: 20px 5px;
     display: block;
     gap: 20px;
     text-align: center;
