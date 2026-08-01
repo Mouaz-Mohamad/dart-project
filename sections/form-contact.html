@@ -1,0 +1,44 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../CSS/Stayle 1.css">
+<link rel="stylesheet" href="../CSS/base.css">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+
+<section class="feedback-section dja-flexdir" aria-label="Contact Us | اتصل بنا">
+    <h1 class="section-title">Contact Us</h1>
+
+    <form id="feedback-form" class="form">
+        <div class="form-group">
+            <label for="full-name">Full Name</label>
+            <input type="text" id="full-name" placeholder="you + Father + GrandBa" pattern="^\s*(\S+\s+){2,}\S+\s*$" required>
+        </div>
+
+        <div class="form-row flex-center">
+            <div class="form-group">
+                <label for="phone-number">Phone Number</label>
+                <input type="tel" id="phone-number" placeholder="+20 1*********" pattern="[0-9]{11}" required>
+            </div>
+            <div class="form-group">
+                <label for="phone-number">Phone Number 2</label>
+                <input type="tel" id="phone-number" placeholder="+20 1*********" pattern="[0-9]{11}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="Value" required>
+        </div>
+
+        <div class="form-group">
+            <label for="review-text">Message</label>
+            <textarea id="review-text" placeholder="Value" rows="4" required></textarea>
+        </div>
+
+        <button type="submit" class="submit-btn-form">Submit</button>
+    </form>
+</section>
+
+    <script src="../Js/one .js"></script>
