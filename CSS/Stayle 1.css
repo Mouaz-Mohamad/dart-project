@@ -372,13 +372,11 @@ header {
     align-items: center;
 }
 .why article .box{
-    width: 48%;
+    width: 50%;
     max-width: 200px;
-    height: 60px;
-    padding: 5px 5px;
-    display: block;
-    gap: 15px;
-    text-align: center;
+    height: 90px;
+    padding: 10px 10px;
+    gap: 5px;
     background: var(--white); 
     backdrop-filter: blur(10px); 
     border-radius: 15px;
@@ -386,21 +384,13 @@ header {
     font-family: var(--font-cabin);
     color: var(--bragnte);
 }
-.why article .box .icon-h2 h2{
-    font-size: 20px;
+.why article .box  h2{
+    font-size: 26px;
     font-family: var(--font-cabin);
     font-weight: 600;
     width: 70%;
     text-align: right;
 }
-.why article .box .icon-h2 i{
+.why article .box  i{
     width: 30%;
-}
-.why article .box h4{
-    margin-top: 10px;
-    font-size: 15px;
-    line-height: 1.5;
-}
-.why article .box .icon-h2{
-    padding: 0 10px;
 }
