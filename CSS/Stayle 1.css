@@ -343,6 +343,7 @@ header {
 .card-conteiner h3 {
     margin: 0 20px 0 70px;
     text-align: right;
+    color: var(--bg-dark);
 }
 
 /* Dart For You Section */
