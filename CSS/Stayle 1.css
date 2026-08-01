@@ -318,16 +318,16 @@ header {
 
 .birthday-details img {
     position: absolute;
-    right: -100px;
-    max-height: 87%;
-    max-width: 87%;
+    right: -140px;
+    max-height: 100%;
+    max-width: 100%;
 }
 
 .birthday-details .birthday-conteiner2 h3 { margin-right: 50px; }
 
 .card-details img {
     position: absolute;
-    left: -30px;
+    left: -50px;
     max-height: 100%;
     max-width: 100%;
     top: 40px;
@@ -367,15 +367,15 @@ header {
 .why article{
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 10px;
     justify-content: center;
     align-items: center;
 }
 .why article .box{
-    width: 47%;
+    width: 48%;
     max-width: 200px;
-    height: 120px;
-    padding: 20px 5px;
+    height: 100px;
+    padding: 10px 5px;
     display: block;
     gap: 15px;
     text-align: center;
@@ -387,7 +387,7 @@ header {
     color: var(--bragnte);
 }
 .why article .box .icon-h2 h2{
-    font-size: 24px;
+    font-size: 22px;
     font-family: var(--font-cabin);
     font-weight: 600;
     width: 70%;
