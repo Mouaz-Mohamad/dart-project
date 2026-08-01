@@ -373,13 +373,14 @@ header {
     height: 180px;
     padding: 20px 5px;
     display: block;
-    gap: 20px;
+    gap: 15px;
     text-align: center;
-    background: var(--bragnte); 
+    background: var(--border-color); 
     backdrop-filter: blur(10px); 
     border-radius: 15px;
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); /* ظل ناعم */
     font-family: var(--font-cabin);
+    color: var(--bragnte);
 }
 .why article .box .icon-h2 h2{
     font-size: 24px;
