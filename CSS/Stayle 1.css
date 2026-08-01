@@ -374,8 +374,8 @@ header {
 .why article .box{
     width: 48%;
     max-width: 200px;
-    height: 100px;
-    padding: 10px 5px;
+    height: 80px;
+    padding: 5px 5px;
     display: block;
     gap: 15px;
     text-align: center;
@@ -387,7 +387,7 @@ header {
     color: var(--bragnte);
 }
 .why article .box .icon-h2 h2{
-    font-size: 22px;
+    font-size: 20px;
     font-family: var(--font-cabin);
     font-weight: 600;
     width: 70%;
