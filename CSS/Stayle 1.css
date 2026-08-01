@@ -384,6 +384,8 @@ header {
 .why article .box h2{
     font-size: 18px;
     margin-top: 20px;
+    font-family: var(--font-cabin);
+    font-weight: 500;
 }
 .why article .box h4{
     margin-top: 20px;
