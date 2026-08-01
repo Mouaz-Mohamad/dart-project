@@ -291,6 +291,8 @@ header {
     margin-left: 10px;
 }
 
+.story .container-story h1 ,.story .container-story h4{ color: var(--bragnte);}
+.story .container-story h3{ color: var(--bg-dark);}
 .story .container-story h3,
 .birthday-details .birthday-conteiner2 h3 {
     text-align: right;
