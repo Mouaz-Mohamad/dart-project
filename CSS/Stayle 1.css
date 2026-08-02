@@ -3,14 +3,18 @@
 .form .container-select, .form .container-select select,
 .story, .submit-btn-form, .container-select select option,
 .dart-for-you, header, .birthday-conteiner, .feedback-section,
-.form-group, .paragraph-btn,.why {
+.form-group, .paragraph-btn, .why, .pge-que, .products {
     width: 100%;
+}
+
+/* Flex Column Shared Utility */
+header, .side-menu, .pge-que .pge, .que {
+    display: flex;
+    flex-direction: column;
 }
 
 /* Layout & Header */
 header {
-    display: flex;
-    flex-direction: column;
     justify-content: flex-end;
     align-content: flex-end;
 }
@@ -36,8 +40,12 @@ header {
 }
 
 /* Badges & Rounded Buttons */
-.icon-menu, .icon-shop {
-    border-radius: 50px 0 0 50px;
+.icon-menu, .icon-shop { 
+    border-radius: 50px 0 0 50  ; 
+    -webkit-border-radius: 50px 0 0 50  ; 
+    -moz-border-radius: 50px 0 0 50  ; 
+    -ms-border-radius: 50px 0 0 50  ; 
+    -o-border-radius: 50px 0 0 50  ;
 }
 
 .icon-menu {
@@ -58,7 +66,6 @@ header {
     top: 92px;
     z-index: 100000;
     display: none;
-    flex-direction: column;
     justify-content: center;
     align-self: flex-end;
     min-height: 80vh;
@@ -82,13 +89,16 @@ header {
     border-bottom: 1px solid rgba(255, 255, 255, 0.7);
 }
 
-.menu-list a, .social-icons a {
+.menu-list a, .social-icons a, .account-btn a {
     text-decoration: none;
+}
+
+.menu-list a, .account-btn a {
+    font-size: clamp(15px, 2vw, 18px);
 }
 
 .menu-list a {
     padding: 15px 5px;
-    font-size: clamp(15px, 2vw, 18px);
 }
 
 .social-icons {
@@ -106,9 +116,7 @@ header {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: clamp(15px, 2vw, 18px);
     font-weight: 300;
-    text-decoration: none;
 }
 
 /* Headings & Shared Containers */
@@ -293,9 +301,11 @@ header {
     color: var(--bragnte);
 }
 
-.story .container-story h4{ color: var(--bragnte);}
+.story .container-story h4 { color: var(--bragnte); }
+
 .story .container-story h3,
-.birthday-details .birthday-conteiner2 h3 {
+.birthday-details .birthday-conteiner2 h3,
+.card-conteiner h3 {
     text-align: right;
     line-height: 1.14;
     font-family: var(--font-cabin);
@@ -305,6 +315,7 @@ header {
 }
 
 .story .container-story h3 { margin-right: 90px; }
+
 .story .container-story h4 {
     margin: 20px 100px 0 0;
     font-size: clamp(0.85em, 2vw, 1em);
@@ -345,8 +356,6 @@ header {
 
 .card-conteiner h3 {
     margin: 0 20px 0 70px;
-    text-align: right;
-    color: var(--bg-dark);
 }
 
 /* Dart For You Section */
@@ -361,91 +370,96 @@ header {
     height: 40%;
 }
 
-.why h1{
+/* Why Section */
+.why h1 {
     font-size: 2.5rem;
     color: var(--bragnte);
     font-family: var(--font-irish);
     text-align: center;
 }
-.why article{
+
+.why article {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
     justify-content: center;
     align-items: center;
 }
-.why article .box{
+
+.why article .box {
     width: 47%;
     max-width: 200px;
     height: 90px;
-    padding: 10px 10px;
+    padding: 10px;
     gap: 5px;
-    background: var(--white); 
-    backdrop-filter: blur(10px); 
+    background: var(--white);
+    backdrop-filter: blur(10px);
     border-radius: 15px;
-    box-shadow: 1px 4px 30px rgba(0, 0, 0, 0.2); /* ظل ناعم */
+    box-shadow: 1px 4px 30px rgba(0, 0, 0, 0.2);
     font-family: var(--font-cabin);
     color: var(--bragnte);
 }
-.why article .box  h2{
+
+.why article .box h2 {
     font-size: 22px;
-    font-family: var(--font-cabin);
     font-weight: 600;
     width: 70%;
     text-align: right;
 }
-.why article .box  i{
+
+.why article .box i {
     width: 30%;
 }
 
-.footer-continear{
-    padding: 20px 0px;
+/* Footer Section */
+.footer-continear {
+    padding: 20px 0;
     color: var(--bg-dark);
     gap: 20px;
 }
 
-.footer-continear .logo-text{
+.footer-continear .logo-text {
     justify-content: start;
     gap: 10px;
 }
-.footer-continear .logo-text img{
+
+.footer-continear .logo-text img {
     width: 25%;
     height: 25%;
 }
-.footer-continear .logo-text h1{
+
+.footer-continear .logo-text h1 {
     color: var(--bragnte);
     font-family: var(--font-irish);
     font-size: xx-large;
 }
 
-.pge-que{
-    width: 100%;
+.pge-que {
     justify-content: flex-start;
     align-items: flex-start;
     gap: 30px;
     padding: 0 30px;
 }
 
-.pge-que .pge ,.que{ 
-    justify-content: flex-start;
-    display: flex;
-    flex-direction: column;
-}
-.pge-que .pge a, .que a{
+.pge-que .pge a, .que a {
     color: var(--text-muted);
     text-align: start;
+    font-weight: 300;
 }
-.products{
-    width: 100%;
+
+.products {
     color: var(--bragnte);
 }
-.footer-continear h3{
+
+.footer-continear h3 {
     text-align: center;
 }
-.footer-continear .hg , .footer-continear .social-icons a{
+
+.footer-continear .hg, .footer-continear .social-icons a {
     color: var(--bg-dark);
     font-family: var(--font-cabin);
 }
-.footer-continear a span{
+
+.footer-continear a span {
     color: #0088FF;
 }
