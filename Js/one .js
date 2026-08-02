@@ -13,7 +13,9 @@ async function loadSection(containerId, filePath) {
 }
 
 // دالة تفعيل المنيو بالأسماء الصحيحة من الـ HTML بتاعك
-function initHeader() {
+document.addEventListener('DOMContentLoaded', function () {
+    let lastScrollTop = 0;
+    const navbar = document.getElementById('navbar-container');
     const iconMenu = document.querySelector('.icon-menu');
     const sideMenu = document.querySelector('.side-menu');
 
@@ -30,13 +32,24 @@ function initHeader() {
                 sideMenu.classList.remove('active');
             }
         });
-
-        // إغلاق القائمة عند عمل سكرول للشاشة
-        window.addEventListener('scroll', () => {
-            sideMenu.classList.remove('active');
-        });
     }
-}
+
+    // حدث التمرير (السكرول) للنافبار والمنيو
+    window.addEventListener('scroll', function () {
+        let currentScroll = window.scrollY || document.documentElement.scrollTop;
+
+        if (currentScroll > lastScrollTop && currentScroll > navbar.offsetHeight) {
+            // Scroll Down: إخفاء الناڤبار وإغلاق المنيو الجانبية
+            navbar.style.transform = 'translateY(-100px)';
+            if (sideMenu) sideMenu.classList.remove('active');
+        } else if (currentScroll < lastScrollTop) {
+            // Scroll Up: إظهار الناڤبار
+            navbar.style.transform = 'translateY(0)';
+        }
+
+        lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+    });
+});
 
 //للتاكد من خانه الاسم ان بها ثلاث اسماء 
 function isThreeWords(name) {
