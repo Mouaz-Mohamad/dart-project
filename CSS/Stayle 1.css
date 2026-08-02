@@ -35,7 +35,7 @@ header {
 }
 
 .logo img {
-    width: clamp(90px, 15vw, 120px);
+    width: clamp(90px, 15vw, 100px);
     height: auto;
     object-fit: contain;
 }
@@ -64,12 +64,12 @@ background-color: var(--white);
 /* Side Menu */
 .side-menu {
 position: fixed;
-top: 92px;
+top: 95px;
 z-index: 100000;
 display: none;
 justify-content: center;
 align-self: flex-end;
-min-height: 80vh;
+height: 80vh;
 padding: 40px 25px 20px;
 background-color: var(--bragnte);
 border-top-left-radius: 80px;
@@ -208,7 +208,7 @@ letter-spacing: 0.5px;
 }
 
 /* Misc Sections */
-.birthday-conteiner, .feedback-section {
+.birthday-conteiner {
 color: var(--bg-dark);
 text-align: center;
 }
@@ -229,6 +229,7 @@ gap: 15px;
 
 .feedback-section h1 {
 font-size: clamp(1.5rem, 3.5vw, 2rem);
+width: 100%;
 }
 
 .form {
@@ -377,6 +378,7 @@ font-size: 2.5rem;
 color: var(--bragnte);
 font-family: var(--font-irish);
 text-align: center;
+margin-bottom: 20px;
 }
 
 .why article {
@@ -421,6 +423,7 @@ gap: 20px;
 
 .footer-continear .logo-text {
 justify-content: start;
+margin-left: 20px;
 gap: 10px;
 }
 
@@ -448,8 +451,9 @@ text-align: start;
 font-weight: 300;
 }
 
-.products {
+.footer-continear .products {
 color: var(--bragnte);
+padding: 0 20px;
 }
 
 .footer-continear h3 {
@@ -466,13 +470,14 @@ color: #0088FF;
 }
 
 
-.section-title- {
+.section-title-,.feedback-section h1 {
     font-size: 32px;
     font-family: var(--font-irish);
     margin-bottom: 20px;
     color: var(--bragnte);
     border-left: 4px solid #902139;
     padding-right: 10px;
+    text-align: left;
 }
 
 .products-grid {
@@ -501,10 +506,15 @@ color: #0088FF;
 
 .product-img {
     width: 100%;
-    height: 170px;
-    object-fit: fit;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
     background-color: var(--white);
-    }
+    border-radius: 8px;
+    -webkit-border-radius: 8px;
+    -moz-border-radius: 8px;
+    -ms-border-radius: 8px;
+    -o-border-radius: 8px;
+}
 
 .product-details { 
     padding: 12px; 
@@ -585,5 +595,5 @@ color: #0088FF;
 
     .user-info { display: flex; align-items: center; gap: 10px; }
     .user-avatar { border-radius: 50%; object-fit: cover; background: var(--white);color: var(--bragnte); }
-    .user-name { font-size: 20px; font-weight: 500; color: var(--bg-dark);text-align: right; }
+    .user-name- { font-size: 20px; font-weight: 500; color: var(--bg-dark);text-align: right; }
     .review-date { font-size: 9px; color: var(--text-muted); }

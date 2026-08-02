@@ -88,7 +88,7 @@ body.no-scroll {
 main{
   display: flex;
   flex-direction: column;
-  row-gap: 20px;
+  gap: 40px;
   position: relative;
   overflow: hidden;   /* بيخفي أي عنصر يخرج بره حدوده ويمنع السكرول */
   max-width: 100%;

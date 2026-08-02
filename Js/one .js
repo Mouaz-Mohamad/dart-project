@@ -76,14 +76,86 @@ document.addEventListener('DOMContentLoaded', async () => {
     { category: "قمصان",
         title: "قميص جينز | بيج", 
         code: "DA-T695", 
-        price: 849, 
-        image: "../Photos/card.png" },
+        price: 749, 
+        image: "../Photos/products/1.jpg" },
 
     { category: "قمصان",
         title: "قميص جينز | بيج", 
         code: "DA-T695", 
         price: 849, 
-        image: "../Photos/card.png" },
+        image: "../Photos/products/2.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/3.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/4.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/5.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/6.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/7.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/9.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/10.jpg" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/11.jfif" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/12.jfif" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/13.jfif" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/14.jfif" },
+
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/products/15.jfif" },
     ];
 
     // عناصر المنتجات
@@ -163,7 +235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     card.querySelector('.review-title').textContent = item.title;
     card.querySelector('.review-text').textContent = item.comment;
-    card.querySelector('.user-name').textContent = item.name;
+    card.querySelector('.user-name-').textContent = item.name;
     card.querySelector('.review-date').textContent = item.date;
 
     reviewsContainer.appendChild(card);
