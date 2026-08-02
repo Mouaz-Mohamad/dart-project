@@ -6,7 +6,7 @@
 }
 
 :root {
-  color-scheme: light only;
+  color-scheme: light;
   /* Colors */
   --bragnte: #AB012B;
   --secondary: #2196f3;
@@ -64,7 +64,7 @@ html {
   font-size: 100%;
   scroll-behavior: smooth;
   direction: ltr;
-  forced-color-adjust: none; /* بيمنع المتصفح إنه يغير الألوان من تلقاء نفسه */
+  forced-color-adjust: none;
   background-color: #ffffff !important;
   color: #000000;
 }
