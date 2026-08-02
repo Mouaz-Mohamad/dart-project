@@ -476,7 +476,7 @@ color: #0088FF;
 
 .products-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 175px));
+    grid-template-columns: repeat(auto-fill, minmax(165px, 165px));
     gap: 5px;
 }
 .product-card {
