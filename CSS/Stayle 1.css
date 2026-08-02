@@ -3,7 +3,7 @@
 .form .container-select, .form .container-select select,
 .story, .submit-btn-form, .container-select select option,
 .dart-for-you, header, .birthday-conteiner, .feedback-section,
-.form-group, .paragraph-btn, .why, .pge-que, .products {
+.form-group, .paragraph-btn, .why, .pge-que, .products,.products-section {
     width: 100%;
 }
 
@@ -462,4 +462,89 @@ font-family: var(--font-cabin);
 
 .footer-continear a span {
 color: #0088FF;
+}
+
+
+.section-title- {
+    font-size: 22px;
+    font-family: var(--font-irish);
+    margin-bottom: 20px;
+    color: var(--bragnte);
+    border-left: 4px solid #902139;
+    padding-right: 10px;
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 175px));
+    gap: 5px;
+}
+.product-card {
+    padding: 5px;
+    background: var(--white);
+    border: 1px solid var(--bragnte);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    border-color: #902139;
+}
+
+.product-img {
+    width: 100%;
+    height: 170px;
+    object-fit: fit;
+    background-color: var(--white);
+    }
+
+.product-details { 
+    padding: 12px; 
+    text-align: right;
+}
+
+.product-category {
+    font-size: 12px;
+    color: var(--bragnte);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    font-weight: 500;
+    font-family: var(--font-cabin);
+}
+
+.product-title {
+    font-size: 16px;
+    color: var(--bg-dark);
+    margin-bottom: 4px;
+    font-weight: 500;
+    font-family: var(--font-cabin);
+}
+
+.product-code {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.product-price {
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--bragnte);
+}
+
+.cart-btn {
+    color: var(--white);
+    transition: 0.2s;
+    font-size: 15px;
+}
+.cart-btn:hover {
+    background: var(--white); 
+    color: var(--bragnte); 
+    border: 1px solid var(--bragnte);
 }

@@ -66,3 +66,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     // يشتغل بعد ما Nav-Bar ينزل تماماً في الـ DOM
     initHeader();
 });
+
+
+
+    // ==========================================
+    // 1. مصفوفة المنتجات (أنواع مختلفة)
+    // ==========================================
+    const productsData = [
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/card.png" },
+        
+    { category: "قمصان",
+        title: "قميص جينز | بيج", 
+        code: "DA-T695", 
+        price: 849, 
+        image: "../Photos/card.png" },
+    ];
+
+    // عناصر المنتجات
+    const productsContainer = document.getElementById('productsContainer');
+    const productTemplate = document.getElementById('productTemplate');
+
+    // أخذ أول 12 منتج فقط للعرض في index.html
+    const mainPageProducts = productsData.slice(0, 12);
+
+    mainPageProducts.forEach(item => {
+    const card = productTemplate.cloneNode(true);
+    card.removeAttribute('id');
+    card.style.display = 'flex';
+
+    card.querySelector('.product-img').src = item.image;
+    card.querySelector('.product-img').alt = item.title;
+    card.querySelector('.product-category').textContent = item.category; // إضافة النوع
+    card.querySelector('.product-title').textContent = item.title;
+    card.querySelector('.product-code').textContent = `كود : ${item.code}`;
+    card.querySelector('.product-price').textContent = `EGP ${item.price}`;
+
+    productsContainer.appendChild(card);
+    });
