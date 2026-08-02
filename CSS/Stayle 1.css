@@ -478,6 +478,7 @@ color: #0088FF;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(165px, 165px));
     gap: 5px;
+    justify-content: center;
 }
 .product-card {
     padding: 5px;
@@ -519,10 +520,11 @@ color: #0088FF;
 }
 
 .product-title {
-    height: 40px;
+    line-height: 1.1;
+    height: 50px;
     font-size: 16px;
     color: var(--bg-dark);
-    margin-bottom: 4px;
+    margin-bottom: 7px;
     font-weight: 500;
     font-family: var(--font-cabin);
 }
@@ -531,7 +533,7 @@ color: #0088FF;
     font-size: 10px;
     font-family: var(--font-cabin);
     color: var(--text-muted);
-    margin-bottom: 12px;
+    margin-bottom: 4px;
     text-align: right;
 }
 
