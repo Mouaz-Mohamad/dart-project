@@ -342,8 +342,8 @@ max-width: 90%;
 .card-details img {
 position: absolute;
 left: -50px;
-max-height: 95%;
-max-width: 95%;
+max-height: 80%;
+max-width: 80%;
 bottom: -4vw;
 }
 
