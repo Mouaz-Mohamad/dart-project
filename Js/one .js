@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         code: "DA-T695", 
         price: 849, 
         image: "../Photos/card.png" },
-        
+
     { category: "قمصان",
         title: "قميص جينز | بيج", 
         code: "DA-T695", 

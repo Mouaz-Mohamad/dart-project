@@ -519,6 +519,7 @@ color: #0088FF;
 }
 
 .product-title {
+    height: 40px;
     font-size: 16px;
     color: var(--bg-dark);
     margin-bottom: 4px;
@@ -528,8 +529,10 @@ color: #0088FF;
 
 .product-code {
     font-size: 10px;
+    font-family: var(--font-cabin);
     color: var(--text-muted);
     margin-bottom: 12px;
+    text-align: right;
 }
 
 .product-price {
