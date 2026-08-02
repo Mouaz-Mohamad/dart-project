@@ -342,8 +342,8 @@ header {
 .card-details img {
     position: absolute;
     left: -50px;
-    max-height: 95%;
-    max-width: 95%;
+    max-height: 90%;
+    max-width: 90%;
     bottom: -4vw;
 }
 
