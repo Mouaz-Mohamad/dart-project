@@ -88,7 +88,7 @@ body.no-scroll {
 main{
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: 10px;
   position: relative;
   overflow: hidden;   /* بيخفي أي عنصر يخرج بره حدوده ويمنع السكرول */
   max-width: 100%;
@@ -104,7 +104,8 @@ main{
   margin: 0 auto;
   background-color: var(--white);
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-  row-gap: 50px;
+  display: block;
+  gap: 30px;
 }
 
 /* 3. Typography & Links */

@@ -59,71 +59,75 @@
     <div class="mother">
         <header id="header-container" aria-label="Main Navigation | القائمة الرئيسية"></header>
             
-            <main class="#">
+        <main class="#">
 
-                <section id="search-serial-container" aria-label="Product Authenticity Check"></section>
+            <!-- <section id="search-serial-container" aria-label="Product Authenticity Check"></section> -->
 
-                <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
+            <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
 
-                <!-- ================= سكشن المنتجات ================= -->
-                <section class="products-section">
-                    <h2 class="section-title-">&nbsp;Newest products</h2>
-                    
-                    <div class="products-grid" id="productsContainer">
-                    <!-- الكارت المرجعي (Template) -->
-                        <div class="product-card" id="productTemplate" style="display: none;">
-                            <img src="" alt="" class="product-img">
-                            <div class="product-details">
-                            <div class="product-category"></div>
-                            <div class="product-code" dir="rtl"></div>
-                            <div class="product-title"></div>
-                            <div class="product-footer djasb">
-                                <span class="product-price"></span>
-                                <button class="cart-btn dja">Bay &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
-                            </div>
-                            </div>
+            <!-- ================= سكشن المنتجات الجزء الأول (أول 7 منتجات) ================= -->
+            <section class="products-section">
+                <h2 class="section-title-">&nbsp;Newest products</h2>
+                
+                <div class="products-grid" id="productsPart1">
+                <!-- الكارت المرجعي (Template) -->
+                    <div class="product-card" id="productTemplate" style="display: none;">
+                        <img src="" alt="" class="product-img">
+                        <div class="product-details">
+                        <div class="product-category"></div>
+                        <div class="product-code" dir="rtl"></div>
+                        <div class="product-title"></div>
+                        <div class="product-footer djasb">
+                            <span class="product-price"></span>
+                            <button class="cart-btn dja">Bay &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                        </div>
                         </div>
                     </div>
-                </section>
+                </div>
+            </section>
 
-                <section id="birthday"></section>
+            <!-- ================= التلات سكاشن اللي في النص ================= -->
+            <section class="reviews-section">
+                <h2 class="section-title-">&nbsp; Our Reviews </h2>
 
-                <!-- ================= سكشن التقييمات ================= -->
-                <section class="reviews-section">
-                    <h2 class="section-title-">&nbsp; Our Reviews </h2>
-
-                    <div class="reviews-container" id="reviewsContainer">
-                    <!-- الكارت المرجعي (Template) -->
-                        <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
+                <div class="reviews-container" id="reviewsContainer">
+                <!-- الكارت المرجعي (Template) -->
+                    <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
+                        <div>
+                            <div class="stars"></div>
+                            <div class="review-title"></div>
+                            <div class="review-text"></div>
+                        </div>
+                        <div class="user-info" dir="rtl">
+                            <i class="fa-regular fa-circle-user fa-xl user-avatar"></i>
                             <div>
-                                <div class="stars"></div>
-                                <div class="review-title"></div>
-                                <div class="review-text"></div>
-                            </div>
-                            <div class="user-info" dir="rtl">
-                                <i class="fa-regular fa-circle-user fa-xl user-avatar"></i>
-                                <div>
-                                    <div class="user-name-"></div>
-                                    <div class="review-date"></div>
-                                </div>
+                                <div class="user-name-"></div>
+                                <div class="review-date"></div>
                             </div>
                         </div>
                     </div>
-                </section>
+                </div>
+            </section>
 
-                <section id="why" aria-label="Why Choose DART?."></section>
+            <section id="birthday"></section>
 
-                <section id="feedback-form" aria-label="Share Your Experience"></section>
+            <!-- ================= سكشن المنتجات الجزء الثاني (باقي المنتجات) ================= -->
+            <section class="products-section">
+                <div class="products-grid" id="productsPart2"></div>
+            </section>
+            
+            <section id="dart-for-you" aria-label="The brand logo is a kite bird in a burgundy color."></section>
+            
+            <section id="feedback-form" aria-label="Share Your Experience"></section>
+            <!-- <section id="why" aria-label="Why Choose DART?."></section> -->
+            <!-- <section id="return-form" aria-label="Exchange or Return Request "></section>
+            <section id="contact-form" aria-label="Contact Us "></section>
+            <section id="birthday-details" aria-label="Information and details about the birthday discount."></section>
+            <section id="card-details" aria-label="Information and details about the Dart card."></section>
+            <section id="story"></section> -->
+        </main>
 
-                <!-- <section id="story"></section>
-                <section id="return-form" aria-label="Exchange or Return Request "></section>
-                <section id="contact-form" aria-label="Contact Us "></section>
-                <section id="dart-for-you" aria-label="The brand logo is a kite bird in a burgundy color."></section>
-                <section id="birthday-details" aria-label="Information and details about the birthday discount."></section>
-                <section id="card-details" aria-label="Information and details about the Dart card."></section> -->
-            </main>
-
-            <footer id="footer" aria-label="footer."></footer>
+        <footer id="footer" aria-label="footer."></footer>
     
     </div>
     <script src="Js/one .js"></script>
