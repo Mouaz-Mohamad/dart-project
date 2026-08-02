@@ -91,7 +91,7 @@ main{
   position: relative;
   overflow: hidden;   /* بيخفي أي عنصر يخرج بره حدوده ويمنع السكرول */
   max-width: 100%;
-  background-color: var(--white);
+  background-color: var(--white) !important;
   padding: 0 10px 0 10px;
   width: 100%;
 }
