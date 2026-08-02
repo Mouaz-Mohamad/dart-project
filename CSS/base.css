@@ -76,7 +76,7 @@ body {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--white);
-  background-color: #f1f2f6;
+  background-color: var(--bragnte);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
