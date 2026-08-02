@@ -20,7 +20,7 @@ function initHeader() {
     if (iconMenu && sideMenu) {
         // فتح وإغلاق القائمة عند الضغط على الأيقونة
         iconMenu.addEventListener('click', (e) => {
-            e.stopPropagation(); // منع إغلاق القائمة فوراً عند الضغط
+            e.stopPropagation();
             sideMenu.classList.toggle('active');
         });
 
@@ -29,6 +29,11 @@ function initHeader() {
             if (!sideMenu.contains(event.target) && !iconMenu.contains(event.target)) {
                 sideMenu.classList.remove('active');
             }
+        });
+
+        // إغلاق القائمة عند عمل سكرول للشاشة
+        window.addEventListener('scroll', () => {
+            sideMenu.classList.remove('active');
         });
     }
 }
