@@ -61,7 +61,7 @@ header {
     flex-direction: column;
     justify-content: center;
     align-self: flex-end;
-    min-height: 85vh;
+    min-height: 80vh;
     padding: 40px 25px 20px;
     background-color: var(--bragnte);
     border-top-left-radius: 80px;
