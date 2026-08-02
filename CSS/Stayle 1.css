@@ -260,9 +260,9 @@ header {
 
 /* Story, Birthday & Card Details Shared Layouts */
 .story, .birthday-details, .card-details {
-    background-color: var(--white);
+    background-color: var(--white) !important;
     position: relative;
-    color: var(--bragnte);
+    color: var(--bragnte) !important;
     display: flex;
     align-items: center;
 }
@@ -282,7 +282,7 @@ header {
 .birthday-details .birthday-conteiner2 h1,
 .card-conteiner h1 {
     font-family: var(--font-irish);
-    font-size: clamp(50px, 8vw, 70px);
+    font-size: clamp(40px, 7vw, 60px);
     -webkit-text-stroke: 0.2px var(--white);
 }
 
@@ -313,15 +313,17 @@ header {
 .story img {
     position: absolute;
     right: -40px;
-    max-width: 100%;
-    max-height: 100%;
+    bottom: 0;
+    max-width: 90%;
+    max-height: 90%;
 }
 
 .birthday-details img {
     position: absolute;
     right: -140px;
-    max-height: 100%;
-    max-width: 100%;
+    bottom: 0;
+    max-height: 90%;
+    max-width: 90%;
 }
 
 .birthday-details .birthday-conteiner2 h3 { margin-right: 50px; }
@@ -329,9 +331,9 @@ header {
 .card-details img {
     position: absolute;
     left: -50px;
-    max-height: 100%;
-    max-width: 100%;
-    top: 40px;
+    max-height: 95%;
+    max-width: 95%;
+    bottom: -4vw;
 }
 
 .card-conteiner { justify-self: left; }
