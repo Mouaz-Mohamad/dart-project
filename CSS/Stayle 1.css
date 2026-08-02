@@ -397,3 +397,55 @@ header {
 .why article .box  i{
     width: 30%;
 }
+
+.footer-continear{
+    padding: 20px 0px;
+    color: var(--bg-dark);
+    gap: 20px;
+}
+
+.footer-continear .logo-text{
+    justify-content: start;
+    gap: 10px;
+}
+.footer-continear .logo-text img{
+    width: 25%;
+    height: 25%;
+}
+.footer-continear .logo-text h1{
+    color: var(--bragnte);
+    font-family: var(--font-irish);
+    font-size: xx-large;
+}
+
+.pge-que{
+    width: 100%;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 30px;
+    padding: 0 30px;
+}
+
+.pge-que .pge ,.que{ 
+    justify-content: flex-start;
+    display: flex;
+    flex-direction: column;
+}
+.pge-que .pge a, .que a{
+    color: var(--text-muted);
+    text-align: start;
+}
+.products{
+    width: 100%;
+    color: var(--bragnte);
+}
+.footer-continear h3{
+    text-align: center;
+}
+.footer-continear .hg , .footer-continear .social-icons a{
+    color: var(--bg-dark);
+    font-family: var(--font-cabin);
+}
+.footer-continear a span{
+    color: #0088FF;
+}
