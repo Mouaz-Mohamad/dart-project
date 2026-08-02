@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="color-scheme" content="light">
+
+    <!-- SEO الأساسي -->
+    <title>Dart | متجر أزياء وملابس عصرية</title>
+    <meta name="description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة مع خصومات وعروض حصرية وتوصيل سريع.">
+    <meta name="keywords" content="Dart, ملابس, أزياء, موضة, متجر ملابس, هوديز, Dart Brand">
+    <meta name="author" content="Dart">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://yourdomain.com/">
+
+    <!-- Open Graph / Facebook & WhatsApp -->
+    <meta property="og:site_name" content="Dart">
+    <meta property="og:title" content="Dart | متجر أزياء وملابس عصرية">
+    <meta property="og:description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة.">
+    <meta property="og:image" content="https://yourdomain.com/Photos/logo-1to1.png">
+    <meta property="og:image:secure_url" content="https://yourdomain.com/Photos/logo-1to1.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:alt" content="Dart Brand Logo">
+    <meta property="og:url" content="https://yourdomain.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ar_AR">
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Dart | متجر أزياء وملابس عصرية">
+    <meta name="twitter:description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة.">
+    <meta name="twitter:image" content="https://yourdomain.com/Photos/logo-1to1.png">
+
+    <!-- Favicon والأيقونات -->
+    <link rel="icon" type="image/png" sizes="48x48" href="Photos/logo-1to1.png">
+    <link rel="apple-touch-icon" sizes="48x48" href="Photos/logo-1to1.png">
+
+
+
+    <link rel="stylesheet" href="CSS/Stayle 1.css">
+    <link rel="stylesheet" href="CSS/base.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap" rel="stylesheet">
+</head>
+<body class='dja-flexdir'>
+    <div class="mother">
+        <header id="header-container" aria-label="Main Navigation | القائمة الرئيسية"></header>
+            
+        <main class="cart-checkout">
+
+            <h1 class="sopping">&nbsp; Shopping cart</h1>
+            <p dir="rtl"><i class="fa-solid fa-star"></i> &nbsp;يمكنك الاستبدال او الاسترجاع خلال 14 يوم من تاريخ استلام الاوردر </p>
+
+            <section id="cartView" class="cart-section">
+                <div class="cart-items-container" id="cartItemsContainer">
+                    <!-- قالب كارت المنتج في السلة -->
+                    <div class="cart-product-card" id="cartItemTemplate" style="display: none;">
+                        <img src="" alt="" class="cart-product-img">
+                        
+                        <div class="cart-product-info">
+                            <div class="cart-product-title"></div>
+                            <div class="cart-product-specs">
+                                size : <span class="p-size"></span> &nbsp;|&nbsp; color : <span class="p-color"></span>
+                            </div>
+                            <div class="cart-product-price-qty">
+                                <span class="cart-item-price"></span>
+                                <div class="qty-control">
+                                    <button class="qty-btn decrease">-</button>
+                                    <span class="qty-value">1</span>
+                                    <button class="qty-btn increase">+</button>
+                                </div>
+                            </div>
+                            <div class="cart-item-total-price">Total: <span class="p-total"></span> EGP</div>
+                        </div>
+
+                        <button class="remove-item-btn">حذف</button>
+                    </div>
+                </div>
+
+            <!-- زر الانتقال لإتمام الطلب -->
+            <button class="primary-btn" id="toCheckoutBtn">Continue to Checkout</button>
+        </section>
+
+
+        <!-- ================= ثانياً: شاشة إتمام الطلب والعنوان (Checkout) (مخفية في البداية) ================= -->
+        <section id="checkoutView" class="checkout-section" style="display: none;">
+            
+            <!-- ملخص المنتج وسعره -->
+            <div class="checkout-summary-box" id="checkoutSummaryContainer"></div>
+
+            <!-- خصم الكوبون -->
+            <div class="discount-box">
+                <input type="text" placeholder="text your Discount" id="discountInput">
+                <button id="applyDiscountBtn" type="button">Apply</button>
+            </div>
+
+            <div class="totals-calculation">
+                <div class="calc-row"><span>Subtotal</span> <span id="subtotalVal">0 EGP</span></div>
+                <div class="calc-row"><span>Discount</span> <span id="discountVal">0 EGP</span></div>
+                <div class="calc-row total-row"><span>Total</span> <span id="totalVal">0 EGP</span></div>
+            </div>
+
+            <h3 class="address-header">Address___</h3>
+
+            <!-- نموذج تفاصيل العنوان -->
+            <form id="checkoutForm" class="address-form">
+                <div class="form-group"><label>Name</label><input class="inp" type="text" placeholder="Value" required></div>
+                <div class="form-group"><label>Email</label><input class="inp" type="email" placeholder="Value"></div>
+                <div class="form-group"><label>Phone number</label><input class="inp" type="tel" placeholder="Value" required></div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <select required class="select-cart">
+                        <option value="" selected disabled hidden> Select </option>
+                        <option value="Country">Egypt</option> 
+                    </select>                  
+                </div>
+                <div class="form-group">
+                    <label>Governorate</label>
+                    <select required class="select-cart">
+                        <option value="" selected disabled hidden> Select </option>
+                        <option value="Governorate">Cairo</option> 
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Area</label>
+                    <select required class="select-cart">
+                        <option value="" selected disabled hidden> Select </option>
+                        <option value="wrong_size">المقاس غير مناسب</option>
+                        <option value="defective">المنتج به عيب تصنيع أو تلف</option>
+                        <option value="not_as_described">المنتج يختلف عن الصورة أو الوصف</option>
+                        <option value="wrong_item">استلمت منتجًا مختلفًا عن طلبي</option>
+                        
+                        <!-- خيارات جودة أو تفضيل -->
+                        <option value="quality_issue">خامة المنتج لم تعجبني</option>
+                        <option value="changed_mind">لم أعد بحاجة إلى المنتج (تغيير رأي)</option>
+                        <option value="missing_parts">يوجد نقص في محتويات الشحنة</option>
+                        
+                        <!-- خيار عام -->
+                        <option value="other">سبب آخر</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Street Name</label><input class="inp" type="text" placeholder="Value" required></div>
+                <div class="form-group"><label>Building Number/Name</label><input class="inp" type="text" placeholder="Value"required></div>
+                <div class="form-group"><label>Floor</label><input class="inp" type="text" placeholder="Value"></div>
+                <div class="form-group"><label>Delivery Notes</label><textarea class="inp" placeholder="Value"></textarea></div>
+
+                <h3 class="payment-header" style="color: #000;">Payment Method</h3>
+                <div class="payment-method-box dja">
+                    <label class="dja" style="color: #000;"><input  type="checkbox" checked> Cash on Delivery</label>
+                </div>
+
+                <button type="submit" class="order-btn">Order</button>
+            </form>
+        </section>
+
+            <!-- <section id="contact-form" aria-label="Contact Us "></section>
+                <div class="social-icons-contact dja">
+                    <a href="#"><i class="fa-brands fa-instagram"></i></a>
+                    <a href="#"><i class="fa-brands fa-facebook-f"></i></a>
+                    <a href="#"><i class="fa-brands fa-tiktok"></i></a>
+                    <a href="#"><i class="fa-brands fa-youtube"></i></a>
+                    <a href="#"><i class="fa-brands fa-whatsapp"></i></a>
+                </div>
+            <section id="return-form" aria-label="Exchange or Return Request "></section> -->
+            <!-- <section class="products-section">
+                <h2 class="section-title-">&nbsp;Newest products</h2>
+                
+                <div class="products-grid" id="productsContainer">
+                    <div class="product-card" id="productTemplate" style="display: none;">
+                        <img src="" alt="" class="product-img">
+                        <div class="product-details">
+                        <div class="product-category"></div>
+                        <div class="product-code" dir="rtl"></div>
+                        <div class="product-title"></div>
+                        <div class="product-footer djasb">
+                            <span class="product-price"></span>
+                            <button class="cart-btn dja">Bay &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section id="birthday"></section>
+            <section class="reviews-section">
+                <h2 class="section-title-">&nbsp; Our Reviews </h2>
+
+                <div class="reviews-container" id="reviewsContainer">
+                    <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
+                        <div>
+                            <div class="stars"></div>
+                            <div class="review-title"></div>
+                            <div class="review-text"></div>
+                        </div>
+                        <div class="user-info" dir="rtl">
+                            <i class="fa-regular fa-circle-user fa-xl user-avatar"></i>
+                            <div>
+                                <div class="user-name-"></div>
+                                <div class="review-date"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section id="why" aria-label="Why Choose DART?."></section>
+            <section id="feedback-form" aria-label="Share Your Experience"></section>
+            <section id="search-serial-container" aria-label="Product Authenticity Check"></section>
+            <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
+            <section id="story"></section>
+            <section id="dart-for-you" aria-label="The brand logo is a kite bird in a burgundy color."></section>
+            <section id="birthday-details" aria-label="Information and details about the birthday discount."></section>
+            <section id="card-details" aria-label="Information and details about the Dart card."></section>  -->
+        </main>
+
+        <footer id="footer" aria-label="footer."></footer>
+    
+    </div>
+    <script src="Js/one .js"></script>
+</body>
+</html>

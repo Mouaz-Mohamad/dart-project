@@ -174,3 +174,123 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProductsLogic();
     renderReviewsLogic();
 });
+
+
+let cartData = [
+    { id: 1, title: "تيشيرت بيزك", price: 540, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
+    { id: 1, title: "تيشيرت بيزك", price: 860, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
+];
+
+let appliedDiscountRate = 0; // نسبة الخصم الافتراضية 0
+
+document.addEventListener('DOMContentLoaded', () => {
+    const cartView = document.getElementById('cartView');
+    const checkoutView = document.getElementById('checkoutView');
+    const toCheckoutBtn = document.getElementById('toCheckoutBtn');
+    const applyDiscountBtn = document.getElementById('applyDiscountBtn');
+    
+    renderCart();
+
+    // الانتقال لواجهة إتمام الطلب
+    toCheckoutBtn.addEventListener('click', () => {
+        cartView.style.display = 'none';
+        checkoutView.style.display = 'block';
+        renderCheckoutSummary();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // تفعيل زر Apply للكوبون
+    applyDiscountBtn.addEventListener('click', () => {
+        const discountInput = document.getElementById('discountInput').value.trim();
+        
+        // مثال: لو دخل كوبون اسمه "DART10" هياخد 10% خصم
+        if (discountInput === "DART10") {
+            appliedDiscountRate = 0.10; // 10% خصم
+            alert("تم تطبيق الكوبون بنجاح!");
+        } else if (discountInput === "") {
+            appliedDiscountRate = 0;
+            alert("من فضلك أدخل كود الخصم");
+        } else {
+            appliedDiscountRate = 0;
+            alert("كود الخصم غير صحيح");
+        }
+        
+        renderCheckoutSummary(); // تحديث الحسابات بعد الكوبون
+    });
+});
+
+function renderCart() {
+    const container = document.getElementById('cartItemsContainer');
+    const template = document.getElementById('cartItemTemplate');
+    
+    container.querySelectorAll('.cart-product-card:not(#cartItemTemplate)').forEach(el => el.remove());
+
+    cartData.forEach((item, index) => {
+        const card = template.cloneNode(true);
+        card.removeAttribute('id');
+        card.style.display = 'flex';
+
+        card.querySelector('.cart-product-img').src = item.image;
+        card.querySelector('.cart-product-title').textContent = item.title;
+        card.querySelector('.p-size').textContent = item.size;
+        card.querySelector('.p-color').textContent = item.color;
+        card.querySelector('.cart-item-price').textContent = `${item.price} EGP`;
+        card.querySelector('.qty-value').textContent = item.quantity;
+        card.querySelector('.p-total').textContent = item.price * item.quantity;
+
+        card.querySelector('.increase').addEventListener('click', () => {
+            cartData[index].quantity += 1;
+            renderCart();
+        });
+
+        card.querySelector('.decrease').addEventListener('click', () => {
+            if (cartData[index].quantity > 1) {
+                cartData[index].quantity -= 1;
+                renderCart();
+            }
+        });
+
+        card.querySelector('.remove-item-btn').addEventListener('click', () => {
+            cartData.splice(index, 1);
+            renderCart();
+        });
+
+        container.appendChild(card);
+    });
+}
+
+function renderCheckoutSummary() {
+    const summaryContainer = document.getElementById('checkoutSummaryContainer');
+    summaryContainer.innerHTML = '';
+
+    let subtotal = 0;
+
+    cartData.forEach(item => {
+        const itemTotal = item.price * item.quantity;
+        subtotal += itemTotal;
+
+        const box = document.createElement('div');
+        box.className = 'cart-product-card';
+        box.innerHTML = `
+            <img src="${item.image}" alt="" class="cart-product-img">
+            <div class="cart-product-info">
+                <div class="cart-product-title">${item.title}</div>
+                <div class="cart-product-specs">size : ${item.size} | color : ${item.color}</div>
+                <div class="cart-product-price-qty">
+                    <span class="cart-item-price">${item.price} EGP</span>
+                    <span>Qty: ${item.quantity}</span>
+                </div>
+                <div class="cart-item-total-price">Total: ${itemTotal} EGP</div>
+            </div>
+        `;
+        summaryContainer.appendChild(box);
+    });
+
+    // حساب قيمة الخصم والإجمالي النهائي
+    let discountAmount = subtotal * appliedDiscountRate;
+    let finalTotal = subtotal - discountAmount;
+
+    document.getElementById('subtotalVal').textContent = `${subtotal} EGP`;
+    document.getElementById('discountVal').textContent = `${discountAmount} EGP`;
+    document.getElementById('totalVal').textContent = `${finalTotal} EGP`;
+}
