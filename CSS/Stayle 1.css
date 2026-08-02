@@ -13,9 +13,6 @@ header {
     flex-direction: column;
     justify-content: flex-end;
     align-content: flex-end;
-    position: fixed;
-    z-index: 100000;
-    transition: transform 0.3s ease-in-out;
 }
 
 .top {
