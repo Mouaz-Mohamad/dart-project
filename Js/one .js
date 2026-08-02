@@ -15,18 +15,20 @@ async function loadSection(containerId, filePath) {
 // دالة تفعيل المنيو بالأسماء الصحيحة من الـ HTML بتاعك
 document.addEventListener('DOMContentLoaded', function () {
     let lastScrollTop = 0;
-    const navbar = document.getElementById('navbar-container');
+    const headerNav = document.querySelector('.hedar-nav');
     const iconMenu = document.querySelector('.icon-menu');
     const sideMenu = document.querySelector('.side-menu');
 
+    // التأكد من وجود الهيدر في الصفحة
+    if (!headerNav) return;
+
+    // 1. إدارة القائمة الجانبية (فتح/إغلاق)
     if (iconMenu && sideMenu) {
-        // فتح وإغلاق القائمة عند الضغط على الأيقونة
         iconMenu.addEventListener('click', (e) => {
             e.stopPropagation();
             sideMenu.classList.toggle('active');
         });
 
-        // إغلاق القائمة عند الضغط في أي مكان خارجها
         document.addEventListener('click', (event) => {
             if (!sideMenu.contains(event.target) && !iconMenu.contains(event.target)) {
                 sideMenu.classList.remove('active');
@@ -34,17 +36,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // حدث التمرير (السكرول) للنافبار والمنيو
+    // 2. إظهار وإخفاء الهيدر عند السكرول
     window.addEventListener('scroll', function () {
         let currentScroll = window.scrollY || document.documentElement.scrollTop;
 
-        if (currentScroll > lastScrollTop && currentScroll > navbar.offsetHeight) {
-            // Scroll Down: إخفاء الناڤبار وإغلاق المنيو الجانبية
-            navbar.style.transform = 'translateY(-100px)';
+        // التمرير لأسفل: إخفاء الهيدر (وإغلاق المنيو الجانبية لو مفتوحة)
+        if (currentScroll > lastScrollTop && currentScroll > headerNav.offsetHeight) {
+            headerNav.style.transform = 'translateY(-100%)';
             if (sideMenu) sideMenu.classList.remove('active');
-        } else if (currentScroll < lastScrollTop) {
-            // Scroll Up: إظهار الناڤبار
-            navbar.style.transform = 'translateY(0)';
+        } 
+        // التمرير لأعلى: إظهار الهيدر فوراً
+        else if (currentScroll < lastScrollTop) {
+            headerNav.style.transform = 'translateY(0)';
         }
 
         lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
