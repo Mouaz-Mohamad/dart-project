@@ -3,7 +3,8 @@
 .form .container-select, .form .container-select select,
 .story, .submit-btn-form, .container-select select option,
 .dart-for-you, header, .birthday-conteiner, .feedback-section,
-.form-group, .paragraph-btn, .why, .pge-que, .products,.products-section {
+.form-group, .paragraph-btn, .why, .pge-que, .products,.products-section,
+.reviews-section {
     width: 100%;
 }
 
@@ -466,7 +467,7 @@ color: #0088FF;
 
 
 .section-title- {
-    font-size: 22px;
+    font-size: 32px;
     font-family: var(--font-irish);
     margin-bottom: 20px;
     color: var(--bragnte);
@@ -480,7 +481,7 @@ color: #0088FF;
     gap: 5px;
     justify-content: center;
 }
-.product-card {
+.product-card,.review-card {
     padding: 5px;
     background: var(--white);
     border: 1px solid var(--bragnte);
@@ -490,6 +491,7 @@ color: #0088FF;
     flex-direction: column;
     justify-content: space-between;
     transition: transform 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
 }
 
 .product-card:hover {
@@ -553,3 +555,35 @@ color: #0088FF;
     color: var(--bragnte); 
     border: 1px solid var(--bragnte);
 }
+
+.reviews-container {
+    display: flex; 
+    gap: 15px; 
+    overflow-x: auto; /* تفعيل السكرول الأفقي */
+    padding: 10px 5px;
+    scroll-behavior: smooth; /* حركة سكرول ناعمة */
+    -webkit-overflow-scrolling: touch;
+    /* Chrome, Safari, Opera */
+    &::-webkit-scrollbar {
+        display: none;
+    }
+    /* Firefox */
+    scrollbar-width: none;
+    /* IE and Edge */
+    -ms-overflow-style: none;
+}
+.review-card{
+    flex: 0 0 200px;
+    flex-shrink: 0;
+    font-family: var(--font-inter);
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+    .stars { color: #D4AF37; font-size: 20px; margin: 8px; justify-self: center; }
+    .review-title { font-size: 20px; font-weight: 500; margin-bottom: 6px; color: var(--bragnte); }
+    .review-text { font-size: 16px; color: var(--bg-dark); line-height: 1.5; margin-bottom: 15px; font-weight: 300;font-family: var(--font-inter);}
+
+    .user-info { display: flex; align-items: center; gap: 10px; }
+    .user-avatar { border-radius: 50%; object-fit: cover; background: var(--white);color: var(--bragnte); }
+    .user-name { font-size: 20px; font-weight: 500; color: var(--bg-dark);text-align: right; }
+    .review-date { font-size: 9px; color: var(--text-muted); }

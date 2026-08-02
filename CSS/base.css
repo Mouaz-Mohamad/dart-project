@@ -13,7 +13,7 @@
   --bg-dark: #1e1e1e;
   --white: #ffffff;
   --bg-alt: #f8f9fa;
-  --text-muted: #6c757d;
+  --text-muted: #5c646c;
   --border-color: #dee2e6;
 
   /* Typography */
@@ -23,6 +23,7 @@
   --font-cairo: 'Cairo', sans-serif;
   --font-irish: 'Irish Grover', cursive;
   --font-cabin: 'Cabin Condensed', sans-serif;
+  --font-inter: 'Inter', sans-serif;
 
   /* Spacing & Radius */
   --spacing-xs: 0.25rem;

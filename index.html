@@ -46,13 +46,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body class='dja-flexdir'>
     <div class="mother">
         <header id="header-container" aria-label="Main Navigation | القائمة الرئيسية"></header>
             
             <main class="#">
-                
+
+                <!-- ================= سكشن المنتجات ================= -->
                 <section class="products-section">
                     <h2 class="section-title-">&nbsp;Newest products</h2>
                     
@@ -71,7 +76,30 @@
                             </div>
                         </div>
                     </div>
-            </section>
+                </section>
+
+                <!-- ================= سكشن التقييمات ================= -->
+                <section class="reviews-section">
+                    <h2 class="section-title-">&nbsp; Our Reviews </h2>
+
+                    <div class="reviews-container" id="reviewsContainer">
+                    <!-- الكارت المرجعي (Template) -->
+                        <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
+                            <div>
+                                <div class="stars"></div>
+                                <div class="review-title"></div>
+                                <div class="review-text"></div>
+                            </div>
+                            <div class="user-info" dir="rtl">
+                                <i class="fa-regular fa-circle-user fa-xl user-avatar"></i>
+                                <div>
+                                    <div class="user-name"></div>
+                                    <div class="review-date"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
                 <section id="search-serial-container" aria-label="Product Authenticity Check | التحقق من أصالة القطعة"></section>
                 <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard | لوحة متصدري كارت هدايا دارت"></section>

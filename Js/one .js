@@ -107,3 +107,64 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     productsContainer.appendChild(card);
     });
+
+    // ==========================================
+    // 2. مصفوفة التقييمات (عرض بالكامل)
+    // ==========================================
+    const reviewsData = [
+    {
+        name: "سارة محمود",
+        date: "15 يوليو 2026",
+        rating: 5,
+        title: "خامة ممتازة وتقفيل محترم",
+        comment: "القماش مريح جداً في اللبس والتقفيل نضيف مفيش خيوط طالعة، المقاس مضبوط بالظبط زي الجدول. أكيد هطلب تاني",
+    },
+    {
+        name: "خالد علي",
+        date: "10 يوليو 2026",
+        rating: 5,
+        title: "شيك ومريح جداً",
+        comment: "التصميم جميل وعصري والألوان نفس الصور بالظبط والتوصيل سريع.",
+    },
+    {
+        name: "أحمد حسام",
+        date: "02 يوليو 2026",
+        rating: 4,
+        title: "مقاس مظبوط خامة جيدة",
+        comment: "الخامة جيدة جداً بالنسبة للسعر والمقاس جه مظبوط بظبط.",
+    },
+    {
+        name: "مريم إبراهيم",
+        date: "28 يونيو 2026",
+        rating: 5,
+        title: "خدمة عملاء رائعة",
+        comment: "المنتج ممتاز والتغليف شيك جداً، هطلب منكم تاني أكيد.",
+    }
+    ];
+
+    // عناصر الريفيوز
+    const reviewsContainer = document.getElementById('reviewsContainer');
+    const reviewTemplate = document.getElementById('reviewTemplate');
+
+    // عرض جميع التقييمات بدون slice
+    reviewsData.forEach(item => {
+    const card = reviewTemplate.cloneNode(true);
+    card.removeAttribute('id');
+    card.style.display = 'flex';
+
+    // رسم النجوم
+    const starsContainer = card.querySelector('.stars');
+    starsContainer.innerHTML = '';
+    for (let i = 1; i <= 5; i++) {
+        const star = document.createElement('i');
+        star.className = i <= item.rating ? 'fa-solid fa-star' : 'fa-regular fa-star';
+        starsContainer.appendChild(star);
+    }
+
+    card.querySelector('.review-title').textContent = item.title;
+    card.querySelector('.review-text').textContent = item.comment;
+    card.querySelector('.user-name').textContent = item.name;
+    card.querySelector('.review-date').textContent = item.date;
+
+    reviewsContainer.appendChild(card);
+    });
