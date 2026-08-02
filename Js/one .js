@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // التمرير لأسفل: إخفاء الهيدر (وإغلاق المنيو الجانبية لو مفتوحة)
         if (currentScroll > lastScrollTop && currentScroll > headerNav.offsetHeight) {
-            headerNav.style.transform = 'translateY(-100%)';
+            headerNav.style.transform = 'translateY(0%)';
             if (sideMenu) sideMenu.classList.remove('active');
         } 
         // التمرير لأعلى: إظهار الهيدر فوراً
