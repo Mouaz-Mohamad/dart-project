@@ -13,46 +13,30 @@ async function loadSection(containerId, filePath) {
 }
 
 // دالة تفعيل المنيو بالأسماء الصحيحة من الـ HTML بتاعك
-document.addEventListener('DOMContentLoaded', function () {
-    let lastScrollTop = 0;
-    const headerNav = document.querySelector('.hedar-nav');
+function initHeader() {
     const iconMenu = document.querySelector('.icon-menu');
     const sideMenu = document.querySelector('.side-menu');
 
-    // التأكد من وجود الهيدر في الصفحة
-    if (!headerNav) return;
-
-    // 1. إدارة القائمة الجانبية (فتح/إغلاق)
     if (iconMenu && sideMenu) {
+        // فتح وإغلاق القائمة عند الضغط على الأيقونة
         iconMenu.addEventListener('click', (e) => {
             e.stopPropagation();
             sideMenu.classList.toggle('active');
         });
 
+        // إغلاق القائمة عند الضغط في أي مكان خارجها
         document.addEventListener('click', (event) => {
             if (!sideMenu.contains(event.target) && !iconMenu.contains(event.target)) {
                 sideMenu.classList.remove('active');
             }
         });
+
+        // إغلاق القائمة عند عمل سكرول للشاشة
+        window.addEventListener('scroll', () => {
+            sideMenu.classList.remove('active');
+        });
     }
-
-    // 2. إظهار وإخفاء الهيدر عند السكرول
-    window.addEventListener('scroll', function () {
-        let currentScroll = window.scrollY || document.documentElement.scrollTop;
-
-        // التمرير لأسفل: إخفاء الهيدر (وإغلاق المنيو الجانبية لو مفتوحة)
-        if (currentScroll > lastScrollTop && currentScroll > headerNav.offsetHeight) {
-            headerNav.style.transform = 'translateY(0%)';
-            if (sideMenu) sideMenu.classList.remove('active');
-        } 
-        // التمرير لأعلى: إظهار الهيدر فوراً
-        else if (currentScroll < lastScrollTop) {
-            headerNav.style.transform = 'translateY(0)';
-        }
-
-        lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
-    });
-});
+}
 
 //للتاكد من خانه الاسم ان بها ثلاث اسماء 
 function isThreeWords(name) {
