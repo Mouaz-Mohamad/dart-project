@@ -870,7 +870,7 @@ color: #0088FF;
 
 .model img {
     height: 250px;
-    object-fit: fill;
+    object-fit: cover;
     aspect-ratio: 3 / 4;
     border-radius: 20px;
     -webkit-border-radius: 20px;
