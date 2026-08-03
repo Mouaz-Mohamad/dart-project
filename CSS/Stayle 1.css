@@ -870,7 +870,6 @@ color: #0088FF;
 
 .model img {
     height: 250px;
-    width: 100%;
     object-fit: fill;
     aspect-ratio: 3 / 4;
     border-radius: 20px;
