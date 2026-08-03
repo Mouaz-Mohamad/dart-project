@@ -25,8 +25,15 @@ const reviewsData = [
     { name: "مريم إبراهيم", date: "28 يونيو 2026", rating: 5, title: "خدمة عملاء رائعة", comment: "المنتج ممتاز والتغليف شيك جداً، هطلب منكم تاني أكيد." }
 ];
 
+// المتغيرات العامة للسلة والخصم
+let cartData = [
+    { id: 1, title: "تيشيرت بيزك", price: 540, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
+    { id: 2, title: "تيشيرت بيزك", price: 860, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
+];
+let appliedDiscountRate = 0;
+
 // ==========================================
-// 2. الدوال المساعدة
+// 2. الدوال المساعدة الأساسية
 // ==========================================
 async function loadSection(containerId, filePath) {
     const container = document.getElementById(containerId);
@@ -64,17 +71,11 @@ function initHeader() {
     }
 }
 
-function isThreeWords(name) {
-    const words = name.trim().split(/\s+/);
-    return words.length === 3;
-}
-
 // دالة عرض المنتجات
 function renderProductsLogic() {
     const productTemplate = document.getElementById('productTemplate');
     if (!productTemplate) return;
 
-    // 1. الصفحة الرئيسية (عرض 10 منتجات - لو الكونتينر موجود)
     const productsContainer = document.getElementById('productsContainer');
     if (productsContainer) {
         const mainPageProducts = productsData.slice(0, 10);
@@ -94,7 +95,6 @@ function renderProductsLogic() {
         });
     }
 
-    // 2. صفحة كل المنتجات (مقسمة لجزأين: أول 7 فوق، والباقي تحت السكاشن)
     const productsPart1 = document.getElementById('productsPart1');
     const productsPart2 = document.getElementById('productsPart2');
 
@@ -111,7 +111,6 @@ function renderProductsLogic() {
             card.querySelector('.product-code').textContent = `كود : ${item.code}`;
             card.querySelector('.product-price').textContent = `EGP ${item.price}`;
 
-            // أول 7 منتجات يروحوا في القسم الأول، وباقي المنتجات في القسم الثاني
             if (index < 6) {
                 if (productsPart1) productsPart1.appendChild(card);
             } else {
@@ -151,79 +150,19 @@ function renderReviewsLogic() {
 }
 
 // ==========================================
-// 3. التنفيذ بالترتيب الصحيح
+// 3. دوال السلة وإتمام الطلب
 // ==========================================
-document.addEventListener('DOMContentLoaded', async () => {
-    await Promise.all([
-        loadSection('header-container', 'sections/Nav-Bar.html'),
-        loadSection('search-serial-container', 'sections/search-serial.html'),
-        loadSection('leaderboard-card', 'sections/leaderboard-card.html'),
-        loadSection('birthday', 'sections/birthday.html'),
-        loadSection('feedback-form', 'sections/form-feedback.html'),
-        loadSection('return-form', 'sections/form-return.html'),
-        loadSection('contact-form', 'sections/form-contact.html'),
-        loadSection('story', 'sections/story.html'),
-        loadSection('dart-for-you', 'sections/dart-for-you.html'),
-        loadSection('birthday-details', 'sections/birthday-details.html'),
-        loadSection('card-details', 'sections/card.html'),
-        loadSection('why', 'sections/why-dart.html'),
-        loadSection('footer', 'sections/footer.html'),
-    ]);
-
-    initHeader();
-    renderProductsLogic();
-    renderReviewsLogic();
-});
-
-
-let cartData = [
-    { id: 1, title: "تيشيرت بيزك", price: 540, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
-    { id: 1, title: "تيشيرت بيزك", price: 860, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
-];
-
-let appliedDiscountRate = 0; // نسبة الخصم الافتراضية 0
-
-document.addEventListener('DOMContentLoaded', () => {
-    const cartView = document.getElementById('cartView');
-    const checkoutView = document.getElementById('checkoutView');
-    const toCheckoutBtn = document.getElementById('toCheckoutBtn');
-    const applyDiscountBtn = document.getElementById('applyDiscountBtn');
-    
-    renderCart();
-
-    // الانتقال لواجهة إتمام الطلب
-    toCheckoutBtn.addEventListener('click', () => {
-        cartView.style.display = 'none';
-        checkoutView.style.display = 'block';
-        renderCheckoutSummary();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-
-    // تفعيل زر Apply للكوبون
-    applyDiscountBtn.addEventListener('click', () => {
-        const discountInput = document.getElementById('discountInput').value.trim();
-        
-        // مثال: لو دخل كوبون اسمه "DART10" هياخد 10% خصم
-        if (discountInput === "DART10") {
-            appliedDiscountRate = 0.10; // 10% خصم
-            alert("تم تطبيق الكوبون بنجاح!");
-        } else if (discountInput === "") {
-            appliedDiscountRate = 0;
-            alert("من فضلك أدخل كود الخصم");
-        } else {
-            appliedDiscountRate = 0;
-            alert("كود الخصم غير صحيح");
-        }
-        
-        renderCheckoutSummary(); // تحديث الحسابات بعد الكوبون
-    });
-});
-
 function renderCart() {
     const container = document.getElementById('cartItemsContainer');
     const template = document.getElementById('cartItemTemplate');
     
+    if (!container || !template) return;
+
     container.querySelectorAll('.cart-product-card:not(#cartItemTemplate)').forEach(el => el.remove());
+
+    if (cartData.length === 0) {
+        return;
+    }
 
     cartData.forEach((item, index) => {
         const card = template.cloneNode(true);
@@ -261,6 +200,8 @@ function renderCart() {
 
 function renderCheckoutSummary() {
     const summaryContainer = document.getElementById('checkoutSummaryContainer');
+    if (!summaryContainer) return;
+    
     summaryContainer.innerHTML = '';
 
     let subtotal = 0;
@@ -286,11 +227,100 @@ function renderCheckoutSummary() {
         summaryContainer.appendChild(box);
     });
 
-    // حساب قيمة الخصم والإجمالي النهائي
     let discountAmount = subtotal * appliedDiscountRate;
     let finalTotal = subtotal - discountAmount;
 
-    document.getElementById('subtotalVal').textContent = `${subtotal} EGP`;
-    document.getElementById('discountVal').textContent = `${discountAmount} EGP`;
-    document.getElementById('totalVal').textContent = `${finalTotal} EGP`;
+    const subtotalVal = document.getElementById('subtotalVal');
+    const discountVal = document.getElementById('discountVal');
+    const totalVal = document.getElementById('totalVal');
+
+    if (subtotalVal) subtotalVal.textContent = `${subtotal} EGP`;
+    if (discountVal) discountVal.textContent = `${discountAmount} EGP`;
+    if (totalVal) totalVal.textContent = `${finalTotal} EGP`;
 }
+
+function initCartAndCheckoutEvents() {
+    const cartView = document.getElementById('cartView');
+    const checkoutView = document.getElementById('checkoutView');
+    const toCheckoutBtn = document.getElementById('toCheckoutBtn');
+    const applyDiscountBtn = document.getElementById('applyDiscountBtn');
+    const checkoutForm = document.getElementById('checkoutForm');
+
+    renderCart();
+
+    if (toCheckoutBtn && cartView && checkoutView) {
+        toCheckoutBtn.addEventListener('click', () => {
+            if (cartData.length === 0) {
+                alert("السلة فارغة، أضف منتجات أولاً!");
+                return;
+            }
+            cartView.style.display = 'none';
+            checkoutView.style.display = 'block';
+            renderCheckoutSummary();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    if (applyDiscountBtn) {
+        applyDiscountBtn.addEventListener('click', () => {
+            const discountInputEl = document.getElementById('discountInput');
+            if (!discountInputEl) return;
+            const discountInput = discountInputEl.value.trim();
+            
+            if (discountInput === "DART10") {
+                appliedDiscountRate = 0.10;
+                alert("تم تطبيق الكوبون بنجاح!");
+            } else if (discountInput === "") {
+                appliedDiscountRate = 0;
+                alert("من فضلك أدخل كود الخصم");
+            } else {
+                appliedDiscountRate = 0;
+                alert("كود الخصم غير صحيح");
+            }
+            renderCheckoutSummary();
+        });
+    }
+
+    // تفريغ السلة والرجوع لصفحة الـ index عند إتمام الطلب
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            // 1. تصفير السلة
+            cartData = [];
+            appliedDiscountRate = 0;
+            
+            alert("تم إتمام طلبك بنجاح! شكراً لك.");
+
+            // 2. التوجيه لصفحة index.html (لو الموقع صفحات منفصلة)
+            // أو لو الموقع صفحة واحدة SPA، استبدل السطر اللي تحت بـ window.location.href = "index.html"
+            window.location.href = "index.html";
+        });
+    }
+}
+
+// ==========================================
+// 4. نقطة التنفيذ الرئيسية (DOM Loaded)
+// ==========================================
+document.addEventListener('DOMContentLoaded', async () => {
+    await Promise.all([
+        loadSection('header-container', 'sections/Nav-Bar.html'),
+        loadSection('search-serial-container', 'sections/search-serial.html'),
+        loadSection('leaderboard-card', 'sections/leaderboard-card.html'),
+        loadSection('birthday', 'sections/birthday.html'),
+        loadSection('feedback-form', 'sections/form-feedback.html'),
+        loadSection('return-form', 'sections/form-return.html'),
+        loadSection('contact-form', 'sections/form-contact.html'),
+        loadSection('story', 'sections/story.html'),
+        loadSection('dart-for-you', 'sections/dart-for-you.html'),
+        loadSection('birthday-details', 'sections/birthday-details.html'),
+        loadSection('card-details', 'sections/card.html'),
+        loadSection('why', 'sections/why-dart.html'),
+        loadSection('footer', 'sections/footer.html'),
+    ]);
+
+    initHeader();
+    renderProductsLogic();
+    renderReviewsLogic();
+    initCartAndCheckoutEvents();
+});
