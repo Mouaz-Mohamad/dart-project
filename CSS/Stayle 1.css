@@ -836,7 +836,7 @@ color: #0088FF;
     position: fixed;
     max-width: 350px;
     width: 95vh;
-    height: 90%;
+    height: 95%;
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
@@ -852,6 +852,14 @@ color: #0088FF;
     flex-direction: column;
     gap: 10px;
     overflow-y: auto;
+        /* Chrome, Safari, Opera */
+    &::-webkit-scrollbar {
+        display: none;
+    }
+    /* Firefox */
+    scrollbar-width: none;
+    /* IE and Edge */
+    -ms-overflow-style: none;
 }
 
 .model i.fa-x {
@@ -869,8 +877,7 @@ color: #0088FF;
 }
 
 .model img {
-    width: 200px;
-    height: 250px;
+
     object-fit: cover;
     aspect-ratio: 3 / 4;
     border-radius: 20px;
@@ -878,6 +885,7 @@ color: #0088FF;
     -moz-border-radius: 20px;
     -ms-border-radius: 20px;
     -o-border-radius: 20px;
+    justify-self: center;
 }
 
 .model-product {
