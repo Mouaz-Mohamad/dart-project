@@ -835,7 +835,6 @@ color: #0088FF;
     display: none;
     position: fixed;
     max-width: 350px;
-    max-height: 900px;
     width: 95vh;
     height: 95vh;
     top: 20px;
@@ -872,7 +871,7 @@ color: #0088FF;
 .model img {
     height: 250px;
     width: 100%;
-    object-fit: cover;
+    object-fit: fit;
     aspect-ratio: 3 / 4;
     border-radius: 20px;
     -webkit-border-radius: 20px;
