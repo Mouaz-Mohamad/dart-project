@@ -828,3 +828,150 @@ color: #0088FF;
     height: 80px;
 }
 
+/* ========================================== */
+/* تنسيق سيكشن المودل (Modal)                   */
+/* ========================================== */
+.model {
+    display: none;
+    position: fixed;
+    max-width: 350px;
+    width: 90vh;
+    height: 90vh;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background-color: var(--white);
+    border-radius: 20px;
+    -webkit-border-radius: 20px;
+    -moz-border-radius: 20px;
+    -ms-border-radius: 20px;
+    -o-border-radius: 20px;
+    padding: 15px;
+    box-shadow: 0 4px 10px var(--bg-dark);
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
+.model i.fa-x {
+    font-size: 20px;
+    color: var(--bg-dark);
+    cursor: pointer;
+    align-self: flex-end;
+    text-align: right;
+    margin-bottom: 5px;
+    transition: 0.2s;
+}
+
+.model i.fa-x:hover {
+    color: var(--bragnte);
+}
+
+.model img {
+    height: 250px;
+    width: 100%;
+    object-fit: cover;
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    -webkit-border-radius: 20px;
+    -moz-border-radius: 20px;
+    -ms-border-radius: 20px;
+    -o-border-radius: 20px;
+}
+
+.model-product {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.model-product .model-product-category {
+    color: var(--bragnte);
+    font-size: medium;
+    text-align: left;
+    width: 100%;
+}
+
+.model-product .model-product-code {
+    color: var(--text-muted);
+    font-size: small;
+    width: 100%;
+    text-align: left;
+}
+
+.model-product .model-product-title {
+    color: var(--bg-dark);
+    font-size: x-large;
+    width: 100%;
+    text-align: left;
+}
+
+.model-product .model-product-price {
+    font-size: medium;
+    color: var(--text-muted);
+    text-align: left;
+    width: 100%;
+}
+
+.model-product .model-product-price .price-number {
+    color: var(--bragnte);
+    font-size: x-large;
+}
+
+/* حاويات المقاسات والألوان */
+.sizes-container, .colors-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 5px 0;
+}
+
+.size-btn, .color-btn {
+    font-size: small;
+    padding: 6px 12px;
+    background-color: #f1f1f1;
+    color: var(--bg-dark);
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+/* حالة التحديد (Active) */
+.size-btn.active, .color-btn.active {
+    background-color: var(--bragnte);
+    color: var(--white);
+    border-color: var(--bragnte);
+}
+
+/* حالة النفاذ (Disabled / Out of Stock) - تشطيب الشطب */
+.size-btn.disabled, .color-btn.disabled {
+    text-decoration: line-through;
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #e0e0e0;
+}
+
+.model .model-all-detelis {
+    font-size: small;
+    color: var(--bg-dark);
+    line-height: 1.5;
+    margin: 5px 0;
+}
+
+.model .buy-now-btn {
+    width: 100%;
+    padding: 10px;
+    cursor: pointer;
+    background-color: var(--bragnte);
+    color: var(--white);
+    border: none;
+    border-radius: 10px;
+    font-size: medium;
+    transition: 0.2s;
+}
+
+.model .buy-now-btn:hover {
+    opacity: 0.9;
+}

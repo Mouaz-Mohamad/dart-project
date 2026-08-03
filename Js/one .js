@@ -1,21 +1,204 @@
 // ==========================================
-// 1. مصفوفات البيانات (المنتجات والتقييمات)
+// 1. مصفوفات البيانات (المنتجات، التقييمات، والمخزون)
 // ==========================================
 const productsData = [
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 749, image: "Photos/products/1.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/2.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/3.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/4.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/5.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/6.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/7.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/9.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/10.jpg" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/11.jfif" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/12.jfif" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/13.jfif" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/14.jfif" },
-    { category: "قمصان", title: "قميص جينز | بيج", code: "DA-T695", price: 849, image: "Photos/products/15.jfif" }
+    {
+        id: 1,
+        category: "قمصان",
+        title: "Wide leg jeans",
+        code: "DA-P785",
+        price: 450,
+        image: "Photos/products/1.jpg",
+        description: "بنطال جينز فاخر بأرجل واسعة ومصنوع من القطن الخالص بنسبة 100%، ليمنحك قصة مريحة، وراحة تدوم طويلاً، وإطلالة يومية عفوية وأنيقة.",
+        stock: {
+            "32": { "نيلي": 5, "بيج": 5, "ابيض": 2, "اسود": 3 },
+            "34": { "نيلي": 0, "بيج": 4, "ابيض": 1, "اسود": 2 },
+            "36": { "نيلي": 3, "بيج": 2, "ابيض": 0, "اسود": 0 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/2.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "/Photos/products/13.jfif",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/14.jfif",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/18.jfif",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "/Photos/products/11.jfif",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/10.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "/Photos/products/9.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/7.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/6.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/5.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/4.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "Photos/products/3.jpg",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    {
+        id: 2,
+        category: "قمصان",
+        title: "قميص جينز | بيج",
+        code: "DA-T695",
+        price: 749,
+        image: "/Photos/products/14.jfif",
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
+        stock: {
+            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
+            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
+            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+        }
+    },
+    // يمكنك إضافة باقي المنتجات هنا بنفس الهيكل
 ];
 
 const reviewsData = [
@@ -25,12 +208,12 @@ const reviewsData = [
     { name: "مريم إبراهيم", date: "28 يونيو 2026", rating: 5, title: "خدمة عملاء رائعة", comment: "المنتج ممتاز والتغليف شيك جداً، هطلب منكم تاني أكيد." }
 ];
 
-// المتغيرات العامة للسلة والخصم
-let cartData = [
-    { id: 1, title: "تيشيرت بيزك", price: 540, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
-    { id: 2, title: "تيشيرت بيزك", price: 860, size: "M", color: "black", quantity: 1, image: "Photos/products/1.jpg" },
-];
+let cartData = JSON.parse(localStorage.getItem('dart_cart')) || [];
 let appliedDiscountRate = 0;
+
+let selectedSize = null;
+let selectedColor = null;
+let activeProduct = null;
 
 // ==========================================
 // 2. الدوال المساعدة الأساسية
@@ -71,53 +254,64 @@ function initHeader() {
     }
 }
 
-// دالة عرض المنتجات
+// دالة عرض المنتجات (تدعم الرئيسية وصفحة المنتجات المقسمة)
 function renderProductsLogic() {
     const productTemplate = document.getElementById('productTemplate');
     if (!productTemplate) return;
 
+    // 1. الصفحة الرئيسية (عرض أول 8 منتجات كحد أقصى)
     const productsContainer = document.getElementById('productsContainer');
     if (productsContainer) {
-        const mainPageProducts = productsData.slice(0, 10);
-        mainPageProducts.forEach(item => {
-            const card = productTemplate.cloneNode(true);
-            card.removeAttribute('id');
-            card.style.display = 'flex';
-
-            card.querySelector('.product-img').src = item.image;
-            card.querySelector('.product-img').alt = item.title;
-            card.querySelector('.product-category').textContent = item.category;
-            card.querySelector('.product-title').textContent = item.title;
-            card.querySelector('.product-code').textContent = `كود : ${item.code}`;
-            card.querySelector('.product-price').textContent = `EGP ${item.price}`;
-
+        const homeProducts = productsData.slice(0, 8);
+        homeProducts.forEach(item => {
+            const card = createProductCard(item, productTemplate);
             productsContainer.appendChild(card);
         });
     }
 
-    const productsPart1 = document.getElementById('productsPart1');
-    const productsPart2 = document.getElementById('productsPart2');
+    // 2. صفحة المنتجات المقسمة (Part 1 أول 6 منتجات، Part 2 الباقي)
+    const part1Container = document.getElementById('productsPart1');
+    const part2Container = document.getElementById('productsPart2');
 
-    if (productsPart1 || productsPart2) {
-        productsData.forEach((item, index) => {
-            const card = productTemplate.cloneNode(true);
-            card.removeAttribute('id');
-            card.style.display = 'flex';
+    if (part1Container || part2Container) {
+        const firstPartProducts = productsData.slice(0, 6);
+        const secondPartProducts = productsData.slice(6);
 
-            card.querySelector('.product-img').src = item.image;
-            card.querySelector('.product-img').alt = item.title;
-            card.querySelector('.product-category').textContent = item.category;
-            card.querySelector('.product-title').textContent = item.title;
-            card.querySelector('.product-code').textContent = `كود : ${item.code}`;
-            card.querySelector('.product-price').textContent = `EGP ${item.price}`;
+        if (part1Container) {
+            firstPartProducts.forEach(item => {
+                const card = createProductCard(item, productTemplate);
+                part1Container.appendChild(card);
+            });
+        }
 
-            if (index < 6) {
-                if (productsPart1) productsPart1.appendChild(card);
-            } else {
-                if (productsPart2) productsPart2.appendChild(card);
-            }
-        });
+        if (part2Container) {
+            secondPartProducts.forEach(item => {
+                const card = createProductCard(item, productTemplate);
+                part2Container.appendChild(card);
+            });
+        }
     }
+}
+
+// دالة مساعدة لإنشاء كارت المنتج
+function createProductCard(item, template) {
+    const card = template.cloneNode(true);
+    card.removeAttribute('id');
+    card.style.display = 'flex';
+
+    card.querySelector('.product-img').src = item.image;
+    card.querySelector('.product-img').alt = item.title;
+    card.querySelector('.product-category').textContent = item.category;
+    card.querySelector('.product-title').textContent = item.title;
+    card.querySelector('.product-code').textContent = `كود : ${item.code}`;
+    card.querySelector('.product-price').textContent = `EGP ${item.price}`;
+
+    const cartBtn = card.querySelector('.cart-btn');
+    if (cartBtn) {
+        cartBtn.setAttribute('data-id', item.id);
+    }
+
+    return card;
 }
 
 // دالة عرض التقييمات
@@ -150,8 +344,146 @@ function renderReviewsLogic() {
 }
 
 // ==========================================
-// 3. دوال السلة وإتمام الطلب
+// 3. نظام المودال (عرض التفاصيل، المقاسات، الألوان)
 // ==========================================
+document.addEventListener('click', (e) => {
+    const cartBtn = e.target.closest('.cart-btn');
+    if (cartBtn) {
+        const productId = cartBtn.getAttribute('data-id');
+        activeProduct = productsData.find(p => p.id == productId);
+        if (activeProduct) {
+            openProductModal(activeProduct);
+        }
+    }
+
+    if (e.target.closest('.model .fa-x')) {
+        const modal = document.getElementById('SectionModel');
+        if (modal) modal.style.display = 'none';
+    }
+});
+
+function openProductModal(product) {
+    const modal = document.getElementById('SectionModel');
+    if (!modal) return;
+
+    modal.querySelector('img').src = product.image;
+    modal.querySelector('.model-product-category').textContent = product.category;
+    modal.querySelector('.model-product-code').textContent = product.code;
+    modal.querySelector('.model-product-title').textContent = product.title;
+    modal.querySelector('.price-number').textContent = product.price;
+    modal.querySelector('.model-all-detelis').textContent = product.description;
+
+    selectedSize = null;
+    selectedColor = null;
+
+    const sizesContainer = modal.querySelector('.sizes-container');
+    sizesContainer.innerHTML = '';
+    
+    Object.keys(product.stock).forEach(size => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'size-btn';
+        btn.textContent = size;
+        btn.setAttribute('data-size', size);
+        
+        const sizeColors = product.stock[size];
+        const totalSizeStock = Object.values(sizeColors).reduce((sum, qty) => sum + qty, 0);
+        
+        if (totalSizeStock <= 0) {
+            btn.classList.add('disabled');
+        }
+
+        btn.addEventListener('click', () => {
+            if (btn.classList.contains('disabled')) return;
+            sizesContainer.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedSize = size;
+            
+            updateColorsAvailability(product, size);
+        });
+
+        sizesContainer.appendChild(btn);
+    });
+
+    const colorsContainer = modal.querySelector('.colors-container');
+    colorsContainer.innerHTML = '';
+    
+    let allColors = [];
+    Object.values(product.stock).forEach(colorsObj => {
+        Object.keys(colorsObj).forEach(color => {
+            if (!allColors.includes(color)) allColors.push(color);
+        });
+    });
+
+    allColors.forEach(color => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'color-btn';
+        btn.textContent = color;
+        btn.setAttribute('data-color', color);
+
+        btn.addEventListener('click', () => {
+            if (btn.classList.contains('disabled')) return;
+            
+            if (!selectedSize) {
+                alert("من فضلك اختر المقاس أولاً!");
+                return;
+            }
+
+            const stockQty = product.stock[selectedSize]?.[color] ?? 0;
+            if (stockQty <= 0) {
+                alert("عذراً، هذا اللون غير متوفر للمقاس المختار!");
+                return;
+            }
+
+            colorsContainer.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedColor = color;
+        });
+
+        colorsContainer.appendChild(btn);
+    });
+
+    modal.style.display = 'flex';
+}
+
+function updateColorsAvailability(product, size) {
+    const modal = document.getElementById('SectionModel');
+    const colorBtns = modal.querySelectorAll('.color-btn');
+    
+    colorBtns.forEach(btn => {
+        const color = btn.getAttribute('data-color');
+        const qty = product.stock[size]?.[color] ?? 0;
+        
+        if (qty <= 0) {
+            btn.classList.add('disabled');
+            if (selectedColor === color) {
+                btn.classList.remove('active');
+                selectedColor = null;
+            }
+        } else {
+            btn.classList.remove('disabled');
+        }
+    });
+}
+
+// ==========================================
+// 4. دوال السلة، الخصم، وإتمام الطلب
+// ==========================================
+function updateCartTotals() {
+    const subtotalEl = document.getElementById('subtotalVal');
+    const totalEl = document.getElementById('totalVal');
+    const discountEl = document.getElementById('discountVal');
+
+    let subtotal = cartData.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    let discountAmount = subtotal * appliedDiscountRate;
+    let finalTotal = subtotal - discountAmount;
+
+    if (subtotalEl) subtotalEl.textContent = `${subtotal} EGP`;
+    if (discountEl) discountEl.textContent = `${discountAmount} EGP`;
+    if (totalEl) totalEl.textContent = `${finalTotal} EGP`;
+}
+
 function renderCart() {
     const container = document.getElementById('cartItemsContainer');
     const template = document.getElementById('cartItemTemplate');
@@ -159,10 +491,6 @@ function renderCart() {
     if (!container || !template) return;
 
     container.querySelectorAll('.cart-product-card:not(#cartItemTemplate)').forEach(el => el.remove());
-
-    if (cartData.length === 0) {
-        return;
-    }
 
     cartData.forEach((item, index) => {
         const card = template.cloneNode(true);
@@ -179,128 +507,121 @@ function renderCart() {
 
         card.querySelector('.increase').addEventListener('click', () => {
             cartData[index].quantity += 1;
+            saveCartToLocalStorage();
             renderCart();
+            updateCartTotals();
         });
 
         card.querySelector('.decrease').addEventListener('click', () => {
             if (cartData[index].quantity > 1) {
                 cartData[index].quantity -= 1;
+                saveCartToLocalStorage();
                 renderCart();
+                updateCartTotals();
             }
         });
 
         card.querySelector('.remove-item-btn').addEventListener('click', () => {
             cartData.splice(index, 1);
+            saveCartToLocalStorage();
             renderCart();
+            updateCartTotals();
         });
 
         container.appendChild(card);
     });
+
+    updateCartTotals();
 }
 
-function renderCheckoutSummary() {
-    const summaryContainer = document.getElementById('checkoutSummaryContainer');
-    if (!summaryContainer) return;
-    
-    summaryContainer.innerHTML = '';
-
-    let subtotal = 0;
-
-    cartData.forEach(item => {
-        const itemTotal = item.price * item.quantity;
-        subtotal += itemTotal;
-
-        const box = document.createElement('div');
-        box.className = 'cart-product-card';
-        box.innerHTML = `
-            <img src="${item.image}" alt="" class="cart-product-img">
-            <div class="cart-product-info">
-                <div class="cart-product-title">${item.title}</div>
-                <div class="cart-product-specs">size : ${item.size} | color : ${item.color}</div>
-                <div class="cart-product-price-qty">
-                    <span class="cart-item-price">${item.price} EGP</span>
-                    <span>Qty: ${item.quantity}</span>
-                </div>
-                <div class="cart-item-total-price">Total: ${itemTotal} EGP</div>
-            </div>
-        `;
-        summaryContainer.appendChild(box);
-    });
-
-    let discountAmount = subtotal * appliedDiscountRate;
-    let finalTotal = subtotal - discountAmount;
-
-    const subtotalVal = document.getElementById('subtotalVal');
-    const discountVal = document.getElementById('discountVal');
-    const totalVal = document.getElementById('totalVal');
-
-    if (subtotalVal) subtotalVal.textContent = `${subtotal} EGP`;
-    if (discountVal) discountVal.textContent = `${discountAmount} EGP`;
-    if (totalVal) totalVal.textContent = `${finalTotal} EGP`;
+function saveCartToLocalStorage() {
+    localStorage.setItem('dart_cart', JSON.stringify(cartData));
 }
 
 function initCartAndCheckoutEvents() {
     const cartView = document.getElementById('cartView');
     const checkoutView = document.getElementById('checkoutView');
     const toCheckoutBtn = document.getElementById('toCheckoutBtn');
-    const applyDiscountBtn = document.getElementById('applyDiscountBtn');
     const checkoutForm = document.getElementById('checkoutForm');
+    const modalBuyBtn = document.getElementById('modalBuyBtn');
+    
+    const discountBtn = document.getElementById('applyDiscountBtn');
+    const discountInput = document.getElementById('discountInput');
+
+    if (cartView) cartView.style.display = 'block';
 
     renderCart();
 
-    if (toCheckoutBtn && cartView && checkoutView) {
+    if (modalBuyBtn) {
+        modalBuyBtn.addEventListener('click', () => {
+            if (!selectedSize) {
+                alert("من فضلك اختر المقاس!");
+                return;
+            }
+            if (!selectedColor) {
+                alert("من فضلك اختر اللون!");
+                return;
+            }
+
+            cartData.push({
+                id: activeProduct.id,
+                title: activeProduct.title,
+                price: activeProduct.price,
+                size: selectedSize,
+                color: selectedColor,
+                quantity: 1,
+                image: activeProduct.image
+            });
+
+            saveCartToLocalStorage();
+            alert("تم إضافة المنتج إلى السلة بنجاح!");
+            document.getElementById('SectionModel').style.display = 'none';
+            renderCart();
+        });
+    }
+
+    if (discountBtn && discountInput) {
+        discountBtn.addEventListener('click', () => {
+            const code = discountInput.value.trim().toUpperCase();
+            if (code === "DART10") {
+                appliedDiscountRate = 0.10;
+                alert("تم تطبيق خصم 10% بنجاح!");
+            } else if (code === "DART20") {
+                appliedDiscountRate = 0.20;
+                alert("تم تطبيق خصم 20% بنجاح!");
+            } else {
+                appliedDiscountRate = 0;
+                alert("كود الخصم غير صحيح!");
+            }
+            updateCartTotals();
+        });
+    }
+
+    if (toCheckoutBtn && checkoutView) {
         toCheckoutBtn.addEventListener('click', () => {
             if (cartData.length === 0) {
                 alert("السلة فارغة، أضف منتجات أولاً!");
                 return;
             }
-            cartView.style.display = 'none';
             checkoutView.style.display = 'block';
-            renderCheckoutSummary();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.scrollTo({ top: checkoutView.offsetTop, behavior: 'smooth' });
         });
     }
 
-    if (applyDiscountBtn) {
-        applyDiscountBtn.addEventListener('click', () => {
-            const discountInputEl = document.getElementById('discountInput');
-            if (!discountInputEl) return;
-            const discountInput = discountInputEl.value.trim();
-            
-            if (discountInput === "DART10") {
-                appliedDiscountRate = 0.10;
-                alert("تم تطبيق الكوبون بنجاح!");
-            } else if (discountInput === "") {
-                appliedDiscountRate = 0;
-                alert("من فضلك أدخل كود الخصم");
-            } else {
-                appliedDiscountRate = 0;
-                alert("كود الخصم غير صحيح");
-            }
-            renderCheckoutSummary();
-        });
-    }
-
-    // تفريغ السلة والرجوع لصفحة الـ index عند إتمام الطلب
     if (checkoutForm) {
         checkoutForm.addEventListener('submit', (e) => {
             e.preventDefault();
-
-            // 1. تصفير السلة
             cartData = [];
+            saveCartToLocalStorage();
             appliedDiscountRate = 0;
-            
             alert("تم إتمام طلبك بنجاح! شكراً لك.");
-
-            // 2. التوجيه لصفحة index.html (لو الموقع صفحات منفصلة)
-            // أو لو الموقع صفحة واحدة SPA، استبدل السطر اللي تحت بـ window.location.href = "index.html"
             window.location.href = "index.html";
         });
     }
 }
 
 // ==========================================
-// 4. نقطة التنفيذ الرئيسية (DOM Loaded)
+// 5. التشغيل عند تحميل الصفحة
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([
@@ -324,3 +645,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderReviewsLogic();
     initCartAndCheckoutEvents();
 });
+
+
+
+
+
+
+
+
