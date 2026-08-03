@@ -1,6 +1,9 @@
 // ==========================================
 // 1. مصفوفات البيانات (المنتجات، التقييمات، والمخزون)
 // ==========================================
+// ==========================================
+// 1. مصفوفات البيانات (المنتجات، التقييمات، والمخزون)
+// ==========================================
 const productsData = [
     {
         id: 1,
@@ -197,7 +200,8 @@ const productsData = [
             "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
             "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
         }
-    },
+    }
+    
     // يمكنك إضافة باقي المنتجات هنا بنفس الهيكل
 ];
 
@@ -358,7 +362,10 @@ document.addEventListener('click', (e) => {
 
     if (e.target.closest('.model .fa-x')) {
         const modal = document.getElementById('SectionModel');
-        if (modal) modal.style.display = 'none';
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto'; // إعادة التمرير عند الإغلاق
+        }
     }
 });
 
@@ -445,6 +452,7 @@ function openProductModal(product) {
     });
 
     modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // منع التمرير في الخلفية
 }
 
 function updateColorsAvailability(product, size) {
@@ -506,6 +514,15 @@ function renderCart() {
         card.querySelector('.p-total').textContent = item.price * item.quantity;
 
         card.querySelector('.increase').addEventListener('click', () => {
+            // التحقق من المخزون المتاح للمنتج باللون والمقاس المختار
+            const product = productsData.find(p => p.id === item.id);
+            const availableStock = product?.stock?.[item.size]?.[item.color] ?? 0;
+
+            if (cartData[index].quantity >= availableStock) {
+                alert(`عذراً، الكمية المطلوبة غير متوفرة. المتاح بالمخزون لهذا المقاس واللون هو ${availableStock} قطع فقط.`);
+                return;
+            }
+
             cartData[index].quantity += 1;
             saveCartToLocalStorage();
             renderCart();
@@ -575,7 +592,11 @@ function initCartAndCheckoutEvents() {
 
             saveCartToLocalStorage();
             alert("تم إضافة المنتج إلى السلة بنجاح!");
-            document.getElementById('SectionModel').style.display = 'none';
+            const modal = document.getElementById('SectionModel');
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.style.overflow = 'auto'; // إعادة التمرير بعد الشراء
+            }
             renderCart();
         });
     }
@@ -645,9 +666,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderReviewsLogic();
     initCartAndCheckoutEvents();
 });
-
-
-
 
 
 
