@@ -121,8 +121,8 @@ h1 { font-size: clamp(1.3rem, 1vw, 3rem);}
 h2 { font-size: clamp(1.1rem, .8vw , 2.5rem);}
 h3 { font-size: clamp(1rem, .7vw , 1.85rem);}
 h4 { font-size: clamp(.9rem, .6vw , 1.5rem);}
-h5 { font-size: clamp(.7rem, 0.5vw , 1.25rem);}
-h6 { font-size: clamp(.5rem, 0.3vw , 1rem);}
+h5 { font-size: clamp(.8rem, 0.5vw , 1.25rem);}
+h6 { font-size: clamp(.6rem, 0.3vw , 1rem);}
 
 p { margin-bottom: var(--spacing-md); }
 
