@@ -998,8 +998,3 @@ color: #0088FF;
     z-index: 2;
     text-transform: uppercase;
 }
-
-body.modal-open > *:not(#SectionModel) {
-    pointer-events: none;
-    user-select: none;
-}
