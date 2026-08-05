@@ -101,7 +101,7 @@ header {
     display: none;
     justify-content: center;
     align-self: flex-end;
-    height: 82vh;
+    height: 80vh;
     padding: 40px 25px 20px;
     background-color: var(--bragnte);
     border-top-left-radius: 80px;
