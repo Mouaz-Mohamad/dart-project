@@ -392,13 +392,13 @@ function renderReviewsLogic() {
 // ==========================================
 // 3. نظام المودال (عرض التفاصيل، المقاسات، الألوان)
 // ==========================================
+
+// 1. فتح المودال عند الضغط على الكارت أو زرار السلة
 document.addEventListener('click', (e) => {
-    // التحقق من الضغط على زرار السلة أو على الكارت نفسه
-    const productCard = e.target.closest('.product-card'); // تأكد إن ده كلاس الكارت عندك
+    const productCard = e.target.closest('.product-card');
     const cartBtn = e.target.closest('.cart-btn');
 
     if (productCard || cartBtn) {
-        // بنجيب الـ id سواء من الزرار أو من الكارت نفسه لو الزرار مش هو اللي اتداس
         const targetElement = cartBtn || productCard;
         const productId = targetElement.getAttribute('data-id') || 
         productCard.querySelector('.cart-btn')?.getAttribute('data-id');
@@ -409,18 +409,47 @@ document.addEventListener('click', (e) => {
         }
     }
 
+    // 2. إغلاق المودال عند الضغط على زرار (X)
     if (e.target.closest('.model .fa-x')) {
-        const modal = document.getElementById('SectionModel');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto'; // إعادة التمرير عند الإغلاق
-        }
+        closeProductModal();
+    }
+
+    // 3. إغلاق المودال عند الضغط خارج السيكشن (على الخلفية السوداء مباشرة)
+    const modal = document.getElementById('SectionModel');
+    if (e.target === modal) {
+        closeProductModal();
     }
 });
+
+// 4. إغلاق المودال عند سحب الشاشة أو الضغط على زرار الرجوع (Back / Swipe)
+window.addEventListener('popstate', () => {
+    const modal = document.getElementById('SectionModel');
+    if (modal && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+});
+
+// دالة إغلاق المودال
+function closeProductModal() {
+    const modal = document.getElementById('SectionModel');
+    if (!modal) return;
+
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+
+    // الرجوع خطوة في المتصفح لو كنا ضفنا حالة للمودال
+    if (history.state && history.state.modalOpen) {
+        history.back();
+    }
+}
 
 function openProductModal(product) {
     const modal = document.getElementById('SectionModel');
     if (!modal) return;
+
+    // إضافة وهمية لسجل المتصفح عشان زرار الرجوع يقفل المودال مش الموقع
+    history.pushState({ modalOpen: true }, "");
 
     modal.querySelector('img').src = product.image;
     modal.querySelector('.model-product-category').textContent = product.category;
@@ -501,7 +530,7 @@ function openProductModal(product) {
     });
 
     modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden'; // منع التمرير في الخلفية
+    document.body.style.overflow = 'hidden';
 }
 
 function updateColorsAvailability(product, size) {

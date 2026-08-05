@@ -870,6 +870,8 @@ color: #0088FF;
     text-align: right;
     margin-bottom: 5px;
     transition: 0.2s;
+    width: 100%;
+    height: 40px;
 }
 
 .model i.fa-x:hover {
