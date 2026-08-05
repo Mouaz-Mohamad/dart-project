@@ -1166,15 +1166,14 @@ header {
     position: absolute;
     top: 50px;
     left: 100px;
-        opacity: 50%;
+    opacity: 40%;
 }
 .dart-card-1-dart{
     position: absolute;
     right: 0;
-    top: -5px;
     width: 30%;
-    height: 100%;
-    opacity: 50%;
+    height: 90%;
+    opacity: 40%;
 }
 .dart-card-acount h1 ,.exp-issue-date,.name-id ,.limit-items{
     position: relative;
