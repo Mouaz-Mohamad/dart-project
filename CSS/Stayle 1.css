@@ -1112,6 +1112,9 @@ header {
     margin-top: 20px;
     width: 49%;
 }
+.monthly-order{
+    font-size: 1rem;
+}
 
 .dart-card-acount{
     background: linear-gradient(to right, #000000 0%, #8a0022 100%);
