@@ -65,12 +65,12 @@ background-color: var(--white);
 /* Side Menu */
 .side-menu {
 position: fixed;
-top: 95px;
+top: 93px;
 z-index: 100000;
 display: none;
 justify-content: center;
 align-self: flex-end;
-height: 80vh;
+height: 85vh;
 padding: 40px 25px 20px;
 background-color: var(--bragnte);
 border-top-left-radius: 80px;
@@ -89,6 +89,7 @@ list-style: none;
 
 .menu-list li {
 border-bottom: 1px solid rgba(255, 255, 255, 0.7);
+font-size: medium;
 }
 
 .menu-list a, .social-icons a, .account-btn a {
@@ -96,7 +97,7 @@ text-decoration: none;
 }
 
 .menu-list a, .account-btn a {
-font-size: clamp(15px, 2vw, 18px);
+font-size: clamp(medium, 2vw, 18px);
 }
 
 .menu-list a {
@@ -106,7 +107,7 @@ padding: 15px 5px;
 .social-icons {
 gap: 15px;
 margin-bottom: auto;
-font-size: 20px;
+font-size: medium;
 }
 
 .account-btn {
