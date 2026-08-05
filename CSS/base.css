@@ -185,3 +185,7 @@ textarea { resize: vertical; }
 section{
   background-color: var(--white);
 }
+
+.width100{
+  width: 100%;
+}

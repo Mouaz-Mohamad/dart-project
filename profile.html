@@ -61,33 +61,78 @@
             
             <main class="#">
 
-                <section id="search-serial-container" aria-label="Product Authenticity Check"></section>
+                <!-- =============== سكشن الروفيل =============== -->
+                <section class="account">
+                    <div class="hello glass-effect width100">
+                        <h1>
+                            Hello.
+                            <span class="user-name"></span>
+                            How are you?
+                        </h1>
+                        <h3 class="e-mail">midomoaaz3@gmail.com</h3>
+                    </div>
 
-                <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
+                    <div class="flex-start glass-effect width100">
+                        <i class="fa-regular fa-user"></i>
+                        <h2>Profile</h2>
+                        <i class="fa-solid fa-sort-up"></i>
+                    </div>
+                    <div class="flex-start glass-effect width100">
+                        <i class="fa-solid fa-cart-plus"></i>
+                        <h2>All Orders</h2>
+                        <i class="fa-solid fa-sort-up"></i>
+                    </div>
+                    <div class="flex-start glass-effect width100">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <h2>Returns and Exchanges</h2>
+                        <i class="fa-solid fa-sort-up"></i>
+                    </div>
 
-                <!-- ================= سكشن المنتجات ================= -->
-                <section class="products-section">
-                    <h2 class="section-title-">&nbsp;Newest products</h2>
-                    
-                    <div class="products-grid" id="productsContainer">
-                    <!-- الكارت المرجعي (Template) -->
-                        <div class="product-card" id="productTemplate" style="display: none;">
-                            <img src="" alt="" class="product-img" loading="lazy">
-                            <div class="product-details">
-                            <div class="product-category"></div>
-                            <div class="product-code" dir="rtl"></div>
-                            <div class="product-title"></div>
-                            <div class="product-footer djasb">
-                                <span class="product-price"></span>
-                                <button class="cart-btn dja">Bay &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                    <div class="djasb width100">
+                        <div class="total-order glass-effect">
+                            <h2>Total Orders</h2>
+                            <h3 class="number-total-order">0</h3>
+                        </div>
+                        <div class="monthly-order glass-effect">
+                            <h2>Monthly Orders</h2>
+                            <h3 class="number-monthly-order">0</h3>
+                        </div>
+                    </div>
+
+                    <div class="dart-card-acount width100 ">
+                        <h1>Dart Card</h1>
+                        <div class="name-id width100">
+                            <h2 class="name width100"> Mouaz Mohamad</h2>
+                            <h4 class="id width100">ID- 45815</h4>
+                        </div>
+                        <div class="exp-issue-date djasb width100">
+                            <div class="exp">
+                                <h5>Expiry Date</h5>
+                                <h6>12-12-2027</h6>
                             </div>
+                            <div class="issue">
+                                <h5>Issue Date</h5>
+                                <h6>12-12-2026</h6>
+                            </div>
+                        </div>
+
+                        <div class="limit-items djasb width100">
+                            <div class="limit">
+                                <h5>Purchase Limit</h5>
+                                <h6>20 PIC</h6>
+                            </div>
+                            <div class="items">
+                                <h5>Purchased Items</h5>
+                                <h6>6 PIC</h6>
                             </div>
                         </div>
                     </div>
+
+                    <button class="btn-accont-log-out">Loge Out</button>
                 </section>
 
-                <section id="birthday"></section>
-
+                <section id="search-serial-container" aria-label="Product Authenticity Check"></section>
+                <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
                 <!-- ================= سكشن التقييمات ================= -->
                 <section class="reviews-section">
                     <h2 class="section-title-">&nbsp; Our Reviews </h2>
@@ -111,11 +156,34 @@
                     </div>
                 </section>
 
-                <section id="why" aria-label="Why Choose DART?."></section>
-
                 <section id="feedback-form" aria-label="Share Your Experience"></section>
 
-                <section class="model" id="SectionModel">
+
+
+
+                <!-- ================= سكشن المنتجات ================= -->
+                <!-- <section class="products-section">
+                    <h2 class="section-title-">&nbsp;Newest products</h2>
+                    
+                    <div class="products-grid" id="productsContainer">
+                    <!- الكارت المرجعي (Template) -->
+                        <!-- <div class="product-card" id="productTemplate" style="display: none;">
+                            <img src="" alt="" class="product-img">
+                            <div class="product-details">
+                            <div class="product-category"></div>
+                            <div class="product-code" dir="rtl"></div>
+                            <div class="product-title"></div>
+                            <div class="product-footer djasb">
+                                <span class="product-price"></span>
+                                <button class="cart-btn dja">Bay &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>  -->
+
+                <!-- ============ سكشن المودل ================ -->
+                <!-- <section class="model" id="SectionModel">
                     <i class="fa-solid fa-x"></i>
                     <img src="" alt="">
                     <article class="model-product">
@@ -123,20 +191,23 @@
                         <div class="model-product-code"></div>
                         <div class="model-product-title"></div>
                         <div class="model-product-price">Price: &nbsp;<span class="price-number"></span>&nbsp; EGP</div>
-                        <!-- حاوية المقاسات -->
-                        <div class="sizes-container">
+                        حاوية المقاسات -->
+                        <!-- <div class="sizes-container">
                             <button type="button" class="size-btn" data-size=""></button>
                         </div>
-                        <!-- حاوية الألوان -->
-                        <div class="colors-container">
+                        <!- حاوية الألوان -->
+                        <!-- <div class="colors-container">
                             <button type="button" class="color-btn" data-color=""></button>
                         </div>
-                        <h6 class="model-all-detelis" dir="rtl"></h6>
+                        <h6 class="model-all-detelis" dir="rtl"></h6> -->
                         <!-- زرار الشراء النهائي جوه المودال -->
-                        <button id="modalBuyBtn" class="buy-now-btn">Bay</button>
+                        <!-- <button id="modalBuyBtn" class="buy-now-btn">Bay</button>
                     </article>
-                </section>
-                <!-- <section id="story"></section>
+                </section>  -->
+
+                <!-- <section id="why" aria-label="Why Choose DART?."></section>
+                <section id="story"></section>
+                <section id="birthday"></section>
                 <section id="return-form" aria-label="Exchange or Return Request "></section>
                 <section id="contact-form" aria-label="Contact Us "></section>
                 <section id="dart-for-you" aria-label="The brand logo is a kite bird in a burgundy color."></section>
