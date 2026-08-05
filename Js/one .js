@@ -34,7 +34,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 3,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -48,7 +48,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 4,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -62,7 +62,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 5,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -76,7 +76,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 6,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -90,7 +90,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 7,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -104,7 +104,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 8,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -118,7 +118,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 9,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -132,7 +132,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 10,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -146,7 +146,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 11,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -160,7 +160,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 12,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -174,7 +174,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 13,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
@@ -188,7 +188,7 @@ const productsData = [
         }
     },
     {
-        id: 2,
+        id: 14,
         category: "قمصان",
         title: "قميص جينز | بيج",
         code: "DA-T695",
