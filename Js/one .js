@@ -14,9 +14,9 @@ const productsData = [
         image: "Photos/products/1.jpg",
         description: "بنطال جينز فاخر بأرجل واسعة ومصنوع من القطن الخالص بنسبة 100%، ليمنحك قصة مريحة، وراحة تدوم طويلاً، وإطلالة يومية عفوية وأنيقة.",
         stock: {
-            "32": { "نيلي": 5, "بيج": 5, "ابيض": 2, "اسود": 3 },
-            "34": { "نيلي": 0, "بيج": 4, "ابيض": 1, "اسود": 2 },
-            "36": { "نيلي": 3, "بيج": 2, "ابيض": 0, "اسود": 0 }
+            "32": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 },
+            "34": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 },
+            "36": { "نيلي": 0, "بيج": 2, "ابيض": 0, "اسود": 0 }
         }
     },
     {
@@ -318,6 +318,57 @@ function createProductCard(item, template) {
     return card;
 }
 
+// دالة مساعدة لإنشاء كارت المنتج (معدلة لفحص المخزون الكلي)
+function createProductCard(item, template) {
+    const card = template.cloneNode(true);
+    card.removeAttribute('id');
+    card.style.display = 'flex';
+    card.style.position = 'relative'; // عشان البادج يظهر مظبوط فوق الصورة
+
+    card.querySelector('.product-img').src = item.image;
+    card.querySelector('.product-img').alt = item.title;
+    card.querySelector('.product-category').textContent = item.category;
+    card.querySelector('.product-title').textContent = item.title;
+    card.querySelector('.product-code').textContent = `كود : ${item.code}`;
+    card.querySelector('.product-price').textContent = `EGP ${item.price}`;
+
+    // 1. حساب إجمالي المخزون للمنتج (كل المقاسات والألوان)
+    let totalStock = 0;
+    if (item.stock) {
+        Object.values(item.stock).forEach(sizeObj => {
+            Object.values(sizeObj).forEach(qty => {
+                totalStock += qty;
+            });
+        });
+    }
+
+    const cartBtn = card.querySelector('.cart-btn');
+
+    // 2. لو المخزون صفر أو أقل
+    if (totalStock <= 0) {
+        card.classList.add('out-of-stock');
+
+        // إضافة جملة OUT OF STOCK فوق الصورة
+        const badge = document.createElement('span');
+        badge.className = 'out-of-stock-badge';
+        badge.textContent = 'Out of Stock';
+        card.appendChild(badge);
+
+        // تعطيل زرار السلة عشان محدش يفتح المودال أو يطلب
+    //     if (cartBtn) {
+    //         cartBtn.style.pointerEvents = 'none';
+    //         cartBtn.style.opacity = '0.5';
+    //         cartBtn.textContent = 'غير متوفر';
+    //     }
+    // } else {
+    //     if (cartBtn) {
+    //         cartBtn.setAttribute('data-id', item.id);
+    //     }
+    }
+
+    return card;
+}
+
 // دالة عرض التقييمات
 function renderReviewsLogic() {
     const reviewsContainer = document.getElementById('reviewsContainer');
@@ -347,9 +398,6 @@ function renderReviewsLogic() {
     }
 }
 
-// ==========================================
-// 3. نظام المودال (عرض التفاصيل، المقاسات، الألوان)
-// ==========================================
 // ==========================================
 // 3. نظام المودال (عرض التفاصيل، المقاسات، الألوان)
 // ==========================================
