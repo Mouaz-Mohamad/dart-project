@@ -1122,6 +1122,7 @@ header {
     -o-border-radius: 20px;
     padding: 10px 20px;
     margin-top: 20px;
+    position: relative;
     
 }
 .dart-card-acount h1{
@@ -1158,4 +1159,16 @@ header {
 .btn-accont-log-out{
     width: 90%;
     margin-top: 20px;
+}
+
+.dart-card-acount img{
+    height: 200px;
+    position: absolute;
+    top: 50px;
+    left: 100px;
+}
+
+.dart-card-acount h1 ,.exp-issue-date,.name-id ,.limit-items{
+    position: relative;
+    z-index: 10;
 }
