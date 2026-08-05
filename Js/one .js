@@ -397,11 +397,12 @@ function renderReviewsLogic() {
 document.addEventListener('click', (e) => {
     const productCard = e.target.closest('.product-card');
     const cartBtn = e.target.closest('.cart-btn');
-
+    document.body.classList.add('modal-open');
+    
     if (productCard || cartBtn) {
         const targetElement = cartBtn || productCard;
         const productId = targetElement.getAttribute('data-id') || 
-                          productCard.querySelector('.cart-btn')?.getAttribute('data-id');
+        productCard.querySelector('.cart-btn')?.getAttribute('data-id');
 
         activeProduct = productsData.find(p => p.id == productId);
         if (activeProduct) {
@@ -414,7 +415,7 @@ document.addEventListener('click', (e) => {
         closeProductModal();
     }
 
-    // 3. إغلاق المودال عند الضغط خارج السيكشن (على الخلفية مباشرة)
+    // 3. إغلاق المودال عند الضغط خارج السيكشن (على الخلفية السوداء مباشرة)
     const modal = document.getElementById('SectionModel');
     if (e.target === modal) {
         closeProductModal();
@@ -427,7 +428,6 @@ window.addEventListener('popstate', () => {
     if (modal && modal.style.display === 'flex') {
         modal.style.display = 'none';
         document.body.style.overflow = 'auto';
-        document.body.classList.remove('modal-open');
     }
 });
 
@@ -438,7 +438,6 @@ function closeProductModal() {
 
     modal.style.display = 'none';
     document.body.style.overflow = 'auto';
-    document.body.classList.remove('modal-open');
 
     // الرجوع خطوة في المتصفح لو كنا ضفنا حالة للمودال
     if (history.state && history.state.modalOpen) {
@@ -533,7 +532,6 @@ function openProductModal(product) {
 
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    document.body.classList.add('modal-open');
 }
 
 function updateColorsAvailability(product, size) {
