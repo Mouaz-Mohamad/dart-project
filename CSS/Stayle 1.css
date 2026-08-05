@@ -1105,7 +1105,7 @@ header {
 }
 
 .total-order,.monthly-order{
-    padding: 10px 20px ;
+    padding: 10px;
     color: var(--bg-dark);
     font-size: large;
     text-align: center;
@@ -1113,7 +1113,7 @@ header {
     width: 49%;
 }
 .monthly-order h2{
-    font-size: 10px;
+
 }
 
 .dart-card-acount{
