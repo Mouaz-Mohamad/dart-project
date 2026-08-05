@@ -1161,13 +1161,21 @@ header {
     margin-top: 20px;
 }
 
-.dart-card-acount img{
+.dart-card-acount .bird{
     height: 200px;
     position: absolute;
     top: 50px;
     left: 100px;
+        opacity: 50%;
 }
-
+.dart-card-1-dart{
+    position: absolute;
+    right: 0;
+    top: -5px;
+    width: 30%;
+    height: 100%;
+    opacity: 50%;
+}
 .dart-card-acount h1 ,.exp-issue-date,.name-id ,.limit-items{
     position: relative;
     z-index: 10;
