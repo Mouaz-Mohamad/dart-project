@@ -67,7 +67,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/18.jfif",
+        image: "/Photos/products/15.jfif",
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -323,7 +323,7 @@ function createProductCard(item, template) {
     const card = template.cloneNode(true);
     card.removeAttribute('id');
     card.style.display = 'flex';
-    card.style.position = 'relative'; // عشان البادج يظهر مظبوط فوق الصورة
+    card.style.position = 'relative'; // عشان شريط النفاذ يظهر فوق الصورة
 
     card.querySelector('.product-img').src = item.image;
     card.querySelector('.product-img').alt = item.title;
@@ -332,7 +332,7 @@ function createProductCard(item, template) {
     card.querySelector('.product-code').textContent = `كود : ${item.code}`;
     card.querySelector('.product-price').textContent = `EGP ${item.price}`;
 
-    // 1. حساب إجمالي المخزون للمنتج (كل المقاسات والألوان)
+    // حساب إجمالي المخزون للمنتج
     let totalStock = 0;
     if (item.stock) {
         Object.values(item.stock).forEach(sizeObj => {
@@ -342,33 +342,24 @@ function createProductCard(item, template) {
         });
     }
 
-    const cartBtn = card.querySelector('.cart-btn');
-
-    // 2. لو المخزون صفر أو أقل
+    // لو المخزون صفر: هنضيف شريط النفاذ فقط بدون لمس الزرار
     if (totalStock <= 0) {
         card.classList.add('out-of-stock');
 
-        // إضافة جملة OUT OF STOCK فوق الصورة
         const badge = document.createElement('span');
         badge.className = 'out-of-stock-badge';
         badge.textContent = 'Out of Stock';
         card.appendChild(badge);
+    }
 
-        // تعطيل زرار السلة عشان محدش يفتح المودال أو يطلب
-    //     if (cartBtn) {
-    //         cartBtn.style.pointerEvents = 'none';
-    //         cartBtn.style.opacity = '0.5';
-    //         cartBtn.textContent = 'غير متوفر';
-    //     }
-    // } else {
-    //     if (cartBtn) {
-    //         cartBtn.setAttribute('data-id', item.id);
-    //     }
+    // ربط الـ ID بالزرار في كل الحالات عشان يفتح المودال عادي
+    const cartBtn = card.querySelector('.cart-btn');
+    if (cartBtn) {
+        cartBtn.setAttribute('data-id', item.id);
     }
 
     return card;
 }
-
 // دالة عرض التقييمات
 function renderReviewsLogic() {
     const reviewsContainer = document.getElementById('reviewsContainer');

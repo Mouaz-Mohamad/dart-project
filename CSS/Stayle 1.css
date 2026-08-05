@@ -983,13 +983,11 @@ color: #0088FF;
 .model .buy-now-btn:hover {
     opacity: 0.9;
 }
-
-/* شريط نفاذ الكمية على صورة الكارت */
 .out-of-stock-badge {
     position: absolute;
     top: 10px;
     left: 10px;
-    background-color: rgba(220, 53, 69, 0.9); /* لون أحمر */
+    background-color: rgba(220, 53, 69, 0.9);
     color: #fff;
     padding: 4px 8px;
     font-size: 12px;
@@ -997,9 +995,4 @@ color: #0088FF;
     border-radius: 4px;
     z-index: 2;
     text-transform: uppercase;
-}
-
-/* اختياري: بهتان كارت المنتج لو المخزون خلصان بالكامل */
-.product-card.out-of-stock {
-    opacity: 0.6;
 }
