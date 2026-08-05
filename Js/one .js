@@ -350,10 +350,20 @@ function renderReviewsLogic() {
 // ==========================================
 // 3. نظام المودال (عرض التفاصيل، المقاسات، الألوان)
 // ==========================================
+// ==========================================
+// 3. نظام المودال (عرض التفاصيل، المقاسات، الألوان)
+// ==========================================
 document.addEventListener('click', (e) => {
+    // التحقق من الضغط على زرار السلة أو على الكارت نفسه
+    const productCard = e.target.closest('.product-card'); // تأكد إن ده كلاس الكارت عندك
     const cartBtn = e.target.closest('.cart-btn');
-    if (cartBtn) {
-        const productId = cartBtn.getAttribute('data-id');
+
+    if (productCard || cartBtn) {
+        // بنجيب الـ id سواء من الزرار أو من الكارت نفسه لو الزرار مش هو اللي اتداس
+        const targetElement = cartBtn || productCard;
+        const productId = targetElement.getAttribute('data-id') || 
+        productCard.querySelector('.cart-btn')?.getAttribute('data-id');
+
         activeProduct = productsData.find(p => p.id == productId);
         if (activeProduct) {
             openProductModal(activeProduct);
