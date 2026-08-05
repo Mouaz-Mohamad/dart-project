@@ -1098,7 +1098,7 @@ header {
 
 .hello{
     color: var(--bg-dark);
-    padding: 10px 20px;
+    padding: 10px;
 }
 .hello .two{
     font-size: 20px;
