@@ -1188,11 +1188,15 @@ header {
     color: var(--bg-dark);
 
     position: absolute;
+    max-width: inherit; /* بيورث أقصى عرض من الـ main */
+    top: 0;
+    left: 0;
 
     box-sizing: border-border-box;
     overflow-y: auto;
     z-index: 1000;
     display: none;
+    overflow-y: auto;
 }
 .profile-details.active {
     display: block;
