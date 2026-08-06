@@ -854,7 +854,7 @@ header {
 }
 
 .story .container-story, .birthday-conteiner2, .card-conteiner {
-    width: 80%;
+    width: 90%;
     position: relative;
     z-index: 3;
 }
@@ -914,7 +914,7 @@ header {
 
 .birthday-details img {
     position: absolute;
-    right: -100px;
+    right: -110px;
     bottom: -40px;
     margin-bottom: 20px;
     max-height: 90%;
@@ -929,8 +929,8 @@ header {
     position: absolute;
     bottom: -40px;
     left: -50px;
-    max-height: 100%;
-    max-width: 100%;
+    max-height: 90%;
+    max-width: 90%;
     margin-bottom: 20px;
 }
 
@@ -944,7 +944,7 @@ header {
 }
 
 .card-conteiner h3 {
-    margin: 0 0 0 50px;
+    margin: 0 0 0 90px;
 }
 
 .dart-for-you h1 {
