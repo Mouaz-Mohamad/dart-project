@@ -867,7 +867,7 @@ header {
 .birthday-details .birthday-conteiner2 h1,
 .card-conteiner h1 {
     font-family: var(--font-irish);
-    font-size: clamp(40px, 7vw, 60px);
+    font-size: clamp(60px, 7vw, 60px);
     -webkit-text-stroke: 0.2px var(--white);
 }
 
@@ -876,6 +876,7 @@ header {
     text-align: left;
     margin-left: 10px;
     color: var(--bragnte);
+    width: 100%;
 }
 
 .story .container-story h4 { 
@@ -885,7 +886,7 @@ header {
 .story .container-story h3,
 .birthday-details .birthday-conteiner2 h3,
 .card-conteiner h3 {
-    text-align: right;
+    text-align: left;
     line-height: 1.14;
     font-family: var(--font-cabin);
     font-weight: 470;
@@ -898,22 +899,24 @@ header {
 }
 
 .story .container-story h4 {
+    text-align: left;
     margin: 20px 100px 0 0;
     font-size: clamp(0.85em, 2vw, 1em);
 }
 
 .story img {
     position: absolute;
-    right: -40px;
+    right: -50px;
     bottom: 0;
-    max-width: 100%;
-    max-height: 100%;
+    max-width: 90%;
+    max-height: 90%;
 }
 
 .birthday-details img {
     position: absolute;
-    right: -130px;
-    bottom: 0;
+    right: -100px;
+    bottom: -40px;
+    margin-bottom: 20px;
     max-height: 90%;
     max-width: 90%;
 }
@@ -924,9 +927,11 @@ header {
 
 .card-details img {
     position: absolute;
+    bottom: -40px;
     left: -50px;
-    max-height: 80%;
-    max-width: 80%;
+    max-height: 100%;
+    max-width: 100%;
+    margin-bottom: 20px;
 }
 
 .card-conteiner { 
@@ -939,7 +944,7 @@ header {
 }
 
 .card-conteiner h3 {
-    margin: 0 20px 0 70px;
+    margin: 0 0 0 50px;
 }
 
 .dart-for-you h1 {
@@ -970,11 +975,11 @@ header {
 }
 
 .why article .box {
-    width: 47%;
+    width: 48%;
     max-width: 200px;
     height: 90px;
     padding: 10px;
-    gap: 5px;
+    gap: 2px;
     background: var(--white);
     backdrop-filter: blur(10px);
     border-radius: 15px;
@@ -987,7 +992,7 @@ header {
     font-size: 22px;
     font-weight: 600;
     width: 70%;
-    text-align: right;
+    text-align: left;
 }
 
 .why article .box i {
