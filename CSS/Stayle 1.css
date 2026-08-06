@@ -31,7 +31,7 @@ header, .side-menu, .pge-que .pge, .que,
 }
 
 /* Hide Scrollbar Shared Utility */
-.reviews-container, .model {
+.reviews-container, .model,.profile-details,.return-info,.order-info {
     &::-webkit-scrollbar { display: none; }
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -1196,7 +1196,6 @@ header {
     overflow-y: auto;
     z-index: 1000;
     display: none;
-    overflow-y: auto;
 }
 .profile-details.active,.order-info.active,.return-info.active {
     display: block;
