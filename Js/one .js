@@ -752,34 +752,31 @@ const profileBtn = document.querySelector('.profile');
 const profileSection = document.querySelector('.profile-details');
 const closeBtn = document.querySelector('.profile-details .fa-arrow-right-from-bracket');
 
-// 1. فتح البروفايل وقفل سكرول الصفحة
+// دالة قفل البروفايل
+function closeProfile() {
+  profileSection.classList.remove('active');
+  document.body.classList.remove('no-scroll');
+}
+
+// 1. عند فتح البروفايل: بنضيف خطوة في سجل المتصفح (History State)
 profileBtn.addEventListener('click', () => {
   profileSection.classList.add('active');
-  document.body.classList.add('no-scroll'); // منع السكرول
+  document.body.classList.add('no-scroll');
+  history.pushState({ profileOpen: true }, ''); // تسجيل حالة الفتح
 });
 
-// 2. إغلاق البروفايل وإعادة سكرول الصفحة
+// 2. عند الضغط على زر الإغلاق الداخلي: بنعمل رجوع خطوة للخلف
 closeBtn.addEventListener('click', () => {
-  profileSection.classList.remove('active');
-  document.body.classList.remove('no-scroll'); // إرجاع السكرول
-});
-
-// 3. عند السحب لإغلاق البروفايل
-let startX = 0;
-let startY = 0;
-
-profileSection.addEventListener('touchstart', (e) => {
-  startX = e.touches[0].clientX;
-  startY = e.touches[0].clientY;
-});
-
-profileSection.addEventListener('touchend', (e) => {
-  const endX = e.changedTouches[0].clientX;
-  const endY = e.changedTouches[0].clientY;
-
-  if (endX - startX > 100 || endY - startY > 150) {
-    profileSection.classList.remove('active');
-    document.body.classList.remove('no-scroll'); // إرجاع السكرول عند السحب
+  if (history.state && history.state.profileOpen) {
+    history.back(); // ده هيشغل حدث popstate تلقائياً وبيقفل البروفايل
+  } else {
+    closeProfile();
   }
+});
+
+// 3. الاستماع لزر/إيماءة الرجوع في التلفون (Back Gesture)
+window.addEventListener('popstate', (e) => {
+  // أول ما المستخدم يسحب من جنب الشاشة للرجوع، بنقفل السيكشن
+  closeProfile();
 });
 
