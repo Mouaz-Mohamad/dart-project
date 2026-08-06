@@ -747,6 +747,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 
+// ============= معلومات المستخدم 
+const profileBtn = document.querySelector('.profile');
+const profileSection = document.querySelector('.profile-details');
+const closeBtn = document.querySelector('.profile-details .fa-arrow-right-from-bracket');
 
+    // 1. فتح السيكشن عند الضغط على زرار .profile
+    profileBtn.addEventListener('click', () => {
+    profileSection.classList.add('active');
+    });
+
+    // 2. إخفاء السيكشن عند الضغط على الأيقونة i
+    closeBtn.addEventListener('click', () => {
+    profileSection.classList.remove('active');
+    });
+
+    // 3. إخفاء السيكشن عند السحب من الشاشة (Swipe Down / Right)
+    let startX = 0;
+    let startY = 0;
+
+    profileSection.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    });
+
+    profileSection.addEventListener('touchend', (e) => {
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+
+    // إخفاء عند السحب لليمين (رجوع) أو لأسفل
+    if (endX - startX > 100 || endY - startY > 150) {
+    profileSection.classList.remove('active');
+    }
+});
 
 

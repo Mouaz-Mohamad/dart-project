@@ -1177,3 +1177,39 @@ header {
     position: relative;
     z-index: 10;
 }
+
+
+/* ========= Profile info */
+.profile-details{
+    width: 100%;
+    height: 100vh;
+    background-color: var(--white);
+    padding: 30px 10px;
+    color: var(--bg-dark);
+
+    position: absolute;
+
+    box-sizing: border-border-box;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+.profile-details.active {
+    display: block;
+}
+.exit-edit{
+    margin: 0 10px 50px 0;
+}
+
+.info-profile{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.info-profile .value{
+    border-bottom: 1px solid var(--text-muted);
+    width: 100%;
+    height: 30px;
+}
