@@ -748,35 +748,79 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
 // ============= معلومات المستخدم 
-const profileBtn = document.querySelector('.profile');
-const profileSection = document.querySelector('.profile-details');
-const closeBtn = document.querySelector('.profile-details .fa-arrow-right-from-bracket');
+document.addEventListener('DOMContentLoaded', () => {
 
-// دالة قفل البروفايل
-function closeProfile() {
-  profileSection.classList.remove('active');
-  document.body.classList.remove('no-scroll');
-}
+  // قائمة بجميع السكاشن التي تفتح وتغلق
+  const sections = document.querySelectorAll('.profile-details, .order-info, .return-info');
 
-// 1. عند فتح البروفايل: بنضيف خطوة في سجل المتصفح (History State)
-profileBtn.addEventListener('click', () => {
-  profileSection.classList.add('active');
-  document.body.classList.add('no-scroll');
-  history.pushState({ profileOpen: true }, ''); // تسجيل حالة الفتح
-});
-
-// 2. عند الضغط على زر الإغلاق الداخلي: بنعمل رجوع خطوة للخلف
-closeBtn.addEventListener('click', () => {
-  if (history.state && history.state.profileOpen) {
-    history.back(); // ده هيشغل حدث popstate تلقائياً وبيقفل البروفايل
-  } else {
-    closeProfile();
+  // دالة قفل جميع السكاشن
+  function closeAllSections() {
+    sections.forEach(sec => sec.classList.remove('active'));
+    document.body.classList.remove('no-scroll');
   }
-});
 
-// 3. الاستماع لزر/إيماءة الرجوع في التلفون (Back Gesture)
-window.addEventListener('popstate', (e) => {
-  // أول ما المستخدم يسحب من جنب الشاشة للرجوع، بنقفل السيكشن
-  closeProfile();
-});
+  // دالة فتح سيكشن معينة
+  function openTargetSection(selector) {
+    const targetSection = document.querySelector(selector);
+    if (targetSection) {
+      closeAllSections(); // إغلاق أي سيكشن مفتوح سابقاً
+      targetSection.classList.add('active');
+      document.body.classList.add('no-scroll');
+      history.pushState({ activeSection: selector }, '');
+    }
+  }
 
+  // 1. ربط أزرار/عناصر الفتح
+  document.querySelectorAll('.profile').forEach(el => {
+    el.addEventListener('click', () => openTargetSection('.profile-details'));
+  });
+
+  document.querySelectorAll('.orde2r').forEach(el => {
+    el.addEventListener('click', () => openTargetSection('.order-info'));
+  });
+
+  document.querySelectorAll('.retur2n').forEach(el => {
+    el.addEventListener('click', () => openTargetSection('.return-info'));
+  });
+
+  // 2. إغلاق عند الضغط على أيقونة الخروج داخل أي سيكشن
+  document.querySelectorAll('.fa-arrow-right-from-bracket').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (history.state && history.state.activeSection) {
+        history.back();
+      } else {
+        closeAllSections();
+      }
+    });
+  });
+
+  // 3. دعم الرجوع بإيماءة التلفون (Back Gesture)
+  window.addEventListener('popstate', () => {
+    closeAllSections();
+  });
+
+  // 4. دعم السحب للإغلاق (Swipe) لكل السكاشن
+  sections.forEach(section => {
+    let startX = 0;
+    let startY = 0;
+
+    section.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    });
+
+    section.addEventListener('touchend', (e) => {
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+
+      if (endX - startX > 100 || endY - startY > 150) {
+        if (history.state && history.state.activeSection) {
+          history.back();
+        } else {
+          closeAllSections();
+        }
+      }
+    });
+  });
+
+});

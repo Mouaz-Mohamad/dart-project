@@ -1180,7 +1180,7 @@ header {
 
 
 /* ========= Profile info */
-.profile-details{
+.profile-details,.order-info,.return-info{
     width: 100%;
     height: 100vh;
     background-color: var(--white);
@@ -1192,17 +1192,18 @@ header {
     top: 0;
     left: 0;
 
-    box-sizing: border-border-box;
+    box-sizing: border-box;
     overflow-y: auto;
     z-index: 1000;
     display: none;
     overflow-y: auto;
 }
-.profile-details.active {
+.profile-details.active,.order-info.active,.return-info.active {
     display: block;
 }
 .exit-edit{
     margin: 0 10px 50px 0;
+    direction: rtl;
 }
 
 .info-profile{
@@ -1216,4 +1217,21 @@ header {
     border-bottom: 1px solid var(--text-muted);
     width: 100%;
     height: 30px;
+}
+
+.titel-order-row,.titel-return-row{
+    color: var(--white);
+    text-align: center;
+    background-color: var(--bragnte);
+}
+.item-model-code,.titel-order-row span,.titel-return-row span{
+    width: 20%;
+}
+.order-row{
+    border: 1px solid var(--bg-dark);
+    color: var(--bg-dark);
+}
+.item-model-code ,.size,.color,.order-number,.date{
+    width: 20%;
+    text-align: center;
 }
