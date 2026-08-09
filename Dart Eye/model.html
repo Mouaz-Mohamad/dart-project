@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Code</title>
+    <link rel="stylesheet" href="dart.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+</head>
+<body>
+    <header>
+        <div id="menu-container"></div>
+    </header>
+    <main>
+        <section>
+            <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Category</option>
+                        <option value="all">All Categories</option>
+                        <option value="t-shirts">T-Shirts</option>
+                        <option value="hoodies">Hoodies</option>
+                        <option value="pants">Pants</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">Active</option>
+                        <option value="out-of-stock">Out of stock</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Price Range -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Price Range</option>
+                        <option value="0-500">0 - 500 EGP</option>
+                        <option value="500-1000">500 - 1000 EGP</option>
+                        <option value="1000+">1000+ EGP</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- زر Add Product -->
+                <button class="add-btn">
+                    <span>+</span> Add Product
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w100">Photo</h2>
+                    <h2 class="w150">ID Model</h2>
+                    <h2 class="w150">Model Name</h2>
+                    <h2 class="w150">Category</h2>
+                    <h2 class="w150">Description</h2>
+                    <h2 class="w150">Number</h2>
+                    <h2 class="w150">Cost</h2>
+                    <h2 class="w150">Selling</h2>
+                    <h2 class="w150">Discount %</h2>
+                    <h2 class="w150">Discounted price</h2>
+                    <h2 class="w300">Colors</h2>
+                    <h2 class="w300">Sizes</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w150">Date</h2>
+                </div>
+
+                <div id="models-container">
+                    <!-- صف فردي بمثابة نموذج -->
+                    <div class="model-row">
+                        <input type="checkbox" id="check-1" class="model-checkbox">
+                        
+                        <!-- الأزرار بالأيقونات فقط -->
+                        <div class="w100 button">
+                            <button id="btn-delete-1" class="action-btn btn-delete" title="مسح">
+                            <i class="bx bx-trash"></i>
+                            </button>
+                            <button id="btn-edit-1" class="action-btn btn-edit" title="تعديل">
+                            <i class="bx bx-edit"></i>
+                            </button>
+                        </div>
+
+                        <!-- الصورة -->
+                        <div class="w100"> <img src="" id="img-1" class="model-img" alt="Model Photo"></div>
+
+                        <!-- باقي البيانات (Text) -->
+                        <span id="id-model-1" class="text-item w150"></span>
+                        <span id="name-1" class="text-item w150"></span>
+                        <span id="category-1" class="text-item w150"></span>
+                        <span id="description-1" class="text-item w200"></span>
+                        <span id="number-1" class="text-item w150"></span>
+                        <span id="cost-1" class="text-item w150"></span>
+                        <span id="selling-1" class="text-item w150"></span>
+                        <span id="discount-1" class="text-item w150"></span>
+                        <span id="discounted-price-1" class="text-item w150"></span>
+                        <span id="colors-1" class="text-item w300"></span>
+                        <span id="sizes-1" class="text-item w300"></span>
+                        <span id="status-1" class="text-item status-active w150"></span>
+                        <span id="date-1" class="text-item w150"></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script src="dart.js"></script>
+</body>
+</html>

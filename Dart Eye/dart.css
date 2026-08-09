@@ -1,0 +1,348 @@
+/* ربط الخط وأيقونات Boxicons إذا لم تكن مضافة مسبقاً */
+@import url('https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css');
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  color-scheme: light;
+  
+  /* Colors */
+  --bragnte: #AB012B;
+  --secondary: #2196f3;
+  --bg-dark: #1e1e1e;
+  --white: #ffffff;
+  --bg-alt: #f8f9fa;
+  --text-main: #1a1a1a;
+  --text-muted: #5c646c;
+  --border-color: #dee2e6;
+
+  /* Spacing & Radius */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 0.75rem;
+  --spacing-lg: 1rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+}
+
+html {
+  font-size: 100%;
+  scroll-behavior: smooth;
+  direction: ltr;
+  background-color: var(--white);
+  color: var(--text-main);
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-main);
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  background-color: var(--white);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+a:hover { 
+  text-decoration: underline; 
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+input, button, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+input, textarea, select {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--bragnte);
+}
+
+button {
+  cursor: pointer;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: var(--bragnte);
+  color: var(--white);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+button:hover { 
+  background-color: var(--bg-alt);
+  color: var(--bragnte); 
+}
+
+textarea { 
+  resize: vertical; 
+}
+
+/* Sidebar Navigation */
+.cont-menu {
+  width: 18%; /* العرض بـ px أفضل للحفاظ على التناسق */
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: #19485f;
+  background-image: linear-gradient(rgba(25, 72, 95, 0.85), rgba(25, 72, 95, 0.85)), url('../Photos/dart-bird-.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: var(--white);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+  padding: 20px 15px;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.menu li {
+  width: 100%;
+}
+
+.menu li a {
+    font-size: x-larger;
+  display: block;
+  width: 100%;
+  color: var(--white);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.menu li a.active {
+  background-color: var(--bragnte);
+  font-weight: 600;
+}
+
+.menu li a:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.15);
+  text-decoration: none;
+}
+
+section{
+    margin-left: 18%;
+    width: 82%;
+    height: 100vh;
+    background-color: var(--white);
+    padding: 0 ;
+}
+
+/* الحاوية الرئيسية للشريط */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border-radius: 0 50px 50px 0;
+    gap: 15px;
+    background-color: var(--white);
+    padding: 12px 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    flex-wrap: wrap;
+    -webkit-border-radius: 0 50px 50px 0;
+    -moz-border-radius: 0 50px 50px 0;
+    -ms-border-radius: 0 50px 50px 0;
+    -o-border-radius: 0 50px 50px 0;
+}
+
+/* مربع البحث */
+.search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-box input {
+    width: 230px;
+    padding: 8px 35px 8px 15px;
+    border: 1px solid var(--bragnte);
+    border-radius: 20px;
+    outline: none;
+    font-size: 14px;
+    color: var(--bragnte);
+    background: #fff;
+}
+
+.search-box input::placeholder {
+    color: var(--bragnte);
+    opacity: 0.8;
+}
+
+.search-box i {
+    position: absolute;
+    right: 12px;
+    color: var(--bragnte);
+    font-size: 16px;
+    pointer-events: none;
+}
+
+/* قوائم الاختيار Dropdowns */
+.select-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.select-box select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: #fff;
+    border: 1px solid var(--bragnte);
+    border-radius: 10px;
+    padding: 8px 32px 8px 35px;
+    font-size: 14px;
+    color: var(--bragnte);
+    cursor: pointer;
+    outline: none;
+}
+
+/* السهم الأحمر داخل القوائم */
+.select-box .arrow-icon {
+    position: absolute;
+    left: 10px;
+    color: var(--primary-red);
+    font-size: 18px;
+    pointer-events: none;
+}
+
+/* زر إضافة منتج */
+.add-btn span {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.second{
+    text-align: right;
+    margin: 10px 0px;
+    width: 98%;
+}
+
+.cont-titel{
+  overflow: scroll;
+  &::-webkit-scrollbar { display: none; }
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 80.5%;
+  background-color: #19485f;
+}
+.title-name{
+  display: flex;
+  align-items: center;
+  padding: 0 0 0 20px;
+  gap: 10px;
+  background-color: var(--bragnte);
+  margin-bottom: 20px;
+  width: fit-content;
+}
+.title-name input,.model-checkbox{
+  width: 25px;
+  height: 25px;
+  margin-right: 50px;
+}
+.title-name h2{ 
+  font-size: 15px;
+  color: white;
+}
+.w100{width: 100px; flex-shrink: 0;}
+.w150{width: 150px; flex-shrink: 0;}
+.w200{width: 200px; flex-shrink: 0;}
+.w300{width: 300px; flex-shrink: 0;}
+
+
+
+.model-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #ffffff;
+    border: 1px solid #ab012b;
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 10px;
+    font-family: sans-serif;
+    font-size: 14px;
+    color: #333;
+    width: fit-content;
+  }
+
+  /* أزرار الأكشن */
+  .action-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: opacity 0.2s;
+  }
+  
+  .action-btn:hover {
+    opacity: 0.7;
+  }
+
+  .btn-delete { color: #d32f2f; } /* أحمر للمسح */
+  .btn-edit { color: #2e7d32; }   /* أخضر للتعديل */
+
+  /* صورة الموديل */
+  .model-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+  }
+
+  /* النصوص وتنسيق الحالة */
+  .text-item { white-space: nowrap; }
+  .status-active { color: #2e7d32; font-weight: bold; }
+
+  .button{
+    display: flex;
+  }
+#description-1{
+  overflow:scroll;
+    &::-webkit-scrollbar { display: none; }
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
