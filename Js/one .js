@@ -824,3 +824,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const enterBtns = document.querySelectorAll('.enter-btn');
+
+    enterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const form = btn.closest('form');
+            
+            // التحقق من صحة وملء حقول النموذج أولاً
+            if (form && form.checkValidity()) {
+                e.preventDefault();
+                window.location.href = '/profile.html';
+            }
+        });
+    });
+});
