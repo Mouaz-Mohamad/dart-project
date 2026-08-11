@@ -3,17 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Code</title>
+    <title>Dart Dashboard</title>
     <link rel="stylesheet" href="dart.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
 </head>
 <body>
-    <header>
-        <div id="menu-container"></div>
-    </header>
+
+    <!-- القائمة الجانبية (الثابتة) -->
+    <nav class="cont-menu">
+        <img src="dart_logo (3).png" alt="Dart Logo">
+        <ul class="menu">
+            <li><a href="#" data-target="brand">Brand Information</a></li>
+            <li><a href="#" data-target="models" class="active">Model Code</a></li>
+            <li><a href="#" data-target="items">Items Code</a></li>
+            <li><a href="#" data-target="customers">Customers</a></li>
+            <li><a href="#" data-target="orders">Orders</a></li>
+            <li><a href="#" data-target="returns">Returns</a></li>
+            <li><a href="#" data-target="review">Review</a></li>
+            <li><a href="#" data-target="card">Dart Card</a></li>
+        </ul>
+    </nav>
+
     <main>
-        <section>
+        <!-- سكشن Brand Information -->
+        <section id="brand" class="dashboard-section">
+            <h2>Brand Information</h2>
+        </section>
+
+        <!-- سكشن Model Code (النشط افتراضياً) -->
+        <section id="models" class="dashboard-section active-section">
             <div class="filter-bar">
                 <!-- input البحث -->
                 <div class="search-box">
@@ -75,7 +93,7 @@
                     <h2 class="w150">ID Model</h2>
                     <h2 class="w150">Model Name</h2>
                     <h2 class="w150">Category</h2>
-                    <h2 class="w150">Description</h2>
+                    <h2 class="w200">Description</h2>
                     <h2 class="w150">Number</h2>
                     <h2 class="w150">Cost</h2>
                     <h2 class="w150">Selling</h2>
@@ -88,42 +106,20 @@
                 </div>
 
                 <div id="models-container">
-                    <!-- صف فردي بمثابة نموذج -->
-                    <div class="model-row">
-                        <input type="checkbox" id="check-1" class="model-checkbox">
-                        
-                        <!-- الأزرار بالأيقونات فقط -->
-                        <div class="w100 button">
-                            <button id="btn-delete-1" class="action-btn btn-delete" title="مسح">
-                            <i class="bx bx-trash"></i>
-                            </button>
-                            <button id="btn-edit-1" class="action-btn btn-edit" title="تعديل">
-                            <i class="bx bx-edit"></i>
-                            </button>
-                        </div>
-
-                        <!-- الصورة -->
-                        <div class="w100"> <img src="" id="img-1" class="model-img" alt="Model Photo"></div>
-
-                        <!-- باقي البيانات (Text) -->
-                        <span id="id-model-1" class="text-item w150"></span>
-                        <span id="name-1" class="text-item w150"></span>
-                        <span id="category-1" class="text-item w150"></span>
-                        <span id="description-1" class="text-item w200"></span>
-                        <span id="number-1" class="text-item w150"></span>
-                        <span id="cost-1" class="text-item w150"></span>
-                        <span id="selling-1" class="text-item w150"></span>
-                        <span id="discount-1" class="text-item w150"></span>
-                        <span id="discounted-price-1" class="text-item w150"></span>
-                        <span id="colors-1" class="text-item w300"></span>
-                        <span id="sizes-1" class="text-item w300"></span>
-                        <span id="status-1" class="text-item status-active w150"></span>
-                        <span id="date-1" class="text-item w150"></span>
-                    </div>
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
                 </div>
             </div>
         </section>
+
+        <!-- باقي السكاشن -->
+        <section id="items" class="dashboard-section"><h2>Items Code</h2></section>
+        <section id="customers" class="dashboard-section"><h2>Customers</h2></section>
+        <section id="orders" class="dashboard-section"><h2>Orders</h2></section>
+        <section id="returns" class="dashboard-section"><h2>Returns</h2></section>
+        <section id="review" class="dashboard-section"><h2>Review</h2></section>
+        <section id="card" class="dashboard-section"><h2>Dart Card</h2></section>
     </main>
+
     <script src="dart.js"></script>
 </body>
 </html>
