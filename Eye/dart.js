@@ -35,11 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 const modelsData = [
-    { id: "1", modelId: "DA-Jen121", name: "Wide-leg", category: "pants", description: "بنطلون جينز اسباني", number: "24", cost: "490", selling: "690", discount: "0", discountedPrice: "0", colors: "ابيض, اسود", sizes: "32 34 36", status: "Active", date: "18-10-2026", img: "Eye/Dart-Bird-.png" }
+    { id: "1", modelId: "DA-Jen121", name: "Wide-leg", category: "pants", description: "بنطلون جينز اسباني", number: "24", cost: "490", selling: "690", discount: "0", discountedPrice: "0", colors: "ابيض, اسود", sizes: "32 34 36", status: "Active", date: "18-10-2026", img: "https://images.unsplash.com/photo-1542272604-787c3835535d" }
 ];
 
 const itemsData = [
-    { id: "1", modelId: "DA-Jen121", itemCode: "IT-992", color: "اسود", size: "34", status: "In stock", regDate: "18-10-2026", orderId: "ORD-200", clientName: "محمد علي", clientId: "C-101", phone1: "0100000000", phone2: "-", email: "user@mail.com", purchaseDate: "20-10-2026", img: "Eye/Dart-Bird-.png" }
+    { id: "1", modelId: "DA-Jen121", itemCode: "IT-992", color: "اسود", size: "34", status: "In stock", regDate: "18-10-2026", orderId: "ORD-200", clientName: "محمد علي", clientId: "C-101", phone1: "0100000000", phone2: "-", email: "user@mail.com", purchaseDate: "20-10-2026", img: "https://images.unsplash.com/photo-1542272604-787c3835535d" }
 ];
 
 const customersData = [
@@ -112,7 +112,7 @@ function renderItems(dataArray) {
                     <button class="action-btn btn-delete"><i class="bx bx-trash"></i></button>
                     <button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>
                 </div>
-                <div class="w100"><img src="${item.img}" alt="item" class="product-img"></div>
+                <div class="w100"><img src="${item.img}" alt="item" class="product-img model-img"></div>
                 <span class="text-item w150">${item.modelId}</span>
                 <span class="text-item w150">${item.itemCode}</span>
                 <span class="text-item w150">${item.color}</span>
@@ -207,18 +207,16 @@ function renderReturns(dataArray) {
         container.insertAdjacentHTML('beforeend', `
             <div class="model-row" style="display:flex; align-items:center;">
                 <input type="checkbox" class="model-checkbox">
-                <div class="w100 button">
+                <div class="w150 button">
                     <button class="action-btn btn-delete"><i class="bx bx-trash"></i></button>
                     <button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>
+                    <button class="btn-good" style="display: ${isGood ? 'none' : 'inline-block'}; color: green;   background-color: white; border: 1px solid green; padding: 5px; cursor: pointer;" onclick="toggleReturnStatus(this)">Good</button>
+                    <button class="btn-bad" style="display: ${isGood ? 'inline-block' : 'none'}; color: red; background-color: white; border: 1px solid red; padding: 5px; cursor: pointer;" onclick="toggleReturnStatus(this)">Bad</button>
                 </div>
-                <div class="w100 button">
-                    <button class="btn-good" style="display: ${isGood ? 'none' : 'inline-block'}; color: white; border: 1px solid green; padding: 5px; cursor: pointer;" onclick="toggleReturnStatus(this)">Good</button>
-                    <button class="btn-bad" style="display: ${isGood ? 'inline-block' : 'none'}; color: white; border: 1px solid red; padding: 5px; cursor: pointer;" onclick="toggleReturnStatus(this)">Bad</button>
-                </div>
-                <span class="text-item w100">${item.returnId}</span>
+                <span class="text-item w150">${item.returnId}</span>
                 <span class="text-item w150">${item.modelId}</span>
                 <span class="text-item w150">${item.itemCode}</span>
-                <span class="text-item w150 status-text" style="font-weight:bold;">${item.status}</span>
+                <span class="text-item w150 status-text" style="font-weight:600; font-size:20px;">${item.status}</span>
                 <span class="text-item w150">${item.date}</span>
                 <span class="text-item overflow w200">${item.clientName}</span>
                 <span class="text-item w150">${item.clientId}</span>
@@ -321,10 +319,16 @@ function toggleReturnStatus(btn) {
     if (btn.classList.contains('btn-good')) {
         goodBtn.style.display = 'none';
         badBtn.style.display = 'inline-block';
-        statusText.textContent = 'Good';
+        badBtn.style.backgroundColor = 'red'; // لون خلفية الباد أحمر
+        badBtn.style.color = 'white';
+        statusText.textContent = '.Good';
+        statusText.style.color = 'green';
     } else {
         goodBtn.style.display = 'inline-block';
         badBtn.style.display = 'none';
-        statusText.textContent = 'Bad';
+        goodBtn.style.backgroundColor = 'green'; // لون خلفية الجود أخضر
+        goodBtn.style.color = 'white';
+        statusText.textContent = '.Bad';
+        statusText.style.color = 'red';
     }
 }
