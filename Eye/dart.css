@@ -64,6 +64,7 @@ img, picture, video, canvas, svg {
   display: block;
   max-width: 100%;
   height: auto;
+  aspect-ratio: 1/1;
 }
 
 input, button, textarea, select {

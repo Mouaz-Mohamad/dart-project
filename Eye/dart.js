@@ -81,7 +81,7 @@ function renderModels(dataArray) {
                     <button class="action-btn btn-delete"><i class="bx bx-trash"></i></button>
                     <button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>
                 </div>
-                <div class="w100"><img src="${item.img}" alt="product" class="product-img"></div>
+                <div class="w100"><img src="${item.img}" alt="product" class="product-img model-img"></div>
                 <span class="text-item w150">${item.modelId}</span>
                 <span class="text-item w150">${item.name}</span>
                 <span class="text-item w150">${item.category}</span>
