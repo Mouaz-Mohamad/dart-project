@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dart Dashboard</title>
+    <link rel="stylesheet" href="dart.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+
+    <!-- القائمة الجانبية (الثابتة) -->
+    <nav class="cont-menu">
+        <img src="dart_logo.png" alt="Dart Logo">
+        <ul class="menu">
+            <li><a href="#" data-target="brand">Brand Information</a></li>
+            <li><a href="#" data-target="models" class="active">Model Code</a></li>
+            <li><a href="#" data-target="items">Items Code</a></li>
+            <li><a href="#" data-target="customers">Customers</a></li>
+            <li><a href="#" data-target="orders">Orders</a></li>
+            <li><a href="#" data-target="returns">Returns</a></li>
+            <li><a href="#" data-target="review">Review</a></li>
+            <li><a href="#" data-target="card">Dart Card</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <!-- سكشن Brand Information -->
+        <section id="brand" class="dashboard-section">
+            <h2>Brand Information</h2>
+        </section>
+
+        <!-- سكشن Model Code (النشط افتراضياً) -->
+        <section id="models" class="dashboard-section active-section">
+            <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Category</option>
+                        <option value="all">All Categories</option>
+                        <option value="t-shirts">T-Shirts</option>
+                        <option value="hoodies">Hoodies</option>
+                        <option value="pants">Pants</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">Active</option>
+                        <option value="out-of-stock">Out of stock</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Price Range -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Price Range</option>
+                        <option value="0-500">0 - 500 EGP</option>
+                        <option value="500-1000">500 - 1000 EGP</option>
+                        <option value="1000+">1000+ EGP</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- زر Add Product -->
+                <button class="add-btn">
+                    <span>+</span> Add Product
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w100">Photo</h2>
+                    <h2 class="w150">ID Model</h2>
+                    <h2 class="w150">Model Name</h2>
+                    <h2 class="w150">Category</h2>
+                    <h2 class="w200">Description</h2>
+                    <h2 class="w150">Number</h2>
+                    <h2 class="w150">Cost</h2>
+                    <h2 class="w150">Selling</h2>
+                    <h2 class="w150">Discount %</h2>
+                    <h2 class="w150">Discounted price</h2>
+                    <h2 class="w300">Colors</h2>
+                    <h2 class="w300">Sizes</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w150">Date</h2>
+                </div>
+
+                <div id="models-container">
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
+                </div>
+            </div>
+        </section>
+
+        <!-- items -->
+        <section id="items" class="dashboard-section">
+            <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Category</option>
+                        <option value="all">All Categories</option>
+                        <option value="t-shirts">T-Shirts</option>
+                        <option value="hoodies">Hoodies</option>
+                        <option value="pants">Pants</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">In stock</option>
+                        <option value="out-of-stock">Sold</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Price Range -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Sizes</option>
+                        <option value="36 XL">36 XL</option>
+                        <option value="34 L">34 L</option>
+                        <option value="32 M">32 M</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Colors</option>
+                        <option value="بيج">بيج</option>
+                        <option value="ابيض">ابيض</option>
+                        <option value="اسود">اسود</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- زر Add Product -->
+                <button class="add-btn">
+                    <span>+</span> Add Items
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w100">Photo</h2>
+                    <h2 class="w150">ID Model</h2>
+                    <h2 class="w150">Item Code</h2>
+                    <h2 class="w150">Color</h2>
+                    <h2 class="w150">Size</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w200">Registration Date</h2>
+                    <h2 class="w150">ID Order</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w300">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                    <h2 class="w150">Date of Purchase</h2>
+                </div>
+
+                <div id="items-container">
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Customers -->
+        <section id="customers" class="dashboard-section">
+                    <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Monthly order</option>
+                        <option value="up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Dart Card</option>
+                        <option value="yes">yes</option>
+                        <option value="no">no</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Price Range -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Date Birthday</option>
+                        <option value="tomorrow">Tomorrow</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- زر Add Product -->
+                <button class="add-btn">
+                    <span>+</span> Add Clintes
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w150">Birthday</h2>
+                    <h2 class="w150">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w200">E-Mail</h2>
+                    <h2 class="w150">The Country</h2>
+                    <h2 class="w200">governorate</h2>
+                    <h2 class="w150">Monthly Orders</h2>
+                    <h2 class="w150">Total Orders</h2>
+                    <h2 class="w300">Total amount</h2>
+                    <h2 class="w200">Dart Cart</h2>
+                </div>
+
+                <div id="customers-container">
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
+                </div>
+            </div>
+        </section>
+
+        <!-- order -->
+        <section id="orders" class="dashboard-section"><h2>Orders</h2></section>
+
+        <!-- return -->
+        <section id="returns" class="dashboard-section">
+            <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Reason</option>
+                        <option value="wrong_size">المقاس غير مناسب</option>
+                        <option value="defective">المنتج به عيب تصنيع أو تلف</option>
+                        <option value="not_as_described">المنتج يختلف عن الصورة أو الوصف</option>
+                        <option value="wrong_item">استلمت منتجًا مختلفًا عن طلبي</option>
+                        
+                        <!-- خيارات جودة أو تفضيل -->
+                        <option value="quality_issue">خامة المنتج لم تعجبني</option>
+                        <option value="changed_mind">لم أعد بحاجة إلى المنتج (تغيير رأي)</option>
+                        <option value="missing_parts">يوجد نقص في محتويات الشحنة</option>
+                        
+                        <!-- خيار عام -->
+                        <option value="other">سبب آخر</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="Good">Good</option>
+                        <option value="Bad">Bad</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- زر Add Product -->
+                <button class="add-btn">
+                    <span>+</span> Add Return
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w150">ID-return</h2>
+                    <h2 class="w150">ID Model</h2>
+                    <h2 class="w150">Item Code</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w150">Date</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                    <h2 class="w150">Reason</h2>
+                    <h2 class="w150">ID Order</h2>
+                </div>
+
+                <div id="returns-container">
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
+                </div>
+            </div>
+        </section>
+
+        <!-- review -->
+        <section id="review" class="dashboard-section">
+            <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Star Rating</option>
+                        <option value="Up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">Active</option>
+                        <option value="hidden">Hidden</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- زر Add Product -->
+                <button class="add-btn">
+                    <span>+</span> Add Review
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w200">Date</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w100">Star Rating</h2>
+                    <h2 class="w300">Reviewer's Title</h2>
+                    <h2 class="w500">Review</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                </div>
+
+                <div id="review-container">
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
+                </div>
+            </div>
+        </section>
+        
+        <!-- dart card -->
+        <section id="card" class="dashboard-section">
+            <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>EXP date</option>
+                        <option value="up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Purchased Items</option>
+                        <option value="up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Dart Card</option>
+                        <option value="yes">yes</option>
+                        <option value="no">no</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w150">ID-Card</h2>
+                    <h2 class="w150">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w200">E-Mail</h2>
+                    <h2 class="w150">States</h2>
+                    <h2 class="w200">Card issuance date</h2>
+                    <h2 class="w150">EXP date</h2>
+                    <h2 class="w150">Purchased Items</h2>
+                    <h2 class="w150">Purchased limet</h2>
+                    <h2 class="w1200">Requested products</h2>
+                </div>
+
+                <div id="card-container">
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="dart.js"></script>
+</body>
+</html>

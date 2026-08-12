@@ -285,6 +285,9 @@ section{
 .w150{width: 150px; flex-shrink: 0;}
 .w200{width: 200px; flex-shrink: 0;}
 .w300{width: 300px; flex-shrink: 0;}
+.w500{width: 500px; flex-shrink: 0;}
+.w1000{width: 1000px; flex-shrink: 0;}
+.w1200{width: 1200px; flex-shrink: 0;}
 
 .model-row {
     display: flex;
@@ -334,7 +337,7 @@ section{
     display: flex;
 }
 
-#description-1{
+.overflow{
   overflow:scroll;
   &::-webkit-scrollbar { display: none; }
   scrollbar-width: none;
