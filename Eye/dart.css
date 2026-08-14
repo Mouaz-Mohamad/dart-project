@@ -37,6 +37,10 @@ html {
   direction: ltr;
   background-color: var(--white);
   color: var(--text-main);
+    overflow:scroll;
+  &::-webkit-scrollbar { display: none; }
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 body {
@@ -49,6 +53,10 @@ body {
   background-color: var(--white);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+    overflow:scroll;
+  &::-webkit-scrollbar { display: none; }
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 a {
@@ -330,7 +338,13 @@ section{
     object-fit: contain;
 }
 
-.text-item { white-space: nowrap; }
+.text-item {
+  white-space: nowrap;
+  overflow:scroll;
+  &::-webkit-scrollbar { display: none; }
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
 .status-active { color: #2e7d32; font-weight: bold; }
 
 .button{
@@ -351,4 +365,296 @@ section{
 
 .dashboard-section.active-section {
     display: block;
+}
+
+.cont-card-info{
+  display: flex;
+  justify-content: space-around;
+  gap: 5px;
+  padding: 5px;
+  padding: 20px 10px;
+}
+.card-inf{
+  background: rgba(255, 255, 255, 0.30);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 7px 10px;
+}
+.span-img{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 5px;
+  font-size: xx-large;
+  width: 200px;
+}
+.card-inf h5{
+  color: var(--text-muted);
+}
+
+
+
+
+/* ===================================== */
+
+/* Modal Overlay */
+/* ==========================================
+   تنسيقات Modal الموحدة (أبعاد ثابتة وتمركز)
+   ========================================== */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: fixed;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    -webkit-transform: translate(-50%, -50%);
+    -moz-transform: translate(-50%, -50%);
+    -ms-transform: translate(-50%, -50%);
+    -o-transform: translate(-50%, -50%);
+}
+
+.close-modal,.close-item-modal {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #333;
+    transition: color 0.2s ease;
+    margin-bottom: 20px;
+}
+
+.close-modal:hover,.close-item-modal:hover {
+    color: var(--bragnte, #ab012b);
+}
+
+.modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-group input, 
+.form-group select, 
+.form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    color: #333;
+    background-color: #fafafa;
+}
+
+.form-group input:focus, 
+.form-group select:focus, 
+.form-group textarea:focus {
+    border-color: var(--bragnte, #ab012b);
+    background-color: #fff;
+}
+
+.price-summary {
+    margin-top: 15px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.price-summary strong {
+    color: var(--bragnte, #ab012b);
+    margin-left: 8px;
+}
+
+.btn-done {
+    width: 100%;
+    background-color: var(--bragnte, #ab012b);
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.30s ease;
+    -webkit-transition: background 0.30s ease;
+    -moz-transition: background 0.30s ease;
+    -ms-transition: background 0.30s ease;
+    -o-transition: background 0.30s ease;
+}
+
+
+/* ضبط المسافة بين الحقول لتكون 10 بكسل فقط */
+.modal form .input-group, 
+.modal form div {
+    margin-bottom: 10px !important;
+}
+
+/* توحيد شكل الـ Select مع الـ Inputs الحالية */
+.modal-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.modal-select:focus {
+    border-color: #8B263E; /* أو لون الحدود المناسب لديك */
+    background-color: #fff;
+}
+/* ==========================================
+   كلاسات التنسيق البديلة للـ Inline Styles
+   ========================================== */
+.row-action-btns {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.btn-status-prev {
+    background-color: #f8f9fa;
+    color: #333;
+    border: 1px solid #ccc;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.btn-status-next {
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.status-delivered-text {
+    font-size: 12px;
+    color: #155724;
+    font-weight: bold;
+}
+
+.order-items-grid {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.order-item-chip {
+    border: 1px solid #ddd;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.order-final-amount {
+    font-weight: bold;
+    color: var(--bragnte, #ab012b);
+}
+
+.card-items-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.card-item-chip {
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+}
+
+.row-deleted {
+    display: flex;
+    align-items: center;
+    text-decoration: line-through;
+    opacity: 0.5;
+    background-color: #f8d7da;
+}
+
+.row-normal {
+    display: flex;
+    align-items: center;
+}
+
+.return-toggle-btn {
+    background-color: #fff;
+    padding: 5px;
+    cursor: pointer;
+}
+
+.return-status-good {
+    color: green;
+    border: 1px solid green;
+}
+
+.return-status-bad {
+    color: red;
+    border: 1px solid red;
+}
+
+.review-toggle-btn {
+    background-color: #fff;
+    padding: 5px;
+    cursor: pointer;
+}
+
+.review-status-active {
+    color: red;
+    border: 1px solid red;
+}
+
+.review-status-hidden {
+    color: green;
+    border: 1px solid green;
 }

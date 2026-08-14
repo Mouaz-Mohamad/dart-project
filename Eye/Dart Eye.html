@@ -30,7 +30,7 @@
             <h2>Brand Information</h2>
         </section>
 
-        <!-- سكشن Model Code (النشط افتراضياً) -->
+        <!-- سكشن Model Code -->
         <section id="models" class="dashboard-section active-section">
             <div class="filter-bar">
                 <!-- input البحث -->
@@ -204,7 +204,7 @@
 
         <!-- Customers -->
         <section id="customers" class="dashboard-section">
-                    <div class="filter-bar">
+            <div class="filter-bar">
                 <!-- input البحث -->
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
@@ -243,7 +243,7 @@
                 </div>
 
                 <!-- زر Add Product -->
-                <button class="add-btn">
+                <button class="add-btn" id="openCustomerModalBtn">
                     <span>+</span> Add Clintes
                 </button>
             </div>
@@ -280,7 +280,125 @@
         </section>
 
         <!-- order -->
-        <section id="orders" class="dashboard-section"><h2>Orders</h2></section>
+        <section id="orders" class="dashboard-section">
+            <div class="cont-card-info">
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">556</span>
+                        <i class="fa-solid fa-spinner fa-lg" style="color: rgb(255, 212, 59);"></i>
+                    </div>
+                    <h5>Pending Orders</h5>
+                </div>
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">454</span>
+                        <i class="fa-solid fa-calendar-check fa-lg" style="color: rgb(99, 230, 190);"></i>                </div>
+                    <h5>Completed Orders</h5>
+                </div>
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">6</span>
+                        <i class="fa-solid fa-cart-plus fa-lg" style="color: rgb(177, 151, 252);"></i>
+                    </div>
+                    <h5>New Orders</h5>
+                </div>
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">55.9 M</span>
+                        <i class="fa-solid fa-sack-dollar fa-lg" style="color: rgb(171, 1, 43);"></i>
+                    </div>
+                    <h5>Total amount</h5>
+                </div>
+            </div>
+
+            <div class="filter-bar">
+                <!-- input البحث -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+
+                <!-- قائمة Category -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Date Order</option>
+                        <option value="an-hour-ago">An hour ago</option>
+                        <option value="two-hours-ago"> Two hours ago</option>
+                        <option value="five-hours-ago"> Five hours ago</option>
+                        <option value="today"> Today</option>
+                        <option value="yesterday"> Yesterday</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- قائمة Status -->
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="pendig">Pendig</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="out for delivery">Out for Delivery</option>
+                        <option value="deliverd">Deliverd</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Total Price</option>
+                        <option value="up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+
+                <!-- زر Add Product -->
+                <button class="add-btn" id="openModalBtn">
+                    <span>+</span> Add Order
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w300">Action</h2>
+                    <h2 class="w150">ID Order</h2>
+                    <h2 class="w150">Date</h2>
+                    <h2 class="w150">Time</h2>
+                    <h2 class="w200">Status</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                    <h2 class="w150">Total products</h2>
+                    <h2 class="w500">Requested products</h2>
+                    <h2 class="w150">Total Price</h2>
+                    <h2 class="w150">Discounts %</h2>
+                    <h2 class="w150">Reason Deduction</h2>
+                    <h2 class="w150">The final amount</h2>
+                    <h2 class="w150">payment method</h2>
+                    <h2 class="w150">Delivery Notes</h2>
+                    <h2 class="w150">Country</h2>
+                    <h2 class="w150">Governorate</h2>
+                    <h2 class="w150">Name Area</h2>
+                    <h2 class="w150">Street name</h2>
+                    <h2 class="w150">Building<br> Number / Name</h2>
+                    <h2 class="w150">Floor</h2>
+                </div>
+
+                <div id="orders-container">
+                    <!-- سيتم تعبئته عبر الجافاسكربت -->
+                </div>
+            </div>
+        </section>
 
         <!-- return -->
         <section id="returns" class="dashboard-section">
@@ -403,7 +521,7 @@
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w100">Action</h2>
+                    <h2 class="w200">Action</h2>
                     <h2 class="w200">Date</h2>
                     <h2 class="w200">Client Name</h2>
                     <h2 class="w150">ID Clinte</h2>
@@ -492,6 +610,374 @@
             </div>
         </section>
     </main>
+
+
+
+<!-- ==================================== -->
+<!-- 1. Modal إضافة / تعديل الموديل -->
+<div id="model-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-model-btn">&times;</span>
+        <form id="model-form">
+            <input type="hidden" id="modal-edit-id">
+            <div class="modal-grid">
+                <div class="modal-col">
+                    <div class="form-group">
+                        <label for="modal-id">ID Model</label>
+                        <input type="text" id="modal-id" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-name">Model Name</label>
+                        <input type="text" id="modal-name" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-category">Category</label>
+                        <select id="modal-category" required>
+                            <option value="" disabled selected hidden>Value</option>
+                            <option value="t-shirts">T-Shirts</option>
+                            <option value="hoodies">Hoodies</option>
+                            <option value="pants">Pants</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-description">Description</label>
+                        <textarea id="modal-description" placeholder="+ Value" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-discount">Discount %</label>
+                        <input type="number" id="modal-discount" placeholder="Value" value="0">
+                    </div>
+                    <div class="price-summary">
+                        <span>Final Price :</span>
+                        <strong id="modal-final-price">0 EGP</strong>
+                    </div>
+                </div>
+                <div class="modal-col">
+                    <div class="form-group">
+                        <label for="modal-cost">Cost</label>
+                        <input type="number" id="modal-cost" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-selling">Selling</label>
+                        <input type="number" id="modal-selling" placeholder="Value" required>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px;">
+                        <button type="submit" id="btn-submit-modal" class="btn-done">DONE</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 2. Modal القطع (Items) -->
+<div id="item-add-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-item-add-btn">&times;</span>
+        <form id="item-add-form">
+            <input type="hidden" id="modal-item-add-edit-id">
+            <div class="form-group">
+                <label>Photo</label>
+                <input type="file" id="modal-item-file" accept="image/*" required>
+            </div>
+            <div class="form-group">
+                <label>Model Code</label>
+                <input type="text" id="modal-item-model-id" list="models-list" placeholder="اختر أو اكتب كود الموديل" required>
+                <datalist id="models-list"></datalist>
+            </div>
+            <div class="form-group">
+                <label>Code PIC</label>
+                <input type="text" id="modal-item-code-pic" required>
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <input type="text" id="modal-item-color" required>
+            </div>
+            <div class="form-group">
+                <label>Size</label>
+                <input type="text" id="modal-item-size" required>
+            </div>
+            <button type="submit" class="btn-submit">Save</button>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 3. Modal الطلبات (Orders) -->
+<div class="modal" id="orderModal">
+    <div class="modal-content">
+        <span class="close-modal" id="closeModalBtn">&times;</span>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <input type="text" id="orderSearchInput" placeholder="search about client" required>
+        </div>
+        <form id="orderForm">
+            <div class="modal-grid">
+                <div class="column">
+                    <div class="form-group">
+                        <label for="clientName">Name</label>
+                        <input type="text" id="clientName" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientId">id client</label>
+                        <input type="text" id="clientId" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone1">Phone number</label>
+                        <input type="text" id="phone1" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone2">Phone number 2</label>
+                        <input type="text" id="phone2" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">E-Mail</label>
+                        <input type="email" id="email" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentMethod">Payment Method</label>
+                        <select id="paymentMethod">
+                            <option value="">Select Payment Method</option>
+                            <option value="cash">Cash on Delivery</option>
+                            <option value="visa">Visa / Credit Card</option>
+                            <option value="wallet">Vodafone Cash / Wallet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="deliveryNotes">Delivery Notes</label>
+                        <textarea id="deliveryNotes" placeholder="Value" rows="2" required></textarea>
+                    </div>
+                    <div class="price-summary">
+                        <p>Subtotal : <strong id="subtotalVal">0.00 EGP</strong></p>
+                        <p>Discount : <strong id="discountVal">0.00 EGP</strong></p>
+                        <p>Total : <strong id="totalVal">0.00 EGP</strong></p>
+                    </div>
+                    <button type="submit" class="btn-done">DONE</button>
+                </div>
+                <div class="column">
+                    <div class="form-group">
+                        <label for="productsInputCode">Products (Item Codes)</label>
+                        <input type="text" id="productsInputCode" list="items-datalist" placeholder="اكتب أو اختر كود القطعة...">
+                        <datalist id="items-datalist"></datalist>
+                        <button type="button" id="addProductBtn">إضافة للطلب</button>
+                        <div id="selectedProductsList"></div>
+                    </div>
+                    <input type="hidden" id="modal-order-edit-id">
+                    <div class="form-group">
+                        <label for="deductions">Deductions</label>
+                        <input type="number" id="deductions" placeholder="Value" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="customDiscount">Custom Discount</label>
+                        <input type="number" id="customDiscount" placeholder="Value" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderCountry">Country</label>
+                        <input type="text" id="orderCountry" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="governorate">Governorate</label>
+                        <input type="text" id="governorate" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderArea">Area</label>
+                        <input type="text" id="orderArea" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderStreetName">Street Name</label>
+                        <input type="text" id="orderStreetName" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderBuildingNumber">Building Number/Name</label>
+                        <input type="text" id="orderBuildingNumber" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderFloor">Floor</label>
+                        <input type="text" id="orderFloor" placeholder="Value" required>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 4. Modal العملاء الأساسي (Customer Profile) -->
+<div class="modal" id="customerModal">
+    <div class="modal-content">
+        <span class="close-modal close-customer-modal">&times;</span>
+        <form id="customerForm">
+            <input type="hidden" id="modal-customer-edit-id">
+            <div class="modal-grid">
+                <div class="modal-column">
+                    <div class="form-group">
+                        <label for="custName">Name</label>
+                        <input type="text" id="custName" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="custBirthday">Birthday</label>
+                        <input type="text" id="custBirthday" placeholder="Value">
+                    </div>
+                    <div class="form-group">
+                        <label for="custEmail">E-Mail</label>
+                        <input type="email" id="custEmail" placeholder="Value">
+                    </div>
+                    <div class="form-group" style="margin-top: 30px;">
+                        <button type="submit" class="btn-done">DONE</button>
+                    </div>
+                </div>
+                <div class="modal-column">
+                    <div class="form-group">
+                        <label for="custPhone1">Phone number</label>
+                        <input type="text" id="custPhone1" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="custPhone2">Phone number 2</label>
+                        <input type="text" id="custPhone2" placeholder="Value">
+                    </div>
+                    <div class="form-group">
+                        <label for="custCountry">Country</label>
+                        <select id="custCountry" class="modal-input" required>
+                            <option value="" disabled selected>Value</option>
+                            <option value="Egypt">Egypt</option>
+                        </select>            
+                    </div>
+                    <div class="form-group">
+                        <label for="custGovernorate">Governorate</label>
+                        <select id="custGovernorate" class="modal-input" required>
+                            <option value="" disabled selected>Value</option>
+                            <option value="Cairo">Cairo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 5. Modal المرتجعات (Returns / Item Edit) -->
+<div class="modal" id="return-modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-return-btn">&times;</span>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
+                <input type="text" id="returnSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
+                <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
+            </div>
+        </div>
+        <form id="return-form">
+            <input type="hidden" id="modal-return-edit-id">
+            <div class="modal-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="modal-return-name" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>Item code</label>
+                    <input type="text" id="modal-return-item-code" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>Phone number</label>
+                    <input type="text" id="modal-return-phone1" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>Model code</label>
+                    <input type="text" id="modal-return-model-id" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>Phone number 2</label>
+                    <input type="text" id="modal-return-phone2" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>E-Mail</label>
+                    <input type="email" id="modal-return-email" placeholder="Value">
+                </div>
+                <!-- حقل حالة المنتج -->
+<div class="input-group">
+    <label>Condition of returned item</label>
+    <select id="modal-item-condition" class="modal-select">
+        <option value="Good">Good</option>
+        <option value="Bad">Bad</option>
+    </select>
+</div>
+
+<!-- حقل سبب الاسترجاع -->
+<div class="input-group">
+    <label>Reason for return</label>
+    <select id="modal-item-reason" class="modal-select">
+        <option value="المقاس صغير">المقاس صغير</option>
+        <option value="المقاس كبير">المقاس كبير</option>
+        <option value="عيب في المنتج">عيب في المنتج</option>
+        <option value="غير مطابق للصورة">غير مطابق للصورة</option>
+        سبب آخر
+    </select>
+</div>
+            </div>
+            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 6. Modal مراجعات العملاء (Customer Review Modal) -->
+<div class="modal" id="customer-review-modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-review-btn">&times;</span>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
+                <input type="text" id="reviewSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
+                <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
+            </div>
+        </div>
+        <form id="customer-review-form">
+            <input type="hidden" id="modal-review-edit-id">
+            <div class="modal-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="modal-cust-rev-name" placeholder="Value">
+                </div>
+                <!-- Star Rating (Select) -->
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Star Rating</label>
+                    <select id="modal-cust-rating" class="modal-select">
+                        <option value="1">1 Star</option>
+                        <option value="2">2 Stars</option>
+                        <option value="3">3 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="5" selected>5 Stars</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Phone number</label>
+                    <input type="text" id="modal-cust-rev-phone1" placeholder="Value">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Customer Review</label>
+                    <textarea id="modal-cust-review" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Phone number 2</label>
+                    <input type="text" id="modal-cust-rev-phone2" placeholder="Value">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Reviewer's Title</label>
+                    <textarea id="modal-cust-title" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>E-Mail</label>
+                    <input type="email" id="modal-cust-rev-email" placeholder="Value">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Message</label>
+                    <textarea id="modal-cust-message" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                </div>
+            </div>
+            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+        </form>
+    </div>
+</div>
+    <!-- ==================================== -->
 
     <script src="dart.js"></script>
 </body>
