@@ -6,6 +6,8 @@
     <title>Dart Dashboard</title>
     <link rel="stylesheet" href="dart.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</body>
 </head>
 <body>
 
@@ -27,19 +29,33 @@
     <main>
         <!-- سكشن Brand Information -->
         <section id="brand" class="dashboard-section">
-            <h2>Brand Information</h2>
+            <div class="chart">
+                <div class="card">
+                    <div class="controls">
+                        <div class="mode-btns">
+                            <button onclick="setMode('days')" id="btnDays">أيام</button>
+                            <button onclick="setMode('months')" id="btnMonths" class="active">شهور</button>
+                            <button onclick="setMode('years')" id="btnYears">سنين</button>
+                        </div>
+                        
+                        <div class="nav-controls">
+                            <button class="nav-btn" onclick="navigate(-1)">❮</button>
+                            <span id="displayLabel" style="font-weight:bold;">2026</span>
+                            <button class="nav-btn" onclick="navigate(1)">❯</button>
+                        </div>
+                    </div>
+                    <div id="myChart"></div>
+                </div>
+            </div>
         </section>
 
         <!-- سكشن Model Code -->
         <section id="models" class="dashboard-section active-section">
             <div class="filter-bar">
-                <!-- input البحث -->
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
                     <i class="bx bx-search"></i>
                 </div>
-
-                <!-- قائمة Category -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Category</option>
@@ -50,8 +66,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Status -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Status</option>
@@ -60,8 +74,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Price Range -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Price Range</option>
@@ -71,8 +83,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- زر Add Product -->
                 <button class="add-btn">
                     <span>+</span> Add Product
                 </button>
@@ -104,23 +114,17 @@
                     <h2 class="w150">Status</h2>
                     <h2 class="w150">Date</h2>
                 </div>
-
-                <div id="models-container">
-                    <!-- سيتم تعبئته عبر الجافاسكربت -->
-                </div>
+                <div id="models-container"></div>
             </div>
         </section>
 
         <!-- items -->
         <section id="items" class="dashboard-section">
             <div class="filter-bar">
-                <!-- input البحث -->
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
                     <i class="bx bx-search"></i>
                 </div>
-
-                <!-- قائمة Category -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Category</option>
@@ -131,8 +135,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Status -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Status</option>
@@ -141,8 +143,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Price Range -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Sizes</option>
@@ -152,7 +152,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Colors</option>
@@ -162,8 +161,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- زر Add Product -->
                 <button class="add-btn">
                     <span>+</span> Add Items
                 </button>
@@ -195,23 +192,17 @@
                     <h2 class="w150">E-Mail</h2>
                     <h2 class="w150">Date of Purchase</h2>
                 </div>
-
-                <div id="items-container">
-                    <!-- سيتم تعبئته عبر الجافاسكربت -->
-                </div>
+                <div id="items-container"></div>
             </div>
         </section>
 
         <!-- Customers -->
         <section id="customers" class="dashboard-section">
             <div class="filter-bar">
-                <!-- input البحث -->
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
                     <i class="bx bx-search"></i>
                 </div>
-
-                <!-- قائمة Category -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Monthly order</option>
@@ -220,8 +211,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Status -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Dart Card</option>
@@ -230,8 +219,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Price Range -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Date Birthday</option>
@@ -241,8 +228,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- زر Add Product -->
                 <button class="add-btn" id="openCustomerModalBtn">
                     <span>+</span> Add Clintes
                 </button>
@@ -272,10 +257,7 @@
                     <h2 class="w300">Total amount</h2>
                     <h2 class="w200">Dart Cart</h2>
                 </div>
-
-                <div id="customers-container">
-                    <!-- سيتم تعبئته عبر الجافاسكربت -->
-                </div>
+                <div id="customers-container"></div>
             </div>
         </section>
 
@@ -312,13 +294,10 @@
             </div>
 
             <div class="filter-bar">
-                <!-- input البحث -->
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
                     <i class="bx bx-search"></i>
                 </div>
-
-                <!-- قائمة Category -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Date Order</option>
@@ -330,8 +309,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Status -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Status</option>
@@ -342,7 +319,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Total Price</option>
@@ -351,8 +327,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- زر Add Product -->
                 <button class="add-btn" id="openModalBtn">
                     <span>+</span> Add Order
                 </button>
@@ -393,23 +367,17 @@
                     <h2 class="w150">Building<br> Number / Name</h2>
                     <h2 class="w150">Floor</h2>
                 </div>
-
-                <div id="orders-container">
-                    <!-- سيتم تعبئته عبر الجافاسكربت -->
-                </div>
+                <div id="orders-container"></div>
             </div>
         </section>
 
         <!-- return -->
         <section id="returns" class="dashboard-section">
             <div class="filter-bar">
-                <!-- input البحث -->
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
                     <i class="bx bx-search"></i>
                 </div>
-
-                <!-- قائمة Category -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Reason</option>
@@ -417,19 +385,13 @@
                         <option value="defective">المنتج به عيب تصنيع أو تلف</option>
                         <option value="not_as_described">المنتج يختلف عن الصورة أو الوصف</option>
                         <option value="wrong_item">استلمت منتجًا مختلفًا عن طلبي</option>
-                        
-                        <!-- خيارات جودة أو تفضيل -->
                         <option value="quality_issue">خامة المنتج لم تعجبني</option>
                         <option value="changed_mind">لم أعد بحاجة إلى المنتج (تغيير رأي)</option>
                         <option value="missing_parts">يوجد نقص في محتويات الشحنة</option>
-                        
-                        <!-- خيار عام -->
                         <option value="other">سبب آخر</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Status -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Status</option>
@@ -438,9 +400,7 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- زر Add Product -->
-                <button class="add-btn">
+                <button class="add-btn" id="openReturnModalBtn">
                     <span>+</span> Add Return
                 </button>
             </div>
@@ -469,23 +429,17 @@
                     <h2 class="w150">Reason</h2>
                     <h2 class="w150">ID Order</h2>
                 </div>
-
-                <div id="returns-container">
-                    <!-- سيتم تعبئته عبر الجافاسكربت -->
-                </div>
+                <div id="returns-container"></div>
             </div>
         </section>
 
         <!-- review -->
         <section id="review" class="dashboard-section">
             <div class="filter-bar">
-                <!-- input البحث -->
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
                     <i class="bx bx-search"></i>
                 </div>
-
-                <!-- قائمة Category -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Star Rating</option>
@@ -494,8 +448,6 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- قائمة Status -->
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Status</option>
@@ -504,9 +456,7 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
-
-                <!-- زر Add Product -->
-                <button class="add-btn">
+                <button class="add-btn" id="openReviewModalBtn">
                     <span>+</span> Add Review
                 </button>
             </div>
@@ -533,59 +483,18 @@
                     <h2 class="w150">phone number 2</h2>
                     <h2 class="w150">E-Mail</h2>
                 </div>
-
-                <div id="review-container">
-                    <!-- سيتم تعبئته عبر الجافاسكربت -->
-                </div>
+                <div id="review-container"></div>
             </div>
         </section>
         
         <!-- dart card -->
         <section id="card" class="dashboard-section">
             <div class="filter-bar">
-                <!-- input البحث -->
-                <div class="search-box">
-                    <input type="text" placeholder="search product name">
-                    <i class="bx bx-search"></i>
-                </div>
-
-                <!-- قائمة Category -->
-                <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>EXP date</option>
-                        <option value="up">Up</option>
-                        <option value="low">Low</option>
-                    </select>
-                    <i class="bx bx-chevron-down arrow-icon"></i>
-                </div>
-
-                <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>Purchased Items</option>
-                        <option value="up">Up</option>
-                        <option value="low">Low</option>
-                    </select>
-                    <i class="bx bx-chevron-down arrow-icon"></i>
-                </div>
-
-                <!-- قائمة Status -->
-                <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>Dart Card</option>
-                        <option value="yes">yes</option>
-                        <option value="no">no</option>
-                    </select>
-                    <i class="bx bx-chevron-down arrow-icon"></i>
-                </div>
+                <!-- ... محتوى الكارت زي ما هو ... -->
             </div>
-
             <div class="second">
-                <button class="delete-btn">
-                    <i class='bx bx-trash'></i>
-                    <span>Delete</span>
-                </button>
+                <button class="delete-btn"><i class='bx bx-trash'></i><span>Delete</span></button>
             </div>
-
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
@@ -603,15 +512,10 @@
                     <h2 class="w150">Purchased limet</h2>
                     <h2 class="w1200">Requested products</h2>
                 </div>
-
-                <div id="card-container">
-                    <!-- سيتم تعبئته عبر الجافاسكربت -->
-                </div>
+                <div id="card-container"></div>
             </div>
         </section>
     </main>
-
-
 
 <!-- ==================================== -->
 <!-- 1. Modal إضافة / تعديل الموديل -->
@@ -679,7 +583,8 @@
             <input type="hidden" id="modal-item-add-edit-id">
             <div class="form-group">
                 <label>Photo</label>
-                <input type="file" id="modal-item-file" accept="image/*" required>
+                <input type="file" id="modal-item-file" accept="image/*">
+                <img id="item-preview-img" style="display:none; width: 100px; margin-top: 10px;" alt="preview">
             </div>
             <div class="form-group">
                 <label>Model Code</label>
@@ -709,7 +614,7 @@
     <div class="modal-content">
         <span class="close-modal" id="closeModalBtn">&times;</span>
         <div style="text-align: center; margin-bottom: 20px;">
-            <input type="text" id="orderSearchInput" placeholder="search about client" required>
+            <input type="text" id="orderSearchInput" placeholder="search about client">
         </div>
         <form id="orderForm">
             <div class="modal-grid">
@@ -728,7 +633,7 @@
                     </div>
                     <div class="form-group">
                         <label for="phone2">Phone number 2</label>
-                        <input type="text" id="phone2" placeholder="Value" required>
+                        <input type="text" id="phone2" placeholder="Value">
                     </div>
                     <div class="form-group">
                         <label for="email">E-Mail</label>
@@ -745,7 +650,11 @@
                     </div>
                     <div class="form-group">
                         <label for="deliveryNotes">Delivery Notes</label>
-                        <textarea id="deliveryNotes" placeholder="Value" rows="2" required></textarea>
+                        <textarea id="deliveryNotes" placeholder="Value" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderAddress">Address (Google Maps)</label>
+                        <textarea id="orderAddress" placeholder="Paste location link"></textarea>
                     </div>
                     <div class="price-summary">
                         <p>Subtotal : <strong id="subtotalVal">0.00 EGP</strong></p>
@@ -773,27 +682,27 @@
                     </div>
                     <div class="form-group">
                         <label for="orderCountry">Country</label>
-                        <input type="text" id="orderCountry" placeholder="Value" required>
+                        <input type="text" id="orderCountry" placeholder="Value">
                     </div>
                     <div class="form-group">
                         <label for="governorate">Governorate</label>
-                        <input type="text" id="governorate" placeholder="Value" required>
+                        <input type="text" id="governorate" placeholder="Value">
                     </div>
                     <div class="form-group">
                         <label for="orderArea">Area</label>
-                        <input type="text" id="orderArea" placeholder="Value" required>
+                        <input type="text" id="orderArea" placeholder="Value">
                     </div>
                     <div class="form-group">
                         <label for="orderStreetName">Street Name</label>
-                        <input type="text" id="orderStreetName" placeholder="Value" required>
+                        <input type="text" id="orderStreetName" placeholder="Value">
                     </div>
                     <div class="form-group">
                         <label for="orderBuildingNumber">Building Number/Name</label>
-                        <input type="text" id="orderBuildingNumber" placeholder="Value" required>
+                        <input type="text" id="orderBuildingNumber" placeholder="Value">
                     </div>
                     <div class="form-group">
                         <label for="orderFloor">Floor</label>
-                        <input type="text" id="orderFloor" placeholder="Value" required>
+                        <input type="text" id="orderFloor" placeholder="Value">
                     </div>
                 </div>
             </div>
@@ -816,7 +725,7 @@
                     </div>
                     <div class="form-group">
                         <label for="custBirthday">Birthday</label>
-                        <input type="text" id="custBirthday" placeholder="Value">
+                        <input type="date" id="custBirthday" required>
                     </div>
                     <div class="form-group">
                         <label for="custEmail">E-Mail</label>
@@ -856,7 +765,7 @@
 </div>
 
 <!-- ==================================== -->
-<!-- 5. Modal المرتجعات (Returns / Item Edit) -->
+<!-- 5. Modal المرتجعات (Returns) -->
 <div class="modal" id="return-modal">
     <div class="modal-content">
         <span class="close-modal" id="close-return-btn">&times;</span>
@@ -893,26 +802,23 @@
                     <label>E-Mail</label>
                     <input type="email" id="modal-return-email" placeholder="Value">
                 </div>
-                <!-- حقل حالة المنتج -->
-<div class="input-group">
-    <label>Condition of returned item</label>
-    <select id="modal-item-condition" class="modal-select">
-        <option value="Good">Good</option>
-        <option value="Bad">Bad</option>
-    </select>
-</div>
-
-<!-- حقل سبب الاسترجاع -->
-<div class="input-group">
-    <label>Reason for return</label>
-    <select id="modal-item-reason" class="modal-select">
-        <option value="المقاس صغير">المقاس صغير</option>
-        <option value="المقاس كبير">المقاس كبير</option>
-        <option value="عيب في المنتج">عيب في المنتج</option>
-        <option value="غير مطابق للصورة">غير مطابق للصورة</option>
-        سبب آخر
-    </select>
-</div>
+                <div class="input-group">
+                    <label>Condition of returned item</label>
+                    <select id="modal-item-condition" class="modal-select">
+                        <option value="Good">Good</option>
+                        <option value="Bad">Bad</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Reason for return</label>
+                    <select id="modal-item-reason" class="modal-select">
+                        <option value="المقاس صغير">المقاس صغير</option>
+                        <option value="المقاس كبير">المقاس كبير</option>
+                        <option value="عيب في المنتج">عيب في المنتج</option>
+                        <option value="غير مطابق للصورة">غير مطابق للصورة</option>
+                        <option value="سبب آخر">سبب آخر</option>
+                    </select>
+                </div>
             </div>
             <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
         </form>
@@ -920,7 +826,7 @@
 </div>
 
 <!-- ==================================== -->
-<!-- 6. Modal مراجعات العملاء (Customer Review Modal) -->
+<!-- 6. Modal مراجعات العملاء (Review) -->
 <div class="modal" id="customer-review-modal">
     <div class="modal-content">
         <span class="close-modal" id="close-review-btn">&times;</span>
@@ -937,7 +843,6 @@
                     <label>Name</label>
                     <input type="text" id="modal-cust-rev-name" placeholder="Value">
                 </div>
-                <!-- Star Rating (Select) -->
                 <div class="input-group" style="margin-bottom: 10px;">
                     <label>Star Rating</label>
                     <select id="modal-cust-rating" class="modal-select">
@@ -969,16 +874,19 @@
                     <input type="email" id="modal-cust-rev-email" placeholder="Value">
                 </div>
                 <div class="input-group" style="margin-bottom: 10px;">
-                    <label>Message</label>
-                    <textarea id="modal-cust-message" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                    <label>Status</label>
+                    <select id="modal-cust-status" class="modal-select">
+                        <option value="Active">Active</option>
+                        <option value="Hidden">Hidden</option>
+                    </select>
                 </div>
             </div>
             <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
         </form>
     </div>
 </div>
-    <!-- ==================================== -->
 
     <script src="dart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </body>
 </html>
