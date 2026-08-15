@@ -45,6 +45,7 @@ html {
 
 body {
   min-height: 100vh;
+  height: 100%;
   font-family: var(--font-main);
   font-weight: 400;
   font-size: 1rem;
@@ -53,7 +54,7 @@ body {
   background-color: var(--white);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
-    overflow:scroll;
+  overflow:scroll;
   &::-webkit-scrollbar { display: none; }
   scrollbar-width: none;
   -ms-overflow-style: none;
