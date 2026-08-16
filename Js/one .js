@@ -840,3 +840,68 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+
+// function setupHeaderBatchActions() { /* unchanged */ }
+// function setupSearchFilter() { /* unchanged */ }
+
+// document.addEventListener('click', (e) => {
+//     if (e.target.classList.contains('close-modal') || (e.target.tagName === 'SPAN' && e.target.closest('.modal')) || e.target.classList.contains('modal')) {
+//         const modal = e.target.closest('.modal') || e.target;
+//         modal.style.display = 'none'; modal.classList.remove('active');
+//     }
+// });
+
+//     const dataRepo = {
+//     '2027': { 
+//         revenue: [3000, 4500, 5000, 6200, 7000, 8100, 9000, 10500, 11200, 12500, ], 
+//         cost:    [1500, 2000, 2200, 3000, 3200, 4000, 4500, 5000, 5500, 6000, ] 
+//     },
+//     '2026': { 
+//         revenue: [3000, 4500, 5000, 6200, 7000, 8100, 9000, 10500, 11200, 12500, 14000, 15500], 
+//         cost:    [1500, 2000, 2200, 3000, 3200, 4000, 4500, 5000, 5500, 6000, 7000, 7500] 
+//     },
+//     '2025': { 
+//         revenue: [2800, 4000, 4800, 5900, 6800, 7500, 8500, 9800, 10500, 11800, 13000, 14500], 
+//         cost:    [1400, 1800, 2100, 2800, 3000, 3800, 4200, 4800, 5200, 5800, 6500, 7200] 
+//     },
+// };
+
+//     let currentMode = 'months';
+//     let currentYear = 2026;
+
+//     var options = {
+//         series: [{ name: 'Profit', data: [] }, { name: 'Cost', data: [] }],
+//         chart: { type: 'area', height: 350 },
+//         colors: ['#10b981', '#ef4444'],
+//         xaxis: { categories: [] }
+//     };
+
+//     var chart = new ApexCharts(document.querySelector("#myChart"), options);
+//     chart.render();
+
+//     function setMode(mode) {
+//         currentMode = mode;
+//         document.querySelectorAll('.mode-btns button').forEach(b => b.classList.remove('active'));
+//         document.getElementById('btn' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+//         updateChart();
+//     }
+
+//     function navigate(dir) {
+//         currentYear += dir;
+//         updateChart();
+//     }
+
+//     function updateChart() {
+//         document.getElementById('displayLabel').innerText = currentYear;
+        
+//         // محاكاة سحب البيانات بناءً على السنة والنمط
+//         const yearData = dataRepo[currentYear] || { revenue: [0,0,0], cost: [0,0,0] };
+        
+//         chart.updateOptions({
+//             series: [{ name: 'Profit', data: yearData.revenue }, { name: 'Cost', data: yearData.cost }],
+//             xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] }        });
+//     }
+
+//     // تشغيل مبدئي
+//     updateChart();
