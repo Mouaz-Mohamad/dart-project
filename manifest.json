@@ -1,13 +1,13 @@
 {
     "name": "Dart Dashboard",
     "short_name": "Dart",
-    "start_url": "/dashboard.html",
+    "start_url": "https://dart-project-psi.vercel.app/Eye/Dart%20Eye.html",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#8b5cf6",
     "icons": [
         {
-        "src": "icon.png",
+        "src": "/Photos/dart_logo.png",
         "sizes": "192x192",
         "type": "image/png"
         }
