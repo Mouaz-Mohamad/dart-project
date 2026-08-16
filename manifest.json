@@ -7,7 +7,7 @@
     "theme_color": "#8b5cf6",
     "icons": [
         {
-        "src": "/Photos/dart_logo.png",
+        "src": "/Photos/dart.png",
         "sizes": "192x192",
         "type": "image/png"
         }
