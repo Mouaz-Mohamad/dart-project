@@ -2,7 +2,7 @@
     "name": "Dart Dashboard",
     "short_name": "Dart",
     "start_url": "/Eye/Dart%20Eye.html",
-    "display": "standalone",
+    "display": "browser",
     "background_color": "#ffffff",
     "theme_color": "#8b5cf6",
     "icons": [
