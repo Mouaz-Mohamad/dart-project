@@ -926,3 +926,121 @@ document.addEventListener('DOMContentLoaded', () => {
   // زوم يلم الطرفين سوا
   const group = new L.featureGroup([clientMarker, driverMarker]);
   map.fitBounds(group.getBounds().pad(0.3));
+
+//   ============================
+//     Bage REP
+// ==============================
+
+  let watchId = null;
+  let countdownTimer = null;
+
+  window.onload = function() {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => { console.log("GPS Permission Granted"); },
+        (error) => { console.error("GPS Permission Error: ", error.message); },
+        { enableHighAccuracy: true }
+      );
+    }
+
+    const savedState = localStorage.getItem('order_45_state');
+    if (savedState === 'on_the_way') {
+      restoreActiveState();
+    } else if (savedState === 'delivered') {
+      restoreCompletedState();
+    }
+  };
+
+  function startCountdown() {
+    const goBtn = document.getElementById('goBtn');
+    let count = 3;
+
+    goBtn.disabled = true;
+    goBtn.innerText = `Opening Maps in ${count}...`;
+
+    countdownTimer = setInterval(() => {
+      count--;
+      if (count > 0) {
+        goBtn.innerText = `Opening Maps in ${count}...`;
+      } else {
+        clearInterval(countdownTimer);
+        startDelivery();
+      }
+    }, 1000);
+  }
+
+  function startDelivery() {
+    localStorage.setItem('order_45_state', 'on_the_way');
+    restoreActiveState();
+
+    const addressText = document.getElementById('customerAddress').innerText.trim();
+    const encodedAddress = encodeURIComponent(addressText);
+    window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}&travelmode=driving`;
+  }
+
+  function restoreActiveState() {
+    const statusBadge = document.getElementById('orderStatus');
+    statusBadge.innerText = "On the Way (Step 4)";
+    statusBadge.className = "rep-status-badge rep-status-active";
+
+    document.getElementById('goBtn').style.display = 'none';
+    document.getElementById('completeBtn').style.display = 'flex';
+    document.getElementById('cancelBtn').style.display = 'flex';
+    document.getElementById('gpsStatus').style.display = 'block';
+
+    startGpsTracking();
+  }
+
+  function startGpsTracking() {
+    if ("geolocation" in navigator && !watchId) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          console.log(`Driver Lat: ${position.coords.latitude}, Lng: ${position.coords.longitude}`);
+        },
+        (error) => { console.error("Tracking Error: ", error.message); },
+        { enableHighAccuracy: true }
+      );
+    }
+  }
+
+  function cancelDelivery() {
+    if (countdownTimer) clearInterval(countdownTimer);
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+
+    localStorage.removeItem('order_45_state');
+
+    const goBtn = document.getElementById('goBtn');
+    goBtn.disabled = false;
+    goBtn.innerText = "GO (Start Delivery)";
+
+    const statusBadge = document.getElementById('orderStatus');
+    statusBadge.innerText = "Assigned (Step 3)";
+    statusBadge.className = "rep-status-badge";
+
+    document.getElementById('goBtn').style.display = 'flex';
+    document.getElementById('completeBtn').style.display = 'none';
+    document.getElementById('cancelBtn').style.display = 'none';
+    document.getElementById('gpsStatus').style.display = 'none';
+  }
+
+  function completeDelivery() {
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+
+    localStorage.setItem('order_45_state', 'delivered');
+    restoreCompletedState();
+  }
+
+  function restoreCompletedState() {
+    const statusBadge = document.getElementById('orderStatus');
+    statusBadge.innerText = "Delivered (Step 5)";
+    statusBadge.className = "rep-status-badge rep-status-completed";
+
+    document.getElementById('goBtn').style.display = 'none';
+    document.getElementById('completeBtn').style.display = 'none';
+    document.getElementById('cancelBtn').style.display = 'none';
+    document.getElementById('gpsStatus').style.display = 'block';
+    document.getElementById('gpsStatus').innerText = "Order Completed";
+    document.getElementById('gpsStatus').style.color = "#16a34a";
+  }
