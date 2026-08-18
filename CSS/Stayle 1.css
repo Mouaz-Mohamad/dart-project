@@ -1090,9 +1090,9 @@ header {
     display: flex;
     align-items: center;
     gap: 20px;
-    font-size: large;
+    font-size: 18px;
     color: var(--bg-dark);
-    padding: 10px 20px;
+    padding: 10px 10px;
     margin-top: 20px;
 }
 
@@ -1117,19 +1117,24 @@ header {
 .hello{
     color: var(--bg-dark);
     padding: 10px;
+    font-size: 12px;
+}
+.hello h1{
+    font-size: 16px;
 }
 .hello .two{
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 600;
 }
 .hello .e-mail{
     color: var(--text-muted);
+        font-size: 16px;
 }
 
 .total-order,.monthly-order{
-    padding: 10px;
+    padding: 5px;
     color: var(--bg-dark);
-    font-size: large;
+    font-size: 10px;
     text-align: center;
     margin-top: 20px;
     width: 49%;
@@ -1157,7 +1162,7 @@ header {
     margin-top: 10px;
 }
 .name-id .name{
-    font-size: 30px;
+    font-size: 27px;
     font-family: var(--font-cabin);
     color: var(--border-color);
 }
