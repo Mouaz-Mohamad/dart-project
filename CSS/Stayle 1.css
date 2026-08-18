@@ -96,12 +96,12 @@ header {
 
 .side-menu {
     position: fixed;
-    top: 14.5%;
+    top: 14.5vh;
     z-index: 100000;
     display: none;
     justify-content: center;
     align-self: flex-end;
-    height: 85.5vh;
+    height: 84vh;
     padding: 40px 25px 20px;
     background-color: var(--bragnte);
     border-top-left-radius: 80px;
