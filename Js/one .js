@@ -930,26 +930,32 @@ document.addEventListener('DOMContentLoaded', () => {
 //   ============================
 //     Bage REP
 // ==============================
+var countdownTimer = null;
+var watchId = null;
 
-  let watchId = null;
-  let countdownTimer = null;
+window.onload = function() {
+  // فحص وجود الخريطة قبل التشغيل لمنع خطأ Map container not found
+  if (document.getElementById('map')) {
+    // كود تهيئة الخريطة يوضع هنا عند الحاجة
+  }
 
-  window.onload = function() {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => { console.log("GPS Permission Granted"); },
-        (error) => { console.error("GPS Permission Error: ", error.message); },
-        { enableHighAccuracy: true }
-      );
-    }
+  // طلب إذن الـ GPS
+  if ("geolocation" in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => { console.log("GPS Permission Granted"); },
+      (error) => { console.warn("GPS Permission Warning: ", error.message); },
+      { enableHighAccuracy: true }
+    );
+  }
 
-    const savedState = localStorage.getItem('order_45_state');
-    if (savedState === 'on_the_way') {
-      restoreActiveState();
-    } else if (savedState === 'delivered') {
-      restoreCompletedState();
-    }
-  };
+  // استرجاع حالة الطلب المسجلة
+  const savedState = localStorage.getItem('order_45_state');
+  if (savedState === 'on_the_way') {
+    restoreActiveState();
+  } else if (savedState === 'delivered') {
+    restoreCompletedState();
+  }
+};
 
 function startCountdown() {
   const goBtn = document.getElementById('goBtn');
@@ -970,84 +976,79 @@ function startCountdown() {
 }
 
 function startDelivery() {
-  // 1. حفظ الحالة
   localStorage.setItem('order_45_state', 'on_the_way');
   restoreActiveState();
 
-  // 2. تجهيز العنوان
   const addressText = document.getElementById('customerAddress').innerText.trim();
   const encodedAddress = encodeURIComponent(addressText);
   
-  // 3. رابط جوجل مابس الأضمن للموبايل
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-  
-  // 4. فتح الخريطة في تبويب جديد أو تطبيق الخرائط مباشرة
-  window.open(mapsUrl, '_blank');
+  // فتح Google Maps في تبويب جديد
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}&travelmode=driving`, '_blank');
 }
 
-  function restoreActiveState() {
-    const statusBadge = document.getElementById('orderStatus');
-    statusBadge.innerText = "On the Way (Step 4)";
-    statusBadge.className = "rep-status-badge rep-status-active";
+function restoreActiveState() {
+  const statusBadge = document.getElementById('orderStatus');
+  statusBadge.innerText = "On the Way (Step 4)";
+  statusBadge.className = "rep-status-badge rep-status-active";
 
-    document.getElementById('goBtn').style.display = 'none';
-    document.getElementById('completeBtn').style.display = 'flex';
-    document.getElementById('cancelBtn').style.display = 'flex';
-    document.getElementById('gpsStatus').style.display = 'block';
+  document.getElementById('goBtn').style.display = 'none';
+  document.getElementById('completeBtn').style.display = 'flex';
+  document.getElementById('cancelBtn').style.display = 'flex';
+  document.getElementById('gpsStatus').style.display = 'block';
 
-    startGpsTracking();
+  startGpsTracking();
+}
+
+function startGpsTracking() {
+  if ("geolocation" in navigator && !watchId) {
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        console.log(`Driver Lat: ${position.coords.latitude}, Lng: ${position.coords.longitude}`);
+      },
+      (error) => { console.warn("Tracking Warning: ", error.message); },
+      { enableHighAccuracy: true }
+    );
   }
+}
 
-  function startGpsTracking() {
-    if ("geolocation" in navigator && !watchId) {
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          console.log(`Driver Lat: ${position.coords.latitude}, Lng: ${position.coords.longitude}`);
-        },
-        (error) => { console.error("Tracking Error: ", error.message); },
-        { enableHighAccuracy: true }
-      );
-    }
-  }
+function cancelDelivery() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  if (watchId) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
 
-  function cancelDelivery() {
-    if (countdownTimer) clearInterval(countdownTimer);
-    if (watchId) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
+  localStorage.removeItem('order_45_state');
 
-    localStorage.removeItem('order_45_state');
+  const goBtn = document.getElementById('goBtn');
+  goBtn.disabled = false;
+  goBtn.innerText = "GO (Start Delivery)";
 
-    const goBtn = document.getElementById('goBtn');
-    goBtn.disabled = false;
-    goBtn.innerText = "GO (Start Delivery)";
+  const statusBadge = document.getElementById('orderStatus');
+  statusBadge.innerText = "Assigned (Step 3)";
+  statusBadge.className = "rep-status-badge";
 
-    const statusBadge = document.getElementById('orderStatus');
-    statusBadge.innerText = "Assigned (Step 3)";
-    statusBadge.className = "rep-status-badge";
+  document.getElementById('goBtn').style.display = 'flex';
+  document.getElementById('completeBtn').style.display = 'none';
+  document.getElementById('cancelBtn').style.display = 'none';
+  document.getElementById('gpsStatus').style.display = 'none';
+}
 
-    document.getElementById('goBtn').style.display = 'flex';
-    document.getElementById('completeBtn').style.display = 'none';
-    document.getElementById('cancelBtn').style.display = 'none';
-    document.getElementById('gpsStatus').style.display = 'none';
-  }
+function completeDelivery() {
+  if (watchId) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
 
-  function completeDelivery() {
-    if (watchId) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
+  localStorage.setItem('order_45_state', 'delivered');
+  restoreCompletedState();
+}
 
-    localStorage.setItem('order_45_state', 'delivered');
-    restoreCompletedState();
-  }
+function restoreCompletedState() {
+  const statusBadge = document.getElementById('orderStatus');
+  statusBadge.innerText = "Delivered (Step 5)";
+  statusBadge.className = "rep-status-badge rep-status-completed";
 
-  function restoreCompletedState() {
-    const statusBadge = document.getElementById('orderStatus');
-    statusBadge.innerText = "Delivered (Step 5)";
-    statusBadge.className = "rep-status-badge rep-status-completed";
-
-    document.getElementById('goBtn').style.display = 'none';
-    document.getElementById('completeBtn').style.display = 'none';
-    document.getElementById('cancelBtn').style.display = 'none';
-    document.getElementById('gpsStatus').style.display = 'block';
-    document.getElementById('gpsStatus').innerText = "Order Completed";
-    document.getElementById('gpsStatus').style.color = "#16a34a";
-  }
+  document.getElementById('goBtn').style.display = 'none';
+  document.getElementById('completeBtn').style.display = 'none';
+  document.getElementById('cancelBtn').style.display = 'none';
+  document.getElementById('gpsStatus').style.display = 'block';
+  document.getElementById('gpsStatus').innerText = "Order Completed";
+  document.getElementById('gpsStatus').style.color = "#16a34a";
+}
