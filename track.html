@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تتبع الطلب #45</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <link rel="stylesheet" href="CSS/Stayle 1.css">
+    <link rel="stylesheet" href="CSS/base.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class='dja-flexdir'>
+    <div class="mother">
+      <header id="header-container" aria-label="Main Navigation"></header>
+
+      <main>
+<div class="tracking-card">
+  <!-- Map Container -->
+  <div id="map"></div>
+
+  <div class="content">
+    
+    <!-- Order Header -->
+    <div class="order-header">
+      <div>
+        <div class="order-id">Order ID: #ORD-45</div>
+        <div style="font-size: 11px; color: #64748b;">Date: Today, 02:30 PM</div>
+      </div>
+      <div id="etaTime" class="eta-badge">ETA: 15 mins</div>
+    </div>
+
+    <!-- 5 Steps Timeline -->
+    <div class="stepper">
+      <div class="stepper-progress" style="width: 75%;"></div>
+
+      <div class="step active">
+        <div class="circle">✓</div>
+        <span class="step-text">Confirmed</span>
+      </div>
+      <div class="step active">
+        <div class="circle">✓</div>
+        <span class="step-text">Preparing</span>
+      </div>
+      <div class="step active">
+        <div class="circle">✓</div>
+        <span class="step-text">Picked Up</span>
+      </div>
+      <div class="step active">
+        <div class="circle">4</div>
+        <span class="step-text">On the Way</span>
+      </div>
+      <div class="step">
+        <div class="circle">5</div>
+        <span class="step-text">Delivered</span>
+      </div>
+    </div>
+
+    <!-- Order Items Summary -->
+    <div class="items-box">
+      <div class="items-title">Order Items:</div>
+      <div class="item-row">
+        <span>1x Black Hoodie (Dart Brand) - L</span>
+        <strong>EGP 450</strong>
+      </div>
+      <div class="item-row">
+        <span>1x Blue Jeans - 32</span>
+        <strong>EGP 650</strong>
+      </div>
+      <hr style="border-color: #e2e8f0; margin: 8px 0;">
+      <div class="item-row" style="font-weight: bold; color: #0f172a;">
+        <span>Total:</span>
+        <span>EGP 1100</span>
+      </div>
+    </div>
+
+    <!-- Driver Info -->
+    <div class="driver-box">
+      <div>
+        <div style="font-weight:bold; font-size: 14px; color: #0f172a;">Ahmed Mahmoud</div>
+        <div style="font-size:11px; color:#64748b;">Courier (ID: #DRV-102)</div>
+      </div>
+      <a href="tel:01000000000" class="btn-call">Call</a>
+    </div>
+
+  </div>
+</div>
+      </main>
+
+      <footer id="footer" aria-label="footer."></footer>
+
+    </div>
+<!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="Js/one .js"></script>
+
+</body>
+</html>

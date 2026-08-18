@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="manifest" href="../manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </body>
 </head>
 <body>
@@ -16,42 +17,92 @@
     <nav class="cont-menu">
         <img src="dart_logo.png" alt="Dart Logo">
         <ul class="menu">
-            <li><a href="#" data-target="brand">Brand Information</a></li>
-            <li><a href="#" data-target="models" class="active">Model Code</a></li>
-            <li><a href="#" data-target="items">Items Code</a></li>
-            <li><a href="#" data-target="customers">Customers</a></li>
+            <li><a href="#" data-target="brand">Brand</a></li>
+            <li><a href="#" data-target="models" class="active">Models</a></li>
+            <li><a href="#" data-target="items">Items</a></li>
+            <li><a href="#" data-target="customers">Clients</a></li>
             <li><a href="#" data-target="orders">Orders</a></li>
             <li><a href="#" data-target="returns">Returns</a></li>
             <li><a href="#" data-target="review">Review</a></li>
+            <li><a href="#" data-target="representative">Rep</a></li>
             <li><a href="#" data-target="card">Dart Card</a></li>
         </ul>
     </nav>
 
     <main>
         <!-- سكشن Brand Information -->
-        <section id="brand" class="dashboard-section">
-            <div class="chart">
-                <div class="card">
-                    <div class="controls">
-                        <div class="mode-btns">
-                            <button onclick="setMode('days')" id="btnDays">أيام</button>
-                            <button onclick="setMode('months')" id="btnMonths" class="active">شهور</button>
-                            <button onclick="setMode('years')" id="btnYears">سنين</button>
+        <section id="brand" class="dashboard-section brand">
+            <div class="cards-one">
+                <div class="cont-card-info-2">
+                    <div class="card-inf-2 customar-card">
+                        <div class="span-img">
+                            <span class="numebr">556</span>
+                            <i class="fa-solid fa-user" style="color: #43bfe5;"></i>
                         </div>
+                        <h5>Customer</h5>
+                    </div>
+                    <div class="card-inf-2 orders-card">
+                        <div class="span-img">
+                            <span class="numebr">454</span>
+                            <i class="fa-solid fa-box-open" style="color: #1abc9c;"></i>         
+                        </div>
+                        <h5>Orders</h5>
+                    </div>
+                    <div class="card-inf-2">
+                        <div class="span-img">
+                            <span class="numebr">4.8</span>
+                            <i class="fa-regular fa-star" style="color: rgb(255, 212, 59);"></i>
+                        </div>
+                        <h5>Rating</h5>
+                    </div>
+                    <div class="card-inf-2 stock-card">
+                        <div class="span-img">
+                            <span class="numebr">55.9 M</span>
+                            <i class="fa-solid fa-shirt" style="color: rgb(0, 0, 0);"></i>
+                        </div>
+                        <h5>In Stock</h5>
+                    </div>
+                    <div class="card-inf-2 sold-card">
+                        <div class="span-img">
+                            <span class="numebr">55.9 M</span>
+                            <i class="fa-solid fa-clipboard-check" style="color: #16742d;"></i>
+                        </div>
+                        <h5>Sold out</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-one">
+                <div class="financial-summary">
+                    <div class="sales-cont">
+                        <span class="variance"><i class="fa-solid fa-caret-up" style="color: rgb(62, 186, 24);"></i>&nbsp; 0.8%</span>
+                        <span class="sales">2.23M</span>
+                        <h4>Sales</h4>
+                    </div>
+                    <div class="cost-cont">
+                        <span class="variance"><i class="fa-solid fa-caret-up" style="color: rgb(62, 186, 24);"></i>&nbsp; 0.8%</span>
+                        <span class="sales">2.23M</span>
+                        <h4>Cost</h4>
+                    </div>
+                    <div class="profit-cont">
+                        <span class="variance"><i class="fa-solid fa-caret-up" style="color: rgb(62, 186, 24);"></i>&nbsp; 0.8%</span>
+                        <span class="sales">2.23M</span>
+                        <h4>Profit</h4>
+                    </div>
+                </div>
+
+                <div class="dart-chart-card">
+                    <div class="dart-controls">
                         
-                        <div class="nav-controls">
-                            <button class="nav-btn" onclick="navigate(-1)">❮</button>
-                            <span id="displayLabel" style="font-weight:bold;">2026</span>
-                            <button class="nav-btn" onclick="navigate(1)">❯</button>
+                        <div class="dart-nav-controls">
+                            <button class="dart-nav-btn" onclick="navigate(-1)">❮</button>
+                            <span id="displayLabel">2026</span>
+                            <button class="dart-nav-btn" onclick="navigate(1)">❯</button>
                         </div>
                     </div>
                     <div id="myChart"></div>
                 </div>
             </div>
-
-            <div class="cards">
-
-            </div>
+            <div class="strok"></div>
         </section>
 
         <!-- سكشن Model Code -->
@@ -491,12 +542,70 @@
                 <div id="review-container"></div>
             </div>
         </section>
+
+        <!-- representative -->
+        <section id="representative" class="dashboard-section">
+            <div class="filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">Active</option>
+                        <option value="hidden">Not available</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="openRepModalBtn">
+                    <span>+</span> Add Rep
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn" id="deleteSelectedRepBtn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w200">representative Name</h2>
+                    <h2 class="w150">ID representative</h2>
+                    <h2 class="w100">Status</h2>
+                    <h2 class="w150">National ID Number</h2>
+                    <h2 class="w150">Current orders</h2>
+                    <h2 class="w100">Total orders</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w200">Representative's Address</h2>
+                    <h2 class="w150">Date</h2>
+                </div>
+                <div id="representative-container"></div>
+            </div>
+        </section>
         
         <!-- dart card -->
         <section id="card" class="dashboard-section">
             <div class="filter-bar">
-                <!-- ... محتوى الكارت زي ما هو ... -->
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">Active</option>
+                        <option value="hidden">Hidden</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
             </div>
+
             <div class="second">
                 <button class="delete-btn"><i class='bx bx-trash'></i><span>Delete</span></button>
             </div>
@@ -634,11 +743,11 @@
                     </div>
                     <div class="form-group">
                         <label for="phone1">Phone number</label>
-                        <input type="text" id="phone1" placeholder="Value" required>
+                        <input type="text" id="phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
                     </div>
                     <div class="form-group">
                         <label for="phone2">Phone number 2</label>
-                        <input type="text" id="phone2" placeholder="Value">
+                        <input type="text" id="phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
                     </div>
                     <div class="form-group">
                         <label for="email">E-Mail</label>
@@ -646,7 +755,7 @@
                     </div>
                     <div class="form-group">
                         <label for="paymentMethod">Payment Method</label>
-                        <select id="paymentMethod">
+                        <select id="paymentMethod"required>
                             <option value="">Select Payment Method</option>
                             <option value="cash">Cash on Delivery</option>
                             <option value="visa">Visa / Credit Card</option>
@@ -678,36 +787,36 @@
                     </div>
                     <input type="hidden" id="modal-order-edit-id">
                     <div class="form-group">
-                        <label for="deductions">Deductions</label>
-                        <input type="number" id="deductions" placeholder="Value" value="0" required>
+                        <label for="deductions">Deductions %</label>
+                        <input type="number" id="deductions" placeholder="%" value="0" min="0" max="100" required>
                     </div>
                     <div class="form-group">
                         <label for="customDiscount">Custom Discount</label>
-                        <input type="number" id="customDiscount" placeholder="Value" value="0" required>
+                        <input type="number" id="customDiscount" placeholder="Auto" value="0" readonly>
                     </div>
                     <div class="form-group">
                         <label for="orderCountry">Country</label>
-                        <input type="text" id="orderCountry" placeholder="Value">
+                        <input type="text" id="orderCountry" placeholder="Value" required>
                     </div>
                     <div class="form-group">
                         <label for="governorate">Governorate</label>
-                        <input type="text" id="governorate" placeholder="Value">
+                        <input type="text" id="governorate" placeholder="Value" required>
                     </div>
                     <div class="form-group">
                         <label for="orderArea">Area</label>
-                        <input type="text" id="orderArea" placeholder="Value">
+                        <input type="text" id="orderArea" placeholder="Value" required>
                     </div>
                     <div class="form-group">
                         <label for="orderStreetName">Street Name</label>
-                        <input type="text" id="orderStreetName" placeholder="Value">
+                        <input type="text" id="orderStreetName" placeholder="Value" required>
                     </div>
                     <div class="form-group">
                         <label for="orderBuildingNumber">Building Number/Name</label>
-                        <input type="text" id="orderBuildingNumber" placeholder="Value">
+                        <input type="text" id="orderBuildingNumber" placeholder="Value" required>
                     </div>
                     <div class="form-group">
                         <label for="orderFloor">Floor</label>
-                        <input type="text" id="orderFloor" placeholder="Value">
+                        <input type="text" id="orderFloor" placeholder="Value" required>
                     </div>
                 </div>
             </div>
@@ -743,11 +852,11 @@
                 <div class="modal-column">
                     <div class="form-group">
                         <label for="custPhone1">Phone number</label>
-                        <input type="text" id="custPhone1" placeholder="Value" required>
+                        <input type="text" id="custPhone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
                     </div>
                     <div class="form-group">
                         <label for="custPhone2">Phone number 2</label>
-                        <input type="text" id="custPhone2" placeholder="Value">
+                        <input type="text" id="custPhone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
                     </div>
                     <div class="form-group">
                         <label for="custCountry">Country</label>
@@ -793,7 +902,7 @@
                 </div>
                 <div class="form-group">
                     <label>Phone number</label>
-                    <input type="text" id="modal-return-phone1" placeholder="Value">
+                    <input type="text" id="modal-return-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
                 </div>
                 <div class="form-group">
                     <label>Model code</label>
@@ -801,7 +910,7 @@
                 </div>
                 <div class="form-group">
                     <label>Phone number 2</label>
-                    <input type="text" id="modal-return-phone2" placeholder="Value">
+                    <input type="text" id="modal-return-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
                 </div>
                 <div class="form-group">
                     <label>E-Mail</label>
@@ -860,7 +969,7 @@
                 </div>
                 <div class="form-group">
                     <label>Phone number</label>
-                    <input type="text" id="modal-cust-rev-phone1" placeholder="Value">
+                    <input type="tel" id="modal-cust-rev-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
                 </div>
                 <div class="input-group" style="margin-bottom: 10px;">
                     <label>Customer Review</label>
@@ -868,7 +977,7 @@
                 </div>
                 <div class="form-group">
                     <label>Phone number 2</label>
-                    <input type="text" id="modal-cust-rev-phone2" placeholder="Value">
+                    <input type="text" id="modal-cust-rev-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
                 </div>
                 <div class="input-group" style="margin-bottom: 10px;">
                     <label>Reviewer's Title</label>
@@ -884,6 +993,44 @@
                         <option value="Active">Active</option>
                         <option value="Hidden">Hidden</option>
                     </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 7. Modal المندوبين(Representative) -->
+<div class="modal" id="representative-modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-rep-btn">&times;</span>
+        <form id="rep-form">
+            <input type="hidden" id="modal-rep-id">
+            <div class="modal-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="modal-representative-name" placeholder="Value" required>
+                </div>
+                <div class="form-group">
+                    <label>ID representative</label>
+                    <input type="text" id="modal-representative-id" placeholder="Value" required>
+                </div>
+                <div class="form-group">
+                    <label>National ID Number</label>
+                    <input type="text"  id="modal-representative-national-id"  placeholder="أدخل الرقم القومي (14 رقم)"  pattern="\d{14}"  maxlength="14"  inputmode="numeric" required onkeypress="return event.charCode >= 48 && event.charCode <= 57">
+                </div>
+                <div class="form-group">
+                    <label>Representative's Address</label>
+                    <textarea id="modal-representative-address" placeholder="Enter full address" rows="2" style="width: 100%;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Phone number</label>
+                    <input type="tel" id="modal-rep-phone1" placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label>Phone number 2</label>
+                    <input type="tel" id="modal-rep-phone2" placeholder="Enter phone number" maxlength="11" inputmode="numeric">
                 </div>
             </div>
             <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>

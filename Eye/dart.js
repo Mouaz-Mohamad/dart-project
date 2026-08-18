@@ -50,7 +50,17 @@ function closeModal(modal) {
     modal.classList.remove('active');
 }
 
+// تحديث قائمة الموديلات داخل Datalist للقطع
+function populateModelsDatalist() {
+    const datalist = document.getElementById('models-list');
+    if (!datalist) return;
+    datalist.innerHTML = modelsData.map(m => `<option value="${m.modelId}">${m.name}</option>`).join('');
+}
 
+// استدعاء الدالة عند فتح النافذة المنبثقة للقطع
+document.getElementById('add-btn')?.addEventListener('click', () => {
+    populateModelsDatalist();
+});
 // ==========================================
 // 2. قسم الموديلات (Models Module)
 // ==========================================
@@ -169,6 +179,14 @@ function setupModelModal() {
             form.reset();
         });
     }
+
+    document.querySelector('#models .add-btn')?.addEventListener('click', () => {
+        const form = document.getElementById('model-form');
+        if (form) form.reset();
+        const editIdInput = document.getElementById('modal-edit-id');
+        if (editIdInput) editIdInput.value = ''; // Clears edit ID for new entry
+        openModal(document.getElementById('model-modal'));
+    });
 }
 
 
@@ -252,6 +270,28 @@ function setupItemModal() {
             form.reset();
             if (previewImg) previewImg.style.display = 'none';
         });
+
+        // Inside setupItemModal() function:
+
+        document.querySelector('#items .add-btn')?.addEventListener('click', () => {
+            const form = document.getElementById('item-add-form');
+            if (form) form.reset();
+
+            // Populate datalist with active models
+            populateModelsDatalist();
+
+            const editIdInput = document.getElementById('modal-item-add-edit-id');
+            if (editIdInput) editIdInput.value = '';
+
+            const previewImg = document.getElementById('item-preview-img');
+            if (previewImg) {
+                previewImg.src = '';
+                previewImg.style.display = 'none';
+            }
+
+            const modal = document.getElementById('item-add-modal');
+            if (modal) modal.style.display = 'block';
+        });
     }
 
     // 2. تعبئة البيانات وفتح النافذة عند الضغط على زر التعديل
@@ -325,6 +365,23 @@ function setupItemModal() {
         // 3. فتح النافذة
         const modal = document.getElementById('item-add-modal');
         if (modal) modal.style.display = 'block';
+    });
+
+    document.querySelector('#items .add-btn')?.addEventListener('click', () => {
+        const form = document.getElementById('item-add-form');
+        if (form) form.reset();
+        
+        const editIdInput = document.getElementById('modal-item-add-edit-id');
+        if (editIdInput) editIdInput.value = ''; // Clears edit ID
+
+        const previewImg = document.getElementById('item-preview-img');
+        if (previewImg) {
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+        }
+
+        populateModelsDatalist();
+        openModal(document.getElementById('item-add-modal'));
     });
 }
 
@@ -545,163 +602,181 @@ function renderOrders(dataArray) {
 
 // النافذة المنبثقة للطلبات
 function setupOrderModal() {
-    const modal = document.getElementById('order-modal') || document.getElementById('orderModal');
+    const modal = document.getElementById('orderModal');
     const form = document.getElementById('orderForm');
     const phone1Input = document.getElementById('phone1');
     const clientNameInput = document.getElementById('clientName');
     const phone2Input = document.getElementById('phone2');
     const emailInput = document.getElementById('email');
     const govInput = document.getElementById('governorate');
+    const itemsDatalist = document.getElementById('items-datalist');
+    const productsInputCode = document.getElementById('productsInputCode');
+    const addProductBtn = document.getElementById('addProductBtn');
 
     let currentSelectedItems = [];
 
-    function searchAndFillCustomer(query) {
-        if (!query) return;
-        const cleanQuery = query.trim();
-        const matchedClient = customersData.find(c => c.phone1 === cleanQuery || c.clientId === cleanQuery);
+    // ملء قائمة القطع المتاحة
+    function populateItemsDatalist() {
+        if (!itemsDatalist) return;
+        itemsDatalist.innerHTML = itemsData
+            .filter(i => !i.isDeleted)
+            .map(i => `<option value="${i.itemCode}">${i.modelId} - ${i.color} (${i.size})</option>`)
+            .join('');
+    }
+
+    // إضافة قطعة للطلب
+    function addSelectedItem() {
+        const code = productsInputCode?.value.trim();
+        if (!code) return;
         
-        if (matchedClient) {
-            if (clientNameInput) clientNameInput.value = matchedClient.clientName || '';
-            if (phone2Input) phone2Input.value = matchedClient.phone2 || '';
-            if (emailInput) emailInput.value = matchedClient.email || '';
-            if (govInput) govInput.value = matchedClient.governorate || '';
+        const itemExists = itemsData.some(i => i.itemCode === code);
+        if (!itemExists) {
+            alert("كود القطعة غير موجود!");
+            return;
         }
+
+        if (!currentSelectedItems.includes(code)) {
+            currentSelectedItems.push(code);
+            updateSelectedUI();
+        }
+        productsInputCode.value = '';
     }
 
-    if (phone1Input) {
-        phone1Input.addEventListener('input', (e) => searchAndFillCustomer(e.target.value));
-    }
+    if (addProductBtn) addProductBtn.onclick = addSelectedItem;
 
-    function calculatePrices() {
-        let subtotal = 0;
-        currentSelectedItems.forEach(itemCode => {
-            const matchedItem = itemsData.find(i => i.itemCode === itemCode);
-            if (matchedItem) {
-                const matchedModel = modelsData.find(m => m.modelId === matchedItem.modelId);
-                if (matchedModel) {
-                    const priceToUse = parseFloat(matchedModel.discountedPrice || matchedModel.selling) || 0;
-                    subtotal += priceToUse;
-                }
+    // حساب الأسعار والخصومات
+function calculatePrices() {
+    let subtotal = 0;
+    const selectedItems = Array.isArray(currentSelectedItems) ? currentSelectedItems : [];
+
+    selectedItems.forEach(itemCode => {
+        const matchedItem = itemsData?.find(i => i.itemCode === itemCode);
+        if (matchedItem) {
+            const matchedModel = modelsData?.find(m => m.modelId === matchedItem.modelId);
+            if (matchedModel) {
+                const hasDiscountPrice = matchedModel.discountedPrice !== undefined && 
+                                        matchedModel.discountedPrice !== null && 
+                                        matchedModel.discountedPrice !== '';
+                                        
+                const price = hasDiscountPrice 
+                    ? parseFloat(matchedModel.discountedPrice) || 0 
+                    : parseFloat(matchedModel.selling) || 0;
+
+                subtotal += price;
             }
-        });
+        }
+    });
 
-        const discountPercentage = parseFloat(document.getElementById('customDiscount')?.value || 0) || 0;
-        const discountAmountFromPercentage = (subtotal * discountPercentage) / 100;
-        const deductions = parseFloat(document.getElementById('deductions')?.value || 0) || 0;
-        
-        const totalDiscount = discountAmountFromPercentage + deductions;
-        const total = Math.max(0, subtotal - totalDiscount);
+    const deductionPercent = parseFloat(document.getElementById('deductions')?.value || 0) || 0;
+    const customDiscount = parseFloat(document.getElementById('customDiscount')?.value || 0) || 0;
+    
+    const deductionAmount = subtotal * (deductionPercent / 100);
+    const calculatedDiscount = deductionAmount + customDiscount;
+    const totalDiscount = Math.min(subtotal, calculatedDiscount);
+    const total = subtotal - totalDiscount;
 
-        const subtotalElem = document.getElementById('subtotalVal');
-        const discountElem = document.getElementById('discountVal');
-        const totalElem = document.getElementById('totalVal');
+    // حساب النسبة المئوية الإجمالية للخصم (مثلاً 10%)
+    const discountPercent = subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0;
 
-        if (subtotalElem) subtotalElem.textContent = subtotal.toFixed(2) + ' EGP';
-        if (discountElem) discountElem.textContent = totalDiscount.toFixed(2) + ' EGP (' + discountPercentage + '%)';
-        if (totalElem) totalElem.textContent = total.toFixed(2) + ' EGP';
+    const subtotalEl = document.getElementById('subtotalVal');
+    const discountEl = document.getElementById('discountVal');
+    const totalEl = document.getElementById('totalVal');
 
-        return { subtotal, discountPercentage, totalDiscount, total };
-    }
+    if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2) + ' EGP';
+    if (discountEl) discountEl.textContent = totalDiscount.toFixed(2) + ' EGP';
+    if (totalEl) totalEl.textContent = total.toFixed(2) + ' EGP';
+
+    return { subtotal, totalDiscount, total, discountPercent };
+}
 
     function updateSelectedUI() {
         const container = document.getElementById('selectedProductsList');
         if (container) {
             container.innerHTML = currentSelectedItems.map((code, index) => `
-                <span style="background: #f1f1f1; border: 1px solid #ccc; padding: 4px 10px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; color: #333; margin-top: 5px;">
+                <span class="order-item-chip" style="background:#e0e0e0; padding:4px 8px; border-radius:4px; margin:2px; display:inline-block;">
                     <b>${code}</b>
-                    <button type="button" class="remove-item-btn" data-index="${index}" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold; font-size: 15px;">&times;</button>
+                    <button type="button" class="remove-item-btn" data-index="${index}" style="border:none; background:none; color:red; cursor:pointer;">&times;</button>
                 </span>
             `).join('');
         }
         calculatePrices();
     }
 
-    const selectedListContainer = document.getElementById('selectedProductsList');
-    if (selectedListContainer) {
-        selectedListContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('remove-item-btn')) {
-                const index = parseInt(e.target.getAttribute('data-index'));
-                currentSelectedItems.splice(index, 1);
-                updateSelectedUI();
-            }
-        });
-    }
+    // إزالة قطعة من القائمة
+    document.getElementById('selectedProductsList')?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-item-btn')) {
+            const index = parseInt(e.target.getAttribute('data-index'));
+            currentSelectedItems.splice(index, 1);
+            updateSelectedUI();
+        }
+    });
 
-    window.loadOrderItemsForEdit = function(itemsArray) {
-        currentSelectedItems = itemsArray ? [...itemsArray] : [];
+    // إعادة الحساب عند تغيير الخصومات
+    document.getElementById('deductions')?.addEventListener('input', calculatePrices);
+    document.getElementById('customDiscount')?.addEventListener('input', calculatePrices);
+
+    // فتح النافذة المجهزة
+    document.getElementById('openModalBtn')?.addEventListener('click', () => {
+        populateItemsDatalist();
+        currentSelectedItems = [];
         updateSelectedUI();
-    };
+        if (modal) modal.style.display = 'block';
+    });
 
+    // حفظ / تعديل الطلب عند إرسال النموذج
     if (form) {
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-
             const editId = document.getElementById('modal-order-edit-id')?.value;
-            const clientNameVal = clientNameInput ? clientNameInput.value.trim() : '';
-            const phoneVal = phone1Input ? phone1Input.value.trim() : '';
-            const emailVal = emailInput ? emailInput.value.trim() : '';
-
-            if (!clientNameVal || !phoneVal) {
-                alert('برجاء إدخال اسم العميل ورقم الهاتف الأساسي!');
-                return;
-            }
-
-            if (currentSelectedItems.length === 0) {
-                alert('برجاء إضافة قطعة واحدة على الأقل للطلب!');
-                return;
-            }
-
             const prices = calculatePrices();
 
+            const orderPayload = {
+                orderId: editId ? undefined : 'ORD-' + Math.floor(100 + Math.random() * 900),
+                date: new Date().toLocaleDateString('en-GB'),
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'Pending',
+                clientId: document.getElementById('clientId')?.value || '-',
+                clientName: document.getElementById('clientName')?.value || '',
+                phone1: document.getElementById('phone1')?.value || '',
+                phone2: document.getElementById('phone2')?.value || '-',
+                email: document.getElementById('email')?.value || '-',
+                paymentMethod: document.getElementById('paymentMethod')?.value || 'Cash',
+                deliveryNotes: document.getElementById('deliveryNotes')?.value || '',
+                totalProducts: currentSelectedItems.length,
+                items: [...currentSelectedItems],
+                totalPrice: prices.subtotal,
+                discount: prices.discountPercent,
+                reasonDeduction: 'Discount',
+                country: document.getElementById('orderCountry')?.value || 'Egypt',
+                governorate: document.getElementById('governorate')?.value || '',
+                area: document.getElementById('orderArea')?.value || '',
+                street: document.getElementById('orderStreetName')?.value || '',
+                building: document.getElementById('orderBuildingNumber')?.value || '',
+                floor: document.getElementById('orderFloor')?.value || '',
+                isDeleted: false,
+                isChecked: false
+            };
+
             if (editId) {
-                const index = ordersData.findIndex(o => o.id === editId);
-                if (index !== -1) {
-                    ordersData[index] = {
-                        ...ordersData[index],
-                        clientName: clientNameVal,
-                        phone1: phoneVal,
-                        phone2: phone2Input ? phone2Input.value.trim() : '',
-                        email: emailVal,
-                        governorate: govInput ? govInput.value.trim() : '',
-                        paymentMethod: document.getElementById('paymentMethod')?.value || 'Cash',
-                        discount: prices.discountPercentage,
-                        items: [...currentSelectedItems],
-                        deliveryNotes: document.getElementById('deliveryNotes')?.value || '',
-                        totalProducts: currentSelectedItems.length,
-                        totalPrice: prices.subtotal
-                    };
-                }
+                const index = ordersData.findIndex(o => String(o.id) === String(editId));
+                if (index !== -1) ordersData[index] = { ...ordersData[index], ...orderPayload };
             } else {
-                const orderPayload = {
-                    id: Date.now().toString(),
-                    orderId: 'ORD-' + Math.floor(Math.random() * 10000),
-                    clientId: document.getElementById('clientId')?.value || 'C-New',
-                    clientName: clientNameVal,
-                    phone1: phoneVal,
-                    phone2: phone2Input ? phone2Input.value.trim() : '',
-                    email: emailVal,
-                    governorate: govInput ? govInput.value.trim() : '',
-                    paymentMethod: document.getElementById('paymentMethod')?.value || 'Cash',
-                    discount: prices.discountPercentage,
-                    items: [...currentSelectedItems],
-                    deliveryNotes: document.getElementById('deliveryNotes')?.value || '',
-                    status: "Pending",
-                    date: new Date().toLocaleDateString('en-GB'),
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    totalProducts: currentSelectedItems.length,
-                    totalPrice: prices.subtotal,
-                    isDeleted: false,
-                    isChecked: false
-                };
+                orderPayload.id = Date.now().toString();
                 ordersData.push(orderPayload);
             }
 
-            renderOrders(ordersData);
-            saveSectionState('orders');
-            closeModal(modal);
+            if (typeof renderOrders === 'function') renderOrders(ordersData);
+            if (typeof saveSectionState === 'function') saveSectionState('orders');
+
+            if (typeof closeModal === 'function') closeModal(modal);
+            else if (modal) modal.style.display = 'none';
+
             form.reset();
             currentSelectedItems = [];
             updateSelectedUI();
+            
+            const editIdInput = document.getElementById('modal-order-edit-id');
+            if (editIdInput) editIdInput.value = '';
         });
     }
 }
@@ -953,10 +1028,173 @@ function setupReviewModal() {
         }
     });
 }
+// ==========================================
+// 8. قسم المندوبين (Representative Module)
+// ==========================================
+
+// البيانات الأولية للتقييمات
+let representativeData = [
+    { 
+        id: "1", 
+        name: "محمد علي", 
+        repId: "REP-101", 
+        status: "Active", 
+        nationalId: "29910121201234", 
+        currentOrders: "3", 
+        totalOrders: "45", 
+        phone1: "0100000000", 
+        phone2: "-", 
+        address: "القاهرة", 
+        date: "12-08-2026", 
+        isChecked: false 
+    }
+];
+
+function renderRepresentative(dataArray) {
+    const container = document.getElementById('representative-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    getSortedData(dataArray).forEach(item => {
+        const isActive = item.status === 'Active';
+        
+        container.insertAdjacentHTML('beforeend', `
+            <div class="${getRowClass(item)}" data-id="${item.id}">
+                <input type="checkbox" class="model-checkbox" ${item.isChecked ? 'checked' : ''}>
+                <div class="w100 button row-action-btns">
+                    <button class="action-btn btn-delete" title="شطب"><i class="bx bx-minus-circle"></i></button>
+                    <button class="action-btn btn-hard-delete" title="حذف نهائي"><i class="bx bx-trash"></i></button>
+                    <button class="action-btn btn-edit" title="تعديل"><i class="bx bx-edit"></i></button>
+                </div>
+                <span class="text-item w200">${item.name}</span>
+                <span class="text-item w150">${item.repId}</span>
+                <span class="text-item w100" style="color:${isActive ? '#10b981' : '#ef4444'};">${item.status}</span>
+                <span class="text-item w150">${item.nationalId}</span>
+                <span class="text-item w150">${item.currentOrders}</span>
+                <span class="text-item w100">${item.totalOrders}</span>
+                <span class="text-item w150">${item.phone1}</span>
+                <span class="text-item w150">${item.phone2}</span>
+                <span class="text-item w200">${item.address}</span>
+                <span class="text-item w150">${item.date}</span>
+            </div>
+        `);
+    });
+}
+
+function setupRepresentativeModal() {
+    const modal = document.getElementById('representative-modal');
+    const form = document.getElementById('rep-form');
+    const openBtn = document.getElementById('openRepModalBtn');
+    const closeBtn = document.getElementById('close-rep-btn');
+    const container = document.getElementById('representative-container');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedRepBtn');
+
+    openBtn?.addEventListener('click', () => {
+        form?.reset();
+        document.getElementById('modal-rep-id').value = '';
+        if (modal) modal.style.display = 'flex';
+    });
+
+    closeBtn?.addEventListener('click', () => {
+        if (modal) modal.style.display = 'none';
+    });
+
+    form?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const editId = document.getElementById('modal-rep-id')?.value;
+
+        const payload = {
+            name: document.getElementById('modal-representative-name')?.value || '',
+            repId: document.getElementById('modal-representative-id')?.value || ('REP-' + Math.floor(100 + Math.random() * 900)),
+            phone1: document.getElementById('modal-rep-phone1')?.value || '',
+            phone2: document.getElementById('modal-rep-phone2')?.value || '-',
+            nationalId: document.getElementById('modal-representative-national-id')?.value || '29900000000000',
+            address: document.getElementById('modal-representative-address')?.value || 'القاهرة',
+            currentOrders: '0',
+            totalOrders: '0',
+            status: 'Active',
+            date: new Date().toLocaleDateString('en-GB'),
+            isDeleted: false,
+            isChecked: false
+        };
+
+        if (editId && editId.trim() !== '') {
+            const index = representativeData.findIndex(r => String(r.id) === String(editId));
+            if (index !== -1) {
+                representativeData[index] = { ...representativeData[index], ...payload };
+            }
+        } else {
+            payload.id = Date.now().toString();
+            representativeData.push(payload);
+        }
+
+        renderRepresentative(representativeData);
+        if (modal) modal.style.display = 'none';
+        form.reset();
+    });
+
+    container?.addEventListener('click', (e) => {
+        const row = e.target.closest('[data-id]');
+        if (!row) return;
+        const id = row.getAttribute('data-id');
+
+        // زر التعديل
+        if (e.target.closest('.btn-edit')) {
+            const item = representativeData.find(r => String(r.id) === String(id));
+            if (item) {
+                document.getElementById('modal-rep-id').value = item.id;
+                document.getElementById('modal-representative-name').value = item.name || '';
+                document.getElementById('modal-representative-id').value = item.repId || '';
+                document.getElementById('modal-representative-national-id').value = item.nationalId || '';
+                document.getElementById('modal-representative-address').value = item.address || '';
+                document.getElementById('modal-rep-phone1').value = item.phone1 || '';
+                document.getElementById('modal-rep-phone2').value = item.phone2 || '';
+                if (modal) modal.style.display = 'flex';
+            }
+        }
+
+        // زر الشطب (نقل العنصر للأسفل وتغيير الحالة)
+        if (e.target.closest('.btn-delete')) {
+            const item = representativeData.find(r => String(r.id) === String(id));
+            if (item) {
+                item.isDeleted = !item.isDeleted;
+                renderRepresentative(representativeData);
+            }
+        }
+
+        // زر الحذف النهائي (تأكيد الحذف)
+        if (e.target.closest('.btn-hard-delete')) {
+            if (confirm("هل أنت متأكد من الحذف النهائي؟")) {
+                representativeData = representativeData.filter(r => String(r.id) !== String(id));
+                renderRepresentative(representativeData);
+            }
+        }
+    });
+
+    // حذف المحدد
+    deleteSelectedBtn?.addEventListener('click', () => {
+        representativeData = representativeData.filter(r => !r.isChecked);
+        renderRepresentative(representativeData);
+    });
+
+    container?.addEventListener('change', (e) => {
+        if (e.target.classList.contains('model-checkbox')) {
+            const row = e.target.closest('[data-id]');
+            const id = row?.getAttribute('data-id');
+            const item = representativeData.find(r => String(r.id) === String(id));
+            if (item) item.isChecked = e.target.checked;
+        }
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    renderRepresentative(representativeData);
+    setupRepresentativeModal();
+});
 
 
 // ==========================================
-// 8. قسم الكروت (Cards Module)
+// 9. قسم الكروت (Cards Module)
 // ==========================================
 
 // البيانات الأولية للكروت
@@ -1047,7 +1285,7 @@ function setupCardModal() {
 
 
 // ==========================================
-// 9. خريطة الأقسام والتحكم العام بالتعديل (Sections Router & Dynamic Edit)
+// 10. خريطة الأقسام والتحكم العام بالتعديل (Sections Router & Dynamic Edit)
 // ==========================================
 
 const sectionsMap = {
@@ -1057,7 +1295,8 @@ const sectionsMap = {
     'orders': { get data() { return ordersData; }, set data(v) { ordersData = v; }, render: renderOrders, storageKey: 'dart_orders' },
     'returns': { get data() { return returnsData; }, set data(v) { returnsData = v; }, render: renderReturns, storageKey: 'dart_returns' },
     'review': { get data() { return reviewsData; }, set data(v) { reviewsData = v; }, render: renderReviews, storageKey: 'dart_reviews' },
-    'card': { get data() { return cardsData; }, set data(v) { cardsData = v; }, render: renderCards, storageKey: 'dart_cards' }
+    'card': { get data() { return cardsData; }, set data(v) { cardsData = v; }, render: renderCards, storageKey: 'dart_cards' },
+    'representative': { get data() { return cardsData; }, set data(v) { cardsData = v; }, render: renderCards, storageKey: 'dart_cards' },
 };
 
 function saveSectionState(sectionKey) {
@@ -1145,6 +1384,17 @@ function openEditModal(id, sectionKey) {
         document.getElementById('modal-rev-email').value = item.email || '';
         openModal(modal);
     }
+    else if (sectionKey === 'representative') {
+        const modal = document.getElementById('representative-modal');
+        if (!modal) return;
+        document.getElementById('modal-representative-id').value = item.id;
+        document.getElementById('modal-representative-name').value = item.clientName || '';
+        document.getElementById('modal-rep-phone1').value = item.phone1 || '';
+        document.getElementById('modal-representative-address').value = item.address || '';
+        document.getElementById('modal-rep-phone2').value = item.phone2 || '';
+        document.getElementById('modal-representative-national-id').value = item.nationalId || '';
+        openModal(modal);
+    }
     else if (sectionKey === 'card') {
         const modal = document.getElementById('card-modal');
         if (!modal) return;
@@ -1180,7 +1430,7 @@ function openEditModal(id, sectionKey) {
 
 
 // ==========================================
-// 10. تفويض الأحداث والتحكم الجماعي والبحث (Event Delegation & Global Handlers)
+// 11. تفويض الأحداث والتحكم الجماعي والبحث (Event Delegation & Global Handlers)
 // ==========================================
 
 function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
@@ -1388,6 +1638,7 @@ function setupGlobalModalTriggers() {
             'orders': 'orderModal',
             'returns': 'return-modal',
             'review': 'customer-review-modal',
+            'representative': 'representative-modal',
             'card': 'card-modal'
         };
 
@@ -1416,21 +1667,35 @@ function setupGlobalModalTriggers() {
 
 
 // ==========================================
-// 11. تشغيل التطبيق (DOM Content Loaded)
+// 12. تشغيل التطبيق (DOM Content Loaded)
 // ==========================================
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
     // 1. تحميل البيانات المخزنة سابقاً
     loadAllDataFromStorage();
 
-    // 2. إعداد التنقل بين السكاشن (Navigation)
+    // 2. إعداد التنقل بين السكاشن (Navigation) مع حفظ القسم الحالي
     const menuLinks = document.querySelectorAll('.menu li a');
     const sections = document.querySelectorAll('.dashboard-section');
 
+    // استرجاع القسم المخزن أو جعل "Brand Information" هو الافتراضي (تأكد من مطابقة الـ id لديك، مثل 'brand' أو 'info')
+    const savedSectionId = localStorage.getItem('dart_active_section') || 'brand'; 
+
     menuLinks.forEach(link => {
+        const targetId = link.getAttribute('data-target');
+        
+        // تفعيل الرابط والقسم بناءً على المخزن أو الافتراضي
+        if (targetId === savedSectionId) {
+            menuLinks.forEach(l => l.classList.remove('active'));
+            sections.forEach(sec => sec.classList.remove('active-section'));
+            
+            link.classList.add('active');
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) targetSection.classList.add('active-section');
+        }
+
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            const targetId = link.getAttribute('data-target');
             if (!targetId) return;
 
             menuLinks.forEach(l => l.classList.remove('active'));
@@ -1441,6 +1706,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetSection) {
                 targetSection.classList.add('active-section');
             }
+
+            // حفظ القسم النشط في التخزين المحلي
+            localStorage.setItem('dart_active_section', targetId);
         });
     });
 
@@ -1461,6 +1729,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCardModal();
 });
 
+
+// ===========================================
+// 13. Chart in Brand Information
+// ===========================================
 function setupHeaderBatchActions() { /* unchanged */ }
 function setupSearchFilter() { /* unchanged */ }
 
@@ -1472,17 +1744,11 @@ document.addEventListener('click', (e) => {
 });
 
     const dataRepo = {
-    '2027': { 
-        revenue: [3000, 4500, 5000, 6200, 7000, 8100, 9000, 10500, 11200, 12500, ], 
-        cost:    [1500, 2000, 2200, 3000, 3200, 4000, 4500, 5000, 5500, 6000, ] 
-    },
     '2026': { 
         revenue: [3000, 4500, 5000, 6200, 7000, 8100, 9000, 10500, 11200, 12500, 14000, 15500], 
-        cost:    [1500, 2000, 2200, 3000, 3200, 4000, 4500, 5000, 5500, 6000, 7000, 7500] 
     },
     '2025': { 
-        revenue: [2800, 4000, 4800, 5900, 6800, 7500, 8500, 9800, 10500, 11800, 13000, 14500], 
-        cost:    [1400, 1800, 2100, 2800, 3000, 3800, 4200, 4800, 5200, 5800, 6500, 7200] 
+        revenue: [280, 400, 480, 590, 680, 750, 850, 1080, 1500, 1100, 1300, 1450], 
     },
 };
 
@@ -1490,9 +1756,9 @@ document.addEventListener('click', (e) => {
     let currentYear = 2026;
 
     var options = {
-        series: [{ name: 'Profit', data: [] }, { name: 'Cost', data: [] }],
-        chart: { type: 'area', height: 200 },
-        colors: ['#10b981', '#ef4444'],
+        series: [{ name: 'Profit', data: [] }],
+        chart: { type: 'area', height: 230 },
+        colors: ['#43BFE5',],
         xaxis: { categories: [] }
     };
 
@@ -1515,12 +1781,80 @@ document.addEventListener('click', (e) => {
         document.getElementById('displayLabel').innerText = currentYear;
         
         // محاكاة سحب البيانات بناءً على السنة والنمط
-        const yearData = dataRepo[currentYear] || { revenue: [0,0,0], cost: [0,0,0] };
+        const yearData = dataRepo[currentYear] || { revenue: [0,0,0]};
         
         chart.updateOptions({
-            series: [{ name: 'Profit', data: yearData.revenue }, { name: 'Cost', data: yearData.cost }],
+            series: [{ name: 'Profit', data: yearData.revenue }],
             xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] }        });
     }
 
     // تشغيل مبدئي
     updateChart();
+
+    // البحث التلقائي وتعبئة بيانات العميل عبر برقم الهاتف
+function autofillCustomerByPhone(phoneInput, fieldsMap) {
+    if (!phoneInput) return;
+
+    phoneInput.addEventListener('input', (e) => {
+        const phoneVal = e.target.value.trim();
+        if (phoneVal.length < 10) return;
+
+        const customer = customersData.find(c => c.phone1 === phoneVal || c.phone2 === phoneVal);
+        if (customer) {
+            if (fieldsMap.name && document.getElementById(fieldsMap.name)) 
+                document.getElementById(fieldsMap.name).value = customer.clientName || '';
+            if (fieldsMap.clientId && document.getElementById(fieldsMap.clientId)) 
+                document.getElementById(fieldsMap.clientId).value = customer.clientId || '';
+            if (fieldsMap.phone2 && document.getElementById(fieldsMap.phone2)) 
+                document.getElementById(fieldsMap.phone2).value = customer.phone2 || '';
+            if (fieldsMap.email && document.getElementById(fieldsMap.email)) 
+                document.getElementById(fieldsMap.email).value = customer.email || '';
+            if (fieldsMap.governorate && document.getElementById(fieldsMap.governorate)) 
+                document.getElementById(fieldsMap.governorate).value = customer.governorate || '';
+            if (fieldsMap.country && document.getElementById(fieldsMap.country)) 
+                document.getElementById(fieldsMap.country).value = customer.country || '';
+        }
+    });
+}
+
+// تفعيل البحث التلقائي في جميع النوافذ المنبثقة (Modals)
+function initGlobalCustomerAutofill() {
+    // 1. نافذة الطلبات Order Modal
+    autofillCustomerByPhone(document.getElementById('phone1'), {
+        name: 'clientName',
+        clientId: 'clientId',
+        phone2: 'phone2',
+        email: 'email',
+        governorate: 'governorate'
+    });
+
+    // 2. نافذة المرتجعات Returns Modal
+    autofillCustomerByPhone(document.getElementById('modal-return-phone1'), {
+        name: 'modal-return-name',
+        phone2: 'modal-return-phone2',
+        email: 'modal-return-email'
+    });
+
+    // 3. نافذة التقييمات Reviews Modal
+    autofillCustomerByPhone(document.getElementById('modal-cust-rev-phone1'), {
+        name: 'modal-cust-rev-name',
+        phone2: 'modal-cust-rev-phone2',
+        email: 'modal-cust-rev-email'
+    });
+}
+
+// تشغيل التعبئة عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', () => {
+    initGlobalCustomerAutofill();
+});
+
+
+function populateModelsDatalist() {
+    const datalist = document.getElementById('models-list');
+    if (!datalist) return;
+    
+    datalist.innerHTML = modelsData
+        .filter(m => !m.isDeleted)
+        .map(m => `<option value="${m.modelId}">${m.name} - ${m.category}</option>`)
+        .join('');
+}

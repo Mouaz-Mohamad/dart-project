@@ -45,13 +45,13 @@ html {
 
 body {
   min-height: 100vh;
-  height: 100%;
+  height: 100vh;
   font-family: var(--font-main);
   font-weight: 400;
   font-size: 1rem;
   line-height: 1.5;
   color: var(--text-main);
-  background-color: var(--white);
+ background:  #ffffff ;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   overflow:scroll;
@@ -113,7 +113,7 @@ textarea {
 
 /* Sidebar Navigation */
 .cont-menu {
-  width: 18%; 
+  width: 15%; 
   height: 100vh;
   position: fixed;
   top: 0;
@@ -173,11 +173,11 @@ textarea {
 }
 
 section{
-    margin-left: 18%;
-    width: 82%;
-    height: 100vh;
+    margin-left: 15%;
+    width: 85%;
+    height: 99vh;
     background-color: var(--white);
-    padding: 0 ;
+    padding: 20px 0 0 0 ;
     position: relative;
 }
 
@@ -665,10 +665,160 @@ section{
     color: green;
     border: 1px solid green;
 }
+.chart-one ,.cards-tow,.cards-one{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 20px;
+}
+.chart-one{
+    background:  #19485f;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  /* إطار زجاجي مع لمعة خفيفة من الأعلى */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border-radius: 20px;
+}
+.dart-chart-card {
+        padding: 5px;
+        width: 70%;
+        font-family: 'Cairo', Tahoma, sans-serif;
+    }
+    .dart-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    .dart-mode-btns {
+        display: flex;
+        background: #f1f5f9;
+        padding: 4px;
+        border-radius: 10px;
+        gap: 4px;
+    }
+    .dart-nav-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #f8fafc;
+        padding: 6px 12px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+    }
+    .dart-nav-btn {
+        background: white;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+    .dart-nav-btn:hover {
+        background: #881337;
+        color: white;
+        border-color: #881337;
+    }
+    #displayLabel {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 16px;
+        min-width: 50px;
+        text-align: center;
+    }
 
-.card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 95%; max-height: 270px; margin: auto; }
-.controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.mode-btns button { padding: 8px 15px; border: none; background: #e2e8f0;color: black; border-radius: 5px; cursor: pointer; }
-.mode-btns button.active { background: #8b5cf6; color: white; }
-.nav-controls { display: flex; align-items: center; gap: 15px; }
-.nav-btn { background: #64748b; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer;text-align: center; }
+
+    .financial-summary{
+        display: grid;
+  /* بيقسم الشاشة لأعمدة تلقائية أقل عرض ليها 220px وتكبر بـ 1fr */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px; /* المسافة بين الكروت */
+    width: 30%;
+    }
+    .financial-summary > *:first-child {
+    grid-column: 1 / -1;
+}
+.sales-cont,.cost-cont,.profit-cont{
+    background-color: var(--white);
+    padding: 10px 20px;
+    height: 100%;
+    color: var(--bragnte);
+    border-radius: 30px;
+    -webkit-border-radius: 30px;
+    -moz-border-radius: 30px;
+    -ms-border-radius: 30px;
+    -o-border-radius: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+
+
+.variance{
+    color: #afafaf;
+    width: 70%;
+
+    border-radius: 10px;
+    padding: 5px;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    -ms-border-radius: 10px;
+    -o-border-radius: 10px;
+}
+.sales{
+    font-size: 40px;
+}
+.financial-summary h4{
+    color: #000000;
+    font-size: 15px;
+}
+.brand{
+        padding: 10px 20px;
+}
+
+
+.cont-card-info-2{
+  display: grid;
+  /* بيقسم الشاشة لأعمدة تلقائية أقل عرض ليها 220px وتكبر بـ 1fr */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 10px; /* المسافة بين الكروت */
+  width: 100%;
+  justify-content: space-around;
+}
+.card-inf-2{
+  background: rgba(255, 255, 255, 0.30);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 7px 10px;
+}
+.card-inf-2 .span-img{
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  font-size: xx-large;
+  width: 190px;
+}
+.card-inf-2 h5{
+  color: var(--text-muted);
+}
+
+.strok{
+    width: 100%;
+    border: 2px solid #43BFE5;
+    margin-top: 10px;
+}

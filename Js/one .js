@@ -1,9 +1,6 @@
 // ==========================================
 // 1. مصفوفات البيانات (المنتجات، التقييمات، والمخزون)
 // ==========================================
-// ==========================================
-// 1. مصفوفات البيانات (المنتجات، التقييمات، والمخزون)
-// ==========================================
 const productsData = [
     {
         id: 1,
@@ -905,3 +902,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 //     // تشغيل مبدئي
 //     updateChart();
+
+
+ // 1. الإحداثيات
+  const clientCoords = [30.0444, 31.2357];
+  const driverCoords = [30.0500, 31.2400];
+
+  // 2. إنشاء الخريطة وإلغاء التحكم في الزوم وشريط الحقوق (Attribution)
+  const map = L.map('map', { 
+    zoomControl: false,
+    attributionControl: false 
+  }).setView(clientCoords, 14);
+
+  // 3. ثيم الخريطة الفاتح والنظيف (CartoDB Positron / Light)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // 4. إيقونات العميل والمندوب
+  const clientMarker = L.marker(clientCoords).addTo(map).bindPopup('موقعك');
+  const driverMarker = L.marker(driverCoords).addTo(map).bindPopup('المندوب هنا');
+
+  // زوم يلم الطرفين سوا
+  const group = new L.featureGroup([clientMarker, driverMarker]);
+  map.fitBounds(group.getBounds().pad(0.3));
