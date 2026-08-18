@@ -504,25 +504,24 @@ function openProductModal(product) {
         btn.className = 'color-btn';
         btn.textContent = color;
         btn.setAttribute('data-color', color);
+btn.addEventListener('click', () => {
+    if (btn.classList.contains('disabled')) return;
+    
+    if (!selectedSize) {
+        showToast("من فضلك اختر المقاس أولاً!");
+        return;
+    }
 
-        btn.addEventListener('click', () => {
-            if (btn.classList.contains('disabled')) return;
-            
-            if (!selectedSize) {
-                alert("من فضلك اختر المقاس أولاً!");
-                return;
-            }
+    const stockQty = product.stock[selectedSize]?.[color] ?? 0;
+    if (stockQty <= 0) {
+        showToast("عذراً، هذا اللون غير متوفر للمقاس المختار!");
+        return;
+    }
 
-            const stockQty = product.stock[selectedSize]?.[color] ?? 0;
-            if (stockQty <= 0) {
-                alert("عذراً، هذا اللون غير متوفر للمقاس المختار!");
-                return;
-            }
-
-            colorsContainer.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            selectedColor = color;
-        });
+    colorsContainer.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedColor = color;
+});
 
         colorsContainer.appendChild(btn);
     });
@@ -593,11 +592,25 @@ function renderCart() {
             // التحقق من المخزون المتاح للمنتج باللون والمقاس المختار
             const product = productsData.find(p => p.id === item.id);
             const availableStock = product?.stock?.[item.size]?.[item.color] ?? 0;
+if (cartData[index].quantity >= availableStock) {
+    showToast(`عذراً، المتاح بالمخزون ${availableStock} قطع فقط.`);
+    return;
+}
 
-            if (cartData[index].quantity >= availableStock) {
-                alert(`عذراً، الكمية المطلوبة غير متوفرة. المتاح بالمخزون لهذا المقاس واللون هو ${availableStock} قطع فقط.`);
-                return;
-            }
+// دالة إظهار الإشعار (تُوضع في مكان عام بملف الـ JS)
+function showToast(message) {
+    const existingToast = document.querySelector('.custom-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    toast.innerText = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
 
             cartData[index].quantity += 1;
             saveCartToLocalStorage();
@@ -648,11 +661,11 @@ function initCartAndCheckoutEvents() {
     if (modalBuyBtn) {
         modalBuyBtn.addEventListener('click', () => {
             if (!selectedSize) {
-                alert("من فضلك اختر المقاس!");
+                showToast("من فضلك اختر المقاس!");
                 return;
             }
             if (!selectedColor) {
-                alert("من فضلك اختر اللون!");
+                showToast("من فضلك اختر اللون!");
                 return;
             }
 
@@ -667,11 +680,12 @@ function initCartAndCheckoutEvents() {
             });
 
             saveCartToLocalStorage();
-            alert("تم إضافة المنتج إلى السلة بنجاح!");
+            showToast("تم إضافة المنتج إلى السلة بنجاح!");
+            
             const modal = document.getElementById('SectionModel');
             if (modal) {
-                modal.style.display = 'none';
-                document.body.style.overflow = 'auto'; // إعادة التمرير بعد الشراء
+                modal.classList.remove('active');
+                document.body.style.overflow = 'auto'; 
             }
             renderCart();
         });
@@ -682,13 +696,13 @@ function initCartAndCheckoutEvents() {
             const code = discountInput.value.trim().toUpperCase();
             if (code === "DART10") {
                 appliedDiscountRate = 0.10;
-                alert("تم تطبيق خصم 10% بنجاح!");
+                showToast("تم تطبيق خصم 10% بنجاح!");
             } else if (code === "DART20") {
                 appliedDiscountRate = 0.20;
-                alert("تم تطبيق خصم 20% بنجاح!");
+                showToast("تم تطبيق خصم 20% بنجاح!");
             } else {
                 appliedDiscountRate = 0;
-                alert("كود الخصم غير صحيح!");
+                showToast("كود الخصم غير صحيح!");
             }
             updateCartTotals();
         });
@@ -697,7 +711,7 @@ function initCartAndCheckoutEvents() {
     if (toCheckoutBtn && checkoutView) {
         toCheckoutBtn.addEventListener('click', () => {
             if (cartData.length === 0) {
-                alert("السلة فارغة، أضف منتجات أولاً!");
+                showToast("السلة فارغة، أضف منتجات أولاً!");
                 return;
             }
             checkoutView.style.display = 'block';
@@ -711,10 +725,27 @@ function initCartAndCheckoutEvents() {
             cartData = [];
             saveCartToLocalStorage();
             appliedDiscountRate = 0;
-            alert("تم إتمام طلبك بنجاح! شكراً لك.");
-            window.location.href = "index.html";
+            showToast("تم إتمام طلبك بنجاح! شكراً لك.");
+            setTimeout(() => {
+                window.location.href = "index.html";
+            }, 1500);
         });
     }
+}
+
+// دالة عرض الإشعار العائم
+function showToast(message) {
+    const existingToast = document.querySelector('.custom-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    toast.innerText = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
 }
 
 // ==========================================
