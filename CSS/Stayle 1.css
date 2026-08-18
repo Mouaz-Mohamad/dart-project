@@ -1291,7 +1291,9 @@ header {
     .items-title { font-size: 12px; color: #64748b; margin-bottom: 8px; }
     .item-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: #334155; }
 
+    /* ================================= */
     /* المندوب */
+    /* ================================= */
     .driver-box {
       display: flex; justify-content: space-between; align-items: center;
       background: #f1f5f9; padding: 12px; border-radius: 12px; margin-bottom: 15px;

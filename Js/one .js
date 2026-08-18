@@ -951,32 +951,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  function startCountdown() {
-    const goBtn = document.getElementById('goBtn');
-    let count = 3;
+function startCountdown() {
+  const goBtn = document.getElementById('goBtn');
+  let count = 3;
 
-    goBtn.disabled = true;
-    goBtn.innerText = `Opening Maps in ${count}...`;
+  goBtn.disabled = true;
+  goBtn.innerText = `Opening Maps in ${count}...`;
 
-    countdownTimer = setInterval(() => {
-      count--;
-      if (count > 0) {
-        goBtn.innerText = `Opening Maps in ${count}...`;
-      } else {
-        clearInterval(countdownTimer);
-        startDelivery();
-      }
-    }, 1000);
-  }
+  countdownTimer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      goBtn.innerText = `Opening Maps in ${count}...`;
+    } else {
+      clearInterval(countdownTimer);
+      startDelivery();
+    }
+  }, 1000);
+}
 
-  function startDelivery() {
-    localStorage.setItem('order_45_state', 'on_the_way');
-    restoreActiveState();
+function startDelivery() {
+  // 1. حفظ الحالة
+  localStorage.setItem('order_45_state', 'on_the_way');
+  restoreActiveState();
 
-    const addressText = document.getElementById('customerAddress').innerText.trim();
-    const encodedAddress = encodeURIComponent(addressText);
-    window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}&travelmode=driving`;
-  }
+  // 2. تجهيز العنوان
+  const addressText = document.getElementById('customerAddress').innerText.trim();
+  const encodedAddress = encodeURIComponent(addressText);
+  
+  // 3. رابط جوجل مابس الأضمن للموبايل
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+  
+  // 4. فتح الخريطة في تبويب جديد أو تطبيق الخرائط مباشرة
+  window.open(mapsUrl, '_blank');
+}
 
   function restoreActiveState() {
     const statusBadge = document.getElementById('orderStatus');
