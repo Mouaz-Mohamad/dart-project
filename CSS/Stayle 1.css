@@ -96,7 +96,7 @@ header {
 
 .side-menu {
     position: fixed;
-    top: 13.5vh;
+    top: 12vh;
     z-index: 100000;
     display: none;
     justify-content: center;
