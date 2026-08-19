@@ -84,7 +84,7 @@ header {
 }
 
 .icon-shop {
-    width: clamp(50px, 8vw, 70px);
+    width:  70px;
     height: 30px;
     background-color: var(--white);
 }
