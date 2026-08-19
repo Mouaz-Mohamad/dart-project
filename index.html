@@ -43,8 +43,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Cabin:ital,wght@0,400..700;1,400..700&family=Edu+VIC+WA+NT+Hand:wght@400..700&family=Itim&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Sans+Display:ital,wght@0,100..900;1,100..900&family=PT+Serif:ital@0;1&family=Playwrite+NZ+Basic:wght@300&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">    <link href="https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap" rel="stylesheet">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -74,6 +74,13 @@
 
                 <section id="search-serial-container" aria-label="Product Authenticity Check"></section>
 
+                <!-- سيكشن أفضل المنتجات -->
+                <section class="best-products-section">
+                    <h2 class="section-title-">&nbsp;Best Products</h2>
+                    <!-- الحاوية المخصصة للإسكرول الأفقي -->
+                    <div class="x-scroll-container" id="bestProductsContainer"></div>
+                </section>
+
                 <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
 
                 <!-- ================= سكشن المنتجات ================= -->
@@ -98,6 +105,11 @@
                 </section>
 
                 <section id="birthday"></section>
+
+
+
+
+
 
                 <!-- ================= سكشن التقييمات ================= -->
                 <section class="reviews-section">
@@ -153,6 +165,20 @@
                 <section id="dart-for-you" aria-label="The brand logo is a kite bird in a burgundy color."></section>
                 <section id="birthday-details" aria-label="Information and details about the birthday discount."></section>
                 <section id="card-details" aria-label="Information and details about the Dart card."></section> -->
+
+                <!-- الكارت المرجعي (Template) -->
+                <div class="product-card" id="productTemplate" style="display: none;">
+                    <img src="" alt="" class="product-img" loading="lazy">
+                    <div class="product-details">
+                        <div class="product-category"></div>
+                        <div class="product-code" dir="rtl"></div>
+                        <div class="product-title"></div>
+                        <div class="product-footer djasb">
+                            <span class="product-price"></span>
+                            <button class="cart-btn dja">Buy &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                        </div>
+                    </div>
+                </div>
             </main>
 
             <footer id="footer" aria-label="footer."></footer>

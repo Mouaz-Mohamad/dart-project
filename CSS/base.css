@@ -79,7 +79,9 @@ body {
   color: var(--white);
   background-color: var(--bragnte);
   overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
+        &::-webkit-scrollbar { display: none; }
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 body.no-scroll {
@@ -99,6 +101,10 @@ main{
 .mother {
   position: relative;
   width: 100%;
+  overflow: hidden;
+          &::-webkit-scrollbar { display: none; }
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   max-width: 400px;
   min-height: 100vh;
   margin: 0 auto;

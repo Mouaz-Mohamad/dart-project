@@ -65,9 +65,14 @@
         <main class="#">
 
             <!-- <section id="search-serial-container" aria-label="Product Authenticity Check"></section> -->
-
+            
+            
             <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
+            <!-- 1. حاوية أزرار الفلترة بكلاس filter-container -->
+            <div class="filter-container" id="filterContainer"></div>
 
+            <!-- 2. حاوية المنتجات بكلاس products-grid -->
+            <div class="products-grid" id="productsContainer"></div>
             <!-- ================= سكشن المنتجات الجزء الأول (أول 7 منتجات) ================= -->
             <section class="products-section">
                 <h2 class="section-title-">&nbsp;Newest products</h2>
@@ -90,6 +95,13 @@
             </section>
 
             <!-- ================= التلات سكاشن اللي في النص ================= -->
+                    <!-- سيكشن أفضل المنتجات -->
+                <section class="best-products-section">
+                    <h2 class="section-title-">&nbsp;Best Products</h2>
+                    <!-- الحاوية المخصصة للإسكرول الأفقي -->
+                    <div class="x-scroll-container" id="bestProductsContainer"></div>
+                </section>
+            
             <section class="reviews-section">
                 <h2 class="section-title-">&nbsp; Our Reviews </h2>
 
@@ -150,6 +162,20 @@
             <section id="birthday-details" aria-label="Information and details about the birthday discount."></section>
             <section id="card-details" aria-label="Information and details about the Dart card."></section>
             <section id="story"></section> -->
+
+                <!-- الكارت المرجعي (Template) -->
+                <div class="product-card" id="productTemplate" style="display: none;">
+                    <img src="" alt="" class="product-img" loading="lazy">
+                    <div class="product-details">
+                        <div class="product-category"></div>
+                        <div class="product-code" dir="rtl"></div>
+                        <div class="product-title"></div>
+                        <div class="product-footer djasb">
+                            <span class="product-price"></span>
+                            <button class="cart-btn dja">Buy &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                        </div>
+                    </div>
+                </div>
         </main>
 
         <footer id="footer" aria-label="footer."></footer>

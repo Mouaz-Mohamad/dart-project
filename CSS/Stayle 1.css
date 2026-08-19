@@ -288,7 +288,7 @@ header {
 
 .product-details { 
     padding: 12px; 
-    text-align: right;
+    text-align: left;
 }
 
 .product-category {
@@ -312,12 +312,12 @@ header {
 }
 
 .product-code {
-    font-size: 12px;
+    font-size: 10px;
     font-family: var(--font-cabin);
     color: var(--text-muted);
     font-weight: 300;
     margin-bottom: 4px;
-    text-align: right;
+    text-align: left;
 }
 
 .product-price {
@@ -860,7 +860,7 @@ header {
 }
 
 .story, .birthday-details { 
-    justify-content: flex-end; 
+    justify-content: flex-start; 
 }
 
 .card-details { 
@@ -909,13 +909,15 @@ header {
 }
 
 .story .container-story h3 { 
-    margin-right: 90px; 
+    width: 259px;
+    
 }
 
 .story .container-story h4 {
     text-align: left;
     margin: 20px 100px 0 0;
     font-size: clamp(0.85em, 2vw, 1em);
+    border-left: 2.5px solid var(--bragnte) ;
 }
 
 .story img {
@@ -1418,4 +1420,101 @@ header {
     15% { opacity: 1; transform: translate(-50%, 0) scale(1); }
     85% { opacity: 1; transform: translate(-50%, 0) scale(1); }
     100% { opacity: 0; transform: translate(-50%, 25px) scale(0.95); }
+}
+
+.x-scroll-container {
+    display: flex;
+    gap: 15px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: 10px 0;
+    scrollbar-width: thin;
+    &::-webkit-scrollbar { display: none; }
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+/* إخفاء شريط الإسكرول لو حابب الشكل يكون أضفئ (اختياري) */
+.x-scroll-container::-webkit-scrollbar {
+    height: 6px;
+}
+.x-scroll-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+/* ضمان ثبات عرض الكارت داخل الإسكرول الأفقي */
+.x-scroll-container .product-card {
+    flex: 0 0 165px;
+    scroll-snap-align: start;
+}
+/* تنسيق أزرار الفلترة (تظهر بجانب بعضها مع إمكانية السحب) */
+.filter-container {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 10px 5px;
+    margin-bottom: 15px;
+    white-space: nowrap;
+        &::-webkit-scrollbar { display: none; }
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.filter-btn {
+    padding: 8px 18px;
+    background-color: var(--white);
+    color: var(--bg-dark);
+    border: 1px solid var(--bragnte);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0; /* منع انكماش الأزرار */
+    transition: 0.3s ease;
+}
+
+.filter-btn.active {
+    background-color: var(--bragnte);
+    color: var(--white);
+}
+
+/* شبكة المنتجات (عمودين وصفوف غير منتهية) */
+.products-grid {
+display: grid !important;
+    grid-template-columns: repeat(2, 1fr); /* عمودين متساويين */
+    gap: 12px; /* المسافة بين الكروت */
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.products-grid .product-card {
+    width: 100%;
+    min-width: 0;
+}
+/* تأثير Fade In للظهور */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.35s ease-in-out forwards;
+}
+
+/* تنسيق العداد فوق أيقونة السلة */
+.cart-count {
+    display: inline-block;
+
+    color: var(--bragnte);
+    font-size: 15px;
+    font-weight: bold;
+    padding: 2px 6px;
+    position: absolute;
+
+    right: 05px;
 }
