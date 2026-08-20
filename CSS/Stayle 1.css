@@ -208,52 +208,120 @@ header {
 .search-input::placeholder, .search-button i {
     color: #c91b1b;
 }
+/* ========================================== */
+/* Modern Leaderboard Styling                 */
+/* ========================================== */
 
-.leaderboard-list {
-    color: var(--bg-dark);
-    list-style: none;
-    overflow: hidden;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+.leaderboard-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin: 0;
+    width: 100%;
 }
 
+.leaderboard-card h1 {
+    font-family: var(--font-inter);
+    color: var(--bragnte);
+    font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+    text-align: center;
+}
+
+.leaderboard-list {
+    width: min(92%, 480px);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    background: var(--white);
+    border: 1px solid rgba(171, 1, 43, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.leaderboard-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.leaderboard-item:last-child {
+    border-bottom: none;
+}
+
+.leaderboard-item:hover {
+    background-color: rgba(171, 1, 43, 0.03);
+}
+
+/* شارات الترتيب */
 .rank-badge {
     display: flex;
     align-items: center;
-    gap: 4px;
-    min-width: 26px;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.rank-num {
+    font-family: var(--font-inter);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--bg-dark);
+    margin: 0;
+}
+
+/* تمييز المراكز الثلاثة الأولى */
+.leaderboard-item.top-rank {
+    background: linear-gradient(90deg, rgba(171, 1, 43, 0.5) 0%, transparent 100%);
 }
 
 .leaderboard-item.top-rank .rank-badge {
-    margin-left: -16px;
-    padding: 4px 10px 0 20px;
-    height: 30px;
-    background: url('../Icons/Rectangle 1.svg') center/cover no-repeat;
+    border-right: 2px solid gold;
+    color: gold;
 }
 
 .leaderboard-item.top-rank .rank-num {
-    color: #ffffff;
+    color: gold;
 }
 
-.trophy-icon, .score {
-    font-size: 0.9rem;
-}
+/* المركز الثاني والثالث */
 
-.user-name, .score {
-    font-weight: 400;
+.leaderboard-item:nth-child(2) .rank-num ,.leaderboard-item:nth-child(3) .rank-num {
     color: var(--bragnte);
 }
 
+
+
+
+/* بيانات المتنافسين */
 .user-name {
     flex: 1;
-    padding-left: 12px;
-    text-align: left;
-    font-size: clamp(14px, 1.8vw, 16px);
+    margin: 0 15px;
+    text-align: left; /* ملائمة للغة العربية والإنجليزية */
+    font-size: clamp(11px, 2vw, 15px);
+    font-weight: 500;
+    color: var(--bg-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .score {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--bragnte);
+    background: rgba(171, 1, 43, 0.08);
+    padding: 4px 10px;
+    border-radius: 12px;
     letter-spacing: 0.5px;
+    white-space: nowrap;
 }
-
 
 /* ========================================== */
 /* Products & Cards                           */
