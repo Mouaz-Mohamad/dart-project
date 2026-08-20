@@ -1586,3 +1586,64 @@ display: grid !important;
 
     right: 05px;
 }
+
+
+/* تنسيق قائمة الاقتراحات */
+.results-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    border: 1px solid #ccc;
+    background: white;
+    z-index: 1000;
+    list-style: none;
+    padding: 0;
+    margin: 5px 0 0 0;
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.results-list li {
+    padding: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+}
+
+.results-list li:hover {
+    background: #f7f7f7;
+}
+
+/* لضبط موقع القائمة */
+.form-group {
+    position: relative;
+}
+
+/* إخفاء شريط الحقوق والعلم أسفل الخريطة */
+.leaflet-control-attribution {
+    display: none !important;
+}
+
+/* ضبط حاوية الخريطة حتى لا تخرج عن إطارها أو تتداخل مع العناصر */
+#map {
+    height: 300px !important;
+    width: 100% !important;
+    border-radius: 8px;
+}
+
+/* حل مشكلة القائمة المنسدلة للنتائج لتظهر فوق الخريطة */
+#results-list {
+    position: absolute;
+    z-index: 1000;
+    background: #fff;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}

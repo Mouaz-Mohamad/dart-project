@@ -538,8 +538,6 @@ function updateColorsAvailability(product, size) {
     });
 }
 
-
-
 // ==========================================
 // 4. دوال السلة، الخصم، وإتمام الطلب
 // ==========================================
@@ -729,10 +727,130 @@ function initCartAndCheckoutEvents() {
     }
 }
 
+// ==========================================
+// 5. تهيئة الخريطة والبحث عن العنوان (محمية بدالة)
+// ==========================================
+function initAddressMap() {
+    const mapElement = document.getElementById('map');
+    const input = document.getElementById('address-input');
+    const resultsList = document.getElementById('results-list');
 
+    if (!mapElement || typeof L === 'undefined') return;
+
+    // تنظيف الخريطة القديمة إن وجدت لمنع إعادة التهيئة المزدوجة
+    if (window.orderMap) {
+        window.orderMap.remove();
+    }
+
+    // 1. إنشاء الخريطة بدون شريط الحقوق والعلم
+    const map = L.map('map', { attributionControl: false }).setView([26.8206, 30.8025], 6);
+    window.orderMap = map;
+
+    // 2. استخدام طبقة CartoDB البيضاء والهادئة فقط (نمط أوبر)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+    }).addTo(map);
+
+    // 3. حل مشكلة النصف الرمادي وتحديث أبعاد الخريطة فور ظهور الحاوية
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 300);
+
+    if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+        resizeObserver.observe(mapElement);
+    }
+
+    let marker = null;
+    let selectedAddressData = null;
+    let timeout = null;
+
+    if (input && resultsList) {
+        input.addEventListener('input', () => {
+            clearTimeout(timeout);
+            const query = input.value.trim();
+
+            if (query.length < 2) {
+                resultsList.style.display = 'none';
+                selectedAddressData = null;
+                return;
+            }
+
+            resultsList.innerHTML = '<li style="color:#888; padding:10px;">جاري البحث...</li>';
+            resultsList.style.display = 'block';
+
+            timeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&countrycodes=eg&addressdetails=1`);
+                    const data = await response.json();
+
+                    resultsList.innerHTML = '';
+
+                    if (data && data.length > 0) {
+                        data.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = item.display_name;
+                            li.onclick = () => {
+                                input.value = item.display_name;
+                                
+                                const lat = parseFloat(item.lat);
+                                const lon = parseFloat(item.lon);
+
+                                selectedAddressData = {
+                                    address: item.display_name,
+                                    lat: lat,
+                                    lng: lon
+                                };
+
+                                const latInp = document.getElementById('lat-input');
+                                const lngInp = document.getElementById('lng-input');
+                                const fmtInp = document.getElementById('formatted-address-input');
+
+                                if (latInp) latInp.value = lat;
+                                if (lngInp) lngInp.value = lon;
+                                if (fmtInp) fmtInp.value = item.display_name;
+
+                                map.setView([lat, lon], 16);
+                                
+                                if (marker) {
+                                    marker.setLatLng([lat, lon]);
+                                } else {
+                                    marker = L.marker([lat, lon]).addTo(map);
+                                }
+                                
+                                marker.bindPopup(item.display_name).openPopup();
+                                resultsList.style.display = 'none';
+                            };
+                            resultsList.appendChild(li);
+                        });
+                    } else {
+                        resultsList.innerHTML = '<li style="color:#888; padding:10px;">لم يتم العثور على نتائج</li>';
+                    }
+                } catch (error) {
+                    console.error("خطأ في الاتصال:", error);
+                    resultsList.innerHTML = '<li style="color:red; padding:10px;">حدث خطأ أثناء جلب البيانات</li>';
+                }
+            }, 400);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target !== input) resultsList.style.display = 'none';
+        });
+    }
+
+    const checkoutForm = document.getElementById('checkoutForm');
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', (e) => {
+            if (!selectedAddressData) {
+                e.preventDefault();
+                alert('برجاء اختيار العنوان من القائمة المنسدلة أولاً قبل إتمام الطلب');
+            }
+        });
+    }
+}
 
 // ==========================================
-// 5. الفلترة والبانر
+// 6. الفلترة والبانر
 // ==========================================
 
 function filterProductsByCategory(selectedCat) {
@@ -802,10 +920,11 @@ function showCartBanner(productTitle) {
     clearTimeout(window.cartBannerTimeout);
     window.cartBannerTimeout = setTimeout(() => {
         banner.classList.remove('show');
-    }, 2500); // يختفي بعد 2.5 ثانية عشان ميبقاش مزعج
+    }, 2500);
 }
+
 // ==========================================
-// 6. معلومات المستخدم والملف الشخصي
+// 7. معلومات المستخدم والملف الشخصي
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -901,28 +1020,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-if (typeof L !== 'undefined' && document.getElementById('map')) {
-    const clientCoords = [30.0444, 31.2357];
-    const driverCoords = [30.0500, 31.2400];
-
-    const map = L.map('map', { 
-        zoomControl: false,
-        attributionControl: false 
-    }).setView(clientCoords, 14);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
-    }).addTo(map);
-
-    const clientMarker = L.marker(clientCoords).addTo(map).bindPopup('موقعك');
-    const driverMarker = L.marker(driverCoords).addTo(map).bindPopup('المندوب هنا');
-
-    const group = new L.featureGroup([clientMarker, driverMarker]);
-    map.fitBounds(group.getBounds().pad(0.3));
-}
-
 // ==========================================
-// 7. صفحة المندوب (Page REP)
+// 8. صفحة المندوب (Page REP)
 // ==========================================
 
 var countdownTimer = null;
@@ -967,7 +1066,7 @@ function startDelivery() {
     localStorage.setItem('order_45_state', 'on_the_way');
     restoreActiveState();
 
-    const addressText = document.getElementById('customerAddress').innerText.trim();
+    const addressText = document.getElementById('customerAddress')?.innerText.trim() || '';
     const encodedAddress = encodeURIComponent(addressText);
     
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}&travelmode=driving`, '_blank');
@@ -1069,9 +1168,8 @@ function restoreCompletedState() {
     }
 }
 
-
 // ==========================================
-// 8. التشغيل عند تحميل الصفحة
+// 9. التشغيل عند تحميل الصفحة
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1096,5 +1194,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderFilterButtons();
     renderReviewsLogic();
     initCartAndCheckoutEvents();
+    initAddressMap();
     updateCartCount();
 });

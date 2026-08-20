@@ -57,7 +57,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap" rel="stylesheet">
-</head>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <body class='dja-flexdir'>
     <div class="mother">
         <header id="header-container" aria-label="Main Navigation"></header>
@@ -116,57 +118,73 @@
                 <div class="calc-row total-row"><span>Total</span> <span id="totalVal">0 EGP</span></div>
             </div>
 
-            <h3 class="address-header">Address___</h3>
+<h3 class="address-header">Address</h3>
 
-            <!-- نموذج تفاصيل العنوان -->
-            <form id="checkoutForm" class="address-form">
-                <div class="form-group"><label>Name</label><input class="inp" type="text" placeholder="Value" required></div>
-                <div class="form-group"><label>Email</label><input class="inp" type="email" placeholder="Value"></div>
-                <div class="form-group"><label>Phone number</label><input class="inp" type="tel" placeholder="Value" required></div>
-                <div class="form-group">
-                    <label>Country</label>
-                    <select required class="select-cart">
-                        <option value="" selected disabled hidden> Select </option>
-                        <option value="Country">Egypt</option> 
-                    </select>                  
-                </div>
-                <div class="form-group">
-                    <label>Governorate</label>
-                    <select required class="select-cart">
-                        <option value="" selected disabled hidden> Select </option>
-                        <option value="Governorate">Cairo</option> 
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Area</label>
-                    <select required class="select-cart">
-                        <option value="" selected disabled hidden> Select </option>
-                        <option value="wrong_size">المقاس غير مناسب</option>
-                        <option value="defective">المنتج به عيب تصنيع أو تلف</option>
-                        <option value="not_as_described">المنتج يختلف عن الصورة أو الوصف</option>
-                        <option value="wrong_item">استلمت منتجًا مختلفًا عن طلبي</option>
-                        
-                        <!-- خيارات جودة أو تفضيل -->
-                        <option value="quality_issue">خامة المنتج لم تعجبني</option>
-                        <option value="changed_mind">لم أعد بحاجة إلى المنتج (تغيير رأي)</option>
-                        <option value="missing_parts">يوجد نقص في محتويات الشحنة</option>
-                        
-                        <!-- خيار عام -->
-                        <option value="other">سبب آخر</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>Street Name</label><input class="inp" type="text" placeholder="Value" required></div>
-                <div class="form-group"><label>Building Number/Name</label><input class="inp" type="text" placeholder="Value"required></div>
-                <div class="form-group"><label>Floor</label><input class="inp" type="text" placeholder="Value"></div>
-                <div class="form-group"><label>Delivery Notes</label><textarea class="inp" placeholder="Value"></textarea></div>
+<!-- نموذج تفاصيل العنوان -->
+<form id="checkoutForm" class="address-form">
+    
+    <!-- خانة البحث والاقتراحات من جوجل -->
+<div class="form-group" style="position: relative;">
+    <label>ابحث عن عنوانك</label>
+    <input type="text" id="address-input" class="inp" placeholder="اكتب المنطقة أو الشارع..." autocomplete="off">
+    <ul id="results-list" class="results-list" style="display:none;"></ul>
+</div>
 
-                <h3 class="payment-header" style="color: #000;">Payment Method</h3>
-                <div class="payment-method-box dja">
-                    <label class="dja" style="color: #000;"><input  type="checkbox" checked> Cash on Delivery</label>
-                </div>
+<!-- حاوية الخريطة -->
+<div id="map" style="height: 250px; width: 100%; border-radius: 8px; margin: 10px 0; border: 1px solid #ccc; z-index: 1;"></div>
 
-                <button type="submit" class="order-btn">Order</button>
-            </form>
+<input type="hidden" id="lat-input" name="latitude">
+<input type="hidden" id="lng-input" name="longitude">
+<input type="hidden" id="formatted-address-input" name="full_address">
+
+    <!-- حقول مخفية لإرسال البيانات مع الفورم -->
+    <input type="hidden" id="lat-input" name="latitude">
+    <input type="hidden" id="lng-input" name="longitude">
+    <input type="hidden" id="formatted-address-input" name="full_address">
+
+    <div class="form-group"><label>Name</label><input class="inp" type="text" placeholder="Value" required></div>
+    <div class="form-group"><label>Email</label><input class="inp" type="email" placeholder="Value"></div>
+    <div class="form-group"><label>Phone number</label><input class="inp" type="tel" placeholder="Value" required></div>
+    
+    <div class="form-group">
+        <label>Country</label>
+        <select required class="select-cart">
+            <option value="" selected disabled hidden> Select </option>
+            <option value="Egypt">Egypt</option> 
+        </select>                  
+    </div>
+
+    <div class="form-group">
+        <label>Governorate</label>
+        <select required class="select-cart" id="governorate-select">
+            <option value="" selected disabled hidden> Select </option>
+            <option value="Cairo">Cairo</option> 
+            <option value="Giza">Giza</option> 
+            <option value="Alexandria">Alexandria</option> 
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Area</label>
+        <input class="inp" type="text" id="area-input" placeholder="المنطقة / الحي">
+    </div>
+
+    <div class="form-group">
+        <label>Street Name</label>
+        <input class="inp" type="text" id="street-input" placeholder="اسم الشارع" required>
+    </div>
+
+    <div class="form-group"><label>Building Number/Name</label><input class="inp" type="text" placeholder="Value" required></div>
+    <div class="form-group"><label>Floor</label><input class="inp" type="text" placeholder="Value"></div>
+    <div class="form-group"><label>Delivery Notes</label><textarea class="inp" placeholder="Value"></textarea></div>
+
+    <h3 class="payment-header" style="color: #000;">Payment Method</h3>
+    <div class="payment-method-box dja">
+        <label class="dja" style="color: #000;"><input type="checkbox" checked> Cash on Delivery</label>
+    </div>
+
+    <button type="submit" class="order-btn">Order</button>
+</form>
         </section>
 
             <!-- <section id="contact-form" aria-label="Contact Us "></section>
