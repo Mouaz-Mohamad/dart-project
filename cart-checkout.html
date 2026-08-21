@@ -137,51 +137,54 @@
 <input type="hidden" id="lng-input" name="longitude">
 <input type="hidden" id="formatted-address-input" name="full_address">
 
-    <!-- حقول مخفية لإرسال البيانات مع الفورم -->
-    <input type="hidden" id="lat-input" name="latitude">
-    <input type="hidden" id="lng-input" name="longitude">
-    <input type="hidden" id="formatted-address-input" name="full_address">
-
     <div class="form-group"><label>Name</label><input class="inp" type="text" placeholder="Value" required></div>
-    <div class="form-group"><label>Email</label><input class="inp" type="email" placeholder="Value"></div>
     <div class="form-group"><label>Phone number</label><input class="inp" type="tel" placeholder="Value" required></div>
-    
-    <div class="form-group">
-        <label>Country</label>
-        <select required class="select-cart">
-            <option value="" selected disabled hidden> Select </option>
-            <option value="Egypt">Egypt</option> 
-        </select>                  
-    </div>
-
-    <div class="form-group">
-        <label>Governorate</label>
-        <select required class="select-cart" id="governorate-select">
-            <option value="" selected disabled hidden> Select </option>
-            <option value="Cairo">Cairo</option> 
-            <option value="Giza">Giza</option> 
-            <option value="Alexandria">Alexandria</option> 
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>Area</label>
-        <input class="inp" type="text" id="area-input" placeholder="المنطقة / الحي">
-    </div>
-
-    <div class="form-group">
-        <label>Street Name</label>
-        <input class="inp" type="text" id="street-input" placeholder="اسم الشارع" required>
-    </div>
-
+    <div class="form-group"><label>Email</label><input class="inp" type="email" placeholder="Value"></div>
     <div class="form-group"><label>Building Number/Name</label><input class="inp" type="text" placeholder="Value" required></div>
     <div class="form-group"><label>Floor</label><input class="inp" type="text" placeholder="Value"></div>
     <div class="form-group"><label>Delivery Notes</label><textarea class="inp" placeholder="Value"></textarea></div>
+    <div class="arrwo-for-other-adrees">=== &#9662; Alternative address entry &#9662; ===</div>
+
+
+    <div class="other-addres">
+        <div class="form-group">
+            <label>Country</label>
+            <select required class="select-cart">
+                <option value="" selected disabled hidden> Select </option>
+                <option value="Egypt">Egypt</option> 
+            </select>                  
+        </div>
+
+        <div class="form-group">
+            <label>Governorate</label>
+            <select class="select-cart" id="governorate-select">
+                <option value="" selected disabled hidden> Select </option>
+                <option value="Cairo">Cairo</option> 
+                <option value="Giza">Giza</option> 
+                <option value="Alexandria">Alexandria</option> 
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Area</label>
+            <input class="inp" type="text" id="area-input" placeholder="المنطقة / الحي">
+        </div>
+
+        <div class="form-group">
+            <label>Street Name</label>
+            <input class="inp" type="text" id="street-input" placeholder="اسم الشارع" >
+        </div>
+    </div>
+
+
 
     <h3 class="payment-header" style="color: #000;">Payment Method</h3>
-    <div class="payment-method-box dja">
-        <label class="dja" style="color: #000;"><input type="checkbox" checked> Cash on Delivery</label>
-    </div>
+<div class="payment-method-box">
+    <label class="simple-checkbox">
+        <input type="checkbox" checked>
+        <span>Cash on Delivery</span>
+    </label>
+</div>
 
     <button type="submit" class="order-btn">Order</button>
 </form>

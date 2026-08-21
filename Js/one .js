@@ -247,21 +247,27 @@ async function loadSection(containerId, filePath) {
 function initHeader() {
     const iconMenu = document.querySelector('.icon-menu');
     const sideMenu = document.querySelector('.side-menu');
+    const menuFacke = document.querySelector('.menu-facke');
 
-    if (iconMenu && sideMenu) {
+    if (iconMenu) {
         iconMenu.addEventListener('click', (e) => {
             e.stopPropagation();
-            sideMenu.classList.toggle('active');
+            if (sideMenu) sideMenu.classList.toggle('active');
+            if (menuFacke) menuFacke.classList.toggle('active');
         });
 
         document.addEventListener('click', (event) => {
-            if (!sideMenu.contains(event.target) && !iconMenu.contains(event.target)) {
+            if (sideMenu && !sideMenu.contains(event.target) && !iconMenu.contains(event.target)) {
                 sideMenu.classList.remove('active');
+            }
+            if (menuFacke && !menuFacke.contains(event.target) && !iconMenu.contains(event.target)) {
+                menuFacke.classList.remove('active');
             }
         });
 
         window.addEventListener('scroll', () => {
-            sideMenu.classList.remove('active');
+            if (sideMenu) sideMenu.classList.remove('active');
+            if (menuFacke) menuFacke.classList.remove('active');
         });
     }
 }
@@ -316,15 +322,26 @@ function createProductCard(item, template) {
     card.removeAttribute('id');
     card.style.display = 'flex';
     card.style.position = 'relative';
-
     card.setAttribute('data-id', item.id);
 
-    card.querySelector('.product-img').src = item.image;
-    card.querySelector('.product-img').alt = item.title;
-    card.querySelector('.product-category').textContent = item.category;
-    card.querySelector('.product-title').textContent = item.title;
-    card.querySelector('.product-code').textContent = `Code : ${item.code}`;
-    card.querySelector('.product-price').textContent = `EGP ${item.price}`;
+    // فحص العناصر قبل استخدامها لتفادي توقف الكود
+    const img = card.querySelector('.product-img');
+    if (img) {
+        img.src = item.image;
+        img.alt = item.title;
+    }
+
+    const category = card.querySelector('.product-category');
+    if (category) category.textContent = item.category;
+
+    const title = card.querySelector('.product-title');
+    if (title) title.textContent = item.title;
+
+    const code = card.querySelector('.product-code');
+    if (code) code.textContent = `Code : ${item.code}`;
+
+    const price = card.querySelector('.product-price');
+    if (price) price.textContent = `EGP ${item.price}`;
 
     let totalStock = 0;
     if (item.stock) {
@@ -715,6 +732,27 @@ function initCartAndCheckoutEvents() {
     if (checkoutForm) {
         checkoutForm.addEventListener('submit', (e) => {
             e.preventDefault();
+
+            // فحص وجود موقع من الخريطة/GPS
+            const latVal = document.getElementById('lat-input')?.value.trim();
+            const addressInputVal = document.getElementById('address-input')?.value.trim();
+            const hasGpsAddress = Boolean(latVal || addressInputVal);
+
+            // فحص إدخال أي عنوان يدوياً داخل other-addres
+            const manualInputs = document.querySelectorAll('.other-addres input');
+            let hasManualAddress = false;
+            manualInputs.forEach(inputEl => {
+                if (inputEl.value.trim() !== '') {
+                    hasManualAddress = true;
+                }
+            });
+
+            // الشرط: إما إحداثيات/عنوان الخريطة أو أحد الحقول اليدوية
+            if (!hasGpsAddress && !hasManualAddress) {
+                showToast("يرجى تحديد الموقع على الخريطة أو إدخال العنوان يدوياً لإتمام الطلب!");
+                return;
+            }
+
             cartData = [];
             saveCartToLocalStorage();
             appliedDiscountRate = 0;
@@ -727,125 +765,239 @@ function initCartAndCheckoutEvents() {
     }
 }
 
+
 // ==========================================
-// 5. تهيئة الخريطة والبحث عن العنوان (محمية بدالة)
+// 5. تهيئة الخريطة والبحث عن العنوان (معتمد على GPS و OpenStreetMap)
 // ==========================================
 function initAddressMap() {
     const mapElement = document.getElementById('map');
     const input = document.getElementById('address-input');
     const resultsList = document.getElementById('results-list');
 
+    // إخفاء حقول العنوان اليدوي والتحكم في ظهورها عند النقر على السهم
+    const otherAddressDiv = document.querySelector('.other-addres');
+    const arrowBtn = document.querySelector('.arrwo-for-other-adrees');
+
+    if (otherAddressDiv) {
+        otherAddressDiv.style.display = 'none';
+    }
+
+    if (arrowBtn && otherAddressDiv) {
+        arrowBtn.addEventListener('click', () => {
+            const isHidden = otherAddressDiv.style.display === 'none';
+            otherAddressDiv.style.display = isHidden ? 'block' : 'none';
+        });
+    }
+
     if (!mapElement || typeof L === 'undefined') return;
 
-    // تنظيف الخريطة القديمة إن وجدت لمنع إعادة التهيئة المزدوجة
-    if (window.orderMap) {
-        window.orderMap.remove();
-    }
+    try {
+        if (window.orderMap) window.orderMap.remove();
 
-    // 1. إنشاء الخريطة بدون شريط الحقوق والعلم
-    const map = L.map('map', { attributionControl: false }).setView([26.8206, 30.8025], 6);
-    window.orderMap = map;
+        const egyptBounds = L.latLngBounds([22.0, 25.0], [31.7, 37.0]);
 
-    // 2. استخدام طبقة CartoDB البيضاء والهادئة فقط (نمط أوبر)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
-    }).addTo(map);
+        const map = L.map('map', { 
+            attributionControl: false,
+            zoomControl: false,
+            maxBounds: egyptBounds,
+            maxBoundsViscosity: 0.8
+        }).setView([26.8206, 30.8025], 6);
+        
+        window.orderMap = map;
 
-    // 3. حل مشكلة النصف الرمادي وتحديث أبعاد الخريطة فور ظهور الحاوية
-    setTimeout(() => {
-        map.invalidateSize();
-    }, 300);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
 
-    if (window.ResizeObserver) {
-        const resizeObserver = new ResizeObserver(() => map.invalidateSize());
-        resizeObserver.observe(mapElement);
-    }
+        setTimeout(() => map.invalidateSize(), 300);
 
-    let marker = null;
-    let selectedAddressData = null;
-    let timeout = null;
+        if (window.ResizeObserver) {
+            new ResizeObserver(() => map.invalidateSize()).observe(mapElement);
+        }
 
-    if (input && resultsList) {
-        input.addEventListener('input', () => {
-            clearTimeout(timeout);
-            const query = input.value.trim();
+        const customIcon = L.divIcon({
+            className: 'custom-map-pin',
+            html: `<div style="color: #ef4444; font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); cursor: pointer;">
+                    <i class="fa-solid fa-location-dot"></i>
+                   </div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+        });
 
-            if (query.length < 2) {
-                resultsList.style.display = 'none';
-                selectedAddressData = null;
-                return;
+        let marker = null;
+        let selectedAddressData = null;
+        let timeout = null;
+
+        window.getCartAddressData = function() {
+            return selectedAddressData || {
+                address: input ? input.value : '',
+                lat: document.getElementById('lat-input')?.value || null,
+                lng: document.getElementById('lng-input')?.value || null
+            };
+        };
+
+        async function setLocation(lat, lon, addressName = null) {
+            const latInp = document.getElementById('lat-input');
+            const lngInp = document.getElementById('lng-input');
+            const fmtInp = document.getElementById('formatted-address-input');
+
+            if (latInp) latInp.value = lat;
+            if (lngInp) lngInp.value = lon;
+
+            map.setView([lat, lon], 16);
+
+            if (marker) {
+                marker.setLatLng([lat, lon]);
+            } else {
+                marker = L.marker([lat, lon], { draggable: true, icon: customIcon }).addTo(map);
+
+                marker.on('dragend', (e) => {
+                    const position = e.target.getLatLng();
+                    setLocation(position.lat, position.lng);
+                });
             }
 
-            resultsList.innerHTML = '<li style="color:#888; padding:10px;">جاري البحث...</li>';
-            resultsList.style.display = 'block';
+            if (!addressName) {
+                const loadingHtml = '<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-spinner fa-spin"></i> جاري جلب العنوان...</div>';
+                if (input) input.value = "جاري جلب اسم الشارع...";
+                marker.bindPopup(loadingHtml).openPopup();
 
-            timeout = setTimeout(async () => {
                 try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&countrycodes=eg&addressdetails=1`);
-                    const data = await response.json();
-
-                    resultsList.innerHTML = '';
-
-                    if (data && data.length > 0) {
-                        data.forEach(item => {
-                            const li = document.createElement('li');
-                            li.textContent = item.display_name;
-                            li.onclick = () => {
-                                input.value = item.display_name;
-                                
-                                const lat = parseFloat(item.lat);
-                                const lon = parseFloat(item.lon);
-
-                                selectedAddressData = {
-                                    address: item.display_name,
-                                    lat: lat,
-                                    lng: lon
-                                };
-
-                                const latInp = document.getElementById('lat-input');
-                                const lngInp = document.getElementById('lng-input');
-                                const fmtInp = document.getElementById('formatted-address-input');
-
-                                if (latInp) latInp.value = lat;
-                                if (lngInp) lngInp.value = lon;
-                                if (fmtInp) fmtInp.value = item.display_name;
-
-                                map.setView([lat, lon], 16);
-                                
-                                if (marker) {
-                                    marker.setLatLng([lat, lon]);
-                                } else {
-                                    marker = L.marker([lat, lon]).addTo(map);
-                                }
-                                
-                                marker.bindPopup(item.display_name).openPopup();
-                                resultsList.style.display = 'none';
-                            };
-                            resultsList.appendChild(li);
-                        });
-                    } else {
-                        resultsList.innerHTML = '<li style="color:#888; padding:10px;">لم يتم العثور على نتائج</li>';
-                    }
-                } catch (error) {
-                    console.error("خطأ في الاتصال:", error);
-                    resultsList.innerHTML = '<li style="color:red; padding:10px;">حدث خطأ أثناء جلب البيانات</li>';
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+                    const data = await res.json();
+                    addressName = data.display_name || `${lat}, ${lon}`;
+                } catch {
+                    addressName = `${lat}, ${lon}`;
                 }
-            }, 400);
-        });
-
-        document.addEventListener('click', (e) => {
-            if (e.target !== input) resultsList.style.display = 'none';
-        });
-    }
-
-    const checkoutForm = document.getElementById('checkoutForm');
-    if (checkoutForm) {
-        checkoutForm.addEventListener('submit', (e) => {
-            if (!selectedAddressData) {
-                e.preventDefault();
-                alert('برجاء اختيار العنوان من القائمة المنسدلة أولاً قبل إتمام الطلب');
             }
+
+            if (input) input.value = addressName;
+            if (fmtInp) fmtInp.value = addressName;
+
+            selectedAddressData = { address: addressName, lat: lat, lng: lon };
+            marker.bindPopup(addressName).openPopup();
+
+            localStorage.setItem('user_last_address', JSON.stringify(selectedAddressData));
+        }
+
+        map.on('click', (e) => {
+            setLocation(e.latlng.lat, e.latlng.lng);
         });
+
+        const savedLoc = localStorage.getItem('user_last_address');
+        if (savedLoc) {
+            try {
+                const parsed = JSON.parse(savedLoc);
+                setLocation(parsed.lat, parsed.lng, parsed.address);
+            } catch {
+                fetchGPS();
+            }
+        } else {
+            fetchGPS();
+        }
+
+        function fetchGPS() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => setLocation(pos.coords.latitude, pos.coords.longitude),
+                    (err) => console.log('تعذر جلب موقع GPS تلقائياً:', err),
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
+            }
+        }
+
+        const controlsGroup = L.control({ position: 'bottomright' });
+        controlsGroup.onAdd = function() {
+            const container = L.DomUtil.create('div', 'map-controls-container');
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '8px';
+            container.style.margin = '10px';
+
+            const locateBtn = document.createElement('button');
+            locateBtn.type = 'button';
+            locateBtn.title = 'العودة لموقعي';
+            locateBtn.innerHTML = '<i class="fa-solid fa-crosshairs"></i>';
+            Object.assign(locateBtn.style, {
+                backgroundColor: '#ffffff', border: 'none', borderRadius: '50%',
+                width: '40px', height: '40px', cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: '#111827'
+            });
+            locateBtn.onclick = (e) => { L.DomEvent.stopPropagation(e); fetchGPS(); };
+
+            const resetBtn = document.createElement('button');
+            resetBtn.type = 'button';
+            resetBtn.title = 'مسح العنوان المحفوظ';
+            resetBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+            Object.assign(resetBtn.style, {
+                backgroundColor: '#ffffff', border: 'none', borderRadius: '50%',
+                width: '40px', height: '40px', cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: '#ef4444'
+            });
+            resetBtn.onclick = (e) => {
+                L.DomEvent.stopPropagation(e);
+                localStorage.removeItem('user_last_address');
+                selectedAddressData = null;
+                if (input) input.value = '';
+                if (document.getElementById('lat-input')) document.getElementById('lat-input').value = '';
+                if (document.getElementById('lng-input')) document.getElementById('lng-input').value = '';
+                if (document.getElementById('formatted-address-input')) document.getElementById('formatted-address-input').value = '';
+                if (marker) map.removeLayer(marker);
+                marker = null;
+            };
+
+            container.appendChild(locateBtn);
+            container.appendChild(resetBtn);
+            return container;
+        };
+        controlsGroup.addTo(map);
+
+        if (input && resultsList) {
+            input.addEventListener('input', () => {
+                clearTimeout(timeout);
+                const query = input.value.trim();
+
+                if (query.length < 2) {
+                    resultsList.style.display = 'none';
+                    return;
+                }
+
+                resultsList.innerHTML = '<li style="color:#888; padding:10px;"><i class="fa-solid fa-spinner fa-spin"></i> جاري البحث...</li>';
+                resultsList.style.display = 'block';
+
+                timeout = setTimeout(async () => {
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&countrycodes=eg&addressdetails=1`);
+                        const data = await response.json();
+                        resultsList.innerHTML = '';
+
+                        if (data && data.length > 0) {
+                            data.forEach(item => {
+                                const li = document.createElement('li');
+                                li.textContent = item.display_name;
+                                li.onclick = () => {
+                                    setLocation(parseFloat(item.lat), parseFloat(item.lon), item.display_name);
+                                    resultsList.style.display = 'none';
+                                };
+                                resultsList.appendChild(li);
+                            });
+                        } else {
+                            resultsList.innerHTML = '<li style="color:#888; padding:10px;">لم يتم العثور على نتائج داخل مصر</li>';
+                        }
+                    } catch {
+                        resultsList.innerHTML = '<li style="color:red; padding:10px;">حدث خطأ أثناء جلب البيانات</li>';
+                    }
+                }, 400);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (e.target !== input) resultsList.style.display = 'none';
+            });
+        }
+    } catch (err) {
+        console.error("خطأ في الخريطة:", err);
     }
 }
 

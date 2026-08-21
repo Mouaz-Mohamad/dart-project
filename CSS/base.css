@@ -77,7 +77,7 @@ body {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--white);
-  background-color: var(--bragnte);
+  background-color: var(--white);
   overflow-x: hidden;
         &::-webkit-scrollbar { display: none; }
     scrollbar-width: none;
@@ -105,13 +105,17 @@ main{
           &::-webkit-scrollbar { display: none; }
     scrollbar-width: none;
     -ms-overflow-style: none;
-  max-width: 400px;
+  max-width: 450px;
   min-height: 100vh;
   margin: 0 auto;
   background-color: var(--white);
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   display: block;
   gap: 30px;
+}
+
+.margen2020{
+  margin: 20px 0;
 }
 
 /* 3. Typography & Links */
