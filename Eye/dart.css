@@ -111,6 +111,9 @@ textarea {
   resize: vertical; 
 }
 
+.margen20{
+    margin: 10px 0;
+}
 /* Sidebar Navigation */
 .cont-menu {
   width: 15%; 
@@ -786,6 +789,7 @@ section{
 }
 .brand{
         padding: 10px 20px;
+
 }
 
 
@@ -823,3 +827,436 @@ section{
     margin-top: 10px;
 }
 
+
+/* حاوية الأرتيكلز */
+.brand-widgets-container {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.widget-card {
+    overflow: scroll;
+    flex: 1;
+    height: 400px;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e5e5e5;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 12px;
+}
+
+.widget-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.widget-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-left: 4px;
+}
+
+/* 1. تنسيقات المستجدات */
+.feed-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border-right: 3px solid #ab012b;
+}
+
+.feed-item i { font-size: 16px; }
+.icon-order { color: #1abc9c; }
+.icon-return { color: #e74c3c; }
+
+.feed-info .feed-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.feed-info .feed-time {
+    font-size: 11px;
+    color: #888;
+}
+
+/* 2. تنسيقات أعياد الميلاد */
+.bday-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-send-bday {
+
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bday-item {
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid #f1c40f33;
+    border-radius: 8px;
+    background: #fffdf5;
+    font-size: 13px;
+    display: flex;
+    height: 50px;
+}
+.bday-num{
+    font-size: 20px;
+}
+
+.chart-box-tow {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e5e5e5;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    width: 100%;
+}
+.chart-header-tow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.chart-title-tow h3 {
+    font-size: 15px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+.header-actions-tow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.export-btn-tow {
+    background: #ffffff;
+    border: 1px solid #ab012b;
+    color: #ab012b;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+.export-btn-tow:hover {
+    background: #ab012b;
+    color: #ffffff;
+}
+.filter-btns-tow {
+    display: flex;
+    gap: 4px;
+    background: #f4f4f5;
+    padding: 4px;
+    border-radius: 8px;
+}
+.filter-btn-tow {
+    border: none;
+    background: transparent;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.filter-btn-tow.active-tow {
+    background: #ab012b;
+    color: #fff;
+}
+.chart-body-tow {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+.chart-notes-tow {
+    margin-top: 15px;
+    padding-top: 12px;
+    border-top: 1px solid #eee;
+}
+.note-item-tow {
+    font-size: 13px;
+    color: #444;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fdf8f9;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border-right: 3px solid #ab012b;
+}
+
+.nav-tow {
+  display: none;
+}
+/* ==========================================
+   تنسيقات شاشات الموبايل (التصميم التجاوبي)
+   ========================================== */
+@media (max-width: 768px) {
+  /* 1. ضبط الصفحة وإلغاء الارتفاع الثابت */
+  html, body {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  section {
+    margin-left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100vh;
+    padding: 15px 12px !important;
+    margin-bottom: 70px;
+  }
+
+  .cont-menu {
+    display: none !important;
+  }
+
+  /* إظهار وتثبيت الـ Nav الجديد في الأسفل */
+  .nav-tow {
+    display: block !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 60px !important;
+    background-color: #19485f !important;
+    z-index: 9999 !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .menu-tow {
+    display: flex !important;
+    align-items: center !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 10px !important;
+    list-style: none !important;
+    gap: 8px !important;
+    overflow-x: auto !important; /* سكرول أفقي سلس لو العناصر كثيرة */
+    scrollbar-width: none; /* إخفاء شريط السكرول */
+    -ms-overflow-style: none;
+  }
+
+  .menu-tow::-webkit-scrollbar {
+    display: none;
+  }
+
+  .menu-tow li {
+    flex-shrink: 0; /* منع انكماش العناصر */
+  }
+
+  .menu-tow li a {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #ffffff !important;
+    font-size: 10px !important;
+    text-decoration: none !important;
+    gap: 3px !important;
+    padding: 5px 10px !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
+    transition: background-color 0.2s ease;
+  }
+
+  .menu-tow li a i {
+    font-size: 18px !important;
+  }
+
+  /* حالة العنصر النشط */
+  .menu-tow li a.active {
+    background-color: var(--bragnte, #ab012b) !important;
+    font-weight: bold !important;
+}
+  /* 2. الكروت العامة (3 أعمدة) */
+  .cards-one{
+    padding: 0;
+  }
+  .cont-card-info, 
+  .cont-card-info-2 {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    padding: 5px 0 !important;
+  }
+
+  .card-inf, 
+  .card-inf-2 {
+    padding: 6px 4px !important;
+    border-radius: 8px !important;
+    text-align: center !important;
+    min-width: 0 !important;
+  }
+
+  .span-img, 
+  .card-inf-2 .span-img {
+    width: 100% !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .card-inf h3, .card-inf-2 h3, 
+  .card-inf p, .card-inf-2 p,
+  .card-inf span, .card-inf-2 span {
+    font-size: 10px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 4. إتاحة السكرول الأفقي للجداول والعناصر العريضة */
+  .cont-titel {
+    height: auto !important;
+    max-height: 65vh;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    border-radius: 8px;
+  }
+
+  /* 5. الرسوم البيانية والبطاقات المالية */
+  .chart-one {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 15px !important;
+    padding: 12px !important;
+    width: 100% !important;
+  }
+
+  /* كروت الملخص المالي (3 أعمدة) */
+  .financial-summary {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  /* إلغاء تمدد الكرت الأول */
+  .financial-summary > *:first-child {
+    grid-column: span 1 !important;
+  }
+
+  /* تنسيق كروت المبيعات والتكاليف والأرباح */
+  .sales-cont, 
+  .cost-cont, 
+  .profit-cont {
+    padding: 8px 4px !important;
+    border-radius: 10px !important;
+    text-align: center !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+  }
+
+  .financial-summary h4 {
+    font-size: 10px !important;
+    margin-bottom: 2px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sales, 
+  .financial-summary .sales {
+    font-size: 15px !important;
+    font-weight: bold !important;
+    line-height: 1.2 !important;
+  }
+
+  .variance {
+    width: 100% !important;
+    font-size: 8px !important;
+    padding: 2px !important;
+    margin-top: 2px !important;
+    text-align: center !important;
+  }
+
+  /* الشارت مستقيل بالأسفل */
+  .dart-chart-card {
+    width: 100% !important;
+    min-height: 280px !important;
+  }
+
+  .brand-widgets-container {
+    flex-direction: column !important;
+    gap: 15px !important;
+    height: 620px;
+  }
+
+  .widget-card {
+    width: 100% !important;
+    max-height: 350px !important;
+    height: 300px;
+  }
+
+  /* 6. أدوات البحث والفلترة */
+  .filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    border-radius: 12px !important;
+    gap: 10px !important;
+  }
+
+  .search-box, 
+  .search-box input, 
+  .select-box, 
+  .select-box select {
+    width: 100% !important;
+  }
+
+  /* 7. النافذة المنبثقة Modal */
+  .modal-content {
+    width: 92% !important;
+    padding: 15px !important;
+    max-height: 85vh !important;
+  }
+
+  .modal-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  
+}

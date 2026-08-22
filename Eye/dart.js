@@ -1674,41 +1674,45 @@ document.addEventListener("DOMContentLoaded", () => {
     // 1. تحميل البيانات المخزنة سابقاً
     loadAllDataFromStorage();
 
-    // 2. إعداد التنقل بين السكاشن (Navigation) مع حفظ القسم الحالي
-    const menuLinks = document.querySelectorAll('.menu li a');
+    // 2. إعداد التنقل (يحدد جميع الروابط في النافين التي تحتوي على data-target)
+    const menuLinks = document.querySelectorAll('[data-target]');
     const sections = document.querySelectorAll('.dashboard-section');
 
-    // استرجاع القسم المخزن أو جعل "Brand Information" هو الافتراضي (تأكد من مطابقة الـ id لديك، مثل 'brand' أو 'info')
     const savedSectionId = localStorage.getItem('dart_active_section') || 'brand'; 
 
-    menuLinks.forEach(link => {
-        const targetId = link.getAttribute('data-target');
-        
-        // تفعيل الرابط والقسم بناءً على المخزن أو الافتراضي
-        if (targetId === savedSectionId) {
-            menuLinks.forEach(l => l.classList.remove('active'));
-            sections.forEach(sec => sec.classList.remove('active-section'));
-            
-            link.classList.add('active');
-            const targetSection = document.getElementById(targetId);
-            if (targetSection) targetSection.classList.add('active-section');
+    // دالة موحدة لتنفيذ التفعيل وتحديث النافين معاً
+    function activateSection(targetId) {
+        if (!targetId) return;
+
+        // تحديث كلاس active لجميع الروابط المترابطة في القائمتين
+        menuLinks.forEach(link => {
+            if (link.getAttribute('data-target') === targetId) {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
+
+        // إخفاء وإظهار السكاشن
+        sections.forEach(sec => sec.classList.remove('active-section'));
+        const targetSection = document.getElementById(targetId);
+        if (targetSection) {
+            targetSection.classList.add('active-section');
         }
 
+        // حفظ القسم النشط
+        localStorage.setItem('dart_active_section', targetId);
+    }
+
+    // تفعيل القسم المخزن أو الافتراضي عند التحميل
+    activateSection(savedSectionId);
+
+    // إضافة الأحداث لكل الروابط
+    menuLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            if (!targetId) return;
-
-            menuLinks.forEach(l => l.classList.remove('active'));
-            sections.forEach(sec => sec.classList.remove('active-section'));
-
-            link.classList.add('active');
-            const targetSection = document.getElementById(targetId);
-            if (targetSection) {
-                targetSection.classList.add('active-section');
-            }
-
-            // حفظ القسم النشط في التخزين المحلي
-            localStorage.setItem('dart_active_section', targetId);
+            const targetId = link.getAttribute('data-target');
+            activateSection(targetId);
         });
     });
 
@@ -1858,3 +1862,109 @@ function populateModelsDatalist() {
         .map(m => `<option value="${m.modelId}">${m.name} - ${m.category}</option>`)
         .join('');
 }
+
+const ctxTow = document.getElementById('analyticsChartTow').getContext('2d');
+
+const gradVisitorsTow = ctxTow.createLinearGradient(0, 0, 0, 300);
+gradVisitorsTow.addColorStop(0, 'rgba(171, 1, 43, 0.25)');
+gradVisitorsTow.addColorStop(1, 'rgba(171, 1, 43, 0.0)');
+
+const dataStoreTow = {
+    daily: {
+        labels: ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'],
+        visitors: [120, 190, 300, 250, 200, 450, 380],
+        sales: [15, 22, 45, 30, 28, 65, 50],
+        note: 'أعلى نسبة مبيعات تحققت يوم الخميس بالتزامن مع زيادة الزوار بنسبة 25%.'
+    },
+    weekly: {
+        labels: ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'],
+        visitors: [1200, 1800, 2400, 3100],
+        sales: [140, 210, 310, 420],
+        note: 'نمو متواصل في معدل تحويل الزوار إلى مبيعات للأسبوع الرابع على التوالي.'
+    },
+    monthly: {
+        labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'],
+        visitors: [5000, 7200, 8900, 11000, 9500, 13000],
+        sales: [600, 850, 1100, 1400, 1150, 1700],
+        note: 'شهر يونيو حقق أعلى معدل مبيعات وزيارات منذ بداية العام.'
+    }
+};
+
+const analyticsChartTow = new Chart(ctxTow, {
+    type: 'bar',
+    data: {
+        labels: dataStoreTow.daily.labels,
+        datasets: [
+            {
+                type: 'line',
+                label: 'الزوار',
+                data: dataStoreTow.daily.visitors,
+                borderColor: '#ab012b',
+                backgroundColor: gradVisitorsTow,
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'yVisitorsTow',
+                pointRadius: 4
+            },
+            {
+                type: 'bar',
+                label: 'المبيعات',
+                data: dataStoreTow.daily.sales,
+                backgroundColor: '#1abc9c',
+                borderRadius: 6,
+                yAxisID: 'ySalesTow',
+                barPercentage: 0.5
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { position: 'top', align: 'end' },
+            tooltip: { cornerRadius: 8, padding: 10 }
+        },
+        scales: {
+            x: { grid: { display: false } },
+            yVisitorsTow: {
+                type: 'linear',
+                position: 'left',
+                beginAtZero: true,
+                title: { display: true, text: 'الزوار' },
+                grid: { color: '#f0f0f0' }
+            },
+            ySalesTow: {
+                type: 'linear',
+                position: 'right',
+                beginAtZero: true,
+                title: { display: true, text: 'المبيعات' },
+                grid: { drawOnChartArea: false }
+            }
+        }
+    }
+});
+
+function updateChartTow(period, btn) {
+    document.querySelectorAll('.filter-btn-tow').forEach(b => b.classList.remove('active-tow'));
+    btn.classList.add('active-tow');
+
+    const selectedData = dataStoreTow[period];
+    analyticsChartTow.data.labels = selectedData.labels;
+    analyticsChartTow.data.datasets[0].data = selectedData.visitors;
+    analyticsChartTow.data.datasets[1].data = selectedData.sales;
+    analyticsChartTow.update();
+
+    document.getElementById('chartNoteTextTow').innerHTML = `<strong>ملاحظة:</strong> ${selectedData.note}`;
+}
+
+function exportChartPNGTow() {
+    const imageURI = analyticsChartTow.toBase64Image();
+    const link = document.createElement('a');
+    link.download = 'dart-analytics-report.png';
+    link.href = imageURI;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+

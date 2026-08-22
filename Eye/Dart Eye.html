@@ -15,7 +15,8 @@
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </body>
 </head>
 <body>
@@ -35,6 +36,21 @@
             <li><a href="#" data-target="card">Dart Card</a></li>
         </ul>
     </nav>
+
+    <!-- الشريط السفلي الخاص بالموبايل فقط -->
+<nav class="nav-tow">
+    <ul class="menu-tow">
+        <li><a href="#" data-target="brand"><i class='bx bx-store-alt'></i><span>Brand</span></a></li>
+        <li><a href="#" data-target="models" class="active"><i class='bx bx-layer'></i><span>Models</span></a></li>
+        <li><a href="#" data-target="items"><i class='bx bx-box'></i><span>Items</span></a></li>
+        <li><a href="#" data-target="customers"><i class='bx bx-user-pin'></i><span>Clients</span></a></li>
+        <li><a href="#" data-target="orders"><i class='bx bx-cart'></i><span>Orders</span></a></li>
+        <li><a href="#" data-target="returns"><i class='bx bx-undo'></i><span>Returns</span></a></li>
+        <li><a href="#" data-target="review"><i class='bx bx-star'></i><span>Review</span></a></li>
+        <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
+        <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
+    </ul>
+</nav>
 
     <main>
         <!-- سكشن Brand Information -->
@@ -78,6 +94,9 @@
                     </div>
                 </div>
             </div>
+
+            <div class="margen20"></div>
+
             <div class="chart-one">
                 <div class="financial-summary">
                     <div class="sales-cont">
@@ -109,7 +128,112 @@
                     <div id="myChart"></div>
                 </div>
             </div>
+
             <div class="strok"></div>
+
+            <div class="margen20"></div>
+            <!-- سكشن الإشعارات -->
+            <div class="brand-widgets-container">
+                <!-- 1. أرتيكل آخر المستجدات -->
+                <article class="widget-card">
+                    <div class="widget-header">
+                        <h3><i class="fa-solid fa-bell"></i> Latest Updates </h3>
+                    </div>
+                    <div class="widget-content" id="updates-feed">
+                        <!-- صفوف يكررها الباك إند -->
+                        <div class="feed-item" data-id="1">
+                            <i class="fa-solid fa-cart-shopping icon-order"></i>
+                            <div class="feed-info">
+                                <p class="feed-title">New order #1580</p>
+                                <span class="feed-time">since 5min</span>
+                            </div>
+                        </div>
+                        
+                        <div class="feed-item" data-id="2">
+                            <i class="fa-solid fa-rotate-left icon-return"></i>
+                            <div class="feed-info">
+                                <p class="feed-title">New replacement #502</p>
+                                <span class="feed-time">since 2h</span>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- 2. أرتيكل أعياد الميلاد -->
+                <article class="widget-card">
+                    <div class="widget-header bday-header">
+                        <h3><i class="fa-solid fa-cake-candles"></i> Birthday </h3>
+                        <div class="bday-actions">
+                            <label class="select-all-label">All <input type="checkbox" id="selectAllBirthdays"></label>
+                            <button class="btn-send-bday" id="sendBdayBtn"><i class="fa-solid fa-paper-plane"></i> Send</button>
+                        </div>
+                    </div>
+                    <div class="widget-content overflow" id="birthday-feed">
+                        <!-- صفوف يكررها الباك إند -->
+                        <div class="bday-item" data-client-id="101">
+                            <input type="checkbox" class="bday-checkbox">
+                            <span class="bday-date w100">10-10-2026</span>
+                            <span class="bday-name w150">Mouaz Mohamad</span>
+                            <span class="bday-phone w100">01104193534</span>
+                            <span class="orders w100"> 25 Order</span>
+                            <span class="from w100">Cairo</span>
+                        </div>
+
+                    </div>
+
+                </article>
+            </div>
+
+            <div class="margen20"></div>
+            <!-- top clintes -->
+            <article class="widget-card">
+                <div class="widget-header bday-header">
+                    <h3><i class="fa-solid fa-ranking-star"></i> Top Clintes </h3>
+                </div>
+                <div class="widget-content overflow" id="birthday-feed">
+                    <!-- صفوف يكررها الباك إند -->
+                    <div class="bday-item overflow" data-client-id="101">
+                        <span class="bday-num ">1)</span>
+                        <span class="bday-date w100">10-10-2026</span>
+                        <span class="bday-name w150">Mouaz Mohamad</span>
+                        <span class="bday-id w100">C-196</span>
+                        <span class="bday-phone w100">01104193534</span>
+                        <span class="bday-orders w100"> 25 Order</span>
+                        <span class="bday-amount w150"> 14,800 EGP</span>
+                        <span class="bday-from w100">Cairo</span>
+                    </div>
+                </div>
+            </article>
+
+            <div class="margen20"></div>
+            <div class="chart-box-tow">
+                <div class="chart-header-tow">
+                    <div class="chart-title-tow">
+                        <h3><i class="fa-solid fa-chart-line" style="color: #ab012b;"></i> تحليلات الزوار والمبيعات</h3>
+                    </div>
+                    <div class="header-actions-tow">
+                        <button class="export-btn-tow" onclick="exportChartPNGTow()">
+                            <i class="fa-solid fa-download"></i> تصدير PNG
+                        </button>
+                        <div class="filter-btns-tow">
+                            <button class="filter-btn-tow active-tow" onclick="updateChartTow('daily', this)">يومي</button>
+                            <button class="filter-btn-tow" onclick="updateChartTow('weekly', this)">أسبوعي</button>
+                            <button class="filter-btn-tow" onclick="updateChartTow('monthly', this)">شهري</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-body-tow">
+                    <canvas id="analyticsChartTow"></canvas>
+                </div>
+
+                <div class="chart-notes-tow">
+                    <div class="note-item-tow">
+                        <i class="fa-solid fa-lightbulb" style="color: #f39c12;"></i>
+                        <span id="chartNoteTextTow"><strong>ملاحظة:</strong> أعلى نسبة مبيعات تحققت يوم الخميس بـ 65 أوردر.</span>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- سكشن Model Code -->
