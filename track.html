@@ -20,8 +20,8 @@
       <main>
 <div class="tracking-card">
   <!-- Map Container -->
-  <div id="map"></div>
-
+<!-- Map Container -->
+<div id="tracking-map" style="height: 300px; width: 100%; border-radius: 12px;"></div>
   <div class="content">
     
     <!-- Order Header -->
@@ -94,8 +94,15 @@
 
     </div>
 <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="Js/one .js"></script>
+  <!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="Js/one .js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // مرر إحداثيات عنوان التوصيل الثابت هنا (مثال: القاهرة)
+    initTrackingMap(30.0444, 31.2357); 
+  });
+</script>
 
 </body>
 </html>
