@@ -1334,12 +1334,12 @@ header {
 /* ========= Profile info */
 .profile-details, .order-info, .return-info {
     width: 100%;
-    height: 100vh;
+    height: 100v;
     background-color: var(--white);
     padding: 30px 10px;
     color: var(--bg-dark);
 
-    position: absolute;
+    position: fixed;
     max-width: inherit;
     top: 0;
     left: 0;
