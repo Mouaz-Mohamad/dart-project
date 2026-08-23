@@ -1258,5 +1258,39 @@ section{
     grid-template-columns: 1fr !important;
   }
 
+
+  /* 1. تصغير الخطوط والمسافات داخل الصف */
+    .model-row, 
+    .title-name {
+        font-size: 11px !important;
+        gap: 4px !important; /* تقليل الفواصل بين العناصر */
+        padding: 6px 4px !important;
+    }
+
+    .title-name h2 {
+        font-size: 11px !important;
+    }
+
+    /* 2. تصغير العروض الثابتة لتناسب الموبايل */
+    .w100  { width: 70px  !important; }
+    .w150  { width: 100px !important; }
+    .w200  { width: 130px !important; }
+    .w300  { width: 180px !important; }
+    .w500  { width: 280px !important; }
+    .w1000 { width: 500px !important; }
+    .w1200 { width: 600px !important; }
+
+    /* 3. تصغير أزرار التحكم والشرائح */
+    .row-action-btns .action-btn {
+        width: 22px;
+        height: 22px;
+        font-size: 12px;
+    }
+
+    .order-item-chip {
+        font-size: 10px;
+        padding: 2px 4px;
+    }
+
   
 }

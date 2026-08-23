@@ -1667,7 +1667,7 @@ function setupGlobalModalTriggers() {
 
 
 // ==========================================
-// 12. تشغيل التطبيق (DOM Content Loaded)
+// 12. الناف  (DOM Content Loaded)
 // ==========================================
 
 document.addEventListener("DOMContentLoaded", () => {
