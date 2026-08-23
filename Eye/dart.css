@@ -1150,8 +1150,7 @@ section{
 
   /* 4. إتاحة السكرول الأفقي للجداول والعناصر العريضة */
   .cont-titel {
-    height: auto !important;
-    max-height: 65vh;
+    height: 600px !important;
     overflow-x: auto !important;
     overflow-y: auto !important;
     border-radius: 8px;
@@ -1233,16 +1232,37 @@ section{
   }
 
   /* 6. أدوات البحث والفلترة */
-  .filter-bar {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    border-radius: 12px !important;
-    gap: 10px !important;
-  }
+.filter-bar {
+        padding: 8px 12px;
+        gap: 8px; /* تقليل الفواصل بين العناصر */
 
-  .search-box, 
+        overflow: scroll; /* لو الشاشة صغيرة جداً يعمل سكورول خفيف */
+    }
+
+    /* 2. تصغير حجم حقل البحث والقائمة */
+    .search-box input, 
+    .select-box select {
+        font-size: 12px;
+        padding: 6px 10px;
+        height: 32px;
+    }
+
+    /* 3. تصغير الأيقونات داخل الحقول */
+    .search-box i, 
+    .select-box .arrow-icon {
+        opacity: 0;
+    }
+
+    /* 4. تصغير الأزرار والـ Padding */
+    button {
+        padding: 6px 12px;
+        font-size: 12px;
+        height: 32px;
+        white-space: nowrap; /* منع انقسام النص داخل الزر */
+    }
+
+
   .search-box input, 
-  .select-box, 
   .select-box select {
     width: 100% !important;
   }
