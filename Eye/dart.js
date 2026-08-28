@@ -1761,9 +1761,48 @@ document.addEventListener('click', (e) => {
 
     var options = {
         series: [{ name: 'Profit', data: [] }],
-        chart: { type: 'area', height: 230 },
-        colors: ['#43BFE5',],
-        xaxis: { categories: [] }
+        chart: { 
+            type: 'area', 
+            height: 230,
+            width: '100%',
+            toolbar: { show: false },
+            sparkline: { enabled: false }
+        },
+        colors: ['#43BFE5'],
+        stroke: {
+            curve: 'smooth',
+            width: 2
+        },
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 1,
+                opacityFrom: 0.4,
+                opacityTo: 0.05
+            }
+        },
+        dataLabels: { enabled: false },
+        xaxis: { 
+            categories: [],
+            labels: { 
+                style: { colors: '#e2e8f0', fontSize: '11px' } 
+            },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+        },
+        yaxis: {
+            labels: { 
+                style: { colors: '#e2e8f0', fontSize: '11px' },
+                formatter: (val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val
+            }
+        },
+        grid: {
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            strokeDashArray: 4
+        },
+        tooltip: { 
+            theme: 'dark' 
+        }
     };
 
     var chart = new ApexCharts(document.querySelector("#myChart"), options);
