@@ -8,12 +8,12 @@ const productsData = [
         title: "Wide leg jeans",
         code: "DA-P785",
         price: 450,
-        image: "Photos/products/1.jpg",
-        description: "بنطال جينز فاخر بأرجل واسعة ومصنوع من القطن الخالص بنسبة 100%، ليمنحك قصة مريحة، وراحة تدوم طويلاً، وإطلالة يومية عفوية وأنيقة.",
+        images: ["Photos/products/1.jpg", "Photos/products/7.jpg"], // أضفت صورة المنتج البيچ الجديدة اللي بعتها
+        description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عاليةميع الأوقات، خامة عاليةميع الأوقات، خامة عاليةميع الأوقات، خامة عاليةميع الأوقات، خامة عاليةميع الأوقات، خامة عاليةميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
-            "32": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 },
-            "34": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 },
-            "36": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 }
+            "32": { "نيلي": 10, "بيج": 10, "ابيض": 10, "اسود": 0 },
+            "34": { "نيلي": 10, "بيج": 10, "ابيض": 10, "اسود": 0 },
+            "36": { "نيلي": 10, "بيج": 10, "ابيض":10, "اسود": 0 }
         }
     },
     {
@@ -22,12 +22,12 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/2.jpg",
+        images: ["Photos/products/2.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
-            "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
-            "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
-            "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
+            "32": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 },
+            "34": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 },
+            "36": { "نيلي": 0, "بيج": 0, "ابيض": 0, "اسود": 0 }
         }
     },
     {
@@ -36,7 +36,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "/Photos/products/13.jfif",
+        images: ["/Photos/products/13.jfif"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -50,7 +50,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/14.jfif",
+        images: ["Photos/products/14.jfif"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -64,7 +64,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "/Photos/products/15.jfif",
+        images: ["/Photos/products/15.jfif"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -78,7 +78,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "/Photos/products/11.jfif",
+        images: ["/Photos/products/11.jfif"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -92,7 +92,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/10.jpg",
+        images: ["Photos/products/10.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -106,7 +106,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "/Photos/products/9.jpg",
+        images: ["/Photos/products/9.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -120,7 +120,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/7.jpg",
+        images: ["Photos/products/7.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -134,7 +134,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/6.jpg",
+        images: ["Photos/products/6.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -148,7 +148,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/5.jpg",
+        images: ["Photos/products/5.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -162,7 +162,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/4.jpg",
+        images: ["Photos/products/4.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -176,7 +176,7 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "Photos/products/3.jpg",
+        images: ["Photos/products/3.jpg"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
@@ -190,13 +190,27 @@ const productsData = [
         title: "قميص جينز | بيج",
         code: "DA-T695",
         price: 749,
-        image: "/Photos/products/14.jfif",
+        images: ["/Photos/products/14.jfif"], // TODO: أضف باقي روابط صور المنتج هنا لو موجودة
         description: "قميص أنيق بتصميم عصري يناسب جميع الأوقات، خامة عالية الجودة ومريحة جداً.",
         stock: {
             "32": { "نيلي": 2, "بيج": 2, "ابيض": 2, "اسود": 2 },
             "34": { "نيلي": 1, "بيج": 0, "ابيض": 3, "اسود": 1 },
             "36": { "نيلي": 0, "بيج": 1, "ابيض": 1, "اسود": 2 }
         }
+    },
+    {
+        id: 15,
+        category: "jacket",
+        title: "جاكيت فرو أبيض", // TODO: عدّل الاسم النهائي
+        code: "DA-J801", // TODO: عدّل الكود
+        price: 0, // TODO: حط السعر الحقيقي
+        images: ["Photos/products/17.jpg"],
+        description: "جاكيت فرو ناعم بقصة قصيرة وسحاب أمامي، مناسب للإطلالات الشتوية العصرية.", // TODO: عدّل الوصف لو حابب
+        stock: {
+            "S": { "كريمي": 10 },
+            "M": { "كريمي": 10 },
+            "L": { "كريمي": 10 }
+        } // TODO: حط أرقام المخزون الحقيقية، دلوقتي كله صفر يعني "Out of Stock"
     }
 ];
 
@@ -213,12 +227,21 @@ let appliedDiscountRate = 0;
 let selectedSize = null;
 let selectedColor = null;
 let activeProduct = null;
+let modalQuantity = 1;
+let modalCarouselIndex = 0;
 
 // ==========================================
 // 2. الدوال المساعدة الأساسية
 // ==========================================
 
 let cachedProductTemplate = null;
+
+// يرجع مصفوفة صور المنتج مهما كانت شكل البيانات (images[] أو image واحدة قديمة)
+function getProductImages(item) {
+    if (item && Array.isArray(item.images) && item.images.length) return item.images;
+    if (item && item.image) return [item.image];
+    return [];
+}
 
 function getProductTemplate() {
     if (!cachedProductTemplate) {
@@ -273,7 +296,7 @@ function initHeader() {
 }
 
 function renderProductsLogic() {
-    const productTemplate = document.getElementById('productTemplate');
+    const productTemplate = getProductTemplate();
     if (!productTemplate) return;
 
     const productsContainer = document.getElementById('productsContainer');
@@ -327,7 +350,8 @@ function createProductCard(item, template) {
     // فحص العناصر قبل استخدامها لتفادي توقف الكود
     const img = card.querySelector('.product-img');
     if (img) {
-        img.src = item.image;
+        const images = getProductImages(item);
+        img.src = images[0] || '';
         img.alt = item.title;
     }
 
@@ -453,7 +477,6 @@ function openProductModal(product) {
 
     history.pushState({ modalOpen: true }, "");
 
-    modal.querySelector('img').src = product.image;
     modal.querySelector('.model-product-category').textContent = product.category;
     modal.querySelector('.model-product-code').textContent = product.code;
     modal.querySelector('.model-product-title').textContent = product.title;
@@ -462,6 +485,10 @@ function openProductModal(product) {
 
     selectedSize = null;
     selectedColor = null;
+    modalQuantity = 1;
+    modalCarouselIndex = 0;
+
+    renderModalCarousel(getProductImages(product), product.title);
 
     const sizesContainer = modal.querySelector('.sizes-container');
     sizesContainer.innerHTML = '';
@@ -485,8 +512,12 @@ function openProductModal(product) {
             sizesContainer.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             selectedSize = size;
-            
+            selectedColor = null;
+            modalQuantity = 1;
+
+            modal.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
             updateColorsAvailability(product, size);
+            updateModalQtyMax(product);
         });
 
         sizesContainer.appendChild(btn);
@@ -526,10 +557,16 @@ function openProductModal(product) {
             colorsContainer.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             selectedColor = color;
+            modalQuantity = 1;
+
+            updateModalQtyMax(product);
         });
 
         colorsContainer.appendChild(btn);
     });
+
+    initModalQtyControl(product);
+    updateModalQtyMax(product);
 
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -553,6 +590,150 @@ function updateColorsAvailability(product, size) {
             btn.classList.remove('disabled');
         }
     });
+}
+
+// ==========================================
+// كاروسيل صور المنتج داخل المودال
+// ==========================================
+
+function renderModalCarousel(images, altText) {
+    const modal = document.getElementById('SectionModel');
+    const carousel = modal.querySelector('#modelCarousel');
+    const track = modal.querySelector('#carouselTrack');
+    const dotsContainer = modal.querySelector('#carouselDots');
+    const prevBtn = modal.querySelector('#carouselPrev');
+    const nextBtn = modal.querySelector('#carouselNext');
+
+    if (!carousel || !track || !dotsContainer) return;
+
+    const slides = images.length ? images : [''];
+
+    track.innerHTML = slides.map(src => `
+        <div class="carousel-slide">
+            <img src="${src}" alt="${altText || ''}" loading="lazy">
+        </div>
+    `).join('');
+
+    dotsContainer.innerHTML = slides.map((_, i) => `
+        <button type="button" class="carousel-dot ${i === 0 ? 'active' : ''}" data-index="${i}" aria-label="Image ${i + 1}"></button>
+    `).join('');
+
+    const showArrows = slides.length > 1;
+    if (prevBtn) prevBtn.classList.toggle('hidden', !showArrows);
+    if (nextBtn) nextBtn.classList.toggle('hidden', !showArrows);
+    dotsContainer.classList.toggle('hidden', !showArrows);
+
+    modalCarouselIndex = 0;
+    updateCarouselPosition(track);
+
+    dotsContainer.querySelectorAll('.carousel-dot').forEach(dot => {
+        dot.onclick = () => {
+            modalCarouselIndex = parseInt(dot.getAttribute('data-index'), 10) || 0;
+            updateCarouselPosition(track);
+        };
+    });
+
+    if (prevBtn) {
+        prevBtn.onclick = () => {
+            modalCarouselIndex = (modalCarouselIndex - 1 + slides.length) % slides.length;
+            updateCarouselPosition(track);
+        };
+    }
+
+    if (nextBtn) {
+        nextBtn.onclick = () => {
+            modalCarouselIndex = (modalCarouselIndex + 1) % slides.length;
+            updateCarouselPosition(track);
+        };
+    }
+
+    // دعم السحب باللمس على الموبايل
+    let touchStartX = 0;
+    track.ontouchstart = (e) => {
+        touchStartX = e.touches[0].clientX;
+    };
+    track.ontouchend = (e) => {
+        const diff = e.changedTouches[0].clientX - touchStartX;
+        if (Math.abs(diff) < 40) return;
+        if (diff < 0) {
+            modalCarouselIndex = (modalCarouselIndex + 1) % slides.length;
+        } else {
+            modalCarouselIndex = (modalCarouselIndex - 1 + slides.length) % slides.length;
+        }
+        updateCarouselPosition(track);
+    };
+}
+
+function updateCarouselPosition(track) {
+    const modal = document.getElementById('SectionModel');
+    track.style.transform = `translateX(-${modalCarouselIndex * 100}%)`;
+
+    modal.querySelectorAll('.carousel-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === modalCarouselIndex);
+    });
+}
+
+// ==========================================
+// عداد الكمية داخل المودال (قبل الإضافة للسلة)
+// ==========================================
+
+function initModalQtyControl(product) {
+    const modal = document.getElementById('SectionModel');
+    const decreaseBtn = modal.querySelector('#modalQtyDecrease');
+    const increaseBtn = modal.querySelector('#modalQtyIncrease');
+    const valueEl = modal.querySelector('#modalQtyValue');
+
+    if (!decreaseBtn || !increaseBtn || !valueEl) return;
+
+    valueEl.textContent = modalQuantity;
+
+    decreaseBtn.onclick = () => {
+        if (modalQuantity <= 1) return;
+        modalQuantity -= 1;
+        valueEl.textContent = modalQuantity;
+        updateModalQtyMax(product);
+    };
+
+    increaseBtn.onclick = () => {
+        if (!selectedSize || !selectedColor) {
+            showToast("من فضلك اختر المقاس واللون أولاً!");
+            return;
+        }
+
+        const maxQty = product.stock[selectedSize]?.[selectedColor] ?? 0;
+        if (modalQuantity >= maxQty) {
+            showToast(`عذراً، المتاح بالمخزون ${maxQty} قطعة فقط.`);
+            return;
+        }
+
+        modalQuantity += 1;
+        valueEl.textContent = modalQuantity;
+        updateModalQtyMax(product);
+    };
+}
+
+function updateModalQtyMax(product) {
+    const modal = document.getElementById('SectionModel');
+    const decreaseBtn = modal.querySelector('#modalQtyDecrease');
+    const increaseBtn = modal.querySelector('#modalQtyIncrease');
+    const valueEl = modal.querySelector('#modalQtyValue');
+
+    if (!decreaseBtn || !increaseBtn || !valueEl) return;
+
+    const maxQty = (selectedSize && selectedColor)
+        ? (product.stock[selectedSize]?.[selectedColor] ?? 0)
+        : 0;
+
+    if (modalQuantity > maxQty && maxQty > 0) {
+        modalQuantity = maxQty;
+    }
+    if (maxQty === 0) {
+        modalQuantity = 1;
+    }
+
+    valueEl.textContent = modalQuantity;
+    decreaseBtn.classList.toggle('disabled-btn', modalQuantity <= 1);
+    increaseBtn.classList.toggle('disabled-btn', modalQuantity >= maxQty);
 }
 
 // ==========================================
@@ -682,15 +863,30 @@ function initCartAndCheckoutEvents() {
                 return;
             }
 
-            cartData.push({
-                id: activeProduct.id,
-                title: activeProduct.title,
-                price: activeProduct.price,
-                size: selectedSize,
-                color: selectedColor,
-                quantity: 1,
-                image: activeProduct.image
-            });
+            const availableStock = activeProduct.stock[selectedSize]?.[selectedColor] ?? 0;
+            const existingItem = cartData.find(c =>
+                c.id === activeProduct.id && c.size === selectedSize && c.color === selectedColor
+            );
+            const requestedTotal = (existingItem ? existingItem.quantity : 0) + modalQuantity;
+
+            if (requestedTotal > availableStock) {
+                showToast(`عذراً، المتاح بالمخزون ${availableStock} قطعة فقط لهذا المقاس واللون.`);
+                return;
+            }
+
+            if (existingItem) {
+                existingItem.quantity = requestedTotal;
+            } else {
+                cartData.push({
+                    id: activeProduct.id,
+                    title: activeProduct.title,
+                    price: activeProduct.price,
+                    size: selectedSize,
+                    color: selectedColor,
+                    quantity: modalQuantity,
+                    image: getProductImages(activeProduct)[0] || ''
+                });
+            }
 
             saveCartToLocalStorage();
             showToast("تم إضافة المنتج إلى السلة بنجاح!");
@@ -1130,23 +1326,54 @@ function initTrackingMap(destLat = 30.0444, destLng = 31.2357) {
 // ==========================================
 
 function filterProductsByCategory(selectedCat) {
-    const container = document.getElementById('productsContainer');
-    const template = document.getElementById('productTemplate');
-
-    if (!container || !template) return;
-
-    container.innerHTML = '';
+    const template = getProductTemplate();
+    if (!template) return;
 
     const isAll = !selectedCat || selectedCat.toLowerCase() === 'all';
-    const filtered = isAll 
-        ? productsData 
+    const filtered = isAll
+        ? productsData
         : productsData.filter(item => item.category && item.category.toLowerCase() === selectedCat.toLowerCase());
 
-    filtered.forEach(item => {
-        const card = createProductCard(item, template);
-        card.classList.add('fade-in');
-        container.appendChild(card);
-    });
+    // صفحة index.html عندها شبكة واحدة فقط بمعرف productsContainer
+    const singleContainer = document.getElementById('productsContainer');
+
+    // صفحة products.html مقسّمة على جزئين: productsPart1 و productsPart2
+    const part1Container = document.getElementById('productsPart1');
+    const part2Container = document.getElementById('productsPart2');
+
+    // مهم: بنغيّر شبكة المنتجات بس، وبقية السكاشن (Best Products, Reviews, Birthday...) متتلمسش
+    if (singleContainer) {
+        singleContainer.innerHTML = '';
+        filtered.forEach(item => {
+            const card = createProductCard(item, template);
+            card.classList.add('fade-in');
+            singleContainer.appendChild(card);
+        });
+        return;
+    }
+
+    if (part1Container) {
+        part1Container.innerHTML = '';
+        if (part2Container) part2Container.innerHTML = '';
+
+        if (isAll) {
+            // "الكل": رجّع التقسيم الأصلي (أول 6 فوق، والباقي تحت السكاشن الوسطى)
+            const firstPart = filtered.slice(0, 6);
+            const secondPart = filtered.slice(6);
+
+            firstPart.forEach(item => part1Container.appendChild(createProductCard(item, template)));
+            if (part2Container) {
+                secondPart.forEach(item => part2Container.appendChild(createProductCard(item, template)));
+            }
+        } else {
+            // فلتر مُحدد: كل النتائج في نفس الشبكة العلوية عشان السكاشن التانية متتزحزحش
+            filtered.forEach(item => {
+                const card = createProductCard(item, template);
+                card.classList.add('fade-in');
+                part1Container.appendChild(card);
+            });
+        }
+    }
 }
 
 function renderFilterButtons() {
