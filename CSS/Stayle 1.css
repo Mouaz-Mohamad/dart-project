@@ -358,7 +358,7 @@ header {
 
 .product-img {
     width: 100%;
-    object-fit: contain;
+    object-fit: cover;
 }
 
 .product-details { 
