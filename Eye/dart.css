@@ -1476,7 +1476,7 @@ section{
 /* ========================================================================== */
 /* DART V3 — additive refinements only; original stylesheet preserved         */
 /* ========================================================================== */
-.row-action-btns{min-width:100%;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding-right:4px;}
+.row-action-btns{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding-right:4px;}
 .row-action-btns::-webkit-scrollbar{display:none;}
 #models .row-action-btns,#items .row-action-btns,#customers .row-action-btns{width:200px;min-width:200px;}
 #orders .row-action-btns{width:500px;min-width:500px;}
