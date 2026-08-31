@@ -16,8 +16,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-</body>
 </head>
 <body>
 
@@ -31,6 +29,7 @@
             <li><a href="#" data-target="customers">Clients</a></li>
             <li><a href="#" data-target="orders">Orders</a></li>
             <li><a href="#" data-target="returns">Returns</a></li>
+            <li><a href="#" data-target="damage">Damage</a></li>
             <li><a href="#" data-target="review">Review</a></li>
             <li><a href="#" data-target="representative">Rep</a></li>
             <li><a href="#" data-target="card">Dart Card</a></li>
@@ -46,6 +45,7 @@
         <li><a href="#" data-target="customers"><i class='bx bx-user-pin'></i><span>Clients</span></a></li>
         <li><a href="#" data-target="orders"><i class='bx bx-cart'></i><span>Orders</span></a></li>
         <li><a href="#" data-target="returns"><i class='bx bx-undo'></i><span>Returns</span></a></li>
+        <li><a href="#" data-target="damage"><i class='bx bx-error-circle'></i><span>Damage</span></a></li>
         <li><a href="#" data-target="review"><i class='bx bx-star'></i><span>Review</span></a></li>
         <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
         <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
@@ -90,7 +90,7 @@
                             <span class="numebr">55.9 M</span>
                             <i class="fa-solid fa-clipboard-check" style="color: #16742d;"></i>
                         </div>
-                        <h5>Sold out</h5>
+                        <h5>Sold Items</h5>
                     </div>
                 </div>
             </div>
@@ -101,7 +101,7 @@
                 <div class="financial-summary">
                     <div class="sales-cont">
                         <div class="card-top">
-                            <h4>Sales</h4>
+                            <h4><i class="fa-solid fa-sack-dollar"></i> Sales</h4>
                             <span class="variance"><i class="fa-solid fa-caret-up"></i> 0.8%</span>
                         </div>
                         <span class="sales">2.23M</span>
@@ -109,7 +109,7 @@
 
                     <div class="cost-cont">
                         <div class="card-top">
-                            <h4>Cost</h4>
+                            <h4><i class="fa-solid fa-coins"></i> Total Cost</h4>
                             <span class="variance"><i class="fa-solid fa-caret-up"></i> 0.8%</span>
                         </div>
                         <span class="sales">2.23M</span>
@@ -117,7 +117,7 @@
 
                     <div class="profit-cont">
                         <div class="card-top">
-                            <h4>Profit</h4>
+                            <h4><i class="fa-solid fa-chart-line"></i> Profit</h4>
                             <span class="variance"><i class="fa-solid fa-caret-up"></i> 0.8%</span>
                         </div>
                         <span class="sales">2.23M</span>
@@ -145,6 +145,18 @@
                 <article class="widget-card">
                     <div class="widget-header">
                         <h3><i class="fa-solid fa-bell"></i> Latest Updates </h3>
+                        <div class="notification-filter-wrap">
+                            <select id="notificationFilter" aria-label="Filter notifications">
+                                <option value="all">All</option>
+                                <option value="order">Orders</option>
+                                <option value="inventory">Inventory</option>
+                                <option value="return">Returns</option>
+                                <option value="damage">Damage</option>
+                                <option value="payment">Payments</option>
+                                <option value="customer">Clients</option>
+                                <option value="system">System</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="widget-content" id="updates-feed">
                         <!-- صفوف يكررها الباك إند -->
@@ -197,8 +209,7 @@
                 <div class="widget-header bday-header">
                     <h3><i class="fa-solid fa-ranking-star"></i> Top Clintes </h3>
                 </div>
-                <div class="widget-content overflow" id="birthday-feed">
-                    <!-- صفوف يكررها الباك إند -->
+                <div class="widget-content overflow" id="top-clients-feed">
                     <div class="bday-item overflow" data-client-id="101">
                         <span class="bday-num ">1)</span>
                         <span class="bday-date w100">10-10-2026</span>
@@ -292,13 +303,16 @@
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w100">Action</h2>
+                    <h2 class="w200">Action</h2>
                     <h2 class="w100">Photo</h2>
                     <h2 class="w150">ID Model</h2>
                     <h2 class="w150">Model Name</h2>
                     <h2 class="w150">Category</h2>
                     <h2 class="w200">Description</h2>
-                    <h2 class="w150">Number</h2>
+                    <h2 class="w150">Available</h2>
+                    <h2 class="w150">Total Items</h2>
+                    <h2 class="w150">Sold</h2>
+                    <h2 class="w150">Damaged</h2>
                     <h2 class="w150">Cost</h2>
                     <h2 class="w150">Selling</h2>
                     <h2 class="w150">Discount %</h2>
@@ -338,11 +352,16 @@
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
                 <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>Sizes</option>
-                        <option value="36 XL">36 XL</option>
-                        <option value="34 L">34 L</option>
-                        <option value="32 M">32 M</option>
+                    <select data-filter-key="sizeProfile" id="item-size-profile-filter">
+                        <option value="all">All Size Systems</option>
+                        <option value="pants">Pants Sizes</option>
+                        <option value="tops">T-Shirts / Shirts / Hoodies</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="size" id="item-size-filter">
+                        <option value="all">All Sizes</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -370,7 +389,7 @@
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w100">Action</h2>
+                    <h2 class="w200">Action</h2>
                     <h2 class="w100">Photo</h2>
                     <h2 class="w150">ID Model</h2>
                     <h2 class="w150">Item Code</h2>
@@ -399,7 +418,7 @@
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Monthly order</option>
+                        <option value="all">All</option>
                         <option value="up">Up</option>
                         <option value="low">Low</option>
                     </select>
@@ -407,7 +426,7 @@
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Dart Card</option>
+                        <option value="all">None</option>
                         <option value="yes">yes</option>
                         <option value="no">no</option>
                     </select>
@@ -415,7 +434,7 @@
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Date Birthday</option>
+                        <option value="all">None</option>
                         <option value="tomorrow">Tomorrow</option>
                         <option value="today">Today</option>
                         <option value="yesterday">Yesterday</option>
@@ -437,7 +456,7 @@
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w100">Action</h2>
+                    <h2 class="w200">Action</h2>
                     <h2 class="w150">Birthday</h2>
                     <h2 class="w150">Client Name</h2>
                     <h2 class="w150">ID Clinte</h2>
@@ -504,18 +523,23 @@
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
                 <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>Status</option>
-                        <option value="pendig">Pendig</option>
-                        <option value="accepted">Accepted</option>
-                        <option value="out for delivery">Out for Delivery</option>
-                        <option value="deliverd">Deliverd</option>
+                    <select data-filter-key="status">
+                        <option value="">All Statuses</option>
+                        <option value="New">New</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Preparing">Preparing</option>
+                        <option value="Out With Representative">Out With Representative</option>
+                        <option value="Representative On The Way">Representative On The Way</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Refused">Refused</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Needs Attention">Needs Attention</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Total Price</option>
+                        <option value="all">None</option>
                         <option value="up">Up</option>
                         <option value="low">Low</option>
                     </select>
@@ -528,15 +552,25 @@
 
             <div class="second">
                 <button class="delete-btn">
-                    <i class='bx bx-trash'></i>
-                    <span>Delete</span>
+                    <i class='bx bx-minus-circle'></i>
+                    <span>Archive Selected</span>
                 </button>
+            </div>
+            <div class="order-bulk-actions" id="order-bulk-actions">
+                <span class="bulk-selected-count" id="bulk-selected-count">0 selected</span>
+                <button type="button" data-bulk-order-status="Accepted">Accept</button>
+                <button type="button" data-bulk-order-status="Preparing">Preparing</button>
+                <button type="button" data-bulk-order-status="Out With Representative">Out With Rep</button>
+                <button type="button" data-bulk-order-status="Representative On The Way">On The Way</button>
+                <button type="button" data-bulk-order-status="Delivered">Delivered</button>
+                <button type="button" data-bulk-order-status="Refused">Refused</button>
+                <button type="button" data-bulk-order-status="Cancelled">Cancel</button>
             </div>
 
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w300">Action</h2>
+                    <h2 class="w500">Action</h2>
                     <h2 class="w150">ID Order</h2>
                     <h2 class="w150">Date</h2>
                     <h2 class="w150">Time</h2>
@@ -553,6 +587,9 @@
                     <h2 class="w150">Reason Deduction</h2>
                     <h2 class="w150">The final amount</h2>
                     <h2 class="w150">payment method</h2>
+                    <h2 class="w150">Payment Status</h2>
+                    <h2 class="w150">Order Source</h2>
+                    <h2 class="w150">Representative</h2>
                     <h2 class="w150">Delivery Notes</h2>
                     <h2 class="w150">Country</h2>
                     <h2 class="w150">Governorate</h2>
@@ -609,7 +646,7 @@
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w150">Action</h2>
+                    <h2 class="w200">Action</h2>
                     <h2 class="w150">ID-return</h2>
                     <h2 class="w150">ID Model</h2>
                     <h2 class="w150">Item Code</h2>
@@ -620,10 +657,61 @@
                     <h2 class="w150">phone number</h2>
                     <h2 class="w150">phone number 2</h2>
                     <h2 class="w150">E-Mail</h2>
-                    <h2 class="w150">Reason</h2>
+                    <h2 class="w300">Reason</h2>
                     <h2 class="w150">ID Order</h2>
                 </div>
                 <div id="returns-container"></div>
+            </div>
+        </section>
+
+
+        <!-- damage -->
+        <section id="damage" class="dashboard-section">
+            <div class="filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search damage / item code">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="status">
+                        <option value="">All Damage Statuses</option>
+                        <option value="Damaged">Damaged</option>
+                        <option value="Repaired">Repaired</option>
+                        <option value="Destroyed">Destroyed</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="archive">
+                        <option value="active">Active</option>
+                        <option value="archived">Archived</option>
+                        <option value="all">All</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="add-damage-btn"><span>+</span> Add Damage</button>
+            </div>
+            <div class="second">
+                <button class="delete-btn"><i class='bx bx-minus-circle'></i><span>Archive Selected</span></button>
+            </div>
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input type="checkbox">
+                    <h2 class="w200">Action</h2>
+                    <h2 class="w150">Damage ID</h2>
+                    <h2 class="w150">Item Code</h2>
+                    <h2 class="w150">Model</h2>
+                    <h2 class="w100">Photo</h2>
+                    <h2 class="w150">Color</h2>
+                    <h2 class="w150">Size</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w200">Reason</h2>
+                    <h2 class="w150">Date</h2>
+                    <h2 class="w150">Order ID</h2>
+                    <h2 class="w150">Client</h2>
+                    <h2 class="w150">Return ID</h2>
+                </div>
+                <div id="damage-container"></div>
             </div>
         </section>
 
@@ -636,7 +724,7 @@
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Star Rating</option>
+                        <option value="all">None</option>
                         <option value="Up">Up</option>
                         <option value="low">Low</option>
                     </select>
@@ -644,7 +732,7 @@
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Status</option>
+                        <option value="all">None</option>
                         <option value="active">Active</option>
                         <option value="hidden">Hidden</option>
                     </select>
@@ -666,7 +754,7 @@
                 <div class="title-name">
                     <input class="" type="checkbox">
                     <h2 class="w200">Action</h2>
-                    <h2 class="w200">Date</h2>
+                    <h2 class="w200">Date & Time</h2>
                     <h2 class="w200">Client Name</h2>
                     <h2 class="w150">ID Clinte</h2>
                     <h2 class="w150">Status</h2>
@@ -690,7 +778,7 @@
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Status</option>
+                        <option value="all">None</option>
                         <option value="active">Active</option>
                         <option value="hidden">Not available</option>
                     </select>
@@ -903,6 +991,36 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label for="paymentStatus">Payment Status</label>
+                        <select id="paymentStatus">
+                            <option value="Unpaid">Unpaid</option>
+                            <option value="Partially Paid">Partially Paid</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Partially Refunded">Partially Refunded</option>
+                            <option value="Refunded">Refunded</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderSource">Order Source</label>
+                        <select id="orderSource">
+                            <option value="Website">Website</option>
+                            <option value="Instagram">Instagram</option>
+                            <option value="Facebook">Facebook</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                            <option value="TikTok">TikTok</option>
+                            <option value="Manual" selected>Manual</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="amountPaid">Amount Paid</label>
+                        <input type="number" id="amountPaid" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="amountRefunded">Amount Refunded</label>
+                        <input type="number" id="amountRefunded" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
                         <label for="deliveryNotes">Delivery Notes</label>
                         <textarea id="deliveryNotes" placeholder="Value" rows="2"></textarea>
                     </div>
@@ -919,10 +1037,18 @@
                 </div>
                 <div class="column">
                     <div class="form-group">
-                        <label for="productsInputCode">Products (Item Codes)</label>
+                        <label>Auto Allocate Product</label>
+                        <input type="text" id="orderModelCode" list="models-list" placeholder="Model Code">
+                        <input type="text" id="orderItemColor" placeholder="Color">
+                        <input type="text" id="orderItemSize" placeholder="Size">
+                        <input type="number" id="orderItemQty" min="1" value="1" placeholder="Qty">
+                        <button type="button" id="autoAllocateProductBtn">Auto Allocate</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="productsInputCode">Physical Item Code (optional manual selection)</label>
                         <input type="text" id="productsInputCode" list="items-datalist" placeholder="اكتب أو اختر كود القطعة...">
                         <datalist id="items-datalist"></datalist>
-                        <button type="button" id="addProductBtn">إضافة للطلب</button>
+                        <button type="button" id="addProductBtn">Add Item</button>
                         <div id="selectedProductsList"></div>
                     </div>
                     <input type="hidden" id="modal-order-edit-id">
@@ -1000,17 +1126,13 @@
                     </div>
                     <div class="form-group">
                         <label for="custCountry">Country</label>
-                        <select id="custCountry" class="modal-input" required>
-                            <option value="" disabled selected>Value</option>
-                            <option value="Egypt">Egypt</option>
-                        </select>            
+                        <input id="custCountry" class="modal-input" list="country-options" value="Egypt" placeholder="Country" required>
+                        <datalist id="country-options"><option value="Egypt"></option></datalist>            
                     </div>
                     <div class="form-group">
                         <label for="custGovernorate">Governorate</label>
-                        <select id="custGovernorate" class="modal-input" required>
-                            <option value="" disabled selected>Value</option>
-                            <option value="Cairo">Cairo</option>
-                        </select>
+                        <input id="custGovernorate" class="modal-input" list="egypt-governorates" placeholder="Governorate" required>
+                        <datalist id="egypt-governorates"><option value="Cairo"></option><option value="Alexandria"></option><option value="Giza"></option><option value="Qalyubia"></option><option value="Dakahlia"></option><option value="Sharqia"></option><option value="Gharbia"></option><option value="Monufia"></option><option value="Beheira"></option><option value="Kafr El Sheikh"></option><option value="Damietta"></option><option value="Port Said"></option><option value="Ismailia"></option><option value="Suez"></option><option value="North Sinai"></option><option value="South Sinai"></option><option value="Beni Suef"></option><option value="Faiyum"></option><option value="Minya"></option><option value="Asyut"></option><option value="Sohag"></option><option value="Qena"></option><option value="Luxor"></option><option value="Aswan"></option><option value="Red Sea"></option><option value="New Valley"></option><option value="Matrouh"></option></datalist>
                     </div>
                 </div>
             </div>
@@ -1178,7 +1300,21 @@
     </div>
 </div>
 
+
+<!-- Dart operational modals -->
+<div class="modal" id="rep-assignment-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Assign Representative</h3><select id="rep-assignment-select"></select><button type="button" class="btn-done" id="confirm-rep-assignment">Assign</button></div></div>
+<div class="modal" id="order-reason-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3 id="order-reason-title">Reason</h3><select id="order-reason-select"></select><textarea id="order-reason-notes" rows="3" placeholder="Notes / Other reason"></textarea><button type="button" class="btn-done" id="confirm-order-reason">Confirm</button></div></div>
+<div class="modal" id="history-modal"><div class="modal-content dart-history-modal"><span class="close-modal">&times;</span><h3 id="history-modal-title">History</h3><div id="history-modal-body"></div></div></div>
+<div class="modal" id="damage-modal"><div class="modal-content"><span class="close-modal">&times;</span><h3>Damage Record</h3><form id="damage-form"><input type="hidden" id="damage-edit-id"><div class="modal-grid"><div class="form-group"><label>Item Code</label><input id="damage-item-code" required></div><div class="form-group"><label>Reason</label><input id="damage-reason" required></div><div class="form-group"><label>Notes</label><textarea id="damage-notes" rows="3"></textarea></div><div class="form-group"><label>Status</label><select id="damage-status"><option value="Damaged">Damaged</option><option value="Repaired">Repaired</option><option value="Destroyed">Destroyed</option></select></div></div><button class="btn-done" type="submit">DONE</button></form></div></div>
+
     <script src="dart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<div class="modal" id="image-preview-modal">
+  <div class="modal-content dart-image-preview-content">
+    <span class="close-modal">&times;</span>
+    <img id="full-item-image" alt="Full item preview">
+  </div>
+</div>
+
 </body>
 </html>
