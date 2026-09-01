@@ -420,7 +420,7 @@ function renderCustomers(dataArray) {
                 <span class="text-item w200">${item.governorate || '-'}</span>
                 <span class="text-item w150">${item.monthlyOrders || 0}</span>
                 <span class="text-item w150">${item.totalOrders || 0}</span>
-                <span class="text-item w300">${item.totalAmount || '0 EGP'}</span>
+                <span class="text-item w500">${item.totalAmount || '0 EGP'}</span>
                 <span class="text-item w200">${item.dartCard || 'no'}</span>
             </div>
         `);
