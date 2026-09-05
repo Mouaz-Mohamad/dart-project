@@ -91,7 +91,7 @@
                     <div class="products-grid" id="productsContainer">
                     <!-- الكارت المرجعي (Template) -->
                         <div class="product-card" id="productTemplate" style="display: none;">
-                            <img src="" alt="" class="product-img" loading="lazy">
+                            <img src="" alt="Product photograph; description is filled from the product name" class="product-img" loading="lazy">
                             <div class="product-details">
                             <div class="product-category"></div>
                             <div class="product-code" dir="rtl"></div>
@@ -168,6 +168,21 @@
                         <!-- حاوية الألوان -->
                         <div class="colors-container">
                             <button type="button" class="color-btn" data-color=""></button>
+                        </div>
+
+                        <div class="product-size-chart-actions">
+                            <button type="button" id="productSizeChartBtn" class="product-size-chart-trigger" aria-controls="productSizeChartPanel" aria-expanded="false">
+                                <i class="fa-solid fa-ruler-combined" aria-hidden="true"></i> Size Chart
+                            </button>
+                        </div>
+                        <p id="productOptionStatus" class="product-option-status" role="status" aria-live="polite"></p>
+
+                        <div id="productSizeChartPanel" class="product-size-chart-panel" hidden>
+                            <div class="product-size-chart-dialog" role="dialog" aria-modal="true" aria-labelledby="productSizeChartTitle">
+                                <button type="button" id="closeProductSizeChart" class="product-size-chart-close" aria-label="Close size chart">&times;</button>
+                                <h3 id="productSizeChartTitle">Size Chart</h3>
+                                <div id="productSizeChartContent"></div>
+                            </div>
                         </div>
 
                         <!-- عداد الكمية -->

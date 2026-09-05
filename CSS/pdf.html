@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thermal Receipt</title>
+    <style>
+        /* إعدادات حجم الورقة للطابعة الحرارية تلقائياً */
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 5px;
+            color: #000000;
+        }
+        .thermal-receipt {
+            width: 72mm;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 5px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+        
+        .header {
+            border-bottom: 1px dashed #000;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+        }
+        .header h2 {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+        }
+        .info {
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+        th, td {
+            padding: 4px 2px;
+            text-align: left;
+            font-size: 11px;
+            border-bottom: 1px dotted #ccc;
+        }
+        th {
+            border-bottom: 1px solid #000;
+        }
+        .totals {
+            border-top: 1px dashed #000;
+            padding-top: 5px;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 11px;
+            border-top: 1px dashed #000;
+            padding-top: 5px;
+        }
+        .actions {
+            margin-top: 15px;
+            text-align: center;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #000;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        @media print {
+            body { padding: 0; }
+            .actions { display: none; }
+            .thermal-receipt { width: 100%; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="thermal-receipt" id="receipt-content">
+        <div class="header text-center">
+            <h2>Dart Brand</h2>
+            <p>Modern Men's Apparel</p>
+        </div>
+
+        <div class="info">
+            <div><strong>Order ID:</strong> #INV-5092</div>
+            <div><strong>Date:</strong> <span id="current-date"></span></div>
+            <div><strong>Customer:</strong> Mouaz</div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                </tr>
+            </thead>
+            <tbody id="receipt-items">
+                <!-- Items will be loaded dynamically -->
+            </tbody>
+        </table>
+
+        <div class="totals">
+            <div>Total: <span id="grand-total">0</span> EGP</div>
+        </div>
+
+        <div class="footer">
+            <p>Dart for you</p>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button onclick="window.print()">Print Receipt</button>
+    </div>
+
+    <script>
+        const orderProducts = [
+            { name: "Jeans 9 oz", qty: 2, price: 450 },
+            { name: "Dart Brand T-Shirt", qty: 3, price: 250 },
+            { name: "Black Winter Hoodie", qty: 1, price: 600 }
+        ];
+
+        function loadReceipt() {
+            document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-GB');
+            
+            const tbody = document.getElementById('receipt-items');
+            tbody.innerHTML = '';
+            let grandTotal = 0;
+
+            orderProducts.forEach(item => {
+                let total = item.qty * item.price;
+                grandTotal += total;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>${item.qty}</td>
+                        <td>${total} EGP</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('grand-total').innerText = grandTotal;
+        }
+
+        window.onload = loadReceipt;
+    </script>
+
+</body>
+</html>

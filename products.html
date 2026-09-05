@@ -69,8 +69,48 @@
             
             
             <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
-            <!-- 1. حاوية أزرار الفلترة بكلاس filter-container -->
-            <div class="filter-container" id="filterContainer"></div>
+
+            <button type="button" id="toggleProductFilters" class="product-filter-toggle" aria-controls="productFiltersPanel" aria-expanded="false">
+                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                <span>Filter products</span>
+                <i class="fa-solid fa-chevron-down product-filter-toggle-arrow" aria-hidden="true"></i>
+            </button>
+
+            <section id="productFiltersPanel" class="product-filter-panel" aria-label="Search and filter products" hidden>
+                <div class="product-filter-search">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input id="productSearchInput" type="search" placeholder="Search by product name or code" aria-label="Search products by name or code" autocomplete="off">
+                </div>
+                <div class="product-filter-selects">
+                    <select id="productSizeFilter" aria-label="Filter by size"><option value="all">All sizes</option></select>
+                    <select id="productColorFilter" aria-label="Filter by color"><option value="all">All colors</option></select>
+                    <select id="productAvailabilityFilter" aria-label="Filter by availability">
+                        <option value="all">Any availability</option>
+                        <option value="in-stock">In stock</option>
+                        <option value="out-of-stock">Out of stock</option>
+                    </select>
+                    <select id="productPriceFilter" aria-label="Filter by price">
+                        <option value="all">Any price</option>
+                        <option value="under-500">Under 500 EGP</option>
+                        <option value="500-750">500–750 EGP</option>
+                        <option value="750-1000">751–1,000 EGP</option>
+                        <option value="over-1000">Over 1,000 EGP</option>
+                    </select>
+                    <select id="productSortSelect" aria-label="Sort products">
+                        <option value="featured">Featured order</option>
+                        <option value="newest">Newest first</option>
+                        <option value="price-low">Price: low to high</option>
+                        <option value="price-high">Price: high to low</option>
+                        <option value="name">Name: A to Z</option>
+                    </select>
+                    <button type="button" id="clearProductFilters" class="clear-product-filters">Clear</button>
+                </div>
+                <div class="product-filter-categories">
+                    <span>Category</span>
+                    <div class="filter-container" id="filterContainer"></div>
+                </div>
+                <p id="productResultsCount" class="product-results-count" role="status" aria-live="polite"></p>
+            </section>
 
             <!-- ================= سكشن المنتجات الجزء الأول (أول 7 منتجات) ================= -->
             <section class="products-section">
@@ -79,7 +119,7 @@
                 <div class="products-grid" id="productsPart1">
                 <!-- الكارت المرجعي (Template) -->
                     <div class="product-card" id="productTemplate" style="display: none;">
-                        <img src="" alt="" class="product-img" loading="lazy">
+                        <img src="" alt="Product photograph; description is filled from the product name" class="product-img" loading="lazy">
                         <div class="product-details">
                             <div class="product-category"></div>
                             <div class="product-code" dir="rtl"></div>
@@ -161,6 +201,21 @@
                     <!-- حاوية الألوان -->
                     <div class="colors-container">
                         <button type="button" class="color-btn" data-color=""></button>
+                    </div>
+
+                    <div class="product-size-chart-actions">
+                        <button type="button" id="productSizeChartBtn" class="product-size-chart-trigger" aria-controls="productSizeChartPanel" aria-expanded="false">
+                            <i class="fa-solid fa-ruler-combined" aria-hidden="true"></i> Size Chart
+                        </button>
+                    </div>
+                    <p id="productOptionStatus" class="product-option-status" role="status" aria-live="polite"></p>
+
+                    <div id="productSizeChartPanel" class="product-size-chart-panel" hidden>
+                        <div class="product-size-chart-dialog" role="dialog" aria-modal="true" aria-labelledby="productSizeChartTitle">
+                            <button type="button" id="closeProductSizeChart" class="product-size-chart-close" aria-label="Close size chart">&times;</button>
+                            <h3 id="productSizeChartTitle">Size Chart</h3>
+                            <div id="productSizeChartContent"></div>
+                        </div>
                     </div>
 
                     <!-- عداد الكمية -->
