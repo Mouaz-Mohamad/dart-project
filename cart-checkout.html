@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,22 +7,21 @@
     <meta name="color-scheme" content="light">
 
     <!-- SEO الأساسي -->
-    <title>Dart | متجر أزياء وملابس عصرية</title>
+    <title>سلة التسوق وإتمام الطلب | Dart</title>
     <meta name="description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة مع خصومات وعروض حصرية وتوصيل سريع.">
     <meta name="keywords" content="Dart, ملابس, أزياء, موضة, متجر ملابس, هوديز, Dart Brand">
     <meta name="author" content="Dart">
-    <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://yourdomain.com/">
+    <meta name="robots" content="noindex, nofollow">
 
     <!-- Open Graph / Facebook & WhatsApp -->
     <meta property="og:site_name" content="Dart">
     <meta property="og:title" content="Dart | متجر أزياء وملابس عصرية">
     <meta property="og:description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة.">
-    <meta property="og:image" content="https://yourdomain.com/Photos/logo-1to1.png">
-    <meta property="og:image:secure_url" content="https://yourdomain.com/Photos/logo-1to1.png">
+    <meta property="og:image" content="https://dart-project-psi.vercel.app/Photos/logo-1to1.png">
+    <meta property="og:image:secure_url" content="https://dart-project-psi.vercel.app/Photos/logo-1to1.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="Dart Brand Logo">
-    <meta property="og:url" content="https://yourdomain.com/">
+    <meta property="og:url" content="https://dart-project-psi.vercel.app/cart-checkout.html">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ar_AR">
 
@@ -30,7 +29,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Dart | متجر أزياء وملابس عصرية">
     <meta name="twitter:description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة.">
-    <meta name="twitter:image" content="https://yourdomain.com/Photos/logo-1to1.png">
+    <meta name="twitter:image" content="https://dart-project-psi.vercel.app/Photos/logo-1to1.png">
 
     <!-- Favicon والأيقونات -->
     <link rel="icon" type="image/png" sizes="48x48" href="Photos/logo-1to1.png">
@@ -40,7 +39,7 @@
 
     <link rel="stylesheet" href="CSS/Stayle 1.css">
     <link rel="stylesheet" href="CSS/base.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="CSS/fixes.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -60,6 +59,7 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
 <body class='dja-flexdir'>
     <div class="mother">
         <header id="header-container" aria-label="Main Navigation"></header>
@@ -70,6 +70,7 @@
             <p dir="rtl"><i class="fa-solid fa-star"></i> &nbsp;يمكنك الاستبدال او الاسترجاع خلال 14 يوم من تاريخ استلام الاوردر </p>
 
             <section id="cartView" class="cart-section">
+                <div id="cartReservationTimer" class="cart-reservation-timer" hidden></div>
                 <div class="cart-items-container" id="cartItemsContainer">
                     <!-- قالب كارت المنتج في السلة -->
                     <div class="cart-product-card" id="cartItemTemplate" style="display: none;">
@@ -83,20 +84,20 @@
                             <div class="cart-product-price-qty">
                                 <span class="cart-item-price"></span>
                                 <div class="qty-control">
-                                    <button class="qty-btn decrease">-</button>
+                                    <button type="button" class="qty-btn decrease" aria-label="تقليل الكمية">-</button>
                                     <span class="qty-value">1</span>
-                                    <button class="qty-btn increase">+</button>
+                                    <button type="button" class="qty-btn increase" aria-label="زيادة الكمية">+</button>
                                 </div>
                             </div>
                             <div class="cart-item-total-price">Total: <span class="p-total"></span> EGP</div>
                         </div>
 
-                        <button class="remove-item-btn">حذف</button>
+                        <button type="button" class="remove-item-btn">حذف</button>
                     </div>
                 </div>
 
             <!-- زر الانتقال لإتمام الطلب -->
-            <button class="primary-btn" id="toCheckoutBtn">Continue to Checkout</button>
+            <button type="button" class="primary-btn" id="toCheckoutBtn">Continue to Checkout</button>
         </section>
 
 
@@ -125,8 +126,8 @@
     
     <!-- خانة البحث والاقتراحات من جوجل -->
 <div class="form-group" style="position: relative;">
-    <label>ابحث عن عنوانك</label>
-    <input type="text" id="address-input" class="inp" placeholder="اكتب المنطقة أو الشارع..." autocomplete="off">
+    <label for="address-input">ابحث عن عنوانك</label>
+    <input type="text" id="address-input" name="address_search" class="inp" placeholder="اكتب المنطقة أو الشارع..." autocomplete="street-address">
     <ul id="results-list" class="results-list" style="display:none;"></ul>
 </div>
 
@@ -137,19 +138,20 @@
 <input type="hidden" id="lng-input" name="longitude">
 <input type="hidden" id="formatted-address-input" name="full_address">
 
-    <div class="form-group"><label>Name</label><input class="inp" type="text" placeholder="Value" required></div>
-    <div class="form-group"><label>Phone number</label><input class="inp" type="tel" placeholder="Value" required></div>
-    <div class="form-group"><label>Email</label><input class="inp" type="email" placeholder="Value"></div>
-    <div class="form-group"><label>Building Number/Name</label><input class="inp" type="text" placeholder="Value" required></div>
-    <div class="form-group"><label>Floor</label><input class="inp" type="text" placeholder="Value"></div>
-    <div class="form-group"><label>Delivery Notes</label><textarea class="inp" placeholder="Value"></textarea></div>
-    <div class="arrwo-for-other-adrees">=== &#9662; Alternative address entry &#9662; ===</div>
+    <div class="form-group"><label for="checkout-name">Name</label><input id="checkout-name" name="customer_name" class="inp" type="text" placeholder="Value" autocomplete="name" required></div>
+    <div class="form-group"><label for="checkout-phone1">Phone number</label><input id="checkout-phone1" name="phone1" class="inp" type="tel" placeholder="Value" autocomplete="tel" inputmode="tel" required></div>
+    <div class="form-group"><label for="checkout-phone2">Phone number 2</label><input id="checkout-phone2" name="phone2" class="inp" type="tel" placeholder="Optional" inputmode="tel"></div>
+    <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Value" autocomplete="email"></div>
+    <div class="form-group"><label for="checkout-building">Building Number/Name</label><input id="checkout-building" name="building" class="inp" type="text" placeholder="Value" required></div>
+    <div class="form-group"><label for="checkout-floor">Floor</label><input id="checkout-floor" name="floor" class="inp" type="text" placeholder="Value"></div>
+    <div class="form-group"><label for="checkout-notes">Delivery Notes</label><textarea id="checkout-notes" name="delivery_notes" class="inp" placeholder="Value"></textarea></div>
+    <div class="arrwo-for-other-adrees" role="button" tabindex="0" aria-expanded="false">=== &#9662; Alternative address entry &#9662; ===</div>
 
 
     <div class="other-addres">
         <div class="form-group">
             <label>Country</label>
-            <select required class="select-cart">
+            <select required class="select-cart" name="country">
                 <option value="" selected disabled hidden> Select </option>
                 <option value="Egypt">Egypt</option> 
             </select>                  
@@ -157,7 +159,7 @@
 
         <div class="form-group">
             <label>Governorate</label>
-            <select class="select-cart" id="governorate-select">
+            <select class="select-cart" id="governorate-select" name="governorate">
                 <option value="" selected disabled hidden> Select </option>
                 <option value="Cairo">Cairo</option> 
                 <option value="Giza">Giza</option> 
@@ -167,12 +169,12 @@
 
         <div class="form-group">
             <label>Area</label>
-            <input class="inp" type="text" id="area-input" placeholder="المنطقة / الحي">
+            <input class="inp" type="text" id="area-input" name="area" placeholder="المنطقة / الحي">
         </div>
 
         <div class="form-group">
             <label>Street Name</label>
-            <input class="inp" type="text" id="street-input" placeholder="اسم الشارع" >
+            <input class="inp" type="text" id="street-input" name="street" placeholder="اسم الشارع" >
         </div>
     </div>
 
@@ -181,7 +183,7 @@
     <h3 class="payment-header" style="color: #000;">Payment Method</h3>
 <div class="payment-method-box">
     <label class="simple-checkbox">
-        <input type="checkbox" checked>
+        <input type="checkbox" name="cash_on_delivery" checked disabled>
         <span>Cash on Delivery</span>
     </label>
 </div>
@@ -252,5 +254,6 @@
     
     </div>
     <script src="Js/one .js"></script>
+    <script src="Js/dart-platform.js"></script>
 </body>
 </html>

@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login / Sign Up Modern</title>
+    <title>تسجيل الدخول أو إنشاء حساب | Dart</title>
+    <meta name="description" content="سجّل الدخول إلى حساب Dart أو أنشئ حسابًا جديدًا لمتابعة الطلبات والمرتجعات.">
+    <meta name="robots" content="noindex, nofollow">
     <link rel="stylesheet" href="CSS/Stayle 1.css">
     <link rel="stylesheet" href="CSS/base.css">
+    <link rel="stylesheet" href="CSS/fixes.css">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
         * {
@@ -284,60 +287,70 @@
     <div class="container">
         <!-- Login Form -->
         <div class="form-box login">
-            <form action="#">
+            <form id="loginForm" action="#" novalidate>
                 <h1>Login</h1>
                 <div class="input-box">
-                    <input type="text" placeholder="Username" required>
+                    <input type="text" name="identifier" placeholder="Email or phone" autocomplete="username" required>
                     <i class='bx bxs-user'></i>
                 </div>
 
                 <div class="input-box">
-                    <input type="password" placeholder="Password" required>
+                    <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
                     <i class='bx bxs-lock-alt'></i>
                 </div>
 
                 <div class="forgot-link">
-                    <a href="#">Forgot password?</a>
+                    <a href="#" data-forgot-password>Forgot password?</a>
                 </div>
 
                 <button type="submit" class="btn enter-btn">Login</button>
                 <p>Or login with social platforms</p>
                 <div class="social-icons">
-                    <a href="#"><i class='bx bxl-google'></i></a>
-                    <a href="#"><i class='bx bxl-facebook'></i></a>
+                    <a href="#" data-social-login="google" aria-label="Login with Google"><i class='bx bxl-google'></i></a>
+                    <a href="#" data-social-login="facebook" aria-label="Login with Facebook"><i class='bx bxl-facebook'></i></a>
                 </div>
             </form>
         </div>
 
         <!-- Registration Form -->
         <div class="form-box register">
-            <form action="#">
+            <form id="registerForm" action="#" novalidate>
                 <h1>Registration</h1>
                 <div class="input-box">
-                    <input type="text" placeholder="Username" required>
+                    <input type="text" name="name" placeholder="Full name" autocomplete="name" minlength="3" required>
                     <i class='bx bxs-user'></i>
                 </div>
 
                 <div class="input-box">
-                    <input type="email" placeholder="Email" required>
+                    <input type="email" name="email" placeholder="Email" autocomplete="email" required>
                     <i class='bx bxs-envelope'></i>
                 </div>
 
                 <div class="input-box">
-                    <input type="password" placeholder="Password" required>
+                    <input type="tel" name="phone1" placeholder="Phone number" autocomplete="tel" inputmode="tel" required>
+                    <i class='bx bxs-phone'></i>
+                </div>
+
+                <div class="input-box">
+                    <input type="tel" name="phone2" placeholder="Phone number 2 (optional)" inputmode="tel">
+                    <i class='bx bxs-phone'></i>
+                </div>
+
+                <div class="input-box">
+                    <input type="password" name="password" placeholder="Password (8+ characters)" autocomplete="new-password" minlength="8" required>
                     <i class='bx bxs-lock-alt'></i>
                 </div>
 
                 <div class="input-box">
-                    <input type="date" placeholder="Your Birthday" required>
+                    <input type="date" name="birthday" aria-label="Your birthday" autocomplete="bday" required>
                     <i class="fa-solid fa-calendar"></i>
                 </div>
 
                 <button type="submit" class="btn enter-btn">Register</button>
                 <p>Or register with social platforms</p>
                 <div class="social-icons">
-                    <a href="#"><i class='bx bxl-google'></i></a>
-                    <a href="#"><i class='bx bxl-facebook'></i></a>
+                    <a href="#" data-social-login="google" aria-label="Register with Google"><i class='bx bxl-google'></i></a>
+                    <a href="#" data-social-login="facebook" aria-label="Register with Facebook"><i class='bx bxl-facebook'></i></a>
                 </div>
             </form>
         </div>
@@ -347,13 +360,13 @@
             <div class="toggle-panel toggle-left">
                 <h1>Hello, Welcome!</h1>
                 <p>Don't have an account?</p>
-                <button class="btn register-btn" >Register</button>
+                <button type="button" class="btn register-btn">Register</button>
             </div>
 
             <div class="toggle-panel toggle-right">
                 <h1>Welcome Back!</h1>
                 <p>Already have an account?</p>
-                <button class="btn login-btn" id="enter-btn">Login</button>
+                <button type="button" class="btn login-btn" id="enter-btn">Login</button>
             </div>
         </div>
     </div>
@@ -372,5 +385,6 @@
         });
     </script>
     <script src="Js/one .js"></script>
+    <script src="Js/dart-platform.js"></script>
 </body>
 </html>

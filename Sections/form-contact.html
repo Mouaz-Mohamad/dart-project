@@ -1,42 +1,33 @@
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="../CSS/Stayle 1.css">
-<link rel="stylesheet" href="../CSS/base.css">
-
-
-
-
 <section class="feedback-section dja-flexdir" aria-label="Contact Us | اتصل بنا">
     <h1 class="section-title">&nbsp;Contact Us</h1>
 
-    <form id="feedback-form" class="form">
+    <form id="contactForm" class="form">
         <div class="form-group">
             <label for="full-name">Full Name</label>
-            <input type="text" id="full-name" placeholder="you + Father + GrandBa" pattern="^\s*(\S+\s+){2,}\S+\s*$" required>
+            <input type="text" id="contact-full-name" name="full_name" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
         </div>
 
         <div class="form-row flex-center">
             <div class="form-group">
-                <label for="phone-number">Phone Number</label>
-                <input type="tel" id="phone-number" placeholder="+20 1*********" pattern="[0-9]{11}" required>
+                <label for="contact-phone-1">Phone Number</label>
+                <input type="tel" id="contact-phone-1" name="phone1" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel" required>
             </div>
             <div class="form-group">
-                <label for="phone-number">Phone Number 2</label>
-                <input type="tel" id="phone-number" placeholder="+20 1*********" pattern="[0-9]{11}">
+                <label for="contact-phone-2">Phone Number 2</label>
+                <input type="tel" id="contact-phone-2" name="phone2" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel">
             </div>
         </div>
 
         <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" placeholder="Value" required>
+            <label for="contact-email">Email</label>
+            <input type="email" id="contact-email" name="email" placeholder="Value" autocomplete="email" required>
         </div>
 
         <div class="form-group">
-            <label for="review-text">Message</label>
-            <textarea id="review-text" placeholder="Value" rows="4" required></textarea>
+            <label for="contact-message">Message</label>
+            <textarea id="contact-message" name="message" placeholder="Value" rows="4" required></textarea>
         </div>
 
         <button type="submit" class="submit-btn-form">Submit</button>
     </form>
 </section>
-
-    <script src="../Js/one .js"></script>

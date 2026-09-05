@@ -1,47 +1,43 @@
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="../CSS/Stayle 1.css">
-<link rel="stylesheet" href="../CSS/base.css">
-
 <section class="feedback-section dja-flexdir" aria-label="Exchange or Return Request | طلب استبدال أو إرجاع">
     <h1 class="section-title">&nbsp;Exchange <br>&nbsp;&nbsp;&nbsp;&nbsp;or Return Request</h1>
 
-    <form id="feedback-form" class="form">
+    <form id="returnRequestForm" class="form">
         <div class="form-group">
             <label for="full-name">Full Name</label>
-            <input type="text" id="full-name" placeholder="you + Father + GrandBa" pattern="^\s*(\S+\s+){2,}\S+\s*$" required>
+            <input type="text" id="return-full-name" name="full_name" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
         </div>
 
         <div class="form-row flex-center">
             <div class="form-group">
-                <label for="phone-number">Phone Number</label>
-                <input type="tel" id="phone-number" placeholder="+20 1*********" pattern="[0-9]{11}" required>
+                <label for="return-phone-1">Phone Number</label>
+                <input type="tel" id="return-phone-1" name="phone1" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel" required>
             </div>
             <div class="form-group">
-                <label for="phone-number">Phone Number 2</label>
-                <input type="tel" id="phone-number" placeholder="+20 1*********" pattern="[0-9]{11}">
+                <label for="return-phone-2">Phone Number 2</label>
+                <input type="tel" id="return-phone-2" name="phone2" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel">
             </div>
         </div>
 
 
         <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" placeholder="Value" required>
+            <label for="return-email">Email</label>
+            <input type="email" id="return-email" name="email" placeholder="Value" autocomplete="email" required>
         </div>
 
         <div class="form-row flex-center">
             <div class="form-group">
-                <label for="item-Code">Item Code</label>
-                <input type="text" id="title-text" placeholder="Value" required>
+                <label for="return-item-code">Item Code</label>
+                <input type="text" id="return-item-code" name="item_code" placeholder="Value" required>
             </div>
             <div class="form-group">
-                <label for="model-code">Model code</label>
-                <input type="text" id="title-text" placeholder="Value" required>
+                <label for="return-model-code">Model code</label>
+                <input type="text" id="return-model-code" name="model_code" placeholder="Value" required>
             </div>
         </div>
         <div class="form-row flex-center">
             <div class="container-select">
                 <h4>Request Type</h4>
-                <select required>
+                <select name="request_type" required>
                 <option value="" selected disabled hidden> Select </option>
                 <option> Exchange | استبدال</option>
                 <option> Refund | استرجاع</option>
@@ -49,7 +45,7 @@
             </div>
             <div class="container-select">
                 <h4>Reason for request</h4>
-                <select required>
+                <select name="reason" required>
                     <option value="" selected disabled hidden> Select </option>
                     <option value="wrong_size">المقاس غير مناسب</option>
                     <option value="defective">المنتج به عيب تصنيع أو تلف</option>
@@ -68,13 +64,11 @@
         </div>
 
         <div class="form-group">
-            <label for="nots">Notes</label>
-            <textarea id="notes" placeholder="Value" rows="4"></textarea>
+            <label for="return-notes">Notes</label>
+            <textarea id="return-notes" name="notes" placeholder="Value" rows="4"></textarea>
         </div>
 
 
         <button type="submit" class="submit-btn-form">Submit</button>
     </form>
 </section>
-
-    <script src="../Js/one .js"></script>

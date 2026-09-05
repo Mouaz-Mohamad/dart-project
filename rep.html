@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Driver Dashboard - Order #45</title>
+  <title>لوحة المندوب | Dart</title>
+  <meta name="robots" content="noindex,nofollow">
   <link rel="stylesheet" href="CSS/Stayle 1.css">
   <link rel="stylesheet" href="CSS/base.css">
+  <link rel="stylesheet" href="CSS/fixes.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -22,7 +24,7 @@
     
     <main>
         <div class="img-rep djasb">
-            <img src="Photos/dart.png" style="height: 30%; width: 30%;">
+            <img src="Photos/dart.png" alt="Dart" style="height: 30%; width: 30%;">
             <h1 class="section-title-rep">&nbsp;You work  <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For Dart</h1>
         </div>
 
@@ -30,8 +32,8 @@
         <!-- Header -->
         <div class="rep-header">
           <div>
-            <h2 style="font-size: 18px; color: #0f172a;">Order #ORD-45</h2>
-            <span style="font-size: 12px; color: #64748b;">Courier: Ahmed Mahmoud</span>
+            <h2 style="font-size: 18px; color: #0f172a;">Order</h2>
+            <span style="font-size: 12px; color: #64748b;">Courier</span>
           </div>
           <span id="orderStatus" class="rep-status-badge">Assigned (Step 3)</span>
         </div>
@@ -39,9 +41,9 @@
         <!-- Customer Details -->
         <div class="rep-info-box">
           <div class="rep-info-title">Customer & Address</div>
-          <div class="rep-info-value">Moaaz Mohammed</div>
+          <div class="rep-info-value">Customer</div>
           <div id="customerAddress" style="font-size: 13px; color: #475569;">
-            890 بور سعيد، الوايلي الكبير غرب، حدائق القبة، محافظة القاهرة 37VG+QG
+            Delivery address
           </div>
         </div>
 
@@ -49,13 +51,12 @@
         <div class="rep-info-box">
           <div class="rep-info-title">Items & Cash Collection</div>
           <div style="font-size: 13px; color: #475569; margin-bottom: 8px;">
-            1x Black Hoodie (Dart Brand) - L<br>
-            1x Blue Jeans - 32
+            Loading order items…
           </div>
           <hr style="border-color: #e2e8f0; margin: 8px 0;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 13px; font-weight: 600; color: #64748b;">Collect Cash:</span>
-            <span style="font-size: 16px; font-weight: bold; color: #0f172a;">EGP 1100</span>
+            <span style="font-size: 16px; font-weight: bold; color: #0f172a;">—</span>
           </div>
         </div>
 
@@ -63,9 +64,9 @@
         <a href="tel:01000000000" class="rep-btn rep-btn-call">Call Customer</a>
 
         <!-- Control Buttons -->
-        <button id="goBtn" class="rep-btn rep-btn-go" onclick="startCountdown()">GO (Start Delivery)</button>
-        <button id="completeBtn" class="rep-btn rep-btn-complete" onclick="completeDelivery()">Mark as Delivered</button>
-        <button id="cancelBtn" class="rep-btn rep-btn-cancel" onclick="cancelDelivery()">Cancel Delivery Movement</button>
+        <button type="button" id="goBtn" class="rep-btn rep-btn-go" onclick="startCountdown()">GO (Start Delivery)</button>
+        <button type="button" id="completeBtn" class="rep-btn rep-btn-complete" onclick="completeDelivery()">Mark as Delivered</button>
+        <button type="button" id="cancelBtn" class="rep-btn rep-btn-cancel" onclick="cancelDelivery()">Cancel Delivery Movement</button>
 
         <!-- GPS Status Indicator -->
         <div id="gpsStatus" class="rep-gps-status">
@@ -77,6 +78,7 @@
   </div>
 
   <script src="Js/one .js"></script>
+  <script src="Js/dart-platform.js"></script>
 
 </body>
 </html>

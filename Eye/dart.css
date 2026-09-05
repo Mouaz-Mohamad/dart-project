@@ -18,6 +18,7 @@
   --text-main: #1a1a1a;
   --text-muted: #5c646c;
   --border-color: #dee2e6;
+  --font-main: "Inter", "Cairo", Arial, sans-serif;
 
   /* Spacing & Radius */
   --spacing-xs: 0.25rem;

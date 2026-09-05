@@ -214,12 +214,32 @@ const productsData = [
     }
 ];
 
-const reviewsData = [
-    { name: "سارة محمود", date: "15 يوليو 2026", rating: 5, title: "خامة ممتازة وتقفيل محترم", comment: "القماش مريح جداً في اللبس والتقفيل نضيف مفيش خيوط طالعة، المقاس مضبوط بالظبط زي الجدول. أكيد هطلب تاني" },
-    { name: "خالد علي", date: "10 يوليو 2026", rating: 5, title: "شيك ومريح جداً", comment: "التصميم جميل وعصري والألوان نفس الصور بالظبط والتوصيل سريع." },
-    { name: "أحمد حسام", date: "02 يوليو 2026", rating: 4, title: "مقاس مظبوط خامة جيدة", comment: "الخامة جيدة جداً بالنسبة للسعر والمقاس جه مظبوط بظبط." },
-    { name: "مريم إبراهيم", date: "28 يونيو 2026", rating: 5, title: "خدمة عملاء رائعة", comment: "المنتج ممتاز والتغليف شيك جداً، هطلب منكم تاني أكيد." }
-];
+// Keep model codes unique until the real catalog API becomes the source of truth.
+const usedProductCodes = new Set();
+productsData.forEach(product => {
+    const baseCode = String(product.code || `DA-${product.id}`);
+    product.code = usedProductCodes.has(baseCode)
+        ? `${baseCode}-${String(product.id).padStart(2, '0')}`
+        : baseCode;
+    usedProductCodes.add(product.code);
+});
+
+// Only approved dashboard reviews are public. No fabricated launch reviews.
+const reviewsData = (() => {
+    try {
+        return (JSON.parse(localStorage.getItem('dart_reviews')) || [])
+            .filter(review => review.status === 'Active' && !review.isArchived && !review.isDeleted)
+            .map(review => ({
+                name: review.clientName || 'Dart Customer',
+                date: review.date || '',
+                rating: Number(review.rating) || 0,
+                title: review.title || '',
+                comment: review.review || ''
+            }));
+    } catch {
+        return [];
+    }
+})();
 
 let cartData = JSON.parse(localStorage.getItem('dart_cart')) || [];
 let appliedDiscountRate = 0;
@@ -241,6 +261,23 @@ function getProductImages(item) {
     if (item && Array.isArray(item.images) && item.images.length) return item.images;
     if (item && item.image) return [item.image];
     return [];
+}
+
+function getAvailableStock(product, size, color) {
+    try {
+        const storedItems = JSON.parse(localStorage.getItem('dart_items')) || [];
+        const related = storedItems.filter(item => item.modelId === product.code);
+        if (related.length) {
+            return related.filter(item =>
+                String(item.size) === String(size) &&
+                item.color === color &&
+                (String(item.status).toLowerCase() === 'in stock' ||
+                 (String(item.status).toLowerCase() === 'cart reserved' && item.cartReservationId === window.DartPlatform?.cartReservationId)) &&
+                !item.isArchived && !item.isDeleted
+            ).length;
+        }
+    } catch {}
+    return Number(product?.stock?.[size]?.[color]) || 0;
 }
 
 function getProductTemplate() {
@@ -301,7 +338,7 @@ function renderProductsLogic() {
 
     const productsContainer = document.getElementById('productsContainer');
     if (productsContainer) {
-        const homeProducts = productsData.slice(0, 8);
+        const homeProducts = productsData.filter(item => Number(item.price) > 0 && getProductImages(item).length).slice(0, 8);
         homeProducts.forEach(item => {
             const card = createProductCard(item, productTemplate);
             productsContainer.appendChild(card);
@@ -310,7 +347,7 @@ function renderProductsLogic() {
 
     const bestProductsContainer = document.getElementById('bestProductsContainer');
     if (bestProductsContainer) {
-        const bestProducts = productsData.slice(0, 5);
+        const bestProducts = productsData.filter(item => Number(item.price) > 0 && getProductImages(item).length).slice(0, 5);
         bestProducts.forEach(item => {
             const card = createProductCard(item, productTemplate);
             bestProductsContainer.appendChild(card);
@@ -321,8 +358,9 @@ function renderProductsLogic() {
     const part2Container = document.getElementById('productsPart2');
 
     if (part1Container || part2Container) {
-        const firstPartProducts = productsData.slice(0, 6);
-        const secondPartProducts = productsData.slice(6);
+        const publicProducts = productsData.filter(item => Number(item.price) > 0 && getProductImages(item).length);
+        const firstPartProducts = publicProducts.slice(0, 6);
+        const secondPartProducts = publicProducts.slice(6);
 
         if (part1Container) {
             firstPartProducts.forEach(item => {
@@ -369,9 +407,9 @@ function createProductCard(item, template) {
 
     let totalStock = 0;
     if (item.stock) {
-        Object.values(item.stock).forEach(sizeObj => {
-            Object.values(sizeObj).forEach(qty => {
-                totalStock += qty;
+        Object.entries(item.stock).forEach(([size, sizeObj]) => {
+            Object.keys(sizeObj).forEach(color => {
+                totalStock += getAvailableStock(item, size, color);
             });
         });
     }
@@ -548,7 +586,7 @@ function openProductModal(product) {
                 return;
             }
 
-            const stockQty = product.stock[selectedSize]?.[color] ?? 0;
+            const stockQty = getAvailableStock(product, selectedSize, color);
             if (stockQty <= 0) {
                 showToast("عذراً، هذا اللون غير متوفر للمقاس المختار!");
                 return;
@@ -578,7 +616,7 @@ function updateColorsAvailability(product, size) {
     
     colorBtns.forEach(btn => {
         const color = btn.getAttribute('data-color');
-        const qty = product.stock[size]?.[color] ?? 0;
+        const qty = getAvailableStock(product, size, color);
         
         if (qty <= 0) {
             btn.classList.add('disabled');
@@ -700,7 +738,7 @@ function initModalQtyControl(product) {
             return;
         }
 
-        const maxQty = product.stock[selectedSize]?.[selectedColor] ?? 0;
+        const maxQty = getAvailableStock(product, selectedSize, selectedColor);
         if (modalQuantity >= maxQty) {
             showToast(`عذراً، المتاح بالمخزون ${maxQty} قطعة فقط.`);
             return;
@@ -721,7 +759,7 @@ function updateModalQtyMax(product) {
     if (!decreaseBtn || !increaseBtn || !valueEl) return;
 
     const maxQty = (selectedSize && selectedColor)
-        ? (product.stock[selectedSize]?.[selectedColor] ?? 0)
+        ? getAvailableStock(product, selectedSize, selectedColor)
         : 0;
 
     if (modalQuantity > maxQty && maxQty > 0) {
@@ -801,7 +839,7 @@ function renderCart() {
 
         card.querySelector('.increase').addEventListener('click', () => {
             const product = productsData.find(p => p.id === item.id);
-            const availableStock = product?.stock?.[item.size]?.[item.color] ?? 0;
+            const availableStock = product ? getAvailableStock(product, item.size, item.color) : 0;
 
             if (cartData[index].quantity >= availableStock) {
                 showToast(`عذراً، المتاح بالمخزون ${availableStock} قطع فقط.`);
@@ -835,7 +873,20 @@ function renderCart() {
 }
 
 function saveCartToLocalStorage() {
-    localStorage.setItem('dart_cart', JSON.stringify(cartData));
+    const previous = JSON.parse(localStorage.getItem('dart_cart') || '[]');
+    try {
+        if (window.DartPlatform?.reserveCart) window.DartPlatform.reserveCart(cartData);
+        else localStorage.setItem('dart_cart', JSON.stringify(cartData));
+        if (window.dartAppliedPromotion?.cardId) {
+            const used=Number(window.dartAppliedPromotion.purchasedItems||0),limit=Number(window.dartAppliedPromotion.itemLimit||window.dartAppliedPromotion.purchasedLimit||10),count=cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0);
+            if(count>limit-used){window.dartAppliedPromotion=null;appliedDiscountRate=0;showToast(`تم إلغاء Dart Card: المتبقي في الكارت ${Math.max(0,limit-used)} قطع.`);}
+        }
+        return true;
+    } catch (error) {
+        cartData = previous;
+        showToast(error.message || 'تعذر حجز القطعة. حاول مرة أخرى.');
+        return false;
+    }
 }
 
 function initCartAndCheckoutEvents() {
@@ -848,6 +899,8 @@ function initCartAndCheckoutEvents() {
     const discountBtn = document.getElementById('applyDiscountBtn');
     const discountInput = document.getElementById('discountInput');
 
+    window.DartPlatform?.cleanupCartReservations?.();
+    cartData = JSON.parse(localStorage.getItem('dart_cart') || '[]');
     if (cartView) cartView.style.display = 'block';
 
     renderCart();
@@ -863,7 +916,7 @@ function initCartAndCheckoutEvents() {
                 return;
             }
 
-            const availableStock = activeProduct.stock[selectedSize]?.[selectedColor] ?? 0;
+            const availableStock = getAvailableStock(activeProduct, selectedSize, selectedColor);
             const existingItem = cartData.find(c =>
                 c.id === activeProduct.id && c.size === selectedSize && c.color === selectedColor
             );
@@ -888,7 +941,7 @@ function initCartAndCheckoutEvents() {
                 });
             }
 
-            saveCartToLocalStorage();
+            if (!saveCartToLocalStorage()) { renderCart(); return; }
             showToast("تم إضافة المنتج إلى السلة بنجاح!");
             updateCartCount();
             showCartBanner(activeProduct.title);
@@ -900,15 +953,35 @@ function initCartAndCheckoutEvents() {
     if (discountBtn && discountInput) {
         discountBtn.addEventListener('click', () => {
             const code = discountInput.value.trim().toUpperCase();
-            if (code === "DART10") {
-                appliedDiscountRate = 0.10;
-                showToast("تم تطبيق خصم 10% بنجاح!");
-            } else if (code === "DART20") {
-                appliedDiscountRate = 0.20;
-                showToast("تم تطبيق خصم 20% بنجاح!");
+            let promotion = null;
+            try {
+                const today = new Date();
+                promotion = (JSON.parse(localStorage.getItem('dart_promotions')) || []).find(item =>
+                    String(item.code || '').toUpperCase() === code &&
+                    item.status === 'Active' &&
+                    (!item.startsAt || new Date(item.startsAt) <= today) &&
+                    (!item.endsAt || new Date(item.endsAt) >= today)
+                );
+                if (!promotion && window.DartPlatform) {
+                    const user = window.DartPlatform.currentUser();
+                    promotion = (JSON.parse(localStorage.getItem('dart_cards')) || []).find(card =>
+                        String(card.cardId || '').toUpperCase() === code &&
+                        card.clientId === user?.customerId && card.status === 'Active' &&
+                        Number(card.purchasedItems || 0) < Number(card.itemLimit || card.purchasedLimit || 10) &&
+                        cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0) <= Number(card.itemLimit || card.purchasedLimit || 10)-Number(card.purchasedItems||0) &&
+                        (!card.expDate || (() => { const parts=String(card.expDate).split(/[-/]/).map(Number);const expiry=parts[0]>999?new Date(parts[0],parts[1]-1,parts[2],23,59,59):new Date(parts[2],parts[1]-1,parts[0],23,59,59);return expiry>=today; })())
+                    );
+                    if (promotion) promotion.percent = 40;
+                }
+            } catch {}
+            if (promotion) {
+                window.dartAppliedPromotion = promotion;
+                appliedDiscountRate = Math.min(0.40, Math.max(0, Number(promotion.percent || promotion.discount) / 100));
+                showToast(`تم تطبيق خصم ${Math.round(appliedDiscountRate * 100)}% بنجاح!`);
             } else {
+                window.dartAppliedPromotion = null;
                 appliedDiscountRate = 0;
-                showToast("كود الخصم غير صحيح!");
+                showToast("كود الخصم غير صحيح أو غير متاح لهذا الحساب.");
             }
             updateCartTotals();
         });
@@ -926,8 +999,21 @@ function initCartAndCheckoutEvents() {
     }
 
     if (checkoutForm) {
-        checkoutForm.addEventListener('submit', (e) => {
+        checkoutForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            if (window.DartPlatform?.checkout) {
+                try {
+                    const order = await window.DartPlatform.checkout(checkoutForm);
+                    showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
+                    setTimeout(() => {
+                        window.location.href = `track.html?order=${encodeURIComponent(order.orderId)}`;
+                    }, 700);
+                } catch (error) {
+                    showToast(error.message || "تعذر إنشاء الطلب.");
+                }
+                return;
+            }
 
             // فحص وجود موقع من الخريطة/GPS
             const latVal = document.getElementById('lat-input')?.value.trim();
@@ -970,6 +1056,8 @@ function initAddressMap() {
     const input = document.getElementById('address-input');
     const resultsList = document.getElementById('results-list');
 
+    if (!mapElement || typeof L === 'undefined') return;
+
     // مركز القاهرة والنطاق المسموح به (25,000 متر = القاهرة الكبرى + 5 كم)
     const CAIRO_CENTER = L.latLng(30.0444, 31.2357);
     const MAX_ALLOWED_DISTANCE_METERS = 25000;
@@ -993,8 +1081,6 @@ function initAddressMap() {
             otherAddressDiv.style.display = isHidden ? 'block' : 'none';
         });
     }
-
-    if (!mapElement || typeof L === 'undefined') return;
 
     try {
         if (window.orderMap) window.orderMap.remove();
@@ -1509,19 +1595,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    const enterBtns = document.querySelectorAll('.enter-btn');
-
-    enterBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const form = btn.closest('form');
-            if (form && form.checkValidity()) {
-                e.preventDefault();
-                window.location.href = '/profile.html';
-            }
-        });
-    });
-});
+// Authentication is handled by dart-platform.js and, later, the Express API.
 
 // ==========================================
 // 8. صفحة المندوب (Page REP)

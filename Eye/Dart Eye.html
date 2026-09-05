@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dart Dashboard</title>
+    <meta name="robots" content="noindex,nofollow">
     <link rel="stylesheet" href="dart.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="manifest" href="../manifest.json">
@@ -1308,6 +1309,7 @@
 <div class="modal" id="damage-modal"><div class="modal-content"><span class="close-modal">&times;</span><h3>Damage Record</h3><form id="damage-form"><input type="hidden" id="damage-edit-id"><div class="modal-grid"><div class="form-group"><label>Item Code</label><input id="damage-item-code" required></div><div class="form-group"><label>Reason</label><input id="damage-reason" required></div><div class="form-group"><label>Notes</label><textarea id="damage-notes" rows="3"></textarea></div><div class="form-group"><label>Status</label><select id="damage-status"><option value="Damaged">Damaged</option><option value="Repaired">Repaired</option><option value="Destroyed">Destroyed</option></select></div></div><button class="btn-done" type="submit">DONE</button></form></div></div>
 
     <script src="dart.js"></script>
+    <script src="dart-fixes.js"></script>
 
 <div class="modal" id="image-preview-modal">
   <div class="modal-content dart-image-preview-content">

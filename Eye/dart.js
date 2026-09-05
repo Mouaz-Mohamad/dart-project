@@ -2193,6 +2193,7 @@ function dartApplyTransition(order,target,meta={}){
     if(target==='Delivered'){
         (order.items||[]).forEach(code=>{const it=dartFindItemByCode(code);if(it){it.status='Sold';it.purchaseDate=new Date().toLocaleDateString('en-GB');}});
         if(order.paymentMethod && String(order.paymentMethod).toLowerCase().includes('cash') && order.paymentStatus==='Unpaid'){order.paymentStatus='Paid';order.amountPaid=dartOrderNet(order);order.paidAt=now;}
+        if(order.dartCardId&&!order.dartCardUsageRecorded){const card=cardsData.find(c=>c.cardId===order.dartCardId&&c.status==='Active');if(card){card.purchasedItems=String(Number(card.purchasedItems||0)+Number(order.totalProducts||order.items?.length||0));card.requestedProducts=[...new Set([...(card.requestedProducts||[]),...(order.items||[])])];if(Number(card.purchasedItems)>=Number(card.itemLimit||card.purchasedLimit||10))card.status='Expired';order.dartCardUsageRecorded=true;}}
     }
     if(target==='Refused'){order.refusalReason=meta.reason||'Other';order.refusalNotes=meta.notes||'';dartCreateInspectionReturns(order,order.refusalReason);}
     if(target==='Cancelled'){order.cancelledByRole=meta.actorRole||'Admin';order.cancelledBy=meta.actorId||null;order.cancellationReason=meta.reason||'Cancelled';dartReleaseOrderItems(order,'In stock');}
@@ -2596,10 +2597,12 @@ function renderTopClients(){const feed=document.getElementById('top-clients-feed
 
 function dartEnsureMonthlyDartCardWinners(){
     const now=new Date(),prev=new Date(now.getFullYear(),now.getMonth()-1,1),key=dartMonthKey(prev),marker=`dart_card_awarded_${key}`;if(localStorage.getItem(marker)==='1')return;
-    const candidates=customersData.filter(dartIsActive).map(c=>{const os=dartDeliveredInMonth(c.clientId,prev.getFullYear(),prev.getMonth());return{c,count:os.length,spent:os.reduce((a,o)=>a+Math.max(0,dartOrderNet(o)-(Number(o.amountRefunded)||0)),0)};}).filter(x=>x.count>0).sort((a,b)=>b.count-a.count||b.spent-a.spent);
+    cardsData.forEach(card=>{if(card.status==='Active'){const expiredByItems=Number(card.purchasedItems||0)>=Number(card.itemLimit||card.purchasedLimit||10),expiry=dartDateValue(card.expDate),expiredByDate=expiry&&expiry<now;if(expiredByItems||expiredByDate)card.status='Expired';}});
+    const activeCardClients=new Set(cardsData.filter(card=>card.status==='Active').map(card=>String(card.clientId)));customersData.forEach(customer=>{customer.dartCard=activeCardClients.has(String(customer.clientId))?'yes':'no';});
+    const candidates=customersData.filter(dartIsActive).filter(c=>!activeCardClients.has(String(c.clientId))).map(c=>{const os=dartDeliveredInMonth(c.clientId,prev.getFullYear(),prev.getMonth());return{c,count:os.length,spent:os.reduce((a,o)=>a+Math.max(0,dartOrderNet(o)-(Number(o.amountRefunded)||0)),0)};}).filter(x=>x.count>0).sort((a,b)=>b.count-a.count||b.spent-a.spent);
     if(!candidates.length){localStorage.setItem(marker,'1');return;}
     const maxCount=candidates[0].count,winners=candidates.filter(x=>x.count===maxCount).sort((a,b)=>b.spent-a.spent).slice(0,3);
-    winners.forEach((w,idx)=>{if(!cardsData.some(c=>c.awardMonth===key&&c.clientId===w.c.clientId)){cardsData.push({id:dartUid('CARDDB'),cardId:`DART-${key}-${idx+1}`,clientName:w.c.clientName,clientId:w.c.clientId,phone1:w.c.phone1,phone2:w.c.phone2||'-',email:w.c.email||'',status:'Active',issueDate:new Date(now.getFullYear(),now.getMonth(),1).toLocaleDateString('en-GB'),expDate:new Date(now.getFullYear()+1,now.getMonth(),1).toLocaleDateString('en-GB'),purchasedItems:String(w.count),purchasedLimit:String(w.spent),requestedProducts:[],awardMonth:key,isArchived:false,isDeleted:false,isChecked:false});w.c.dartCard='yes';}});
+    winners.forEach((w,idx)=>{if(!cardsData.some(c=>c.awardMonth===key&&c.clientId===w.c.clientId)){cardsData.push({id:dartUid('CARDDB'),cardId:`DART-${key}-${idx+1}`,clientName:w.c.clientName,clientId:w.c.clientId,phone1:w.c.phone1,phone2:w.c.phone2||'-',email:w.c.email||'',status:'Active',issueDate:new Date(now.getFullYear(),now.getMonth(),1).toLocaleDateString('en-GB'),expDate:new Date(now.getFullYear()+1,now.getMonth(),1).toLocaleDateString('en-GB'),purchasedItems:'0',purchasedLimit:'10',itemLimit:10,discountPercent:40,requestedProducts:[],awardMonth:key,isArchived:false,isDeleted:false,isChecked:false});w.c.dartCard='yes';}});
     localStorage.setItem(marker,'1');
 }
 
