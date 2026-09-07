@@ -1,0 +1,201 @@
+/* 1. Reset & Variables */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  color-scheme: light;
+  /* Colors */
+  --bragnte: #AB012B;
+  --secondary: #2196f3;
+  --bg-dark: #1e1e1e;
+  --white: #ffffff;
+  --bg-alt: #f8f9fa;
+  --text-muted: #5c646c;
+  --border-color: #dee2e6;
+
+  /* Typography */
+  --font-main: 'Readex Pro', 'Montserrat', sans-serif;
+  --font-mono: SFMono-Regular, Consolas, monospace;
+  --font-itim: 'Itim', cursive;
+  --font-cairo: 'Cairo', sans-serif;
+  --font-irish: 'Irish Grover', cursive;
+  --font-cabin: 'Cabin Condensed', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+
+  /* Spacing & Radius */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  /* --spacing-md: 0.75rem; */
+  --spacing-lg: 1rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+}
+
+/* التعديلات دي بتشتغل بس لما المتصفح يفرض Dark Mode */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #ffffff !important; /* إجبار الخلفية تفضل بيضاء */
+  }
+
+  /* لو المتصفح غيّر خلفية العنصر أو كسر الألوان */
+  .search-container,
+  .leaderboard-list,
+  .story,
+  .top {
+    background-color: #ffffff !important;
+    color: var(--bg-dark) !important;
+  }
+
+  /* الحفاظ على ألوان العلامة التجارية الخاصة بـ Dart */
+  .under-nav,
+  .icon-menu,
+  .side-menu {
+    background-color: var(--bragnte) !important;
+  }
+}
+
+/* 2. Global Setup */
+html {
+  font-size: 100%;
+  scroll-behavior: smooth;
+  direction: ltr;
+  forced-color-adjust: none;
+  background-color: #ffffff !important;
+  color: #000000;
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-main);
+  font-weight: 200;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--white);
+  background-color: var(--white);
+  overflow-x: hidden;
+        &::-webkit-scrollbar { display: none; }
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+body.no-scroll {
+  overflow: hidden;
+}
+main{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;   /* بيخفي أي عنصر يخرج بره حدوده ويمنع السكرول */
+  max-width: 100%;
+  background-color: var(--white) !important;
+  padding: 0 10px 0 10px;
+  width: 100%;
+}
+.mother {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+          &::-webkit-scrollbar { display: none; }
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  max-width: 450px;
+  min-height: 100vh;
+  margin: 0 auto;
+  background-color: var(--white);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  display: block;
+  gap: 30px;
+}
+
+.margen2020{
+  margin: 20px 0;
+}
+
+/* 3. Typography & Links */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 500;
+  line-height: 1.2;
+  margin-bottom: var(--spacing-xs);
+  forced-color-adjust: none;
+  -webkit-text-fill-color: initial; 
+}
+
+h1 { font-size: clamp(1.3rem, 1vw, 3rem);}
+h2 { font-size: clamp(1.1rem, .8vw , 2.5rem);}
+h3 { font-size: clamp(1rem, .7vw , 1.85rem);}
+h4 { font-size: clamp(.9rem, .6vw , 1.5rem);}
+h5 { font-size: clamp(.8rem, 0.5vw , 1.25rem);}
+h6 { font-size: clamp(.6rem, 0.3vw , 1rem);}
+
+p { margin-bottom: var(--spacing-md); }
+
+a {
+  color: var(--white);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover { text-decoration: underline; }
+
+/* 4. Media & Forms */
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+input, button, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+input, textarea, select {
+  background: transparent;
+  border: 1px solid var(--bragnte);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) 0.75rem;
+}
+
+button {
+  cursor: pointer;
+  padding: 5px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: var(--bragnte);
+  color: var(--white);
+  transition: background-color var(--transition-fast);
+}
+
+button:hover { background-color: var(--bg-alt);color: var(--bragnte); }
+textarea { resize: vertical; }
+
+/* 5. Utility Classes */
+.flex-center, .dja { display: flex; align-items: center; justify-content: center; }
+.djasb { display: flex; align-items: center; justify-content: space-between; }
+.dja-flexdir { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.grid-center { display: grid; place-items: center; }
+
+.container {
+  width: 100%;
+  max-width: 450px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-md);
+}
+.margin-top{ margin-top: 20px;}
+.pading10 { padding: 20px; }
+.hidden { display: none !important; }
+
+section{
+  background-color: var(--white);
+}
+
+.width100{
+  width: 100%;
+}
