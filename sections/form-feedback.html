@@ -1,0 +1,49 @@
+<section class="feedback-section dja-flexdir" aria-label="Share Your Experience | شارك تجربتك">
+    <h1 class="section-title">&nbsp;Share Your <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Experience</h1>
+
+    <form id="reviewForm" class="form">
+        <div class="form-group">
+            <label for="full-name">Full Name</label>
+            <input type="text" id="review-full-name" name="full_name" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
+        </div>
+
+        <div class="form-row flex-center">
+            <div class="form-group">
+                <label for="review-phone-1">Phone Number</label>
+                <input type="tel" id="review-phone-1" name="phone1" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel" required>
+            </div>
+            <div class="form-group">
+                <label for="review-phone-2">Phone Number 2</label>
+                <input type="tel" id="review-phone-2" name="phone2" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="review-email">Email</label>
+            <input type="email" id="review-email" name="email" placeholder="Value" autocomplete="email" required>
+        </div>
+        
+                <div class="container-select">
+                    <label>Star Rating</label>
+                    <select name="rating" required>
+                        <option value="1">1 Star</option>
+                        <option value="2">2 Stars</option>
+                        <option value="3">3 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="5" selected>5 Stars</option>
+                    </select>
+                </div>
+
+        <div class="form-group">
+            <label for="review-title">Title of the Text</label>
+            <input type="text" id="review-title" name="title" placeholder="Value" required>
+        </div>
+
+        <div class="form-group">
+            <label for="review-text">Review Text</label>
+            <textarea id="review-text" name="review" placeholder="Value" rows="4" required></textarea>
+        </div>
+
+        <button type="submit" class="submit-btn-form">Submit</button>
+    </form>
+</section>

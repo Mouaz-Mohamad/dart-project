@@ -1,0 +1,1773 @@
+/* Dart stability and responsive fixes. Desktop visual identity intentionally unchanged. */
+:focus-visible {
+  outline: 3px solid rgba(171, 1, 43, 0.38);
+  outline-offset: 3px;
+}
+
+button,
+[role="button"],
+.arrwo-for-other-adrees {
+  touch-action: manipulation;
+}
+.arrwo-for-other-adrees {
+  cursor: pointer;
+}
+.form-status {
+  width: 100%;
+  min-height: 1.5rem;
+  margin-top: 0.5rem;
+  text-align: center;
+  color: #1e1e1e;
+}
+.form-status.is-error {
+  color: #a40028;
+}
+.form-status.is-success {
+  color: #167346;
+}
+.field-error {
+  border: 1px solid #a40028 !important;
+}
+.profile-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.profile-edit-input {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-bottom: 1px solid var(--text-muted);
+  background: transparent;
+  color: #1e1e1e;
+  font: inherit;
+}
+.profile-details .edit.cancel-edit {
+  background: #5c646c;
+}
+.empty-state {
+  width: 100%;
+  padding: 24px 12px;
+  text-align: center;
+  color: #5c646c;
+}
+.demo-security-note {
+  font-size: 12px;
+  color: #5c646c;
+  margin-top: 8px;
+}
+.form-box.register form {
+  max-height: 100%;
+  overflow-y: auto;
+  padding-block: 8px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.serial-result {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.52);
+  text-align: center;
+  color: #1e1e1e;
+}
+.serial-result[hidden] {
+  display: none;
+}
+.serial-result-card {
+  position: relative;
+  width: min(92vw, 500px);
+  padding: 22px;
+  border: 1px solid rgba(171, 1, 43, 0.35);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(30, 30, 30, 0.08);
+}
+.serial-result.is-authentic .serial-result-card {
+  border-color: #167346;
+}
+.serial-result.is-missing .serial-result-card {
+  border-color: #ab012b;
+}
+.serial-result-close {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 12px;
+  border: 0;
+  background: transparent;
+  color: #5c646c;
+  font-size: 28px;
+  cursor: pointer;
+}
+.serial-result-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  background: #ab012b;
+  color: #fff;
+  font-size: 22px;
+}
+.serial-result.is-authentic .serial-result-icon {
+  background: #167346;
+}
+.serial-result h2 {
+  margin: 0 0 8px;
+  font-size: clamp(18px, 3vw, 24px);
+}
+.serial-owner {
+  margin-top: 14px;
+  font-size: clamp(17px, 3vw, 22px);
+  font-weight: 700;
+  color: #ab012b;
+}
+.feedback-access-message {
+  width: min(92%, 560px);
+  margin: 20px auto;
+  padding: 32px 20px;
+  border: 1px solid rgba(171, 1, 43, 0.25);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(30, 30, 30, 0.07);
+  text-align: center;
+}
+.feedback-access-message i {
+  color: #ab012b;
+  font-size: 30px;
+  margin-bottom: 12px;
+}
+.feedback-access-message p {
+  margin: 10px 0 22px;
+  color: #5c646c;
+}
+.feedback-access-message .submit-btn-form {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.cart-reservation-timer {
+  width: fit-content;
+  margin: 0 auto 16px;
+  padding: 8px 14px;
+  border: 1px solid rgba(171, 1, 43, 0.25);
+  border-radius: 999px;
+  color: #ab012b;
+  background: #fff;
+  font-weight: 600;
+}
+.profile-records {
+  display: grid;
+  gap: 16px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+.profile-record-card {
+  border: 1px solid rgba(30, 30, 30, 0.16);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(30, 30, 30, 0.06);
+  overflow: hidden;
+}
+.profile-record-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px;
+  border-bottom: 1px solid rgba(30, 30, 30, 0.1);
+}
+.profile-record-head strong {
+  color: #ab012b;
+  font-size: 18px;
+}
+.profile-status {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(171, 1, 43, 0.09);
+  color: #ab012b;
+  font-size: 12px;
+  font-weight: 700;
+}
+.profile-record-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px 18px;
+}
+.profile-record-field {
+  min-width: 0;
+}
+.profile-record-field small {
+  display: block;
+  margin-bottom: 3px;
+  color: #5c646c;
+}
+.profile-record-field span {
+  display: block;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.profile-record-items {
+  margin: 0 18px 18px;
+  border-top: 1px solid rgba(30, 30, 30, 0.1);
+  padding-top: 12px;
+}
+.profile-record-item {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(30, 30, 30, 0.12);
+}
+.profile-record-item:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .form-row {
+    flex-wrap: wrap;
+  }
+  .form-row > * {
+    min-width: min(100%, 260px);
+    flex: 1 1 260px;
+  }
+  .cart-checkout,
+  .account {
+    padding-inline: 12px;
+  }
+  .profile-details,
+  .order-info,
+  .return-info {
+    overflow: auto;
+  }
+  .titel-order-row,
+  .titel-return-row,
+  .order-row {
+    min-width: 720px;
+  }
+  .dart-card-acount {
+    max-width: 100%;
+  }
+  .profile-record-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-record-item {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .product-card {
+    min-width: 0;
+  }
+  .product-title,
+  .product-category,
+  .product-code {
+    overflow-wrap: anywhere;
+  }
+  .model {
+    width: calc(100% - 20px);
+    max-height: 92vh;
+    overflow: auto;
+  }
+  .checkout-summary-box,
+  .totals-calculation,
+  .discount-box,
+  .address-form {
+    width: 100%;
+  }
+  .account .djasb {
+    gap: 10px;
+  }
+  .total-order,
+  .monthly-order {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+  .profile-details {
+    padding: 20px 12px;
+  }
+  .info-profile {
+    margin-top: 14px;
+  }
+  .profile-record-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .profile-record-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 380px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Shared OpenStreetMap address controls */
+.dart-address-status {
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border-inline-start: 3px solid #94a3b8;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+}
+.dart-address-status[data-state="success"] {
+  border-color: #16a34a;
+  color: #166534;
+  background: #f0fdf4;
+}
+.dart-address-status[data-state="error"] {
+  border-color: #dc2626;
+  color: #991b1b;
+  background: #fef2f2;
+}
+.dart-address-status[data-state="warning"] {
+  border-color: #d97706;
+  color: #92400e;
+  background: #fffbeb;
+}
+.dart-address-status[data-state="loading"] {
+  border-color: #2563eb;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+.dart-address-pin {
+  background: transparent;
+  border: 0;
+}
+.dart-address-pin span {
+  display: grid;
+  place-items: center;
+  color: #8c1d2c;
+  font-size: 36px;
+  filter: drop-shadow(0 4px 5px rgba(15, 23, 42, 0.28));
+}
+.dart-map-locate {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.22);
+}
+.dart-locate-address-btn {
+  width: 100%;
+  margin: 8px 0 14px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+  color: #111827;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dart-locate-address-btn:hover {
+  border-color: #8c1d2c;
+  color: #8c1d2c;
+}
+#results-list button,
+.dart-address-results button {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: #fff;
+  text-align: start;
+  cursor: pointer;
+}
+#results-list button:hover,
+.dart-address-results button:hover {
+  background: #f8fafc;
+}
+
+/* Representative account and multi-order delivery portal */
+.dart-rep-page {
+  background: #f5f5f4;
+  color: #111827;
+}
+.dart-rep-main {
+  width: min(1180px, calc(100% - 28px));
+  margin: 0 auto 60px;
+}
+.dart-rep-hero {
+  min-height: 280px;
+  gap: 40px;
+  padding: 32px;
+  margin: 22px 0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+}
+.dart-rep-hero img {
+  width: min(34vw, 280px);
+  height: auto;
+  object-fit: contain;
+}
+.dart-rep-hero > div {
+  flex: 1;
+}
+.dart-rep-hero .section-title-rep {
+  margin: 4px 0 12px;
+  line-height: 0.95;
+}
+.dart-rep-eyebrow {
+  margin: 0 0 8px;
+  color: #8c1d2c;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.dart-rep-auth,
+.dart-rep-dashboard {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+}
+.dart-rep-auth-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 5px;
+  margin-bottom: 24px;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+.dart-rep-auth-tabs button {
+  flex: 1;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dart-rep-auth-tabs button.active {
+  background: #fff;
+  color: #8c1d2c;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.1);
+}
+.dart-rep-auth-form {
+  display: grid;
+  gap: 14px;
+}
+.dart-rep-auth-form > label,
+.dart-rep-form-grid label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dart-rep-auth-form input,
+.dart-rep-auth-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+.dart-rep-auth-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.dart-rep-auth-form input:focus,
+.dart-rep-auth-form textarea:focus {
+  outline: 2px solid rgba(140, 29, 44, 0.18);
+  border-color: #8c1d2c;
+}
+.dart-rep-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.dart-rep-form-grid .dart-rep-wide {
+  grid-column: 1/-1;
+}
+.dart-rep-file {
+  align-content: start;
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+}
+.dart-rep-file img {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.dart-upload-policy {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+}
+.dart-link-button {
+  justify-self: start;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #8c1d2c;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.dart-rep-dashboard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.dart-rep-dashboard-head h2 {
+  margin: 0 0 5px;
+}
+.dart-rep-delivery-map {
+  width: 100%;
+  height: 390px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.dart-rep-map-summary {
+  margin: -22px 16px 20px;
+  position: relative;
+  z-index: 500;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  padding: 10px 15px;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+  font-size: 13px;
+}
+.dart-rep-orders-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.dart-rep-orders-list .rep-driver-card {
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+.dart-rep-orders-list .rep-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.dart-rep-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #e2e8f0;
+  font-size: 12px;
+}
+.dart-rep-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #cbd5e1;
+}
+.dart-rep-order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.dart-rep-order-actions .rep-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 38px;
+  margin: 0;
+  text-align: center;
+}
+.dart-route-pin {
+  background: transparent;
+  border: 0;
+}
+.dart-route-pin span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.3);
+}
+.dart-route-pin .destination {
+  color: #fff;
+  background: #8c1d2c;
+  font-size: 20px;
+}
+.dart-route-pin .courier {
+  color: #fff;
+  background: #111827;
+  font-size: 18px;
+}
+@media (max-width: 800px) {
+  .dart-rep-hero {
+    min-height: auto;
+    align-items: center;
+    padding: 22px;
+    gap: 18px;
+  }
+  .dart-rep-form-grid,
+  .dart-rep-orders-list {
+    grid-template-columns: 1fr;
+  }
+  .dart-rep-delivery-map {
+    height: 310px;
+  }
+  .dart-rep-auth,
+  .dart-rep-dashboard {
+    padding: 18px;
+  }
+}
+@media (max-width: 520px) {
+  .dart-rep-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+  .dart-rep-hero img {
+    width: 150px;
+  }
+  .dart-rep-dashboard-head {
+    flex-direction: column;
+  }
+  .dart-rep-order-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dart-password-change-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.66);
+}
+.dart-password-change-dialog[hidden] {
+  display: none;
+}
+.dart-password-change-dialog form {
+  width: min(430px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 26px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+}
+.dart-password-change-dialog label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dart-password-change-dialog input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.leaderboard-entry {
+  display: grid;
+  grid-template-columns: 34px minmax(120px, 1fr) minmax(180px, 1.5fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+}
+.leaderboard-rank {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #8c1d2c;
+  color: #fff;
+  font-weight: 800;
+}
+.leaderboard-name {
+  font-weight: 800;
+}
+.leaderboard-score {
+  color: #475569;
+  font-size: 13px;
+}
+.leaderboard-entry.is-registered-only .leaderboard-rank {
+  background: #64748b;
+}
+.leaderboard-note {
+  list-style: none;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+}
+@media (max-width: 560px) {
+  .leaderboard-entry {
+    grid-template-columns: 34px 1fr;
+  }
+  .leaderboard-score {
+    grid-column: 2;
+  }
+}
+
+#tracking-map {
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.tracking-map-summary {
+  position: relative;
+  z-index: 500;
+  width: fit-content;
+  max-width: calc(100% - 28px);
+  margin: -20px 14px 14px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 7px 22px rgba(15, 23, 42, 0.25);
+  font-size: 12px;
+}
+.tracking-final-row {
+  padding-top: 10px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.items-box hr {
+  border: 0;
+  border-top: 1px solid #cbd5e1;
+  margin: 8px 0;
+}
+
+/* Product discovery, size chart and consistent loading/empty/error states. */
+.product-filter-panel {
+  width: min(1180px, calc(100% - 28px));
+  margin: 18px auto 8px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+.product-filter-search {
+  position: relative;
+  margin-bottom: 10px;
+}
+.product-filter-search i {
+  position: absolute;
+  inset-inline-start: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+.product-filter-search input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px 10px 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+.product-filter-selects {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.product-filter-selects select,
+.clear-product-filters {
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+.product-filter-selects select {
+  flex: 1 1 150px;
+}
+.clear-product-filters {
+  flex: 0 0 auto;
+  border-color: #8c1d2c;
+  color: #8c1d2c;
+  font-weight: 700;
+  cursor: pointer;
+}
+.product-filter-search input:focus,
+.product-filter-selects select:focus,
+.clear-product-filters:focus-visible {
+  outline: 2px solid rgba(140, 29, 44, 0.28);
+  border-color: #8c1d2c;
+}
+.product-results-count {
+  min-height: 18px;
+  margin: 9px 2px 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.dart-ui-state {
+  width: 100%;
+  min-height: 110px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  text-align: start;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #475569;
+}
+.products-grid > .dart-ui-state,
+.reviews-container > .dart-ui-state,
+.x-scroll-container > .dart-ui-state {
+  grid-column: 1 / -1;
+}
+.dart-ui-state strong {
+  display: block;
+  color: #111827;
+  margin-bottom: 4px;
+}
+.dart-ui-state p {
+  margin: 0;
+  font-size: 13px;
+}
+.dart-ui-state-icon {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #94a3b8;
+  flex: 0 0 auto;
+}
+.dart-ui-state-loading .dart-ui-state-icon {
+  background: transparent;
+  border: 2px solid #cbd5e1;
+  border-top-color: #8c1d2c;
+  animation: dartStateSpin 0.75s linear infinite;
+}
+.dart-ui-state-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+.dart-ui-state-error .dart-ui-state-icon {
+  background: #dc2626;
+}
+.dart-ui-state-warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+.dart-ui-state-warning .dart-ui-state-icon {
+  background: #d97706;
+}
+.dart-ui-state-action {
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 8px;
+  background: #8c1d2c;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+@keyframes dartStateSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dart-product-image-error {
+  width: 100%;
+  min-height: 210px;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  background: #f1f5f9;
+  color: #64748b;
+}
+.dart-product-image-error i {
+  font-size: 30px;
+}
+
+.product-size-chart-actions {
+  margin: 10px 0 6px;
+}
+.product-size-chart-trigger {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #8c1d2c;
+  border-radius: 8px;
+  background: #fff;
+  color: #8c1d2c;
+  font-weight: 700;
+  cursor: pointer;
+}
+.product-option-status {
+  min-height: 20px;
+  margin: 6px 0 10px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+}
+.product-option-status[data-state="error"] {
+  background: #fef2f2;
+  color: #991b1b;
+}
+.product-option-status[data-state="success"] {
+  background: #f0fdf4;
+  color: #166534;
+}
+.product-size-chart-panel[hidden] {
+  display: none !important;
+}
+.product-size-chart-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.66);
+  backdrop-filter: blur(3px);
+}
+.product-size-chart-dialog {
+  position: relative;
+  width: min(820px, 96vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 24px;
+  border-radius: 15px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+.product-size-chart-dialog h3 {
+  margin: 0 38px 18px 0;
+}
+.product-size-chart-close {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #111827;
+  font-size: 24px;
+  cursor: pointer;
+}
+.product-size-chart-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+.product-size-chart-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+}
+.product-size-chart-table th,
+.product-size-chart-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: center;
+  white-space: nowrap;
+}
+.product-size-chart-table th {
+  background: #8c1d2c;
+  color: #fff;
+  font-size: 12px;
+}
+.product-size-chart-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.product-size-chart-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+.product-size-chart-note {
+  margin: 12px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.dart-connectivity-banner {
+  position: fixed;
+  top: 0;
+  inset-inline: 0;
+  z-index: 20000;
+  padding: 10px 16px;
+  transform: translateY(-110%);
+  background: #991b1b;
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+  transition: transform 0.22s ease;
+}
+.dart-connectivity-banner.is-visible {
+  transform: translateY(0);
+}
+.dart-connectivity-banner.is-restored {
+  background: #166534;
+}
+.dart-delivery-zone-note {
+  margin: 8px 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dart-delivery-zone-note i {
+  margin-inline-end: 6px;
+}
+
+@media (max-width: 700px) {
+  .product-filter-panel {
+    width: calc(100% - 18px);
+    padding: 10px;
+  }
+  .product-filter-selects select {
+    flex-basis: calc(50% - 5px);
+    min-width: 0;
+  }
+  .clear-product-filters {
+    flex: 1 1 100%;
+  }
+  .dart-ui-state {
+    text-align: center;
+  }
+  .product-size-chart-dialog {
+    padding: 20px 12px;
+  }
+}
+
+/* ========================================================================== */
+/* DART V6 — requested interface corrections                                  */
+/* ========================================================================== */
+
+/* Products: keep the complete filter working while its panel is collapsed. */
+.product-filter-toggle {
+  width: min(92%, 1100px);
+  min-height: 46px;
+  margin: 18px auto 8px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(171, 1, 43, 0.32);
+  border-radius: 12px;
+  background: #fff;
+  color: #ab012b;
+  font: 700 15px/1.2 inherit;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+}
+.product-filter-toggle span {
+  flex: 1;
+  text-align: start;
+}
+.product-filter-toggle-arrow {
+  transition: transform 0.2s ease;
+}
+.product-filter-toggle[aria-expanded="true"] .product-filter-toggle-arrow {
+  transform: rotate(180deg);
+}
+.product-filter-panel[hidden] {
+  display: none !important;
+}
+.product-filter-panel {
+  margin-top: 8px;
+}
+.product-filter-categories {
+  margin-top: 12px;
+}
+.product-filter-categories > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+.product-filter-panel .filter-container {
+  width: 100%;
+  margin: 0;
+}
+
+/* Size Chart: the page stays fixed; only the measurement viewport scrolls. */
+.product-size-chart-dialog {
+  width: min(900px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#productSizeChartContent {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.product-size-chart-table-wrap {
+  width: 100%;
+  max-height: min(62dvh, 520px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+.product-size-chart-table {
+  min-width: max-content;
+}
+.product-size-chart-table th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.product-size-chart-table th:first-child,
+.product-size-chart-table td:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 2;
+}
+.product-size-chart-table th:first-child {
+  z-index: 4;
+  background: #7f001f;
+}
+.product-size-chart-table td:first-child {
+  background: #fff;
+  font-weight: 800;
+  box-shadow: 1px 0 0 #e5e7eb;
+}
+.product-size-chart-table tbody tr:nth-child(even) td:first-child {
+  background: #f8fafc;
+}
+
+/* Checkout map must be invalidated after its hidden checkout panel opens. */
+#checkoutView #map,
+#checkoutView #map.leaflet-container {
+  width: 100% !important;
+  min-height: 250px;
+  background: #e2e8f0;
+}
+#checkoutView .leaflet-map-pane,
+#checkoutView .leaflet-tile-pane {
+  visibility: visible;
+}
+
+/* Tracking card keeps the original layout and disables only the map surface. */
+.tracking-card {
+  margin: 24px auto 48px;
+}
+.tracking-map-shell {
+  position: relative;
+  width: 100%;
+  min-height: 300px;
+  overflow: hidden;
+  background: #cbd5e1;
+}
+#tracking-map {
+  width: 100%;
+  height: 300px;
+  border-radius: 0;
+  background: #e2e8f0;
+}
+.tracking-map-disabled {
+  position: absolute;
+  inset: 0;
+  z-index: 800;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  text-align: center;
+  font-weight: 800;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+.tracking-map-disabled[hidden] {
+  display: none !important;
+}
+.tracking-map-shell.is-disabled #tracking-map {
+  pointer-events: none;
+}
+.tracking-map-summary {
+  margin: -18px 14px 14px;
+}
+.driver-box [data-representative-empty] {
+  color: #64748b;
+}
+
+/* BEGIN V8 review, return and customer insights controls. */
+.return-accept-btn,
+.return-reject-btn,
+.return-good-btn,
+.return-bad-btn {
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.return-accept-btn,
+.return-good-btn {
+  background: #16834b;
+}
+.return-reject-btn,
+.return-bad-btn {
+  background: #b4233b;
+}
+.top-client-period-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.top-client-period-filters label {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.top-client-period-filters select {
+  min-height: 34px;
+  max-width: 150px;
+  padding: 5px 8px;
+  border: 1px solid #d8c5ca;
+  border-radius: 7px;
+  background: #fff;
+  color: #111827;
+}
+.dart-purchase-trend {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #f1f5f9;
+}
+.dart-purchase-trend.is-up {
+  color: #167447;
+  background: #e8f7ef;
+}
+.dart-purchase-trend.is-down {
+  color: #a71931;
+  background: #fff0f3;
+}
+.dart-purchase-trend.is-flat {
+  color: #475569;
+}
+@media (max-width: 560px) {
+  .top-client-period-filters {
+    width: 100%;
+  }
+  .top-client-period-filters label {
+    flex: 1 1 135px;
+  }
+  .top-client-period-filters select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+/* END V8 review, return and customer insights controls. */
+
+/* Representative authentication mirrors the customer sign-in experience. */
+.dart-rep-page {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: linear-gradient(90deg, #e2e2e2, #c9d6ff);
+  color: #0f172a;
+}
+.dart-rep-main {
+  width: min(1180px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 20px 0 56px;
+}
+.dart-rep-auth-stage {
+  min-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.dart-rep-logo,
+.dart-rep-dashboard-identity img {
+  width: 150px !important;
+  height: 150px !important;
+  object-fit: contain;
+  flex: 0 0 150px;
+}
+.dart-rep-auth-card {
+  width: min(960px, 100%);
+  height: min(680px, calc(100vh - 210px));
+  min-height: 610px;
+  display: grid;
+  grid-template-columns: 40% 60%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.16);
+}
+.dart-rep-auth-switch {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: #ab012b;
+  color: #fff;
+  text-align: center;
+  border-radius: 0 110px 110px 0;
+}
+.dart-rep-switch-panel[hidden],
+.dart-rep-auth-form[hidden],
+.dart-rep-dashboard[hidden],
+.dart-rep-auth-stage[hidden] {
+  display: none !important;
+}
+.dart-rep-switch-panel h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+.dart-rep-switch-panel p {
+  margin: 0 0 18px;
+}
+.dart-rep-switch-panel button {
+  min-width: 150px;
+  min-height: 38px;
+  padding: 8px 16px;
+  border: 2px solid #fff;
+  border-radius: 7px;
+  background: transparent;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dart-rep-auth-forms {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dart-rep-auth-form {
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 34px clamp(22px, 4vw, 48px);
+  text-align: center;
+}
+.dart-rep-auth-form h1 {
+  margin: 0 0 7px;
+  color: #ab012b;
+  font-size: 26px;
+}
+.dart-rep-auth-form > p {
+  margin: 0 0 18px;
+  color: #64748b;
+  font-size: 13px;
+}
+.dart-rep-input-box {
+  position: relative;
+  margin: 12px 0;
+}
+.dart-rep-input-box input,
+.dart-rep-input-box textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 42px 11px 14px;
+  border: 0;
+  border-radius: 7px;
+  outline: 0;
+  background: #eee;
+  color: #334155;
+  font: 500 14px/1.35 inherit;
+}
+.dart-rep-input-box textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+.dart-rep-input-box input:focus,
+.dart-rep-input-box textarea:focus {
+  box-shadow: 0 0 0 2px rgba(171, 1, 43, 0.24);
+}
+.dart-rep-input-box i {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  color: #64748b;
+  font-size: 19px;
+  pointer-events: none;
+}
+.dart-rep-auth-submit {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: #ab012b;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dart-rep-auth-form .dart-link-button {
+  display: block;
+  margin: 0 0 10px auto;
+}
+.dart-rep-registration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px;
+}
+.dart-rep-registration-grid .dart-rep-wide {
+  grid-column: 1/-1;
+}
+.dart-rep-files {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+.dart-rep-file {
+  min-width: 0;
+  padding: 10px;
+  display: grid;
+  gap: 7px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 9px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: start;
+}
+.dart-rep-file input {
+  width: 100%;
+  font-size: 11px;
+}
+.dart-rep-file img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 7px;
+}
+.dart-rep-file img[hidden] {
+  display: none !important;
+}
+.dart-upload-policy {
+  margin: 10px 0 0 !important;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+/* Representative order list: one full-width card per row and no embedded map. */
+.dart-rep-dashboard {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.09);
+}
+.dart-rep-dashboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+.dart-rep-dashboard-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+.dart-rep-dashboard-identity h1 {
+  margin: 0 0 6px;
+}
+.dart-rep-dashboard-identity p {
+  overflow-wrap: anywhere;
+}
+.dart-rep-location-status {
+  margin: 0 0 18px;
+  padding: 10px 13px;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #475569;
+}
+.dart-rep-location-status[data-state="success"] {
+  background: #f0fdf4;
+  color: #166534;
+}
+.dart-rep-location-status[data-state="error"] {
+  background: #fef2f2;
+  color: #991b1b;
+}
+.dart-rep-location-status[data-state="loading"] {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.dart-rep-orders-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dart-rep-orders-list .rep-driver-card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+.dart-rep-orders-list .rep-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+.dart-rep-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #e2e8f0;
+  font-size: 13px;
+}
+.dart-rep-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #cbd5e1;
+}
+.dart-rep-customer-phone {
+  margin: 5px 0;
+  color: #475569;
+}
+.dart-rep-orders-list address {
+  color: #334155;
+  font-style: normal;
+  line-height: 1.6;
+}
+.dart-rep-notes {
+  margin: 9px 0 0;
+  padding: 8px 10px;
+  border-inline-start: 3px solid #ab012b;
+  background: #fff;
+  color: #475569;
+}
+.dart-rep-proximity {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dart-rep-proximity.is-ready {
+  background: #f0fdf4;
+  color: #166534;
+}
+.dart-rep-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.dart-rep-order-actions .rep-btn {
+  width: auto;
+  min-width: 160px;
+  min-height: 42px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1 1 190px;
+}
+
+/* Dashboard representative Action cell must match its w300 title cell. */
+#representative .row-action-btns {
+  width: 300px !important;
+  min-width: 300px !important;
+}
+
+@media (max-width: 700px) {
+  .product-filter-toggle,
+  .product-filter-panel {
+    width: calc(100% - 18px);
+  }
+  .product-size-chart-panel {
+    padding: 8px;
+  }
+  .product-size-chart-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 18px 10px 12px;
+  }
+  .product-size-chart-table-wrap {
+    max-height: 68dvh;
+  }
+  .product-size-chart-table th,
+  .product-size-chart-table td {
+    padding: 10px;
+  }
+
+  .dart-rep-main {
+    width: 100%;
+    padding: 10px 0 36px;
+  }
+  .dart-rep-auth-stage {
+    min-height: 100vh;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .dart-rep-auth-card {
+    width: 100%;
+    height: auto;
+    min-height: calc(100vh - 168px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+  }
+  .dart-rep-auth-switch {
+    order: -1;
+    min-height: 180px;
+    padding: 22px;
+    border-radius: 0 0 18vw 18vw;
+  }
+  .dart-rep-auth-forms {
+    width: 100%;
+    min-height: 430px;
+  }
+  .dart-rep-auth-form {
+    padding: 28px 18px;
+  }
+  .dart-rep-registration-grid,
+  .dart-rep-files {
+    grid-template-columns: 1fr;
+  }
+  .dart-rep-logo {
+    width: 150px !important;
+    height: 150px !important;
+    flex-basis: 150px;
+  }
+  .dart-rep-dashboard {
+    padding: 14px;
+    border-radius: 0;
+  }
+  .dart-rep-dashboard-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .dart-rep-dashboard-identity {
+    align-items: flex-start;
+    gap: 10px;
+    flex-direction: column;
+  }
+  .dart-rep-dashboard-identity h1 {
+    font-size: 21px;
+  }
+  .dart-rep-order-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .dart-rep-order-actions .rep-btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .tracking-card {
+    width: calc(100% - 12px);
+    margin-top: 10px;
+  }
+  .tracking-card .content {
+    padding: 14px 12px;
+  }
+  .tracking-card .step-text {
+    font-size: 9px;
+  }
+  .tracking-card .item-row {
+    gap: 10px;
+  }
+}
+/* BEGIN V7 product color and image feedback */
+#modalBuyBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+#color-image-note {
+  font-size: 13px;
+  color: #744619;
+  background: #fff5df;
+  padding: 8px;
+  border-radius: 8px;
+  white-space: normal;
+}
+#SectionModel .color-btn.active {
+  border: 2px solid #ab012b;
+  box-shadow: 0 0 0 1px #ab012b;
+}
+#SectionModel .size-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+/* END V7 product color and image feedback */
