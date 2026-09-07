@@ -1,4 +1,4 @@
-const CACHE = 'dart-static-v7';
+const CACHE = 'dart-static-v8';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));

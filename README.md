@@ -60,3 +60,14 @@ See `API_CONTRACT.md` for the mandatory Node.js / Express handoff and `IMAGE_DES
 localStorage is not a shared database and must not hold real passwords, National ID images or authoritative orders. Live cross-device tracking requires authenticated server APIs plus WebSocket or Server-Sent Events. Production image files must be stored privately with encrypted storage and short-lived signed URLs.
 
 See `CODE_MAP_V7.md` and `VERIFICATION_REPORT_V7.md` for implementation boundaries and verification.
+
+## V8 corrections
+
+- Contact Us submissions enter the dashboard Review section with source `Contact Us`. Status, rating and title stay `-`; the Review source filter separates contact messages from customer reviews.
+- A customer return starts at `Pending Request`. Admin can Accept or Reject it. Accepted returns move to `Pending Inspection`, where Good restores the item to stock and Damaged moves it to Damage.
+- The tracking map initializes immediately around the saved order destination. It remains behind a 20% black layer until the assigned representative presses Start Delivery for that specific order. The start action records `deliveryStartedAt`; only then can live location and route/ETA appear.
+- Top Clients has mutually exclusive month/year filters. Month defaults to This Month and Year to None. If both become None, the month returns to This Month. Ranking uses delivered order count first and net spending after refunds second.
+- Client age is calculated from birthday in Client rows, Top Clients and Birthday. Client History compares the last complete month with the preceding complete month for order-count and spending trends.
+- Run `node tests/v8-features-browser.js` with Playwright/Chromium for the V8 end-to-end checks.
+
+See `VERIFICATION_REPORT_V8.md` for current verification. Historical reports apply to their named versions.

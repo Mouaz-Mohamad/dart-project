@@ -187,6 +187,10 @@
             <article class="widget-card">
                 <div class="widget-header bday-header">
                     <h3><i class="fa-solid fa-ranking-star"></i> Top Clintes </h3>
+                    <div class="top-client-period-filters" aria-label="Top clients period">
+                        <label>Month <select id="topClientsMonthFilter" aria-label="Top clients month"><option value="current">This Month</option><option value="none">None</option></select></label>
+                        <label>Year <select id="topClientsYearFilter" aria-label="Top clients year"><option value="none">None</option></select></label>
+                    </div>
                 </div>
                 <div class="widget-content overflow" id="top-clients-feed">
 <!-- Filled from saved records; empty on first launch. -->
@@ -442,6 +446,7 @@
                     <h2 class="w150">Total Orders</h2>
                     <h2 class="w300">Total amount</h2>
                     <h2 class="w200">Dart Cart</h2>
+                    <h2 class="w100">Age</h2>
                 </div>
                 <div id="customers-container"></div>
             </div>
@@ -619,7 +624,7 @@
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w200">Action</h2>
+                    <h2 class="w300">Action</h2>
                     <h2 class="w150">ID-return</h2>
                     <h2 class="w150">ID Model</h2>
                     <h2 class="w150">Item Code</h2>
@@ -711,6 +716,14 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
+                <div class="select-box">
+                    <select data-filter-key="source" aria-label="Filter review source">
+                        <option value="all">All Sources</option>
+                        <option value="review">Review</option>
+                        <option value="contact us">Contact Us</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
                 <button class="add-btn" id="openReviewModalBtn">
                     <span>+</span> Add Review
                 </button>
@@ -728,6 +741,7 @@
                     <input class="" type="checkbox">
                     <h2 class="w200">Action</h2>
                     <h2 class="w200">Date & Time</h2>
+                    <h2 class="w150">Source</h2>
                     <h2 class="w200">Client Name</h2>
                     <h2 class="w150">ID Clinte</h2>
                     <h2 class="w150">Status</h2>

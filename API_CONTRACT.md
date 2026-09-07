@@ -190,3 +190,21 @@ Item: unique `itemCode`, model reference, color/size references, status, timesta
 Each physical line stores itemCode, modelCode, name, color, size, qty, originalUnitPrice, discountPercent, discountAmount, finalUnitPrice and costSnapshot. Preserve the order's customer/address/payment/delivery records independently of future profile changes. Model price or discount edits must never rewrite existing snapshots. Editing an existing order retains snapshots for retained items; newly added items use the current server price. Keep an audit trail.
 
 Public availability must come from server stock counts. Transactions and locking must prevent the same item entering two active orders. localStorage events only synchronize same-origin browser tabs and cannot enforce cross-device consistency. Authenticate every admin action on the server; retain prior security requirements in this document. The owner-requested V7 browser reset must not be reused as a production database deletion mechanism.
+
+# V8 service contracts
+
+## Contact and review inbox
+
+`POST /contact-messages` accepts name, phone(s), email and message. The admin inbox response uses a shared record shape with `source: "Contact Us"`, while `status`, `rating` and `title` are null and displayed as `-`. Customer reviews use `source: "Review"`. Contact records must never be published as storefront reviews by changing visibility accidentally. `GET /admin/feedback?source=contact|review` provides server-side filtering and cursor pagination.
+
+## Return state machine
+
+Customer requests begin as `Pending Request`. Admin may transition them to `Rejected` or `Pending Inspection`. Only `Pending Inspection` may become `Good` or `Damaged`. `Good` restores the physical item to `In stock`; `Damaged` creates/updates a Damage record and makes the item unavailable. Apply the return record, inventory movement, refund if approved, audit entry and notification in one database transaction. Existing `amountRefunded` values are subtracted from customer spending reports.
+
+## Per-order delivery activation
+
+Assignment and `Out With Representative` do not activate live tracking. `POST /representative/orders/:id/start` records an immutable start event and `deliveryStartedAt`, then authorizes location writes for that representative and order. Cancelling the active delivery clears its current activation and location. A representative can carry many assigned orders while sharing location only with orders they explicitly started. Tracking always returns the saved destination; courier location and route are returned only after activation. Production must authorize these rules on the server rather than trusting status fields from the browser.
+
+## Customer ranking and trend
+
+Monthly and annual reports include Delivered orders only, count orders first, and use net spending (`finalAmount - amountRefunded`) as the tie-breaker. Month and year parameters are mutually exclusive. Age is derived from birthday at response/display time. Client trend compares the most recent complete calendar month with the complete month immediately before it for both delivered order count and net spending.

@@ -771,6 +771,22 @@ function dartDateValue(v) {
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
 }
+// BEGIN Client age — derived from birthday and today's calendar date.
+function dartClientAge(birthday, today = new Date()) {
+  const born = dartDateValue(birthday);
+  if (!born || born > today) return "-";
+  let age = today.getFullYear() - born.getFullYear();
+  const birthdayPassed =
+    today.getMonth() > born.getMonth() ||
+    (today.getMonth() === born.getMonth() && today.getDate() >= born.getDate());
+  if (!birthdayPassed) age -= 1;
+  return age >= 0 ? age : "-";
+}
+function dartClientAgeLabel(birthday) {
+  const age = dartClientAge(birthday);
+  return age === "-" ? "-" : `${age} years`;
+}
+// END Client age.
 function dartIsArchived(x) {
   return Boolean(x?.isArchived ?? x?.isDeleted);
 }
@@ -1080,6 +1096,8 @@ function dartAssignRepresentative(order, repId) {
   order.representativeBusinessId = rep.repId;
   order.representativeName = rep.name;
   order.representativePhone = rep.phone1 || "";
+  order.deliveryStartedAt = null;
+  order.courierLocation = null;
   return true;
 }
 
@@ -1271,6 +1289,39 @@ function dartInspectReturn(r, condition) {
   dartSaveAll();
   dartRefreshAll();
 }
+
+// BEGIN Return decision — inspection is available only after acceptance.
+function dartDecideReturn(r, decision) {
+  if (!r || r.status !== "Pending Request") return;
+  const old = r.status;
+  const accepted = decision === "accept";
+  r.status = accepted ? "Pending Inspection" : "Rejected";
+  r.updatedAt = dartNowISO();
+  r[accepted ? "acceptedAt" : "rejectedAt"] = r.updatedAt;
+  const item = dartFindItemByCode(r.itemCode);
+  if (accepted && item) item.status = "Return Inspection";
+  dartAudit(
+    accepted ? "RETURN_ACCEPTED" : "RETURN_REJECTED",
+    "returns",
+    r.id,
+    { status: old },
+    { status: r.status },
+  );
+  dartNotify(
+    accepted ? "return_accepted" : "return_rejected",
+    `${r.returnId}: ${r.status}`,
+    accepted
+      ? "Return accepted and waiting for item inspection."
+      : "Return request rejected.",
+    "returns",
+    r.id,
+    accepted ? "info" : "warning",
+  );
+  dartSaveAll();
+  dartRefreshAll();
+}
+// END Return decision.
+
 function renderDamage(dataArray) {
   const c = document.getElementById("damage-container");
   if (!c) return;
@@ -1542,8 +1593,10 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     }
     if (sectionKey === "returns") {
       const r = returnsData.find((x) => String(x.id) === String(id));
+      if (e.target.closest(".return-accept-btn")) dartDecideReturn(r, "accept");
+      if (e.target.closest(".return-reject-btn")) dartDecideReturn(r, "reject");
       if (e.target.closest(".return-good-btn")) dartInspectReturn(r, "Good");
-      if (e.target.closest(".return-bad-btn")) dartInspectReturn(r, "Bad");
+      if (e.target.closest(".return-bad-btn")) dartInspectReturn(r, "Damaged");
     }
     if (sectionKey === "damage") {
       const d = damageData.find((x) => String(x.id) === String(id));
@@ -1869,8 +1922,9 @@ function dartShowClientProfile(c) {
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   document.getElementById("history-modal-title").textContent =
     `Client — ${c.clientName}`;
+  const trend = dartClientPurchaseTrend(c.clientId);
   document.getElementById("history-modal-body").innerHTML =
-    `<div><b>${dartEsc(c.clientId)}</b> · ${dartEsc(c.phone1)} · ${dartEsc(c.email || "-")}</div><p>Orders: <b>${st.orders}</b> · Delivered: <b>${st.delivered}</b> · Items: <b>${st.purchased}</b> · Spent: <b>${dartMoney(st.spent)}</b></p><div class="dart-timeline">${os.map((o) => `<div class="dart-timeline-item"><b>${dartEsc(o.orderId)}</b> — ${dartEsc(o.status)}<div>${(o.items || []).map(dartEsc).join(", ")}</div><small>${dartEsc(o.date || "")} · ${dartMoney(dartOrderNet(o))}</small></div>`).join("") || '<div class="dart-empty-state">No orders</div>'}</div>`;
+    `<div><b>${dartEsc(c.clientId)}</b> · ${dartEsc(c.phone1)} · ${dartEsc(c.email || "-")}</div><p>Orders: <b>${st.orders}</b> · Delivered: <b>${st.delivered}</b> · Items: <b>${st.purchased}</b> · Spent: <b>${dartMoney(st.spent)}</b></p><p class="dart-purchase-trend ${trend.direction}"><b>Purchase trend:</b> Orders ${dartEsc(trend.orders)} · Spending ${dartEsc(trend.spending)} <small>(last complete month vs previous month)</small></p><div class="dart-timeline">${os.map((o) => `<div class="dart-timeline-item"><b>${dartEsc(o.orderId)}</b> — ${dartEsc(o.status)}<div>${(o.items || []).map(dartEsc).join(", ")}</div><small>${dartEsc(o.date || "")} · ${dartMoney(dartOrderNet(o))}</small></div>`).join("") || '<div class="dart-empty-state">No orders</div>'}</div>`;
   openModal(document.getElementById("history-modal"));
 }
 
@@ -2178,6 +2232,67 @@ function dartCurrentMonthlyOrders(clientId) {
   const n = new Date();
   return dartDeliveredInMonth(clientId, n.getFullYear(), n.getMonth()).length;
 }
+
+// BEGIN Monthly purchase direction — compare the last two complete months.
+function dartDeliveredPeriodStats(clientId, start, end) {
+  const rows = ordersData.filter((order) => {
+    const date = new Date(order.deliveredAt || order.createdAt || 0);
+    return (
+      order.status === "Delivered" &&
+      order.clientId === clientId &&
+      !Number.isNaN(date.getTime()) &&
+      date >= start &&
+      date < end
+    );
+  });
+  return {
+    orders: rows.length,
+    spending: rows.reduce(
+      (sum, order) =>
+        sum +
+        Math.max(0, dartOrderNet(order) - (Number(order.amountRefunded) || 0)),
+      0,
+    ),
+  };
+}
+function dartTrendValue(current, previous) {
+  const percent = previous
+    ? Math.round(((current - previous) / previous) * 100)
+    : current
+      ? 100
+      : 0;
+  const arrow = percent > 0 ? "↑" : percent < 0 ? "↓" : "→";
+  return `${arrow} ${Math.abs(percent)}%`;
+}
+function dartClientPurchaseTrend(clientId) {
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+  const last = dartDeliveredPeriodStats(
+    clientId,
+    lastMonthStart,
+    currentMonthStart,
+  );
+  const previous = dartDeliveredPeriodStats(
+    clientId,
+    previousMonthStart,
+    lastMonthStart,
+  );
+  const orderChange = last.orders - previous.orders;
+  const spendingChange = last.spending - previous.spending;
+  return {
+    orders: dartTrendValue(last.orders, previous.orders),
+    spending: dartTrendValue(last.spending, previous.spending),
+    direction:
+      orderChange > 0 || (orderChange === 0 && spendingChange > 0)
+        ? "is-up"
+        : orderChange < 0 || spendingChange < 0
+          ? "is-down"
+          : "is-flat",
+  };
+}
+// END Monthly purchase direction.
 function renderCustomers(dataArray) {
   const c = document.getElementById("customers-container");
   if (!c) return;
@@ -2187,7 +2302,7 @@ function renderCustomers(dataArray) {
       monthly = dartCurrentMonthlyOrders(x.clientId);
     c.insertAdjacentHTML(
       "beforeend",
-      `<div class="${getRowClass(x)}" data-id="${dartEsc(x.id)}"><input type="checkbox" class="model-checkbox" ${x.isChecked ? "checked" : ""} ${dartIsArchived(x) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(x) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-client-profile="1" title="Client history"><i class="bx bx-history"></i></button><button class="dart-reset-password-btn" title="Reset Password"><i class="bx bx-key"></i></button></div><span class="text-item w150">${dartEsc(x.birthday || "-")}</span><span class="text-item w150">${dartEsc(x.clientName)}</span><span class="text-item w150">${dartEsc(x.clientId)}</span><span class="text-item w150">${dartEsc(x.phone1)}</span><span class="text-item w150">${dartEsc(x.phone2 || "-")}</span><span class="text-item w200">${dartEsc(x.email || "-")}</span><span class="text-item w150">${dartEsc(x.country || "Egypt")}</span><span class="text-item w200">${dartEsc(x.governorate || "-")}</span><span class="text-item w150">${monthly}</span><span class="text-item w150">${st.delivered}</span><span class="text-item w300">${dartMoney(st.spent)}<small class="dart-kpi-inline">${st.purchased} items · last ${dartEsc(st.lastPurchase)}</small></span><span class="text-item w200">${dartEsc(x.dartCard || "no")}</span></div>`,
+      `<div class="${getRowClass(x)}" data-id="${dartEsc(x.id)}"><input type="checkbox" class="model-checkbox" ${x.isChecked ? "checked" : ""} ${dartIsArchived(x) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(x) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-client-profile="1" title="Client history"><i class="bx bx-history"></i></button><button class="dart-reset-password-btn" title="Reset Password"><i class="bx bx-key"></i></button></div><span class="text-item w150">${dartEsc(x.birthday || "-")}</span><span class="text-item w150">${dartEsc(x.clientName)}</span><span class="text-item w150">${dartEsc(x.clientId)}</span><span class="text-item w150">${dartEsc(x.phone1)}</span><span class="text-item w150">${dartEsc(x.phone2 || "-")}</span><span class="text-item w200">${dartEsc(x.email || "-")}</span><span class="text-item w150">${dartEsc(x.country || "Egypt")}</span><span class="text-item w200">${dartEsc(x.governorate || "-")}</span><span class="text-item w150">${monthly}</span><span class="text-item w150">${st.delivered}</span><span class="text-item w300">${dartMoney(st.spent)}<small class="dart-kpi-inline">${st.purchased} items · last ${dartEsc(st.lastPurchase)}</small></span><span class="text-item w200">${dartEsc(x.dartCard || "no")}</span><span class="text-item w100">${dartEsc(dartClientAge(x.birthday))}</span></div>`,
     );
   });
 }
@@ -2327,7 +2442,7 @@ function renderReturns(dataArray) {
     .forEach((r) =>
       c.insertAdjacentHTML(
         "beforeend",
-        `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""} ${dartIsArchived(r) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>${r.status === "Pending Inspection" ? '<button class="return-good-btn">Good</button><button class="return-bad-btn">Bad</button>' : ""}</div><span class="text-item w150">${dartEsc(r.returnId)}</span><span class="text-item w150">${dartEsc(r.modelId || "-")}</span><span class="text-item w150">${dartEsc(r.itemCode)}</span><span class="text-item w150"><span class="return-status ${String(r.status).toLowerCase() === "good" ? "return-status-good" : ""}">${dartEsc(r.status)}</span></span><span class="text-item w150">${dartEsc(r.date || "-")}</span><span class="text-item w200">${dartEsc(r.clientName || "-")}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150">${dartEsc(r.phone1 || "-")}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w150">${dartEsc(r.email || "-")}</span><span class="text-item w300 overflow">${dartEsc(r.reason || "-")}</span><span class="text-item w150">${dartEsc(r.orderId || "-")}</span></div>`,
+        `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""} ${dartIsArchived(r) ? "disabled" : ""}><div class="w300 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>${r.status === "Pending Request" ? '<button class="return-accept-btn">Accept</button><button class="return-reject-btn">Reject</button>' : ""}${r.status === "Pending Inspection" ? '<button class="return-good-btn">Good</button><button class="return-bad-btn">Damaged</button>' : ""}</div><span class="text-item w150">${dartEsc(r.returnId)}</span><span class="text-item w150">${dartEsc(r.modelId || "-")}</span><span class="text-item w150">${dartEsc(r.itemCode)}</span><span class="text-item w150"><span class="return-status ${String(r.status).toLowerCase() === "good" ? "return-status-good" : ""}">${dartEsc(r.status)}</span></span><span class="text-item w150">${dartEsc(r.date || "-")}</span><span class="text-item w200">${dartEsc(r.clientName || "-")}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150">${dartEsc(r.phone1 || "-")}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w150">${dartEsc(r.email || "-")}</span><span class="text-item w300 overflow">${dartEsc(r.reason || "-")}</span><span class="text-item w150">${dartEsc(r.orderId || "-")}</span></div>`,
       ),
     );
 }
@@ -2340,9 +2455,15 @@ function renderReviews(dataArray) {
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
     .forEach((r) => {
       const active = r.status === "Active";
+      const source =
+        r.source || (r.recordType === "contact" ? "Contact Us" : "Review");
+      const isContact = source === "Contact Us";
+      const visibilityButton = isContact
+        ? ""
+        : `<button class="btn-toggle-review review-toggle-btn ${active ? "review-status-active" : "review-status-hidden"}">${active ? "Hide" : "Activate"}</button>`;
       c.insertAdjacentHTML(
         "beforeend",
-        `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="btn-toggle-review review-toggle-btn ${active ? "review-status-active" : "review-status-hidden"}">${active ? "Hide" : "Activate"}</button></div><span class="text-item w200">${dartEsc(new Date(r.createdAt).toLocaleString())}</span><span class="text-item w200">${dartEsc(r.clientName)}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150 status-text" style="color:${active ? "green" : "red"}">${dartEsc(r.status)}</span><span class="text-item w100">${dartEsc(r.rating)} / 5</span><span class="text-item w300">${dartEsc(r.title)}</span><span class="text-item w500 overflow">${dartEsc(r.review)}</span><span class="text-item w150">${dartEsc(r.phone1)}</span><span class="text-item w150">${dartEsc(r.phone2)}</span><span class="text-item w150">${dartEsc(r.email)}</span></div>`,
+        `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>${visibilityButton}</div><span class="text-item w200">${dartEsc(new Date(r.createdAt).toLocaleString())}</span><span class="text-item w150">${dartEsc(source)}</span><span class="text-item w200">${dartEsc(r.clientName || "-")}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150 status-text" style="color:${isContact ? "#64748b" : active ? "green" : "red"}">${dartEsc(r.status || "-")}</span><span class="text-item w100">${isContact ? "-" : `${dartEsc(r.rating || "-")} / 5`}</span><span class="text-item w300">${dartEsc(r.title || "-")}</span><span class="text-item w500 overflow">${dartEsc(r.review || "-")}</span><span class="text-item w150">${dartEsc(r.phone1 || "-")}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w150">${dartEsc(r.email || "-")}</span></div>`,
       );
     });
 }
@@ -2516,6 +2637,14 @@ function dartApplyFilters(key, data) {
       out.sort(
         (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
       );
+    if (state.source && state.source !== "all")
+      out = out.filter((r) =>
+        String(
+          r.source || (r.recordType === "contact" ? "Contact Us" : "Review"),
+        )
+          .toLowerCase()
+          .includes(state.source.toLowerCase()),
+      );
   }
   if (key === "representative") {
     if (state.status && state.status !== "all")
@@ -2630,7 +2759,7 @@ function renderBirthdayWidget() {
     rows
       .map(
         (c) =>
-          `<div class="bday-item overflow" data-client-id="${dartEsc(c.id)}"><input type="checkbox" class="bday-checkbox"><span class="bday-date w100">${dartEsc(c.birthday)}</span><span class="bday-name w150">${dartEsc(c.clientName)}</span><span class="bday-phone w100">${dartEsc(c.phone1)}</span><span class="orders w100">${dartCurrentMonthlyOrders(c.clientId)} Order</span><span class="from w100">${dartEsc(c.governorate || c.country || "-")}</span></div>`,
+          `<div class="bday-item overflow" data-client-id="${dartEsc(c.id)}"><input type="checkbox" class="bday-checkbox"><span class="bday-date w100">${dartEsc(c.birthday)}</span><span class="bday-name w150">${dartEsc(c.clientName)}</span><span class="bday-age w100">${dartEsc(dartClientAgeLabel(c.birthday))}</span><span class="bday-phone w100">${dartEsc(c.phone1)}</span><span class="orders w100">${dartCurrentMonthlyOrders(c.clientId)} Order</span><span class="from w100">${dartEsc(c.governorate || c.country || "-")}</span></div>`,
       )
       .join("") || '<div class="dart-empty-state">No birthdays tomorrow</div>';
   const master = document.getElementById("selectAllBirthdays");
@@ -2649,18 +2778,141 @@ function renderBirthdayWidget() {
 function renderTopClients() {
   const feed = document.getElementById("top-clients-feed");
   if (!feed) return;
+
+  // BEGIN Exclusive month/year filters. Both None falls back to This Month.
+  const monthFilter = document.getElementById("topClientsMonthFilter");
+  const yearFilter = document.getElementById("topClientsYearFilter");
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const deliveredDates = ordersData
+    .filter((order) => order.status === "Delivered")
+    .map((order) => new Date(order.deliveredAt || order.createdAt || 0))
+    .filter((date) => !Number.isNaN(date.getTime()));
+  const registeredDates = customersData
+    .map((customer) => new Date(customer.registeredAt || 0))
+    .filter(
+      (date) => !Number.isNaN(date.getTime()) && date.getFullYear() > 2000,
+    );
+  const firstBusinessDate =
+    [...deliveredDates, ...registeredDates].sort((a, b) => a - b)[0] || now;
+  const monthKeys = [];
+  for (
+    let cursor = new Date(
+      firstBusinessDate.getFullYear(),
+      firstBusinessDate.getMonth(),
+      1,
+    );
+    cursor <= new Date(now.getFullYear(), now.getMonth(), 1);
+    cursor.setMonth(cursor.getMonth() + 1)
+  )
+    monthKeys.unshift(
+      `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`,
+    );
+  const years = Array.from(
+    { length: now.getFullYear() - firstBusinessDate.getFullYear() + 1 },
+    (_, index) => now.getFullYear() - index,
+  );
+
+  if (monthFilter && !monthFilter.dataset.optionsReady) {
+    monthFilter.dataset.optionsReady = "1";
+  }
+  if (monthFilter) {
+    const previous = monthFilter.value || "current";
+    monthFilter.innerHTML =
+      '<option value="current">This Month</option><option value="none">None</option>' +
+      monthKeys
+        .filter((key) => key !== currentMonth)
+        .map((key) => {
+          const [year, month] = key.split("-").map(Number);
+          const label = new Intl.DateTimeFormat("en", {
+            month: "long",
+            year: "numeric",
+          }).format(new Date(year, month - 1, 1));
+          return `<option value="${key}">${dartEsc(label)}</option>`;
+        })
+        .join("");
+    monthFilter.value = [...monthFilter.options].some(
+      (option) => option.value === previous,
+    )
+      ? previous
+      : "current";
+  }
+  if (yearFilter) {
+    const previous = yearFilter.value || "none";
+    yearFilter.innerHTML =
+      '<option value="none">None</option>' +
+      years.map((year) => `<option value="${year}">${year}</option>`).join("");
+    yearFilter.value = [...yearFilter.options].some(
+      (option) => option.value === previous,
+    )
+      ? previous
+      : "none";
+  }
+  if (monthFilter && yearFilter && !monthFilter.dataset.dartBound) {
+    monthFilter.dataset.dartBound = "1";
+    yearFilter.dataset.dartBound = "1";
+    monthFilter.addEventListener("change", () => {
+      if (monthFilter.value !== "none") yearFilter.value = "none";
+      if (monthFilter.value === "none" && yearFilter.value === "none")
+        monthFilter.value = "current";
+      renderTopClients();
+    });
+    yearFilter.addEventListener("change", () => {
+      if (yearFilter.value !== "none") monthFilter.value = "none";
+      if (yearFilter.value === "none" && monthFilter.value === "none")
+        monthFilter.value = "current";
+      renderTopClients();
+    });
+  }
+  const selectedYear = yearFilter?.value || "none";
+  const selectedMonth =
+    monthFilter?.value === "current"
+      ? currentMonth
+      : monthFilter?.value || "current";
+  // END Exclusive period filters.
+
   const rows = customersData
     .filter(dartIsActive)
-    .map((c) => ({ c, s: dartCustomerStats(c.clientId) }))
+    .map((c) => {
+      const eligible = ordersData.filter((order) => {
+        if (order.status !== "Delivered" || order.clientId !== c.clientId)
+          return false;
+        const date = new Date(order.deliveredAt || order.createdAt || 0);
+        if (Number.isNaN(date.getTime())) return false;
+        if (selectedYear !== "none")
+          return date.getFullYear() === Number(selectedYear);
+        return (
+          `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` ===
+          selectedMonth
+        );
+      });
+      return {
+        c,
+        s: {
+          delivered: eligible.length,
+          spent: eligible.reduce(
+            (sum, order) =>
+              sum +
+              Math.max(
+                0,
+                dartOrderNet(order) - (Number(order.amountRefunded) || 0),
+              ),
+            0,
+          ),
+        },
+      };
+    })
+    .filter(({ s }) => s.delivered > 0)
     .sort((a, b) => b.s.delivered - a.s.delivered || b.s.spent - a.s.spent)
     .slice(0, 100);
   feed.innerHTML =
     rows
       .map(
         ({ c, s }, i) =>
-          `<div class="bday-item overflow"><span class="bday-num">${i + 1})</span><span class="bday-date w100">${dartEsc(c.birthday || "-")}</span><span class="bday-name w150">${dartEsc(c.clientName)}</span><span class="bday-id w100">${dartEsc(c.clientId)}</span><span class="bday-phone w100">${dartEsc(c.phone1)}</span><span class="bday-orders w100">${s.delivered} Order</span><span class="bday-amount w150">${dartMoney(s.spent)}</span><span class="bday-from w100">${dartEsc(c.governorate || c.country || "-")}</span></div>`,
+          `<div class="bday-item overflow"><span class="bday-num">${i + 1})</span><span class="bday-date w100">${dartEsc(c.birthday || "-")}</span><span class="bday-age w100">${dartEsc(dartClientAgeLabel(c.birthday))}</span><span class="bday-name w150">${dartEsc(c.clientName)}</span><span class="bday-id w100">${dartEsc(c.clientId)}</span><span class="bday-phone w100">${dartEsc(c.phone1)}</span><span class="bday-orders w100">${s.delivered} Order</span><span class="bday-amount w150">${dartMoney(s.spent)}</span><span class="bday-from w100">${dartEsc(c.governorate || c.country || "-")}</span></div>`,
       )
-      .join("") || '<div class="dart-empty-state">No clients yet</div>';
+      .join("") ||
+    '<div class="dart-empty-state">No delivered orders in this period</div>';
 }
 
 function dartEnsureMonthlyDartCardWinners() {
@@ -3573,7 +3825,7 @@ function setupSearchFilter() {
         customers: ["monthlyOrders", "dartCard", "birthday"],
         orders: ["date", "status", "totalPrice"],
         returns: ["reason", "status"],
-        review: ["rating", "status"],
+        review: ["rating", "status", "source"],
         representative: ["status"],
         card: ["status"],
         damage: ["status", "archive"],
