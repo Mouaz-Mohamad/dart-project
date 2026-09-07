@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Representative Portal | Dart</title>
+  <meta name="description" content="Secure Dart representative portal for assigned deliveries.">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/png" href="Photos/logo-1to1.png">
+  <link rel="stylesheet" href="CSS/Stayle 1.css">
+  <link rel="stylesheet" href="CSS/base.css">
+  <link rel="stylesheet" href="CSS/fixes.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#ab012b">
+</head>
+<body class="dart-rep-page">
+  <main class="dart-rep-main">
+    <section id="repAuthView" class="dart-rep-auth-stage" aria-labelledby="repAuthTitle">
+      <img class="dart-rep-logo" src="Photos/dart_logo.png" alt="Dart" width="150" height="150">
+
+      <div id="repAuthCard" class="dart-rep-auth-card">
+        <div class="dart-rep-auth-forms">
+          <form id="repLoginForm" class="dart-rep-auth-form" novalidate>
+            <h1 id="repAuthTitle">Representative Login</h1>
+            <p>Use your phone, email, Rep ID or National ID.</p>
+            <div class="dart-rep-input-box">
+              <input name="identifier" type="text" autocomplete="username" placeholder="Phone, email, Rep ID or National ID" required>
+              <i class="bx bxs-user" aria-hidden="true"></i>
+            </div>
+            <div class="dart-rep-input-box">
+              <input name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Password" required>
+              <i class="bx bxs-lock-alt" aria-hidden="true"></i>
+            </div>
+            <button type="button" class="dart-link-button" id="repForgotPassword">Forgot password?</button>
+            <button type="submit" class="dart-rep-auth-submit">Login</button>
+            <p class="form-status" role="status" aria-live="polite"></p>
+          </form>
+
+          <form id="repRegisterForm" class="dart-rep-auth-form dart-rep-register-form" hidden novalidate>
+            <h1>Create Account</h1>
+            <p>Your account opens after approval from the Dart dashboard.</p>
+            <div class="dart-rep-registration-grid">
+              <div class="dart-rep-input-box"><input name="name" type="text" autocomplete="name" minlength="3" placeholder="Full name" required><i class="bx bxs-user" aria-hidden="true"></i></div>
+              <div class="dart-rep-input-box"><input name="nationalId" type="text" inputmode="numeric" pattern="\d{14}" maxlength="14" placeholder="National ID — 14 digits" required><i class="bx bxs-id-card" aria-hidden="true"></i></div>
+              <div class="dart-rep-input-box"><input name="email" type="email" autocomplete="email" placeholder="Email" required><i class="bx bxs-envelope" aria-hidden="true"></i></div>
+              <div class="dart-rep-input-box"><input name="phone1" type="tel" autocomplete="tel" inputmode="tel" placeholder="Primary phone" required><i class="bx bxs-phone" aria-hidden="true"></i></div>
+              <div class="dart-rep-input-box"><input name="phone2" type="tel" inputmode="tel" placeholder="Second phone (optional)"><i class="bx bxs-phone" aria-hidden="true"></i></div>
+              <div class="dart-rep-input-box dart-rep-wide"><textarea name="address" rows="2" autocomplete="street-address" placeholder="Full address written on the ID" required></textarea><i class="bx bxs-map" aria-hidden="true"></i></div>
+              <div class="dart-rep-input-box"><input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Password (8+ characters)" required><i class="bx bxs-lock-alt" aria-hidden="true"></i></div>
+              <div class="dart-rep-input-box"><input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Confirm password" required><i class="bx bxs-lock-alt" aria-hidden="true"></i></div>
+            </div>
+
+            <div class="dart-rep-files">
+              <label class="dart-rep-file">National ID — front<input name="idFront" type="file" accept="image/jpeg,image/png,image/webp" required><img data-preview="idFront" alt="Preview of national ID front" hidden></label>
+              <label class="dart-rep-file">National ID — back<input name="idBack" type="file" accept="image/jpeg,image/png,image/webp" required><img data-preview="idBack" alt="Preview of national ID back" hidden></label>
+              <label class="dart-rep-file">Face verification photo<input name="face" type="file" accept="image/jpeg,image/png,image/webp" required><img data-preview="face" alt="Preview of representative face" hidden></label>
+            </div>
+            <p class="dart-upload-policy">JPG, PNG or WebP only. Maximum 5 MB per image.</p>
+            <button type="submit" class="dart-rep-auth-submit">Submit for approval</button>
+            <p class="form-status" role="status" aria-live="polite"></p>
+          </form>
+
+          <form id="repChangePasswordForm" class="dart-rep-auth-form" hidden novalidate>
+            <h1>Replace Temporary Password</h1>
+            <p>Create your private password before opening assigned orders.</p>
+            <div class="dart-rep-input-box"><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="New password" required><i class="bx bxs-lock-alt" aria-hidden="true"></i></div>
+            <div class="dart-rep-input-box"><input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Confirm new password" required><i class="bx bxs-lock-alt" aria-hidden="true"></i></div>
+            <button type="submit" class="dart-rep-auth-submit">Save new password</button>
+            <p class="form-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+
+        <aside class="dart-rep-auth-switch" aria-label="Choose account action">
+          <div id="repRegisterPrompt" class="dart-rep-switch-panel">
+            <h2>Hello, Welcome!</h2>
+            <p>Don't have a representative account?</p>
+            <button type="button" id="repRegisterTab">Create account</button>
+          </div>
+          <div id="repLoginPrompt" class="dart-rep-switch-panel" hidden>
+            <h2>Welcome Back!</h2>
+            <p>Already have an approved account?</p>
+            <button type="button" id="repLoginTab">Login</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="repDashboardView" class="dart-rep-dashboard" hidden aria-labelledby="repDashboardTitle">
+      <header class="dart-rep-dashboard-head">
+        <div class="dart-rep-dashboard-identity">
+          <img src="Photos/dart_logo.png" alt="Dart" width="150" height="150">
+          <div>
+            <p class="dart-rep-eyebrow">ACTIVE REPRESENTATIVE</p>
+            <h1 id="repDashboardTitle">Assigned deliveries</h1>
+            <p id="repIdentity">Loading account…</p>
+          </div>
+        </div>
+        <button type="button" id="repLogout" class="rep-btn rep-btn-cancel">Log out</button>
+      </header>
+      <p id="repLocationStatus" class="dart-rep-location-status" role="status" aria-live="polite">Location sharing starts only after you start a delivery.</p>
+      <div id="repOrdersList" class="dart-rep-orders-list"></div>
+    </section>
+  </main>
+
+  <footer id="footer" aria-label="Footer"></footer>
+  <script src="Js/dart-catalog.js"></script>
+    <script src="Js/one .js"></script>
+    <script src="Js/dart-storefront.js"></script>
+  <script src="Js/dart-platform.js"></script>
+  <script src="Js/dart-rep.js"></script>
+</body>
+</html>

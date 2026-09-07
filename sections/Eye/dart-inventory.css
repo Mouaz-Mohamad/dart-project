@@ -1,0 +1,269 @@
+/* BEGIN Inventory layout — keeps the original dashboard identity and row widths. */
+[hidden] {
+  display: none !important;
+}
+#items .cont-titel {
+  max-height: 72vh;
+  overflow: auto;
+  position: relative;
+}
+#items .title-name {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  min-width: max-content;
+}
+#items .groups .title-name,
+#items .group-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  min-width: max-content;
+}
+#items .group-row {
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+#items .group-row:hover,
+#items .group-row:focus {
+  background: #fff3f6;
+  outline: 2px solid #ab012b;
+  outline-offset: -2px;
+}
+#items .groups .w150 {
+  width: 150px;
+  min-width: 150px;
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+#items .product-img {
+  width: 54px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.inventory-view-buttons {
+  display: flex;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+.inventory-view-buttons button,
+.group-heading button,
+.inventory-load-more {
+  background: white;
+  color: #ab012b;
+  border: 1px solid #ab012b;
+  border-radius: 8px;
+  padding: 9px 15px;
+  cursor: pointer;
+}
+.inventory-view-buttons button.active {
+  background: #ab012b;
+  color: #fff;
+}
+#items .second {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#items .second .delete-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.group-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: #fff;
+  position: sticky;
+  left: 0;
+  white-space: normal;
+}
+.stock-badge {
+  border-radius: 20px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+.stock-badge.empty {
+  color: #a40925;
+  background: #ffe6ed;
+}
+.stock-badge.low {
+  color: #8b4a00;
+  background: #fff0d8;
+}
+.stock-badge.normal {
+  color: #126440;
+  background: #e6f4ed;
+}
+/* END Inventory layout */
+/* BEGIN Model options editor — single column on phones, shared color images. */
+#model-modal .modal-content {
+  max-height: 90dvh;
+  overflow: auto;
+  width: min(850px, 94vw);
+  box-sizing: border-box;
+}
+#model-modal .modal-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+#model-modal .modal-col {
+  width: 100%;
+  min-width: 0;
+}
+#model-modal input,
+#model-modal select,
+#model-modal textarea,
+#item-add-modal input,
+#item-add-modal select {
+  box-sizing: border-box;
+  max-width: 100%;
+  width: 100%;
+}
+.option-entry {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.option-entry input {
+  min-width: 0;
+  flex: 1;
+}
+.option-entry button,
+.option-tag button,
+.color-editor button {
+  border: 1px solid #ab012b;
+  border-radius: 6px;
+  background: #fff;
+  color: #ab012b;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.option-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.option-tag {
+  background: #f7f3f4;
+  border-radius: 8px;
+  padding: 5px 9px;
+}
+.color-editor {
+  border: 1px solid #e4d8dc;
+  border-radius: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+.color-editor-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.color-images {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-top: 10px;
+}
+.color-images figure {
+  margin: 0;
+  flex: 0 0 105px;
+}
+.color-images img {
+  width: 105px;
+  height: 125px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.color-images figcaption {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.color-images button {
+  font-size: 11px;
+  padding: 4px;
+}
+.archived-option {
+  opacity: 0.55;
+}
+.archived-option strong {
+  text-decoration: line-through;
+}
+#catalog-form-status {
+  font-size: 13px;
+  color: #ab012b;
+  white-space: normal;
+}
+.inventory-load-more {
+  margin: 16px;
+}
+.dart-empty-state {
+  padding: 22px;
+  color: #666;
+}
+/* END Model options editor */
+/* BEGIN Header contrast and responsive column alignment */
+#items .title-name {
+  background: #ab012b;
+  color: white;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+}
+#items .title-name h2 {
+  color: white;
+}
+#items .group-row {
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid #ab012b;
+}
+#items .row-action-btns {
+  gap: 6px;
+}
+#items .groups .title-name h2 {
+  font-size: 14px;
+}
+@media (max-width: 767px) {
+  #items .groups .w150 {
+    width: 110px !important;
+    min-width: 110px;
+  }
+  .inventory-view-buttons button {
+    padding: 8px 11px;
+  }
+  #items .second {
+    flex-wrap: wrap;
+  }
+  #items .cont-titel {
+    height: auto;
+    min-height: 200px;
+    max-height: 65dvh;
+  }
+  #model-modal .modal-content,
+  #item-add-modal .modal-content {
+    padding: 18px;
+    max-height: 88dvh;
+    overflow: auto;
+  }
+}
+/* END Header contrast */
+
+/* BEGIN Shared group grid: header and rows use identical spacing. */
+#items .groups .title-name,
+#items .group-row {
+  gap: 12px !important;
+  padding: 12px 16px !important;
+}
+/* END Shared group grid */

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="color-scheme" content="light">
+
+    <!-- SEO الأساسي -->
+    <title>منتجات Dart | ملابس رجالية عصرية</title>
+    <meta name="description" content="اكتشف منتجات Dart من الملابس الرجالية العصرية، واختر المقاس واللون المتاح قبل إضافته إلى السلة.">
+    <meta name="keywords" content="Dart, ملابس, أزياء, موضة, متجر ملابس, هوديز, Dart Brand">
+    <meta name="author" content="Dart">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://dart-project-psi.vercel.app/products.html">
+
+    <!-- Open Graph / Facebook & WhatsApp -->
+    <meta property="og:site_name" content="Dart">
+    <meta property="og:title" content="Dart | متجر أزياء وملابس عصرية">
+    <meta property="og:description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة.">
+    <meta property="og:image" content="https://dart-project-psi.vercel.app/Photos/logo-1to1.png">
+    <meta property="og:image:secure_url" content="https://dart-project-psi.vercel.app/Photos/logo-1to1.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:alt" content="Dart Brand Logo">
+    <meta property="og:url" content="https://dart-project-psi.vercel.app/products.html">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ar_AR">
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Dart | متجر أزياء وملابس عصرية">
+    <meta name="twitter:description" content="تسوق أحدث صيحات الملابس والأزياء العصرية من متجر Dart. أزياء عالية الجودة وتصاميم مميزة.">
+    <meta name="twitter:image" content="https://dart-project-psi.vercel.app/Photos/logo-1to1.png">
+
+    <!-- Favicon والأيقونات -->
+    <link rel="icon" type="image/png" sizes="48x48" href="Photos/logo-1to1.png">
+    <link rel="apple-touch-icon" sizes="48x48" href="Photos/logo-1to1.png">
+
+
+
+    <link rel="stylesheet" href="CSS/Stayle 1.css">
+    <link rel="stylesheet" href="CSS/base.css">
+    <link rel="stylesheet" href="CSS/fixes.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Irish+Grover&display=swap" rel="stylesheet">
+</head>
+<body class='dja-flexdir'>
+    <div class="mother">
+        <header id="header-container" aria-label="Main Navigation"></header>
+            
+        <main class="#">
+
+            <!-- <section id="search-serial-container" aria-label="Product Authenticity Check"></section> -->
+            
+            
+            <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
+
+            <button type="button" id="toggleProductFilters" class="product-filter-toggle" aria-controls="productFiltersPanel" aria-expanded="false">
+                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                <span>Filter products</span>
+                <i class="fa-solid fa-chevron-down product-filter-toggle-arrow" aria-hidden="true"></i>
+            </button>
+
+            <section id="productFiltersPanel" class="product-filter-panel" aria-label="Search and filter products" hidden>
+                <div class="product-filter-search">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input id="productSearchInput" type="search" placeholder="Search by product name or code" aria-label="Search products by name or code" autocomplete="off">
+                </div>
+                <div class="product-filter-selects">
+                    <select id="productSizeFilter" aria-label="Filter by size"><option value="all">All sizes</option></select>
+                    <select id="productColorFilter" aria-label="Filter by color"><option value="all">All colors</option></select>
+                    <select id="productAvailabilityFilter" aria-label="Filter by availability">
+                        <option value="all">Any availability</option>
+                        <option value="in-stock">In stock</option>
+                        <option value="out-of-stock">Out of stock</option>
+                    </select>
+                    <select id="productPriceFilter" aria-label="Filter by price">
+                        <option value="all">Any price</option>
+                        <option value="under-500">Under 500 EGP</option>
+                        <option value="500-750">500–750 EGP</option>
+                        <option value="750-1000">751–1,000 EGP</option>
+                        <option value="over-1000">Over 1,000 EGP</option>
+                    </select>
+                    <select id="productSortSelect" aria-label="Sort products">
+                        <option value="featured">Featured order</option>
+                        <option value="newest">Newest first</option>
+                        <option value="price-low">Price: low to high</option>
+                        <option value="price-high">Price: high to low</option>
+                        <option value="name">Name: A to Z</option>
+                    </select>
+                    <button type="button" id="clearProductFilters" class="clear-product-filters">Clear</button>
+                </div>
+                <div class="product-filter-categories">
+                    <span>Category</span>
+                    <div class="filter-container" id="filterContainer"></div>
+                </div>
+                <p id="productResultsCount" class="product-results-count" role="status" aria-live="polite"></p>
+            </section>
+
+            <!-- ================= سكشن المنتجات الجزء الأول (أول 7 منتجات) ================= -->
+            <section class="products-section">
+                <h2 class="section-title-">&nbsp;Newest products</h2>
+                
+                <div class="products-grid" id="productsPart1">
+                <!-- الكارت المرجعي (Template) -->
+                    <div class="product-card" id="productTemplate" style="display: none;">
+                        <img src="" alt="Product photograph; description is filled from the product name" class="product-img" loading="lazy">
+                        <div class="product-details">
+                            <div class="product-category"></div>
+                            <div class="product-code" dir="rtl"></div>
+                            <div class="product-title"></div>
+                            <div class="product-footer djasb">
+                                <span class="product-price"></span>
+                                <button class="cart-btn dja">Buy &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= التلات سكاشن اللي في النص ================= -->
+                    <!-- سيكشن أفضل المنتجات -->
+                <section class="best-products-section">
+                    <h2 class="section-title-">&nbsp;Best Products</h2>
+                    <!-- الحاوية المخصصة للإسكرول الأفقي -->
+                    <div class="x-scroll-container" id="bestProductsContainer"></div>
+                </section>
+            
+            <section class="reviews-section">
+                <h2 class="section-title-">&nbsp; Our Reviews </h2>
+
+                <div class="reviews-container" id="reviewsContainer">
+                <!-- الكارت المرجعي (Template) -->
+                    <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
+                        <div>
+                            <div class="stars"></div>
+                            <div class="review-title"></div>
+                            <div class="review-text"></div>
+                        </div>
+                        <div class="user-info" dir="rtl">
+                            <i class="fa-regular fa-circle-user fa-xl user-avatar"></i>
+                            <div>
+                                <div class="user-name-"></div>
+                                <div class="review-date"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="birthday"></section>
+
+            <!-- ================= سكشن المنتجات الجزء الثاني (باقي المنتجات) ================= -->
+            <section class="products-section">
+                <div class="products-grid" id="productsPart2"></div>
+            </section>
+            
+            <section id="dart-for-you" aria-label="The brand logo is a kite bird in a burgundy color."></section>
+            
+            <section id="feedback-form" aria-label="Share Your Experience"></section>
+
+            <section class="model" id="SectionModel">
+                <i class="fa-solid fa-x"></i>
+
+                <!-- كاروسيل صور المنتج -->
+                <div class="model-carousel" id="modelCarousel">
+                    <div class="carousel-track" id="carouselTrack"></div>
+                    <button type="button" class="carousel-arrow carousel-prev" id="carouselPrev" aria-label="Previous image">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="carousel-arrow carousel-next" id="carouselNext" aria-label="Next image">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    <div class="carousel-dots" id="carouselDots"></div>
+                </div>
+
+                <article class="model-product overflow">
+                    <div class="model-product-category"></div>
+                    <div class="model-product-code"></div>
+                    <div class="model-product-title"></div>
+                    <div class="model-product-price">Price: &nbsp;<span class="price-number"></span>&nbsp; EGP</div>
+                    <!-- حاوية المقاسات -->
+                    <div class="sizes-container">
+                        <button type="button" class="size-btn" data-size=""></button>
+                    </div>
+                    <!-- حاوية الألوان -->
+                    <div class="colors-container">
+                        <button type="button" class="color-btn" data-color=""></button>
+                    </div>
+
+                    <div class="product-size-chart-actions">
+                        <button type="button" id="productSizeChartBtn" class="product-size-chart-trigger" aria-controls="productSizeChartPanel" aria-expanded="false">
+                            <i class="fa-solid fa-ruler-combined" aria-hidden="true"></i> Size Chart
+                        </button>
+                    </div>
+                    <p id="productOptionStatus" class="product-option-status" role="status" aria-live="polite"></p>
+
+                    <div id="productSizeChartPanel" class="product-size-chart-panel" hidden>
+                        <div class="product-size-chart-dialog" role="dialog" aria-modal="true" aria-labelledby="productSizeChartTitle">
+                            <button type="button" id="closeProductSizeChart" class="product-size-chart-close" aria-label="Close size chart">&times;</button>
+                            <h3 id="productSizeChartTitle">Size Chart</h3>
+                            <div id="productSizeChartContent"></div>
+                        </div>
+                    </div>
+
+                    <!-- عداد الكمية -->
+                    <div class="modal-qty-row djasb">
+                        <span class="modal-qty-label">Quantity</span>
+                        <div class="qty-control" id="modalQtyControl">
+                            <button type="button" class="qty-btn" id="modalQtyDecrease" aria-label="Decrease quantity">-</button>
+                            <span class="qty-value" id="modalQtyValue">1</span>
+                            <button type="button" class="qty-btn" id="modalQtyIncrease" aria-label="Increase quantity">+</button>
+                        </div>
+                    </div>
+
+                    <h6 class="model-all-detelis" dir="rtl"></h6>
+                    <!-- زرار الشراء النهائي جوه المودال -->
+                    <button id="modalBuyBtn" class="buy-now-btn">Buy</button>
+                </article>
+            </section>
+            <!-- <section id="why" aria-label="Why Choose DART?."></section> -->
+            <!-- <section id="return-form" aria-label="Exchange or Return Request "></section>
+            <section id="contact-form" aria-label="Contact Us "></section>
+            <section id="birthday-details" aria-label="Information and details about the birthday discount."></section>
+            <section id="card-details" aria-label="Information and details about the Dart card."></section>
+            <section id="story"></section> -->
+        </main>
+
+        <footer id="footer" aria-label="footer."></footer>
+    
+    </div>
+    <script src="Js/dart-catalog.js"></script>
+    <script src="Js/one .js"></script>
+    <script src="Js/dart-storefront.js"></script>
+    <script src="Js/dart-platform.js"></script>
+</body>
+</html>

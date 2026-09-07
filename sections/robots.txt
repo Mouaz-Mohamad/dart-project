@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /Eye/
+Disallow: /profile.html
+Disallow: /cart-checkout.html
+Disallow: /track.html
+Disallow: /rep.html
+Disallow: /pdf.html
+Disallow: /Sign%20Up%20modern.html
+
+Sitemap: https://dart-project-psi.vercel.app/sitemap.xml

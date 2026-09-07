@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dart Dashboard</title>
+    <meta name="robots" content="noindex,nofollow">
+    <link rel="stylesheet" href="dart.css">
+    <link rel="stylesheet" href="dart-inventory.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="manifest" href="../manifest.json">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <!-- القائمة الجانبية (الثابتة) -->
+    <nav class="cont-menu">
+        <img src="dart_logo.png" alt="Dart Logo">
+        <ul class="menu">
+            <li><a href="#" data-target="brand">Brand</a></li>
+            <li><a href="#" data-target="models" class="active">Models</a></li>
+            <li><a href="#" data-target="items">Items</a></li>
+            <li><a href="#" data-target="customers">Clients</a></li>
+            <li><a href="#" data-target="orders">Orders</a></li>
+            <li><a href="#" data-target="returns">Returns</a></li>
+            <li><a href="#" data-target="damage">Damage</a></li>
+            <li><a href="#" data-target="review">Review</a></li>
+            <li><a href="#" data-target="representative">Rep</a></li>
+            <li><a href="#" data-target="card">Dart Card</a></li>
+        </ul>
+    </nav>
+
+    <!-- الشريط السفلي الخاص بالموبايل فقط -->
+<nav class="nav-tow">
+    <ul class="menu-tow">
+        <li><a href="#" data-target="brand"><i class='bx bx-store-alt'></i><span>Brand</span></a></li>
+        <li><a href="#" data-target="models" class="active"><i class='bx bx-layer'></i><span>Models</span></a></li>
+        <li><a href="#" data-target="items"><i class='bx bx-box'></i><span>Items</span></a></li>
+        <li><a href="#" data-target="customers"><i class='bx bx-user-pin'></i><span>Clients</span></a></li>
+        <li><a href="#" data-target="orders"><i class='bx bx-cart'></i><span>Orders</span></a></li>
+        <li><a href="#" data-target="returns"><i class='bx bx-undo'></i><span>Returns</span></a></li>
+        <li><a href="#" data-target="damage"><i class='bx bx-error-circle'></i><span>Damage</span></a></li>
+        <li><a href="#" data-target="review"><i class='bx bx-star'></i><span>Review</span></a></li>
+        <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
+        <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
+    </ul>
+</nav>
+
+    <main>
+        <!-- سكشن Brand Information -->
+        <section id="brand" class="dashboard-section brand">
+            <div class="cards-one">
+                <div class="cont-card-info-2">
+                    <div class="card-inf-2 customar-card">
+                        <div class="span-img">
+                            <span class="numebr">0</span>
+                            <i class="fa-solid fa-user" style="color: #43bfe5;"></i>
+                        </div>
+                        <h5>Customer</h5>
+                    </div>
+                    <div class="card-inf-2 orders-card">
+                        <div class="span-img">
+                            <span class="numebr">0</span>
+                            <i class="fa-solid fa-box-open" style="color: #1abc9c;"></i>         
+                        </div>
+                        <h5>Orders</h5>
+                    </div>
+                    <div class="card-inf-2">
+                        <div class="span-img">
+                            <span class="numebr">0</span>
+                            <i class="fa-regular fa-star" style="color: rgb(255, 212, 59);"></i>
+                        </div>
+                        <h5>Rating</h5>
+                    </div>
+                    <div class="card-inf-2 stock-card">
+                        <div class="span-img">
+                            <span class="numebr">0</span>
+                            <i class="fa-solid fa-shirt" style="color: rgb(0, 0, 0);"></i>
+                        </div>
+                        <h5>In Stock</h5>
+                    </div>
+                    <div class="card-inf-2 sold-card">
+                        <div class="span-img">
+                            <span class="numebr">0</span>
+                            <i class="fa-solid fa-clipboard-check" style="color: #16742d;"></i>
+                        </div>
+                        <h5>Sold Items</h5>
+                    </div>
+                </div>
+            </div>
+
+            <div class="margen20"></div>
+
+            <div class="chart-one">
+                <div class="financial-summary">
+                    <div class="sales-cont">
+                        <div class="card-top">
+                            <h4><i class="fa-solid fa-sack-dollar"></i> Sales</h4>
+                            <span class="variance">—</span>
+                        </div>
+                        <span class="sales">0 EGP</span>
+                    </div>
+
+                    <div class="cost-cont">
+                        <div class="card-top">
+                            <h4><i class="fa-solid fa-coins"></i> Total Cost</h4>
+                            <span class="variance">—</span>
+                        </div>
+                        <span class="sales">0 EGP</span>
+                    </div>
+
+                    <div class="profit-cont">
+                        <div class="card-top">
+                            <h4><i class="fa-solid fa-chart-line"></i> Profit</h4>
+                            <span class="variance">—</span>
+                        </div>
+                        <span class="sales">0 EGP</span>
+                    </div>
+                </div>
+
+                <div class="dart-chart-card">
+                    <div class="dart-controls">
+                        <div class="dart-nav-controls">
+                            <button class="dart-nav-btn" onclick="navigate(-1)">❮</button>
+                            <span id="displayLabel">2026</span>
+                            <button class="dart-nav-btn" onclick="navigate(1)">❯</button>
+                        </div>
+                    </div>
+                    <div id="myChart"></div>
+                </div>
+            </div>
+
+            <div class="strok"></div>
+
+            <div class="margen20"></div>
+            <!-- سكشن الإشعارات -->
+            <div class="brand-widgets-container">
+                <!-- 1. أرتيكل آخر المستجدات -->
+                <article class="widget-card">
+                    <div class="widget-header">
+                        <h3><i class="fa-solid fa-bell"></i> Latest Updates </h3>
+                        <div class="notification-filter-wrap">
+                            <select id="notificationFilter" aria-label="Filter notifications">
+                                <option value="all">All</option>
+                                <option value="order">Orders</option>
+                                <option value="inventory">Inventory</option>
+                                <option value="return">Returns</option>
+                                <option value="damage">Damage</option>
+                                <option value="payment">Payments</option>
+                                <option value="customer">Clients</option>
+                                <option value="system">System</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="widget-content" id="updates-feed">
+<!-- Filled from saved records; empty on first launch. -->
+</div>
+                </article>
+
+                <!-- 2. أرتيكل أعياد الميلاد -->
+                <article class="widget-card">
+                    <div class="widget-header bday-header">
+                        <h3><i class="fa-solid fa-cake-candles"></i> Birthday </h3>
+                        <div class="bday-actions">
+                            <label class="select-all-label">All <input type="checkbox" id="selectAllBirthdays"></label>
+                            <button class="btn-send-bday" id="sendBdayBtn"><i class="fa-solid fa-paper-plane"></i> Send</button>
+                        </div>
+                    </div>
+                    <div class="widget-content overflow" id="birthday-feed">
+<!-- Filled from saved records; empty on first launch. -->
+</div>
+
+                </article>
+            </div>
+
+            <div class="margen20"></div>
+            <!-- top clintes -->
+            <article class="widget-card">
+                <div class="widget-header bday-header">
+                    <h3><i class="fa-solid fa-ranking-star"></i> Top Clintes </h3>
+                </div>
+                <div class="widget-content overflow" id="top-clients-feed">
+<!-- Filled from saved records; empty on first launch. -->
+</div>
+            </article>
+
+            <div class="margen20"></div>
+            <div class="chart-box-tow">
+                <div class="chart-header-tow">
+                    <div class="chart-title-tow">
+                        <h3><i class="fa-solid fa-chart-line" style="color: #ab012b;"></i> تحليلات الزوار والمبيعات</h3>
+                    </div>
+                    <div class="header-actions-tow">
+                        <button class="export-btn-tow" onclick="exportChartPNGTow()">
+                            <i class="fa-solid fa-download"></i> تصدير PNG
+                        </button>
+                        <div class="filter-btns-tow">
+                            <button class="filter-btn-tow active-tow" onclick="updateChartTow('daily', this)">يومي</button>
+                            <button class="filter-btn-tow" onclick="updateChartTow('weekly', this)">أسبوعي</button>
+                            <button class="filter-btn-tow" onclick="updateChartTow('monthly', this)">شهري</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-body-tow">
+                    <canvas id="analyticsChartTow"></canvas>
+                </div>
+
+                <div class="chart-notes-tow">
+                    <div class="note-item-tow">
+                        <i class="fa-solid fa-lightbulb" style="color: #f39c12;"></i>
+                        <span id="chartNoteTextTow">لا توجد بيانات زيارات مسجلة بعد.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- سكشن Model Code -->
+        <section id="models" class="dashboard-section active-section">
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Category</option>
+                        <option value="all">All Categories</option>
+                        <option value="t-shirts">T-Shirts</option>
+                        <option value="hoodies">Hoodies</option>
+                        <option value="pants">Pants</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">Active</option>
+                        <option value="out-of-stock">Out of stock</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Price Range</option>
+                        <option value="0-500">0 - 500 EGP</option>
+                        <option value="500-1000">500 - 1000 EGP</option>
+                        <option value="1000+">1000+ EGP</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn">
+                    <span>+</span> Add Product
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w200">Action</h2>
+                    <h2 class="w100">Photo</h2>
+                    <h2 class="w150">ID Model</h2>
+                    <h2 class="w150">Model Name</h2>
+                    <h2 class="w150">Category</h2>
+                    <h2 class="w200">Description</h2>
+                    <h2 class="w150">Available</h2>
+                    <h2 class="w150">Total Items</h2>
+                    <h2 class="w150">Sold</h2>
+                    <h2 class="w150">Damaged</h2>
+                    <h2 class="w150">Cost</h2>
+                    <h2 class="w150">Selling</h2>
+                    <h2 class="w150">Discount %</h2>
+                    <h2 class="w150">Discounted price</h2>
+                    <h2 class="w300">Colors</h2>
+                    <h2 class="w300">Sizes</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w150">Date</h2>
+                </div>
+                <div id="models-container"></div>
+            </div>
+        </section>
+
+        <!-- items -->
+        <section id="items" class="dashboard-section">
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Category</option>
+                        <option value="all">All Categories</option>
+                        <option value="t-shirts">T-Shirts</option>
+                        <option value="hoodies">Hoodies</option>
+                        <option value="pants">Pants</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">In stock</option>
+                        <option value="out-of-stock">Sold</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="sizeProfile" id="item-size-profile-filter">
+                        <option value="all">All Size Systems</option>
+                        <option value="pants">Pants Sizes</option>
+                        <option value="tops">T-Shirts / Shirts / Hoodies</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="size" id="item-size-filter">
+                        <option value="all">All Sizes</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Colors</option>
+                        <option value="بيج">بيج</option>
+                        <option value="ابيض">ابيض</option>
+                        <option value="اسود">اسود</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn">
+                    <span>+</span> Add Items
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w200">Action</h2>
+                    <h2 class="w100">Photo</h2>
+                    <h2 class="w150">ID Model</h2>
+                    <h2 class="w150">Item Code</h2>
+                    <h2 class="w150">Color</h2>
+                    <h2 class="w150">Size</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w200">Registration Date</h2>
+                    <h2 class="w150">ID Order</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w300">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                    <h2 class="w150">Date of Purchase</h2>
+                </div>
+                <div id="items-container"></div>
+            </div>
+        </section>
+
+        <!-- Customers -->
+        <section id="customers" class="dashboard-section">
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="all">All</option>
+                        <option value="up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="all">None</option>
+                        <option value="yes">yes</option>
+                        <option value="no">no</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="all">None</option>
+                        <option value="tomorrow">Tomorrow</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="openCustomerModalBtn">
+                    <span>+</span> Add Clintes
+                </button>
+                <button class="add-btn dart-reset-requests-btn" id="openPasswordRequestsBtn" type="button">
+                    <i class="bx bx-key"></i> Password Requests <span id="passwordRequestsCount">0</span>
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w200">Action</h2>
+                    <h2 class="w150">Birthday</h2>
+                    <h2 class="w150">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w200">E-Mail</h2>
+                    <h2 class="w150">The Country</h2>
+                    <h2 class="w200">governorate</h2>
+                    <h2 class="w150">Monthly Orders</h2>
+                    <h2 class="w150">Total Orders</h2>
+                    <h2 class="w300">Total amount</h2>
+                    <h2 class="w200">Dart Cart</h2>
+                </div>
+                <div id="customers-container"></div>
+            </div>
+        </section>
+
+        <!-- order -->
+        <section id="orders" class="dashboard-section">
+            <div class="cont-card-info">
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">0</span>
+                        <i class="fa-solid fa-spinner fa-lg" style="color: rgb(255, 212, 59);"></i>
+                    </div>
+                    <h5>Pending Orders</h5>
+                </div>
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">0</span>
+                        <i class="fa-solid fa-calendar-check fa-lg" style="color: rgb(99, 230, 190);"></i>                </div>
+                    <h5>Completed Orders</h5>
+                </div>
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">0</span>
+                        <i class="fa-solid fa-cart-plus fa-lg" style="color: rgb(177, 151, 252);"></i>
+                    </div>
+                    <h5>New Orders</h5>
+                </div>
+                <div class="card-inf">
+                    <div class="span-img">
+                        <span class="numebr">0</span>
+                        <i class="fa-solid fa-sack-dollar fa-lg" style="color: rgb(171, 1, 43);"></i>
+                    </div>
+                    <h5>Total amount</h5>
+                </div>
+            </div>
+
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Date Order</option>
+                        <option value="an-hour-ago">An hour ago</option>
+                        <option value="two-hours-ago"> Two hours ago</option>
+                        <option value="five-hours-ago"> Five hours ago</option>
+                        <option value="today"> Today</option>
+                        <option value="yesterday"> Yesterday</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="status">
+                        <option value="">All Statuses</option>
+                        <option value="New">New</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Preparing">Preparing</option>
+                        <option value="Out With Representative">Out With Representative</option>
+                        <option value="Representative On The Way">Representative On The Way</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Refused">Refused</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Needs Attention">Needs Attention</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="all">None</option>
+                        <option value="up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="openModalBtn">
+                    <span>+</span> Add Order
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-minus-circle'></i>
+                    <span>Archive Selected</span>
+                </button>
+            </div>
+            <div class="order-bulk-actions" id="order-bulk-actions">
+                <span class="bulk-selected-count" id="bulk-selected-count">0 selected</span>
+                <button type="button" data-bulk-order-status="Accepted">Accept</button>
+                <button type="button" data-bulk-order-status="Preparing">Preparing</button>
+                <button type="button" data-bulk-order-status="Out With Representative">Out With Rep</button>
+                <button type="button" data-bulk-order-status="Representative On The Way">On The Way</button>
+                <button type="button" data-bulk-order-status="Delivered">Delivered</button>
+                <button type="button" data-bulk-order-status="Refused">Refused</button>
+                <button type="button" data-bulk-order-status="Cancelled">Cancel</button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w500">Action</h2>
+                    <h2 class="w150">ID Order</h2>
+                    <h2 class="w150">Date</h2>
+                    <h2 class="w150">Time</h2>
+                    <h2 class="w200">Status</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                    <h2 class="w150">Total products</h2>
+                    <h2 class="w500">Requested products</h2>
+                    <h2 class="w150">Total Price</h2>
+                    <h2 class="w150">Discounts %</h2>
+                    <h2 class="w150">Reason Deduction</h2>
+                    <h2 class="w150">The final amount</h2>
+                    <h2 class="w150">payment method</h2>
+                    <h2 class="w150">Payment Status</h2>
+                    <h2 class="w150">Order Source</h2>
+                    <h2 class="w150">Representative</h2>
+                    <h2 class="w150">Delivery Notes</h2>
+                    <h2 class="w150">Country</h2>
+                    <h2 class="w150">Governorate</h2>
+                    <h2 class="w150">Name Area</h2>
+                    <h2 class="w150">Street name</h2>
+                    <h2 class="w150">Building<br> Number / Name</h2>
+                    <h2 class="w150">Floor</h2>
+                </div>
+                <div id="orders-container"></div>
+            </div>
+        </section>
+
+        <!-- return -->
+        <section id="returns" class="dashboard-section">
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Reason</option>
+                        <option value="wrong_size">المقاس غير مناسب</option>
+                        <option value="defective">المنتج به عيب تصنيع أو تلف</option>
+                        <option value="not_as_described">المنتج يختلف عن الصورة أو الوصف</option>
+                        <option value="wrong_item">استلمت منتجًا مختلفًا عن طلبي</option>
+                        <option value="quality_issue">خامة المنتج لم تعجبني</option>
+                        <option value="changed_mind">لم أعد بحاجة إلى المنتج (تغيير رأي)</option>
+                        <option value="missing_parts">يوجد نقص في محتويات الشحنة</option>
+                        <option value="other">سبب آخر</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="Good">Good</option>
+                        <option value="Bad">Bad</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="add-return-btn">
+                    <span>+</span> Add Return
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w200">Action</h2>
+                    <h2 class="w150">ID-return</h2>
+                    <h2 class="w150">ID Model</h2>
+                    <h2 class="w150">Item Code</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w150">Date</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                    <h2 class="w300">Reason</h2>
+                    <h2 class="w150">ID Order</h2>
+                </div>
+                <div id="returns-container"></div>
+            </div>
+        </section>
+
+
+        <!-- damage -->
+        <section id="damage" class="dashboard-section">
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search damage / item code">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="status">
+                        <option value="">All Damage Statuses</option>
+                        <option value="Damaged">Damaged</option>
+                        <option value="Repaired">Repaired</option>
+                        <option value="Destroyed">Destroyed</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="archive">
+                        <option value="active">Active</option>
+                        <option value="archived">Archived</option>
+                        <option value="all">All</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="add-damage-btn"><span>+</span> Add Damage</button>
+            </div>
+            <div class="second">
+                <button class="delete-btn"><i class='bx bx-minus-circle'></i><span>Archive Selected</span></button>
+            </div>
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input type="checkbox">
+                    <h2 class="w200">Action</h2>
+                    <h2 class="w150">Damage ID</h2>
+                    <h2 class="w150">Item Code</h2>
+                    <h2 class="w150">Model</h2>
+                    <h2 class="w100">Photo</h2>
+                    <h2 class="w150">Color</h2>
+                    <h2 class="w150">Size</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w200">Reason</h2>
+                    <h2 class="w150">Date</h2>
+                    <h2 class="w150">Order ID</h2>
+                    <h2 class="w150">Client</h2>
+                    <h2 class="w150">Return ID</h2>
+                </div>
+                <div id="damage-container"></div>
+            </div>
+        </section>
+
+        <!-- review -->
+        <section id="review" class="dashboard-section">
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="all">None</option>
+                        <option value="Up">Up</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="all">None</option>
+                        <option value="active">Active</option>
+                        <option value="hidden">Hidden</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="openReviewModalBtn">
+                    <span>+</span> Add Review
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w200">Action</h2>
+                    <h2 class="w200">Date & Time</h2>
+                    <h2 class="w200">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w100">Star Rating</h2>
+                    <h2 class="w300">Reviewer's Title</h2>
+                    <h2 class="w500">Review</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w150">E-Mail</h2>
+                </div>
+                <div id="review-container"></div>
+            </div>
+        </section>
+
+        <!-- representative -->
+        <section id="representative" class="dashboard-section">
+            <div class="first filter-bar">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="all">None</option>
+                        <option value="active">Active</option>
+                        <option value="Pending Approval">Pending Approval</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="hidden">Not available</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <button class="add-btn" id="openRepModalBtn">
+                    <span>+</span> Add Rep
+                </button>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn" id="deleteSelectedRepBtn">
+                    <i class='bx bx-trash'></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w300">Action</h2>
+                    <h2 class="w200">representative Name</h2>
+                    <h2 class="w150">ID representative</h2>
+                    <h2 class="w150">Status</h2>
+                    <h2 class="w150">National ID Number</h2>
+                    <h2 class="w150">Current orders</h2>
+                    <h2 class="w100">Total orders</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w200">E-Mail</h2>
+                    <h2 class="w200">Representative's Address</h2>
+                    <h2 class="w300">Identity Photos</h2>
+                    <h2 class="w150">Date</h2>
+                </div>
+                <div id="representative-container"></div>
+            </div>
+        </section>
+        
+        <!-- dart card -->
+        <section id="card" class="dashboard-section">
+            <div class="filter-bar overflow">
+                <div class="search-box">
+                    <input type="text" placeholder="search product name">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box">
+                    <select>
+                        <option value="" disabled selected hidden>Status</option>
+                        <option value="active">Active</option>
+                        <option value="hidden">Hidden</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+            </div>
+
+            <div class="second">
+                <button class="delete-btn"><i class='bx bx-trash'></i><span>Delete</span></button>
+            </div>
+            <div class="cont-titel">
+                <div class="title-name">
+                    <input class="" type="checkbox">
+                    <h2 class="w100">Action</h2>
+                    <h2 class="w150">ID-Card</h2>
+                    <h2 class="w150">Client Name</h2>
+                    <h2 class="w150">ID Clinte</h2>
+                    <h2 class="w150">phone number</h2>
+                    <h2 class="w150">phone number 2</h2>
+                    <h2 class="w200">E-Mail</h2>
+                    <h2 class="w150">States</h2>
+                    <h2 class="w200">Card issuance date</h2>
+                    <h2 class="w150">EXP date</h2>
+                    <h2 class="w150">Purchased Items</h2>
+                    <h2 class="w150">Purchased limet</h2>
+                    <h2 class="w1200">Requested products</h2>
+                </div>
+                <div id="card-container"></div>
+            </div>
+
+            
+        </section>
+    </main>
+
+<!-- ==================================== -->
+<!-- 1. Modal إضافة / تعديل الموديل -->
+<div id="model-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-model-btn">&times;</span>
+        <form id="model-form">
+            <input type="hidden" id="modal-edit-id">
+            <div class="modal-grid">
+                <div class="modal-col">
+                    <div class="form-group">
+                        <label for="modal-id">ID Model</label>
+                        <input type="text" id="modal-id" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-name">Model Name</label>
+                        <input type="text" id="modal-name" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-category">Category</label>
+                        <select id="modal-category" required>
+                            <option value="" disabled selected hidden>Value</option>
+                            <option value="t-shirts">T-Shirts</option>
+                            <option value="hoodies">Hoodies</option>
+                            <option value="pants">Pants</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-description">Description</label>
+                        <textarea id="modal-description" placeholder="+ Value" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-discount">Discount %</label>
+                        <input type="number" id="modal-discount" placeholder="Value" value="0">
+                    </div>
+                    <div class="price-summary">
+                        <span>Final Price :</span>
+                        <strong id="modal-final-price">0 EGP</strong>
+                    </div>
+                </div>
+                <div class="modal-col">
+                    <div class="form-group">
+                        <label for="modal-cost">Cost</label>
+                        <input type="number" id="modal-cost" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-selling">Selling</label>
+                        <input type="number" id="modal-selling" placeholder="Value" required>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px;">
+                        <button type="submit" id="btn-submit-modal" class="btn-done">DONE</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 2. Modal القطع (Items) -->
+<div id="item-add-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-item-add-btn">&times;</span>
+        <form id="item-add-form">
+            <input type="hidden" id="modal-item-add-edit-id">
+            <div class="form-group">
+                <label>Photo</label>
+                <input type="file" id="modal-item-file" accept="image/*">
+                <img id="item-preview-img" style="display:none; width: 100px; margin-top: 10px;" alt="Preview of the uploaded physical item image">
+            </div>
+            <div class="form-group">
+                <label>Model Code</label>
+                <input type="text" id="modal-item-model-id" list="models-list" placeholder="اختر أو اكتب كود الموديل" required>
+                <datalist id="models-list"></datalist>
+            </div>
+            <div class="form-group">
+                <label>Code PIC</label>
+                <input type="text" id="modal-item-code-pic" required>
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <input type="text" id="modal-item-color" required>
+            </div>
+            <div class="form-group">
+                <label>Size</label>
+                <input type="text" id="modal-item-size" required>
+            </div>
+            <button type="submit" class="btn-submit">Save</button>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 3. Modal الطلبات (Orders) -->
+<div class="modal" id="orderModal">
+    <div class="modal-content">
+        <span class="close-modal" id="closeModalBtn">&times;</span>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <input type="text" id="orderSearchInput" placeholder="search about client">
+        </div>
+        <form id="orderForm">
+            <div class="modal-grid">
+                <div class="column">
+                    <div class="form-group">
+                        <label for="clientName">Name</label>
+                        <input type="text" id="clientName" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientId">id client</label>
+                        <input type="text" id="clientId" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone1">Phone number</label>
+                        <input type="text" id="phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone2">Phone number 2</label>
+                        <input type="text" id="phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">E-Mail</label>
+                        <input type="email" id="email" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentMethod">Payment Method</label>
+                        <select id="paymentMethod"required>
+                            <option value="Cash on Delivery" selected>Cash on Delivery</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentStatus">Payment Status</label>
+                        <select id="paymentStatus">
+                            <option value="Unpaid">Unpaid</option>
+                            <option value="Partially Paid">Partially Paid</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Partially Refunded">Partially Refunded</option>
+                            <option value="Refunded">Refunded</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderSource">Order Source</label>
+                        <select id="orderSource">
+                            <option value="Website">Website</option>
+                            <option value="Instagram">Instagram</option>
+                            <option value="Facebook">Facebook</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                            <option value="TikTok">TikTok</option>
+                            <option value="Manual" selected>Manual</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="amountPaid">Amount Paid</label>
+                        <input type="number" id="amountPaid" min="0" step="1" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="amountRefunded">Amount Refunded</label>
+                        <input type="number" id="amountRefunded" min="0" step="1" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="deliveryNotes">Delivery Notes</label>
+                        <textarea id="deliveryNotes" placeholder="Value" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderAddress">Address (OpenStreetMap)</label>
+                        <textarea id="orderAddress" placeholder="Search for the delivery address"></textarea>
+                        <ul id="dashboard-address-results" class="dart-address-results" hidden></ul>
+                    </div>
+                    <div id="dashboard-order-map" class="dart-dashboard-order-map" aria-label="Order delivery location map"></div>
+                    <p class="dart-delivery-zone-note"><i class="fa-solid fa-clock" aria-hidden="true"></i> Cairo and Giza delivery only — promised within 12 hours.</p>
+                    <p id="dashboard-address-status" class="dart-address-status" role="status" aria-live="polite">Select a Cairo/Giza pin or enter the complete address manually.</p>
+                    <input type="hidden" id="orderLatitude">
+                    <input type="hidden" id="orderLongitude">
+                    <input type="hidden" id="orderFullAddress">
+                    <div class="price-summary">
+                        <p>Subtotal : <strong id="subtotalVal">0 EGP</strong></p>
+                        <p>Discount : <strong id="discountVal">0 EGP</strong></p>
+                        <p>Total : <strong id="totalVal">0 EGP</strong></p>
+                    </div>
+                    <button type="submit" class="btn-done">DONE</button>
+                </div>
+                <div class="column">
+                    <div class="form-group">
+                        <label>Auto Allocate Product</label>
+                        <input type="text" id="orderModelCode" list="models-list" placeholder="Model Code">
+                        <input type="text" id="orderItemColor" placeholder="Color">
+                        <input type="text" id="orderItemSize" placeholder="Size">
+                        <input type="number" id="orderItemQty" min="1" value="1" placeholder="Qty">
+                        <button type="button" id="autoAllocateProductBtn">Auto Allocate</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="productsInputCode">Physical Item Code (optional manual selection)</label>
+                        <input type="text" id="productsInputCode" list="items-datalist" placeholder="اكتب أو اختر كود القطعة...">
+                        <datalist id="items-datalist"></datalist>
+                        <button type="button" id="addProductBtn">Add Item</button>
+                        <div id="selectedProductsList"></div>
+                    </div>
+                    <input type="hidden" id="modal-order-edit-id">
+                    <div class="form-group">
+                        <label for="deductions">Deductions %</label>
+                        <input type="number" id="deductions" placeholder="%" value="0" min="0" max="100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="customDiscount">Custom Discount</label>
+                        <input type="number" id="customDiscount" placeholder="Auto" value="0" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderCountry">Country</label>
+                        <input type="text" id="orderCountry" value="Egypt" readonly required>
+                    </div>
+                    <div class="form-group">
+                        <label for="governorate">Governorate</label>
+                        <select id="governorate" required>
+                            <option value="Cairo" selected>Cairo</option>
+                            <option value="Giza">Giza</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderArea">Area</label>
+                        <input type="text" id="orderArea" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderStreetName">Street Name</label>
+                        <input type="text" id="orderStreetName" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderBuildingNumber">Building Number/Name</label>
+                        <input type="text" id="orderBuildingNumber" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="orderFloor">Floor</label>
+                        <input type="text" id="orderFloor" placeholder="Required" required>
+                    </div>
+                    <button type="button" id="dashboard-locate-manual-address" class="dart-locate-address-btn"><i class="fa-solid fa-location-crosshairs"></i> Locate manual address</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 4. Modal العملاء الأساسي (Customer Profile) -->
+<div class="modal" id="customerModal">
+    <div class="modal-content">
+        <span class="close-modal close-customer-modal">&times;</span>
+        <form id="customerForm">
+            <input type="hidden" id="modal-customer-edit-id">
+            <div class="modal-grid">
+                <div class="modal-column">
+                    <div class="form-group">
+                        <label for="custName">Name</label>
+                        <input type="text" id="custName" placeholder="Value" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="custBirthday">Birthday</label>
+                        <input type="date" id="custBirthday" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="custEmail">E-Mail</label>
+                        <input type="email" id="custEmail" placeholder="Value">
+                    </div>
+                    <div class="form-group" style="margin-top: 30px;">
+                        <button type="submit" class="btn-done">DONE</button>
+                    </div>
+                </div>
+                <div class="modal-column">
+                    <div class="form-group">
+                        <label for="custPhone1">Phone number</label>
+                        <input type="text" id="custPhone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="custPhone2">Phone number 2</label>
+                        <input type="text" id="custPhone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="custCountry">Country</label>
+                        <input id="custCountry" class="modal-input" list="country-options" value="Egypt" placeholder="Country" required>
+                        <datalist id="country-options"><option value="Egypt"></option></datalist>            
+                    </div>
+                    <div class="form-group">
+                        <label for="custGovernorate">Governorate</label>
+                        <input id="custGovernorate" class="modal-input" list="egypt-governorates" placeholder="Governorate" required>
+                        <datalist id="egypt-governorates"><option value="Cairo"></option><option value="Alexandria"></option><option value="Giza"></option><option value="Qalyubia"></option><option value="Dakahlia"></option><option value="Sharqia"></option><option value="Gharbia"></option><option value="Monufia"></option><option value="Beheira"></option><option value="Kafr El Sheikh"></option><option value="Damietta"></option><option value="Port Said"></option><option value="Ismailia"></option><option value="Suez"></option><option value="North Sinai"></option><option value="South Sinai"></option><option value="Beni Suef"></option><option value="Faiyum"></option><option value="Minya"></option><option value="Asyut"></option><option value="Sohag"></option><option value="Qena"></option><option value="Luxor"></option><option value="Aswan"></option><option value="Red Sea"></option><option value="New Valley"></option><option value="Matrouh"></option></datalist>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 5. Modal المرتجعات (Returns) -->
+<div class="modal" id="return-modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-return-btn">&times;</span>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
+                <input type="text" id="returnSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
+                <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
+            </div>
+        </div>
+        <form id="return-form">
+            <input type="hidden" id="modal-return-edit-id">
+            <div class="modal-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="modal-return-name" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>Item code</label>
+                    <input type="text" id="modal-return-item-code" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>Phone number</label>
+                    <input type="text" id="modal-return-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label>Model code</label>
+                    <input type="text" id="modal-return-model-id" placeholder="Value">
+                </div>
+                <div class="form-group">
+                    <label>Phone number 2</label>
+                    <input type="text" id="modal-return-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label>E-Mail</label>
+                    <input type="email" id="modal-return-email" placeholder="Value">
+                </div>
+                <div class="input-group">
+                    <label>Condition of returned item</label>
+                    <select id="modal-item-condition" class="modal-select">
+                        <option value="Good">Good</option>
+                        <option value="Bad">Bad</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Reason for return</label>
+                    <select id="modal-item-reason" class="modal-select">
+                        <option value="المقاس صغير">المقاس صغير</option>
+                        <option value="المقاس كبير">المقاس كبير</option>
+                        <option value="عيب في المنتج">عيب في المنتج</option>
+                        <option value="غير مطابق للصورة">غير مطابق للصورة</option>
+                        <option value="سبب آخر">سبب آخر</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 6. Modal مراجعات العملاء (Review) -->
+<div class="modal" id="customer-review-modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-review-btn">&times;</span>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
+                <input type="text" id="reviewSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
+                <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
+            </div>
+        </div>
+        <form id="customer-review-form">
+            <input type="hidden" id="modal-review-edit-id">
+            <div class="modal-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="modal-cust-rev-name" placeholder="Value">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Star Rating</label>
+                    <select id="modal-cust-rating" class="modal-select">
+                        <option value="1">1 Star</option>
+                        <option value="2">2 Stars</option>
+                        <option value="3">3 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="5" selected>5 Stars</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Phone number</label>
+                    <input type="tel" id="modal-cust-rev-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Customer Review</label>
+                    <textarea id="modal-cust-review" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Phone number 2</label>
+                    <input type="text" id="modal-cust-rev-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Reviewer's Title</label>
+                    <textarea id="modal-cust-title" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>E-Mail</label>
+                    <input type="email" id="modal-cust-rev-email" placeholder="Value">
+                </div>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <label>Status</label>
+                    <select id="modal-cust-status" class="modal-select">
+                        <option value="Active">Active</option>
+                        <option value="Hidden">Hidden</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================== -->
+<!-- 7. Modal المندوبين(Representative) -->
+<div class="modal" id="representative-modal">
+    <div class="modal-content">
+        <span class="close-modal" id="close-rep-btn">&times;</span>
+        <form id="rep-form">
+            <input type="hidden" id="modal-rep-id">
+            <div class="modal-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="modal-representative-name" placeholder="Value" required>
+                </div>
+                <div class="form-group">
+                    <label>ID representative</label>
+                    <input type="text" id="modal-representative-id" placeholder="Assigned automatically" readonly required>
+                </div>
+                <div class="form-group">
+                    <label>National ID Number</label>
+                    <input type="text"  id="modal-representative-national-id"  placeholder="أدخل الرقم القومي (14 رقم)"  pattern="\d{14}"  maxlength="14"  inputmode="numeric" required onkeypress="return event.charCode >= 48 && event.charCode <= 57">
+                </div>
+                <div class="form-group">
+                    <label>Representative's Address</label>
+                    <textarea id="modal-representative-address" placeholder="Enter full address" rows="2" style="width: 100%;" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Phone number</label>
+                    <input type="tel" id="modal-rep-phone1" placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone number 2</label>
+                    <input type="tel" id="modal-rep-phone2" placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label>E-Mail</label>
+                    <input type="email" id="modal-rep-email" placeholder="name@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Account Status</label>
+                    <select id="modal-rep-status" required>
+                        <option value="Pending Approval">Pending Approval</option>
+                        <option value="Active">Approved / Active</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="Not available">Not available</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Temporary Password</label>
+                    <input type="password" id="modal-rep-password" minlength="8" placeholder="Only for a new account or reset">
+                </div>
+                <div class="form-group dart-file-field">
+                    <label>National ID — Front</label>
+                    <input type="file" id="modal-rep-id-front" accept="image/jpeg,image/png,image/webp">
+                    <img id="modal-rep-id-front-preview" class="dart-rep-upload-preview" alt="Representative national ID front preview" hidden>
+                </div>
+                <div class="form-group dart-file-field">
+                    <label>National ID — Back</label>
+                    <input type="file" id="modal-rep-id-back" accept="image/jpeg,image/png,image/webp">
+                    <img id="modal-rep-id-back-preview" class="dart-rep-upload-preview" alt="Representative national ID back preview" hidden>
+                </div>
+                <div class="form-group dart-file-field">
+                    <label>Representative Face Photo</label>
+                    <input type="file" id="modal-rep-face" accept="image/jpeg,image/png,image/webp">
+                    <img id="modal-rep-face-preview" class="dart-rep-upload-preview" alt="Representative face verification preview" hidden>
+                </div>
+            </div>
+            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+        </form>
+    </div>
+</div>
+
+
+<!-- Dart operational modals -->
+<div class="modal" id="rep-assignment-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Assign Representative</h3><select id="rep-assignment-select"></select><button type="button" class="btn-done" id="confirm-rep-assignment">Assign</button></div></div>
+<div class="modal" id="order-reason-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3 id="order-reason-title">Reason</h3><select id="order-reason-select"></select><textarea id="order-reason-notes" rows="3" placeholder="Notes / Other reason"></textarea><button type="button" class="btn-done" id="confirm-order-reason">Confirm</button></div></div>
+<div class="modal" id="history-modal"><div class="modal-content dart-history-modal"><span class="close-modal">&times;</span><h3 id="history-modal-title">History</h3><div id="history-modal-body"></div></div></div>
+<div class="modal" id="damage-modal"><div class="modal-content"><span class="close-modal">&times;</span><h3>Damage Record</h3><form id="damage-form"><input type="hidden" id="damage-edit-id"><div class="modal-grid"><div class="form-group"><label>Item Code</label><input id="damage-item-code" required></div><div class="form-group"><label>Reason</label><input id="damage-reason" required></div><div class="form-group"><label>Notes</label><textarea id="damage-notes" rows="3"></textarea></div><div class="form-group"><label>Status</label><select id="damage-status"><option value="Damaged">Damaged</option><option value="Repaired">Repaired</option><option value="Destroyed">Destroyed</option></select></div></div><button class="btn-done" type="submit">DONE</button></form></div></div>
+
+<div class="modal" id="password-requests-modal">
+  <div class="modal-content dart-history-modal">
+    <span class="close-modal">&times;</span>
+    <h3>Password Reset Requests</h3>
+    <p class="dart-sensitive-note">Set a one-time temporary password. The account owner must replace it at the next login.</p>
+    <div id="password-requests-list"></div>
+  </div>
+</div>
+
+<div class="modal" id="size-chart-modal">
+  <div class="modal-content dart-size-chart-admin-modal">
+    <span class="close-modal" aria-label="Close size chart">&times;</span>
+    <div class="dart-size-chart-admin-head">
+      <div>
+        <h3 id="dashboard-size-chart-title">Model Size Chart</h3>
+        <p>Fill only the measurements that apply to this model. Values are shown to customers inside the product modal.</p>
+      </div>
+      <label>Unit
+        <select id="dashboard-size-chart-unit">
+          <option value="cm">cm</option>
+          <option value="in">inches</option>
+        </select>
+      </label>
+    </div>
+    <form id="dashboard-size-chart-form">
+      <input type="hidden" id="dashboard-size-chart-model-id">
+      <div class="dart-size-chart-toolbar">
+        <button type="button" id="dashboard-size-chart-stock-sizes"><i class="bx bx-list-check"></i> Use model sizes</button>
+        <button type="button" id="dashboard-size-chart-add-row"><i class="bx bx-plus"></i> Add size</button>
+      </div>
+      <div class="dart-size-chart-admin-table-wrap">
+        <table class="dart-size-chart-admin-table">
+          <thead><tr><th>Size</th><th>Chest</th><th>Waist</th><th>Hip</th><th>Length</th><th>Shoulder</th><th>Sleeve</th><th>Inseam</th><th>Notes</th><th>Action</th></tr></thead>
+          <tbody id="dashboard-size-chart-body"></tbody>
+        </table>
+      </div>
+      <p id="dashboard-size-chart-status" class="dart-size-chart-admin-status" role="status" aria-live="polite"></p>
+      <button type="submit" class="btn-done">Save Size Chart</button>
+    </form>
+  </div>
+</div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="../Js/dart-address.js"></script>
+    <script src="../Js/dart-catalog.js"></script>
+    <script src="dart.js"></script>
+    <script src="dart-inventory.js"></script>
+    <script src="dart-fixes.js"></script>
+    <script src="dart-operations-v4.js"></script>
+    <script src="dart-size-chart-v5.js"></script>
+
+<div class="modal" id="image-preview-modal">
+  <div class="modal-content dart-image-preview-content">
+    <span class="close-modal">&times;</span>
+    <img id="full-item-image" alt="Full item preview">
+  </div>
+</div>
+
+</body>
+</html>
