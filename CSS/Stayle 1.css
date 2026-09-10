@@ -1265,12 +1265,12 @@ header {
 .footer-continear {
     padding: 20px 0;
     color: var(--bg-dark);
-    gap: 20px;
+    gap: 10px;
 }
 
 .footer-continear .logo-text {
     justify-content: start;
-    margin-left: 20px;
+    margin-left: 10px;
     gap: 10px;
 }
 
@@ -1286,10 +1286,11 @@ header {
 }
 
 .pge-que {
+    display: flex;
     justify-content: flex-start;
     align-items: flex-start;
-    gap: 30px;
-    padding: 0 30px;
+    gap: 20px;
+    padding: 0 15px;
 }
 
 .pge-que .pge a, .que a {
@@ -1300,16 +1301,20 @@ header {
 
 .footer-continear .products {
     color: var(--bragnte);
-    padding: 0 20px;
+    padding: 0 10px;
 }
 
 .footer-continear h3 {
     text-align: center;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 300;
 }
 
 .footer-continear .hg, .footer-continear .social-icons a {
     color: var(--bg-dark);
     font-family: var(--font-cabin);
+    font-weight: 300;
 }
 
 .footer-continear a span {
@@ -1321,10 +1326,12 @@ header {
     gap: 20px;
 }
 
-.social-icons-contact a {
+.social-icons a {
     color: var(--bragnte);
-    font-size: xx-large;
+    font-size: x-large;
 }
+
+
 
 .account{
     display: flex;

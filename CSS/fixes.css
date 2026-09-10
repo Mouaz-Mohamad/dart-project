@@ -317,11 +317,7 @@ button,
   }
 }
 
-@media (max-width: 380px) {
-  .products-grid {
-    grid-template-columns: 1fr;
-  }
-}
+
 
 /* Shared OpenStreetMap address controls */
 .dart-address-status {
