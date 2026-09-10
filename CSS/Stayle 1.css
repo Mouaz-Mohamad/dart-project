@@ -1130,14 +1130,13 @@ header {
 .birthday-details .birthday-conteiner2 h1,
 .card-conteiner h1 {
     font-family: var(--font-irish);
-    font-size: clamp(60px, 7vw, 60px);
+    font-size: clamp(50px, 7vw, 60px);
     -webkit-text-stroke: 0.2px var(--white);
 }
 
 .story .container-story h1,
 .birthday-details .birthday-conteiner2 h1 {
     text-align: left;
-    margin-left: 10px;
     color: var(--bragnte);
     width: 100%;
 }
@@ -1159,7 +1158,7 @@ header {
 }
 
 .story .container-story h3 { 
-    width: 260px;
+    width: 75%;
     
 }
 
@@ -1172,10 +1171,9 @@ header {
 
 .story img {
     position: absolute;
-    right: -50px;
+    right: -55px;
     bottom: 0;
-    max-width: 90%;
-    max-height: 90%;
+    max-height: 100%;
 }
 
 .birthday-details img {
