@@ -1,5 +1,5 @@
-// BEGIN V9 cache refresh — birthday rewards and requested UI additions.
-const CACHE = 'dart-static-v9';
+// BEGIN V9.1 cache refresh — representative actions and automatic Dart Card discount.
+const CACHE = 'dart-static-v9-1';
 // END V9 cache refresh.
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 

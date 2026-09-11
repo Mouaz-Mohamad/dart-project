@@ -261,6 +261,38 @@
     return reward?.status === "Active" ? reward : null;
   }
 
+  function dartCardExpiry(value) {
+    const parts = String(value || "")
+      .split(/[-/]/)
+      .map(Number);
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+    return parts[0] > 999
+      ? new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999)
+      : new Date(parts[2], parts[1] - 1, parts[0], 23, 59, 59, 999);
+  }
+
+  function activeDartCard(user = currentUser(), requestedItems = 0) {
+    if (!user?.customerId) return null;
+    const quantity = Math.max(0, Math.trunc(Number(requestedItems) || 0));
+    return (
+      read("dart_cards", []).find((card) => {
+        const limit = Number(card.itemLimit || card.purchasedLimit || 10),
+          used = Number(card.purchasedItems || 0),
+          expiry = dartCardExpiry(card.expDate),
+          remaining = Math.max(0, limit - used);
+        return (
+          card.clientId === user.customerId &&
+          card.status === "Active" &&
+          !card.isArchived &&
+          !card.isDeleted &&
+          remaining > 0 &&
+          (!quantity || quantity <= remaining) &&
+          (!expiry || expiry >= new Date())
+        );
+      }) || null
+    );
+  }
+
   function visibleBirthdayReward(user = currentUser()) {
     return syncBirthdayRewards(user);
   }
@@ -794,11 +826,12 @@
           : 0,
       ),
     );
-    let appliedCard = window.dartAppliedPromotion?.cardId
-      ? read("dart_cards", []).find(
-          (card) => card.cardId === window.dartAppliedPromotion.cardId,
-        )
-      : null;
+    const requestedCardId = window.dartAppliedPromotion?.cardId;
+    let appliedCard =
+      logged && logged.customerId === customer.clientId
+        ? activeDartCard(logged, allocations.length)
+        : null;
+    if (!appliedCard && requestedCardId) discountRate = 0;
     if (appliedCard) {
       const parts = String(appliedCard.expDate || "")
           .split(/[-/]/)
@@ -820,6 +853,8 @@
       ) {
         appliedCard = null;
         discountRate = 0;
+      } else {
+        discountRate = 0.4;
       }
     }
     // Birthday always takes priority and never consumes Dart Card quota.
@@ -857,6 +892,8 @@
       finalAmount,
       reasonDeduction: birthdayReward
         ? "Birthday gift"
+        : appliedCard
+          ? "Dart Card"
         : discountRate
           ? "Verified promotion"
           : "-",
@@ -2328,6 +2365,7 @@
     renderFeedbackEligibility,
     updateCartReservationTimer,
     activeBirthdayReward,
+    activeDartCard,
     visibleBirthdayReward,
     syncBirthdayRewards,
     updateBirthdayRewardForOrder,
