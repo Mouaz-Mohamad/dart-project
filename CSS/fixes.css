@@ -1,9 +1,4 @@
 /* Dart stability and responsive fixes. Desktop visual identity intentionally unchanged. */
-:focus-visible {
-  outline: 3px solid rgba(171, 1, 43, 0.38);
-  outline-offset: 3px;
-}
-
 button,
 [role="button"],
 .arrwo-for-other-adrees {
