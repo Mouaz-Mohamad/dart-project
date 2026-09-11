@@ -2000,7 +2000,6 @@ button,
   isolation: isolate;
   display: grid;
   gap: clamp(11px, 2vw, 18px);
-  aspect-ratio: 1.58 / 1;
   /* min-height: 250px; */
   padding: clamp(10px, 4vw, 15px);
   /* overflow: hidden; */
