@@ -39,7 +39,9 @@
         );
 
   function currentOrder() {
-    const orders = read("dart_orders", []).filter((order) => !order.isDeleted);
+    const orders = read("dart_orders", []).filter(
+      (order) => !order.isDeleted && order.status !== "Delivered",
+    );
     const requested = new URLSearchParams(location.search).get("order");
     if (requested) {
       const exact = orders.find(
@@ -47,7 +49,7 @@
           String(order.orderId) === String(requested) ||
           String(order.id) === String(requested),
       );
-      if (exact) return exact;
+      return exact || null;
     }
 
     const lastOrderId = sessionStorage.getItem("dart_last_order_id");
@@ -313,7 +315,7 @@
     const items = card.querySelector(".items-box");
     if (items)
       items.innerHTML =
-        '<div class="empty-state">No order matches this tracking link.</div>';
+        '<div class="empty-state">No active order matches this tracking link. Delivered orders are removed from tracking.</div>';
     const driver = card.querySelector(".driver-box");
     if (driver)
       driver.innerHTML =

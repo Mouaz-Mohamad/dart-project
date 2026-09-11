@@ -44,7 +44,10 @@ node tests/platform-unit.js
 node tests/rep-unit.js
 node tests/tracking-unit.js
 node tests/address-unit.js
+node tests/dashboard-v9-unit.js
+node tests/v9-requested-features.js
 python3 tests/static_checks.py
+node tests/seo_checks.js
 node tests/catalog-browser.js
 node --check Js/dart-platform.js
 node --check Eye/dart-operations-v4.js
@@ -60,6 +63,14 @@ See `API_CONTRACT.md` for the mandatory Node.js / Express handoff and `IMAGE_DES
 localStorage is not a shared database and must not hold real passwords, National ID images or authoritative orders. Live cross-device tracking requires authenticated server APIs plus WebSocket or Server-Sent Events. Production image files must be stored privately with encrypted storage and short-lived signed URLs.
 
 See `CODE_MAP.md` and `VERIFICATION_REPORT.md` for implementation boundaries and verification.
+
+## V9 birthday and card experience
+
+- The Brand dashboard birthday widget is an unsent WhatsApp queue. At 20:00 Cairo it shows active clients whose birthday is the next day; queueing selected messages removes only those clients from the widget.
+- Logged-in customers receive one 30% Birthday reward from 00:00 Cairo on their birthday for seven calendar days. It is applied automatically, used once, never stacks and always takes priority over Dart Card without spending Dart Card quota.
+- The supplied birthday artwork is the celebration-card background. Its countdown sits in the reserved top area; closing the celebration hides it for that browser tab/session only.
+- The storefront and dashboard additions remain a localStorage prototype. WhatsApp sending, authoritative clocks, reward locking, checkout validation and deletion authorization must be implemented by the backend described in `API_CONTRACT.md`.
+- The dashboard can grant the fixed 40% / 10-piece Dart Card manually through `Additional Benefit`; issue and expiry dates remain editable.
 
 ## V8 corrections
 

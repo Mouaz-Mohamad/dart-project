@@ -149,7 +149,7 @@ Location updates must be accepted only from the assigned active representative a
 - `POST /api/v1/returns`, `GET /api/v1/me/returns`, admin review/update endpoints.
 - `POST /api/v1/reviews` only if the authenticated customer has at least one `Delivered` order.
 - `GET /api/v1/leaderboard` returns current candidates; customers with an active Dart Card are excluded until 10 delivered items or one year. Its `purchasedItems` value is the net count of delivered physical item codes in the selected month after subtracting completed post-delivery returns (`Good` or `Damaged`). Pending or rejected return requests must not reduce the score. Deduplicate by physical Item Code so one return can never be subtracted twice.
-- `GET /api/v1/items/:code/authenticity` returns success only for a sold item and a privacy-masked owner name.
+- `GET /api/v1/items/:code/authenticity` returns success only for a sold item. The customer-facing response includes product name/image, physical Item Code, size, color and only the first two parts of the registered owner's name.
 - If no delivered purchases exist, leaderboard fallback rows are registered accounts marked `not eligible`; no winner is selected.
 
 ## Response codes
@@ -207,3 +207,56 @@ Assignment and `Out With Representative` do not activate live tracking. `POST /r
 ## Customer ranking and trend
 
 Monthly and annual reports include Delivered orders only, count orders first, and use net spending (`finalAmount - amountRefunded`) as the tie-breaker. Month and year parameters are mutually exclusive. Age is derived from birthday at response/display time. Client trend compares the most recent complete calendar month with the complete month immediately before it for both delivered order count and net spending.
+
+# V9 birthday rewards and requested dashboard operations
+
+## Birthday message queue
+
+- All birthday dates, queue windows and reward expiry calculations use the `Africa/Cairo` time zone.
+- `GET /api/v1/admin/birthdays/tomorrow` returns active customers whose birthday is the next Cairo calendar day. It becomes available at 20:00 Cairo on the preceding day and returns only customers whose message has not been sent for that birthday occurrence.
+- `POST /api/v1/admin/birthday-messages/:customerId/send` queues/sends the WhatsApp greeting idempotently using `(customerId, birthdayDate)` as the unique key. Remove a customer from the dashboard widget only after the server accepts the request; an empty result means every applicable customer is already sent or no birthday exists tomorrow.
+- Persist delivery status (`queued`, `sent`, `failed`), provider message ID, attempt count and timestamps. A failed provider request remains retryable and must not be recorded as sent.
+- The current browser prototype stores the action in `dart_message_queue`; the real WhatsApp delivery still requires this backend endpoint and a configured provider.
+
+## Birthday reward lifecycle and checkout priority
+
+The server creates one reward per customer and birthday year:
+
+```json
+{
+  "id": "BDAY-DR-1-2026",
+  "customerId": "DR-1",
+  "type": "Birthday",
+  "discountPercent": 30,
+  "usageLimit": 1,
+  "usedCount": 0,
+  "startsAt": "2026-09-01T21:00:00.000Z",
+  "expiresAt": "2026-09-08T21:00:00.000Z",
+  "status": "Active",
+  "orderId": null
+}
+```
+
+- `startsAt` is 00:00 Cairo on the birthday and `expiresAt` is 00:00 Cairo seven calendar days later. Store UTC instants, but calculate the calendar boundaries in Cairo.
+- Allowed states are `Scheduled`, `Active`, `Reserved`, `Used` and `Expired`.
+- At checkout, an active Birthday reward always takes priority over coupons and Dart Card, regardless of percentage. Discounts never stack.
+- `POST /api/v1/orders` validates and reserves the Birthday reward in the same database transaction that creates the order. A reserved Birthday reward does not consume Dart Card pieces.
+- Mark the reward `Used` only when its linked order becomes `Delivered`. If that order becomes `Cancelled` or `Refused`, restore it to `Active` when it has not expired; otherwise mark it `Expired`.
+- The storefront countdown is informational. The server must reject expired/reused rewards even if the browser displays stale data.
+
+## Dart Card manual benefit
+
+- `POST /api/v1/admin/dart-cards` grants an Additional Benefit manually. The default and only current benefit is `40%`, up to `10` net retained pieces, with editable issue/expiry dates defaulting to today and one year later.
+- Reject a second active Dart Card for the same customer with HTTP `409`.
+- A completed return (`Good` or `Damaged`) for an item bought with Dart Card decrements its consumed-piece count exactly once. Reactivate a quota-completed card only if it is still within its expiry date.
+- The profile may display the most recent inactive/expired card; the server response must expose its status rather than deleting its history.
+
+## Destructive dashboard actions
+
+- Before permanent deletion, `GET /api/v1/admin/delete-impact/:entityType/:id` returns counts of linked records.
+- `DELETE /api/v1/admin/:entityType/:id?mode=only|cascade` requires an explicit per-operation choice. `only` removes only the selected record and preserves linked records; `cascade` removes the selected record and the previewed linked data in one transaction.
+- Both modes require an admin role, an immutable audit event and a second-step confirmation token. Cascade deletion is intended for pre-launch/test cleanup and should be disabled or heavily restricted after production launch.
+
+## Tracking visibility
+
+`GET /api/v1/me/active-orders` and public tracking-token responses exclude `Delivered` orders. Delivery remains available in account order history, but it no longer appears on the Track Your Order page.

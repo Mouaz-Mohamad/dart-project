@@ -21,3 +21,20 @@ Implementation notes and backend boundaries are in `README.md` and `API_CONTRACT
 - Added one full-site smoke test for shared sections, menus, filters, authentication switches, receipt rendering, tracking, every dashboard navigation target and root PWA/SEO files.
 - Added automated SEO/structure checks for metadata, JSON-LD, sitemap membership, noindex pages, unique canonical files, explicit button types and safe external links.
 - Improved public metadata, social previews, structured data and heading semantics; added private-page indexing headers for Vercel.
+
+## V9 birthday rewards and Dart Card experience
+
+- Added the Cairo-time birthday send queue to the Brand dashboard. It opens at 8:00 PM for the next day's birthdays and removes each selected customer immediately after the message is queued.
+- Added the seven-day 30% Birthday reward lifecycle, one-use reservation at checkout, Delivered confirmation and Cancelled/Refused restoration while still valid.
+- Made Birthday discount automatically override every other promotion without stacking or consuming Dart Card pieces.
+- Added the full-screen birthday card using the supplied Dart artwork as a background, with a 60px Days/Hours/Minutes countdown inside its blank top area, balloons/confetti and a session-only Close action.
+- Added the vertical under-nav ticker for Welcome and the active Birthday reward while keeping the shopping icon fixed.
+- Expanded sold-item authenticity results with product image/name, Item Code, size, color and the owner's first two names.
+- Redesigned the public Leaderboard for at most three candidates with gold/burgundy, silver and bronze ranks and three-part names.
+- Simplified the customer return/exchange form to Item Code only; Model Code is derived from the immutable order snapshot or inventory record.
+- Rebuilt the profile Dart Card from the supplied reference with the white logo and dynamic customer/card values; inactive history remains visible.
+- Restored prepared Instagram, Facebook, TikTok, YouTube and WhatsApp placeholders to the side menu and footer without publishing placeholder destinations.
+- Removed Delivered orders from the active tracking page while retaining them in customer history.
+- Added a per-delete modal offering record-only or linked-data cascade deletion, plus Cancel.
+- Added the Dart Card `Additional Benefit` action for manual grants with customer autofill, fixed 40%/10-piece rules and editable issue/expiry dates.
+- Added automated V9 feature-contract checks and bumped the static cache to `dart-static-v9`.

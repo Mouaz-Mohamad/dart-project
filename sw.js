@@ -1,6 +1,6 @@
-// BEGIN V8.1 cache refresh — deliver the corrected net Leaderboard calculation.
-const CACHE = 'dart-static-v8-1';
-// END V8.1 cache refresh.
+// BEGIN V9 cache refresh — birthday rewards and requested UI additions.
+const CACHE = 'dart-static-v9';
+// END V9 cache refresh.
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));

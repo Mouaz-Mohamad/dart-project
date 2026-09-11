@@ -162,9 +162,9 @@ function renderCards(dataArray) {
             <div class="${getRowClass(item)}" data-id="${item.id}">
                 <input type="checkbox" class="model-checkbox" ${item.isChecked ? "checked" : ""}>
                 <div class="w100 button row-action-btns">
-                    <button class="action-btn btn-delete" title="شطب"><i class="bx bx-minus-circle"></i></button>
-                    <button class="action-btn btn-hard-delete" title="حذف نهائي"><i class="bx bx-trash"></i></button>
-                    <button class="action-btn btn-edit" title="تعديل"><i class="bx bx-edit"></i></button>
+                    <button type="button" class="action-btn btn-delete" title="شطب"><i class="bx bx-minus-circle"></i></button>
+                    <button type="button" class="action-btn btn-hard-delete" title="حذف نهائي"><i class="bx bx-trash"></i></button>
+                    <button type="button" class="action-btn btn-edit" title="تعديل"><i class="bx bx-edit"></i></button>
                 </div>
                 <span class="text-item overflow w150">${item.cardId}</span>
                 <span class="text-item overflow w150">${item.clientName}</span>
@@ -185,54 +185,181 @@ function renderCards(dataArray) {
 }
 
 // النافذة المنبثقة للكروت
+function dartCardIsCurrentlyActive(card, reference = new Date()) {
+  if (!card || card.status !== "Active" || dartIsArchived(card)) return false;
+  const limit = Number(card.itemLimit || card.purchasedLimit || 10),
+    used = Number(card.purchasedItems || 0),
+    parsedExpiry = dartDateValue(card.expDate),
+    expiry = parsedExpiry ? new Date(parsedExpiry) : null;
+  if (expiry) expiry.setHours(23, 59, 59, 999);
+  return used < limit && (!expiry || expiry >= reference);
+}
+
 function setupCardModal() {
   const modal = document.getElementById("card-modal");
   const form = document.getElementById("card-form");
+  if (!modal || !form || form.dataset.dartBound) return;
+  form.dataset.dartBound = "1";
+  const clientSelect = document.getElementById("modal-card-client-id"),
+    inputDate = (value) => {
+      const date = dartDateValue(value);
+      if (!date) return "";
+      const year = date.getFullYear(),
+        month = String(date.getMonth() + 1).padStart(2, "0"),
+        day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    },
+    fillClient = (clientId) => {
+      const client = customersData.find(
+        (row) => String(row.clientId) === String(clientId),
+      );
+      document.getElementById("modal-card-client-name").value =
+        client?.clientName || "";
+      document.getElementById("modal-card-phone1").value = client?.phone1 || "";
+      document.getElementById("modal-card-phone2").value = client?.phone2 || "-";
+      document.getElementById("modal-card-email").value = client?.email || "";
+    };
 
-  if (form) {
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const editId = document.getElementById("modal-card-edit-id")?.value;
+  window.dartOpenCardEditor = (card = null) => {
+    form.reset();
+    clientSelect.innerHTML =
+      '<option value="">Select client</option>' +
+      customersData
+        .filter(dartIsActive)
+        .map(
+          (customer) =>
+            `<option value="${dartEsc(customer.clientId)}">${dartEsc(customer.clientName)} — ${dartEsc(customer.clientId)}</option>`,
+        )
+        .join("");
+    const today = new Date(),
+      expiry = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+    document.getElementById("modal-card-edit-id").value = card?.id || "";
+    document.getElementById("modal-card-code-id").value =
+      card?.cardId || `DC-${Date.now().toString(36).toUpperCase()}`;
+    clientSelect.value = card?.clientId || "";
+    fillClient(clientSelect.value);
+    document.getElementById("modal-card-purchased").value =
+      Number(card?.purchasedItems || 0);
+    document.getElementById("modal-card-limit").value = "10";
+    document.getElementById("modal-card-discount").value = "40%";
+    document.getElementById("modal-card-issue").value =
+      inputDate(card?.issueDate) || inputDate(today);
+    document.getElementById("modal-card-exp").value =
+      inputDate(card?.expDate) || inputDate(expiry);
+    document.getElementById("modal-card-status").value = card?.status || "Active";
+    document.getElementById("card-modal-title").textContent = card
+      ? "Edit Dart Card Benefit"
+      : "Additional Benefit — Dart Card";
+    form.querySelector('[type="submit"]').textContent = card
+      ? "Save Dart Card"
+      : "Grant Dart Card";
+    openModal(modal);
+  };
 
-      const cardPayload = {
-        cardId:
-          document.getElementById("modal-card-code-id")?.value ||
-          "CRD-" + Math.floor(Math.random() * 100),
-        clientName:
-          document.getElementById("modal-card-client-name")?.value || "",
-        clientId: document.getElementById("modal-card-client-id")?.value || "",
-        phone1: document.getElementById("modal-card-phone1")?.value || "",
-        phone2: document.getElementById("modal-card-phone2")?.value || "-",
-        email: document.getElementById("modal-card-email")?.value || "",
-        status: document.getElementById("modal-card-status")?.value || "Active",
-        issueDate:
-          document.getElementById("modal-card-issue")?.value ||
-          new Date().toLocaleDateString("en-GB"),
-        expDate: document.getElementById("modal-card-exp")?.value || "",
-        purchasedItems:
-          document.getElementById("modal-card-purchased")?.value || "0",
-        purchasedLimit:
-          document.getElementById("modal-card-limit")?.value || "20",
-        requestedProducts: ["IT-01", "IT-02"],
-        isDeleted: false,
-        isChecked: false,
+  clientSelect.addEventListener("change", () => fillClient(clientSelect.value));
+  document
+    .getElementById("openCardBenefitBtn")
+    ?.addEventListener("click", () => window.dartOpenCardEditor());
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const editId = document.getElementById("modal-card-edit-id").value,
+      client = customersData.find(
+        (row) => String(row.clientId) === String(clientSelect.value),
+      ),
+      issueDate = document.getElementById("modal-card-issue").value,
+      expDate = document.getElementById("modal-card-exp").value,
+      purchasedItems = Number(
+        document.getElementById("modal-card-purchased").value,
+      );
+    if (!client) return alert("اختر العميل أولًا.");
+    if (!issueDate || !expDate || new Date(expDate) <= new Date(issueDate))
+      return alert("تاريخ الانتهاء يجب أن يكون بعد تاريخ الإصدار.");
+    if (!Number.isInteger(purchasedItems) || purchasedItems < 0 || purchasedItems > 10)
+      return alert("عدد القطع المستخدمة يجب أن يكون من 0 إلى 10.");
+    if (
+      document.getElementById("modal-card-status").value === "Active" &&
+      cardsData.some(
+        (row) =>
+          String(row.id) !== String(editId) &&
+          row.clientId === client.clientId &&
+          dartCardIsCurrentlyActive(row),
+      )
+    )
+      return alert("هذا العميل لديه Dart Card نشط بالفعل.");
+
+    const cardPayload = {
+      cardId: document.getElementById("modal-card-code-id").value,
+      clientName: client.clientName,
+      clientId: client.clientId,
+      phone1: client.phone1 || "",
+      phone2: client.phone2 || "-",
+      email: client.email || "",
+      status: document.getElementById("modal-card-status").value || "Active",
+      issueDate,
+      expDate,
+      purchasedItems: String(purchasedItems),
+      purchasedLimit: "10",
+      itemLimit: 10,
+      discountPercent: 40,
+      requestedProducts: editId
+        ? cardsData.find((row) => String(row.id) === String(editId))
+            ?.requestedProducts || []
+        : [],
+      isArchived: false,
+      isDeleted: false,
+      isChecked: false,
+      updatedAt: dartNowISO(),
+    };
+    if (editId) {
+      const card = cardsData.find((row) => String(row.id) === String(editId)),
+        old = { ...card };
+      Object.assign(card, cardPayload);
+      dartAudit("EDIT", "card", card.id, old, cardPayload);
+    } else {
+      const card = {
+        id: dartUid("CARDDB"),
+        createdAt: dartNowISO(),
+        grantType: "Manual Additional Benefit",
+        ...cardPayload,
       };
-
-      if (editId) {
-        const index = cardsData.findIndex((c) => c.id === editId);
-        if (index !== -1)
-          cardsData[index] = { ...cardsData[index], ...cardPayload };
-      } else {
-        cardPayload.id = Date.now().toString();
-        cardsData.push(cardPayload);
-      }
-
-      renderCards(cardsData);
-      saveSectionState("card");
-      closeModal(modal);
-      form.reset();
+      cardsData.push(card);
+      dartAudit("CREATE", "card", card.id, {}, card);
+    }
+    customersData.forEach((customer) => {
+      customer.dartCard = cardsData.some(
+        (row) =>
+          row.clientId === customer.clientId &&
+          dartCardIsCurrentlyActive(row),
+      )
+        ? "yes"
+        : "no";
     });
+    dartSyncUserCardFlags();
+    dartSaveAll();
+    dartRefreshAll();
+    closeModal(modal);
+    form.reset();
+  });
+}
+
+function dartSyncUserCardFlags() {
+  let users;
+  try {
+    users = JSON.parse(localStorage.getItem("dart_users") || "[]");
+  } catch {
+    users = [];
   }
+  users.forEach((user) => {
+    user.dartCard = cardsData.some(
+      (card) =>
+        card.clientId === user.customerId &&
+        dartCardIsCurrentlyActive(card),
+    )
+      ? "yes"
+      : "no";
+  });
+  localStorage.setItem("dart_users", JSON.stringify(users));
 }
 
 // ==========================================
@@ -764,8 +891,8 @@ function dartEsc(v) {
 }
 function dartDateValue(v) {
   if (!v) return null;
-  if (/^\d{2}-\d{2}-\d{4}$/.test(v)) {
-    const [d, m, y] = v.split("-");
+  if (/^\d{2}[/-]\d{2}[/-]\d{4}$/.test(v)) {
+    const [d, m, y] = v.split(/[/-]/);
     return new Date(`${y}-${m}-${d}T00:00:00`);
   }
   const d = new Date(v);
@@ -932,65 +1059,270 @@ function dartLogOrder(order, type, previousStatus, newStatus, meta = {}) {
   });
 }
 
-function dartCanHardDelete(sectionKey, id) {
-  const sid = String(id);
-  const rel = [];
+function dartDeleteImpact(sectionKey, id) {
+  const sid = String(id),
+    impact = {
+      models: new Set(),
+      items: new Set(),
+      customers: new Set(),
+      orders: new Set(),
+      returns: new Set(),
+      review: new Set(),
+      card: new Set(),
+      representative: new Set(),
+      damage: new Set(),
+      clientCodes: new Set(),
+      itemCodes: new Set(),
+      orderCodes: new Set(),
+      returnCodes: new Set(),
+    };
+  const target = sectionsMap[sectionKey]?.data.find(
+    (row) => String(row.id) === sid,
+  );
+  if (!target) return null;
+  impact[sectionKey]?.add(sid);
+
   if (sectionKey === "models") {
-    const m = modelsData.find((x) => String(x.id) === sid);
-    const code = m?.modelId;
-    if (itemsData.some((i) => String(i.modelId) === String(code)))
-      rel.push("Items");
-    if (
-      ordersData.some((o) =>
-        (o.priceSnapshot || []).some(
-          (l) => String(l.modelCode) === String(code),
+    const modelCode = target.modelId;
+    itemsData
+      .filter((row) => String(row.modelId) === String(modelCode))
+      .forEach((row) => {
+        impact.items.add(String(row.id));
+        impact.itemCodes.add(String(row.itemCode));
+      });
+    ordersData
+      .filter((row) =>
+        (row.priceSnapshot || []).some(
+          (line) => String(line.modelCode) === String(modelCode),
         ),
       )
-    )
-      rel.push("Orders");
-  } else if (sectionKey === "items") {
-    const it = itemsData.find((x) => String(x.id) === sid);
-    const code = it?.itemCode;
-    if (ordersData.some((o) => (o.items || []).includes(code)))
-      rel.push("Orders");
-    if (returnsData.some((r) => r.itemCode === code)) rel.push("Returns");
-    if (damageData.some((d) => d.itemCode === code)) rel.push("Damage");
-  } else if (sectionKey === "customers") {
-    const c = customersData.find((x) => String(x.id) === sid);
-    if (ordersData.some((o) => o.clientId === c?.clientId)) rel.push("Orders");
-  } else if (sectionKey === "representative") {
-    if (ordersData.some((o) => String(o.representativeId) === sid))
-      rel.push("Orders");
-  } else if (sectionKey === "orders") {
-    const o = ordersData.find((x) => String(x.id) === sid);
-    if ((o?.items || []).length) rel.push("Items");
-    if (returnsData.some((r) => r.orderId === o?.orderId)) rel.push("Returns");
-  } else if (sectionKey === "returns") {
-    const r = returnsData.find((x) => String(x.id) === sid);
-    if (damageData.some((d) => d.returnId === r?.returnId)) rel.push("Damage");
-  } else if (sectionKey === "damage") {
-    const d = damageData.find((x) => String(x.id) === sid);
-    if (d?.itemCode) rel.push("Item history");
+      .forEach((row) => {
+        impact.orders.add(String(row.id));
+        impact.orderCodes.add(String(row.orderId));
+      });
   }
-  return { allowed: rel.length === 0, relations: [...new Set(rel)] };
+  if (sectionKey === "items") impact.itemCodes.add(String(target.itemCode));
+  if (sectionKey === "customers") impact.clientCodes.add(String(target.clientId));
+  if (sectionKey === "orders") impact.orderCodes.add(String(target.orderId));
+  if (sectionKey === "returns") impact.returnCodes.add(String(target.returnId));
+
+  if (sectionKey === "representative") {
+    ordersData
+      .filter(
+        (row) =>
+          [row.representativeId, row.representativeBusinessId].some(
+            (value) =>
+              String(value) === sid || String(value) === String(target.repId),
+          ),
+      )
+      .forEach((row) => {
+        impact.orders.add(String(row.id));
+        impact.orderCodes.add(String(row.orderId));
+      });
+  }
+
+  if (impact.clientCodes.size) {
+    ordersData
+      .filter((row) => impact.clientCodes.has(String(row.clientId)))
+      .forEach((row) => {
+        impact.orders.add(String(row.id));
+        impact.orderCodes.add(String(row.orderId));
+      });
+    returnsData
+      .filter((row) => impact.clientCodes.has(String(row.clientId)))
+      .forEach((row) => {
+        impact.returns.add(String(row.id));
+        impact.returnCodes.add(String(row.returnId));
+      });
+    reviewsData
+      .filter((row) => impact.clientCodes.has(String(row.clientId)))
+      .forEach((row) => impact.review.add(String(row.id)));
+    cardsData
+      .filter((row) => impact.clientCodes.has(String(row.clientId)))
+      .forEach((row) => impact.card.add(String(row.id)));
+  }
+
+  if (impact.itemCodes.size) {
+    ordersData
+      .filter((row) =>
+        (row.items || []).some((code) => impact.itemCodes.has(String(code))),
+      )
+      .forEach((row) => {
+        impact.orders.add(String(row.id));
+        impact.orderCodes.add(String(row.orderId));
+      });
+    returnsData
+      .filter((row) => impact.itemCodes.has(String(row.itemCode)))
+      .forEach((row) => {
+        impact.returns.add(String(row.id));
+        impact.returnCodes.add(String(row.returnId));
+      });
+    damageData
+      .filter((row) => impact.itemCodes.has(String(row.itemCode)))
+      .forEach((row) => impact.damage.add(String(row.id)));
+  }
+
+  if (impact.orderCodes.size) {
+    ordersData
+      .filter((row) => impact.orderCodes.has(String(row.orderId)))
+      .forEach((row) => {
+        impact.orders.add(String(row.id));
+        (row.items || []).forEach((code) => impact.itemCodes.add(String(code)));
+      });
+    itemsData
+      .filter(
+        (row) =>
+          impact.orderCodes.has(String(row.orderId)) ||
+          impact.itemCodes.has(String(row.itemCode)),
+      )
+      .forEach((row) => {
+        impact.items.add(String(row.id));
+        impact.itemCodes.add(String(row.itemCode));
+      });
+    returnsData
+      .filter((row) => impact.orderCodes.has(String(row.orderId)))
+      .forEach((row) => {
+        impact.returns.add(String(row.id));
+        impact.returnCodes.add(String(row.returnId));
+      });
+  }
+
+  if (impact.itemCodes.size) {
+    damageData
+      .filter((row) => impact.itemCodes.has(String(row.itemCode)))
+      .forEach((row) => impact.damage.add(String(row.id)));
+  }
+
+  if (impact.returnCodes.size) {
+    damageData
+      .filter((row) => impact.returnCodes.has(String(row.returnId)))
+      .forEach((row) => impact.damage.add(String(row.id)));
+  }
+
+  const labels = {
+      models: "Models",
+      items: "Items",
+      customers: "Clients",
+      orders: "Orders",
+      returns: "Returns",
+      review: "Reviews / Messages",
+      card: "Dart Cards",
+      representative: "Representatives",
+      damage: "Damage records",
+    },
+    counts = Object.entries(labels)
+      .map(([key, label]) => ({ key, label, count: impact[key].size }))
+      .filter((row) => row.count > 0);
+  return { sectionKey, id: sid, target, impact, counts };
 }
-function deletePermanently(id, sectionKey) {
-  const sec = sectionsMap[sectionKey];
-  if (!sec) return;
-  const check = dartCanHardDelete(sectionKey, id);
-  if (!check.allowed) {
-    alert(
-      `لا يمكن الحذف النهائي لأن السجل مرتبط بـ: ${check.relations.join(", ")}. استخدم الشطب/Archive بدلاً منه.`,
+
+function dartCanHardDelete(sectionKey, id) {
+  const preview = dartDeleteImpact(sectionKey, id),
+    relations = (preview?.counts || [])
+      .filter((row) => row.key !== sectionKey || row.count > 1)
+      .map((row) => `${row.label} (${row.count})`);
+  return { allowed: relations.length === 0, relations };
+}
+
+let dartPendingHardDelete = null;
+function dartCommitHardDelete(mode) {
+  const preview = dartPendingHardDelete;
+  if (!preview) return;
+  const { sectionKey, id, target, impact } = preview,
+    sec = sectionsMap[sectionKey];
+  if (mode === "only") {
+    sec.data = sec.data.filter((row) => String(row.id) !== String(id));
+  } else {
+    modelsData = modelsData.filter((row) => !impact.models.has(String(row.id)));
+    itemsData = itemsData.filter((row) => !impact.items.has(String(row.id)));
+    customersData = customersData.filter(
+      (row) => !impact.customers.has(String(row.id)),
     );
-    return;
+    ordersData = ordersData.filter((row) => !impact.orders.has(String(row.id)));
+    returnsData = returnsData.filter((row) => !impact.returns.has(String(row.id)));
+    reviewsData = reviewsData.filter((row) => !impact.review.has(String(row.id)));
+    cardsData = cardsData.filter((row) => !impact.card.has(String(row.id)));
+    representativeData = representativeData.filter(
+      (row) => !impact.representative.has(String(row.id)),
+    );
+    damageData = damageData.filter((row) => !impact.damage.has(String(row.id)));
+    if (impact.clientCodes.size) {
+      let users;
+      try {
+        users = JSON.parse(localStorage.getItem("dart_users") || "[]");
+      } catch {
+        users = [];
+      }
+      users = users.filter(
+        (row) => !impact.clientCodes.has(String(row.customerId)),
+      );
+      localStorage.setItem("dart_users", JSON.stringify(users));
+      ["dart_birthday_rewards", "dart_birthday_messages", "dart_message_queue"].forEach(
+        (key) => {
+          let rows;
+          try {
+            rows = JSON.parse(localStorage.getItem(key) || "[]");
+          } catch {
+            rows = [];
+          }
+          rows = rows.filter(
+            (row) =>
+              !impact.clientCodes.has(
+                String(row.customerId || row.clientId || ""),
+              ),
+          );
+          localStorage.setItem(key, JSON.stringify(rows));
+        },
+      );
+    }
   }
-  if (!confirm("هل أنت متأكد من الحذف النهائي؟ لن يمكنك استرجاع هذا العنصر."))
-    return;
-  const old = sec.data.find((x) => String(x.id) === String(id));
-  sec.data = sec.data.filter((x) => String(x.id) !== String(id));
-  dartAudit("PERMANENT_DELETE", sectionKey, id, old || {}, {});
+  customersData.forEach((customer) => {
+    customer.dartCard = cardsData.some(
+      (card) =>
+        card.clientId === customer.clientId &&
+        dartCardIsCurrentlyActive(card),
+    )
+      ? "yes"
+      : "no";
+  });
+  dartSyncUserCardFlags();
+  dartAudit(
+    mode === "cascade" ? "PERMANENT_DELETE_WITH_LINKS" : "PERMANENT_DELETE_ONLY",
+    sectionKey,
+    id,
+    target || {},
+    {},
+  );
   dartSaveAll();
-  dartRenderSection(sectionKey);
+  dartRefreshAll();
+  closeModal(document.getElementById("hard-delete-modal"));
+  dartPendingHardDelete = null;
+}
+
+function deletePermanently(id, sectionKey) {
+  const preview = dartDeleteImpact(sectionKey, id),
+    modal = document.getElementById("hard-delete-modal");
+  if (!preview || !modal) return;
+  dartPendingHardDelete = preview;
+  document.getElementById("hard-delete-summary").textContent =
+    "اختر طريقة الحذف لهذه المرة. الحذف النهائي لا يمكن استرجاعه.";
+  const linked = preview.counts.filter(
+      (row) => row.key !== sectionKey || row.count > 1,
+    ),
+    relations = document.getElementById("hard-delete-relations");
+  relations.classList.toggle("is-empty", !linked.length);
+  relations.innerHTML = linked.length
+    ? `<strong>Linked data:</strong> ${linked.map((row) => `${dartEsc(row.label)} (${row.count})`).join(" · ")}`
+    : "No linked records were found.";
+  document.getElementById("hard-delete-only").onclick = () =>
+    dartCommitHardDelete("only");
+  document.getElementById("hard-delete-cascade").onclick = () =>
+    dartCommitHardDelete("cascade");
+  document.getElementById("hard-delete-cancel").onclick = () => {
+    dartPendingHardDelete = null;
+    closeModal(modal);
+  };
+  openModal(modal);
 }
 
 function dartCustomerStats(clientId) {
@@ -1101,6 +1433,30 @@ function dartAssignRepresentative(order, repId) {
   return true;
 }
 
+function dartUpdateBirthdayRewardForOrder(order, target) {
+  if (!order?.birthdayRewardId) return;
+  let rewards;
+  try {
+    rewards = JSON.parse(localStorage.getItem("dart_birthday_rewards") || "[]");
+  } catch {
+    rewards = [];
+  }
+  const reward = rewards.find((row) => row.id === order.birthdayRewardId);
+  if (!reward) return;
+  if (target === "Delivered") {
+    reward.status = "Used";
+    reward.usedCount = 1;
+    reward.usedAt = order.deliveredAt || dartNowISO();
+    order.birthdayRewardUsageRecorded = true;
+  } else if (["Cancelled", "Refused"].includes(target)) {
+    reward.status = new Date() < new Date(reward.expiresAt) ? "Active" : "Expired";
+    reward.orderId = "";
+    reward.reservedAt = null;
+    order.birthdayRewardUsageRecorded = false;
+  }
+  localStorage.setItem("dart_birthday_rewards", JSON.stringify(rewards));
+}
+
 function dartApplyTransition(order, target, meta = {}) {
   if (!dartCanTransition(order, target))
     return {
@@ -1186,6 +1542,8 @@ function dartApplyTransition(order, target, meta = {}) {
     order.cancellationReason = meta.reason || "Cancelled";
     dartReleaseOrderItems(order, "In stock");
   }
+  if (["Delivered", "Cancelled", "Refused"].includes(target))
+    dartUpdateBirthdayRewardForOrder(order, target);
   dartLogOrder(order, meta.type || "STATUS_CHANGED", prev, target, meta);
   dartAudit(
     "ORDER_STATUS_CHANGE",
@@ -1270,6 +1628,30 @@ function dartInspectReturn(r, condition) {
         isDeleted: false,
         isChecked: false,
       });
+  }
+  if (!r.dartCardUsageReversed) {
+    const order = ordersData.find(
+        (row) => String(row.orderId) === String(r.orderId),
+      ),
+      card = order?.dartCardId
+        ? cardsData.find((row) => row.cardId === order.dartCardId)
+        : null;
+    if (card && order.dartCardUsageRecorded) {
+      card.purchasedItems = String(
+        Math.max(0, Number(card.purchasedItems || 0) - 1),
+      );
+      card.requestedProducts = (card.requestedProducts || []).filter(
+        (code) => String(code) !== String(r.itemCode),
+      );
+      if (
+        card.status === "Expired" &&
+        Number(card.purchasedItems) <
+          Number(card.itemLimit || card.purchasedLimit || 10) &&
+        (!dartDateValue(card.expDate) || dartDateValue(card.expDate) >= new Date())
+      )
+        card.status = "Active";
+      r.dartCardUsageReversed = true;
+    }
   }
   dartAudit(
     "RETURN_INSPECTION",
@@ -2345,6 +2727,29 @@ function dartRollbackOrderOneStep(order) {
       order.amountPaid = 0;
       order.paidAt = null;
     }
+    if (order.birthdayRewardId) {
+      let rewards;
+      try {
+        rewards = JSON.parse(
+          localStorage.getItem("dart_birthday_rewards") || "[]",
+        );
+      } catch {
+        rewards = [];
+      }
+      const reward = rewards.find((row) => row.id === order.birthdayRewardId);
+      if (reward) {
+        reward.status =
+          new Date() < new Date(reward.expiresAt) ? "Reserved" : "Expired";
+        reward.usedCount = 0;
+        reward.usedAt = null;
+        reward.orderId = order.orderId;
+        order.birthdayRewardUsageRecorded = false;
+        localStorage.setItem(
+          "dart_birthday_rewards",
+          JSON.stringify(rewards),
+        );
+      }
+    }
   }
   if (prevStatus === "Representative On The Way")
     order.representativeOnWayAt = null;
@@ -2743,27 +3148,108 @@ function renderNotifications() {
   }
 }
 
-function dartTomorrowBirthdays() {
-  const t = new Date();
-  t.setDate(t.getDate() + 1);
-  return customersData.filter(dartIsActive).filter((c) => {
-    const d = dartDateValue(c.birthday);
-    return d && d.getDate() === t.getDate() && d.getMonth() === t.getMonth();
-  });
+function dartCairoCalendar(reference = new Date()) {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Cairo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(reference)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)]),
+  );
+}
+function dartBirthdayMonthDay(value) {
+  const text = String(value || "").trim(),
+    yearFirst = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/),
+    dayFirst = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (yearFirst)
+    return { month: Number(yearFirst[2]), day: Number(yearFirst[3]) };
+  if (dayFirst)
+    return { month: Number(dayFirst[2]), day: Number(dayFirst[1]) };
+  const parsed = dartDateValue(value);
+  return parsed
+    ? { month: parsed.getMonth() + 1, day: parsed.getDate() }
+    : null;
+}
+function dartBirthdayMessageBatch(reference = new Date()) {
+  const cairo = dartCairoCalendar(reference);
+  if (cairo.hour < 20)
+    return { open: false, key: "", target: null, all: [], rows: [] };
+  const targetDate = new Date(
+      Date.UTC(cairo.year, cairo.month - 1, cairo.day + 1),
+    ),
+    target = {
+      year: targetDate.getUTCFullYear(),
+      month: targetDate.getUTCMonth() + 1,
+      day: targetDate.getUTCDate(),
+    },
+    key = `${target.year}-${String(target.month).padStart(2, "0")}-${String(target.day).padStart(2, "0")}`,
+    history = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("dart_birthday_messages") || "[]");
+      } catch {
+        return [];
+      }
+    })(),
+    all = customersData.filter(dartIsActive).filter((customer) => {
+      const birthday = dartBirthdayMonthDay(customer.birthday);
+      return (
+        birthday &&
+        birthday.day === target.day &&
+        birthday.month === target.month
+      );
+    }),
+    sent = new Set(
+      history
+        .filter((row) => row.birthdayDate === key)
+        .flatMap((row) => [String(row.customerRecordId || ""), String(row.clientId || "")]),
+    ),
+    rows = all.filter(
+      (customer) =>
+        !sent.has(String(customer.id)) && !sent.has(String(customer.clientId)),
+    );
+  return { open: true, key, target, all, rows };
+}
+function dartTomorrowBirthdays(reference = new Date()) {
+  return dartBirthdayMessageBatch(reference).rows;
 }
 function renderBirthdayWidget() {
   const feed = document.getElementById("birthday-feed");
   if (!feed) return;
-  const rows = dartTomorrowBirthdays();
-  feed.innerHTML =
-    rows
+  const batch = dartBirthdayMessageBatch(),
+    rows = batch.rows,
+    label = document.getElementById("birthdayWindowLabel"),
+    send = document.getElementById("sendBdayBtn");
+  if (label)
+    label.textContent = batch.open
+      ? `Birthday messages for ${batch.key} · unsent only`
+      : "Tomorrow's birthday messages · opens 8:00 PM Cairo";
+  if (!batch.open)
+    feed.innerHTML =
+      '<div class="dart-empty-state">Messages for tomorrow open at 8:00 PM Cairo.</div>';
+  else if (!batch.all.length)
+    feed.innerHTML =
+      '<div class="dart-empty-state">No customer birthdays tomorrow.</div>';
+  else if (!rows.length)
+    feed.innerHTML =
+      '<div class="dart-empty-state dart-birthday-all-sent">All birthday messages for tomorrow have been queued.</div>';
+  else
+    feed.innerHTML = rows
       .map(
         (c) =>
-          `<div class="bday-item overflow" data-client-id="${dartEsc(c.id)}"><input type="checkbox" class="bday-checkbox"><span class="bday-date w100">${dartEsc(c.birthday)}</span><span class="bday-name w150">${dartEsc(c.clientName)}</span><span class="bday-age w100">${dartEsc(dartClientAgeLabel(c.birthday))}</span><span class="bday-phone w100">${dartEsc(c.phone1)}</span><span class="orders w100">${dartCurrentMonthlyOrders(c.clientId)} Order</span><span class="from w100">${dartEsc(c.governorate || c.country || "-")}</span></div>`,
+          `<div class="bday-item overflow" data-client-id="${dartEsc(c.id)}" data-birthday-date="${dartEsc(batch.key)}"><input type="checkbox" class="bday-checkbox"><span class="bday-date w100">${dartEsc(c.birthday)}</span><span class="bday-name w150">${dartEsc(c.clientName)}</span><span class="bday-age w100">${dartEsc(dartClientAgeLabel(c.birthday))}</span><span class="bday-phone w100">${dartEsc(c.phone1)}</span><span class="orders w100">${dartCurrentMonthlyOrders(c.clientId)} Order</span><span class="from w100">${dartEsc(c.governorate || c.country || "-")}</span></div>`,
       )
-      .join("") || '<div class="dart-empty-state">No birthdays tomorrow</div>';
+      .join("");
+  if (send) send.disabled = !rows.length;
   const master = document.getElementById("selectAllBirthdays");
   if (master) {
+    master.disabled = !rows.length;
     master.checked = false;
     master.indeterminate = false;
     const boxes = [...feed.querySelectorAll(".bday-checkbox")];
@@ -2963,6 +3449,7 @@ function dartEnsureMonthlyDartCardWinners() {
     .filter((x) => x.count > 0)
     .sort((a, b) => b.count - a.count || b.spent - a.spent);
   if (!candidates.length) {
+    dartSyncUserCardFlags();
     localStorage.setItem(marker, "1");
     return;
   }
@@ -3009,6 +3496,7 @@ function dartEnsureMonthlyDartCardWinners() {
       w.c.dartCard = "yes";
     }
   });
+  dartSyncUserCardFlags();
   localStorage.setItem(marker, "1");
 }
 
@@ -3236,6 +3724,8 @@ function updateBrandAnalytics() {
     console.warn("Dart sales chart update skipped:", err);
   }
   renderBirthdayWidget();
+  if (!window.dartBirthdayWidgetTimer)
+    window.dartBirthdayWidgetTimer = setInterval(renderBirthdayWidget, 30000);
   renderTopClients();
   dartCheckStockAlerts();
 }
@@ -3489,6 +3979,10 @@ function openEditModal(id, sectionKey) {
       document.getElementById("modal-return-refund").value =
         x.refundAmount || 0;
     openModal(document.getElementById("return-modal"));
+    return;
+  }
+  if (sectionKey === "card") {
+    window.dartOpenCardEditor?.(x);
     return;
   }
   if (sectionKey === "representative") {

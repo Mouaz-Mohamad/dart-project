@@ -426,6 +426,85 @@ function form(values) {
     "leaderboard must refresh immediately when another return is completed",
   );
   // END Leaderboard regression.
+
+  // BEGIN V9 birthday reward regression.
+  const fixedBirthdayWindow = platform.birthdayWindow(
+    "2008-09-02",
+    new Date("2026-09-02T12:00:00+03:00"),
+  );
+  assert(fixedBirthdayWindow, "birthday reward must start on the Cairo birthday");
+  assert(
+    fixedBirthdayWindow.expiresAt.toISOString() === "2026-09-08T21:00:00.000Z",
+    "birthday reward must expire after seven Cairo calendar days",
+  );
+  assert(
+    platform.birthdayWindow(
+      "2-9-2008",
+      new Date("2026-09-02T12:00:00+03:00"),
+    ),
+    "birthday reward must support existing day-month-year birthday values",
+  );
+
+  const cairoToday = platform.cairoParts(new Date()),
+    users = JSON.parse(localStorage.getItem("dart_users"));
+  users[0].birthday = `2000-${String(cairoToday.month).padStart(2, "0")}-${String(cairoToday.day).padStart(2, "0")}`;
+  localStorage.setItem("dart_users", JSON.stringify(users));
+  localStorage.setItem(
+    "dart_items",
+    JSON.stringify([
+      {
+        id: "i-birthday",
+        itemCode: "I-BIRTHDAY",
+        modelId: "DA-ONE",
+        color: "Black",
+        size: "M",
+        status: "In stock",
+      },
+    ]),
+  );
+  context.cartData = [
+    {
+      id: "DA-ONE",
+      title: "Product 1",
+      price: 600,
+      quantity: 1,
+      size: "M",
+      color: "Black",
+    },
+  ];
+  context.appliedDiscountRate = 0.4;
+  window.dartAppliedPromotion = { cardId: "HIGHER-DART-CARD" };
+  const birthdayOrder = await platform.checkout(validForm);
+  assert(
+    birthdayOrder.discount === 30 && birthdayOrder.finalAmount === 420,
+    "birthday discount must automatically override a higher Dart Card discount",
+  );
+  assert(
+    birthdayOrder.birthdayRewardId && !birthdayOrder.dartCardId,
+    "birthday order must not consume the Dart Card",
+  );
+  let birthdayRewards = JSON.parse(
+    localStorage.getItem("dart_birthday_rewards"),
+  );
+  assert(
+    birthdayRewards[0].status === "Reserved" &&
+      birthdayRewards[0].orderId === birthdayOrder.orderId,
+    "birthday reward must be reserved when the order is created",
+  );
+  birthdayOrder.deliveredAt = new Date().toISOString();
+  platform.updateBirthdayRewardForOrder(birthdayOrder, "Delivered");
+  birthdayRewards = JSON.parse(localStorage.getItem("dart_birthday_rewards"));
+  assert(
+    birthdayRewards[0].status === "Used" && birthdayRewards[0].usedCount === 1,
+    "birthday reward must become used when the order is delivered",
+  );
+  platform.updateBirthdayRewardForOrder(birthdayOrder, "Cancelled");
+  birthdayRewards = JSON.parse(localStorage.getItem("dart_birthday_rewards"));
+  assert(
+    birthdayRewards[0].status === "Active",
+    "a cancelled birthday order must restore the still-valid reward",
+  );
+  // END V9 birthday reward regression.
   console.log("PASS platform unit tests");
 })().catch((error) => {
   console.error(error.stack || error);

@@ -61,12 +61,42 @@
     const send = document.getElementById('sendBdayBtn');
     if (send) send.addEventListener('click', () => {
       const selected = [...document.querySelectorAll('#birthday-feed .bday-checkbox:checked')]
-        .map(box => box.closest('[data-client-id]')?.dataset.clientId).filter(Boolean);
+        .map(box => box.closest('[data-client-id]')).filter(Boolean);
       if (!selected.length) { alert('اختر عميلًا واحدًا على الأقل.'); return; }
       const queue = JSON.parse(localStorage.getItem('dart_message_queue') || '[]');
-      selected.forEach(id => queue.unshift({ id: `BDAY-${Date.now()}-${id}`, customerId: id, type: 'birthday-30-percent', discountPercent: 30, status: 'Pending API', createdAt: new Date().toISOString() }));
+      const history = JSON.parse(localStorage.getItem('dart_birthday_messages') || '[]');
+      selected.forEach((row, index) => {
+        const recordId = row.dataset.clientId;
+        const birthdayDate = row.dataset.birthdayDate;
+        const customer = customersData.find(item => String(item.id) === String(recordId));
+        if (!customer || history.some(item => item.birthdayDate === birthdayDate && (String(item.customerRecordId) === String(recordId) || String(item.clientId) === String(customer.clientId)))) return;
+        const messageId = `BDAY-${birthdayDate}-${customer.clientId}`;
+        queue.unshift({
+          id: `${messageId}-${Date.now()}-${index}`,
+          messageKey: messageId,
+          customerId: customer.clientId,
+          customerName: customer.clientName,
+          phone: customer.phone1,
+          birthdayDate,
+          type: 'birthday-30-percent',
+          discountPercent: 30,
+          rewardDays: 7,
+          status: 'Pending API',
+          createdAt: new Date().toISOString()
+        });
+        history.unshift({
+          id: messageId,
+          customerRecordId: recordId,
+          clientId: customer.clientId,
+          birthdayDate,
+          queuedAt: new Date().toISOString(),
+          status: 'Queued for Backend'
+        });
+      });
       localStorage.setItem('dart_message_queue', JSON.stringify(queue));
-      alert('تمت إضافة رسائل خصم عيد الميلاد 30% إلى قائمة الإرسال. سيقوم الـBackend بإرسالها فعليًا.');
+      localStorage.setItem('dart_birthday_messages', JSON.stringify(history));
+      renderBirthdayWidget();
+      alert('تم تسجيل رسائل خصم عيد الميلاد 30% وإخفاء العملاء من البوكس. سيقوم الـBackend بالإرسال الفعلي.');
     });
   });
 

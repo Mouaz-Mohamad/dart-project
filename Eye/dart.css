@@ -1585,3 +1585,93 @@ section{
 .dart-approve-rep,.dart-reject-rep{padding:5px 8px;border:0;border-radius:6px;color:#fff;cursor:pointer}.dart-approve-rep{background:#16a34a}.dart-reject-rep{background:#dc2626}.dart-rep-reset{width:30px;height:30px;border:0;border-radius:6px;background:#f59e0b;color:#fff;cursor:pointer}
 .dart-password-request{display:grid;grid-template-columns:minmax(220px,1fr) minmax(180px,280px) auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #e5e7eb}.dart-password-request div{display:grid;gap:4px}.dart-password-request input{min-height:40px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px}.dart-sensitive-note{padding:10px 12px;border-radius:7px;background:#fff7ed;color:#9a3412}.dart-reset-requests-btn span{background:#fff;color:#8c1d2c;border-radius:999px;min-width:22px;padding:2px 6px}
 @media(max-width:760px){.dart-password-request{grid-template-columns:1fr}.dart-dashboard-order-map{height:240px}}
+
+/* BEGIN V9 requested dashboard controls */
+#birthdayWindowLabel {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+}
+.bday-header > div:first-child {
+  min-width: 0;
+}
+#birthday-feed .dart-birthday-all-sent {
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+.dart-hard-delete-modal {
+  width: min(560px, 94vw) !important;
+}
+.dart-delete-relations {
+  margin: 14px 0;
+  padding: 11px 13px;
+  border-inline-start: 4px solid #dc2626;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  line-height: 1.55;
+}
+.dart-delete-relations.is-empty {
+  border-color: #64748b;
+  background: #f8fafc;
+  color: #475569;
+}
+.dart-delete-choice-list {
+  display: grid;
+  gap: 10px;
+}
+.dart-delete-choice {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 62px;
+  padding: 11px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+.dart-delete-choice span {
+  color: #64748b;
+  font-size: 11px;
+}
+.dart-delete-choice.is-danger {
+  border-color: #dc2626;
+  background: #fff7f7;
+  color: #991b1b;
+}
+.dart-delete-cancel {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+#card-modal .modal-content {
+  width: min(850px, 95vw);
+}
+#card-modal input[readonly] {
+  background: #f8fafc;
+  color: #475569;
+}
+#openCardBenefitBtn {
+  white-space: nowrap;
+}
+@media(max-width:700px) {
+  .bday-header {
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+  .bday-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+/* END V9 requested dashboard controls */

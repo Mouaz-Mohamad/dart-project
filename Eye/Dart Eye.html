@@ -168,7 +168,10 @@
                 <!-- 2. أرتيكل أعياد الميلاد -->
                 <article class="widget-card">
                     <div class="widget-header bday-header">
-                        <h3><i class="fa-solid fa-cake-candles"></i> Birthday </h3>
+                        <div>
+                            <h3><i class="fa-solid fa-cake-candles"></i> Birthday </h3>
+                            <small id="birthdayWindowLabel">Tomorrow's birthday messages · opens 8:00 PM Cairo</small>
+                        </div>
                         <div class="bday-actions">
                             <label class="select-all-label">All <input type="checkbox" id="selectAllBirthdays"></label>
                             <button type="button" class="btn-send-bday" id="sendBdayBtn"><i class="fa-solid fa-paper-plane"></i> Send</button>
@@ -820,6 +823,9 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
+                <button type="button" class="add-btn" id="openCardBenefitBtn">
+                    <span>+</span> Additional Benefit
+                </button>
             </div>
 
             <div class="second">
@@ -1345,6 +1351,57 @@
     <div id="password-requests-list"></div>
   </div>
 </div>
+
+<!-- BEGIN Manual Dart Card benefit -->
+<div class="modal" id="card-modal">
+  <div class="modal-content">
+    <span class="close-modal" aria-label="Close Dart Card form">&times;</span>
+    <h3 id="card-modal-title">Additional Benefit — Dart Card</h3>
+    <form id="card-form">
+      <input type="hidden" id="modal-card-edit-id">
+      <div class="modal-grid">
+        <div class="modal-col">
+          <div class="form-group"><label for="modal-card-client-id">Client</label><select id="modal-card-client-id" required><option value="">Select client</option></select></div>
+          <div class="form-group"><label for="modal-card-client-name">Client Name</label><input id="modal-card-client-name" readonly required></div>
+          <div class="form-group"><label for="modal-card-code-id">Card ID</label><input id="modal-card-code-id" readonly></div>
+          <div class="form-group"><label for="modal-card-phone1">Phone Number</label><input id="modal-card-phone1" readonly></div>
+          <div class="form-group"><label for="modal-card-phone2">Phone Number 2</label><input id="modal-card-phone2" readonly></div>
+          <div class="form-group"><label for="modal-card-email">E-Mail</label><input id="modal-card-email" readonly></div>
+        </div>
+        <div class="modal-col">
+          <div class="form-group"><label for="modal-card-discount">Discount</label><input id="modal-card-discount" value="40%" readonly></div>
+          <div class="form-group"><label for="modal-card-limit">Purchase Limit</label><input id="modal-card-limit" type="number" value="10" readonly></div>
+          <div class="form-group"><label for="modal-card-purchased">Purchased Items</label><input id="modal-card-purchased" type="number" min="0" max="10" value="0"></div>
+          <div class="form-group"><label for="modal-card-issue">Issue Date</label><input id="modal-card-issue" type="date" required></div>
+          <div class="form-group"><label for="modal-card-exp">Expiry Date</label><input id="modal-card-exp" type="date" required></div>
+          <div class="form-group"><label for="modal-card-status">Status</label><select id="modal-card-status"><option value="Active">Active</option><option value="Expired">Expired</option><option value="Hidden">Hidden</option></select></div>
+        </div>
+      </div>
+      <button type="submit" class="btn-done">Grant Dart Card</button>
+    </form>
+  </div>
+</div>
+<!-- END Manual Dart Card benefit -->
+
+<!-- BEGIN Explicit hard-delete choices -->
+<div class="modal" id="hard-delete-modal">
+  <div class="modal-content dart-hard-delete-modal" role="dialog" aria-modal="true" aria-labelledby="hard-delete-title">
+    <span class="close-modal" aria-label="Close delete options">&times;</span>
+    <h3 id="hard-delete-title">Permanent delete</h3>
+    <p id="hard-delete-summary"></p>
+    <div id="hard-delete-relations" class="dart-delete-relations"></div>
+    <div class="dart-delete-choice-list">
+      <button type="button" id="hard-delete-only" class="dart-delete-choice">
+        <strong>Delete this record only</strong><span>Keep linked records as they are.</span>
+      </button>
+      <button type="button" id="hard-delete-cascade" class="dart-delete-choice is-danger">
+        <strong>Delete with linked data</strong><span>Also remove the related test records shown above.</span>
+      </button>
+      <button type="button" id="hard-delete-cancel" class="dart-delete-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<!-- END Explicit hard-delete choices -->
 
 <div class="modal" id="size-chart-modal">
   <div class="modal-content dart-size-chart-admin-modal">

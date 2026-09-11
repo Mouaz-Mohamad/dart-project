@@ -3,7 +3,7 @@
 
     <form id="returnRequestForm" class="form">
         <div class="form-group">
-            <label for="full-name">Full Name</label>
+            <label for="return-full-name">Full Name</label>
             <input type="text" id="return-full-name" name="full_name" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
         </div>
 
@@ -24,15 +24,10 @@
             <input type="email" id="return-email" name="email" placeholder="Value" autocomplete="email" required>
         </div>
 
-        <div class="form-row flex-center">
-            <div class="form-group">
-                <label for="return-item-code">Item Code</label>
-                <input type="text" id="return-item-code" name="item_code" placeholder="Value" required>
-            </div>
-            <div class="form-group">
-                <label for="return-model-code">Model code</label>
-                <input type="text" id="return-model-code" name="model_code" placeholder="Value" required>
-            </div>
+        <div class="form-group">
+            <label for="return-item-code">Item Code</label>
+            <input type="text" id="return-item-code" name="item_code" placeholder="Value" required>
+            <small class="dart-form-help">The model, size and color will be filled automatically from the item code.</small>
         </div>
         <div class="form-row flex-center">
             <div class="container-select">

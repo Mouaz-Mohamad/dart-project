@@ -1,4 +1,4 @@
-# V9 verification — 2026-09-07
+# V9 verification — 2026-09-11
 
 ## Clean structure and SEO
 
@@ -28,3 +28,13 @@ The acceptance tests use isolated local records and a Leaflet-compatible map stu
 The V8 browser suites passed before the structure cleanup. After cleanup, unit, structure, accessibility, asset and SEO suites passed again. A final Chromium rerun could not be completed in this environment because the browser binary was unavailable and its download timed out; `tests/full-site-browser.js` remains in the package for the next local or CI run and now covers every dashboard navigation target.
 
 This package is still a browser-local prototype. The production backend requirements are documented in `API_CONTRACT.md`.
+
+## Requested V9 additions verified
+
+- Birthday reward unit scenarios passed for a Cairo birthday window, automatic 30% priority over an active 40% Dart Card, no Dart Card quota consumption, reservation at order creation, use at Delivered and restoration after cancellation while valid.
+- Isolated dashboard data tests passed for the 8:00 PM Cairo tomorrow-birthday queue, day-month-year birthday values, per-customer removal after queueing, record-only deletion and linked-data cascade deletion.
+- Source-contract checks passed for the seven-day countdown fields, 10px insets/60px height, supplied background image, balloons/confetti and session-only Close behavior.
+- Source-contract checks passed for the vertical ticker, two-name authenticity owner, three-name/top-three Leaderboard, Item-Code-only return form with automatic model lookup, persistent profile card, five empty social destinations, Delivered tracking exclusion, both permanent-delete choices and manual Additional Benefit grants.
+- JavaScript syntax, platform, representative, tracking, Cairo/Giza, static HTML/assets/accessibility, integer-money and SEO suites all passed after the V9 changes.
+
+The environment still has no installed Chromium binary, so the included browser suites were not rerun here. They remain available for a visual interaction pass on a development machine or CI runner with Playwright/Chromium.

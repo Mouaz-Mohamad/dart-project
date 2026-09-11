@@ -791,7 +791,52 @@ function updateCartCount() {
     });
 }
 
+function syncBirthdayCheckoutDiscount(showNotice = false) {
+    const birthdayReward = window.DartPlatform?.activeBirthdayReward?.();
+    const discountInput = document.getElementById('discountInput');
+    const discountBtn = document.getElementById('applyDiscountBtn');
+    const discountBox = discountInput?.closest('.discount-box');
+    let note = document.querySelector('.birthday-auto-discount-note');
+
+    if (birthdayReward) {
+        window.dartAppliedPromotion = { ...birthdayReward, type: 'Birthday' };
+        appliedDiscountRate = Math.max(0, Math.min(1, Number(birthdayReward.discountPercent || 30) / 100));
+        if (discountInput) {
+            discountInput.value = `BIRTHDAY ${Math.round(appliedDiscountRate * 100)}% — AUTO`;
+            discountInput.disabled = true;
+        }
+        if (discountBtn) {
+            discountBtn.disabled = true;
+            discountBtn.textContent = 'Applied';
+        }
+        if (discountBox && !note) {
+            note = document.createElement('p');
+            note.className = 'birthday-auto-discount-note';
+            discountBox.insertAdjacentElement('afterend', note);
+        }
+        if (note) note.textContent = 'Your birthday discount is applied automatically and takes priority over other discounts.';
+        if (showNotice) showToast(`تم تطبيق خصم عيد الميلاد ${Math.round(appliedDiscountRate * 100)}% تلقائيًا.`);
+        return true;
+    }
+
+    if (window.dartAppliedPromotion?.type === 'Birthday') {
+        window.dartAppliedPromotion = null;
+        appliedDiscountRate = 0;
+    }
+    if (discountInput?.disabled) {
+        discountInput.disabled = false;
+        discountInput.value = '';
+    }
+    if (discountBtn?.disabled) {
+        discountBtn.disabled = false;
+        discountBtn.textContent = 'Apply';
+    }
+    note?.remove();
+    return false;
+}
+
 function updateCartTotals() {
+    syncBirthdayCheckoutDiscount();
     const subtotalEl = document.getElementById('subtotalVal');
     const totalEl = document.getElementById('totalVal');
     const discountEl = document.getElementById('discountVal');
@@ -952,6 +997,10 @@ function initCartAndCheckoutEvents() {
 
     if (discountBtn && discountInput) {
         discountBtn.addEventListener('click', () => {
+            if (syncBirthdayCheckoutDiscount(true)) {
+                updateCartTotals();
+                return;
+            }
             const code = discountInput.value.trim().toUpperCase();
             let promotion = null;
             try {

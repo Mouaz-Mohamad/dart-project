@@ -19,9 +19,14 @@
     passwordResets: "dart_password_reset_requests",
     representatives: "dart_representatives",
     repSession: "dart_rep_session",
+    birthdayRewards: "dart_birthday_rewards",
+    birthdayMessages: "dart_birthday_messages",
   });
   const API_BASE = String(window.DART_API_BASE_URL || "").replace(/\/$/, "");
   const CART_RESERVATION_MS = 15 * 60 * 1000;
+  const BIRTHDAY_DISCOUNT_PERCENT = 30;
+  const BIRTHDAY_REWARD_DAYS = 7;
+  const CAIRO_TIME_ZONE = "Africa/Cairo";
 
   const read = (key, fallback) => {
     try {
@@ -83,6 +88,202 @@
                 100),
         );
   const getProducts = () => DartCatalog.products();
+
+  // BEGIN Birthday reward clock — frontend prototype; backend remains authoritative.
+  function cairoParts(value = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: CAIRO_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(value);
+    return Object.fromEntries(
+      parts
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, Number(part.value)]),
+    );
+  }
+
+  function cairoOffsetMs(value) {
+    const parts = cairoParts(value);
+    return (
+      Date.UTC(
+        parts.year,
+        parts.month - 1,
+        parts.day,
+        parts.hour,
+        parts.minute,
+        parts.second,
+      ) - Math.floor(value.getTime() / 1000) * 1000
+    );
+  }
+
+  function cairoMoment(year, month, day, hour = 0, minute = 0, second = 0) {
+    const normalized = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+    const target = {
+      year: normalized.getUTCFullYear(),
+      month: normalized.getUTCMonth() + 1,
+      day: normalized.getUTCDate(),
+      hour: normalized.getUTCHours(),
+      minute: normalized.getUTCMinutes(),
+      second: normalized.getUTCSeconds(),
+    };
+    let timestamp = Date.UTC(
+      target.year,
+      target.month - 1,
+      target.day,
+      target.hour,
+      target.minute,
+      target.second,
+    );
+    for (let index = 0; index < 3; index += 1) {
+      const adjusted =
+        Date.UTC(
+          target.year,
+          target.month - 1,
+          target.day,
+          target.hour,
+          target.minute,
+          target.second,
+        ) - cairoOffsetMs(new Date(timestamp));
+      if (adjusted === timestamp) break;
+      timestamp = adjusted;
+    }
+    return new Date(timestamp);
+  }
+
+  function birthdayParts(value) {
+    const text = String(value || "").trim(),
+      yearFirst = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/),
+      dayFirst = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (yearFirst)
+      return { month: Number(yearFirst[2]), day: Number(yearFirst[3]) };
+    if (dayFirst)
+      return { month: Number(dayFirst[2]), day: Number(dayFirst[1]) };
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : { month: parsed.getMonth() + 1, day: parsed.getDate() };
+  }
+
+  function birthdayWindow(birthday, reference = new Date()) {
+    const birth = birthdayParts(birthday);
+    if (!birth) return null;
+    const cairoNow = cairoParts(reference);
+    for (const year of [cairoNow.year, cairoNow.year - 1]) {
+      const startsAt = cairoMoment(year, birth.month, birth.day);
+      const expiresAt = cairoMoment(
+        year,
+        birth.month,
+        birth.day + BIRTHDAY_REWARD_DAYS,
+      );
+      if (reference >= startsAt && reference < expiresAt)
+        return { year, startsAt, expiresAt };
+    }
+    return null;
+  }
+
+  function birthdayRewardId(customerId, year) {
+    return `BDAY-${String(customerId || "CUSTOMER")}-${year}`;
+  }
+
+  function syncBirthdayRewards(user = currentUser(), reference = new Date()) {
+    if (!user?.customerId) return null;
+    const rewards = read(KEYS.birthdayRewards, []);
+    let changed = false;
+    rewards.forEach((reward) => {
+      if (reward.customerId !== user.customerId) return;
+      if (["Active", "Reserved"].includes(reward.status)) {
+        const order = reward.orderId
+          ? read(KEYS.orders, []).find(
+              (row) => String(row.orderId) === String(reward.orderId),
+            )
+          : null;
+        if (order?.status === "Delivered") {
+          reward.status = "Used";
+          reward.usedCount = 1;
+          reward.usedAt = order.deliveredAt || order.updatedAt || now();
+          changed = true;
+        } else if (["Cancelled", "Refused"].includes(order?.status)) {
+          reward.status = reference < new Date(reward.expiresAt) ? "Active" : "Expired";
+          reward.orderId = "";
+          reward.reservedAt = null;
+          changed = true;
+        } else if (reference >= new Date(reward.expiresAt)) {
+          reward.status = "Expired";
+          changed = true;
+        }
+      }
+    });
+    const windowData = birthdayWindow(user.birthday, reference);
+    if (windowData) {
+      const id = birthdayRewardId(user.customerId, windowData.year);
+      let reward = rewards.find((row) => row.id === id);
+      if (!reward) {
+        reward = {
+          id,
+          customerId: user.customerId,
+          customerName: user.name,
+          type: "Birthday",
+          discountPercent: BIRTHDAY_DISCOUNT_PERCENT,
+          usageLimit: 1,
+          usedCount: 0,
+          startsAt: windowData.startsAt.toISOString(),
+          expiresAt: windowData.expiresAt.toISOString(),
+          status: "Active",
+          orderId: "",
+          createdAt: now(),
+        };
+        rewards.push(reward);
+        changed = true;
+      } else if (reward.status === "Scheduled") {
+        reward.status = "Active";
+        changed = true;
+      }
+    }
+    if (changed) write(KEYS.birthdayRewards, rewards);
+    if (!windowData) return null;
+    return (
+      rewards.find(
+        (row) =>
+          row.id === birthdayRewardId(user.customerId, windowData.year) &&
+          ["Active", "Reserved"].includes(row.status),
+      ) || null
+    );
+  }
+
+  function activeBirthdayReward(user = currentUser()) {
+    const reward = syncBirthdayRewards(user);
+    return reward?.status === "Active" ? reward : null;
+  }
+
+  function visibleBirthdayReward(user = currentUser()) {
+    return syncBirthdayRewards(user);
+  }
+
+  function updateBirthdayRewardForOrder(order, targetStatus) {
+    if (!order?.birthdayRewardId) return;
+    const rewards = read(KEYS.birthdayRewards, []);
+    const reward = rewards.find((row) => row.id === order.birthdayRewardId);
+    if (!reward) return;
+    if (targetStatus === "Delivered") {
+      reward.status = "Used";
+      reward.usedCount = 1;
+      reward.usedAt = order.deliveredAt || now();
+      order.birthdayRewardUsageRecorded = true;
+    } else if (["Cancelled", "Refused"].includes(targetStatus)) {
+      reward.status = new Date() < new Date(reward.expiresAt) ? "Active" : "Expired";
+      reward.orderId = "";
+      reward.reservedAt = null;
+      order.birthdayRewardUsageRecorded = false;
+    }
+    write(KEYS.birthdayRewards, rewards);
+  }
+  // END Birthday reward clock.
 
   async function sha256(value) {
     const bytes = new TextEncoder().encode(String(value));
@@ -580,6 +781,10 @@
       (sum, line) => sum + line.finalUnitPrice,
       0,
     );
+    const birthdayReward =
+      logged && logged.customerId === customer.clientId
+        ? activeBirthdayReward(logged)
+        : null;
     let discountRate = Math.max(
       0,
       Math.min(
@@ -617,6 +822,14 @@
         discountRate = 0;
       }
     }
+    // Birthday always takes priority and never consumes Dart Card quota.
+    if (birthdayReward) {
+      appliedCard = null;
+      discountRate = Math.max(
+        0,
+        Math.min(1, Number(birthdayReward.discountPercent || 30) / 100),
+      );
+    }
     const discountAmount = subtotal * discountRate;
     const finalAmount = Math.max(0, subtotal - discountAmount);
     const order = {
@@ -642,8 +855,20 @@
       discount: discountRate * 100,
       orderLevelDiscountAmount: discountAmount,
       finalAmount,
-      reasonDeduction: discountRate ? "Verified promotion" : "-",
+      reasonDeduction: birthdayReward
+        ? "Birthday gift"
+        : discountRate
+          ? "Verified promotion"
+          : "-",
       dartCardId: appliedCard?.cardId || "",
+      birthdayRewardId: birthdayReward?.id || "",
+      promotionType: birthdayReward
+        ? "Birthday"
+        : appliedCard
+          ? "Dart Card"
+          : discountRate
+            ? "Promotion"
+            : "",
       paymentMethod: "Cash on Delivery",
       paymentStatus: "Unpaid",
       amountPaid: 0,
@@ -687,6 +912,16 @@
       delete item.reservationUntil;
     });
     orders.push(order);
+    if (birthdayReward) {
+      const rewards = read(KEYS.birthdayRewards, []),
+        storedReward = rewards.find((row) => row.id === birthdayReward.id);
+      if (storedReward) {
+        storedReward.status = "Reserved";
+        storedReward.orderId = orderId;
+        storedReward.reservedAt = now();
+        write(KEYS.birthdayRewards, rewards);
+      }
+    }
     write(KEYS.items, items);
     write(KEYS.orders, orders);
     audit("CREATE", "orders", order.id, { source: "Website" });
@@ -1010,6 +1245,12 @@
       );
     const rows = candidates.slice(0, 3);
     if (!rows.length) {
+      const heading =
+        list.querySelector("h1")?.outerHTML ||
+        "<h1>Contenders for the DART card</h1>";
+      list.innerHTML =
+        heading +
+        '<li class="leaderboard-empty">No eligible candidates this month yet.</li>';
       list.dataset.dartLeaderboardSignature = signature;
       return;
     }
@@ -1021,7 +1262,7 @@
       rows
         .map(
           (row, index) =>
-            `<li class="leaderboard-item djasb ${index === 0 ? "top-rank" : ""}"><div class="rank-badge"><h2 class="rank-num">${index + 1}</h2></div><h3 class="user-name">${escapeHtml(publicCustomerName(row.customer.clientName))}</h3><h3 class="score">${row.items} PIC</h3></li>`,
+            `<li class="leaderboard-item rank-${index + 1} ${index === 0 ? "top-rank" : ""}"><div class="rank-badge"><h2 class="rank-num">${index + 1}</h2></div><div class="leaderboard-candidate"><small>${index === 0 ? "Leading contender" : "Dart Card contender"}</small><h3 class="user-name">${escapeHtml(customerNameParts(row.customer.clientName, 3))}</h3></div><h3 class="score" aria-label="${row.items} PIC"><strong>${row.items}</strong><span>PIC</span></h3></li>`,
         )
         .join("");
     list.dataset.dartLeaderboardSignature = signature;
@@ -1062,15 +1303,17 @@
     write("dart_cards", cards);
   }
 
-  function publicCustomerName(value) {
+  function customerNameParts(value, count = 2) {
     const parts = String(value || "")
       .trim()
       .split(/\s+/)
       .filter(Boolean);
     if (!parts.length) return "Not disclosed";
-    return parts.length === 1
-      ? parts[0]
-      : `${parts[0]} ${parts[1].charAt(0)}***`;
+    return parts.slice(0, Math.max(1, count)).join(" ");
+  }
+
+  function publicCustomerName(value) {
+    return customerNameParts(value, 2);
   }
 
   function renderSerialResult(form) {
@@ -1104,8 +1347,158 @@
       read(KEYS.customers, []).find(
         (row) => String(row.clientId) === String(item.clientId),
       )?.clientName;
-    content.innerHTML = `<div class="serial-result-icon"><i class="fa-solid fa-check"></i></div><h2 id="serialResultTitle">Authentic Dart Item</h2><p>This sold item is verified in the official Dart registry.</p><div class="serial-owner">Registered owner: ${escapeHtml(publicCustomerName(owner))}</div>`;
+    const model = DartCatalog.model(item.modelId),
+      productName = model?.name || item.modelName || "Dart item",
+      image = DartCatalog.cover(model, item.color);
+    content.innerHTML = `<div class="serial-result-icon"><i class="fa-solid fa-check"></i></div><h2 id="serialResultTitle">Authentic Dart Item</h2><p>This sold item is verified in the official Dart registry.</p><div class="serial-product"><img class="serial-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(`${productName} in ${item.color || "its registered color"}`)}"><div class="serial-product-details"><div><small>Product</small><strong>${escapeHtml(productName)}</strong></div><div><small>Item Code</small><strong>${escapeHtml(item.itemCode)}</strong></div><div><small>Size</small><strong>${escapeHtml(item.size || "-")}</strong></div><div><small>Color</small><strong>${escapeHtml(item.color || "-")}</strong></div><div class="serial-owner"><small>Registered owner</small><strong>${escapeHtml(customerNameParts(owner, 2))}</strong></div></div></div>`;
   }
+
+  // BEGIN Birthday celebration, countdown and vertical navbar ticker.
+  function countdownValues(expiresAt) {
+    const remaining = Math.max(0, new Date(expiresAt).getTime() - Date.now());
+    return {
+      remaining,
+      days: Math.floor(remaining / 864e5),
+      hours: Math.floor((remaining % 864e5) / 36e5),
+      minutes: Math.floor((remaining % 36e5) / 6e4),
+    };
+  }
+
+  function renderBirthdayTicker() {
+    const track = document.querySelector(".dart-nav-ticker-track");
+    if (!track) return;
+    const reward = visibleBirthdayReward(),
+      messages = ["Welcome to Dart"];
+    if (reward)
+      messages.push(
+        reward.status === "Reserved"
+          ? "Your 30% birthday gift is reserved for your current order"
+          : "Your birthday gift is ready — 30% OFF for 7 days",
+      );
+    const signature = `${reward?.id || "none"}:${reward?.status || ""}`;
+    if (track.dataset.signature === signature) return;
+    track.dataset.signature = signature;
+    track.innerHTML = messages
+      .map(
+        (message, index) =>
+          `<p class="dart-nav-ticker-message${index ? " is-birthday" : ""}">${escapeHtml(message)}</p>`,
+      )
+      .join("");
+    clearInterval(window.dartNavTickerTimer);
+    track.style.transform = "translateY(0)";
+    if (messages.length > 1) {
+      let index = 0;
+      window.dartNavTickerTimer = setInterval(() => {
+        index = (index + 1) % messages.length;
+        track.style.transform = `translateY(-${index * 30}px)`;
+      }, 4000);
+    }
+  }
+
+  function wireSocialLinks() {
+    document.querySelectorAll("[data-social-url]").forEach((link) => {
+      const url = String(link.dataset.socialUrl || "").trim();
+      if (url) {
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.removeAttribute("aria-disabled");
+        link.removeAttribute("tabindex");
+      } else {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+        link.tabIndex = -1;
+      }
+    });
+  }
+
+  function addPartyPieces(layer) {
+    const confettiColors = ["#ab012b", "#f4c95d", "#ffffff", "#ef7b45"];
+    for (let index = 0; index < 34; index += 1) {
+      const piece = document.createElement("span");
+      piece.className = "dart-confetti-piece";
+      piece.style.left = `${(index * 29) % 100}%`;
+      piece.style.background = confettiColors[index % confettiColors.length];
+      piece.style.setProperty("--fall", `${5 + (index % 6)}s`);
+      piece.style.setProperty("--delay", `${-(index % 9)}s`);
+      piece.style.setProperty("--drift", `${(index % 2 ? 1 : -1) * (18 + (index % 5) * 9)}px`);
+      layer.appendChild(piece);
+    }
+    for (let index = 0; index < 9; index += 1) {
+      const balloon = document.createElement("span");
+      balloon.className = "dart-balloon";
+      balloon.textContent = ["🎈", "🎈", "🎉"][index % 3];
+      balloon.style.left = `${3 + ((index * 13) % 91)}%`;
+      balloon.style.setProperty("--rise", `${8 + (index % 5) * 1.4}s`);
+      balloon.style.setProperty("--delay", `${-(index % 7) * 1.2}s`);
+      balloon.style.setProperty("--drift", `${(index % 2 ? 1 : -1) * (15 + index * 2)}px`);
+      layer.appendChild(balloon);
+    }
+  }
+
+  function updateBirthdayCountdown(overlay, reward) {
+    const values = countdownValues(reward.expiresAt);
+    const fields = {
+      days: values.days,
+      hours: values.hours,
+      minutes: values.minutes,
+    };
+    Object.entries(fields).forEach(([key, value]) => {
+      const field = overlay.querySelector(`[data-birthday-time="${key}"]`);
+      if (field) field.textContent = String(value).padStart(2, "0");
+    });
+    if (values.remaining > 0) return;
+    overlay.remove();
+    syncBirthdayRewards();
+    renderBirthdayTicker();
+    clearInterval(window.dartBirthdayCountdownTimer);
+  }
+
+  function renderBirthdayCelebration() {
+    const reward = visibleBirthdayReward(),
+      existing = document.querySelector(".dart-birthday-celebration");
+    if (
+      !reward ||
+      sessionStorage.getItem(`dart_birthday_celebration_closed:${reward.id}`) ===
+        "1"
+    ) {
+      existing?.remove();
+      return;
+    }
+    if (existing?.dataset.rewardId === reward.id) return;
+    existing?.remove();
+    const overlay = document.createElement("section");
+    overlay.className = "dart-birthday-celebration";
+    overlay.dataset.rewardId = reward.id;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Your Dart birthday gift");
+    overlay.innerHTML = `<div class="dart-party-layer" aria-hidden="true"></div><div class="dart-birthday-card"><div class="dart-birthday-countdown" aria-label="Time remaining on birthday discount"><div class="dart-birthday-time"><strong data-birthday-time="days">00</strong><span>Days</span></div><div class="dart-birthday-time"><strong data-birthday-time="hours">00</strong><span>Hours</span></div><div class="dart-birthday-time"><strong data-birthday-time="minutes">00</strong><span>Minutes</span></div></div></div><button type="button" class="dart-birthday-close">Close</button>`;
+    addPartyPieces(overlay.querySelector(".dart-party-layer"));
+    overlay.querySelector(".dart-birthday-close").addEventListener("click", () => {
+      sessionStorage.setItem(
+        `dart_birthday_celebration_closed:${reward.id}`,
+        "1",
+      );
+      overlay.remove();
+      clearInterval(window.dartBirthdayCountdownTimer);
+    });
+    document.body.appendChild(overlay);
+    updateBirthdayCountdown(overlay, reward);
+    clearInterval(window.dartBirthdayCountdownTimer);
+    window.dartBirthdayCountdownTimer = setInterval(
+      () => updateBirthdayCountdown(overlay, reward),
+      1000,
+    );
+    overlay.querySelector(".dart-birthday-close")?.focus();
+  }
+
+  function renderBirthdayExperience() {
+    renderBirthdayTicker();
+    wireSocialLinks();
+    renderBirthdayCelebration();
+  }
+  // END Birthday celebration, countdown and vertical navbar ticker.
 
   function bindAuth() {
     document.addEventListener(
@@ -1306,6 +1699,21 @@
             setStatus(form, "يوجد طلب قائم لهذه القطعة بالفعل.", true);
             return;
           }
+          const orderLine = (order.priceSnapshot || []).find(
+              (line) => String(line.itemCode) === String(values.item_code),
+            ),
+            inventoryItem = read(KEYS.items, []).find(
+              (item) => String(item.itemCode) === String(values.item_code),
+            ),
+            modelCode = orderLine?.modelCode || inventoryItem?.modelId || "";
+          if (!modelCode) {
+            setStatus(
+              form,
+              "تعذر ربط رقم القطعة بالتصميم. راجع خدمة العملاء.",
+              true,
+            );
+            return;
+          }
           const row = {
             id: uid("RETDB"),
             returnId: nextCode("R", rows, "returnId"),
@@ -1313,7 +1721,7 @@
             clientId: order.clientId,
             clientName: values.full_name,
             itemCode: values.item_code,
-            modelId: values.model_code,
+            modelId: modelCode,
             phone1: values.phone1,
             phone2: values.phone2 || "-",
             email: normalizeEmail(values.email),
@@ -1425,17 +1833,47 @@
     };
     Object.entries(fields).forEach(([s, v]) => set(s, v));
     set(".dart-card-acount .name", user.name);
-    set(".dart-card-acount .id", `ID- ${user.customerId}`);
-    set(".dart-card-acount .limit h6", "10 PIC");
-    const card = read("dart_cards", []).find(
-      (c) => c.clientId === user.customerId && c.status === "Active",
-    );
-    set(
-      ".dart-card-acount .items h6",
-      `${Number(card?.purchasedItems || 0)} PIC`,
-    );
-    set(".dart-card-acount .issue h6", card?.issueDate || "-");
-    set(".dart-card-acount .exp h6", card?.expDate || "-");
+    set(".dart-card-acount .id", `Customer ID: ${user.customerId}`);
+    const cardExpiry = (value) => {
+        const parts = String(value || "")
+          .split(/[-/]/)
+          .map(Number);
+        if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+        return parts[0] > 999
+          ? new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59)
+          : new Date(parts[2], parts[1] - 1, parts[0], 23, 59, 59);
+      },
+      userCards = read("dart_cards", [])
+        .filter((row) => row.clientId === user.customerId && !row.isDeleted)
+        .sort(
+          (first, second) =>
+            new Date(second.createdAt || 0) - new Date(first.createdAt || 0),
+        ),
+      activeCard = userCards.find((row) => {
+        const limit = Number(row.itemLimit || row.purchasedLimit || 10),
+          expiry = cardExpiry(row.expDate);
+        return (
+          row.status === "Active" &&
+          Number(row.purchasedItems || 0) < limit &&
+          (!expiry || expiry >= new Date())
+        );
+      }),
+      card = activeCard || userCards[0] || null,
+      limit = Number(card?.itemLimit || card?.purchasedLimit || 10),
+      used = Math.max(0, Number(card?.purchasedItems || 0)),
+      remaining = Math.max(0, limit - used),
+      cardStatus = activeCard
+        ? "Active"
+        : card?.status === "Active"
+          ? "Expired"
+          : card?.status || "Inactive",
+      cardElement = document.querySelector(".dart-card-acount");
+    set(".dart-card-acount .items-used", `${used} / ${limit} pieces`);
+    set(".dart-card-acount .items-remaining", remaining);
+    set(".dart-card-acount .issue-date", card?.issueDate || "-");
+    set(".dart-card-acount .expiry-date", card?.expDate || "-");
+    set(".dart-card-acount .dart-card-account-status strong", cardStatus);
+    cardElement?.classList.toggle("is-inactive", cardStatus !== "Active");
     const orderList = document.getElementById("profileOrdersList");
     if (orderList) {
       orderList.innerHTML =
@@ -1613,11 +2051,13 @@
     if (!card) return;
     const params = new URLSearchParams(location.search),
       id = params.get("order"),
-      orders = read(KEYS.orders, []),
+      orders = read(KEYS.orders, []).filter(
+        (order) => order.status !== "Delivered" && !order.isDeleted,
+      ),
       order = orders.find((o) => o.orderId === id);
     if (!order) {
       card.innerHTML =
-        '<div class="empty-state">اكتب رقم طلب صحيح في رابط التتبع.</div>';
+        '<div class="empty-state">لا يوجد طلب نشط بهذا الرابط. الطلبات التي تم توصيلها لا تظهر في صفحة التتبع.</div>';
       return;
     }
     const set = (selector, value) => {
@@ -1761,6 +2201,8 @@
         write(KEYS.items, items);
         recordDartCardUsage(stored);
       }
+      if (["Delivered", "Cancelled", "Refused"].includes(status))
+        updateBirthdayRewardForOrder(stored, status);
       stored.activityLog = stored.activityLog || [];
       stored.activityLog.push({
         id: uid("EVT"),
@@ -1828,9 +2270,12 @@
     bindRep();
     renderFeedbackEligibility();
     renderLeaderboard();
+    renderBirthdayExperience();
     new MutationObserver(() => {
       renderFeedbackEligibility();
       renderLeaderboard();
+      renderBirthdayTicker();
+      wireSocialLinks();
     }).observe(document.body, { childList: true, subtree: true });
     document
       .querySelectorAll("img:not([alt])")
@@ -1856,6 +2301,10 @@
   window.addEventListener("storage", (event) => {
     if (event.key === KEYS.orders && document.querySelector(".tracking-card"))
       renderTracking();
+    if (
+      [KEYS.birthdayRewards, KEYS.session, KEYS.orders].includes(event.key)
+    )
+      renderBirthdayExperience();
   });
   window.DartPlatform = {
     read,
@@ -1878,6 +2327,14 @@
     cleanupCartReservations,
     renderFeedbackEligibility,
     updateCartReservationTimer,
+    activeBirthdayReward,
+    visibleBirthdayReward,
+    syncBirthdayRewards,
+    updateBirthdayRewardForOrder,
+    renderBirthdayExperience,
+    birthdayWindow,
+    cairoParts,
+    cairoMoment,
     requestPasswordReset,
     replaceTemporaryPassword,
     orderNet,

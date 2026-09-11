@@ -29,6 +29,8 @@ This inventory records the visible content and suitable accessible text for ever
 | `Photos/card.png` | Two burgundy Dart loyalty cards with a sample member name and ID. | Two Dart loyalty cards. |
 | `Photos/birthday.png` | Small red gift box with a gold ribbon. | Red birthday gift with gold ribbon. |
 | `Photos/gift.png` | Larger red gift box wrapped in a gold ribbon and bow. | Red gift box with gold ribbon. |
+| `Photos/dart-birthday-reward.jpg` | Off-white birthday reward artwork with burgundy ribbons, gold confetti, gift box, 30% offer and Dart logo. | Decorative Birthday reward card; the dialog supplies the accessible offer and countdown label. |
+| `Photos/dart-logo-white.png` | White Dart wordmark with the burgundy bird forming the letter “r” on black. | Dart white logo. |
 | `Photos/win 1.png` | Small award/winner graphic used as a decorative icon. | Winner badge. |
 | `Photos/me.png` | Dart founder Moaz Mohamed standing outdoors, wearing sunglasses, a light-blue shirt and denim shorts, framed by burgundy brand graphics. | Dart founder Moaz Mohamed standing outdoors in sunglasses and a light-blue shirt. |
 | `Eye/dart_logo.png` | High-resolution Dart wordmark used in the dashboard navigation. | Dart dashboard logo. |
