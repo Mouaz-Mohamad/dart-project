@@ -1068,6 +1068,13 @@ function initCartAndCheckoutEvents() {
                 showToast("السلة فارغة، أضف منتجات أولاً!");
                 return;
             }
+            if (!window.DartPlatform?.currentUser?.()) {
+                showToast('يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.');
+                setTimeout(() => {
+                    window.location.href = 'Sign Up modern.html?next=checkout';
+                }, 500);
+                return;
+            }
             checkoutView.style.display = 'block';
             window.scrollTo({ top: checkoutView.offsetTop, behavior: 'smooth' });
             setTimeout(() => window.dartCheckoutAddress?.invalidate?.(), 60);

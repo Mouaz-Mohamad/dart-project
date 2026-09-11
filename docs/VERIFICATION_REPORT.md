@@ -38,3 +38,11 @@ This package is still a browser-local prototype. The production backend requirem
 - JavaScript syntax, platform, representative, tracking, Cairo/Giza, static HTML/assets/accessibility, integer-money and SEO suites all passed after the V9 changes.
 
 The environment still has no installed Chromium binary, so the included browser suites were not rerun here. They remain available for a visual interaction pass on a development machine or CI runner with Playwright/Chromium.
+
+## V9.2 focused verification
+
+- Confirmed that a `New` order contributes zero Leaderboard pieces and the same order contributes its physical pieces immediately after becoming `Delivered`; completed returns still reduce the score.
+- Confirmed that the birthday list remains available before 20:00 Cairo, rolls to tomorrow at 20:00, includes newly added matching customers immediately and continues hiding customers after their message is queued.
+- Confirmed that customer sessions persist until explicit logout, My Account resolves directly to the profile, and checkout rejects a guest before creating any customer or order.
+- Confirmed that customer and representative sessions remain separate and representative registration permits contact details already used by that person's customer account while retaining representative-to-representative duplicate checks.
+- JavaScript syntax, platform, dashboard, representative, tracking, Cairo/Giza, feature-contract, static structure and SEO checks passed. Chromium-only suites remain pending because no browser binary is installed in this environment.

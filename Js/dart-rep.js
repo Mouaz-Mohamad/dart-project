@@ -297,9 +297,7 @@
   }
 
   function conflict(payload) {
-    const reps = read(KEYS.reps, []),
-      users = read(KEYS.users, []),
-      customers = read(KEYS.customers, []);
+    const reps = read(KEYS.reps, []);
     const email = normalizeEmail(payload.email),
       phone1 = phoneDigits(payload.phone1),
       phone2 = phoneDigits(payload.phone2);
@@ -318,29 +316,6 @@
       )
     )
       return "National ID, email or phone is already registered.";
-    if (
-      users.some(
-        (user) =>
-          !user.isArchived &&
-          (normalizeEmail(user.email) === email ||
-            [phoneDigits(user.phone1), phoneDigits(user.phone2)].some(
-              (phone) => phone && [phone1, phone2].includes(phone),
-            )),
-      )
-    )
-      return "Email or phone is already used by another Dart account.";
-    if (
-      customers.some(
-        (customer) =>
-          !customer.isArchived &&
-          !customer.isDeleted &&
-          (normalizeEmail(customer.email) === email ||
-            [phoneDigits(customer.phone1), phoneDigits(customer.phone2)].some(
-              (phone) => phone && [phone1, phone2].includes(phone),
-            )),
-      )
-    )
-      return "Email or phone is already recorded for a Dart customer.";
     return "";
   }
 

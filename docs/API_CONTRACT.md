@@ -7,7 +7,7 @@ The frontend currently uses localStorage as an executable prototype. The backend
 - Use Node.js with Express and a transactional database selected by the backend developer. PostgreSQL is recommended for orders, unique identities, inventory reservations and reporting.
 - Store passwords with Argon2id (preferred) or bcrypt. Never send password hashes to the browser.
 - Use secure, HttpOnly, SameSite cookies, CSRF protection, strict CORS, validation, rate limits and role-based access (`customer`, `representative`, `admin`).
-- Add database unique indexes for normalized customer email and every normalized phone. Add unique indexes for representative email, phone, National ID and Rep ID.
+- Add database unique indexes for normalized customer email and every normalized phone inside the customer role. Add separate unique indexes for representative email, phone, National ID and Rep ID inside the representative role; the same person may own one customer account and one representative account using the same contact details.
 - Generate Client ID, Order ID, Item Code, Return ID and Rep ID atomically on the server. Never use `MAX(id)+1` without a locked sequence.
 - Perform inventory reservation, discount validation, final-price calculation, delivery state transitions and Dart Card eligibility on the server inside transactions.
 - Accept delivery addresses only when server-side reverse geocoding resolves the administrative governorate to `Cairo` or `Giza`. Do not trust a governorate name or coordinates supplied by the browser alone.
@@ -93,7 +93,7 @@ Each model owns one reusable size chart; do not create a separate HTML table for
 - `GET /api/v1/me`
 - `PATCH /api/v1/me`
 
-Admin-assigned temporary passwords are the selected launch workflow. Send them to the verified owner through a controlled channel; never display existing passwords.
+Keep the customer signed in across site revisits until explicit logout, account revocation or a security event. Implement this with secure rotating server sessions/refresh tokens rather than a never-expiring browser credential. Admin-assigned temporary passwords are the selected launch workflow. Send them to the verified owner through a controlled channel; never display existing passwords.
 
 ## Catalogue, physical items and reservation
 
@@ -119,6 +119,8 @@ State machine:
 
 Terminal/exception states are `Refused`, `Cancelled` and `Needs Attention`. Every transition needs an immutable activity-log entry containing actor, old state, new state, timestamp and optional reason.
 
+Order creation requires an authenticated customer account. Do not create guest customers during checkout; return `401` and preserve the cart so the customer can sign in or register first.
+
 ## Representative accounts and documents
 
 - `POST /api/v1/representatives/register` — multipart upload: ID front, ID back, face photo.
@@ -130,6 +132,8 @@ Terminal/exception states are `Refused`, `Cancelled` and `Needs Attention`. Ever
 - `PATCH /api/v1/admin/representatives/:id`
 
 New registrations start as `Pending Approval`; rejected or unavailable accounts cannot log in or receive orders. Validate JPG/PNG/WebP and a maximum 5 MB source file per image, inspect actual MIME signatures, strip metadata and malware-scan uploads.
+
+Customer and representative identities are separate roles and sessions. Reject duplicate email, phone or National ID within representative accounts, but do not reject a representative merely because the same email or phone belongs to that person's customer account.
 
 ## Live delivery tracking
 
@@ -213,8 +217,8 @@ Monthly and annual reports include Delivered orders only, count orders first, an
 ## Birthday message queue
 
 - All birthday dates, queue windows and reward expiry calculations use the `Africa/Cairo` time zone.
-- `GET /api/v1/admin/birthdays/tomorrow` returns active customers whose birthday is the next Cairo calendar day. It becomes available at 20:00 Cairo on the preceding day and returns only customers whose message has not been sent for that birthday occurrence.
-- `POST /api/v1/admin/birthday-messages/:customerId/send` queues/sends the WhatsApp greeting idempotently using `(customerId, birthdayDate)` as the unique key. Remove a customer from the dashboard widget only after the server accepts the request; an empty result means every applicable customer is already sent or no birthday exists tomorrow.
+- `GET /api/v1/admin/birthdays/message-batch` is available all day and returns only unsent active customers for the current messaging batch. Before 20:00 Cairo the batch retains that Cairo calendar day's birthdays; at 20:00 it rolls to the next calendar day's birthdays. Include the authoritative `birthdayDate` in the response so newly registered matching customers can appear immediately without waiting for the next rollover.
+- `POST /api/v1/admin/birthday-messages/:customerId/send` queues/sends the WhatsApp greeting idempotently using `(customerId, birthdayDate)` as the unique key. Remove a customer from the dashboard widget only after the server accepts the request; an empty result means every applicable customer in the current batch is already sent or no matching birthday exists.
 - Persist delivery status (`queued`, `sent`, `failed`), provider message ID, attempt count and timestamps. A failed provider request remains retryable and must not be recorded as sent.
 - The current browser prototype stores the action in `dart_message_queue`; the real WhatsApp delivery still requires this backend endpoint and a configured provider.
 

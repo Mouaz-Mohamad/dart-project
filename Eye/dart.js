@@ -3179,10 +3179,9 @@ function dartBirthdayMonthDay(value) {
 }
 function dartBirthdayMessageBatch(reference = new Date()) {
   const cairo = dartCairoCalendar(reference);
-  if (cairo.hour < 20)
-    return { open: false, key: "", target: null, all: [], rows: [] };
+  const targetOffset = cairo.hour >= 20 ? 1 : 0;
   const targetDate = new Date(
-      Date.UTC(cairo.year, cairo.month - 1, cairo.day + 1),
+      Date.UTC(cairo.year, cairo.month - 1, cairo.day + targetOffset),
     ),
     target = {
       year: targetDate.getUTCFullYear(),
@@ -3227,18 +3226,13 @@ function renderBirthdayWidget() {
     label = document.getElementById("birthdayWindowLabel"),
     send = document.getElementById("sendBdayBtn");
   if (label)
-    label.textContent = batch.open
-      ? `Birthday messages for ${batch.key} · unsent only`
-      : "Tomorrow's birthday messages · opens 8:00 PM Cairo";
-  if (!batch.open)
+    label.textContent = `Birthday messages for ${batch.key} · unsent only · refreshes at 8:00 PM Cairo`;
+  if (!batch.all.length)
     feed.innerHTML =
-      '<div class="dart-empty-state">Messages for tomorrow open at 8:00 PM Cairo.</div>';
-  else if (!batch.all.length)
-    feed.innerHTML =
-      '<div class="dart-empty-state">No customer birthdays tomorrow.</div>';
+      '<div class="dart-empty-state">No customer birthdays in the current message list.</div>';
   else if (!rows.length)
     feed.innerHTML =
-      '<div class="dart-empty-state dart-birthday-all-sent">All birthday messages for tomorrow have been queued.</div>';
+      '<div class="dart-empty-state dart-birthday-all-sent">All birthday messages in this list have been queued.</div>';
   else
     feed.innerHTML = rows
       .map(

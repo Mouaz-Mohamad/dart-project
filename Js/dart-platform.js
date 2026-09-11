@@ -19,6 +19,7 @@
     passwordResets: "dart_password_reset_requests",
     representatives: "dart_representatives",
     repSession: "dart_rep_session",
+    cards: "dart_cards",
     birthdayRewards: "dart_birthday_rewards",
     birthdayMessages: "dart_birthday_messages",
   });
@@ -38,7 +39,16 @@
   };
   const write = (key, value) => {
     localStorage.setItem(key, JSON.stringify(value));
-    if ([KEYS.items, KEYS.models].includes(key))
+    if (
+      [
+        KEYS.items,
+        KEYS.models,
+        KEYS.orders,
+        KEYS.returns,
+        KEYS.customers,
+        KEYS.cards,
+      ].includes(key)
+    )
       window.dispatchEvent(
         new CustomEvent("dart:data-changed", { detail: { key } }),
       );
@@ -49,6 +59,15 @@
   const CART_RESERVATION_ID =
     sessionStorage.getItem("dart_cart_reservation_id") || uid("CART");
   sessionStorage.setItem("dart_cart_reservation_id", CART_RESERVATION_ID);
+  const ENTERED_FROM_INTERNAL_NAVIGATION =
+    sessionStorage.getItem("dart_internal_navigation") === "1";
+  const PAGE_NAVIGATION_TYPE =
+    typeof performance !== "undefined" && performance.getEntriesByType
+      ? performance.getEntriesByType("navigation")[0]?.type || ""
+      : "";
+  const PRESERVE_BIRTHDAY_CLOSE_STATE =
+    ENTERED_FROM_INTERNAL_NAVIGATION || PAGE_NAVIGATION_TYPE === "reload";
+  const preparedBirthdayCelebrationIds = new Set();
   sessionStorage.removeItem("dart_internal_navigation");
   const normalizeEmail = (value) =>
     String(value || "")
@@ -398,15 +417,19 @@
 
   function currentSession() {
     const session = read(KEYS.session, null);
-    if (
-      !session ||
-      !session.userId ||
-      new Date(session.expiresAt) <= new Date()
-    ) {
+    if (!session || !session.userId) {
       localStorage.removeItem(KEYS.session);
       return null;
     }
     return session;
+  }
+
+  function saveCustomerSession(user) {
+    write(KEYS.session, {
+      userId: user.id,
+      createdAt: now(),
+      rememberedUntilLogout: true,
+    });
   }
 
   function currentUser() {
@@ -522,12 +545,7 @@
     users.push(user);
     write(KEYS.users, users);
     syncCustomer(user);
-    const session = {
-      userId: user.id,
-      createdAt: now(),
-      expiresAt: new Date(Date.now() + 7 * 864e5).toISOString(),
-    };
-    write(KEYS.session, session);
+    saveCustomerSession(user);
     audit("REGISTER", "customers", user.customerId);
     return user;
   }
@@ -549,11 +567,7 @@
     );
     if (!user || user.passwordHash !== hash)
       throw new Error("بيانات الدخول غير صحيحة.");
-    write(KEYS.session, {
-      userId: user.id,
-      createdAt: now(),
-      expiresAt: new Date(Date.now() + 7 * 864e5).toISOString(),
-    });
+    saveCustomerSession(user);
     audit("LOGIN", "customers", user.customerId);
     return user;
   }
@@ -670,6 +684,8 @@
       typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
     if (!cart.length) throw new Error("السلة فارغة.");
     const logged = currentUser();
+    if (!logged)
+      throw new Error("يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.");
     const details = {
       name: getCheckoutField(form, "customer_name") || logged?.name || "",
       phone1: getCheckoutField(form, "phone1") || displayPhone(logged?.phone1),
@@ -716,51 +732,7 @@
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
-    let customer;
-    if (logged) customer = syncCustomer(logged);
-    else {
-      const customers = read(KEYS.customers, []),
-        email = normalizeEmail(details.email),
-        phone = normalizePhone(details.phone1);
-      const emailCustomer =
-        email && customers.find((row) => normalizeEmail(row.email) === email);
-      const phoneCustomer =
-        phone &&
-        customers.find((row) =>
-          [normalizePhone(row.phone1), normalizePhone(row.phone2)].includes(
-            phone,
-          ),
-        );
-      if (
-        emailCustomer &&
-        phoneCustomer &&
-        emailCustomer.id !== phoneCustomer.id
-      )
-        throw new Error(
-          "البريد والهاتف مرتبطان بعميلين مختلفين. راجع خدمة العملاء.",
-        );
-      customer = emailCustomer || phoneCustomer;
-      if (!customer) {
-        customer = {
-          id: uid("CDB"),
-          clientId: nextCode("DA", customers, "clientId"),
-          clientName: details.name,
-          phone1: displayPhone(phone),
-          phone2: details.phone2 || "-",
-          email,
-          birthday: "-",
-          country: details.country,
-          governorate: details.governorate,
-          dartCard: "no",
-          registeredAt: now(),
-          isArchived: false,
-          isDeleted: false,
-          isChecked: false,
-        };
-        customers.push(customer);
-        write(KEYS.customers, customers);
-      }
-    }
+    const customer = syncCustomer(logged);
     const items = read(KEYS.items, []),
       allocations = [],
       snapshots = [];
@@ -1449,6 +1421,35 @@
     });
   }
 
+  function requestedAuthDestination() {
+    let requested = "";
+    try {
+      requested = new URLSearchParams(location.search || "").get("next") || "";
+    } catch {}
+    return requested === "checkout" ? "cart-checkout.html" : "profile.html";
+  }
+
+  function wireAccountLink() {
+    const destination = currentUser()
+      ? "/profile.html"
+      : "/Sign%20Up%20modern.html?next=profile";
+    document.querySelectorAll(".account-btn a").forEach((link) => {
+      link.href = destination;
+    });
+  }
+
+  function redirectRememberedCustomer() {
+    let pathname = "";
+    try {
+      pathname = decodeURIComponent(location.pathname || "").toLowerCase();
+    } catch {
+      pathname = String(location.pathname || "").toLowerCase();
+    }
+    if (!pathname.endsWith("/sign up modern.html") || !currentUser()) return false;
+    location.replace(requestedAuthDestination());
+    return true;
+  }
+
   function addPartyPieces(layer) {
     const confettiColors = ["#ab012b", "#f4c95d", "#ffffff", "#ef7b45"];
     for (let index = 0; index < 34; index += 1) {
@@ -1494,10 +1495,16 @@
   function renderBirthdayCelebration() {
     const reward = visibleBirthdayReward(),
       existing = document.querySelector(".dart-birthday-celebration");
+    const closeKey = reward
+      ? `dart_birthday_celebration_closed:${reward.id}`
+      : "";
+    if (reward && !preparedBirthdayCelebrationIds.has(reward.id)) {
+      preparedBirthdayCelebrationIds.add(reward.id);
+      if (!PRESERVE_BIRTHDAY_CLOSE_STATE) sessionStorage.removeItem(closeKey);
+    }
     if (
       !reward ||
-      sessionStorage.getItem(`dart_birthday_celebration_closed:${reward.id}`) ===
-        "1"
+      sessionStorage.getItem(closeKey) === "1"
     ) {
       existing?.remove();
       return;
@@ -1513,10 +1520,7 @@
     overlay.innerHTML = `<div class="dart-party-layer" aria-hidden="true"></div><div class="dart-birthday-card"><div class="dart-birthday-countdown" aria-label="Time remaining on birthday discount"><div class="dart-birthday-time"><strong data-birthday-time="days">00</strong><span>Days</span></div><div class="dart-birthday-time"><strong data-birthday-time="hours">00</strong><span>Hours</span></div><div class="dart-birthday-time"><strong data-birthday-time="minutes">00</strong><span>Minutes</span></div></div></div><button type="button" class="dart-birthday-close">Close</button>`;
     addPartyPieces(overlay.querySelector(".dart-party-layer"));
     overlay.querySelector(".dart-birthday-close").addEventListener("click", () => {
-      sessionStorage.setItem(
-        `dart_birthday_celebration_closed:${reward.id}`,
-        "1",
-      );
+      sessionStorage.setItem(closeKey, "1");
       overlay.remove();
       clearInterval(window.dartBirthdayCountdownTimer);
     });
@@ -1573,7 +1577,7 @@
           try {
             await register(Object.fromEntries(new FormData(form)));
             setStatus(form, "تم إنشاء الحساب بنجاح.");
-            setTimeout(() => location.assign("profile.html"), 450);
+            setTimeout(() => location.assign(requestedAuthDestination()), 450);
           } catch (error) {
             setStatus(form, error.message, true);
           }
@@ -1589,7 +1593,8 @@
             if (user.mustChangePassword) {
               const dialog = document.getElementById("customerPasswordChange");
               if (dialog) dialog.hidden = false;
-            } else setTimeout(() => location.assign("profile.html"), 350);
+            } else
+              setTimeout(() => location.assign(requestedAuthDestination()), 350);
           } catch (error) {
             setStatus(form, error.message, true);
           }
@@ -1602,7 +1607,7 @@
               form.elements.confirmPassword.value,
             );
             setStatus(form, "Password changed successfully.");
-            setTimeout(() => location.assign("profile.html"), 400);
+            setTimeout(() => location.assign(requestedAuthDestination()), 400);
           } catch (error) {
             setStatus(form, error.message, true);
           }
@@ -1613,7 +1618,10 @@
             const order = await checkout(form);
             if (typeof showToast === "function")
               showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
-            setTimeout(() => location.assign("index.html"), 700);
+            setTimeout(() => {
+              sessionStorage.setItem("dart_internal_navigation", "1");
+              location.assign("index.html");
+            }, 700);
           } catch (error) {
             if (typeof showToast === "function") showToast(error.message);
             else setStatus(form, error.message, true);
@@ -2298,6 +2306,7 @@
 
   bindAuth();
   document.addEventListener("DOMContentLoaded", () => {
+    if (redirectRememberedCustomer()) return;
     ensureCatalogInventory();
     cleanupCartReservations();
     updateCartReservationTimer();
@@ -2308,11 +2317,13 @@
     renderFeedbackEligibility();
     renderLeaderboard();
     renderBirthdayExperience();
+    wireAccountLink();
     new MutationObserver(() => {
       renderFeedbackEligibility();
       renderLeaderboard();
       renderBirthdayTicker();
       wireSocialLinks();
+      wireAccountLink();
     }).observe(document.body, { childList: true, subtree: true });
     document
       .querySelectorAll("img:not([alt])")
@@ -2342,6 +2353,19 @@
       [KEYS.birthdayRewards, KEYS.session, KEYS.orders].includes(event.key)
     )
       renderBirthdayExperience();
+    if (
+      [KEYS.orders, KEYS.returns, KEYS.customers, KEYS.cards].includes(event.key)
+    )
+      renderLeaderboard();
+    if (event.key === KEYS.session) wireAccountLink();
+  });
+  window.addEventListener("dart:data-changed", (event) => {
+    if (
+      [KEYS.orders, KEYS.returns, KEYS.customers, KEYS.cards].includes(
+        event.detail?.key,
+      )
+    )
+      renderLeaderboard();
   });
   window.DartPlatform = {
     read,

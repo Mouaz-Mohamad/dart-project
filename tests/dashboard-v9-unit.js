@@ -89,6 +89,12 @@ context.customersData = [
     clientName: "Different Birthday",
     birthday: "2000-09-03",
   },
+  {
+    id: "customer-db-4",
+    clientId: "DR-4",
+    clientName: "Current Batch Customer",
+    birthday: "2000-09-01",
+  },
 ];
 
 const afterEight = new Date("2026-09-01T20:30:00+03:00");
@@ -121,7 +127,25 @@ assert.deepEqual(
 
 context.beforeEight = new Date("2026-09-01T19:30:00+03:00");
 batch = vm.runInContext("dartBirthdayMessageBatch(beforeEight)", context);
-assert.equal(batch.open, false, "tomorrow queue must stay closed before 8 PM Cairo");
+assert.equal(batch.open, true, "birthday message list must remain visible before 8 PM Cairo");
+assert.equal(batch.key, "2026-09-01");
+assert.deepEqual(
+  Array.from(batch.rows, (row) => row.clientId),
+  ["DR-4"],
+  "before 8 PM the list must retain the batch opened the previous evening",
+);
+context.customersData.push({
+  id: "customer-db-5",
+  clientId: "DR-5",
+  clientName: "New Current Batch Customer",
+  birthday: "2000-09-01",
+});
+batch = vm.runInContext("dartBirthdayMessageBatch(beforeEight)", context);
+assert.deepEqual(
+  Array.from(batch.rows, (row) => row.clientId),
+  ["DR-4", "DR-5"],
+  "new matching customers must appear immediately without waiting for 8 PM",
+);
 
 loadSegment("function dartDeleteImpact", "function dartCustomerStats");
 

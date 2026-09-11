@@ -38,3 +38,12 @@ Implementation notes and backend boundaries are in `README.md` and `API_CONTRACT
 - Added a per-delete modal offering record-only or linked-data cascade deletion, plus Cancel.
 - Added the Dart Card `Additional Benefit` action for manual grants with customer autofill, fixed 40%/10-piece rules and editable issue/expiry dates.
 - Added automated V9 feature-contract checks and bumped the static cache to `dart-static-v9`.
+
+## V9.2 delivery, birthday queue and account corrections
+
+- Kept Leaderboard scoring tied to `Delivered` physical items only and added live refresh when delivery or completed-return data changes.
+- Kept the birthday-message batch visible all day, added immediate inclusion of newly created matching customers and retained the 20:00 Cairo rollover.
+- Preserved birthday Close state during internal browsing/reload while clearing it on a new site entry.
+- Remembered customer login until explicit logout, routed My Account directly to the profile and returned checkout-triggered authentication to the cart.
+- Blocked guest order creation and preserved separate customer/representative accounts, allowing the same contact details across those two roles.
+- Bumped the public static cache to `dart-static-v9-2`.

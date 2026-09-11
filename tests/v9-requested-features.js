@@ -15,6 +15,7 @@ const platform = read("Js/dart-platform.js");
 const checkout = read("Js/one .js");
 const dashboard = read("Eye/dart.js");
 const dashboardFixes = read("Eye/dart-fixes.js");
+const representativePortal = read("Js/dart-rep.js");
 const dashboardHtml = read("Eye/Dart Eye.html");
 const tracking = read("Js/dart-tracking.js");
 const styles = read("CSS/fixes.css");
@@ -44,8 +45,8 @@ requireText(platform, 'storedReward.status = "Reserved"', "Birthday reward must 
 requireText(platform, 'reward.status = "Used"', "Birthday reward must be used on delivery.");
 requireText(platform, 'reward.status = new Date() < new Date(reward.expiresAt)', "Cancelled/refused orders must restore an unexpired reward.");
 
-// Dashboard birthday message queue opens at 8 PM and hides queued customers.
-requirePattern(dashboard, /if \(cairo\.hour < 20\)/, "Tomorrow birthday queue must open at 8 PM Cairo.");
+// Dashboard birthday message queue remains visible and rolls over at 8 PM.
+requireText(dashboard, "const targetOffset = cairo.hour >= 20 ? 1 : 0", "Birthday queue must roll over at 8 PM Cairo while staying visible.");
 requireText(dashboard, 'row.birthdayDate === key', "Birthday send history must be scoped to the target date.");
 requireText(dashboardFixes, 'localStorage.setItem(\'dart_birthday_messages\'', "Queued birthday clients must be recorded and removed from the widget.");
 requireText(dashboardFixes, "renderBirthdayWidget();", "Birthday widget must refresh immediately after queueing.");
@@ -69,6 +70,7 @@ requireText(dashboard, 'itemLimit: 10', "Manual Dart Card limit must stay fixed 
 requireText(platform, 'customerNameParts(owner, 2)', "Serial verification must show the owner's first two names.");
 requireText(platform, 'customerNameParts(row.customer.clientName, 3)', "Leaderboard must show the first three names.");
 requireText(platform, "candidates.slice(0, 3)", "Leaderboard must show no more than three candidates.");
+requireText(platform, 'order.status === "Delivered"', "Leaderboard must count delivered orders only.");
 for (const rank of [1, 2, 3]) requireText(styles, `.leaderboard-item.rank-${rank}`, `Leaderboard rank ${rank} styling is missing.`);
 if (/name=["']model_code["']/i.test(returnsFragment)) errors.push("Public return form must not request Model Code.");
 requireText(platform, "modelCode = orderLine?.modelCode || inventoryItem?.modelId", "Return Model Code must be derived automatically.");
@@ -83,8 +85,20 @@ for (const platformName of ["instagram", "facebook", "tiktok", "youtube", "whats
   requireText(footer, marker, `Footer ${platformName} placeholder is missing.`);
 }
 
+// Account/session rules and separate customer/representative identities.
+requireText(platform, "rememberedUntilLogout: true", "Customer login must be remembered until explicit logout.");
+requireText(platform, "يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب", "Checkout must reject guest orders.");
+requireText(checkout, "Sign Up modern.html?next=checkout", "Checkout must send guests to customer authentication.");
+requireText(platform, "wireAccountLink();", "My Account must route remembered customers directly to their profile.");
+requireText(platform, "PRESERVE_BIRTHDAY_CLOSE_STATE", "Birthday close state must distinguish internal browsing from a new site entry.");
+const repConflictStart = representativePortal.indexOf("function conflict(payload)");
+const repConflictEnd = representativePortal.indexOf("async function register(form)", repConflictStart);
+const repConflictSource = representativePortal.slice(repConflictStart, repConflictEnd);
+if (repConflictStart < 0 || repConflictEnd < 0) errors.push("Representative conflict validation could not be inspected.");
+if (/KEYS\.(?:users|customers)/.test(repConflictSource)) errors.push("Representative registration must allow the same email/phone as a customer account.");
+
 if (errors.length) {
   console.error(errors.map((error) => `FAIL ${error}`).join("\n"));
   process.exit(1);
 }
-console.log("PASS V9 birthday, Dart Card and requested UX contract checks");
+console.log("PASS V9.2 delivery leaderboard, birthday queue, account and role contract checks");

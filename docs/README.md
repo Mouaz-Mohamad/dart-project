@@ -66,11 +66,13 @@ See `CODE_MAP.md` and `VERIFICATION_REPORT.md` for implementation boundaries and
 
 ## V9 birthday and card experience
 
-- The Brand dashboard birthday widget is an unsent WhatsApp queue. At 20:00 Cairo it shows active clients whose birthday is the next day; queueing selected messages removes only those clients from the widget.
+- The Brand dashboard birthday widget remains visible all day as an unsent WhatsApp queue. It retains the current message batch before 20:00 Cairo, rolls to the next day's birthdays at 20:00, includes newly added matching clients immediately and removes only clients whose messages were queued.
 - Logged-in customers receive one 30% Birthday reward from 00:00 Cairo on their birthday for seven calendar days. It is applied automatically, used once, never stacks and always takes priority over Dart Card without spending Dart Card quota.
-- The supplied birthday artwork is the celebration-card background. Its countdown sits in the reserved top area; closing the celebration hides it for that browser tab/session only.
+- The supplied birthday artwork is the celebration-card background. Its countdown sits in the reserved top area; closing it hides it while browsing internally, and a genuinely new site entry shows it again while the reward is visible.
 - The storefront and dashboard additions remain a localStorage prototype. WhatsApp sending, authoritative clocks, reward locking, checkout validation and deletion authorization must be implemented by the backend described in `API_CONTRACT.md`.
 - The dashboard can grant the fixed 40% / 10-piece Dart Card manually through `Additional Benefit`; issue and expiry dates remain editable.
+- Public Leaderboard points come only from `Delivered` item codes and refresh when delivery/return data changes; creating an order adds no points.
+- Checkout requires a signed-in customer. Customer sign-in is remembered until explicit logout, and one person may keep separate customer and representative accounts with the same contact details.
 
 ## V8 corrections
 

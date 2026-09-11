@@ -184,6 +184,12 @@ function form(values) {
     password: "password1",
     birthday: "2000-01-01",
   });
+  const rememberedSession = JSON.parse(localStorage.getItem("dart_session"));
+  assert(
+    rememberedSession.rememberedUntilLogout === true &&
+      !("expiresAt" in rememberedSession),
+    "customer login must remain remembered until explicit logout",
+  );
   let duplicateRejected = false;
   try {
     await platform.register({
@@ -381,6 +387,16 @@ function form(values) {
         totalProducts: 5,
         items: ["LB-1", "LB-2", "LB-3", "LB-4", "LB-5"],
       },
+      {
+        id: "O-LB-NEW",
+        orderId: "O-LB-NEW",
+        clientId: "DA-LB",
+        status: "New",
+        createdAt: deliveredAt,
+        finalAmount: 1000,
+        totalProducts: 2,
+        items: ["LB-6", "LB-7"],
+      },
     ]),
   );
   localStorage.setItem(
@@ -415,14 +431,23 @@ function form(values) {
   platform.renderLeaderboard();
   assert(
     leaderboardList.innerHTML.includes("4 PIC"),
-    "five delivered items minus one completed return must display 4 PIC",
+    "new orders must not count; five delivered items minus one completed return must display 4 PIC",
+  );
+  const changedOrders = JSON.parse(localStorage.getItem("dart_orders"));
+  changedOrders[1].status = "Delivered";
+  changedOrders[1].deliveredAt = deliveredAt;
+  localStorage.setItem("dart_orders", JSON.stringify(changedOrders));
+  platform.renderLeaderboard();
+  assert(
+    leaderboardList.innerHTML.includes("6 PIC"),
+    "the same order must count as soon as its status becomes Delivered",
   );
   const changedReturns = JSON.parse(localStorage.getItem("dart_returns"));
   changedReturns[1].status = "Damaged";
   localStorage.setItem("dart_returns", JSON.stringify(changedReturns));
   platform.renderLeaderboard();
   assert(
-    leaderboardList.innerHTML.includes("3 PIC"),
+    leaderboardList.innerHTML.includes("5 PIC"),
     "leaderboard must refresh immediately when another return is completed",
   );
   // END Leaderboard regression.
@@ -505,6 +530,41 @@ function form(values) {
     "a cancelled birthday order must restore the still-valid reward",
   );
   // END V9 birthday reward regression.
+
+  localStorage.setItem(
+    "dart_items",
+    JSON.stringify([
+      {
+        id: "i-guest",
+        itemCode: "I-GUEST",
+        modelId: "DA-ONE",
+        color: "Black",
+        size: "M",
+        status: "In stock",
+      },
+    ]),
+  );
+  context.cartData = [
+    {
+      id: "DA-ONE",
+      title: "Product 1",
+      price: 600,
+      quantity: 1,
+      size: "M",
+      color: "Black",
+    },
+  ];
+  platform.logout();
+  let guestCheckoutRejected = false;
+  try {
+    await platform.checkout(validForm);
+  } catch (error) {
+    guestCheckoutRejected = error.message.includes("تسجيل الدخول");
+  }
+  assert(
+    guestCheckoutRejected,
+    "checkout must require a registered, logged-in customer",
+  );
   console.log("PASS platform unit tests");
 })().catch((error) => {
   console.error(error.stack || error);
