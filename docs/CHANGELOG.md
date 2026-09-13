@@ -47,3 +47,18 @@ Implementation notes and backend boundaries are in `README.md` and `API_CONTRACT
 - Remembered customer login until explicit logout, routed My Account directly to the profile and returned checkout-triggered authentication to the cart.
 - Blocked guest order creation and preserved separate customer/representative accounts, allowing the same contact details across those two roles.
 - Bumped the public static cache to `dart-static-v9-2`.
+
+## Finance V1 dashboard
+
+- Recalculated Brand Sales, Total Cost and Profit by one shared reporting period and added safe previous-period comparisons, including a non-infinite `New` state when the previous base is zero.
+- Added Returning Customers, Goals and Financial Analysis charts without replacing the original Brand chart or the Customer, Orders, Rating, Stock and Sold Items cards.
+- Added flexible goal, expense, budget, invoice, marketing and COD receipt management with empty initial collections and append-only audit records.
+- Added P&L, Cash Flow, COD reconciliation and model-profitability reports plus CSV export and record-driven operational/financial alerts.
+- Added per-customer Dart Card draw eligibility control and an eligibility history. Excluded customers are removed from the monthly winner candidate set without cancelling an already-earned active benefit.
+- Added Finance backend contracts and isolated calculation/contract tests. No public-site runtime file was changed for this dashboard release.
+
+## Finance V1.1 layout correction
+
+- Moved the fixed Finance navigation, unified-period controls, Business Insights cards and Finance editor forms into `Eye/Dart Eye.html`, with stable IDs used by JavaScript.
+- Fixed the Brand flow and chart-frame heights so Business Insights reserves its own space and cannot overlap the analytics cards or following widgets.
+- Kept the existing Expenses tab and its edit/delete table; the proposed duplicate expense box was removed.

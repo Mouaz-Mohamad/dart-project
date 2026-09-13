@@ -1,0 +1,136 @@
+"use strict";
+
+const assert = require("assert");
+const finance = require("../Eye/dart-finance.js");
+
+function range(start, end) {
+  return { start: finance.parseDate(start), end: new Date(finance.parseDate(end).setHours(23, 59, 59, 999)) };
+}
+
+function baseData(overrides = {}) {
+  return {
+    orders: [], returns: [], items: [], models: [], customers: [], damage: [], expenses: [], budgets: [], invoices: [], goals: [], marketing: [], settlements: [],
+    ...overrides,
+  };
+}
+
+const empty = finance.calculateSummary(baseData(), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(empty.netRevenue, 0, "Empty records must produce zero revenue.");
+assert.strictEqual(empty.netProfit, 0, "Empty records must produce zero profit.");
+assert.strictEqual(empty.repeatRate, 0, "Empty records must not create a customer rate.");
+
+const deliveredOrder = {
+  id: "ORDER-1",
+  orderId: "K-1",
+  clientId: "DA-1",
+  status: "Delivered",
+  deliveredAt: "2026-09-02T10:00:00+03:00",
+  paymentMethod: "Cash on Delivery",
+  paymentStatus: "Unpaid",
+  amountRefunded: 0,
+  priceSnapshot: [{ itemCode: "I-1", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 }],
+};
+
+const returnedData = baseData({
+  orders: [{ ...deliveredOrder, amountRefunded: 1000, refundedAt: "2026-09-05T10:00:00+03:00" }],
+  returns: [
+    { id: "R-1", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05T11:00:00+03:00" },
+    { id: "R-1-DUPLICATE", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05T12:00:00+03:00" },
+  ],
+  expenses: [{ id: "E-1", date: "2026-09-03", amount: 100, status: "Unpaid", category: "Packaging" }],
+});
+const returnedSummary = finance.calculateSummary(returnedData, range("2026-09-01", "2026-09-30"));
+assert.strictEqual(returnedSummary.grossRevenue, 1000);
+assert.strictEqual(returnedSummary.refunds, 1000, "Detailed return refunds must not be duplicated by order.amountRefunded.");
+assert.strictEqual(returnedSummary.netRevenue, 0);
+assert.strictEqual(returnedSummary.netCogs, 0, "A Good return must reverse its immutable COGS snapshot.");
+assert.strictEqual(returnedSummary.soldUnits, 0, "Net units sold must subtract completed returns.");
+assert.strictEqual(returnedSummary.operatingExpenses, 100, "Unpaid recognized expenses belong in accrual P&L.");
+assert.strictEqual(returnedSummary.netProfit, -100);
+assert.strictEqual(returnedSummary.cashOut, 0, "Unpaid expenses must not reduce cash flow.");
+
+const laterReturnData = baseData({
+  orders: [{ ...deliveredOrder, deliveredAt: "2026-08-20", amountRefunded: 1000, refundedAt: "2026-09-05" }],
+  returns: [{ id: "R-LATE", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05" }],
+});
+const laterReturnSummary = finance.calculateSummary(laterReturnData, range("2026-09-01", "2026-09-30"));
+assert.strictEqual(laterReturnSummary.grossRevenue, 0, "An older delivery must not be moved into the return period.");
+assert.strictEqual(laterReturnSummary.netRevenue, -1000, "A later-period refund must reduce that later period's revenue.");
+assert.strictEqual(laterReturnSummary.netCogs, -400, "A later Good return must reverse COGS in its actual return period.");
+assert.strictEqual(laterReturnSummary.netProfit, -600);
+
+const cashData = baseData({
+  orders: [{ ...deliveredOrder, paymentStatus: "Unpaid" }],
+  expenses: [{ id: "E-2", date: "2026-09-03", paidAt: "2026-09-04", amount: 100, status: "Paid", category: "Packaging" }],
+  settlements: [{ id: "S-1", orderId: "K-1", settlementDate: "2026-09-06", amountReceived: 1000, fee: 50, status: "Received" }],
+});
+const cashSummary = finance.calculateSummary(cashData, range("2026-09-01", "2026-09-30"));
+assert.strictEqual(cashSummary.netRevenue, 1000);
+assert.strictEqual(cashSummary.netCogs, 400);
+assert.strictEqual(cashSummary.codFees, 50);
+assert.strictEqual(cashSummary.totalCost, 550);
+assert.strictEqual(cashSummary.netProfit, 450);
+assert.strictEqual(cashSummary.cashIn, 1000);
+assert.strictEqual(cashSummary.cashOut, 150);
+assert.strictEqual(cashSummary.netCashFlow, 850);
+
+const paidWithoutSettlement = finance.calculateSummary(baseData({
+  orders: [{ ...deliveredOrder, paymentStatus: "Paid", amountPaid: 0, paidAt: "2026-09-02" }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(paidWithoutSettlement.cashIn, 1000, "A paid COD order without a separate receipt record must use its final order amount once.");
+
+const damagedReturnData = baseData({
+  orders: [{ ...deliveredOrder, amountRefunded: 1000 }],
+  returns: [{ id: "R-2", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Damaged", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05" }],
+  damage: [{ id: "D-1", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Damaged", costSnapshot: 400, date: "2026-09-05" }],
+});
+const damagedReturnSummary = finance.calculateSummary(damagedReturnData, range("2026-09-01", "2026-09-30"));
+assert.strictEqual(damagedReturnSummary.netCogs, 400, "Damaged customer returns remain in COGS.");
+assert.strictEqual(damagedReturnSummary.damageLoss, 0, "A sold damaged return must not be counted again as pre-sale damage.");
+assert.strictEqual(damagedReturnSummary.netProfit, -400);
+
+const repeatData = baseData({
+  orders: [
+    deliveredOrder,
+    { ...deliveredOrder, id: "ORDER-2", orderId: "K-2", deliveredAt: "2026-09-08", priceSnapshot: [{ itemCode: "I-2", modelCode: "M-1", qty: 1, finalUnitPrice: 800, costSnapshot: 300 }] },
+    { ...deliveredOrder, id: "ORDER-3", orderId: "K-3", clientId: "DA-2", deliveredAt: "2026-09-10", priceSnapshot: [{ itemCode: "I-3", modelCode: "M-2", qty: 1, finalUnitPrice: 700, costSnapshot: 250 }] },
+  ],
+});
+const repeatSummary = finance.calculateSummary(repeatData, range("2026-09-01", "2026-09-30"));
+assert.strictEqual(repeatSummary.uniqueCustomers, 2);
+assert.strictEqual(repeatSummary.returningCustomers, 1);
+assert.strictEqual(repeatSummary.repeatRate, 50);
+
+const modelRows = finance.modelProfitability(repeatData, range("2026-09-01", "2026-09-30"));
+assert.strictEqual(modelRows[0].modelCode, "M-1");
+assert.strictEqual(modelRows[0].revenue, 1800);
+assert.strictEqual(modelRows[0].cogs, 700);
+assert.strictEqual(modelRows[0].profit, 1100);
+
+const budgetData = baseData({
+  expenses: [{ id: "E-3", date: "2026-09-12", amount: 750, status: "Paid", category: "Marketing" }],
+  budgets: [{ id: "B-1", name: "Launch ads", category: "Marketing", amount: 1000, warningPercent: 70, startDate: "2026-09-01", endDate: "2026-09-30" }],
+});
+const budget = finance.budgetRows(budgetData, range("2026-09-01", "2026-09-30"))[0];
+assert.strictEqual(budget.actual, 750);
+assert.strictEqual(budget.remaining, 250);
+assert.strictEqual(budget.utilization, 75);
+assert(finance.operationalAlerts(budgetData, range("2026-09-01", "2026-09-30"), finance.calculateSummary(budgetData, range("2026-09-01", "2026-09-30"))).some((alert) => alert.title.includes("Budget near limit")));
+
+const goalData = baseData({
+  orders: [deliveredOrder],
+  goals: [{ id: "G-1", name: "First revenue goal", metric: "revenue", target: 2000, startDate: "2026-09-01", endDate: "2026-09-30", status: "Active" }],
+});
+const goal = finance.goalRows(goalData, range("2026-09-01", "2026-09-30"))[0];
+assert.strictEqual(goal.actual, 1000);
+assert.strictEqual(goal.progress, 50);
+assert.strictEqual(goal.achieved, false);
+
+assert.deepStrictEqual(finance.comparison(0, 0), { text: "— 0%", direction: "flat", percent: 0 });
+assert.strictEqual(finance.comparison(100, 0).text, "New", "A zero previous base must never display Infinity.");
+
+const september = finance.periodRange("custom", { start: "2026-09-01", end: "2026-09-10" }, new Date("2026-09-13T12:00:00Z"));
+assert.strictEqual(september.previous.start.getDate(), 22);
+assert.strictEqual(september.previous.end.getDate(), 31);
+
+console.log("Dart finance unit tests passed.");

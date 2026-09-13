@@ -46,3 +46,20 @@ The environment still has no installed Chromium binary, so the included browser 
 - Confirmed that customer sessions persist until explicit logout, My Account resolves directly to the profile, and checkout rejects a guest before creating any customer or order.
 - Confirmed that customer and representative sessions remain separate and representative registration permits contact details already used by that person's customer account while retaining representative-to-representative duplicate checks.
 - JavaScript syntax, platform, dashboard, representative, tracking, Cairo/Giza, feature-contract, static structure and SEO checks passed. Chromium-only suites remain pending because no browser binary is installed in this environment.
+
+## Finance V1 verification — 2026-09-13
+
+- Isolated finance tests passed for empty-start behavior, delivered revenue, detailed-refund deduplication, Good-return COGS reversal, Damaged-return non-duplication, accrual expenses, paid-expense Cash Flow, COD receipts/fees, repeat-customer rate, budgets, goals and model profitability.
+- Source-contract checks confirmed the unified period comparison, three new chart mounts, all Finance reports, separate backend-ready storage boundaries and the audited per-customer Dart Card draw control.
+- The original `myChart`, Latest Updates, Birthday, Top Clients and visitor/sales chart IDs remain singular and intact. The finance module never addresses or replaces `myChart`.
+- Every file outside `Eye/`, `docs/` and `tests/` was byte-compared with the supplied archive and matched, confirming that no public-site file was changed.
+- Platform, representative, tracking, address, V9 dashboard, V9 requested-feature, static HTML/assets/accessibility, SEO and JavaScript syntax checks passed after the Finance changes.
+- A Chromium interaction run was attempted, but the cached executable advertised by Playwright was not present. The existing full-site browser suite remains available for CI/staging.
+
+## Finance V1.1 layout verification — 2026-09-13
+
+- Confirmed that the Brand period control, original chart, analytics grid and Business Insights appear in a stable source order before the unchanged Latest Updates, Birthday, Top Clients and visitor/sales chart.
+- Confirmed that all three new chart frames have bounded heights, their panels participate in normal document flow, and mobile collapses the grid to one column.
+- Confirmed that the Finance shell and editor forms now exist in HTML with unique IDs; JavaScript no longer injects those structures.
+- Kept the original Expenses tab table as requested and removed the duplicate management box.
+- Finance calculation tests, source-contract tests, JavaScript syntax checks and a 334-ID uniqueness check passed. Chromium remains unavailable in this environment.

@@ -2396,24 +2396,14 @@ document.addEventListener("DOMContentLoaded", () => {
   if (saved && document.getElementById(saved)) activate(saved);
 });
 
-// Dynamic Brand analytics extension. This intentionally appends to the current Brand UI.
+// Brand analytics data renderer. Its fixed mount lives in Dart Eye.html.
 function dartTopBy(values) {
   const m = new Map();
   values.filter(Boolean).forEach((v) => m.set(v, (m.get(v) || 0) + 1));
   return [...m.entries()].sort((a, b) => b[1] - a[1])[0] || ["-", 0];
 }
 function dartEnsureAnalyticsGrid() {
-  const brand = document.getElementById("brand");
-  if (!brand) return null;
-  let grid = document.getElementById("dart-analytics-grid");
-  if (!grid) {
-    grid = document.createElement("div");
-    grid.id = "dart-analytics-grid";
-    grid.className = "dart-analytics-grid";
-    const anchor = brand.querySelector(".chart-one");
-    anchor?.insertAdjacentElement("afterend", grid);
-  }
-  return grid;
+  return document.getElementById("dart-analytics-grid");
 }
 
 // Better low-stock dedupe: one active alert per model/condition, resolved when stock recovers.
@@ -3423,6 +3413,8 @@ function dartEnsureMonthlyDartCardWinners() {
   });
   const candidates = customersData
     .filter(dartIsActive)
+    // Draw eligibility is opt-out for existing customers and explicitly auditable in Finance.
+    .filter((c) => c.dartCardDrawEligible !== false)
     .filter((c) => !activeCardClients.has(String(c.clientId)))
     .map((c) => {
       const os = dartDeliveredInMonth(

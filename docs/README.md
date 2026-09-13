@@ -13,6 +13,8 @@ This package contains the customer website, Dart Eye dashboard and the represent
 - `Sign Up modern.html` — customer registration/login and password-reset request.
 - `Eye/Dart Eye.html` — private brand/dashboard management, including the per-model size-chart editor.
 
+The dashboard also includes Finance V1: a shared period filter with previous-period comparison, accurate period-based financial cards, Returning Customers/Goals/Financial Analysis charts, flexible goal CRUD, expenses, budgets, invoice control, COD reconciliation, P&L, Cash Flow, model profitability, marketing analytics and record-driven alerts. Every finance collection starts empty. No demonstration sales, costs or targets are seeded.
+
 ## V7 — Empty dashboard and shared catalogue
 
 This version starts with no models, physical items, customers or orders. At the first visit on each browser origin, `dart-catalog.js` clears the previous Dart prototype data once, as requested by the owner. The `dart_v7_empty_start_completed` marker prevents subsequent resets. New entries survive reloads. There is no automatic demo seeding. This does not delete data on a remote server.
@@ -46,6 +48,8 @@ node tests/tracking-unit.js
 node tests/address-unit.js
 node tests/dashboard-v9-unit.js
 node tests/v9-requested-features.js
+node tests/dart-finance-unit.js
+node tests/finance-dashboard-contract.js
 python3 tests/static_checks.py
 node tests/seo_checks.js
 node tests/catalog-browser.js

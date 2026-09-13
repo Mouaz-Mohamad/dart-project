@@ -264,3 +264,50 @@ The server creates one reward per customer and birthday year:
 ## Tracking visibility
 
 `GET /api/v1/me/active-orders` and public tracking-token responses exclude `Delivered` orders. Delivery remains available in account order history, but it no longer appears on the Track Your Order page.
+
+# Finance V1 service contract
+
+All finance endpoints require the admin role, accept/return ISO-8601 timestamps, and store money as integer minor units. The server is authoritative: it recomputes every aggregate from immutable order/cost snapshots and finance records inside a consistent database snapshot. The browser prototype keys in `Eye/dart-finance.js` are repository boundaries, not production storage.
+
+## Unified period and comparison
+
+- `GET /api/v1/admin/finance/summary?start=<ISO>&end=<ISO>&compare=previous` returns the selected range, the immediately comparable range and both summaries.
+- Calendar presets are resolved in `Africa/Cairo`. This month, quarter and year are compared to the same elapsed portion of the previous calendar period; rolling/custom ranges compare with an immediately preceding range of equal length.
+- Return explicit `dataQualityIssues` for missing order `priceSnapshot`, `costSnapshot`, return resolution timestamps or damage cost snapshots. Never invent or silently seed finance data.
+
+## Accounting rules
+
+- Revenue is recognized only when an order becomes `Delivered`. A refund reduces revenue on the completed return/refund date, including when it falls in a later reporting period.
+- COGS uses every delivered line's immutable `costSnapshot`. A completed `Good` return reverses that line's COGS; a completed `Damaged` return does not restore inventory and stays in COGS.
+- Pre-sale damage is written off once using its immutable damage `costSnapshot`. A damaged customer return must never also be counted as a pre-sale write-off.
+- Operating expenses are recognized on `expenseDate` for P&L. Only `Paid` expenses with a `paidAt` instant affect Cash Flow. `Void` records affect neither.
+- COD provider fees are recognized as expense and cash outflow on settlement date. Invoice documents never create revenue or expense by themselves; they reference the authoritative order or expense to prevent duplication.
+- Net units sold are Delivered physical units minus completed post-delivery returns. Returning Customer Rate is customers with at least two Delivered orders in the range divided by customers with at least one.
+
+## Finance resources
+
+- `GET/POST /api/v1/admin/finance/expenses` and `GET/PATCH/DELETE /api/v1/admin/finance/expenses/:id`
+- `GET/POST /api/v1/admin/finance/budgets` and `GET/PATCH/DELETE /api/v1/admin/finance/budgets/:id`
+- `GET/POST /api/v1/admin/finance/invoices` and `GET/PATCH/DELETE /api/v1/admin/finance/invoices/:id`
+- `GET/POST /api/v1/admin/goals` and `GET/PATCH/DELETE /api/v1/admin/goals/:id`
+- `GET/POST /api/v1/admin/finance/marketing` and `GET/PATCH/DELETE /api/v1/admin/finance/marketing/:id`
+- `GET/POST /api/v1/admin/finance/cod-settlements` and `GET /api/v1/admin/finance/cod-settlements/:id`
+- `GET /api/v1/admin/finance/reports/:report?start=<ISO>&end=<ISO>` where `report` is `pnl`, `cash-flow`, `cod`, `model-profitability`, `marketing`, `budgets` or `alerts`.
+
+Mutations use idempotency keys plus optimistic version checks. Deletion archives finance records and retains their references; settled COD receipts are reversed by an explicit reversal entry rather than edited or deleted. Maintain one append-only finance audit event per mutation with actor, timestamp, before/after values and reason.
+
+## COD reconciliation
+
+A settlement references exactly one Delivered COD order and contains `amountReceivedMinor`, `feeMinor`, `settlementDate`, provider/batch reference and immutable audit metadata. Sum of non-reversed receipts cannot exceed `orderFinalMinor - refundedMinor`. P&L revenue remains tied to delivery; Cash Flow uses receipt dates. The API returns `due`, `received`, `remaining` and `Expected | Awaiting Settlement | Partial | Settled` per order.
+
+## Goals and marketing
+
+Goals support `revenue`, `units`, `orders`, `net_profit`, `repeat_rate`, `marketing_roas` and `expense_limit`, with name, target, start/end, Active/Paused state and archive metadata. Actual/progress values are computed server-side and are never persisted as authoritative fields.
+
+Marketing records contain channel, campaign, date, spend, impressions, clicks, attributed orders/revenue and optional `linkedExpenseId`. Attributed revenue is analytical only and never added to accounting revenue. Linked expense validation prevents a marketing cost from being counted twice.
+
+## Dart Card draw eligibility
+
+- `PATCH /api/v1/admin/customers/:customerId/dart-card-draw-eligibility` accepts `{ "eligible": boolean, "reason": string, "expectedVersion": number }`.
+- The eligibility change and its append-only audit event are committed atomically. Return previous/new values, actor and timestamp.
+- Monthly winner selection reads the same committed customer snapshot and excludes `eligible=false` before ranking. Existing customers default to eligible only through an explicit database migration; new-customer defaults must be documented and enforced server-side.

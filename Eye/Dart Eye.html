@@ -7,6 +7,7 @@
     <meta name="robots" content="noindex,nofollow">
     <link rel="stylesheet" href="dart.css">
     <link rel="stylesheet" href="dart-inventory.css">
+    <link rel="stylesheet" href="dart-finance.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="manifest" href="/manifest.json">
@@ -35,6 +36,7 @@
             <li><a href="#" data-target="review">Review</a></li>
             <li><a href="#" data-target="representative">Rep</a></li>
             <li><a href="#" data-target="card">Dart Card</a></li>
+            <li><a href="#" data-target="finance"><i class="fa-solid fa-wallet"></i> Finance</a></li>
         </ul>
     </nav>
 
@@ -51,6 +53,7 @@
         <li><a href="#" data-target="review"><i class='bx bx-star'></i><span>Review</span></a></li>
         <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
         <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
+        <li><a href="#" data-target="finance"><i class="fa-solid fa-wallet"></i><span>Finance</span></a></li>
     </ul>
 </nav>
 
@@ -99,6 +102,32 @@
 
             <div class="margen20"></div>
 
+            <div id="dart-brand-finance" class="dart-brand-finance" data-finance-period="brand">
+                <div id="brand-finance-period-control" class="dart-period-control">
+                    <div class="dart-period-copy">
+                        <span>Unified period</span>
+                        <strong id="brand-period-label" data-period-label></strong>
+                        <small>Compared with the previous equivalent period</small>
+                    </div>
+                    <label for="brand-period-preset">
+                        <span>Range</span>
+                        <select id="brand-period-preset" data-period-preset>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="this_quarter">This Quarter</option>
+                            <option value="this_year">This Year</option>
+                            <option value="last_7">Last 7 Days</option>
+                            <option value="last_30">Last 30 Days</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </label>
+                    <div id="brand-custom-period" class="dart-custom-period">
+                        <label for="brand-period-start"><span>From</span><input id="brand-period-start" type="date" data-period-start></label>
+                        <label for="brand-period-end"><span>To</span><input id="brand-period-end" type="date" data-period-end></label>
+                    </div>
+                </div>
+            </div>
+
             <div class="chart-one">
                 <div class="financial-summary">
                     <div class="sales-cont">
@@ -137,6 +166,50 @@
                     <div id="myChart"></div>
                 </div>
             </div>
+
+            <div id="dart-analytics-grid" class="dart-analytics-grid"></div>
+
+            <section id="dart-brand-insights" class="dart-brand-insights" aria-labelledby="dart-brand-insights-title">
+                <div class="dart-section-heading">
+                    <div>
+                        <p class="dart-eyebrow">DECISION VIEW</p>
+                        <h2 id="dart-brand-insights-title">Business Insights</h2>
+                    </div>
+                    <button id="brand-manage-goals-btn" type="button" class="dart-finance-secondary" data-open-finance-tab="goals">Manage Goals</button>
+                </div>
+                <div id="dart-brand-chart-grid" class="dart-brand-chart-grid">
+                    <article id="returning-customers-card" class="dart-finance-panel">
+                        <div class="dart-panel-head">
+                            <div><h3>Returning Customers</h3><p>Customers with 2+ delivered orders in the selected period.</p></div>
+                            <span id="dart-repeat-rate" class="dart-panel-badge">0%</span>
+                        </div>
+                        <div class="dart-chart-frame">
+                            <canvas id="dart-returning-chart"></canvas>
+                            <div class="dart-chart-empty" id="dart-returning-empty">No delivered orders in this period.</div>
+                        </div>
+                    </article>
+                    <article id="goals-progress-card" class="dart-finance-panel">
+                        <div class="dart-panel-head">
+                            <div><h3>Goals</h3><p>Live progress from saved goal definitions.</p></div>
+                            <span id="dart-goals-count" class="dart-panel-badge">0 active</span>
+                        </div>
+                        <div class="dart-chart-frame">
+                            <canvas id="dart-goals-chart"></canvas>
+                            <div class="dart-chart-empty" id="dart-goals-empty">No goals overlap this period.</div>
+                        </div>
+                    </article>
+                    <article id="financial-analysis-card" class="dart-finance-panel dart-financial-analysis-panel">
+                        <div class="dart-panel-head">
+                            <div><h3>Financial Analysis</h3><p>Revenue, total cost and net profit.</p></div>
+                            <span id="dart-financial-period" class="dart-panel-badge"></span>
+                        </div>
+                        <div class="dart-chart-frame">
+                            <canvas id="dart-financial-chart"></canvas>
+                            <div class="dart-chart-empty" id="dart-financial-empty">No financial activity in this period.</div>
+                        </div>
+                    </article>
+                </div>
+            </section>
 
             <div class="strok"></div>
 
@@ -449,8 +522,14 @@
                     <h2 class="w300">Total amount</h2>
                     <h2 class="w200">Dart Cart</h2>
                     <h2 class="w100">Age</h2>
+                    <h2 id="customers-draw-entry-header" class="w150" data-draw-header>Draw Entry</h2>
                 </div>
                 <div id="customers-container"></div>
+                <template id="customer-draw-toggle-template">
+                    <span class="text-item w150">
+                        <button type="button" class="dart-draw-toggle" data-dart-draw-toggle><span class="dart-draw-state-dot"></span><span data-draw-label></span></button>
+                    </span>
+                </template>
             </div>
         </section>
 
@@ -852,6 +931,61 @@
             </div>
 
             
+        </section>
+
+        <!-- Finance: the fixed interface lives in HTML; JavaScript only fills saved data by ID. -->
+        <section id="finance" class="dashboard-section dart-finance-section">
+            <div id="finance-page-header" class="dart-finance-page-head">
+                <div>
+                    <p class="dart-eyebrow">DART CONTROL CENTER</p>
+                    <h1>Finance</h1>
+                    <p>Expenses, budgets, documents and decision-ready reports from real records.</p>
+                </div>
+                <button id="finance-add-expense-btn" type="button" class="dart-finance-primary" data-finance-add="expenses"><i class="fa-solid fa-plus"></i> Add Expense</button>
+            </div>
+
+            <div id="dart-finance-period" data-finance-period="finance">
+                <div id="finance-period-control" class="dart-period-control">
+                    <div class="dart-period-copy">
+                        <span>Unified period</span>
+                        <strong id="finance-period-label" data-period-label></strong>
+                        <small>Compared with the previous equivalent period</small>
+                    </div>
+                    <label for="finance-period-preset">
+                        <span>Range</span>
+                        <select id="finance-period-preset" data-period-preset>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="this_quarter">This Quarter</option>
+                            <option value="this_year">This Year</option>
+                            <option value="last_7">Last 7 Days</option>
+                            <option value="last_30">Last 30 Days</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </label>
+                    <div id="finance-custom-period" class="dart-custom-period">
+                        <label for="finance-period-start"><span>From</span><input id="finance-period-start" type="date" data-period-start></label>
+                        <label for="finance-period-end"><span>To</span><input id="finance-period-end" type="date" data-period-end></label>
+                    </div>
+                </div>
+            </div>
+
+            <nav id="finance-tabs" class="dart-finance-tabs" aria-label="Finance reports">
+                <button id="finance-tab-overview" type="button" data-finance-tab="overview" class="active">Overview</button>
+                <button id="finance-tab-expenses" type="button" data-finance-tab="expenses">Expenses</button>
+                <button id="finance-tab-budgets" type="button" data-finance-tab="budgets">Budgets</button>
+                <button id="finance-tab-invoices" type="button" data-finance-tab="invoices">Invoices</button>
+                <button id="finance-tab-goals" type="button" data-finance-tab="goals">Goals</button>
+                <button id="finance-tab-pnl" type="button" data-finance-tab="pnl">P&amp;L</button>
+                <button id="finance-tab-cashflow" type="button" data-finance-tab="cashflow">Cash Flow</button>
+                <button id="finance-tab-cod" type="button" data-finance-tab="cod">COD</button>
+                <button id="finance-tab-models" type="button" data-finance-tab="models">Models</button>
+                <button id="finance-tab-marketing" type="button" data-finance-tab="marketing">Marketing</button>
+                <button id="finance-tab-alerts" type="button" data-finance-tab="alerts">Alerts</button>
+                <button id="finance-tab-drawlog" type="button" data-finance-tab="drawlog">Draw Log</button>
+            </nav>
+
+            <div id="dart-finance-content" aria-live="polite"></div>
         </section>
     </main>
 
@@ -1436,6 +1570,92 @@
   </div>
 </div>
 
+<!-- Finance editor: static HTML fields, populated and controlled by their IDs. -->
+<div class="modal" id="dart-finance-modal">
+  <div class="modal-content dart-finance-modal-content" role="dialog" aria-modal="true" aria-labelledby="dart-finance-modal-title">
+    <button id="dart-finance-modal-close" type="button" class="dart-finance-modal-close" aria-label="Close">&times;</button>
+    <div id="dart-finance-modal-body">
+      <div class="dart-finance-modal-head">
+        <p class="dart-eyebrow">DART FINANCE</p>
+        <h2 id="dart-finance-modal-title">Finance Record</h2>
+        <p id="dart-finance-modal-note"></p>
+      </div>
+      <form id="dart-finance-form" data-resource="" data-id="">
+        <input id="finance-record-id" type="hidden">
+        <div class="dart-finance-form-grid">
+          <fieldset id="finance-expense-fields" class="dart-finance-form-section" data-finance-form-resource="expenses" hidden disabled>
+            <label class="dart-finance-field"><span>Expense Date</span><input id="finance-expense-date" name="date" type="date" required></label>
+            <label class="dart-finance-field"><span>Category</span><select id="finance-expense-category" name="category" required><option>Marketing</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
+            <label class="dart-finance-field"><span>Amount (EGP)</span><input id="finance-expense-amount" name="amount" type="number" min="0.01" step="any" required></label>
+            <label class="dart-finance-field"><span>Status</span><select id="finance-expense-status" name="status" required><option>Unpaid</option><option>Paid</option><option>Void</option></select></label>
+            <label class="dart-finance-field"><span>Paid Date</span><input id="finance-expense-paid-at" name="paidAt" type="date"></label>
+            <label class="dart-finance-field"><span>Payment Method</span><input id="finance-expense-payment-method" name="paymentMethod" type="text"></label>
+            <label class="dart-finance-field"><span>Vendor</span><input id="finance-expense-vendor" name="vendor" type="text"></label>
+            <label class="dart-finance-field"><span>Invoice Number</span><input id="finance-expense-invoice-number" name="invoiceNumber" type="text"></label>
+            <label class="dart-finance-field dart-finance-field-wide"><span>Description</span><textarea id="finance-expense-description" name="description" rows="3"></textarea></label>
+            <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-expense-notes" name="notes" rows="3"></textarea></label>
+          </fieldset>
+
+          <fieldset id="finance-budget-fields" class="dart-finance-form-section" data-finance-form-resource="budgets" hidden disabled>
+            <label class="dart-finance-field"><span>Budget Name</span><input id="finance-budget-name" name="name" type="text" required></label>
+            <label class="dart-finance-field"><span>Category</span><select id="finance-budget-category" name="category" required><option value="All">All Operating Expenses</option><option>Marketing</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
+            <label class="dart-finance-field"><span>Budget Limit (EGP)</span><input id="finance-budget-amount" name="amount" type="number" min="0.01" step="any" required></label>
+            <label class="dart-finance-field"><span>Warning At (%)</span><input id="finance-budget-warning" name="warningPercent" type="number" min="1" max="100" step="1" value="80" required></label>
+            <label class="dart-finance-field"><span>Start Date</span><input id="finance-budget-start" name="startDate" type="date" required></label>
+            <label class="dart-finance-field"><span>End Date</span><input id="finance-budget-end" name="endDate" type="date" required></label>
+          </fieldset>
+
+          <fieldset id="finance-invoice-fields" class="dart-finance-form-section" data-finance-form-resource="invoices" hidden disabled>
+            <label class="dart-finance-field"><span>Invoice Number</span><input id="finance-invoice-number" name="number" type="text" required></label>
+            <label class="dart-finance-field"><span>Invoice Type</span><select id="finance-invoice-type" name="type" required><option value="Supplier">Supplier / Expense</option><option value="Customer">Customer / Sales</option></select></label>
+            <label class="dart-finance-field"><span>Issue Date</span><input id="finance-invoice-issue" name="issueDate" type="date" required></label>
+            <label class="dart-finance-field"><span>Due Date</span><input id="finance-invoice-due" name="dueDate" type="date" required></label>
+            <label class="dart-finance-field"><span>Invoice Total (EGP)</span><input id="finance-invoice-total" name="total" type="number" min="0.01" step="any" required></label>
+            <label class="dart-finance-field"><span>Amount Paid (EGP)</span><input id="finance-invoice-paid" name="amountPaid" type="number" min="0" step="any" value="0" required></label>
+            <label class="dart-finance-field"><span>Linked Order / Expense ID</span><input id="finance-invoice-linked" name="linkedId" type="text"></label>
+            <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-invoice-notes" name="notes" rows="3"></textarea></label>
+          </fieldset>
+
+          <fieldset id="finance-goal-fields" class="dart-finance-form-section" data-finance-form-resource="goals" hidden disabled>
+            <label class="dart-finance-field"><span>Goal Name</span><input id="finance-goal-name" name="name" type="text" required></label>
+            <label class="dart-finance-field"><span>Metric</span><select id="finance-goal-metric" name="metric" required><option value="revenue">Net Revenue</option><option value="units">Net Units Sold</option><option value="orders">Delivered Orders</option><option value="net_profit">Net Profit</option><option value="repeat_rate">Returning Customer Rate</option><option value="marketing_roas">Marketing ROAS</option><option value="expense_limit">Operating Expense Limit</option></select></label>
+            <label class="dart-finance-field"><span>Target</span><input id="finance-goal-target" name="target" type="number" min="0.01" step="any" required></label>
+            <label class="dart-finance-field"><span>Start Date</span><input id="finance-goal-start" name="startDate" type="date" required></label>
+            <label class="dart-finance-field"><span>End Date</span><input id="finance-goal-end" name="endDate" type="date" required></label>
+            <label class="dart-finance-field"><span>Status</span><select id="finance-goal-status" name="status" required><option>Active</option><option>Paused</option></select></label>
+          </fieldset>
+
+          <fieldset id="finance-marketing-fields" class="dart-finance-form-section" data-finance-form-resource="marketing" hidden disabled>
+            <label class="dart-finance-field"><span>Date</span><input id="finance-marketing-date" name="date" type="date" required></label>
+            <label class="dart-finance-field"><span>Channel</span><select id="finance-marketing-channel" name="channel" required><option>Meta</option><option>TikTok</option><option>Google</option><option>Influencer</option><option>Organic</option><option>Other</option></select></label>
+            <label class="dart-finance-field"><span>Campaign</span><input id="finance-marketing-campaign" name="campaign" type="text" required></label>
+            <label class="dart-finance-field"><span>Spend (EGP)</span><input id="finance-marketing-spend" name="spend" type="number" min="0" step="any" value="0" required></label>
+            <label class="dart-finance-field"><span>Impressions</span><input id="finance-marketing-impressions" name="impressions" type="number" min="0" step="1" value="0" required></label>
+            <label class="dart-finance-field"><span>Clicks</span><input id="finance-marketing-clicks" name="clicks" type="number" min="0" step="1" value="0" required></label>
+            <label class="dart-finance-field"><span>Attributed Orders</span><input id="finance-marketing-orders" name="orders" type="number" min="0" step="1" value="0" required></label>
+            <label class="dart-finance-field"><span>Attributed Revenue (EGP)</span><input id="finance-marketing-revenue" name="attributedRevenue" type="number" min="0" step="any" value="0" required></label>
+            <label class="dart-finance-field"><span>Linked Expense</span><select id="finance-marketing-expense" name="linkedExpenseId"><option value="">Not linked</option></select></label>
+          </fieldset>
+
+          <fieldset id="finance-settlement-fields" class="dart-finance-form-section" data-finance-form-resource="settlements" hidden disabled>
+            <label class="dart-finance-field"><span>Order</span><select id="finance-settlement-order" name="orderId" required></select></label>
+            <label class="dart-finance-field"><span>Receipt Date</span><input id="finance-settlement-date" name="settlementDate" type="date" required></label>
+            <label class="dart-finance-field"><span>Amount Received (EGP)</span><input id="finance-settlement-amount" name="amountReceived" type="number" min="0.01" step="any" required></label>
+            <label class="dart-finance-field"><span>COD Fee (EGP)</span><input id="finance-settlement-fee" name="fee" type="number" min="0" step="any" value="0" required></label>
+            <label class="dart-finance-field"><span>Receipt Reference</span><input id="finance-settlement-reference" name="reference" type="text"></label>
+            <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-settlement-notes" name="notes" rows="3"></textarea></label>
+          </fieldset>
+        </div>
+        <div id="dart-finance-form-error" class="dart-finance-form-error" role="alert"></div>
+        <div class="dart-finance-form-actions">
+          <button id="dart-finance-modal-cancel" type="button" class="dart-finance-secondary dart-finance-modal-cancel">Cancel</button>
+          <button id="dart-finance-form-submit" type="submit" class="dart-finance-primary">Save Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="../Js/dart-address.js"></script>
     <script src="../Js/dart-catalog.js"></script>
@@ -1444,6 +1664,7 @@
     <script src="dart-fixes.js"></script>
     <script src="dart-operations-v4.js"></script>
     <script src="dart-size-chart-v5.js"></script>
+    <script src="dart-finance.js"></script>
 
 <div class="modal" id="image-preview-modal">
   <div class="modal-content dart-image-preview-content">
