@@ -1142,7 +1142,7 @@ button,
 }
 .dart-return-address-panel .form-group,
 .dart-return-exchange-options .container-select {
-  flex: 1 1 220px;
+  flex: 1 1 20px;
 }
 .dart-return-address-panel input,
 .dart-return-address-panel select,
