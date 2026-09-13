@@ -750,7 +750,6 @@ button,
 }
 .tracking-map-summary {
   position: relative;
-  z-index: 500;
   width: fit-content;
   max-width: calc(100% - 28px);
   margin: -20px 14px 14px;
@@ -1309,7 +1308,6 @@ button,
 .tracking-map-disabled {
   position: absolute;
   inset: 0;
-  z-index: 800;
   display: grid;
   place-items: center;
   padding: 24px;

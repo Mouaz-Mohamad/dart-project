@@ -140,9 +140,14 @@ a {
   color: var(--white);
   text-decoration: none;
   transition: color var(--transition-fast);
+  text-decoration: none;
+  -webkit-transition: color var(--transition-fast);
+  -moz-transition: color var(--transition-fast);
+  -ms-transition: color var(--transition-fast);
+  -o-transition: color var(--transition-fast);
 }
 
-a:hover { text-decoration: underline; }
+a:hover { text-decoration: none; color: #2196f3;}
 
 /* 4. Media & Forms */
 img, picture, video, canvas, svg {

@@ -38,6 +38,64 @@ header, .side-menu, .pge-que .pge, .que,
 }
 
 
+/* =========================== */
+/* Hero Section */
+/* =========================== */
+.hero {
+    margin: 0 -10px 10px -10px;
+    position: relative;
+}
+.hero img{
+    display: block;
+    z-index: 1;
+    
+}
+.hero .btn-go-product{
+    position: absolute;
+    bottom: 20px;
+    left: 10px;
+    font-size: 20px;
+    border-radius: 10px;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    -ms-border-radius: 10px;
+    -o-border-radius: 10px;
+}
+
+.dart-hero-title {
+    margin: 0;
+    font-size: 30px;
+    line-height: 1.05;
+    position: absolute;
+    top: 30px;
+    left: 10px;
+    border:"1px solid #fff";
+    max-width: 70%;
+}
+
+.dart-word {
+    display: inline;
+    text-transform: capitalize;
+    
+}
+
+.dart-cursor {
+    color: var(--bragnte);
+    font-size: 60px;
+    font-weight: 300;
+    animation: cursorBlink 1s infinite;
+    -webkit-animation: cursorBlink 1s infinite;
+}
+
+@keyframes cursorBlink {
+    0%, 50% {
+        opacity: 1;
+    }
+
+    51%, 100% {
+        opacity: 0;
+    }
+}
 /* ========================================== */
 /* Header & Navigation                        */
 /* ========================================== */
@@ -45,7 +103,8 @@ header, .side-menu, .pge-que .pge, .que,
 header {
     justify-content: flex-end;
     align-content: flex-end;
-    margin-bottom: 10px;
+    z-index: 10;
+    margin-bottom: 2px;
 }
 
 .top {
@@ -60,6 +119,7 @@ header {
     color: var(--white);
     background-color: var(--bragnte);
     font-size: clamp(0.85rem, 1.5vw, 1rem);
+    border-bottom: 3px solid var(--bragnte);
 }
 
 .logo img {
@@ -106,7 +166,7 @@ header {
     padding: 40px 25px 20px;
     background-color: var(--bragnte);
     border-top-left-radius: 80px;
-    width: 230px;
+    width: 242px;
     
     /* حالة الاختفاء */
     opacity: 0;
@@ -118,7 +178,8 @@ header {
 }
 .side-menu{
     z-index: 100000;
-    height: 82%;
+    height: 85%;
+
 }
 .menu-facke{
     height: 100%;
@@ -415,6 +476,8 @@ header {
 
 .products-section {
     margin-top: 20px;
+    display: flex;
+    flex-direction: column;
 }
 
 .products-grid {
@@ -423,6 +486,10 @@ header {
     grid-template-columns: repeat(auto-fill, minmax(165px, 165px));
     gap: 5px;
     justify-content: center;
+}
+.products-section .btn-go-product{
+    text-align: center;
+    margin: 20px 20px ;
 }
 
 
@@ -1833,4 +1900,9 @@ display: grid !important;
     list-style: none;
     padding: 0;
     margin: 0;
+}
+
+
+.pge{
+    gap: 5px;
 }

@@ -39,6 +39,9 @@ let activeProduct = null;
 let modalQuantity = 1;
 let modalCarouselIndex = 0;
 
+
+
+
 // ==========================================
 // 2. الدوال المساعدة الأساسية
 // ==========================================
@@ -1873,8 +1876,11 @@ function restoreCompletedState() {
     }
 }
 
+
+
+
 // ==========================================
-// 9. التشغيل عند تحميل الصفحة
+// 10. التشغيل عند تحميل الصفحة
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1906,3 +1912,375 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCartCount();
     if (!navigator.onLine) updateConnectivityBanner();
 });
+
+// =========================================
+// --. الازرار الي بتحولني الي اقسام وصفحات مختلفه
+// =========================================
+document.getElementById("btnToProducts").addEventListener("click", function () {
+    window.location.href = "products.html";
+});
+
+
+
+// ==========================================
+// DART HERO - ADVANCED TYPING EFFECT
+// ==========================================
+
+const typingContainer = document.getElementById("dartTyping");
+
+
+// ==========================================
+// الجمل والكلمات
+// كل كلمة تقدر تتحكم فيها بشكل منفصل
+// ==========================================
+
+const scenes = [
+
+    // =========================
+    // SCENE 1
+    // =========================
+    {
+        hold: 2000,
+
+        words: [
+                        {
+                text: "Dart |",
+                color: "#AB012B",
+                size: "50px",
+                weight: "600"
+            },
+            {
+                text: "For You",
+                color: "#fff",
+                size: "50px",
+                weight: "400"
+            },
+        ]
+    },
+
+
+    // =========================
+    // SCENE 2
+    // =========================
+    {
+        hold: 2000,
+
+        words: [
+            {
+                text: "Delivered Fast",
+                color: "#fff",
+                size: "35px",
+                weight: "400"
+            },
+
+            {
+                text: "up to",
+                color: "#fff",
+                size: "35px",
+                weight: "400"
+            },
+
+            {
+                text: "12h.",
+                color: "#AB012B",
+                size: "50px",
+                weight: "600"
+            }
+        ]
+    },
+
+
+    // =========================
+    // SCENE 3
+    // =========================
+    {
+        hold: 2500,
+
+        words: [
+            {
+                text: "30%",
+                color: "#AB012B",
+                size: "40px",
+                weight: "700"
+            },
+
+            {
+                text: "birthday",
+                color: "#fff",
+                size: "30px",
+                weight: "500"
+            },
+
+            {
+                text: "discount.",
+                color: "#fff",
+                size: "30px",
+                weight: "800"
+            }
+        ]
+    },
+
+
+    // =========================
+    // SCENE 4
+    // =========================
+    {
+        hold: 2200,
+
+        words: [
+            {
+                text: "Easy",
+                color: "#AB012B",
+                size: "50px",
+                weight: "500"
+            },
+
+            {
+                text: "R&E",
+                color: "#fff",
+                size: "30px",
+                weight: "300"
+            },
+        ]
+    },
+    // =========================
+    // SCENE 5
+    // =========================
+    {
+        hold: 2200,
+
+        words: [
+            
+            {
+                text: "Made",
+                color: "#fff",
+                size: "30px",
+                weight: "300"
+            },
+            {
+                text: "For You",
+                color: "#AB012B",
+                size: "40px",
+                weight: "500"
+            },
+        ]
+    }
+
+];
+
+
+// ==========================================
+// SETTINGS
+// ==========================================
+
+const typingSpeed = 70;       // سرعة الكتابة
+const deletingSpeed = 10;     // سرعة المسح
+const wordDelay = 100;        // الوقت بين كل كلمة
+const nextSceneDelay = 400;   // الوقت قبل الجملة الجديدة
+
+
+// ==========================================
+// VARIABLES
+// ==========================================
+
+let sceneIndex = 0;
+let wordIndex = 0;
+let charIndex = 0;
+
+
+// ==========================================
+// CAPITALIZE
+// يحول:
+// fast delivery
+// إلى:
+// Fast Delivery
+// ==========================================
+
+function capitalizeWords(text) {
+
+    return text.replace(
+        /(^|\s)([a-z])/g,
+        function(match, space, letter) {
+            return space + letter.toUpperCase();
+        }
+    );
+}
+
+
+// ==========================================
+// START TYPING SCENE
+// ==========================================
+
+function typeScene() {
+
+    const scene = scenes[sceneIndex];
+
+
+    // ======================================
+    // لو خلصنا كل كلمات الجملة
+    // ======================================
+
+    if (wordIndex >= scene.words.length) {
+        setTimeout(function() {
+            deleteScene();
+        }, scene.hold);
+        return;
+    }
+    // ======================================
+    // الكلمة الحالية
+    // ======================================
+
+    const word = scene.words[wordIndex];
+
+    // تحويل أول حرف إلى Capital
+    const formattedText = capitalizeWords(word.text);
+
+    // ======================================
+    // إنشاء Span للكلمة
+    // ======================================
+
+    const span = document.createElement("span");
+
+    span.classList.add("dart-word");
+
+    // ======================================
+    // تطبيق تصميم الكلمة
+    // ======================================
+
+    span.style.color = word.color || "#111111";
+
+    span.style.fontSize = word.size || "60px";
+
+    span.style.fontWeight = word.weight || "400";
+
+    // مهم عشان الحجم والستايل يشتغلوا صح
+    span.style.display = "inline-block";
+
+    // إضافة الكلمة للـHTML
+    typingContainer.appendChild(span);
+    // نبدأ من أول حرف
+    charIndex = 0;
+
+
+    // ======================================
+    // كتابة الحروف
+    // ======================================
+
+    function typeCharacter() {
+        charIndex++;
+        span.textContent = formattedText.substring(
+            0,
+            charIndex
+        );
+        // لسه فيه حروف
+        if (charIndex < formattedText.length) {
+            setTimeout(
+                typeCharacter,
+                typingSpeed
+            );
+        }
+        // خلصنا الكلمة
+        else {
+
+            // إضافة مسافة حقيقية
+            const space = document.createTextNode(" ");
+
+            typingContainer.appendChild(space);
+
+            // نروح للكلمة التالية
+            wordIndex++;
+            setTimeout(
+                typeScene,
+                wordDelay
+            );
+        }
+    }
+    typeCharacter();
+}
+// ==========================================
+// DELETE SCENE
+// ==========================================
+
+function deleteScene() {
+
+    // نجيب كل الكلمات
+    const words = typingContainer.querySelectorAll(".dart-word");
+    // آخر كلمة
+    const lastWord = words[words.length - 1];
+
+    // ======================================
+    // لو مفيش كلمات خلاص
+    // ======================================
+
+    if (!lastWord) {
+        typingContainer.innerHTML = "";
+        nextScene();
+        return;
+    }
+
+    // ======================================
+    // النص الموجود داخل آخر كلمة
+    // ======================================
+
+    const currentText = lastWord.textContent;
+
+    // ======================================
+    // لو لسه فيها حروف
+    // ======================================
+
+    if (currentText.length > 0) {
+
+        lastWord.textContent =
+            currentText.substring(
+                0,
+                currentText.length - 1
+            );
+
+        setTimeout(
+            deleteScene,
+            deletingSpeed
+        );
+    }
+
+    // ======================================
+    // الكلمة اتمسحت بالكامل
+    // ======================================
+
+    else {
+        lastWord.remove();
+        setTimeout(
+            deleteScene,
+            deletingSpeed
+        );
+    }
+}
+// ==========================================
+// NEXT SCENE
+// ==========================================
+
+function nextScene() {
+    // تنظيف الكلام القديم
+    typingContainer.innerHTML = "";
+
+    // Reset
+    wordIndex = 0;
+    charIndex = 0;
+
+    // الجملة التالية
+    sceneIndex++;
+    // لو وصلنا لآخر جملة
+    // نرجع لأول جملة
+    if (sceneIndex >= scenes.length) {
+        sceneIndex = 0;
+    }
+    setTimeout(
+        typeScene,
+        nextSceneDelay
+    );
+}
+
+// ==========================================
+// START
+// ==========================================
+
+typeScene();
