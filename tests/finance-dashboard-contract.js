@@ -44,6 +44,12 @@ for (const staticId of [
   "finance-tabs",
   "dart-finance-modal",
   "dart-finance-form",
+  "brand-in-stock-selling-value",
+  "brand-in-stock-cost-value",
+  "dashboard-return-row-template",
+  "return-approval-modal",
+  "return-rejection-modal",
+  "return-rep-assignment-modal",
 ]) assert(html.includes(`id="${staticId}"`), `Static HTML structure is missing #${staticId}.`);
 
 assert(html.includes("Compared with the previous equivalent period"), "Unified period comparison copy is missing.");
@@ -65,6 +71,9 @@ assert(
 );
 assert(finance.includes("DART_CARD_DRAW_ELIGIBILITY_CHANGED"), "Draw eligibility changes must be audited.");
 assert(dashboard.includes("c.dartCardDrawEligible !== false"), "Excluded customers must be removed from the winner candidate set.");
+assert(finance.includes("returnCourierCosts"), "Total Cost must include Dart-paid return/exchange representative fees.");
+assert(finance.includes("inStockCost"), "Brand must calculate the filtered In Stock Cost Value.");
+assert(dashboard.includes("dartAssignReturnRepresentative"), "Dashboard return requests must support representative assignment.");
 
 for (const page of ["index.html", "products.html", "cart-checkout.html", "profile.html", "track.html", "about.html", "Contact us.html"]) {
   const source = fs.readFileSync(path.join(root, page), "utf8");

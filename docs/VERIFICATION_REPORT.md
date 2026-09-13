@@ -14,7 +14,7 @@
 ## Passed behavior
 
 - A real Contact Us form submission was stored in the dashboard Review inbox with source, customer contact details and message. Status, stars and title rendered as `-`; Contact Us and Review filters returned only their matching rows.
-- Pending returns displayed Accept/Reject. Acceptance exposed Good/Damaged inspection. Good restored the physical item to stock; Damaged changed the item and created a Damage record.
+- Return requests now follow review, approval/rejection, representative assignment, pickup completion and final Good/Damaged inspection. Good restores the physical item to stock; Damaged creates one deduplicated Damage record.
 - The tracking module created one map and kept it alive through DOM initialization. The destination marker appeared before representative assignment. The waiting layer computed to 20% black. Assignment alone kept the layer and hid courier location; `deliveryStartedAt` removed it and displayed the courier marker.
 - Top Clients defaulted to This Month/None, ranked two orders above one even when the one-order customer spent more, subtracted refunds, switched exclusively to annual mode, and returned to This Month when both filters were cleared.
 - Age appeared in Top Clients, Birthday and Client rows. Client History reported separate order and spending changes using the last two complete months.
@@ -63,3 +63,19 @@ The environment still has no installed Chromium binary, so the included browser 
 - Confirmed that the Finance shell and editor forms now exist in HTML with unique IDs; JavaScript no longer injects those structures.
 - Kept the original Expenses tab table as requested and removed the duplicate management box.
 - Finance calculation tests, source-contract tests, JavaScript syntax checks and a 334-ID uniqueness check passed. Chromium remains unavailable in this environment.
+
+## Settings V1 verification — 2026-09-13
+
+- Confirmed that Settings is reachable from desktop and mobile dashboard navigation and that its section, warning modal and confirmation controls live in HTML with unique IDs.
+- Confirmed that the destructive action stays disabled until `DELETE DART` is typed and the irreversible-action checkbox is selected, followed by one final native confirmation.
+- Confirmed that the reset targets `dart_*`, the two documented legacy Dart keys and the catalogue image store, while preserving unrelated origin storage.
+- Added and passed an isolated reset-scope test. Production backend reset must require authenticated admin re-verification and server-side protected audit logging.
+
+## Accounting and Returns V10 verification — 2026-09-13
+
+- Verified the accounting example: a piece with EGP 400 immutable cost, EGP 600 selling price and a 30% order discount contributes EGP 420 to Total Selling, EGP 400 to Total Cost and EGP 20 to Total Profit.
+- Verified historical snapshots: sales of the same model at EGP 100 and later EGP 120 aggregate to EGP 220 without rewriting the earlier sale. Newly added pieces of the same model inside an existing order inherit that order's original snapshot.
+- Verified `In Stock Cost Value` beside `In Stock Selling Value`, period-aware Brand cards, completed-refund subtraction, first-exchange EGP 50 Dart expense, and exclusion of customer-paid return/exchange courier fees from Dart revenue and Cash Flow.
+- Verified that a damaged physical item contributes its cost once, including an exchanged item whose damaged original is no longer present on the order line.
+- Verified the return/exchange flow across the customer form, public tracking, dashboard approval/assignment, representative pickup and post-pickup inspection. Exchange replacements retain the exact original net price and chain history.
+- All JavaScript syntax, accounting, return-policy, representative, tracking, dashboard-contract, Settings, platform, Cairo/Giza address, static HTML/assets/accessibility and SEO checks passed. Chromium is not installed in this environment, so the included browser-only visual suite remains for CI or staging.

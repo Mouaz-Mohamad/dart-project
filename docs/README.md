@@ -27,7 +27,7 @@ The public catalogue shows one card per active color with images. A color withou
 
 Color images are compressed and stored once in IndexedDB, referenced by model/color. Items do not duplicate image bytes. Covers load first, full galleries load on demand. Brand, models and item groups are prioritized; other dashboard sections render afterward. This prototype still reads browser metadata locally; true server pagination is described in `API_CONTRACT.md`.
 
-Existing orders keep their price and cost snapshots. Current model prices apply to future orders. A cart price change requires reconfirmation. Successful checkout clears the cart and returns Home.
+Existing orders keep their price and cost snapshots. Current model prices apply to future orders. If an admin adds another physical item of a model already present in an existing order, it inherits that model's original order price/cost rather than the model's later price. A cart price change requires reconfirmation. Successful checkout clears the cart and returns Home.
 
 ## Local run
 
@@ -81,11 +81,12 @@ See `CODE_MAP.md` and `VERIFICATION_REPORT.md` for implementation boundaries and
 ## V8 corrections
 
 - Contact Us submissions enter the dashboard Review section with source `Contact Us`. Status, rating and title stay `-`; the Review source filter separates contact messages from customer reviews.
-- A customer return starts at `Pending Request`. Admin can Accept or Reject it. Accepted returns move to `Pending Inspection`, where Good restores the item to stock and Damaged moves it to Damage.
+- A customer return/exchange starts at `Pending Request` with a newly entered Cairo/Giza pickup address. Admin accepts/rejects with a visible reason, then assigns a representative. The request appears automatically in customer tracking and in the assigned representative portal. The representative starts live pickup, records completion or a failed attempt, and the admin then inspects the original piece as Good or Damaged.
+- A refund subtracts the original item's proportional net price only when pickup completes. An exchange keeps the original net sale price and supports another color/size of the same model. The first completed exchange costs Dart 50 EGP; later exchanges cost the customer 50 EGP, and refunds cost the customer 100 EGP, all customer fees paid directly to the representative.
 - The tracking map initializes immediately around the saved order destination. It remains behind a 20% black layer until the assigned representative presses Start Delivery for that specific order. The start action records `deliveryStartedAt`; only then can live location and route/ETA appear.
 - Top Clients has mutually exclusive month/year filters. Month defaults to This Month and Year to None. If both become None, the month returns to This Month. Ranking uses delivered order count first and net spending after refunds second.
 - Client age is calculated from birthday in Client rows, Top Clients and Birthday. Client History compares the last complete month with the preceding complete month for order-count and spending trends.
-- Leaderboard `PIC` now means net retained pieces: delivered physical items minus completed post-delivery returns. Pending and rejected return requests do not reduce the score.
+- Leaderboard `PIC` means net retained pieces: delivered physical items minus completed refunds. Exchanges, pending requests and rejected requests do not reduce the score.
 - Run `node tests/v8-features-browser.js` with Playwright/Chromium for the V8 end-to-end checks.
 
 See `VERIFICATION_REPORT.md` for the current verification results.

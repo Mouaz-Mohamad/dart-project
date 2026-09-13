@@ -1136,7 +1136,8 @@
     return (
       record?.isPostDeliveryReturn === true &&
       !record?.isDeleted &&
-      ["good", "damaged", "bad"].includes(status)
+      !returnRules()?.isExchange(record) &&
+      Boolean(record?.completedAt || ["completed", "good", "damaged", "bad"].includes(status))
     );
   }
 
@@ -1541,6 +1542,140 @@
   }
   // END Birthday celebration, countdown and vertical navbar ticker.
 
+  function returnRules() {
+    return window.DartReturns || null;
+  }
+
+  function deliveredOrderForItem(itemCode, orders = read(KEYS.orders, [])) {
+    return orders
+      .filter(
+        (order) =>
+          order.status === "Delivered" &&
+          !order.isDeleted &&
+          (order.items || []).some((code) => String(code) === String(itemCode)),
+      )
+      .sort(
+        (first, second) =>
+          new Date(second.deliveredAt || second.updatedAt || second.createdAt || 0) -
+          new Date(first.deliveredAt || first.updatedAt || first.createdAt || 0),
+      )[0] || null;
+  }
+
+  function replaceReturnOptions(select, values, placeholder) {
+    if (!select) return;
+    const selected = select.value;
+    select.replaceChildren();
+    const first = document.createElement("option");
+    first.value = "";
+    first.textContent = placeholder;
+    select.appendChild(first);
+    values.forEach((value) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      select.appendChild(option);
+    });
+    if (values.includes(selected)) select.value = selected;
+  }
+
+  function initializeReturnRequestForm() {
+    const form = document.getElementById("returnRequestForm");
+    if (!form || form.dataset.dartReturnBound) return;
+    form.dataset.dartReturnBound = "1";
+    window.DartAddress?.initReturnRequest?.();
+
+    const user = currentUser();
+    const prefill = {
+      "return-full-name": user?.name,
+      "return-phone-1": user?.phone1 ? displayPhone(user.phone1) : "",
+      "return-phone-2": user?.phone2 ? displayPhone(user.phone2) : "",
+      "return-email": user?.email,
+    };
+    Object.entries(prefill).forEach(([id, value]) => {
+      const input = document.getElementById(id);
+      if (input && value && !input.value) input.value = value;
+    });
+
+    const type = document.getElementById("return-request-type");
+    const code = document.getElementById("return-item-code");
+    const group = document.getElementById("return-exchange-options");
+    const color = document.getElementById("return-exchange-color");
+    const size = document.getElementById("return-exchange-size");
+    const feeBox = document.getElementById("return-fee-summary");
+    const feeText = document.getElementById("return-fee-summary-text");
+
+    const availableForRequest = () => {
+      const order = deliveredOrderForItem(code?.value.trim());
+      const line = order?.priceSnapshot?.find(
+        (entry) => String(entry.itemCode) === String(code?.value.trim()),
+      );
+      const original = read(KEYS.items, []).find(
+        (item) => String(item.itemCode) === String(code?.value.trim()),
+      );
+      const modelId = line?.modelCode || original?.modelId;
+      return read(KEYS.items, []).filter(
+        (item) =>
+          !item.isArchived &&
+          !item.isDeleted &&
+          String(item.status || "").toLowerCase() === "in stock" &&
+          String(item.modelId) === String(modelId),
+      );
+    };
+
+    const refreshSizes = () => {
+      const available = availableForRequest().filter(
+        (item) => !color?.value || String(item.color) === String(color.value),
+      );
+      replaceReturnOptions(
+        size,
+        [...new Set(available.map((item) => String(item.size)))].sort(),
+        available.length ? "Select new size" : "No available size",
+      );
+    };
+
+    const refresh = () => {
+      const rules = returnRules();
+      const normalizedType = rules?.normalizeType(type?.value) || "";
+      const isExchange = normalizedType === "Exchange";
+      if (group) {
+        group.hidden = !isExchange;
+        group.disabled = !isExchange;
+      }
+      if (color) color.required = isExchange;
+      if (size) size.required = isExchange;
+
+      if (isExchange) {
+        const available = availableForRequest();
+        replaceReturnOptions(
+          color,
+          [...new Set(available.map((item) => String(item.color)))].sort(),
+          available.length ? "Select new color" : "No replacement is currently available",
+        );
+        refreshSizes();
+      }
+
+      if (!normalizedType) {
+        if (feeBox) feeBox.hidden = true;
+        return;
+      }
+      const items = read(KEYS.items, []);
+      const original = items.find(
+        (item) => String(item.itemCode) === String(code?.value.trim()),
+      );
+      const chainId = rules?.chainIdForItem(original, code?.value.trim()) || code?.value.trim();
+      const completed = rules?.completedExchangeCount(read(KEYS.returns, []), chainId) || 0;
+      const policy = rules?.courierPolicy(normalizedType, completed);
+      if (feeText) feeText.textContent = policy?.label || "";
+      if (feeBox) feeBox.hidden = !policy;
+    };
+
+    type?.addEventListener("change", refresh);
+    code?.addEventListener("change", refresh);
+    code?.addEventListener("blur", refresh);
+    color?.addEventListener("change", refreshSizes);
+    refresh();
+  }
+
   function bindAuth() {
     document.addEventListener(
       "submit",
@@ -1707,13 +1842,27 @@
           setStatus(form, "تم إرسال التقييم للمراجعة.");
         } else if (form.id === "returnRequestForm") {
           event.preventDefault();
-          const values = Object.fromEntries(new FormData(form)),
-            orders = read(KEYS.orders, []);
-          const order = orders.find(
-            (o) =>
-              o.status === "Delivered" &&
-              (o.items || []).includes(values.item_code),
-          );
+          const addressController =
+            window.dartReturnAddress || window.DartAddress?.initReturnRequest?.();
+          const addressValidation = addressController?.validate?.();
+          if (!addressValidation?.ok) {
+            setStatus(
+              form,
+              addressValidation?.message ||
+                "حدد مكان استلام المرتجع على الخريطة أو اكتب العنوان كاملًا.",
+              true,
+            );
+            return;
+          }
+          const values = Object.fromEntries(new FormData(form));
+          const rules = returnRules();
+          const requestType = rules?.normalizeType(values.request_type) || "";
+          if (!requestType) {
+            setStatus(form, "اختر استبدال أو استرجاع.", true);
+            return;
+          }
+          const orders = read(KEYS.orders, []);
+          const order = deliveredOrderForItem(values.item_code, orders);
           const identityOk =
             order &&
             (normalizeEmail(order.email) === normalizeEmail(values.email) ||
@@ -1737,8 +1886,20 @@
           if (
             rows.some(
               (r) =>
+                String(r.itemCode) === String(values.item_code) &&
+                !r.isDeleted &&
+                (rules?.isRefund(r) || r.requestType === "Refund") &&
+                (rules?.isCompleted(r) || ["Completed", "Good", "Damaged", "Bad"].includes(r.status)),
+            )
+          ) {
+            setStatus(form, "تم إتمام استرجاع هذه القطعة من قبل، ولا يمكن استرجاعها مرة أخرى.", true);
+            return;
+          }
+          if (
+            rows.some(
+              (r) =>
                 r.itemCode === values.item_code &&
-                !["Rejected", "Closed"].includes(r.status),
+                !["Rejected", "Closed", "Completed", "Good", "Damaged"].includes(r.status),
             )
           ) {
             setStatus(form, "يوجد طلب قائم لهذه القطعة بالفعل.", true);
@@ -1747,7 +1908,8 @@
           const orderLine = (order.priceSnapshot || []).find(
               (line) => String(line.itemCode) === String(values.item_code),
             ),
-            inventoryItem = read(KEYS.items, []).find(
+            inventory = read(KEYS.items, []),
+            inventoryItem = inventory.find(
               (item) => String(item.itemCode) === String(values.item_code),
             ),
             modelCode = orderLine?.modelCode || inventoryItem?.modelId || "";
@@ -1759,6 +1921,38 @@
             );
             return;
           }
+          let replacementCandidates = [];
+          if (requestType === "Exchange") {
+            replacementCandidates = inventory.filter(
+              (item) =>
+                !item.isArchived &&
+                !item.isDeleted &&
+                String(item.status || "").toLowerCase() === "in stock" &&
+                String(item.modelId) === String(modelCode) &&
+                String(item.color) === String(values.exchange_color) &&
+                String(item.size) === String(values.exchange_size),
+            );
+            if (!values.exchange_color || !values.exchange_size || !replacementCandidates.length) {
+              setStatus(
+                form,
+                "اللون أو المقاس البديل غير متاح حاليًا لنفس التصميم.",
+                true,
+              );
+              return;
+            }
+          }
+          const exchangeChainId =
+              rules?.chainIdForItem(inventoryItem, values.item_code) ||
+              values.item_code,
+            completedExchanges =
+              rules?.completedExchangeCount(rows, exchangeChainId) || 0,
+            courierPolicy = rules?.courierPolicy(requestType, completedExchanges) || {
+              customerFee: 0,
+              brandFee: 0,
+              payer: "None",
+            },
+            allocatedAmount =
+              rules?.allocatedNetAmount(order, values.item_code) || 0;
           const row = {
             id: uid("RETDB"),
             returnId: nextCode("R", rows, "returnId"),
@@ -1770,10 +1964,35 @@
             phone1: values.phone1,
             phone2: values.phone2 || "-",
             email: normalizeEmail(values.email),
-            requestType: values.request_type,
+            requestType,
             reason: values.reason,
             status: "Pending Request",
+            inspectionStatus: "Pending",
             notes: values.notes || "",
+            originalLineSnapshot: orderLine ? { ...orderLine } : null,
+            originalNetAmount: allocatedAmount,
+            refundAmount: requestType === "Refund" ? allocatedAmount : 0,
+            exchangeValue: requestType === "Exchange" ? allocatedAmount : 0,
+            exchangeChainId,
+            completedExchangesBeforeRequest: completedExchanges,
+            requestedColor: requestType === "Exchange" ? values.exchange_color : "",
+            requestedSize: requestType === "Exchange" ? values.exchange_size : "",
+            replacementCandidateCount: replacementCandidates.length,
+            customerCourierFee: courierPolicy.customerFee,
+            brandCourierFee: courierPolicy.brandFee,
+            courierFeePayer: courierPolicy.payer,
+            customerCourierFeeStatus: courierPolicy.customerFee ? "Due to Representative" : "Not Applicable",
+            brandCourierFeeStatus: courierPolicy.brandFee ? "Due to Representative" : "Not Applicable",
+            country: values.country,
+            governorate: values.governorate,
+            area: values.area,
+            street: values.street,
+            building: values.building,
+            floor: values.floor,
+            latitude: Number(values.latitude),
+            longitude: Number(values.longitude),
+            fullAddress: values.full_address,
+            addressSource: addressValidation.source || form.dataset.dartAddressSource || "map",
             isPostDeliveryReturn: true,
             date: dateGB(),
             createdAt: now(),
@@ -1786,12 +2005,22 @@
           notify(
             "return_created",
             `Return ${row.returnId}`,
-            `${row.itemCode} requested by customer.`,
+            `${row.itemCode}: ${requestType} requested by customer.`,
             "returns",
             row.id,
           );
+          sessionStorage.setItem("dart_last_return_id", row.returnId);
           form.reset();
-          setStatus(form, `تم إنشاء الطلب ${row.returnId}.`);
+          const trackingLink = document.getElementById("return-tracking-link");
+          if (trackingLink) {
+            trackingLink.href = `track.html?return=${encodeURIComponent(row.returnId)}`;
+            trackingLink.hidden = false;
+          }
+          setStatus(
+            form,
+            `تم إنشاء الطلب ${row.returnId}. سيظهر تلقائيًا في صفحة تتبع طلبك.`,
+          );
+          renderProfile();
         }
       },
       true,
@@ -1943,20 +2172,33 @@
           .map((r) => {
             const order = orders.find((o) => o.orderId === r.orderId),
               line =
-                order?.priceSnapshot?.find((x) => x.itemCode === r.itemCode) ||
+                returnRules()?.lineForItem(order, r.itemCode, r) ||
                 {},
               address =
-                order?.fullAddress ||
+                r.fullAddress ||
                 [
-                  order?.building,
-                  order?.street,
-                  order?.area,
-                  order?.governorate,
-                  order?.country,
+                  r.building,
+                  r.street,
+                  r.area,
+                  r.governorate,
+                  r.country,
                 ]
                   .filter(Boolean)
-                  .join(", ");
-            return `<article class="profile-record-card"><div class="profile-record-head"><strong>${escapeHtml(r.returnId)}</strong><span class="profile-status">${escapeHtml(r.status)}</span></div><div class="profile-record-grid">${profileField("Request type", r.requestType || "Return / Exchange")}${profileField("Order ID", r.orderId || "-")}${profileField("Request date", r.date || formatDateTime(r.createdAt))}${profileField("Reason", r.reason || "-")}${profileField("Model", r.modelId || line.modelCode || "-")}${profileField("Item Code", r.itemCode || "-")}${profileField("Size", line.size || "-")}${profileField("Color", line.color || "-")}${profileField("Original item price", money((Number(line.finalUnitPrice) || 0) * (Number(line.qty) || 1)))}${profileField("Refund", money(Number(r.refundAmount) || 0))}${profileField("Delivery address", address || "-")}${profileField("Created", formatDateTime(r.createdAt))}${profileField("Inspected", formatDateTime(r.inspectedAt))}${profileField("Updated", formatDateTime(r.updatedAt))}${profileField("Closed", formatDateTime(r.closedAt))}${profileField("Notes", r.notes || "-")}</div></article>`;
+                  .join(", ") ||
+                order?.fullAddress ||
+                "-",
+              publicStatus = returnRules()?.publicStatus(r) || r.status,
+              replacement = r.replacementItemCode
+                ? `${r.replacementItemCode} · ${r.requestedColor || "-"} · ${r.requestedSize || "-"}`
+                : r.requestType === "Exchange"
+                  ? `${r.requestedColor || "-"} · ${r.requestedSize || "-"}`
+                  : "-",
+              fee = Number(r.customerCourierFee) > 0
+                ? `${money(r.customerCourierFee)} payable directly to representative`
+                : Number(r.brandCourierFee) > 0
+                  ? `${money(r.brandCourierFee)} paid by Dart`
+                  : "No customer fee";
+            return `<article class="profile-record-card"><div class="profile-record-head"><strong>${escapeHtml(r.returnId)}</strong><span class="profile-status">${escapeHtml(publicStatus)}</span></div><div class="profile-record-grid">${profileField("Request type", r.requestType || "Return / Exchange")}${profileField("Order ID", r.orderId || "-")}${profileField("Request date", r.date || formatDateTime(r.createdAt))}${profileField("Reason", r.reason || "-")}${profileField("Rejection reason", r.rejectionReason || "-")}${profileField("Model", r.modelId || line.modelCode || "-")}${profileField("Original Item", r.itemCode || "-")}${profileField("Original Size / Color", `${line.size || "-"} / ${line.color || "-"}`)}${profileField("Replacement", replacement)}${profileField("Original net item price", money(Number(r.originalNetAmount) || 0))}${profileField("Refund", money(Number(r.refundAmount) || 0))}${profileField("Courier fee", fee)}${profileField("Pickup address", address)}${profileField("Representative", r.representativeName || "-")}${profileField("Internal progress", r.status || "-")}${profileField("Inspection", returnRules()?.inspectionStatus(r) || r.inspectionStatus || "Pending")}${profileField("Created", formatDateTime(r.createdAt))}${profileField("Completed", formatDateTime(r.completedAt))}${profileField("Inspected", formatDateTime(r.inspectedAt))}${profileField("Notes", r.notes || "-")}</div></article>`;
           })
           .join("") ||
         '<div class="empty-state">No returns or exchanges yet</div>';
@@ -2318,6 +2560,7 @@
     renderLeaderboard();
     renderBirthdayExperience();
     wireAccountLink();
+    initializeReturnRequestForm();
     new MutationObserver(() => {
       renderFeedbackEligibility();
       renderLeaderboard();
@@ -2328,6 +2571,10 @@
     document
       .querySelectorAll("img:not([alt])")
       .forEach((img) => (img.alt = "Decorative Dart visual"));
+  });
+  document.addEventListener("dart:sections-loaded", () => {
+    initializeReturnRequestForm();
+    renderProfile();
   });
   document.addEventListener("click", (event) => {
     const link = event.target.closest("a[href]");
@@ -2399,6 +2646,8 @@
     cairoMoment,
     requestPasswordReset,
     replaceTemporaryPassword,
+    deliveredOrderForItem,
+    initializeReturnRequestForm,
     orderNet,
     money,
     cartReservationId: CART_RESERVATION_ID,

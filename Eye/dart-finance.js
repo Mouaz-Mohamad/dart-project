@@ -318,6 +318,7 @@
       items: overrides.items || [],
       models: overrides.models || [],
       customers: overrides.customers || [],
+      reviews: overrides.reviews || [],
       damage: overrides.damage || [],
       expenses: overrides.expenses || [],
       budgets: overrides.budgets || [],
@@ -332,6 +333,7 @@
       items: typeof itemsData !== "undefined" ? itemsData : readJSON("dart_items", []),
       models: typeof modelsData !== "undefined" ? modelsData : readJSON("dart_models", []),
       customers: typeof customersData !== "undefined" ? customersData : readJSON("dart_customers", []),
+      reviews: typeof reviewsData !== "undefined" ? reviewsData : readJSON("dart_reviews", []),
       damage: typeof damageData !== "undefined" ? damageData : readJSON("dart_damage", []),
       expenses: FinanceRepository.list("expenses"),
       budgets: FinanceRepository.list("budgets"),
@@ -362,11 +364,29 @@
   }
 
   function returnEventDate(record) {
-    return record?.resolvedAt || record?.completedAt || record?.updatedAt || record?.date || record?.createdAt;
+    return record?.completedAt || record?.resolvedAt || record?.updatedAt || record?.date || record?.createdAt;
+  }
+
+  function isExchangeReturn(record) {
+    if (root.DartReturns?.isExchange) return root.DartReturns.isExchange(record);
+    return String(record?.requestType || "").toLowerCase().includes("exchange");
+  }
+
+  function isRefundReturn(record) {
+    return !isExchangeReturn(record);
+  }
+
+  function returnInspection(record) {
+    if (root.DartReturns?.inspectionStatus) return root.DartReturns.inspectionStatus(record);
+    const value = String(record?.inspectionStatus || record?.status || "").toLowerCase();
+    if (value === "good") return "Good";
+    if (["damaged", "bad"].includes(value)) return "Damaged";
+    return "Pending";
   }
 
   function completedReturn(record) {
-    return active(record) && record?.isPostDeliveryReturn === true && ["good", "damaged", "bad"].includes(String(record.status || "").toLowerCase());
+    const legacy = ["completed", "good", "damaged", "bad"].includes(String(record?.status || "").toLowerCase());
+    return active(record) && record?.isPostDeliveryReturn === true && Boolean(record?.completedAt || legacy);
   }
 
   function uniqueCompletedReturns(data, range = null) {
@@ -417,6 +437,7 @@
   function refundAmountForRange(data, range) {
     const returns = data.returns.filter(completedReturn);
     let total = uniqueCompletedReturns(data, range)
+      .filter(isRefundReturn)
       .reduce((sum, record) => sum + Math.max(0, finiteNumber(record.refundAmount)), 0);
     const ordersWithDetailedRefunds = new Set(
       returns
@@ -438,14 +459,20 @@
   }
 
   function returnedGoodCost(data, range) {
+    const unique = new Map();
+    data.returns
+      .filter(completedReturn)
+      .filter(isRefundReturn)
+      .filter((record) => returnInspection(record) === "Good")
+      .filter((record) => within(record.inspectedAt || returnEventDate(record), range))
+      .sort((a, b) => (parseDate(a.inspectedAt || returnEventDate(a)) || 0) - (parseDate(b.inspectedAt || returnEventDate(b)) || 0))
+      .forEach((record) => unique.set(`${record.orderId || ""}:${record.itemCode || record.id}`, record));
     return roundMoney(
-      uniqueCompletedReturns(data, range)
-        .filter((record) => String(record.status).toLowerCase() === "good")
-        .reduce((sum, record) => {
+      [...unique.values()].reduce((sum, record) => {
           const order = orderForReturn(data, record);
           const line = orderLines(order).find((entry) => String(entry.itemCode) === String(record.itemCode));
-          return sum + costForLine(data, line || { itemCode: record.itemCode, modelCode: record.modelId }, order);
-        }, 0),
+          return sum + costForLine(data, record.originalLineSnapshot || line || { itemCode: record.itemCode, modelCode: record.modelId }, order);
+      }, 0),
     );
   }
 
@@ -479,10 +506,13 @@
       data.damage
         .filter(active)
         .filter((record) => ["damaged", "destroyed"].includes(String(record.status || "").toLowerCase()))
-        .filter((record) => within(record.destroyedAt || record.updatedAt || record.date || record.createdAt, range))
+        .filter((record) => within(record.destroyedAt || record.inspectedAt || record.updatedAt || record.date || record.createdAt, range))
         .reduce((sum, record) => {
           const code = String(record.itemCode || record.id || "");
-          if (seen.has(code) || deliveredCodes.has(code) || record.orderId) return sum;
+          // A refunded damaged piece is already present in delivered COGS.
+          // An exchanged damaged piece is no longer the delivered order line, so
+          // its loss is recognized once here in addition to the replacement COGS.
+          if (seen.has(code) || deliveredCodes.has(code)) return sum;
           seen.add(code);
           const item = itemFor(data, record.itemCode);
           const model = modelFor(data, record.modelId || item?.modelId);
@@ -493,6 +523,43 @@
               : finiteNumber(model?.cost);
           return sum + Math.max(0, cost);
         }, 0),
+    );
+  }
+
+  function damagedInventoryValue(data, range) {
+    const records = new Map();
+    data.damage
+      .filter(active)
+      .filter((record) => ["damaged", "destroyed"].includes(String(record.status || "").toLowerCase()))
+      .filter((record) => within(record.destroyedAt || record.inspectedAt || record.updatedAt || record.date || record.createdAt, range))
+      .forEach((record) => records.set(String(record.itemCode || record.id), record));
+    data.items
+      .filter(active)
+      .filter((item) => ["damaged", "destroyed"].includes(String(item.status || "").toLowerCase()))
+      .filter((item) => within(item.destroyedAt || item.updatedAt || item.damageDate || item.date || item.createdAt, range))
+      .forEach((item) => {
+        const key = String(item.itemCode || item.id);
+        if (!records.has(key)) records.set(key, item);
+      });
+    return roundMoney(
+      [...records.values()].reduce((sum, record) => {
+        const item = itemFor(data, record.itemCode) || record;
+        const model = modelFor(data, record.modelId || item?.modelId);
+        const cost = Number.isFinite(Number(record.costSnapshot))
+          ? finiteNumber(record.costSnapshot)
+          : Number.isFinite(Number(item?.costSnapshot))
+            ? finiteNumber(item.costSnapshot)
+            : finiteNumber(model?.cost);
+        return sum + Math.max(0, cost);
+      }, 0),
+    );
+  }
+
+  function returnLogisticsCost(data, range) {
+    return roundMoney(
+      uniqueCompletedReturns(data, range)
+        .filter(isExchangeReturn)
+        .reduce((sum, record) => sum + Math.max(0, finiteNumber(record.brandCourierFee)), 0),
     );
   }
 
@@ -559,7 +626,9 @@
     const settlementsInPeriod = data.settlements.filter(active).filter((entry) => within(entry.settlementDate, range));
     const codFees = roundMoney(settlementsInPeriod.reduce((sum, entry) => sum + Math.max(0, finiteNumber(entry.fee)), 0));
     const damageLoss = damageWriteOff(data, range);
-    const totalOperatingExpenses = roundMoney(operatingExpenses + codFees + damageLoss);
+    const damageValue = damagedInventoryValue(data, range);
+    const returnCourierCosts = returnLogisticsCost(data, range);
+    const totalOperatingExpenses = roundMoney(operatingExpenses + codFees + damageLoss + returnCourierCosts);
     const totalCost = roundMoney(netCogs + totalOperatingExpenses);
     const grossProfit = roundMoney(netRevenue - netCogs);
     const netProfit = roundMoney(netRevenue - totalCost);
@@ -567,7 +636,7 @@
       (sum, order) => sum + orderLines(order).reduce((lineTotal, line) => lineTotal + Math.max(1, finiteNumber(line.qty, 1)), 0),
       0,
     );
-    const returnedUnits = uniqueCompletedReturns(data, range).length;
+    const returnedUnits = uniqueCompletedReturns(data, range).filter(isRefundReturn).length;
     const soldUnits = grossSoldUnits - returnedUnits;
 
     const customerOrders = new Map();
@@ -596,7 +665,8 @@
       settlementsInPeriod.reduce((sum, entry) => sum + Math.max(0, finiteNumber(entry.amountReceived)), 0) + fallbackCODInflow,
     );
     const paidExpenseCashOut = roundMoney(paidExpenses(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
-    const cashOut = roundMoney(paidExpenseCashOut + codFees);
+    const refundCashOut = refunds;
+    const cashOut = roundMoney(paidExpenseCashOut + codFees + returnCourierCosts + refundCashOut);
 
     const marketing = marketingStats(data, range);
     return {
@@ -609,6 +679,8 @@
       operatingExpenses,
       codFees,
       damageLoss,
+      damageValue,
+      returnCourierCosts,
       totalOperatingExpenses,
       totalCost,
       grossProfit,
@@ -628,6 +700,7 @@
       cashOut,
       netCashFlow: roundMoney(codCashIn - cashOut),
       paidExpenseCashOut,
+      refundCashOut,
       marketing,
     };
   }
@@ -725,6 +798,7 @@
       });
     });
     uniqueCompletedReturns(data, range)
+      .filter(isRefundReturn)
       .forEach((record) => {
         const order = orderForReturn(data, record);
         const line = orderLines(order).find((entry) => String(entry.itemCode) === String(record.itemCode));
@@ -733,7 +807,7 @@
         const group = groups.get(code) || { modelCode: code, modelName: model?.name || code, units: 0, revenue: 0, cogs: 0, refunds: 0 };
         group.refunds += Math.max(0, finiteNumber(record.refundAmount));
         group.units -= 1;
-        if (String(record.status).toLowerCase() === "good") group.cogs -= costForLine(data, line || record, order);
+        if (returnInspection(record) === "Good") group.cogs -= costForLine(data, record.originalLineSnapshot || line || record, order);
         groups.set(code, group);
       });
     return [...groups.values()]
@@ -818,6 +892,9 @@
     goalRows,
     modelProfitability,
     operationalAlerts,
+    damagedInventoryValue,
+    returnLogisticsCost,
+    brandMetrics,
     dashboardData,
     money,
   };
@@ -878,6 +955,125 @@
     element.title = `Previous period: ${money(previous)}`;
   }
 
+  function recordCreatedAt(record) {
+    return record?.createdAt || record?.orderCreatedAt || record?.regDate || record?.date;
+  }
+
+  function inStockItems(data, range) {
+    return data.items
+      .filter(active)
+      .filter((item) => String(item.status || "").toLowerCase() === "in stock")
+      .filter((item) => within(recordCreatedAt(item), range));
+  }
+
+  function currentItemCost(data, item) {
+    if (Number.isFinite(Number(item?.costSnapshot))) return Math.max(0, finiteNumber(item.costSnapshot));
+    return Math.max(0, finiteNumber(modelFor(data, item?.modelId)?.cost));
+  }
+
+  function currentItemSelling(data, item) {
+    const model = modelFor(data, item?.modelId);
+    if (!model) return 0;
+    if (Number.isFinite(Number(model.discountedPrice))) return Math.max(0, finiteNumber(model.discountedPrice));
+    const selling = Math.max(0, finiteNumber(model.selling));
+    return Math.max(0, roundMoney(selling - (selling * finiteNumber(model.discount)) / 100));
+  }
+
+  function topValue(values) {
+    const counts = new Map();
+    values.filter(Boolean).forEach((value) => counts.set(String(value), (counts.get(String(value)) || 0) + 1));
+    return [...counts.entries()].sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0] || ["—", 0];
+  }
+
+  function brandMetrics(data, range, summary) {
+    const stock = inStockItems(data, range);
+    const periodOrders = data.orders.filter(active).filter((order) => within(recordCreatedAt(order), range));
+    const delivered = deliveredOrders(data, range);
+    const refundedCodes = new Set(
+      uniqueCompletedReturns(data, range)
+        .filter(isRefundReturn)
+        .map((record) => String(record.itemCode)),
+    );
+    const soldLines = delivered
+      .flatMap((order) => orderLines(order))
+      .filter((line) => !refundedCodes.has(String(line.itemCode)));
+    const stockPerModel = new Map();
+    stock.forEach((item) => stockPerModel.set(String(item.modelId), (stockPerModel.get(String(item.modelId)) || 0) + 1));
+    const ratingRows = data.reviews
+      .filter(active)
+      .filter((review) => String(review.source || "Review") !== "Contact Us")
+      .filter((review) => String(review.status || "").toLowerCase() === "active")
+      .filter((review) => within(recordCreatedAt(review), range))
+      .filter((review) => Number.isFinite(Number(review.rating)));
+    const referenceTime = range.end.getTime();
+    return {
+      customers: data.customers.filter(active).filter((customer) => within(recordCreatedAt(customer), range)).length,
+      orders: periodOrders.length,
+      rating: ratingRows.length ? ratingRows.reduce((sum, review) => sum + finiteNumber(review.rating), 0) / ratingRows.length : 0,
+      stockCount: stock.length,
+      soldCount: summary.soldUnits,
+      inStockSelling: roundMoney(stock.reduce((sum, item) => sum + currentItemSelling(data, item), 0)),
+      inStockCost: roundMoney(stock.reduce((sum, item) => sum + currentItemCost(data, item), 0)),
+      damageValue: summary.damageValue,
+      grossMargin: summary.grossMargin,
+      aov: summary.averageOrderValue,
+      deliveryRate: periodOrders.length ? (periodOrders.filter((order) => String(order.status).toLowerCase() === "delivered").length / periodOrders.length) * 100 : 0,
+      refusalRate: periodOrders.length ? (periodOrders.filter((order) => String(order.status).toLowerCase() === "refused").length / periodOrders.length) * 100 : 0,
+      returnRate: summary.grossSoldUnits ? (summary.returnedUnits / summary.grossSoldUnits) * 100 : 0,
+      topModel: topValue(soldLines.map((line) => line.modelCode || itemFor(data, line.itemCode)?.modelId)),
+      topColor: topValue(soldLines.map((line) => line.color || itemFor(data, line.itemCode)?.color)),
+      topSize: topValue(soldLines.map((line) => line.size || itemFor(data, line.itemCode)?.size)),
+      lowStock: [...stockPerModel.values()].filter((count) => count > 0 && count <= 5).length,
+      deadStock: stock.filter((item) => {
+        const created = parseDate(recordCreatedAt(item));
+        return created && referenceTime - created.getTime() >= 60 * 864e5;
+      }).length,
+    };
+  }
+
+  function setBrandMetric(id, value, current, previous, inverse = false) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+    const change = document.getElementById(id.replace(/-value$/, "-change"));
+    if (change) setComparisonBadge(change, current, previous, inverse);
+  }
+
+  function renderBrandMetricCards(data, range, current, previous) {
+    const metrics = brandMetrics(data, range, current);
+    const prior = brandMetrics(data, range.previous, previous);
+    const numberFormat = new Intl.NumberFormat("en-EG", { maximumFractionDigits: 1 });
+
+    const mainCards = [
+      ["#brand .customar-card .numebr", metrics.customers],
+      ["#brand .orders-card .numebr", metrics.orders],
+      ["#brand .card-inf-2:nth-child(3) .numebr", metrics.rating ? metrics.rating.toFixed(1) : "0"],
+      ["#brand .stock-card .numebr", metrics.stockCount],
+      ["#brand .sold-card .numebr", metrics.soldCount],
+    ];
+    mainCards.forEach(([selector, value]) => {
+      const element = document.querySelector(selector);
+      if (element) element.textContent = value;
+    });
+
+    setBrandMetric("brand-in-stock-selling-value", money(metrics.inStockSelling), metrics.inStockSelling, prior.inStockSelling);
+    setBrandMetric("brand-in-stock-cost-value", money(metrics.inStockCost), metrics.inStockCost, prior.inStockCost, true);
+    setBrandMetric("brand-damage-loss-value", money(metrics.damageValue), metrics.damageValue, prior.damageValue, true);
+    setBrandMetric("brand-gross-margin-value", percent(metrics.grossMargin), metrics.grossMargin, prior.grossMargin);
+    setBrandMetric("brand-aov-value", money(metrics.aov), metrics.aov, prior.aov);
+    setBrandMetric("brand-delivery-rate-value", percent(metrics.deliveryRate), metrics.deliveryRate, prior.deliveryRate);
+    setBrandMetric("brand-refusal-rate-value", percent(metrics.refusalRate), metrics.refusalRate, prior.refusalRate, true);
+    setBrandMetric("brand-return-rate-value", percent(metrics.returnRate), metrics.returnRate, prior.returnRate, true);
+    setBrandMetric("brand-low-stock-value", numberFormat.format(metrics.lowStock), metrics.lowStock, prior.lowStock, true);
+    setBrandMetric("brand-dead-stock-value", numberFormat.format(metrics.deadStock), metrics.deadStock, prior.deadStock, true);
+
+    [["model", metrics.topModel], ["color", metrics.topColor], ["size", metrics.topSize]].forEach(([name, entry]) => {
+      const value = document.getElementById(`brand-top-${name}-value`);
+      const note = document.getElementById(`brand-top-${name}-note`);
+      if (value) value.textContent = entry[0];
+      if (note) note.textContent = `${entry[1]} sold item(s)`;
+    });
+  }
+
   function renderBrandFinance() {
     if (!document.getElementById("brand")) return;
     const data = dashboardData();
@@ -897,9 +1093,9 @@
       setComparisonBadge(card.querySelector(".variance"), value, prior, inverse);
     });
     [
-      [".sales-cont", "Net Revenue", "Delivered order revenue less refunds recorded inside the selected period."],
-      [".cost-cont", "Total Cost", "Net COGS plus recognized operating expenses, COD fees and pre-sale damage write-offs in the selected period."],
-      [".profit-cont", "Net Profit", "Net revenue minus Total Cost for the selected period."],
+      [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
+      [".cost-cont", "Total Cost", "Sold-piece cost plus operating expenses, representative fees and non-duplicated damage loss in the selected period."],
+      [".profit-cont", "Total Profit", "Total Selling minus Total Cost for the selected period."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
       if (info) {
@@ -909,6 +1105,7 @@
     });
     const costTitle = document.querySelector("#brand .cost-cont h4");
     if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Total Cost';
+    renderBrandMetricCards(data, range, current, previous);
     document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(percent(current.repeatRate)));
     document.getElementById("dart-financial-period")?.replaceChildren(document.createTextNode(range.label));
     renderReturningChart(current);
@@ -1037,7 +1234,7 @@
     return `${sectionToolbar("Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
       <div class="dart-finance-kpi-grid">
         ${kpiCard("Net Revenue", money(current.netRevenue), "Delivered sales less period refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue })}
-        ${kpiCard("Total Cost", money(current.totalCost), "COGS + operating expenses + write-offs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true)}
+        ${kpiCard("Total Cost", money(current.totalCost), "Sold-piece cost + all period costs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true)}
         ${kpiCard("Net Profit", money(current.netProfit), `${percent(current.margin)} net margin`, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit })}
         ${kpiCard("Net Cash Flow", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
         ${kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue")}
@@ -1045,7 +1242,7 @@
       </div>
       <div class="dart-finance-two-col">
         <article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}
-          <dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Net revenue</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Net COGS</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses & write-offs</dt><dd>(${money(current.totalOperatingExpenses)})</dd></div><div class="is-total"><dt>Net profit</dt><dd>${money(current.netProfit)}</dd></div></dl>
+          <dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl>
         </article>
         <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Actual recognized expenses against active budgets.", '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>')}
           <div class="dart-budget-stack">${budgets.length ? budgets.slice(0, 5).map((budget) => `<div class="dart-budget-line"><div><strong>${escapeHTML(budget.name)}</strong><span>${money(budget.actual)} / ${money(budget.amount)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, budget.utilization))}%" class="${budget.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(budget.utilization)} used · ${money(budget.remaining)} remaining</small></div>`).join("") : '<div class="dart-finance-empty">No budgets have been added.</div>'}</div>
@@ -1089,6 +1286,7 @@
       ["Gross profit", current.grossProfit, previous.grossProfit, "subtotal"],
       ["Operating expenses", -current.operatingExpenses, -previous.operatingExpenses],
       ["COD fees", -current.codFees, -previous.codFees],
+      ["Representative exchange fees", -current.returnCourierCosts, -previous.returnCourierCosts],
       ["Pre-sale damage write-offs", -current.damageLoss, -previous.damageLoss],
       ["Net profit", current.netProfit, previous.netProfit, "total"],
     ];
@@ -1097,13 +1295,13 @@
   }
 
   function renderCashFlow(current, previous, range) {
-    return `${sectionToolbar("Cash Flow", "Cash basis: COD receipts and Paid expense dates only. Revenue recognition remains in P&L.", '<button type="button" class="dart-finance-secondary" data-finance-export="cashflow">Export CSV</button>')}
+    return `${sectionToolbar("Cash Flow", "Cash basis: collected order cash less paid expenses, completed refunds and Dart-paid representative fees.", '<button type="button" class="dart-finance-secondary" data-finance-export="cashflow">Export CSV</button>')}
       <div class="dart-finance-kpi-grid dart-finance-kpi-grid-three">
         ${kpiCard("Cash In", money(current.cashIn), "Recorded COD receipts", "fa-solid fa-arrow-down", "green", { current: current.cashIn, previous: previous.cashIn })}
-        ${kpiCard("Cash Out", money(current.cashOut), `Paid expenses + ${money(current.codFees)} COD fees`, "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
+        ${kpiCard("Cash Out", money(current.cashOut), "Paid expenses + refunds + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
         ${kpiCard("Net Cash Change", money(current.netCashFlow), range.label, "fa-solid fa-scale-balanced", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
       </div>
-      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>COD cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>COD settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">This report shows movement, not an account balance. An opening balance and bank reconciliation belong to the production accounting backend.</p></article>`;
+      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow.</p></article>`;
   }
 
   function codRows(data, range) {
@@ -1167,7 +1365,7 @@
     const previous = calculateSummary(data, range.previous);
     const renderers = {
       overview: () => renderFinanceOverview(data, range, current, previous),
-      expenses: () => "",
+      expenses: () => renderExpenses(data, range),
       budgets: () => renderBudgets(data, range),
       invoices: () => renderInvoices(data, range),
       goals: () => renderGoals(data, range),
@@ -1467,8 +1665,8 @@
       downloadCSV(`dart-${report}-${stamp}.csv`, headers, rows.map((row) => headers.map((key) => row[key] ?? "")));
       return;
     }
-    if (report === "pnl") downloadCSV(`dart-pnl-${stamp}.csv`, ["Account", "Amount EGP"], [["Gross Revenue", summary.grossRevenue], ["Refunds", -summary.refunds], ["Net Revenue", summary.netRevenue], ["Net COGS", -summary.netCogs], ["Operating Expenses", -summary.operatingExpenses], ["COD Fees", -summary.codFees], ["Damage Write-offs", -summary.damageLoss], ["Net Profit", summary.netProfit]]);
-    else if (report === "cashflow") downloadCSV(`dart-cash-flow-${stamp}.csv`, ["Cash Flow", "Amount EGP"], [["Cash In", summary.cashIn], ["Paid Expenses", -summary.paidExpenseCashOut], ["COD Fees", -summary.codFees], ["Net Cash Flow", summary.netCashFlow]]);
+    if (report === "pnl") downloadCSV(`dart-pnl-${stamp}.csv`, ["Account", "Amount EGP"], [["Gross Revenue", summary.grossRevenue], ["Refunds", -summary.refunds], ["Total Selling", summary.netRevenue], ["Sold-piece Cost", -summary.netCogs], ["Operating Expenses", -summary.operatingExpenses], ["Settlement Fees", -summary.codFees], ["Representative Exchange Fees", -summary.returnCourierCosts], ["Damage Write-offs", -summary.damageLoss], ["Total Profit", summary.netProfit]]);
+    else if (report === "cashflow") downloadCSV(`dart-cash-flow-${stamp}.csv`, ["Cash Flow", "Amount EGP"], [["Cash In", summary.cashIn], ["Paid Expenses", -summary.paidExpenseCashOut], ["Completed Refunds", -summary.refundCashOut], ["Dart-paid Representative Fees", -summary.returnCourierCosts], ["Settlement Fees", -summary.codFees], ["Net Cash Flow", summary.netCashFlow]]);
     else if (report === "cod") downloadCSV(`dart-cod-${stamp}.csv`, ["Order", "Due", "Received", "Remaining", "Status"], codRows(data, range).map((row) => [row.order.orderId || row.order.id, row.due, row.received, row.remaining, row.status]));
     else if (report === "models") downloadCSV(`dart-model-profitability-${stamp}.csv`, ["Model Code", "Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin %"], modelProfitability(data, range).map((row) => [row.modelCode, row.modelName, row.units, row.revenue, row.cogs, row.profit, decimal(row.margin)]));
     else if (report === "drawlog") {
@@ -1533,24 +1731,6 @@
 
   function wrapCustomerRenderer() {
     try {
-      if (typeof renderCustomers === "function" && !renderCustomers.dartFinanceWrapped) {
-        const previousRenderer = renderCustomers;
-        const wrapped = function (...args) {
-          const result = previousRenderer.apply(this, args);
-          enhanceCustomerDrawControls();
-          return result;
-        };
-        wrapped.dartFinanceWrapped = true;
-        renderCustomers = wrapped;
-        if (typeof sectionsMap !== "undefined" && sectionsMap.customers) sectionsMap.customers.render = wrapped;
-      }
-    } catch {
-      // The draw controls still render during finance refreshes in standalone mode.
-    }
-  }
-
-  function wrapCustomerRenderer() {
-    try {
       if (typeof renderCustomers !== "function" || renderCustomers.dartFinanceWrapped) return;
       const previousRenderer = renderCustomers;
       const wrapped = function (...args) {
@@ -1570,7 +1750,6 @@
   renderPeriodControls();
   bindEvents();
   wrapDashboardRefresh();
-  wrapCustomerRenderer();
   wrapCustomerRenderer();
 
   document.addEventListener("DOMContentLoaded", () => {

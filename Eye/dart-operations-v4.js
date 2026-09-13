@@ -90,10 +90,22 @@
 
     function calculate() {
       const existing=ordersData.find(order=>String(order.id)===value('modal-order-edit-id'));
-      // BEGIN Immutable prices: existing lines retain their original transaction prices.
+      // BEGIN Immutable prices: existing lines and same-model additions retain the order's original transaction price/cost.
       const snapshot = selected.map(code=>{
         const saved=existing?.priceSnapshot?.find(line=>line.itemCode===code);
-        return saved ? structuredClone(saved) : dartPriceSnapshotForCodes([code])[0];
+        if (saved) return structuredClone(saved);
+        const current=dartPriceSnapshotForCodes([code])[0];
+        if (!current) return current;
+        const historical=existing?.priceSnapshot?.find(line=>String(line.modelCode)===String(current.modelCode));
+        return historical ? {
+          ...current,
+          originalUnitPrice:Number(historical.originalUnitPrice)||0,
+          discountPercent:Number(historical.discountPercent)||0,
+          discountAmount:Number(historical.discountAmount)||0,
+          finalUnitPrice:Number(historical.finalUnitPrice)||0,
+          costSnapshot:Number(historical.costSnapshot)||0,
+          inheritedFromOrderSnapshot:true
+        } : current;
       });
       // END Immutable prices.
       const subtotal = snapshot.reduce((sum, line) => sum + (Number(line.finalUnitPrice) || 0) * (Number(line.qty) || 1), 0);

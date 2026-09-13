@@ -1,6 +1,5 @@
-// BEGIN V9.2 cache refresh — delivery leaderboard, account session and birthday queue fixes.
-const CACHE = 'dart-static-v9-2';
-// END V9 cache refresh.
+// Return/exchange pickup flow and accounting UI refresh.
+const CACHE = 'dart-static-v10-returns';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));

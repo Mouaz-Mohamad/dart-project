@@ -1086,6 +1086,95 @@ button,
   }
 }
 
+/* BEGIN Return/exchange request pickup location and fee disclosure. */
+.dart-return-exchange-options,
+.dart-return-address-panel {
+  width: 100%;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid rgba(171, 1, 43, 0.18);
+  border-radius: 14px;
+  background: #fffdfb;
+}
+.dart-return-exchange-options legend,
+.dart-return-address-panel legend {
+  padding: 0 8px;
+  color: #7f102c;
+  font-weight: 800;
+}
+.dart-return-exchange-options > p,
+.dart-return-address-panel > p:first-of-type {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-size: 13px;
+}
+.dart-return-address-search {
+  position: relative;
+}
+.dart-return-address-map {
+  width: 100%;
+  height: 280px;
+  margin: 12px 0;
+  overflow: hidden;
+  border: 1px solid #d8dce3;
+  border-radius: 12px;
+  background: #f4f5f6;
+  z-index: 1;
+}
+.dart-return-fee-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-inline-start: 4px solid #ab012b;
+  border-radius: 9px;
+  background: #fff4f6;
+  color: #741126;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dart-return-fee-summary[hidden] { display: none; }
+.dart-return-address-panel .form-row,
+.dart-return-exchange-options .form-row {
+  align-items: stretch;
+  gap: 12px;
+}
+.dart-return-address-panel .form-group,
+.dart-return-exchange-options .container-select {
+  flex: 1 1 220px;
+}
+.dart-return-address-panel input,
+.dart-return-address-panel select,
+.dart-return-exchange-options select {
+  width: 100%;
+}
+.dart-return-address-search .results-list {
+  width: 100%;
+  max-height: 210px;
+  overflow-y: auto;
+  z-index: 900;
+}
+.dart-return-tracking-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 12px;
+  color: #8b1531;
+  font-weight: 800;
+  text-decoration: underline;
+}
+.dart-return-tracking-link[hidden] { display: none; }
+@media (max-width: 640px) {
+  .dart-return-address-panel,
+  .dart-return-exchange-options { padding: 12px; }
+  .dart-return-address-map { height: 240px; }
+  .dart-return-address-panel .form-row,
+  .dart-return-exchange-options .form-row { flex-direction: column; }
+}
+/* END Return/exchange request pickup location and fee disclosure. */
+
 /* ========================================================================== */
 /* DART V6 — requested interface corrections                                  */
 /* ========================================================================== */
@@ -1236,6 +1325,9 @@ button,
 .tracking-map-shell.is-disabled #tracking-map {
   pointer-events: none;
 }
+.tracking-map-shell.is-disabled .return-tracking-map {
+  pointer-events: none;
+}
 .tracking-map-summary {
   margin: -18px 14px 14px;
 }
@@ -1243,9 +1335,80 @@ button,
   color: #64748b;
 }
 
+/* Return tracking cards use the same quiet layout as order tracking. */
+.return-tracking-section {
+  width: min(1080px, calc(100% - 28px));
+  margin: 0 auto 56px;
+}
+.return-tracking-heading {
+  max-width: 760px;
+  margin: 0 auto 16px;
+  text-align: center;
+}
+.return-tracking-heading span,
+.dart-rep-section-heading .dart-rep-eyebrow {
+  color: #8c1d2c;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.return-tracking-heading h2,
+.dart-rep-section-heading h2 {
+  margin: 5px 0 0;
+  color: #111827;
+}
+.return-tracking-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.return-tracking-card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+.return-tracking-map {
+  width: 100%;
+  height: 300px;
+  background: #e2e8f0;
+}
+.return-stepper .step {
+  width: 33.333%;
+}
+.return-stepper .step.is-rejected .circle {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+.return-stepper .step.is-rejected .step-text,
+.return-rejection-row strong {
+  color: #991b1b;
+}
+.return-tracking-details .item-row {
+  gap: 18px;
+  align-items: flex-start;
+}
+.return-tracking-details .item-row strong {
+  max-width: 62%;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.return-rep-name {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+.return-rep-meta,
+.tracking-return-date {
+  color: #64748b;
+  font-size: 11px;
+}
+
 /* BEGIN V8 review, return and customer insights controls. */
 .return-accept-btn,
 .return-reject-btn,
+.return-assign-btn,
 .return-good-btn,
 .return-bad-btn {
   border: 0;
@@ -1259,6 +1422,9 @@ button,
 .return-accept-btn,
 .return-good-btn {
   background: #16834b;
+}
+.return-assign-btn {
+  background: #1d4ed8;
 }
 .return-reject-btn,
 .return-bad-btn {
@@ -1568,6 +1734,17 @@ button,
   width: 100%;
   max-width: none;
   margin: 0;
+}
+.dart-rep-return-section {
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+.dart-rep-section-heading {
+  margin-bottom: 14px;
+}
+.dart-rep-return-card {
+  border-color: rgba(140, 29, 44, 0.2);
 }
 .dart-rep-orders-list .rep-header h2 {
   margin: 0 0 4px;

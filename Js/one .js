@@ -1901,6 +1901,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderReviewsLogic();
     initCartAndCheckoutEvents();
     initAddressMap();
+    window.DartAddress?.initReturnRequest?.();
+    document.dispatchEvent(new CustomEvent('dart:sections-loaded'));
     updateCartCount();
     if (!navigator.onLine) updateConnectivityBanner();
 });

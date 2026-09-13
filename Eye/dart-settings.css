@@ -1,0 +1,356 @@
+/* ========================================================================== */
+/* DART SETTINGS — dashboard-only settings and guarded destructive actions    */
+/* ========================================================================== */
+:root {
+  --dart-settings-burgundy: #ab012b;
+  --dart-settings-danger: #b42318;
+  --dart-settings-danger-deep: #861b14;
+  --dart-settings-ink: #17191d;
+  --dart-settings-muted: #68727e;
+  --dart-settings-line: #e7e1e2;
+  --dart-settings-soft: #fbf8f6;
+}
+
+.dart-settings-section {
+  color: var(--dart-settings-ink);
+}
+
+.dart-settings-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  border: 1px solid var(--dart-settings-line);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff 0%, var(--dart-settings-soft) 100%);
+  padding: 21px 23px;
+  box-shadow: 0 8px 28px rgba(31, 20, 22, .045);
+}
+
+.dart-settings-page-head h1,
+.dart-settings-card h2,
+.dart-reset-modal-content h2 {
+  margin: 0;
+  color: var(--dart-settings-ink);
+}
+
+.dart-settings-page-head h1 {
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.1;
+}
+
+.dart-settings-page-head p:not(.dart-settings-eyebrow) {
+  margin: 6px 0 0;
+  color: var(--dart-settings-muted);
+  font-size: 12px;
+}
+
+.dart-settings-page-head > i {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  background: #f3ecee;
+  color: var(--dart-settings-burgundy);
+  font-size: 20px;
+}
+
+.dart-settings-eyebrow,
+.dart-reset-kicker,
+.dart-settings-card-copy > span {
+  margin: 0 0 5px;
+  color: var(--dart-settings-burgundy);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.dart-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dart-settings-card {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 15px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--dart-settings-line);
+  border-radius: 15px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 8px 26px rgba(31, 20, 22, .04);
+}
+
+.dart-settings-danger-card {
+  grid-column: 1 / -1;
+  border-color: #efc4c0;
+  background: linear-gradient(135deg, #fff 0%, #fff7f6 100%);
+}
+
+.dart-settings-card-icon,
+.dart-reset-warning-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #fde8e6;
+  color: var(--dart-settings-danger);
+}
+
+.dart-settings-card-icon {
+  width: 46px;
+  height: 46px;
+  font-size: 18px;
+}
+
+.dart-settings-card-copy h2 {
+  font-size: 18px;
+}
+
+.dart-settings-card-copy p {
+  max-width: 760px;
+  margin: 6px 0 5px;
+  color: var(--dart-settings-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.dart-settings-card-copy strong {
+  color: var(--dart-settings-danger-deep);
+  font-size: 11px;
+}
+
+.dart-settings-danger-button,
+.dart-reset-confirm-button {
+  border: 1px solid var(--dart-settings-danger);
+  background: var(--dart-settings-danger);
+  color: #fff;
+  font-weight: 800;
+}
+
+.dart-settings-danger-button {
+  min-height: 42px;
+  border-radius: 9px;
+  padding: 9px 14px;
+  white-space: nowrap;
+}
+
+.dart-settings-danger-button:hover,
+.dart-reset-confirm-button:hover:not(:disabled) {
+  border-color: var(--dart-settings-danger-deep);
+  background: var(--dart-settings-danger-deep);
+  color: #fff;
+}
+
+.dart-settings-status {
+  margin-top: 14px;
+  border: 1px solid #bcdccb;
+  border-radius: 10px;
+  background: #f2faf6;
+  color: #106b49;
+  padding: 11px 13px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dart-reset-modal-content {
+  width: min(620px, 94vw) !important;
+  max-height: 92vh;
+  overflow-y: auto;
+  border: 2px solid #d43a30;
+  border-radius: 17px !important;
+  background: #fff !important;
+  padding: 26px !important;
+  box-shadow: 0 24px 70px rgba(78, 13, 8, .32) !important;
+}
+
+.dart-reset-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4efef;
+  color: #4f555d;
+  padding: 0;
+  font-size: 22px;
+}
+
+.dart-reset-modal-close:hover {
+  background: #eee5e5;
+  color: var(--dart-settings-danger);
+}
+
+.dart-reset-warning-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 14px;
+  font-size: 24px;
+}
+
+.dart-reset-kicker {
+  color: var(--dart-settings-danger);
+}
+
+.dart-reset-modal-content h2 {
+  max-width: 500px;
+  padding-right: 30px;
+  font-size: clamp(21px, 3vw, 27px);
+  line-height: 1.35;
+}
+
+#reset-data-modal-description {
+  margin: 10px 0 14px;
+  color: #5d6570;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dart-reset-data-list {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 17px;
+  border: 1px solid #f0d0cd;
+  border-radius: 11px;
+  background: #fff8f7;
+  padding: 12px 14px;
+  list-style: none;
+}
+
+.dart-reset-data-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #68423f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.dart-reset-data-list i {
+  margin-top: 3px;
+  color: var(--dart-settings-danger);
+}
+
+.dart-reset-confirm-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #383d44;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dart-reset-confirm-label code {
+  border-radius: 5px;
+  background: #f4eeee;
+  color: var(--dart-settings-danger-deep);
+  padding: 2px 6px;
+  font-weight: 900;
+}
+
+.dart-reset-confirm-input {
+  width: 100%;
+  min-height: 43px;
+  border: 1px solid #d8ced0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 11px;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.dart-reset-confirm-input:focus {
+  border-color: var(--dart-settings-danger);
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, .09);
+}
+
+.dart-reset-understand-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 13px;
+  color: #474e57;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.dart-reset-understand-label input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  accent-color: var(--dart-settings-danger);
+}
+
+.dart-reset-error {
+  margin-top: 12px;
+  border-radius: 8px;
+  background: #fff0ef;
+  color: var(--dart-settings-danger-deep);
+  padding: 10px 11px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dart-reset-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.dart-reset-cancel-button,
+.dart-reset-confirm-button {
+  min-height: 42px;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 12px;
+}
+
+.dart-reset-cancel-button {
+  border: 1px solid #d8d2d4;
+  background: #fff;
+  color: #4e555e;
+  font-weight: 750;
+}
+
+.dart-reset-cancel-button:hover {
+  background: #f6f3f3;
+  color: var(--dart-settings-burgundy);
+}
+
+.dart-reset-confirm-button:disabled {
+  border-color: #d5cfd0;
+  background: #d5cfd0;
+  color: #817a7c;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .dart-settings-grid { grid-template-columns: 1fr; }
+  .dart-settings-card {
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: start;
+    padding: 15px;
+  }
+  .dart-settings-card-icon { width: 42px; height: 42px; }
+  .dart-settings-danger-button { grid-column: 1 / -1; width: 100%; }
+}
+
+@media (max-width: 520px) {
+  .dart-settings-page-head { padding: 16px; }
+  .dart-reset-modal-content { padding: 20px 16px !important; }
+  .dart-reset-modal-content h2 { padding-right: 26px; }
+  .dart-reset-actions { flex-direction: column-reverse; }
+  .dart-reset-actions button { width: 100%; }
+}

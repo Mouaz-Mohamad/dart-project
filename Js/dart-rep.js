@@ -12,6 +12,7 @@
     audit: "dart_audit",
     notifications: "dart_notifications",
     cards: "dart_cards",
+    returns: "dart_returns",
   };
   const ALLOWED_IMAGES = new Set(["image/jpeg", "image/png", "image/webp"]);
   const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
@@ -20,6 +21,9 @@
   const LOCATION_MAX_AGE_MS = 2 * 60 * 1000;
   const activeOrderIds = new Set(
     JSON.parse(sessionStorage.getItem("dart_rep_active_orders") || "[]"),
+  );
+  const activeReturnIds = new Set(
+    JSON.parse(sessionStorage.getItem("dart_rep_active_returns") || "[]"),
   );
   let locationWatch = null;
   let locationPermissionBlocked = false;
@@ -439,6 +443,17 @@
     );
   }
 
+  function repReturns(rep) {
+    return read(KEYS.returns, []).filter(
+      (record) =>
+        (String(record.representativeId) === String(rep.id) ||
+          String(record.representativeId) === String(rep.repId)) &&
+        !record.isArchived &&
+        !record.isDeleted &&
+        ["Representative Assigned", "Pickup On The Way"].includes(record.status),
+    );
+  }
+
   function fullAddress(order) {
     return (
       order.fullAddress ||
@@ -452,6 +467,66 @@
         .filter(Boolean)
         .join(", ")
     );
+  }
+
+  function renderReturns(rep) {
+    const list = document.getElementById("repReturnsList"),
+      template = document.getElementById("rep-return-card-template");
+    if (!list || !template) return;
+    const records = repReturns(rep);
+    activeReturnIds.clear();
+    records
+      .filter((record) => record.pickupStartedAt && record.status === "Pickup On The Way")
+      .forEach((record) => activeReturnIds.add(record.id));
+    saveActiveIds();
+    list.replaceChildren();
+    if (!records.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "No active return pickups are assigned to you.";
+      list.appendChild(empty);
+      return;
+    }
+    records.forEach((record) => {
+      const fragment = template.content.cloneNode(true),
+        card = fragment.querySelector("[data-return-id]"),
+        started = activeReturnIds.has(record.id) && Boolean(record.pickupStartedAt),
+        proximity = started
+          ? deliveryProximity(record)
+          : { ok: false, reason: "Start pickup to open Google Maps and begin secure location sharing." },
+        customerFee = Number(record.customerCourierFee) || 0,
+        brandFee = Number(record.brandCourierFee) || 0,
+        isExchange = window.DartReturns?.isExchange(record) || record.requestType === "Exchange";
+      card.dataset.returnId = record.id;
+      const values = {
+        title: `${record.requestType || "Return"} #${record.returnId || record.id}`,
+        date: `${record.date || ""}`,
+        status: record.status || "-",
+        customer: record.clientName || record.clientId || "Customer",
+        phones: [record.phone1, record.phone2].filter((phone) => phone && phone !== "-").join(" · ") || "-",
+        address: fullAddress(record) || "Address missing",
+        reason: record.reason || "No reason entered",
+        originalItem: `Original: ${record.itemCode || "-"}`,
+        requestType: record.requestType || "Return",
+        replacementItem: record.replacementItemCode || `${record.requestedColor || "-"} / ${record.requestedSize || "-"}`,
+        feeLabel: customerFee > 0 ? "Collect from customer" : brandFee > 0 ? "Dart owes representative" : "Courier fee",
+        feeAmount: money(customerFee || brandFee),
+        proximity: proximity.reason,
+      };
+      Object.entries(values).forEach(([field, value]) => {
+        const element = card.querySelector(`[data-return-field="${field}"]`);
+        if (element) element.textContent = value;
+      });
+      card.querySelector("[data-return-replacement-row]").hidden = !isExchange;
+      const call = card.querySelector("[data-return-call]");
+      call.href = record.phone1 ? `tel:${record.phone1}` : "#";
+      call.hidden = !record.phone1;
+      card.querySelector('[data-return-action="start"]').hidden = started;
+      card.querySelector('[data-return-action="cancel"]').hidden = !started;
+      card.querySelector('[data-return-action="complete"]').hidden = !started || !proximity.ok;
+      card.querySelector('[data-return-field="proximity"]').classList.toggle("is-ready", proximity.ok);
+      list.appendChild(fragment);
+    });
   }
 
   function renderOrders() {
@@ -513,6 +588,7 @@
         })
         .join("") ||
       '<div class="empty-state">No active orders are assigned to you.</div>';
+    renderReturns(rep);
     ensureLocationWatch();
   }
 
@@ -520,6 +596,10 @@
     sessionStorage.setItem(
       "dart_rep_active_orders",
       JSON.stringify([...activeOrderIds]),
+    );
+    sessionStorage.setItem(
+      "dart_rep_active_returns",
+      JSON.stringify([...activeReturnIds]),
     );
   }
 
@@ -599,8 +679,206 @@
     return order;
   }
 
+  function assignedReturn(recordId) {
+    const rep = currentRep(),
+      records = read(KEYS.returns, []),
+      record = records.find((row) => String(row.id) === String(recordId));
+    if (
+      !rep ||
+      !record ||
+      (String(record.representativeId) !== String(rep.id) &&
+        String(record.representativeId) !== String(rep.repId))
+    )
+      throw new Error("This return pickup is not assigned to your account.");
+    return { rep, records, record };
+  }
+
+  function addReturnActivity(record, previousStatus, newStatus, action, rep) {
+    record.activityLog = record.activityLog || [];
+    record.activityLog.push({
+      id: uid("EVT"),
+      action,
+      previousStatus,
+      newStatus,
+      timestamp: now(),
+      actorRole: "Representative",
+      representativeId: rep.id,
+    });
+  }
+
+  function startReturnPickup(recordId) {
+    const { rep, records, record } = assignedReturn(recordId);
+    if (!["Representative Assigned", "Pickup On The Way"].includes(record.status))
+      throw new Error("This pickup cannot be started in its current status.");
+    const previous = record.status;
+    record.status = "Pickup On The Way";
+    record.pickupStartedAt = record.pickupStartedAt || now();
+    record.updatedAt = now();
+    activeReturnIds.add(record.id);
+    addReturnActivity(record, previous, record.status, "RETURN_PICKUP_STARTED", rep);
+    write(KEYS.returns, records);
+    saveActiveIds();
+    audit("RETURN_PICKUP_STARTED", rep.id, { returnId: record.returnId });
+    notify("return_pickup_started", `${record.returnId}: Pickup started`, rep.name, record.id);
+    return record;
+  }
+
+  function cancelReturnPickup(recordId) {
+    const { rep, records, record } = assignedReturn(recordId);
+    if (record.status !== "Pickup On The Way")
+      throw new Error("This pickup is not currently active.");
+    const previous = record.status;
+    record.status = "Representative Assigned";
+    record.pickupStartedAt = null;
+    record.courierLocation = null;
+    record.lastFailedPickupAt = now();
+    record.failedPickupAttempts = Number(record.failedPickupAttempts || 0) + 1;
+    record.updatedAt = record.lastFailedPickupAt;
+    activeReturnIds.delete(record.id);
+    addReturnActivity(record, previous, record.status, "RETURN_PICKUP_FAILED", rep);
+    write(KEYS.returns, records);
+    saveActiveIds();
+    audit("RETURN_PICKUP_FAILED", rep.id, { returnId: record.returnId });
+    notify("return_pickup_failed", `${record.returnId}: Pickup attempt failed`, rep.name, record.id);
+    return record;
+  }
+
+  function completeReturnPickup(recordId) {
+    const { rep, records, record } = assignedReturn(recordId),
+      proximity = deliveryProximity(record);
+    if (record.status !== "Pickup On The Way" || !record.pickupStartedAt)
+      throw new Error("Start pickup before confirming it.");
+    if (!proximity.ok) throw new Error(proximity.reason);
+    const items = read(KEYS.items, []),
+      orders = read(KEYS.orders, []),
+      originalItem = items.find((item) => String(item.itemCode) === String(record.itemCode)),
+      order = orders.find((row) => String(row.orderId) === String(record.orderId)),
+      completedAt = now(),
+      isExchange = window.DartReturns?.isExchange(record) || record.requestType === "Exchange",
+      isRefund = window.DartReturns?.isRefund(record) || record.requestType === "Refund";
+    if (!originalItem) throw new Error("The original physical item could not be found.");
+    if (!order) throw new Error("The original delivered order could not be found.");
+
+    originalItem.status = "Return Inspection";
+    originalItem.returnRequestId = record.id;
+    originalItem.exchangeChainId = record.exchangeChainId || originalItem.exchangeChainId || originalItem.itemCode;
+    originalItem.updatedAt = completedAt;
+
+    if (isRefund && !record.financialCompletionApplied) {
+      const refundAmount = Math.max(0, Number(record.originalNetAmount ?? record.refundAmount) || 0);
+      order.amountRefunded = Math.min(orderTotal(order), Number(order.amountRefunded || 0) + refundAmount);
+      order.refundedAt = completedAt;
+      order.paymentStatus = order.amountRefunded >= orderTotal(order) ? "Refunded" : "Partially Refunded";
+      record.refundAmount = refundAmount;
+      record.financialCompletionApplied = true;
+      if (order.dartCardId && order.dartCardUsageRecorded && !record.dartCardUsageReversed) {
+        const cards = read(KEYS.cards, []),
+          card = cards.find((row) => String(row.cardId) === String(order.dartCardId));
+        if (card) {
+          card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - 1));
+          card.requestedProducts = (card.requestedProducts || []).filter(
+            (code) => String(code) !== String(record.itemCode),
+          );
+          const expiry = Date.parse(card.expDate || 0);
+          if (
+            card.status === "Expired" &&
+            Number(card.purchasedItems) < Number(card.itemLimit || card.purchasedLimit || 10) &&
+            (!expiry || expiry >= Date.now())
+          )
+            card.status = "Active";
+          record.dartCardUsageReversed = true;
+          write(KEYS.cards, cards);
+        }
+      }
+    }
+
+    if (isExchange && !record.exchangeCompletionApplied) {
+      const replacement = items.find(
+        (item) => String(item.itemCode) === String(record.replacementItemCode),
+      );
+      if (!replacement || String(replacement.status).toLowerCase() !== "processing/held")
+        throw new Error("The held replacement item is no longer available.");
+      replacement.status = "Sold";
+      replacement.orderId = order.orderId;
+      replacement.clientId = order.clientId;
+      replacement.clientName = order.clientName;
+      replacement.phone1 = order.phone1;
+      replacement.phone2 = order.phone2;
+      replacement.email = order.email;
+      replacement.purchaseDate = new Date().toLocaleDateString("en-GB");
+      replacement.exchangeChainId = record.exchangeChainId || record.itemCode;
+      replacement.exchangedFromItemCode = record.itemCode;
+      replacement.updatedAt = completedAt;
+      const itemIndex = (order.items || []).findIndex(
+        (code) => String(code) === String(record.itemCode),
+      );
+      if (itemIndex >= 0) order.items[itemIndex] = replacement.itemCode;
+      const lineIndex = (order.priceSnapshot || []).findIndex(
+        (line) => String(line.itemCode) === String(record.itemCode),
+      );
+      const replacementLine = {
+        ...(record.replacementLineSnapshot || record.originalLineSnapshot || {}),
+        itemId: replacement.id,
+        itemCode: replacement.itemCode,
+        modelCode: replacement.modelId,
+        color: replacement.color,
+        size: String(replacement.size),
+        exchangedFromItemCode: record.itemCode,
+        exchangeChainId: record.exchangeChainId || record.itemCode,
+      };
+      if (lineIndex >= 0) order.priceSnapshot[lineIndex] = replacementLine;
+      else order.priceSnapshot = [...(order.priceSnapshot || []), replacementLine];
+      order.exchangeHistory = order.exchangeHistory || [];
+      order.exchangeHistory.push({
+        returnId: record.returnId,
+        fromItemCode: record.itemCode,
+        toItemCode: replacement.itemCode,
+        originalNetAmount: Number(record.originalNetAmount) || 0,
+        completedAt,
+      });
+      record.exchangeCompletionApplied = true;
+    }
+
+    const previous = record.status;
+    record.status = "Completed";
+    record.completedAt = completedAt;
+    record.updatedAt = completedAt;
+    record.inspectionStatus = record.inspectionStatus || "Pending";
+    record.customerCourierFeeStatus = Number(record.customerCourierFee) > 0
+      ? "Collected by Representative"
+      : "Not Applicable";
+    record.brandCourierFeeStatus = Number(record.brandCourierFee) > 0
+      ? "Paid by Dart"
+      : "Not Applicable";
+    activeReturnIds.delete(record.id);
+    addReturnActivity(record, previous, record.status, "RETURN_PICKUP_COMPLETED", rep);
+    order.activityLog = order.activityLog || [];
+    order.activityLog.push({
+      id: uid("EVT"),
+      action: isExchange ? "EXCHANGE_COMPLETED" : "REFUND_PICKUP_COMPLETED",
+      returnId: record.returnId,
+      itemCode: record.itemCode,
+      replacementItemCode: record.replacementItemCode || "",
+      timestamp: completedAt,
+      actorRole: "Representative",
+      representativeId: rep.id,
+    });
+    write(KEYS.items, items);
+    write(KEYS.orders, orders);
+    write(KEYS.returns, records);
+    saveActiveIds();
+    audit("RETURN_PICKUP_COMPLETED", rep.id, {
+      returnId: record.returnId,
+      requestType: record.requestType,
+      customerCourierFee: Number(record.customerCourierFee) || 0,
+      brandCourierFee: Number(record.brandCourierFee) || 0,
+    });
+    notify("return_pickup_completed", `${record.returnId}: Pickup completed`, "Waiting for Dart item inspection.", record.id);
+    return record;
+  }
+
   function ensureLocationWatch() {
-    if (!activeOrderIds.size) {
+    if (!activeOrderIds.size && !activeReturnIds.size) {
       if (locationWatch != null && navigator.geolocation) {
         navigator.geolocation.clearWatch(locationWatch);
         locationWatch = null;
@@ -622,8 +900,10 @@
     locationWatch = navigator.geolocation.watchPosition(
       (position) => {
         const rep = currentRep(),
-          orders = read(KEYS.orders, []);
-        let changed = false;
+          orders = read(KEYS.orders, []),
+          records = read(KEYS.returns, []);
+        let ordersChanged = false,
+          returnsChanged = false;
         orders.forEach((order) => {
           if (
             activeOrderIds.has(order.id) &&
@@ -638,13 +918,31 @@
               speed: position.coords.speed,
               updatedAt: now(),
             };
-            changed = true;
+            ordersChanged = true;
           }
         });
-        if (changed) {
-          write(KEYS.orders, orders);
+        records.forEach((record) => {
+          if (
+            activeReturnIds.has(record.id) &&
+            (String(record.representativeId) === String(rep?.id) ||
+              String(record.representativeId) === String(rep?.repId))
+          ) {
+            record.courierLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              heading: position.coords.heading,
+              speed: position.coords.speed,
+              updatedAt: now(),
+            };
+            returnsChanged = true;
+          }
+        });
+        if (ordersChanged) write(KEYS.orders, orders);
+        if (returnsChanged) write(KEYS.returns, records);
+        if (ordersChanged || returnsChanged) {
           setLocationStatus(
-            "Live location is being shared for the active delivery.",
+            "Live location is being shared for the active delivery or pickup.",
             "success",
           );
           renderOrders();
@@ -768,6 +1066,7 @@
       if (rep) audit("REP_LOGOUT", rep.id);
       localStorage.removeItem(KEYS.session);
       activeOrderIds.clear();
+      activeReturnIds.clear();
       saveActiveIds();
       ensureLocationWatch();
       showAuth("login");
@@ -826,16 +1125,64 @@
           alert(error.message);
         }
       });
+    document
+      .getElementById("repReturnsList")
+      .addEventListener("click", (event) => {
+        const button = event.target.closest("[data-return-action]");
+        if (!button) return;
+        const card = button.closest("[data-return-id]"),
+          recordId = card?.dataset.returnId,
+          records = read(KEYS.returns, []),
+          record = records.find((row) => String(row.id) === String(recordId));
+        try {
+          if (!record) throw new Error("The assigned return could not be found.");
+          if (button.dataset.returnAction === "start") {
+            window.open(googleMapsRoute(record), "_blank", "noopener");
+            locationPermissionBlocked = false;
+            startReturnPickup(record.id);
+            ensureLocationWatch();
+            renderOrders();
+          }
+          if (button.dataset.returnAction === "complete") {
+            const fresh = read(KEYS.returns, []).find(
+              (row) => String(row.id) === String(record.id),
+            );
+            const proximity = deliveryProximity(fresh);
+            if (!activeReturnIds.has(fresh.id) || !fresh.pickupStartedAt)
+              throw new Error("Start pickup before confirming it.");
+            if (!proximity.ok) throw new Error(proximity.reason);
+            const fee = Number(fresh.customerCourierFee) || 0;
+            const promptText = fee > 0
+              ? `Confirm pickup and that ${money(fee)} was collected directly from the customer?`
+              : `Confirm pickup for ${fresh.returnId}?`;
+            if (!confirm(promptText)) return;
+            completeReturnPickup(fresh.id);
+            renderOrders();
+          }
+          if (button.dataset.returnAction === "cancel") {
+            if (!confirm("Record this pickup attempt as failed/cancelled?")) return;
+            cancelReturnPickup(record.id);
+            ensureLocationWatch();
+            renderOrders();
+          }
+        } catch (error) {
+          alert(error.message);
+        }
+      });
   }
 
   window.DartRepPortal = {
     login,
     currentRep,
     repOrders,
+    repReturns,
     orderTotal,
     distanceKm,
     deliveryProximity,
     googleMapsRoute,
+    startReturnPickup,
+    cancelReturnPickup,
+    completeReturnPickup,
   };
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -849,7 +1196,7 @@
     }, 5000);
   });
   window.addEventListener("storage", (event) => {
-    if ([KEYS.orders, KEYS.reps].includes(event.key) && currentRep())
+    if ([KEYS.orders, KEYS.returns, KEYS.reps, KEYS.items].includes(event.key) && currentRep())
       renderOrders();
   });
 })();

@@ -462,6 +462,7 @@
         const it = {
           id: C.uid(),
           status: "In stock",
+          costSnapshot: Number(m.cost) || 0,
           createdAt: stamp(),
           regDate: new Date().toLocaleDateString("en-GB"),
           isArchived: false,

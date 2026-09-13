@@ -150,9 +150,9 @@ Location updates must be accepted only from the assigned active representative a
 
 ## Returns, reviews, cards and serial verification
 
-- `POST /api/v1/returns`, `GET /api/v1/me/returns`, admin review/update endpoints.
+- `POST /api/v1/returns`, `GET /api/v1/me/returns`, admin review/update endpoints. Every request contains a newly entered Cairo/Giza pickup address with validated coordinates; never silently reuse the order address.
 - `POST /api/v1/reviews` only if the authenticated customer has at least one `Delivered` order.
-- `GET /api/v1/leaderboard` returns current candidates; customers with an active Dart Card are excluded until 10 delivered items or one year. Its `purchasedItems` value is the net count of delivered physical item codes in the selected month after subtracting completed post-delivery returns (`Good` or `Damaged`). Pending or rejected return requests must not reduce the score. Deduplicate by physical Item Code so one return can never be subtracted twice.
+- `GET /api/v1/leaderboard` returns current candidates; customers with an active Dart Card are excluded until 10 delivered items or one year. Its `purchasedItems` value is the net count of delivered physical item codes in the selected month after subtracting completed `Refund` requests. Exchanges, pending requests and rejected requests do not reduce the score. Deduplicate by physical Item Code so one refund can never be subtracted twice.
 - `GET /api/v1/items/:code/authenticity` returns success only for a sold item. The customer-facing response includes product name/image, physical Item Code, size, color and only the first two parts of the registered owner's name.
 - If no delivered purchases exist, leaderboard fallback rows are registered accounts marked `not eligible`; no winner is selected.
 
@@ -190,7 +190,7 @@ Item: unique `itemCode`, model reference, color/size references, status, timesta
 
 ## Immutable order snapshots
 
-Each physical line stores itemCode, modelCode, name, color, size, qty, originalUnitPrice, discountPercent, discountAmount, finalUnitPrice and costSnapshot. Preserve the order's customer/address/payment/delivery records independently of future profile changes. Model price or discount edits must never rewrite existing snapshots. Editing an existing order retains snapshots for retained items; newly added items use the current server price. Keep an audit trail.
+Each physical line stores itemCode, modelCode, name, color, size, qty, originalUnitPrice, discountPercent, discountAmount, finalUnitPrice and costSnapshot. Preserve the order's customer/address/payment/delivery records independently of future profile changes. Model price or discount edits must never rewrite existing snapshots. Editing an existing order retains snapshots for retained items; a newly added physical item of a model already present in that order inherits that model's original order price, discounts and cost snapshot. Only a newly introduced model uses its current server price. Keep an audit trail.
 
 Public availability must come from server stock counts. Transactions and locking must prevent the same item entering two active orders. localStorage events only synchronize same-origin browser tabs and cannot enforce cross-device consistency. Authenticate every admin action on the server; retain prior security requirements in this document. The owner-requested V7 browser reset must not be reused as a production database deletion mechanism.
 
@@ -202,7 +202,16 @@ Public availability must come from server stock counts. Transactions and locking
 
 ## Return state machine
 
-Customer requests begin as `Pending Request`. Admin may transition them to `Rejected` or `Pending Inspection`. Only `Pending Inspection` may become `Good` or `Damaged`. `Good` restores the physical item to `In stock`; `Damaged` creates/updates a Damage record and makes the item unavailable. Apply the return record, inventory movement, refund if approved, audit entry and notification in one database transaction. Existing `amountRefunded` values are subtracted from customer spending reports.
+Customer requests begin as `Pending Request`. Admin may reject them with a required customer-visible reason or approve them as `Approved - Awaiting Representative`. An approved request becomes `Representative Assigned`, then only the assigned active representative may move it to `Pickup On The Way` and `Completed`. Failed/cancelled pickup attempts return it to `Representative Assigned` without consuming an exchange. The customer tracking response maps the detailed workflow to exactly three public phases: Under Review, Approved/Rejected and Return Completed.
+
+- The customer submits a fresh complete pickup address. Map selection reverse-geocodes to text; a manual address is server-geocoded back to a point. Accept Cairo and Giza only.
+- `POST /api/v1/admin/returns/:id/approve`, `POST /api/v1/admin/returns/:id/reject`, `POST /api/v1/admin/returns/:id/assign-representative`.
+- `POST /api/v1/representatives/me/returns/:id/start`, `/location`, `/failed` and `/complete`. Apply the fresh-location and 1 km validation used for delivery confirmation.
+- A completed `Refund` reduces revenue and cash by that physical line's original net customer amount. Allocate any order-level discount proportionally across physical lines. The original delivery component is not separately refunded.
+- A completed `Exchange` never changes order revenue. Its replacement must be the same model/design, may use another color/size, and inherits the exact original line price/cost plus its proportional order discount. The replacement inherits the physical exchange-chain ID.
+- Exchange allowance is per physical exchange chain. Only completion consumes it: Dart pays the representative 50 EGP for the first completed exchange; the customer pays the representative 50 EGP directly for every later exchange. For every completed refund, the customer pays the representative 100 EGP directly. Customer-paid fees never enter Dart revenue or Cash Flow.
+- After representative completion, the original item becomes `Return Inspection`. Admin records `Good` or `Damaged`. `Good` restores it to `In stock`, retaining original cost and using the model's current selling price. `Damaged` creates one damage record. A damaged refund stays in original COGS; a damaged exchange adds one damage loss because its replacement remains the sold line.
+- Apply completion, refund/exchange line movement, fees, inventory, Dart Card reversal for a refund, audit events and notifications in one idempotent database transaction.
 
 ## Per-order delivery activation
 
@@ -252,7 +261,7 @@ The server creates one reward per customer and birthday year:
 
 - `POST /api/v1/admin/dart-cards` grants an Additional Benefit manually. The default and only current benefit is `40%`, up to `10` net retained pieces, with editable issue/expiry dates defaulting to today and one year later.
 - Reject a second active Dart Card for the same customer with HTTP `409`.
-- A completed return (`Good` or `Damaged`) for an item bought with Dart Card decrements its consumed-piece count exactly once. Reactivate a quota-completed card only if it is still within its expiry date.
+- A completed `Refund` for an item bought with Dart Card decrements its consumed-piece count exactly once. An exchange does not change the count. Reactivate a quota-completed card only if it is still within its expiry date.
 - The profile may display the most recent inactive/expired card; the server response must expose its status rather than deleting its history.
 
 ## Destructive dashboard actions
@@ -279,10 +288,15 @@ All finance endpoints require the admin role, accept/return ISO-8601 timestamps,
 
 - Revenue is recognized only when an order becomes `Delivered`. A refund reduces revenue on the completed return/refund date, including when it falls in a later reporting period.
 - COGS uses every delivered line's immutable `costSnapshot`. A completed `Good` return reverses that line's COGS; a completed `Damaged` return does not restore inventory and stays in COGS.
-- Pre-sale damage is written off once using its immutable damage `costSnapshot`. A damaged customer return must never also be counted as a pre-sale write-off.
+- Model/item cost already contains the owner's complete normal per-piece factory, delivery and related cost (for example, the stated 100 EGP delivery component). Never add an automatic normal-order shipping expense on top of it.
+- `Total Selling = Delivered sales recognized in the period − completed refund amounts in the period`.
+- `Total Cost = net sold-piece COGS + recognized operating expenses + COD/settlement fees + Dart-paid representative fees + non-duplicated damage write-offs`.
+- `Total Profit = Total Selling − Total Cost`.
+- Pre-sale damage is written off once using its immutable damage `costSnapshot`. A damaged refunded item already present in delivered COGS is not written off again. A damaged exchanged item is written off once because the replacement occupies the delivered order line.
 - Operating expenses are recognized on `expenseDate` for P&L. Only `Paid` expenses with a `paidAt` instant affect Cash Flow. `Void` records affect neither.
 - COD provider fees are recognized as expense and cash outflow on settlement date. Invoice documents never create revenue or expense by themselves; they reference the authoritative order or expense to prevent duplication.
-- Net units sold are Delivered physical units minus completed post-delivery returns. Returning Customer Rate is customers with at least two Delivered orders in the range divided by customers with at least one.
+- Net units sold are Delivered physical units minus completed refunds; exchanges preserve the unit count. Returning Customer Rate is customers with at least two Delivered orders in the range divided by customers with at least one.
+- `In Stock Cost Value` sums immutable item-entry cost snapshots for active `In stock` physical items in the selected period. `In Stock Selling Value` uses those items and each model's current final selling price. Neither inventory value is added to P&L Total Cost.
 
 ## Finance resources
 

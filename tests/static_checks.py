@@ -49,12 +49,12 @@ for required_text in ['DELIVERY_BOUNDS','isSupportedDeliveryResult','outside-del
     if required_text not in address: errors.append(f'Address module missing delivery-zone rule: {required_text}')
 
 rep=(ROOT/'rep.html').read_text(encoding='utf-8')
-for required in ['repAuthCard','repLoginForm','repRegisterForm','repChangePasswordForm','repOrdersList','repLocationStatus']:
+for required in ['repAuthCard','repLoginForm','repRegisterForm','repChangePasswordForm','repOrdersList','repReturnsList','rep-return-card-template','repLocationStatus']:
     if f'id="{required}"' not in rep: errors.append(f'Representative portal missing #{required}')
 if 'id="repDeliveryMap"' in rep: errors.append('Representative portal must not include an embedded map')
 
 tracking=(ROOT/'track.html').read_text(encoding='utf-8')
-for required in ['trackingMapShell','tracking-map','trackingMapDisabled','trackingMapSummary','etaTime']:
+for required in ['trackingMapShell','tracking-map','trackingMapDisabled','trackingMapSummary','etaTime','returnTrackingSection','returnTrackingList','return-tracking-card-template']:
     if f'id="{required}"' not in tracking: errors.append(f'Tracking page missing #{required}')
 
 fixes=(ROOT/'CSS/fixes.css').read_text(encoding='utf-8')

@@ -869,6 +869,7 @@ const DART_ORDER_FLOW = [
 ];
 const DART_FINAL_ORDER_STATES = ["Delivered", "Refused", "Cancelled"];
 let dartPendingOrderAction = null;
+let dartPendingReturnAction = null;
 const dartFilterState = {};
 
 function dartNowISO() {
@@ -1331,7 +1332,14 @@ function dartCustomerStats(clientId) {
   const purchased = delivered.flatMap((o) => o.items || []);
   const returnedCodes = new Set(
     returnsData
-      .filter((r) => r.clientId === clientId && r.isPostDeliveryReturn)
+      .filter(
+        (r) =>
+          r.clientId === clientId &&
+          r.isPostDeliveryReturn &&
+          !dartReturnIsExchange(r) &&
+          (dartReturnRules()?.isCompleted(r) ||
+            ["Completed", "Good", "Damaged", "Bad"].includes(r.status)),
+      )
       .map((r) => r.itemCode),
   );
   const spent = delivered.reduce(
@@ -1589,118 +1597,212 @@ function dartBatchTransition(orders, target, meta = {}) {
   return { ok: true };
 }
 
-function dartInspectReturn(r, condition) {
-  const it = dartFindItemByCode(r.itemCode);
-  if (!it) return;
-  const old = r.status;
-  r.status = condition;
-  r.inspectedAt = dartNowISO();
+function dartReturnRules() {
+  return window.DartReturns || null;
+}
+
+function dartReturnIsExchange(record) {
+  return dartReturnRules()?.isExchange(record) ||
+    String(record?.requestType || "").toLowerCase().includes("exchange");
+}
+
+function dartReturnPickupAddress(record) {
+  return record?.fullAddress ||
+    [record?.building, record?.street, record?.area, record?.governorate, record?.country]
+      .filter(Boolean)
+      .join(", ");
+}
+
+function dartReturnReplacementCandidates(record) {
+  return itemsData.filter(
+    (item) =>
+      dartIsActive(item) &&
+      String(item.status || "").toLowerCase() === "in stock" &&
+      String(item.modelId) === String(record.modelId) &&
+      String(item.color) === String(record.requestedColor) &&
+      String(item.size) === String(record.requestedSize),
+  );
+}
+
+function dartApproveReturn(record, replacementItemCode = "") {
+  if (!record || record.status !== "Pending Request") return { ok: false, message: "Request is no longer pending." };
+  let replacement = null;
+  if (dartReturnIsExchange(record)) {
+    replacement = dartReturnReplacementCandidates(record).find(
+      (item) => String(item.itemCode) === String(replacementItemCode),
+    );
+    if (!replacement) return { ok: false, message: "Choose an available replacement item with the requested model, color and size." };
+    replacement.status = "Processing/Held";
+    replacement.orderId = record.orderId;
+    replacement.returnRequestId = record.id;
+    replacement.exchangeChainId = record.exchangeChainId || record.itemCode;
+    record.replacementItemCode = replacement.itemCode;
+    record.replacementItemId = replacement.id;
+    const originalLine = record.originalLineSnapshot || {};
+    record.replacementLineSnapshot = {
+      ...originalLine,
+      itemId: replacement.id,
+      itemCode: replacement.itemCode,
+      modelCode: replacement.modelId,
+      color: replacement.color,
+      size: String(replacement.size),
+      exchangedFromItemCode: record.itemCode,
+    };
+  }
+  const old = record.status;
+  record.status = "Approved - Awaiting Representative";
+  record.acceptedAt = dartNowISO();
+  record.updatedAt = record.acceptedAt;
+  record.inspectionStatus = record.inspectionStatus || "Pending";
+  dartAudit("RETURN_ACCEPTED", "returns", record.id, { status: old }, { status: record.status, replacementItemCode: record.replacementItemCode || "" });
+  dartNotify("return_accepted", `${record.returnId}: Approved`, "Request approved and waiting for a pickup representative.", "returns", record.id);
+  dartSaveAll();
+  dartRefreshAll();
+  return { ok: true };
+}
+
+function dartRejectReturn(record, reason) {
+  if (!record || record.status !== "Pending Request") return { ok: false, message: "Request is no longer pending." };
+  if (!String(reason || "").trim()) return { ok: false, message: "A rejection reason is required." };
+  const old = record.status;
+  record.status = "Rejected";
+  record.rejectionReason = String(reason).trim();
+  record.rejectedAt = dartNowISO();
+  record.updatedAt = record.rejectedAt;
+  dartAudit("RETURN_REJECTED", "returns", record.id, { status: old }, { status: record.status, reason: record.rejectionReason });
+  dartNotify("return_rejected", `${record.returnId}: Rejected`, record.rejectionReason, "returns", record.id, "warning");
+  dartSaveAll();
+  dartRefreshAll();
+  return { ok: true };
+}
+
+function dartAssignReturnRepresentative(record, representativeId) {
+  if (!record || record.status !== "Approved - Awaiting Representative") return { ok: false, message: "Approve the request before assigning a representative." };
+  const representative = dartFindRepById(representativeId);
+  if (!representative || !dartIsActive(representative) || representative.status !== "Active") return { ok: false, message: "Choose an active representative." };
+  const old = record.status;
+  record.status = "Representative Assigned";
+  record.representativeId = representative.id;
+  record.representativeBusinessId = representative.repId;
+  record.representativeName = representative.name;
+  record.representativePhone = representative.phone1;
+  record.assignedAt = dartNowISO();
+  record.updatedAt = record.assignedAt;
+  dartAudit("RETURN_REP_ASSIGNED", "returns", record.id, { status: old }, { status: record.status, representativeId: representative.id });
+  dartNotify("return_representative_assigned", `${record.returnId}: Representative assigned`, representative.name, "returns", record.id);
+  dartSaveAll();
+  dartRefreshAll();
+  return { ok: true };
+}
+
+function dartInspectReturn(record, condition) {
+  if (!record) return;
+  const isLegacyRefusal = !record.isPostDeliveryReturn && record.status === "Pending Inspection";
+  const canInspectCompleted = record.isPostDeliveryReturn &&
+    (record.status === "Completed" || Boolean(record.completedAt)) &&
+    (record.inspectionStatus || "Pending") === "Pending";
+  if (!isLegacyRefusal && !canInspectCompleted) return;
+  const item = dartFindItemByCode(record.itemCode);
+  if (!item) return;
+  const previousInspection = record.inspectionStatus || "Pending";
+  record.inspectionStatus = condition;
+  record.inspectedAt = dartNowISO();
+  record.updatedAt = record.inspectedAt;
+  if (isLegacyRefusal) record.status = condition;
   if (condition === "Good") {
-    it.status = "In stock";
-    it.orderId = "";
-    it.clientId = "";
-    it.clientName = "";
+    const model = dartFindModelByCode(item.modelId);
+    item.status = "In stock";
+    item.orderId = "";
+    item.clientId = "";
+    item.clientName = "";
+    item.returnRequestId = "";
+    item.restockedAt = record.inspectedAt;
+    item.restockedSellingPrice = Number(model?.discountedPrice ?? model?.selling) || 0;
   } else {
-    it.status = "Damaged";
-    if (
-      !damageData.some(
-        (d) => d.itemCode === it.itemCode && d.status === "Damaged",
-      )
-    )
+    item.status = "Damaged";
+    item.updatedAt = record.inspectedAt;
+    if (!damageData.some((damage) => damage.itemCode === item.itemCode && ["Damaged", "Destroyed"].includes(damage.status))) {
       damageData.push({
         id: dartUid("DMGDB"),
         damageId: dartUid("DMG"),
-        itemCode: it.itemCode,
-        modelId: it.modelId,
-        img: it.img || "",
-        color: it.color,
-        size: it.size,
+        itemCode: item.itemCode,
+        modelId: item.modelId,
+        img: item.img || "",
+        color: item.color,
+        size: item.size,
         status: "Damaged",
-        reason: r.reason || "Return inspection - Bad",
+        reason: record.reason || "Return inspection - Damaged",
         notes: "",
         date: new Date().toLocaleDateString("en-GB"),
-        createdAt: dartNowISO(),
-        orderId: r.orderId || "",
-        clientId: r.clientId || "",
-        clientName: r.clientName || "",
-        returnId: r.returnId || "",
+        createdAt: record.inspectedAt,
+        inspectedAt: record.inspectedAt,
+        costSnapshot: Number(record.originalLineSnapshot?.costSnapshot) || Number(dartFindModelByCode(item.modelId)?.cost) || 0,
+        orderId: record.orderId || "",
+        requestType: record.requestType || (record.isPostDeliveryReturn ? "Refund" : "Refusal"),
+        exchangeChainId: record.exchangeChainId || "",
+        clientId: record.clientId || "",
+        clientName: record.clientName || "",
+        returnId: record.returnId || "",
         isArchived: false,
         isDeleted: false,
         isChecked: false,
       });
-  }
-  if (!r.dartCardUsageReversed) {
-    const order = ordersData.find(
-        (row) => String(row.orderId) === String(r.orderId),
-      ),
-      card = order?.dartCardId
-        ? cardsData.find((row) => row.cardId === order.dartCardId)
-        : null;
-    if (card && order.dartCardUsageRecorded) {
-      card.purchasedItems = String(
-        Math.max(0, Number(card.purchasedItems || 0) - 1),
-      );
-      card.requestedProducts = (card.requestedProducts || []).filter(
-        (code) => String(code) !== String(r.itemCode),
-      );
-      if (
-        card.status === "Expired" &&
-        Number(card.purchasedItems) <
-          Number(card.itemLimit || card.purchasedLimit || 10) &&
-        (!dartDateValue(card.expDate) || dartDateValue(card.expDate) >= new Date())
-      )
-        card.status = "Active";
-      r.dartCardUsageReversed = true;
     }
   }
-  dartAudit(
-    "RETURN_INSPECTION",
-    "returns",
-    r.id,
-    { status: old },
-    { status: condition },
-  );
-  dartNotify(
-    condition === "Good" ? "return_good" : "item_damaged",
-    `${r.itemCode}: ${condition}`,
-    condition === "Good" ? "Item returned to stock." : "Item moved to Damage.",
-    "returns",
-    r.id,
-    condition === "Good" ? "info" : "warning",
-  );
+  if (!dartReturnIsExchange(record) && !record.dartCardUsageReversed) {
+    const order = ordersData.find((row) => String(row.orderId) === String(record.orderId));
+    const card = order?.dartCardId ? cardsData.find((row) => row.cardId === order.dartCardId) : null;
+    if (card && order.dartCardUsageRecorded) {
+      card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - 1));
+      card.requestedProducts = (card.requestedProducts || []).filter((code) => String(code) !== String(record.itemCode));
+      if (card.status === "Expired" && Number(card.purchasedItems) < Number(card.itemLimit || card.purchasedLimit || 10) && (!dartDateValue(card.expDate) || dartDateValue(card.expDate) >= new Date())) card.status = "Active";
+      record.dartCardUsageReversed = true;
+    }
+  }
+  dartAudit("RETURN_INSPECTION", "returns", record.id, { inspectionStatus: previousInspection }, { inspectionStatus: condition });
+  dartNotify(condition === "Good" ? "return_good" : "item_damaged", `${record.itemCode}: ${condition}`, condition === "Good" ? "Item returned to stock at the model's current selling price." : "Item moved to Damage.", "returns", record.id, condition === "Good" ? "info" : "warning");
   dartSaveAll();
   dartRefreshAll();
 }
 
-// BEGIN Return decision — inspection is available only after acceptance.
-function dartDecideReturn(r, decision) {
-  if (!r || r.status !== "Pending Request") return;
-  const old = r.status;
-  const accepted = decision === "accept";
-  r.status = accepted ? "Pending Inspection" : "Rejected";
-  r.updatedAt = dartNowISO();
-  r[accepted ? "acceptedAt" : "rejectedAt"] = r.updatedAt;
-  const item = dartFindItemByCode(r.itemCode);
-  if (accepted && item) item.status = "Return Inspection";
-  dartAudit(
-    accepted ? "RETURN_ACCEPTED" : "RETURN_REJECTED",
-    "returns",
-    r.id,
-    { status: old },
-    { status: r.status },
-  );
-  dartNotify(
-    accepted ? "return_accepted" : "return_rejected",
-    `${r.returnId}: ${r.status}`,
-    accepted
-      ? "Return accepted and waiting for item inspection."
-      : "Return request rejected.",
-    "returns",
-    r.id,
-    accepted ? "info" : "warning",
-  );
-  dartSaveAll();
-  dartRefreshAll();
+// BEGIN Return decision — approval, representative pickup, completion, then inspection.
+function dartDecideReturn(record, decision) {
+  if (!record || record.status !== "Pending Request") return;
+  dartPendingReturnAction = { record, decision };
+  if (decision === "reject") {
+    const reason = document.getElementById("return-rejection-reason");
+    if (reason) reason.value = "";
+    openModal(document.getElementById("return-rejection-modal"));
+    return;
+  }
+  const isExchange = dartReturnIsExchange(record);
+  const field = document.getElementById("return-replacement-field");
+  const select = document.getElementById("return-replacement-select");
+  if (field) field.hidden = !isExchange;
+  if (select) {
+    select.required = isExchange;
+    select.replaceChildren();
+    dartReturnReplacementCandidates(record).forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.itemCode;
+      option.textContent = `${item.itemCode} — ${item.color} / ${item.size}`;
+      select.appendChild(option);
+    });
+  }
+  if (isExchange && !select?.options.length) {
+    dartPendingReturnAction = null;
+    alert("No available physical item matches the requested model, color and size.");
+    return;
+  }
+  const summary = document.getElementById("return-approval-summary");
+  if (summary) summary.textContent = `${record.returnId} · ${record.requestType || "Return"} · ${record.itemCode}`;
+  const fee = document.getElementById("return-approval-fee-note");
+  if (fee) fee.textContent = Number(record.customerCourierFee) > 0
+    ? `Customer pays ${dartMoney(record.customerCourierFee)} directly to the representative.`
+    : Number(record.brandCourierFee) > 0
+      ? `Dart pays ${dartMoney(record.brandCourierFee)} to the representative.`
+      : "No courier fee.";
+  openModal(document.getElementById("return-approval-modal"));
 }
 // END Return decision.
 
@@ -1977,6 +2079,25 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       const r = returnsData.find((x) => String(x.id) === String(id));
       if (e.target.closest(".return-accept-btn")) dartDecideReturn(r, "accept");
       if (e.target.closest(".return-reject-btn")) dartDecideReturn(r, "reject");
+      if (e.target.closest(".return-assign-btn")) {
+        dartPendingReturnAction = { record: r, decision: "assign" };
+        const select = document.getElementById("return-rep-assignment-select");
+        select?.replaceChildren();
+        dartActiveReps().forEach((representative) => {
+          const option = document.createElement("option");
+          option.value = representative.id;
+          option.textContent = `${representative.name} — ${representative.repId}`;
+          select?.appendChild(option);
+        });
+        if (!select?.options.length) {
+          dartPendingReturnAction = null;
+          alert("لا يوجد مندوب Active وغير مشطوب.");
+          return;
+        }
+        const summary = document.getElementById("return-rep-assignment-summary");
+        if (summary) summary.textContent = `${r.returnId} · ${r.clientName || r.clientId || "Customer"}`;
+        openModal(document.getElementById("return-rep-assignment-modal"));
+      }
       if (e.target.closest(".return-good-btn")) dartInspectReturn(r, "Good");
       if (e.target.closest(".return-bad-btn")) dartInspectReturn(r, "Damaged");
     }
@@ -2080,6 +2201,50 @@ function dartRequestOrderTransition(orders, target) {
   else dartBatchTransition(orders, target);
 }
 function dartSetupOperationalModals() {
+  document
+    .getElementById("confirm-return-approval")
+    ?.addEventListener("click", () => {
+      const record = dartPendingReturnAction?.record;
+      if (!record || dartPendingReturnAction?.decision !== "accept") return;
+      const result = dartApproveReturn(
+        record,
+        document.getElementById("return-replacement-select")?.value || "",
+      );
+      if (!result.ok) {
+        alert(result.message || "Operation failed");
+        return;
+      }
+      dartPendingReturnAction = null;
+      closeModal(document.getElementById("return-approval-modal"));
+    });
+  document
+    .getElementById("confirm-return-rejection")
+    ?.addEventListener("click", () => {
+      const record = dartPendingReturnAction?.record;
+      if (!record || dartPendingReturnAction?.decision !== "reject") return;
+      const reason = document.getElementById("return-rejection-reason")?.value;
+      const result = dartRejectReturn(record, reason);
+      if (!result.ok) {
+        alert(result.message || "Operation failed");
+        return;
+      }
+      dartPendingReturnAction = null;
+      closeModal(document.getElementById("return-rejection-modal"));
+    });
+  document
+    .getElementById("confirm-return-rep-assignment")
+    ?.addEventListener("click", () => {
+      const record = dartPendingReturnAction?.record;
+      if (!record || dartPendingReturnAction?.decision !== "assign") return;
+      const representativeId = document.getElementById("return-rep-assignment-select")?.value;
+      const result = dartAssignReturnRepresentative(record, representativeId);
+      if (!result.ok) {
+        alert(result.message || "Operation failed");
+        return;
+      }
+      dartPendingReturnAction = null;
+      closeModal(document.getElementById("return-rep-assignment-modal"));
+    });
   document
     .getElementById("confirm-rep-assignment")
     ?.addEventListener("click", () => {
@@ -2827,19 +2992,69 @@ function renderOrders(dataArray) {
 function renderReturns(dataArray) {
   const c = document.getElementById("returns-container");
   if (!c) return;
-  c.innerHTML = "";
+  const template = document.getElementById("dashboard-return-row-template");
+  c.replaceChildren();
+  if (!template) return;
   getSortedData(dataArray)
     .sort(
       (a, b) =>
         new Date(b.createdAt || dartDateValue(b.date) || 0) -
         new Date(a.createdAt || dartDateValue(a.date) || 0),
     )
-    .forEach((r) =>
-      c.insertAdjacentHTML(
-        "beforeend",
-        `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""} ${dartIsArchived(r) ? "disabled" : ""}><div class="w300 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>${r.status === "Pending Request" ? '<button class="return-accept-btn">Accept</button><button class="return-reject-btn">Reject</button>' : ""}${r.status === "Pending Inspection" ? '<button class="return-good-btn">Good</button><button class="return-bad-btn">Damaged</button>' : ""}</div><span class="text-item w150">${dartEsc(r.returnId)}</span><span class="text-item w150">${dartEsc(r.modelId || "-")}</span><span class="text-item w150">${dartEsc(r.itemCode)}</span><span class="text-item w150"><span class="return-status ${String(r.status).toLowerCase() === "good" ? "return-status-good" : ""}">${dartEsc(r.status)}</span></span><span class="text-item w150">${dartEsc(r.date || "-")}</span><span class="text-item w200">${dartEsc(r.clientName || "-")}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150">${dartEsc(r.phone1 || "-")}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w150">${dartEsc(r.email || "-")}</span><span class="text-item w300 overflow">${dartEsc(r.reason || "-")}</span><span class="text-item w150">${dartEsc(r.orderId || "-")}</span></div>`,
-      ),
-    );
+    .forEach((r) => {
+      const fragment = template.content.cloneNode(true);
+      const row = fragment.querySelector("[data-return-row]");
+      row.className = getRowClass(r);
+      row.dataset.id = r.id;
+      const checkbox = row.querySelector("[data-return-checkbox]");
+      checkbox.checked = Boolean(r.isChecked);
+      checkbox.disabled = dartIsArchived(r);
+      const archiveIcon = row.querySelector(".btn-delete i");
+      archiveIcon.className = `bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}`;
+      const mayDecide = r.status === "Pending Request";
+      const mayAssign = r.status === "Approved - Awaiting Representative";
+      const mayInspect = r.status === "Pending Inspection" ||
+        (r.isPostDeliveryReturn && r.status === "Completed" && (r.inspectionStatus || "Pending") === "Pending");
+      row.querySelector(".return-accept-btn").hidden = !mayDecide;
+      row.querySelector(".return-reject-btn").hidden = !mayDecide;
+      row.querySelector(".return-assign-btn").hidden = !mayAssign;
+      row.querySelector(".return-good-btn").hidden = !mayInspect;
+      row.querySelector(".return-bad-btn").hidden = !mayInspect;
+      const customerFee = Number(r.customerCourierFee) || 0;
+      const brandFee = Number(r.brandCourierFee) || 0;
+      const replacement = r.replacementItemCode ||
+        (dartReturnIsExchange(r) ? `${r.requestedColor || "-"} / ${r.requestedSize || "-"}` : "-");
+      const values = {
+        returnId: r.returnId || "-",
+        requestType: r.requestType || (r.isPostDeliveryReturn ? "Refund" : "Refusal"),
+        modelId: r.modelId || "-",
+        itemCode: r.itemCode || "-",
+        replacement,
+        status: r.status || "-",
+        inspection: r.inspectionStatus || (r.status === "Good" || r.status === "Damaged" ? r.status : "Pending"),
+        date: r.date || "-",
+        clientName: r.clientName || "-",
+        clientId: r.clientId || "-",
+        phone1: r.phone1 || "-",
+        courierFee: customerFee > 0
+          ? `${dartMoney(customerFee)} · Customer → Representative`
+          : brandFee > 0
+            ? `${dartMoney(brandFee)} · Dart → Representative`
+            : "No fee",
+        representative: r.representativeName || r.representativeBusinessId || "Not assigned",
+        pickupAddress: dartReturnPickupAddress(r) || "-",
+        reason: r.reason || "-",
+        rejectionReason: r.rejectionReason || "-",
+        orderId: r.orderId || "-",
+      };
+      Object.entries(values).forEach(([field, value]) => {
+        const element = row.querySelector(`[data-return-field="${field}"]`);
+        if (element) element.textContent = value;
+      });
+      const status = row.querySelector('[data-return-field="status"]');
+      status?.classList.toggle("return-status-good", ["Completed", "Good"].includes(r.status));
+      c.appendChild(fragment);
+    });
 }
 
 function renderReviews(dataArray) {
@@ -3644,13 +3859,8 @@ function updateBrandAnalytics() {
     ],
   ];
   const grid = dartEnsureAnalyticsGrid();
-  if (grid)
-    grid.innerHTML = cards
-      .map(
-        ([t, v, s, ic], i) =>
-          `<div class="dart-analytics-card kpi-tone-${i % 6}"><div class="kpi-card-head"><i class="${ic}"></i>${dartInfoButton(t, s)}</div><h6>${dartEsc(t)}</h6><strong>${dartEsc(v)}</strong><small>${dartEsc(s)}</small></div>`,
-      )
-      .join("");
+  // Analytics card markup is static in Dart Eye.html; dart-finance.js updates it by ID.
+  if (grid) grid.dataset.dartMetricsMarkup = "static";
   document
     .querySelectorAll(
       "#brand .card-inf-2,#brand .sales-cont,#brand .cost-cont,#brand .profit-cont",
@@ -4411,6 +4621,19 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTopClients();
   renderNotifications();
   updateBrandAnalytics();
+});
+
+// Keep the dashboard synchronized when a representative completes a delivery
+// or return pickup in another browser tab.
+window.addEventListener("storage", (event) => {
+  if (
+    ["dart_orders", "dart_returns", "dart_items", "dart_damage"].includes(
+      event.key,
+    )
+  ) {
+    loadAllDataFromStorage(false);
+    dartRefreshAll();
+  }
 });
 
 // Final V3 precision overrides.

@@ -1,5 +1,14 @@
 # V8 changes
 
+## Returns, exchanges and accounting completion — 2026-09-13
+
+- Added `In Stock Cost Value` beside `In Stock Selling Value`; every Brand KPI and calculation now reads the unified reporting range and previous-period comparison.
+- Locked physical item cost at stock entry and preserved immutable order price/cost snapshots when the model price changes later.
+- Added the complete return/exchange workflow: fresh map/manual pickup address, admin approval/rejection and representative assignment, representative pickup with live location, automatic three-stage customer tracking and post-pickup Good/Damaged inspection.
+- Enforced per-item exchange chains and courier fees: first completed exchange is 50 EGP paid by Dart, later exchanges are 50 EGP paid directly by the customer, and refunds are 100 EGP paid directly by the customer.
+- Completed refunds reduce sales by the original proportional net item amount. Exchanges preserve the original transaction value. Customer-paid courier fees are excluded from Dart revenue and Cash Flow.
+- Kept all new repeating card/table structures in static HTML templates and filled them from JavaScript by stable selectors.
+
 - Routed Contact Us messages into the Review dashboard inbox and added a source filter.
 - Restored the complete return decision and inspection controls.
 - Kept the destination map visible under a 20% waiting layer and tied live tracking to the representative's Start Delivery action for each order.
@@ -62,3 +71,9 @@ Implementation notes and backend boundaries are in `README.md` and `API_CONTRACT
 - Moved the fixed Finance navigation, unified-period controls, Business Insights cards and Finance editor forms into `Eye/Dart Eye.html`, with stable IDs used by JavaScript.
 - Fixed the Brand flow and chart-frame heights so Business Insights reserves its own space and cannot overlap the analytics cards or following widgets.
 - Kept the existing Expenses tab and its edit/delete table; the proposed duplicate expense box was removed.
+
+## Settings V1
+
+- Added a responsive dashboard-only Settings section as a stable place for future preferences.
+- Added a guarded “Reset All Dart Data” action with a detailed destructive warning, typed `DELETE DART` confirmation, acknowledgement checkbox and final browser confirmation.
+- Reset removes only Dart-owned local/session storage plus saved catalogue images in IndexedDB; unrelated origin storage is preserved and no public-site interface file was changed.

@@ -9,7 +9,7 @@ function range(start, end) {
 
 function baseData(overrides = {}) {
   return {
-    orders: [], returns: [], items: [], models: [], customers: [], damage: [], expenses: [], budgets: [], invoices: [], goals: [], marketing: [], settlements: [],
+    orders: [], returns: [], items: [], models: [], customers: [], reviews: [], damage: [], expenses: [], budgets: [], invoices: [], goals: [], marketing: [], settlements: [],
     ...overrides,
   };
 }
@@ -47,7 +47,7 @@ assert.strictEqual(returnedSummary.netCogs, 0, "A Good return must reverse its i
 assert.strictEqual(returnedSummary.soldUnits, 0, "Net units sold must subtract completed returns.");
 assert.strictEqual(returnedSummary.operatingExpenses, 100, "Unpaid recognized expenses belong in accrual P&L.");
 assert.strictEqual(returnedSummary.netProfit, -100);
-assert.strictEqual(returnedSummary.cashOut, 0, "Unpaid expenses must not reduce cash flow.");
+assert.strictEqual(returnedSummary.cashOut, 1000, "The completed customer refund must be a cash outflow; the unpaid expense must not add another outflow.");
 
 const laterReturnData = baseData({
   orders: [{ ...deliveredOrder, deliveredAt: "2026-08-20", amountRefunded: 1000, refundedAt: "2026-09-05" }],
@@ -87,7 +87,69 @@ const damagedReturnData = baseData({
 const damagedReturnSummary = finance.calculateSummary(damagedReturnData, range("2026-09-01", "2026-09-30"));
 assert.strictEqual(damagedReturnSummary.netCogs, 400, "Damaged customer returns remain in COGS.");
 assert.strictEqual(damagedReturnSummary.damageLoss, 0, "A sold damaged return must not be counted again as pre-sale damage.");
+assert.strictEqual(damagedReturnSummary.damageValue, 400, "Damage Value must still show the damaged piece cost even when P&L avoids duplication.");
 assert.strictEqual(damagedReturnSummary.netProfit, -400);
+
+const discountedOrder = finance.calculateSummary(baseData({
+  orders: [{
+    ...deliveredOrder,
+    id: "ORDER-DISCOUNT",
+    orderId: "K-DISCOUNT",
+    finalAmount: 420,
+    totalPrice: 600,
+    discount: 30,
+    orderLevelDiscountAmount: 180,
+    priceSnapshot: [{ itemCode: "I-DISCOUNT", modelCode: "M-1", qty: 1, originalUnitPrice: 600, finalUnitPrice: 600, costSnapshot: 400 }],
+  }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(discountedOrder.netRevenue, 420, "A 30% order discount must turn a 600 EGP item into 420 EGP selling value.");
+assert.strictEqual(discountedOrder.totalCost, 400, "The physical piece keeps its 400 EGP immutable cost.");
+assert.strictEqual(discountedOrder.netProfit, 20, "Net profit must be net selling minus cost.");
+
+const priceHistory = finance.calculateSummary(baseData({
+  orders: [
+    { ...deliveredOrder, id: "PRICE-1", orderId: "K-PRICE-1", finalAmount: 100, deliveredAt: "2026-09-02", priceSnapshot: [{ itemCode: "PRICE-I-1", modelCode: "M-HISTORY", qty: 1, finalUnitPrice: 100, costSnapshot: 50 }] },
+    { ...deliveredOrder, id: "PRICE-2", orderId: "K-PRICE-2", finalAmount: 120, deliveredAt: "2026-09-10", priceSnapshot: [{ itemCode: "PRICE-I-2", modelCode: "M-HISTORY", qty: 1, finalUnitPrice: 120, costSnapshot: 50 }] },
+  ],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(priceHistory.netRevenue, 220, "Sales at 100 then 120 must aggregate to the historical 220, never 200 or 240.");
+assert.strictEqual(priceHistory.netProfit, 120);
+
+const firstExchange = finance.calculateSummary(baseData({
+  orders: [{ ...deliveredOrder, finalAmount: 600, priceSnapshot: [{ itemCode: "NEW-I", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] }],
+  returns: [{ id: "EX-1", returnId: "R-EX-1", orderId: "K-1", itemCode: "OLD-I", requestType: "Exchange", status: "Completed", completedAt: "2026-09-05", inspectionStatus: "Good", brandCourierFee: 50, customerCourierFee: 0, isPostDeliveryReturn: true }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(firstExchange.netRevenue, 600, "An exchange must not reduce selling value.");
+assert.strictEqual(firstExchange.netCogs, 400, "A normal exchange keeps one sold-piece cost.");
+assert.strictEqual(firstExchange.returnCourierCosts, 50, "The first exchange fee is paid by Dart.");
+assert.strictEqual(firstExchange.netProfit, 150);
+
+const laterExchange = finance.calculateSummary(baseData({
+  orders: [{ ...deliveredOrder, finalAmount: 600, priceSnapshot: [{ itemCode: "NEWER-I", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] }],
+  returns: [{ id: "EX-2", returnId: "R-EX-2", orderId: "K-1", itemCode: "NEW-I", requestType: "Exchange", status: "Completed", completedAt: "2026-09-06", inspectionStatus: "Good", brandCourierFee: 0, customerCourierFee: 50, isPostDeliveryReturn: true }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(laterExchange.totalCost, 400, "A customer-paid representative fee must not enter Dart costs.");
+assert.strictEqual(laterExchange.cashOut, 0, "A customer-paid representative fee must not enter Dart Cash Flow.");
+
+const exchangeDamage = finance.calculateSummary(baseData({
+  orders: [{ ...deliveredOrder, finalAmount: 600, priceSnapshot: [{ itemCode: "EX-REPLACEMENT", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] }],
+  returns: [{ id: "EX-DMG", returnId: "R-EX-DMG", orderId: "K-1", itemCode: "EX-OLD", requestType: "Exchange", status: "Completed", completedAt: "2026-09-05", inspectionStatus: "Damaged", brandCourierFee: 50, isPostDeliveryReturn: true }],
+  damage: [{ id: "D-EX", returnId: "R-EX-DMG", orderId: "K-1", itemCode: "EX-OLD", modelId: "M-1", status: "Damaged", costSnapshot: 400, inspectedAt: "2026-09-06" }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(exchangeDamage.damageLoss, 400, "A damaged exchanged original must be written off once in addition to replacement COGS.");
+assert.strictEqual(exchangeDamage.totalCost, 850);
+
+const stockRange = range("2026-09-01", "2026-09-30");
+const stockData = baseData({
+  models: [{ modelId: "M-STOCK", cost: 999, selling: 600, discount: 0 }],
+  items: [
+    { id: "STOCK-1", itemCode: "STOCK-1", modelId: "M-STOCK", status: "In stock", costSnapshot: 400, createdAt: "2026-09-03" },
+    { id: "STOCK-OLD", itemCode: "STOCK-OLD", modelId: "M-STOCK", status: "In stock", costSnapshot: 350, createdAt: "2026-08-03" },
+  ],
+});
+const stockMetrics = finance.brandMetrics(stockData, stockRange, finance.calculateSummary(stockData, stockRange));
+assert.strictEqual(stockMetrics.inStockCost, 400, "In Stock Cost Value must use item-entry cost and the unified period.");
+assert.strictEqual(stockMetrics.inStockSelling, 600);
 
 const repeatData = baseData({
   orders: [

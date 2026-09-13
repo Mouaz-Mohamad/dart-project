@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="dart.css">
     <link rel="stylesheet" href="dart-inventory.css">
     <link rel="stylesheet" href="dart-finance.css">
+    <link rel="stylesheet" href="dart-settings.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="manifest" href="/manifest.json">
@@ -37,6 +38,7 @@
             <li><a href="#" data-target="representative">Rep</a></li>
             <li><a href="#" data-target="card">Dart Card</a></li>
             <li><a href="#" data-target="finance"><i class="fa-solid fa-wallet"></i> Finance</a></li>
+            <li><a href="#" data-target="settings"><i class="fa-solid fa-gear"></i> Settings</a></li>
         </ul>
     </nav>
 
@@ -54,6 +56,7 @@
         <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
         <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
         <li><a href="#" data-target="finance"><i class="fa-solid fa-wallet"></i><span>Finance</span></a></li>
+        <li><a href="#" data-target="settings"><i class="fa-solid fa-gear"></i><span>Settings</span></a></li>
     </ul>
 </nav>
 
@@ -63,6 +66,7 @@
             <div class="cards-one">
                 <div class="cont-card-info-2">
                     <div class="card-inf-2 customar-card">
+                        <button type="button" class="dart-info-btn" data-info-title="Customer" data-info-text="Customers created inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="span-img">
                             <span class="numebr">0</span>
                             <i class="fa-solid fa-user" style="color: #43bfe5;"></i>
@@ -70,6 +74,7 @@
                         <h5>Customer</h5>
                     </div>
                     <div class="card-inf-2 orders-card">
+                        <button type="button" class="dart-info-btn" data-info-title="Orders" data-info-text="Orders created inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="span-img">
                             <span class="numebr">0</span>
                             <i class="fa-solid fa-box-open" style="color: #1abc9c;"></i>         
@@ -77,6 +82,7 @@
                         <h5>Orders</h5>
                     </div>
                     <div class="card-inf-2">
+                        <button type="button" class="dart-info-btn" data-info-title="Rating" data-info-text="Average active review rating inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="span-img">
                             <span class="numebr">0</span>
                             <i class="fa-regular fa-star" style="color: rgb(255, 212, 59);"></i>
@@ -84,6 +90,7 @@
                         <h5>Rating</h5>
                     </div>
                     <div class="card-inf-2 stock-card">
+                        <button type="button" class="dart-info-btn" data-info-title="In Stock" data-info-text="Available physical items added inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="span-img">
                             <span class="numebr">0</span>
                             <i class="fa-solid fa-shirt" style="color: rgb(0, 0, 0);"></i>
@@ -91,6 +98,7 @@
                         <h5>In Stock</h5>
                     </div>
                     <div class="card-inf-2 sold-card">
+                        <button type="button" class="dart-info-btn" data-info-title="Sold Items" data-info-text="Delivered pieces less completed refunds inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="span-img">
                             <span class="numebr">0</span>
                             <i class="fa-solid fa-clipboard-check" style="color: #16742d;"></i>
@@ -131,14 +139,16 @@
             <div class="chart-one">
                 <div class="financial-summary">
                     <div class="sales-cont">
+                        <button type="button" class="dart-info-btn" data-info-title="Total Selling" data-info-text="Delivered sales less completed refunds inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
-                            <h4><i class="fa-solid fa-sack-dollar"></i> Sales</h4>
+                            <h4><i class="fa-solid fa-sack-dollar"></i> Total Selling</h4>
                             <span class="variance">—</span>
                         </div>
                         <span class="sales">0 EGP</span>
                     </div>
 
                     <div class="cost-cont">
+                        <button type="button" class="dart-info-btn" data-info-title="Total Cost" data-info-text="Sold-piece cost plus operating expenses, representative fees and non-duplicated damage loss inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
                             <h4><i class="fa-solid fa-coins"></i> Total Cost</h4>
                             <span class="variance">—</span>
@@ -147,8 +157,9 @@
                     </div>
 
                     <div class="profit-cont">
+                        <button type="button" class="dart-info-btn" data-info-title="Total Profit" data-info-text="Total Selling minus Total Cost inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
-                            <h4><i class="fa-solid fa-chart-line"></i> Profit</h4>
+                            <h4><i class="fa-solid fa-chart-line"></i> Total Profit</h4>
                             <span class="variance">—</span>
                         </div>
                         <span class="sales">0 EGP</span>
@@ -167,7 +178,57 @@
                 </div>
             </div>
 
-            <div id="dart-analytics-grid" class="dart-analytics-grid"></div>
+            <div id="dart-analytics-grid" class="dart-analytics-grid">
+                <article id="brand-in-stock-selling-card" class="dart-analytics-card kpi-tone-0" data-brand-metric="inStockSelling">
+                    <div class="kpi-card-head"><i class="fa-solid fa-tags"></i><span id="brand-in-stock-selling-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>In Stock Selling Value</h6><strong id="brand-in-stock-selling-value">0 EGP</strong><small>Current selling value of In Stock pieces added in this period</small>
+                </article>
+                <article id="brand-in-stock-cost-card" class="dart-analytics-card kpi-tone-1" data-brand-metric="inStockCost">
+                    <div class="kpi-card-head"><i class="fa-solid fa-coins"></i><span id="brand-in-stock-cost-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>In Stock Cost Value</h6><strong id="brand-in-stock-cost-value">0 EGP</strong><small>Cost of In Stock pieces added in this period</small>
+                </article>
+                <article id="brand-damage-loss-card" class="dart-analytics-card kpi-tone-2" data-brand-metric="damageValue">
+                    <div class="kpi-card-head"><i class="fa-solid fa-triangle-exclamation"></i><span id="brand-damage-loss-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>Damage Loss</h6><strong id="brand-damage-loss-value">0 EGP</strong><small>Total cost of unique damaged pieces in this period</small>
+                </article>
+                <article id="brand-gross-margin-card" class="dart-analytics-card kpi-tone-3" data-brand-metric="grossMargin">
+                    <div class="kpi-card-head"><i class="fa-solid fa-percent"></i><span id="brand-gross-margin-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>Gross Margin</h6><strong id="brand-gross-margin-value">0%</strong><small>Sales less sold-piece cost, divided by sales</small>
+                </article>
+                <article id="brand-aov-card" class="dart-analytics-card kpi-tone-4" data-brand-metric="aov">
+                    <div class="kpi-card-head"><i class="fa-solid fa-receipt"></i><span id="brand-aov-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>AOV</h6><strong id="brand-aov-value">0 EGP</strong><small>Average Delivered order value in this period</small>
+                </article>
+                <article id="brand-delivery-rate-card" class="dart-analytics-card kpi-tone-5" data-brand-metric="deliveryRate">
+                    <div class="kpi-card-head"><i class="fa-solid fa-truck-fast"></i><span id="brand-delivery-rate-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>Delivery Rate</h6><strong id="brand-delivery-rate-value">0%</strong><small>Delivered orders from the period's order cohort</small>
+                </article>
+                <article id="brand-refusal-rate-card" class="dart-analytics-card kpi-tone-0" data-brand-metric="refusalRate">
+                    <div class="kpi-card-head"><i class="fa-solid fa-ban"></i><span id="brand-refusal-rate-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>Refusal Rate</h6><strong id="brand-refusal-rate-value">0%</strong><small>Refused orders from the period's order cohort</small>
+                </article>
+                <article id="brand-return-rate-card" class="dart-analytics-card kpi-tone-1" data-brand-metric="returnRate">
+                    <div class="kpi-card-head"><i class="fa-solid fa-rotate-left"></i><span id="brand-return-rate-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>Return Rate</h6><strong id="brand-return-rate-value">0%</strong><small>Completed refunds divided by delivered pieces in this period</small>
+                </article>
+                <article id="brand-top-model-card" class="dart-analytics-card kpi-tone-2" data-brand-metric="topModel">
+                    <div class="kpi-card-head"><i class="fa-solid fa-shirt"></i></div><h6>Top Model</h6><strong id="brand-top-model-value">—</strong><small id="brand-top-model-note">0 sold item(s)</small>
+                </article>
+                <article id="brand-top-color-card" class="dart-analytics-card kpi-tone-3" data-brand-metric="topColor">
+                    <div class="kpi-card-head"><i class="fa-solid fa-palette"></i></div><h6>Top Color</h6><strong id="brand-top-color-value">—</strong><small id="brand-top-color-note">0 sold item(s)</small>
+                </article>
+                <article id="brand-top-size-card" class="dart-analytics-card kpi-tone-4" data-brand-metric="topSize">
+                    <div class="kpi-card-head"><i class="fa-solid fa-ruler"></i></div><h6>Top Size</h6><strong id="brand-top-size-value">—</strong><small id="brand-top-size-note">0 sold item(s)</small>
+                </article>
+                <article id="brand-low-stock-card" class="dart-analytics-card kpi-tone-5" data-brand-metric="lowStock">
+                    <div class="kpi-card-head"><i class="fa-solid fa-boxes-stacked"></i><span id="brand-low-stock-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>Low Stock</h6><strong id="brand-low-stock-value">0</strong><small>Models with 1–5 available pieces added in this period</small>
+                </article>
+                <article id="brand-dead-stock-card" class="dart-analytics-card kpi-tone-0" data-brand-metric="deadStock">
+                    <div class="kpi-card-head"><i class="fa-solid fa-clock"></i><span id="brand-dead-stock-change" class="dart-kpi-change is-flat">— 0%</span></div>
+                    <h6>Dead Stock</h6><strong id="brand-dead-stock-value">0</strong><small>In Stock pieces aged 60+ days inside this period</small>
+                </article>
+            </div>
 
             <section id="dart-brand-insights" class="dart-brand-insights" aria-labelledby="dart-brand-insights-title">
                 <div class="dart-section-heading">
@@ -307,11 +368,12 @@
         <section id="models" class="dashboard-section active-section">
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search product name">
+                    <input type="text" placeholder="search returns">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
-                    <select>
+                    <select data-filter-key="reason">
+                        <option value="">All Reasons</option>
                         <option value="" disabled selected hidden>Category</option>
                         <option value="all">All Categories</option>
                         <option value="t-shirts">T-Shirts</option>
@@ -683,10 +745,14 @@
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
                 <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>Status</option>
-                        <option value="Good">Good</option>
-                        <option value="Bad">Bad</option>
+                    <select data-filter-key="status">
+                        <option value="">All Statuses</option>
+                        <option value="Pending Request">Pending Request</option>
+                        <option value="Approved - Awaiting Representative">Approved</option>
+                        <option value="Representative Assigned">Representative Assigned</option>
+                        <option value="Pickup On The Way">Pickup On The Way</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Rejected">Rejected</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -705,21 +771,58 @@
             <div class="cont-titel">
                 <div class="title-name">
                     <input class="" type="checkbox">
-                    <h2 class="w300">Action</h2>
+                    <h2 class="w500">Action</h2>
                     <h2 class="w150">ID-return</h2>
+                    <h2 class="w150">Type</h2>
                     <h2 class="w150">ID Model</h2>
-                    <h2 class="w150">Item Code</h2>
-                    <h2 class="w150">Status</h2>
+                    <h2 class="w150">Original Item</h2>
+                    <h2 class="w150">Replacement</h2>
+                    <h2 class="w200">Status</h2>
+                    <h2 class="w150">Inspection</h2>
                     <h2 class="w150">Date</h2>
                     <h2 class="w200">Client Name</h2>
                     <h2 class="w150">ID Clinte</h2>
                     <h2 class="w150">phone number</h2>
-                    <h2 class="w150">phone number 2</h2>
-                    <h2 class="w150">E-Mail</h2>
+                    <h2 class="w200">Courier Fee</h2>
+                    <h2 class="w200">Representative</h2>
+                    <h2 class="w300">Pickup Address</h2>
                     <h2 class="w300">Reason</h2>
+                    <h2 class="w300">Rejection Reason</h2>
                     <h2 class="w150">ID Order</h2>
                 </div>
                 <div id="returns-container"></div>
+                <template id="dashboard-return-row-template">
+                    <div class="model-row row-normal" data-return-row>
+                        <input type="checkbox" class="model-checkbox" data-return-checkbox>
+                        <div class="w500 button row-action-btns">
+                            <button class="action-btn btn-delete" type="button" title="Archive"><i class="bx bx-minus-circle"></i></button>
+                            <button class="action-btn btn-hard-delete" type="button" title="Permanent delete"><i class="bx bx-trash"></i></button>
+                            <button class="action-btn btn-edit" type="button" title="Edit"><i class="bx bx-edit"></i></button>
+                            <button class="return-accept-btn" type="button" data-return-action="accept">Accept</button>
+                            <button class="return-reject-btn" type="button" data-return-action="reject">Reject</button>
+                            <button class="return-assign-btn" type="button" data-return-action="assign">Assign Rep</button>
+                            <button class="return-good-btn" type="button" data-return-action="good">Good</button>
+                            <button class="return-bad-btn" type="button" data-return-action="damaged">Damaged</button>
+                        </div>
+                        <span class="text-item w150" data-return-field="returnId"></span>
+                        <span class="text-item w150" data-return-field="requestType"></span>
+                        <span class="text-item w150" data-return-field="modelId"></span>
+                        <span class="text-item w150" data-return-field="itemCode"></span>
+                        <span class="text-item w150" data-return-field="replacement"></span>
+                        <span class="text-item w200"><span class="return-status" data-return-field="status"></span></span>
+                        <span class="text-item w150" data-return-field="inspection"></span>
+                        <span class="text-item w150" data-return-field="date"></span>
+                        <span class="text-item w200" data-return-field="clientName"></span>
+                        <span class="text-item w150" data-return-field="clientId"></span>
+                        <span class="text-item w150" data-return-field="phone1"></span>
+                        <span class="text-item w200" data-return-field="courierFee"></span>
+                        <span class="text-item w200" data-return-field="representative"></span>
+                        <span class="text-item w300 overflow" data-return-field="pickupAddress"></span>
+                        <span class="text-item w300 overflow" data-return-field="reason"></span>
+                        <span class="text-item w300 overflow" data-return-field="rejectionReason"></span>
+                        <span class="text-item w150" data-return-field="orderId"></span>
+                    </div>
+                </template>
             </div>
         </section>
 
@@ -986,6 +1089,32 @@
             </nav>
 
             <div id="dart-finance-content" aria-live="polite"></div>
+        </section>
+
+        <!-- Settings: fixed HTML structure for future dashboard settings. -->
+        <section id="settings" class="dashboard-section dart-settings-section" aria-labelledby="settings-page-title">
+            <header id="settings-page-header" class="dart-settings-page-head">
+                <div>
+                    <p class="dart-settings-eyebrow">DART CONTROL CENTER</p>
+                    <h1 id="settings-page-title">Settings</h1>
+                    <p>Manage dashboard preferences and system data.</p>
+                </div>
+                <i class="fa-solid fa-gear" aria-hidden="true"></i>
+            </header>
+
+            <div id="settings-content" class="dart-settings-grid">
+                <article id="settings-reset-card" class="dart-settings-card dart-settings-danger-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>Danger Zone</span>
+                        <h2>Reset All Dart Data</h2>
+                        <p>يمسح كل بيانات المنتجات والقطع والعملاء والطلبات والمرتجعات والمندوبين والكروت والتمويل والصور المحفوظة، ثم يبدأ النظام من الصفر.</p>
+                        <strong>هذه العملية نهائية ولا يمكن التراجع عنها.</strong>
+                    </div>
+                    <button id="open-reset-data-modal" type="button" class="dart-settings-danger-button"><i class="fa-solid fa-trash-can"></i> Delete All Data</button>
+                </article>
+            </div>
+            <p id="settings-reset-status" class="dart-settings-status" role="status" aria-live="polite" hidden></p>
         </section>
     </main>
 
@@ -1473,6 +1602,42 @@
 
 <!-- Dart operational modals -->
 <div class="modal" id="rep-assignment-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Assign Representative</h3><select id="rep-assignment-select"></select><button type="button" class="btn-done" id="confirm-rep-assignment">Assign</button></div></div>
+
+<!-- Return workflow controls: markup stays in HTML; JavaScript only fills values by ID. -->
+<div class="modal" id="return-approval-modal">
+  <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-approval-title">
+    <span class="close-modal" aria-label="Close">&times;</span>
+    <h3 id="return-approval-title">Approve Return / Exchange</h3>
+    <p id="return-approval-summary"></p>
+    <label id="return-replacement-field" for="return-replacement-select">Replacement physical item
+      <select id="return-replacement-select"></select>
+    </label>
+    <p id="return-approval-fee-note" class="dart-return-admin-note"></p>
+    <button type="button" class="btn-done" id="confirm-return-approval">Approve</button>
+  </div>
+</div>
+
+<div class="modal" id="return-rejection-modal">
+  <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-rejection-title">
+    <span class="close-modal" aria-label="Close">&times;</span>
+    <h3 id="return-rejection-title">Reject Request</h3>
+    <label for="return-rejection-reason">Reason shown to customer</label>
+    <textarea id="return-rejection-reason" rows="4" required></textarea>
+    <button type="button" class="btn-done" id="confirm-return-rejection">Reject Request</button>
+  </div>
+</div>
+
+<div class="modal" id="return-rep-assignment-modal">
+  <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-rep-assignment-title">
+    <span class="close-modal" aria-label="Close">&times;</span>
+    <h3 id="return-rep-assignment-title">Assign Pickup Representative</h3>
+    <p id="return-rep-assignment-summary"></p>
+    <label for="return-rep-assignment-select">Representative
+      <select id="return-rep-assignment-select"></select>
+    </label>
+    <button type="button" class="btn-done" id="confirm-return-rep-assignment">Assign</button>
+  </div>
+</div>
 <div class="modal" id="order-reason-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3 id="order-reason-title">Reason</h3><select id="order-reason-select"></select><textarea id="order-reason-notes" rows="3" placeholder="Notes / Other reason"></textarea><button type="button" class="btn-done" id="confirm-order-reason">Confirm</button></div></div>
 <div class="modal" id="history-modal"><div class="modal-content dart-history-modal"><span class="close-modal">&times;</span><h3 id="history-modal-title">History</h3><div id="history-modal-body"></div></div></div>
 <div class="modal" id="damage-modal"><div class="modal-content"><span class="close-modal">&times;</span><h3>Damage Record</h3><form id="damage-form"><input type="hidden" id="damage-edit-id"><div class="modal-grid"><div class="form-group"><label>Item Code</label><input id="damage-item-code" required></div><div class="form-group"><label>Reason</label><input id="damage-reason" required></div><div class="form-group"><label>Notes</label><textarea id="damage-notes" rows="3"></textarea></div><div class="form-group"><label>Status</label><select id="damage-status"><option value="Damaged">Damaged</option><option value="Repaired">Repaired</option><option value="Destroyed">Destroyed</option></select></div></div><button type="button" class="btn-done" type="submit">DONE</button></form></div></div>
@@ -1656,15 +1821,45 @@
   </div>
 </div>
 
+<!-- Destructive reset confirmation: static HTML controlled by dart-settings.js. -->
+<div class="modal" id="reset-data-modal" aria-hidden="true">
+  <div class="modal-content dart-reset-modal-content" role="dialog" aria-modal="true" aria-labelledby="reset-data-modal-title" aria-describedby="reset-data-modal-description">
+    <button id="close-reset-data-modal" type="button" class="dart-reset-modal-close" aria-label="Close">&times;</button>
+    <div class="dart-reset-warning-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <p class="dart-reset-kicker">DANGER — PERMANENT ACTION</p>
+    <h2 id="reset-data-modal-title">تحذير شديد: سيتم مسح كل بيانات Dart</h2>
+    <p id="reset-data-modal-description">بعد التأكيد لن يمكن استرجاع أي عميل أو طلب أو منتج أو قطعة أو مرتجع أو سجل مالي أو صورة محفوظة على هذا المتصفح.</p>
+    <ul class="dart-reset-data-list">
+      <li><i class="fa-solid fa-xmark"></i> Models, Items and saved product images</li>
+      <li><i class="fa-solid fa-xmark"></i> Clients, accounts, orders, returns and representatives</li>
+      <li><i class="fa-solid fa-xmark"></i> Dart Cards, reviews, notifications and audit history</li>
+      <li><i class="fa-solid fa-xmark"></i> Finance, goals, budgets, invoices and marketing records</li>
+    </ul>
+    <label class="dart-reset-confirm-label" for="reset-confirmation-input">للتأكيد اكتب <code>DELETE DART</code> كما هي:</label>
+    <input id="reset-confirmation-input" class="dart-reset-confirm-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE DART">
+    <label class="dart-reset-understand-label" for="reset-understand-checkbox">
+      <input id="reset-understand-checkbox" type="checkbox">
+      <span>أفهم أن المسح نهائي ولا توجد إمكانية للتراجع.</span>
+    </label>
+    <p id="reset-data-error" class="dart-reset-error" role="alert" aria-live="assertive" hidden></p>
+    <div class="dart-reset-actions">
+      <button id="cancel-reset-data" type="button" class="dart-reset-cancel-button">Cancel</button>
+          <button id="confirm-reset-data" type="button" class="dart-reset-confirm-button" disabled><i class="fa-solid fa-skull-crossbones"></i><span id="reset-delete-button-label">Permanently Delete Everything</span></button>
+    </div>
+  </div>
+</div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="../Js/dart-address.js"></script>
     <script src="../Js/dart-catalog.js"></script>
+    <script src="../Js/dart-returns.js"></script>
     <script src="dart.js"></script>
     <script src="dart-inventory.js"></script>
     <script src="dart-fixes.js"></script>
     <script src="dart-operations-v4.js"></script>
     <script src="dart-size-chart-v5.js"></script>
     <script src="dart-finance.js"></script>
+    <script src="dart-settings.js"></script>
 
 <div class="modal" id="image-preview-modal">
   <div class="modal-content dart-image-preview-content">

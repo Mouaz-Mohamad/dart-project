@@ -6,6 +6,7 @@
   let courierMarker = null;
   let routeLine = null;
   let lastRouteKey = "";
+  const returnMaps = new Map();
 
   const read = (key, fallback = []) => {
     try {
@@ -72,6 +73,38 @@
             new Date(second.createdAt || 0) - new Date(first.createdAt || 0),
         )[0] || null
     );
+  }
+
+  function currentReturns() {
+    const records = read("dart_returns", []).filter(
+      (record) => !record.isDeleted && record.isPostDeliveryReturn,
+    );
+    const requested = new URLSearchParams(location.search).get("return");
+    if (requested) {
+      const exact = records.find(
+        (record) =>
+          String(record.returnId) === String(requested) ||
+          String(record.id) === String(requested),
+      );
+      return exact ? [exact] : [];
+    }
+    const lastId = sessionStorage.getItem("dart_last_return_id");
+    if (lastId) {
+      const last = records.find(
+        (record) =>
+          String(record.returnId) === String(lastId) ||
+          String(record.id) === String(lastId),
+      );
+      if (last) return [last];
+    }
+    const user = window.DartPlatform?.currentUser?.();
+    if (!user?.customerId) return [];
+    return records
+      .filter((record) => String(record.clientId) === String(user.customerId))
+      .sort(
+        (first, second) =>
+          new Date(second.createdAt || 0) - new Date(first.createdAt || 0),
+      );
   }
 
   function markerIcon(type) {
@@ -302,6 +335,158 @@
     if (["Refused", "Cancelled"].includes(order.status)) setEta(order.status);
   }
 
+  function publicReturnState(record) {
+    const value = window.DartReturns?.publicStatus(record) || "Under Review";
+    if (value === "Rejected") return { label: "مرفوض", index: 1, rejected: true };
+    if (value === "Return Completed") return { label: "تم إتمام المرتجع", index: 2, rejected: false };
+    if (value === "Approved") return { label: "تمت الموافقة", index: 1, rejected: false };
+    return { label: "جاري المراجعة", index: 0, rejected: false };
+  }
+
+  function updateReturnMap(record, card) {
+    const container = card.querySelector("[data-return-map]"),
+      shell = card.querySelector("[data-return-map-shell]"),
+      overlay = card.querySelector("[data-return-map-disabled]"),
+      summary = card.querySelector("[data-return-map-summary]"),
+      destination = { lat: Number(record.latitude), lng: Number(record.longitude) },
+      courier = {
+        lat: Number(record.courierLocation?.lat),
+        lng: Number(record.courierLocation?.lng),
+      },
+      hasDestination = [destination.lat, destination.lng].every(Number.isFinite) && destination.lat && destination.lng,
+      hasCourier = [courier.lat, courier.lng].every(Number.isFinite) && courier.lat && courier.lng,
+      started = record.status === "Pickup On The Way" && Boolean(record.pickupStartedAt);
+    if (!container || typeof L === "undefined" || !hasDestination) {
+      shell?.classList.add("is-disabled");
+      if (overlay) {
+        overlay.hidden = false;
+        overlay.textContent = hasDestination ? "تعذر تحميل الخريطة" : "إحداثيات عنوان الاستلام غير متاحة";
+      }
+      if (summary) summary.textContent = "عنوان الاستلام النصي محفوظ مع الطلب.";
+      return;
+    }
+    const trackingMap = L.map(container, { zoomControl: false, attributionControl: false }).setView(
+      [destination.lat, destination.lng],
+      15,
+    );
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+      subdomains: "abcd",
+    }).addTo(trackingMap);
+    L.marker([destination.lat, destination.lng], { icon: markerIcon("destination") })
+      .addTo(trackingMap)
+      .bindPopup("عنوان استلام المرتجع");
+    returnMaps.set(String(record.id), trackingMap);
+    if (started && hasCourier) {
+      L.marker([courier.lat, courier.lng], { icon: markerIcon("courier") })
+        .addTo(trackingMap)
+        .bindPopup("مندوب Dart");
+      L.polyline(
+        [
+          [destination.lat, destination.lng],
+          [courier.lat, courier.lng],
+        ],
+        { color: "#2563eb", weight: 4, opacity: 0.8 },
+      ).addTo(trackingMap);
+      trackingMap.fitBounds(
+        [
+          [destination.lat, destination.lng],
+          [courier.lat, courier.lng],
+        ],
+        { padding: [45, 45], maxZoom: 16 },
+      );
+      shell?.classList.remove("is-disabled");
+      if (overlay) overlay.hidden = true;
+      if (summary) summary.textContent = "المندوب في طريقه لاستلام القطعة — الموقع يتحدث تلقائيًا.";
+    } else {
+      shell?.classList.add("is-disabled");
+      if (overlay) {
+        overlay.hidden = false;
+        overlay.textContent = record.status === "Completed"
+          ? "تم استلام القطعة"
+          : record.representativeId
+            ? "بانتظار بدء المندوب لعملية الاستلام"
+            : "بانتظار تعيين المندوب";
+      }
+      if (summary)
+        summary.textContent = record.status === "Completed"
+          ? "تمت عملية الاستلام، وتنتظر القطعة فحص Dart الداخلي."
+          : "مكان الاستلام محفوظ، وسيظهر تحرك المندوب عند بدء العملية.";
+    }
+    setTimeout(() => trackingMap.invalidateSize(), 60);
+  }
+
+  function renderReturns() {
+    const list = document.getElementById("returnTrackingList"),
+      template = document.getElementById("return-tracking-card-template");
+    if (!list || !template) return;
+    returnMaps.forEach((trackingMap) => {
+      try {
+        trackingMap.remove();
+      } catch {}
+    });
+    returnMaps.clear();
+    list.replaceChildren();
+    const records = currentReturns();
+    if (!records.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "لا يوجد طلب استبدال أو استرجاع مطابق حاليًا.";
+      list.appendChild(empty);
+      return;
+    }
+    records.forEach((record) => {
+      const fragment = template.content.cloneNode(true),
+        card = fragment.querySelector("[data-return-tracking-card]"),
+        state = publicReturnState(record),
+        isExchange = window.DartReturns?.isExchange(record) || record.requestType === "Exchange",
+        customerFee = Number(record.customerCourierFee) || 0,
+        values = {
+          id: `رقم الطلب: ${record.returnId || record.id}`,
+          date: `التاريخ: ${record.date || "-"}`,
+          status: state.label,
+          type: isExchange ? "طلب استبدال" : "طلب استرجاع",
+          originalItem: record.itemCode || "-",
+          replacementItem: record.replacementItemCode || `${record.requestedColor || "-"} / ${record.requestedSize || "-"}`,
+          netAmount: money(record.originalNetAmount || 0),
+          courierFee: customerFee > 0
+            ? `${money(customerFee)} تُدفع مباشرة للمندوب`
+            : "لا توجد رسوم على العميل",
+          address: record.fullAddress || [record.building, record.street, record.area, record.governorate].filter(Boolean).join("، ") || "-",
+          rejectionReason: record.rejectionReason || "-",
+          representative: record.representativeName || "لم يتم تعيين مندوب بعد",
+          representativeMeta: record.representativeBusinessId
+            ? `رقم المندوب: ${record.representativeBusinessId}`
+            : "بانتظار الموافقة والتعيين",
+        };
+      Object.entries(values).forEach(([field, value]) => {
+        const element = card.querySelector(`[data-return-field="${field}"]`);
+        if (element) element.textContent = value;
+      });
+      card.querySelector("[data-return-replacement-row]").hidden = !isExchange;
+      card.querySelector("[data-return-rejection-row]").hidden = !state.rejected;
+      card.querySelectorAll("[data-return-step]").forEach((step, index) => {
+        const active = index <= state.index && !state.rejected;
+        step.classList.toggle("active", active);
+        const circle = step.querySelector(".circle");
+        if (circle) circle.textContent = active && index < state.index ? "✓" : String(index + 1);
+      });
+      if (state.rejected) {
+        const approvalStep = card.querySelector('[data-return-step="approval"]');
+        approvalStep?.classList.add("is-rejected");
+        const text = approvalStep?.querySelector(".step-text");
+        if (text) text.textContent = "مرفوض";
+      }
+      const progress = card.querySelector("[data-return-progress]");
+      if (progress) progress.style.width = state.rejected ? "50%" : `${state.index * 50}%`;
+      const call = card.querySelector("[data-return-call]");
+      call.hidden = !record.representativePhone;
+      call.href = record.representativePhone ? `tel:${record.representativePhone}` : "#";
+      list.appendChild(fragment);
+      updateReturnMap(record, list.lastElementChild);
+    });
+  }
+
   function renderEmpty() {
     const card = document.querySelector(".tracking-card");
     if (!card) return;
@@ -333,6 +518,7 @@
     const order = currentOrder();
     if (!order) {
       renderEmpty();
+      renderReturns();
       return;
     }
 
@@ -370,9 +556,10 @@
     }
 
     updateMap(order);
+    renderReturns();
   }
 
-  window.DartTracking = { render, currentOrder };
+  window.DartTracking = { render, currentOrder, currentReturns, renderReturns };
 
   document.addEventListener("DOMContentLoaded", () => {
     if (!document.querySelector(".tracking-card")) return;
@@ -390,6 +577,6 @@
     }, 4000);
   });
   window.addEventListener("storage", (event) => {
-    if (event.key === "dart_orders") render();
+    if (["dart_orders", "dart_returns"].includes(event.key)) render();
   });
 })();

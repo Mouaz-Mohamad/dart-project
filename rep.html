@@ -101,11 +101,48 @@
       </header>
       <p id="repLocationStatus" class="dart-rep-location-status" role="status" aria-live="polite">Location sharing starts only after you start a delivery.</p>
       <div id="repOrdersList" class="dart-rep-orders-list"></div>
+      <section class="dart-rep-return-section" aria-labelledby="repReturnsTitle">
+        <div class="dart-rep-section-heading">
+          <p class="dart-rep-eyebrow">RETURN PICKUPS</p>
+          <h2 id="repReturnsTitle">Assigned returns and exchanges</h2>
+        </div>
+        <div id="repReturnsList" class="dart-rep-orders-list"></div>
+      </section>
+
+      <template id="rep-return-card-template">
+        <article class="rep-driver-card dart-rep-return-card" data-return-id="">
+          <div class="rep-header">
+            <div><h2 data-return-field="title"></h2><span data-return-field="date"></span></div>
+            <span class="rep-status-badge" data-return-field="status"></span>
+          </div>
+          <div class="rep-info-box">
+            <div class="rep-info-title">Customer &amp; pickup address</div>
+            <div class="rep-info-value" data-return-field="customer"></div>
+            <div class="dart-rep-customer-phone" data-return-field="phones"></div>
+            <address data-return-field="address"></address>
+            <p class="dart-rep-notes" data-return-field="reason"></p>
+          </div>
+          <div class="rep-info-box">
+            <div class="rep-info-title">Item &amp; settlement</div>
+            <div class="dart-rep-line"><span data-return-field="originalItem"></span><b data-return-field="requestType"></b></div>
+            <div class="dart-rep-line" data-return-replacement-row><span>Replacement item</span><b data-return-field="replacementItem"></b></div>
+            <div class="dart-rep-total"><span data-return-field="feeLabel"></span><strong data-return-field="feeAmount"></strong></div>
+          </div>
+          <p class="dart-rep-proximity" data-return-field="proximity" role="status"></p>
+          <div class="dart-rep-order-actions">
+            <a href="#" class="rep-btn rep-btn-call" data-return-call><i class="fa-solid fa-phone"></i> Call customer</a>
+            <button type="button" class="rep-btn rep-btn-go" data-return-action="start"><i class="fa-solid fa-diamond-turn-right"></i> Start pickup</button>
+            <button type="button" class="rep-btn rep-btn-cancel" data-return-action="cancel"><i class="fa-solid fa-xmark"></i> Failed / cancel attempt</button>
+            <button type="button" class="rep-btn rep-btn-complete" data-return-action="complete"><i class="fa-solid fa-circle-check"></i> Pickup completed</button>
+          </div>
+        </article>
+      </template>
     </section>
   </main>
 
   <footer id="footer" aria-label="Footer"></footer>
   <script src="Js/dart-catalog.js"></script>
+    <script src="Js/dart-returns.js"></script>
     <script src="Js/one .js"></script>
     <script src="Js/dart-storefront.js"></script>
   <script src="Js/dart-platform.js"></script>

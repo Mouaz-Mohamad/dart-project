@@ -393,9 +393,24 @@
     return controller;
   }
 
+  function initReturnRequest() {
+    const form = document.getElementById('returnRequestForm');
+    if (!form) return null;
+    const controller = create({
+      form: '#returnRequestForm', map: '#return-address-map', search: '#return-address-search', results: '#return-address-results',
+      latitude: '#return-latitude', longitude: '#return-longitude', fullAddress: '#return-full-address',
+      country: '#return-country', governorate: '#return-governorate', area: '#return-area',
+      street: '#return-street', building: '#return-building', floor: '#return-floor',
+      status: '#return-address-status', manualButton: '#return-locate-manual-address', overwriteFromMap: true
+    });
+    if (controller) window.dartReturnAddress = controller;
+    return controller;
+  }
+
   window.DartAddress = {
     create,
     initCheckout,
+    initReturnRequest,
     addressParts,
     canonicalDeliveryGovernorate,
     isSupportedGovernorateName,
