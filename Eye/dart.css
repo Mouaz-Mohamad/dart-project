@@ -117,7 +117,7 @@ textarea {
 }
 /* Sidebar Navigation */
 .cont-menu {
-  width: 15%; 
+  width: 17%; 
   height: 100vh;
   position: fixed;
   top: 0;
@@ -134,10 +134,6 @@ textarea {
   z-index: 100;
   padding: 20px 15px;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-  overflow: scroll;
-  &::-webkit-scrollbar { display: none; }
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
 .menu {
@@ -146,8 +142,13 @@ textarea {
   gap: 8px;
   list-style: none;
   width: 100%;
+
   padding: 0;
   margin: 0;
+    overflow: scroll;
+  &::-webkit-scrollbar { display: none; }
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .menu li {
@@ -177,8 +178,8 @@ textarea {
 }
 
 section{
-    margin-left: 15%;
-    width: 85%;
+    margin-left: 17%;
+    width: 83%;
     height: 99vh;
     background-color: var(--white);
     padding: 20px 0 0 0 ;
