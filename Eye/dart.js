@@ -241,7 +241,7 @@ function setupCardModal() {
     document.getElementById("modal-card-purchased").value =
       Number(card?.purchasedItems || 0);
     document.getElementById("modal-card-limit").value = "10";
-    document.getElementById("modal-card-discount").value = "40%";
+    document.getElementById("modal-card-discount").value = `${Number(card?.discountPercent ?? window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40)}%`;
     document.getElementById("modal-card-issue").value =
       inputDate(card?.issueDate) || inputDate(today);
     document.getElementById("modal-card-exp").value =
@@ -301,7 +301,9 @@ function setupCardModal() {
       purchasedItems: String(purchasedItems),
       purchasedLimit: "10",
       itemLimit: 10,
-      discountPercent: 40,
+      discountPercent: editId
+        ? Number(cardsData.find((row) => String(row.id) === String(editId))?.discountPercent ?? 40)
+        : Number(window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40),
       requestedProducts: editId
         ? cardsData.find((row) => String(row.id) === String(editId))
             ?.requestedProducts || []
@@ -544,13 +546,11 @@ document.addEventListener("click", (e) => {
   }
 });
 
-const dataRepo = {};
-
 let currentMode = "months";
-let currentYear = 2026;
+let currentYear = new Date().getFullYear();
 
 var options = {
-  series: [{ name: "Profit", data: [] }],
+  series: [{ name: "Total Sales", data: Array(12).fill(0) }],
   chart: {
     type: "area",
     height: 230,
@@ -618,13 +618,25 @@ function navigate(dir) {
 }
 
 function updateChart() {
-  document.getElementById("displayLabel").innerText = currentYear;
-
-  // محاكاة سحب البيانات بناءً على السنة والنمط
-  const yearData = dataRepo[currentYear] || { revenue: [0, 0, 0] };
+  const label = document.getElementById("displayLabel");
+  if (label) label.innerText = currentYear;
+  const monthly = Array(12).fill(0);
+  (typeof ordersData !== "undefined" ? ordersData : []).forEach((order) => {
+    if (order.status !== "Delivered") return;
+    const date = new Date(order.deliveredAt || order.updatedAt || order.createdAt || 0);
+    if (!Number.isNaN(date.getTime()) && date.getFullYear() === currentYear)
+      monthly[date.getMonth()] += dartOrderNet(order);
+  });
+  (typeof returnsData !== "undefined" ? returnsData : []).forEach((record) => {
+    if (!record.isPostDeliveryReturn || !dartReturnRules()?.isRefund?.(record) || !dartReturnRules()?.isCompleted?.(record)) return;
+    const date = new Date(dartReturnRules()?.eventDate?.(record) || record.completedAt || 0);
+    if (Number.isNaN(date.getTime()) || date.getFullYear() !== currentYear) return;
+    const order = ordersData.find((row) => String(row.orderId) === String(record.orderId));
+    monthly[date.getMonth()] -= Number(record.originalNetAmount) || dartReturnRules()?.allocatedNetAmount?.(order, record.itemCode, record) || 0;
+  });
 
   chart.updateOptions({
-    series: [{ name: "Profit", data: yearData.revenue }],
+    series: [{ name: "Total Sales", data: monthly.map((value) => Math.round((value + Number.EPSILON) * 100) / 100) }],
     xaxis: {
       categories: [
         "Jan",
@@ -1480,11 +1492,14 @@ function dartApplyTransition(order, target, meta = {}) {
     !dartAssignRepresentative(order, meta.representativeId)
   )
     return { ok: false, message: "Representative is not available." };
+  if (target === "Out With Representative" && !order.deliveryGroupId)
+    order.deliveryGroupId = window.DartGroups?.newId?.("DLG") || `DLG-${Date.now()}`;
   if (target === "Preparing" && prev === "Out With Representative") {
     order.representativeId = null;
     order.representativeBusinessId = "";
     order.representativeName = "";
     order.representativePhone = "";
+    order.deliveryGroupId = "";
   }
   order.status = target;
   const stamps = {
@@ -1582,6 +1597,12 @@ function dartBatchTransition(orders, target, meta = {}) {
     };
   if (target === "Out With Representative" && !meta.representativeId)
     return { ok: false, needsRep: true };
+  let deliveryGroupId = "";
+  if (target === "Out With Representative") {
+    if (!window.DartGroups?.sameRoute?.(orders))
+      return { ok: false, message: "يمكن تعيين مشوار واحد فقط لأوردرات نفس العميل ونفس الدولة والمحافظة والمنطقة والشارع." };
+    deliveryGroupId = window.DartGroups?.newId?.("DLG") || `DLG-${Date.now()}`;
+  }
   for (const o of orders) {
     if (
       target === "Out With Representative" &&
@@ -1589,9 +1610,10 @@ function dartBatchTransition(orders, target, meta = {}) {
     )
       return { ok: false, message: "Representative unavailable." };
   }
-  orders.forEach((o) =>
-    dartApplyTransition(o, target, { ...meta, suppressRefresh: true }),
-  );
+  orders.forEach((o) => {
+    if (deliveryGroupId) o.deliveryGroupId = deliveryGroupId;
+    dartApplyTransition(o, target, { ...meta, suppressRefresh: true });
+  });
   dartSaveAll();
   dartRefreshAll();
   return { ok: true };
@@ -1632,6 +1654,7 @@ function dartApproveReturn(record, replacementItemCode = "") {
       (item) => String(item.itemCode) === String(replacementItemCode),
     );
     if (!replacement) return { ok: false, message: "Choose an available replacement item with the requested model, color and size." };
+    record.approvalSnapshot = dartReturnRules()?.captureApprovalSnapshot?.(record, replacement, dartNowISO()) || null;
     replacement.status = "Processing/Held";
     replacement.orderId = record.orderId;
     replacement.returnRequestId = record.id;
@@ -1649,6 +1672,8 @@ function dartApproveReturn(record, replacementItemCode = "") {
       exchangedFromItemCode: record.itemCode,
     };
   }
+  if (!record.approvalSnapshot)
+    record.approvalSnapshot = dartReturnRules()?.captureApprovalSnapshot?.(record, null, dartNowISO()) || null;
   const old = record.status;
   record.status = "Approved - Awaiting Representative";
   record.acceptedAt = dartNowISO();
@@ -1664,6 +1689,11 @@ function dartApproveReturn(record, replacementItemCode = "") {
 function dartRejectReturn(record, reason) {
   if (!record || record.status !== "Pending Request") return { ok: false, message: "Request is no longer pending." };
   if (!String(reason || "").trim()) return { ok: false, message: "A rejection reason is required." };
+  record.rejectionSnapshot = dartReturnRules()?.captureWorkflowSnapshot?.(
+    record,
+    ["rejectionReason", "rejectedAt", "updatedAt"],
+    dartNowISO(),
+  ) || null;
   const old = record.status;
   record.status = "Rejected";
   record.rejectionReason = String(reason).trim();
@@ -1676,16 +1706,22 @@ function dartRejectReturn(record, reason) {
   return { ok: true };
 }
 
-function dartAssignReturnRepresentative(record, representativeId) {
+function dartAssignReturnRepresentative(record, representativeId, pickupGroupId = "") {
   if (!record || record.status !== "Approved - Awaiting Representative") return { ok: false, message: "Approve the request before assigning a representative." };
   const representative = dartFindRepById(representativeId);
   if (!representative || !dartIsActive(representative) || representative.status !== "Active") return { ok: false, message: "Choose an active representative." };
+  record.assignmentSnapshot = dartReturnRules()?.captureWorkflowSnapshot?.(
+    record,
+    ["representativeId", "representativeBusinessId", "representativeName", "representativePhone", "pickupGroupId", "assignedAt", "updatedAt"],
+    dartNowISO(),
+  ) || null;
   const old = record.status;
   record.status = "Representative Assigned";
   record.representativeId = representative.id;
   record.representativeBusinessId = representative.repId;
   record.representativeName = representative.name;
   record.representativePhone = representative.phone1;
+  record.pickupGroupId = pickupGroupId || record.pickupGroupId || window.DartGroups?.newId?.("RPG") || `RPG-${Date.now()}`;
   record.assignedAt = dartNowISO();
   record.updatedAt = record.assignedAt;
   dartAudit("RETURN_REP_ASSIGNED", "returns", record.id, { status: old }, { status: record.status, representativeId: representative.id });
@@ -1704,6 +1740,15 @@ function dartInspectReturn(record, condition) {
   if (!isLegacyRefusal && !canInspectCompleted) return;
   const item = dartFindItemByCode(record.itemCode);
   if (!item) return;
+  const order = ordersData.find((row) => String(row.orderId) === String(record.orderId));
+  const card = order?.dartCardId ? cardsData.find((row) => row.cardId === order.dartCardId) : null;
+  record.inspectionSnapshot = dartReturnRules()?.captureInspectionSnapshot?.(
+    record,
+    item,
+    card,
+    damageData,
+    dartNowISO(),
+  ) || null;
   const previousInspection = record.inspectionStatus || "Pending";
   record.inspectionStatus = condition;
   record.inspectedAt = dartNowISO();
@@ -1722,7 +1767,7 @@ function dartInspectReturn(record, condition) {
     item.status = "Damaged";
     item.updatedAt = record.inspectedAt;
     if (!damageData.some((damage) => damage.itemCode === item.itemCode && ["Damaged", "Destroyed"].includes(damage.status))) {
-      damageData.push({
+      const damageRecord = {
         id: dartUid("DMGDB"),
         damageId: dartUid("DMG"),
         itemCode: item.itemCode,
@@ -1746,12 +1791,12 @@ function dartInspectReturn(record, condition) {
         isArchived: false,
         isDeleted: false,
         isChecked: false,
-      });
+      };
+      damageData.push(damageRecord);
+      record.inspectionDamageId = damageRecord.id;
     }
   }
   if (!dartReturnIsExchange(record) && !record.dartCardUsageReversed) {
-    const order = ordersData.find((row) => String(row.orderId) === String(record.orderId));
-    const card = order?.dartCardId ? cardsData.find((row) => row.cardId === order.dartCardId) : null;
     if (card && order.dartCardUsageRecorded) {
       card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - 1));
       card.requestedProducts = (card.requestedProducts || []).filter((code) => String(code) !== String(record.itemCode));
@@ -1761,6 +1806,53 @@ function dartInspectReturn(record, condition) {
   }
   dartAudit("RETURN_INSPECTION", "returns", record.id, { inspectionStatus: previousInspection }, { inspectionStatus: condition });
   dartNotify(condition === "Good" ? "return_good" : "item_damaged", `${record.itemCode}: ${condition}`, condition === "Good" ? "Item returned to stock at the model's current selling price." : "Item moved to Damage.", "returns", record.id, condition === "Good" ? "info" : "warning");
+  dartSaveAll();
+  dartRefreshAll();
+}
+
+function dartRollbackReturn(record) {
+  const rules = dartReturnRules();
+  if (!record || !rules?.canRollback?.(record)) {
+    alert("لا توجد خطوة سابقة آمنة لهذا المرتجع.");
+    return;
+  }
+  const warning = [
+    `تحذير: سيتم إرجاع المرتجع ${record.returnId || record.id} خطوة واحدة للخلف.`,
+    "سيتم عكس أي تغيير مرتبط بهذه الخطوة في المخزون والمبلغ المرتجع والكارت ورسوم المندوب.",
+    "سيُسجل الإجراء بالكامل في سجل المراجعة. هل تريد المتابعة؟",
+  ].join("\n\n");
+  if (!confirm(warning)) return;
+  const before = {
+    status: record.status,
+    inspectionStatus: record.inspectionStatus || "Pending",
+    financialCompletionApplied: Boolean(record.financialCompletionApplied),
+    exchangeCompletionApplied: Boolean(record.exchangeCompletionApplied),
+  };
+  const result = rules.rollbackOneStep(record, {
+    items: itemsData,
+    orders: ordersData,
+    cards: cardsData,
+    damage: damageData,
+  }, dartNowISO());
+  if (!result.ok) {
+    alert(result.message || "تعذر التراجع عن هذه الخطوة بأمان.");
+    return;
+  }
+  const after = {
+    status: record.status,
+    inspectionStatus: record.inspectionStatus || "Pending",
+    financialCompletionApplied: Boolean(record.financialCompletionApplied),
+    exchangeCompletionApplied: Boolean(record.exchangeCompletionApplied),
+  };
+  dartAudit("RETURN_ROLLBACK", "returns", record.id, before, after, `Reversed ${result.step} one step`);
+  dartNotify(
+    "return_rollback",
+    `${record.returnId || record.id}: رجوع خطوة`,
+    `${result.previousStatus} → ${result.newStatus}`,
+    "returns",
+    record.id,
+    "warning",
+  );
   dartSaveAll();
   dartRefreshAll();
 }
@@ -2077,6 +2169,10 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     }
     if (sectionKey === "returns") {
       const r = returnsData.find((x) => String(x.id) === String(id));
+      if (e.target.closest(".return-rollback-btn")) {
+        dartRollbackReturn(r);
+        return;
+      }
       if (e.target.closest(".return-accept-btn")) dartDecideReturn(r, "accept");
       if (e.target.closest(".return-reject-btn")) dartDecideReturn(r, "reject");
       if (e.target.closest(".return-assign-btn")) {
@@ -2234,17 +2330,44 @@ function dartSetupOperationalModals() {
   document
     .getElementById("confirm-return-rep-assignment")
     ?.addEventListener("click", () => {
-      const record = dartPendingReturnAction?.record;
-      if (!record || dartPendingReturnAction?.decision !== "assign") return;
+      const records = dartPendingReturnAction?.records || (dartPendingReturnAction?.record ? [dartPendingReturnAction.record] : []);
+      if (!records.length || dartPendingReturnAction?.decision !== "assign") return;
       const representativeId = document.getElementById("return-rep-assignment-select")?.value;
-      const result = dartAssignReturnRepresentative(record, representativeId);
-      if (!result.ok) {
-        alert(result.message || "Operation failed");
+      if (records.length > 1 && !window.DartGroups?.sameRoute?.(records)) {
+        alert("لا يمكن جمع إلا طلبات نفس العميل ونفس الدولة والمحافظة والمنطقة والشارع.");
         return;
+      }
+      const pickupGroupId = window.DartGroups?.newId?.("RPG") || `RPG-${Date.now()}`;
+      for (const record of records) {
+        const result = dartAssignReturnRepresentative(record, representativeId, pickupGroupId);
+        if (!result.ok) { alert(result.message || "Operation failed"); return; }
       }
       dartPendingReturnAction = null;
       closeModal(document.getElementById("return-rep-assignment-modal"));
     });
+
+  document.getElementById("assign-selected-returns")?.addEventListener("click", () => {
+    const visibleIds = new Set(dartApplyFilters("returns", returnsData).map((row) => String(row.id)));
+    const records = returnsData.filter((row) => row.isChecked && visibleIds.has(String(row.id)));
+    if (!records.length) return alert("حدد طلب استبدال أو استرجاع واحدًا على الأقل.");
+    if (records.some((row) => row.status !== "Approved - Awaiting Representative"))
+      return alert("كل الطلبات المحددة يجب أن تكون Approved وتنتظر تعيين المندوب.");
+    if (!window.DartGroups?.sameRoute?.(records))
+      return alert("حدد طلبات نفس العميل ونفس الدولة والمحافظة والمنطقة والشارع فقط.");
+    const select = document.getElementById("return-rep-assignment-select");
+    select?.replaceChildren();
+    dartActiveReps().forEach((representative) => {
+      const option = document.createElement("option");
+      option.value = representative.id;
+      option.textContent = `${representative.name} — ${representative.repId}`;
+      select?.appendChild(option);
+    });
+    if (!select?.options.length) return alert("لا يوجد مندوب Active وغير مشطوب.");
+    dartPendingReturnAction = { records, decision: "assign" };
+    const summary = document.getElementById("return-rep-assignment-summary");
+    if (summary) summary.textContent = `${records.length} selected request(s) · one pickup route · independent records`;
+    openModal(document.getElementById("return-rep-assignment-modal"));
+  });
   document
     .getElementById("confirm-rep-assignment")
     ?.addEventListener("click", () => {
@@ -2912,6 +3035,7 @@ function dartRollbackOrderOneStep(order) {
     order.outWithRepresentativeAt = null;
     order.representativeId = null;
     order.representativeName = "";
+    order.deliveryGroupId = "";
   }
   if (prevStatus === "Preparing") order.preparingAt = null;
   if (prevStatus === "Accepted") order.acceptedAt = null;
@@ -2949,7 +3073,15 @@ function renderOrders(dataArray) {
       return Number(dartIsArchived(a)) - Number(dartIsArchived(b));
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
-  sorted.forEach((o) => {
+  const operationalGroups = window.DartGroups?.groupOrders?.(sorted) || [];
+  const activeGroupedIds = new Set(operationalGroups.flatMap((group) => group.records.map((row) => String(row.id))));
+  const orderedRows = [...operationalGroups.flatMap((group) => group.records), ...sorted.filter((row) => !activeGroupedIds.has(String(row.id)))];
+  const groupMeta = new Map();
+  operationalGroups.forEach((group) => group.records.forEach((row, index) => groupMeta.set(String(row.id), { ...group, index })));
+  orderedRows.forEach((o) => {
+    const meta = groupMeta.get(String(o.id));
+    if (meta?.records.length > 1 && meta.index === 0)
+      dartAppendOperationGroupHeading(c, "Delivery", meta.records.length, "orders", o, "Each order and item remains independent.");
     const next = dartNextStatus(o.status),
       net = dartOrderNet(o),
       rep =
@@ -2989,19 +3121,37 @@ function renderOrders(dataArray) {
   updateOrderCards();
 }
 
+function dartAppendOperationGroupHeading(container, type, count, noun, record, note) {
+  const template = document.getElementById("dashboard-operation-group-template");
+  if (!template) return;
+  const fragment = template.content.cloneNode(true);
+  fragment.querySelector('[data-operation-group-field="title"]').textContent = `${type} group · ${count} ${noun}`;
+  fragment.querySelector('[data-operation-group-field="route"]').textContent = `${record.clientName || record.clientId || "Customer"} · ${[record.street, record.area, record.governorate].filter(Boolean).join("، ")}`;
+  fragment.querySelector('[data-operation-group-field="note"]').textContent = note;
+  container.appendChild(fragment);
+}
+
 function renderReturns(dataArray) {
   const c = document.getElementById("returns-container");
   if (!c) return;
   const template = document.getElementById("dashboard-return-row-template");
   c.replaceChildren();
   if (!template) return;
-  getSortedData(dataArray)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt || dartDateValue(b.date) || 0) -
-        new Date(a.createdAt || dartDateValue(a.date) || 0),
-    )
-    .forEach((r) => {
+  const sorted = getSortedData(dataArray).sort(
+    (a, b) =>
+      new Date(b.createdAt || dartDateValue(b.date) || 0) -
+      new Date(a.createdAt || dartDateValue(a.date) || 0),
+  );
+  const operationalGroups = window.DartGroups?.groupReturns?.(sorted) || [];
+  const activeGroupedIds = new Set(operationalGroups.flatMap((group) => group.records.map((row) => String(row.id))));
+  const orderedRows = [...operationalGroups.flatMap((group) => group.records), ...sorted.filter((row) => !activeGroupedIds.has(String(row.id)))];
+  const groupMeta = new Map();
+  operationalGroups.forEach((group) => group.records.forEach((row, index) => groupMeta.set(String(row.id), { ...group, index })));
+  orderedRows.forEach((r) => {
+      const meta = groupMeta.get(String(r.id));
+      if (meta?.records.length > 1 && meta.index === 0) {
+        dartAppendOperationGroupHeading(c, "Pickup", meta.records.length, "requests", r, "Each return and physical item remains independent.");
+      }
       const fragment = template.content.cloneNode(true);
       const row = fragment.querySelector("[data-return-row]");
       row.className = getRowClass(r);
@@ -3020,6 +3170,7 @@ function renderReturns(dataArray) {
       row.querySelector(".return-assign-btn").hidden = !mayAssign;
       row.querySelector(".return-good-btn").hidden = !mayInspect;
       row.querySelector(".return-bad-btn").hidden = !mayInspect;
+      row.querySelector(".return-rollback-btn").hidden = !window.DartReturns?.canRollback?.(r);
       const customerFee = Number(r.customerCourierFee) || 0;
       const brandFee = Number(r.brandCourierFee) || 0;
       const replacement = r.replacementItemCode ||
@@ -3687,7 +3838,7 @@ function dartEnsureMonthlyDartCardWinners() {
         purchasedItems: "0",
         purchasedLimit: "10",
         itemLimit: 10,
-        discountPercent: 40,
+        discountPercent: Number(window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40),
         requestedProducts: [],
         awardMonth: key,
         isArchived: false,
@@ -3885,37 +4036,7 @@ function updateBrandAnalytics() {
         );
     });
   try {
-    if (typeof chart !== "undefined" && chart?.updateOptions) {
-      const y = new Date().getFullYear(),
-        monthly = Array(12).fill(0);
-      delivered.forEach((o) => {
-        const d = new Date(o.deliveredAt || o.createdAt || 0);
-        if (d.getFullYear() === y)
-          monthly[d.getMonth()] += Math.max(
-            0,
-            dartOrderNet(o) - (Number(o.amountRefunded) || 0),
-          );
-      });
-      chart.updateOptions({
-        series: [{ name: "Sales", data: monthly }],
-        xaxis: {
-          categories: [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-          ],
-        },
-      });
-    }
+    if (typeof updateChart === "function") updateChart();
   } catch (err) {
     console.warn("Dart sales chart update skipped:", err);
   }
@@ -4985,13 +5106,13 @@ dartApplyFilters = function (key, data) {
   }
   return out;
 };
-// Final finance interpretation: damaged/destroyed physical items are financial loss, not Total Cost.
+// Brand Total Cost owns each physical piece once, regardless of its current status.
 function dartTotalInventoryCost() {
   return itemsData
-    .filter((i) => !["Damaged", "Destroyed"].includes(i.status))
+    .filter((i) => !i.isDeleted)
     .reduce((a, i) => {
       const m = dartFindModelByCode(i.modelId);
-      return a + (Number(m?.cost) || 0);
+      return a + (Number(i.costSnapshot ?? m?.cost) || 0);
     }, 0);
 }
 // Ensure migrated sequences reserve their highest number and migrate review references too.

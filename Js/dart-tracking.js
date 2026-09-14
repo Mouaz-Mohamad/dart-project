@@ -1,582 +1,263 @@
 (function () {
   "use strict";
 
-  let map = null;
-  let destinationMarker = null;
-  let courierMarker = null;
-  let routeLine = null;
-  let lastRouteKey = "";
-  const returnMaps = new Map();
-
+  const maps = new Map();
   const read = (key, fallback = []) => {
-    try {
-      return JSON.parse(localStorage.getItem(key)) ?? fallback;
-    } catch {
-      return fallback;
-    }
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
   };
-  const esc = (value) =>
-    String(value ?? "").replace(
-      /[&<>'"]/g,
-      (char) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          "'": "&#39;",
-          '"': "&quot;",
-        })[char],
-    );
   const money = (value) => `${Math.trunc(Number(value) || 0)} EGP`;
-  const orderTotal = (order) =>
-    Number.isFinite(Number(order?.finalAmount))
-      ? Math.max(0, Number(order.finalAmount))
-      : Math.max(
-          0,
-          Number(order?.totalPrice || 0) -
-            (Number(order?.orderLevelDiscountAmount) ||
-              (Number(order?.totalPrice || 0) * Number(order?.discount || 0)) /
-                100),
-        );
+  const orderTotal = (order) => Number.isFinite(Number(order?.finalAmount))
+    ? Math.max(0, Number(order.finalAmount))
+    : Math.max(0, Number(order?.totalPrice || 0) - (Number(order?.orderLevelDiscountAmount) || Number(order?.totalPrice || 0) * Number(order?.discount || 0) / 100));
 
-  function currentOrder() {
-    const orders = read("dart_orders", []).filter(
-      (order) => !order.isDeleted && order.status !== "Delivered",
-    );
+  function activeOrders() {
+    return read("dart_orders", []).filter((order) => !order.isDeleted && !order.isArchived && !["Delivered", "Cancelled", "Refused"].includes(order.status));
+  }
+
+  function orderGroups(records) {
+    return window.DartGroups?.groupOrders?.(records) || records.map((record) => ({ key: String(record.id), records: [record] }));
+  }
+
+  function currentOrders() {
+    const orders = activeOrders();
     const requested = new URLSearchParams(location.search).get("order");
-    if (requested) {
-      const exact = orders.find(
-        (order) =>
-          String(order.orderId) === String(requested) ||
-          String(order.id) === String(requested),
-      );
-      return exact || null;
-    }
-
     const lastOrderId = sessionStorage.getItem("dart_last_order_id");
-    if (lastOrderId) {
-      const last = orders.find(
-        (order) =>
-          String(order.orderId) === String(lastOrderId) ||
-          String(order.id) === String(lastOrderId),
-      );
-      if (last) return last;
-    }
-
     const user = window.DartPlatform?.currentUser?.();
-    if (!user?.customerId) return null;
-    return (
-      orders
-        .filter((order) => String(order.clientId) === String(user.customerId))
-        .sort(
-          (first, second) =>
-            new Date(second.createdAt || 0) - new Date(first.createdAt || 0),
-        )[0] || null
-    );
+    let customerOrders = user?.customerId
+      ? orders.filter((order) => String(order.clientId) === String(user.customerId))
+      : [];
+    if (requested) {
+      const exact = orders.find((order) => String(order.orderId) === String(requested) || String(order.id) === String(requested));
+      if (!exact) return [];
+      const group = orderGroups(orders).find((entry) => entry.records.some((order) => order === exact));
+      return group?.records || [exact];
+    }
+    if (user?.customerId) {
+      return customerOrders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+    if (lastOrderId) {
+      const exact = orders.find((order) => String(order.orderId) === String(lastOrderId) || String(order.id) === String(lastOrderId));
+      if (exact) {
+        const group = orderGroups(orders).find((entry) => entry.records.includes(exact));
+        return group?.records || [exact];
+      }
+    }
+    return [];
+  }
+
+  function currentOrder() { return currentOrders()[0] || null; }
+
+  function activeReturns() {
+    return read("dart_returns", []).filter((record) => !record.isDeleted && !record.isArchived && record.isPostDeliveryReturn && record.status !== "Completed");
   }
 
   function currentReturns() {
-    const records = read("dart_returns", []).filter(
-      (record) => !record.isDeleted && record.isPostDeliveryReturn,
-    );
+    const records = activeReturns();
     const requested = new URLSearchParams(location.search).get("return");
+    const lastId = sessionStorage.getItem("dart_last_return_id");
+    const user = window.DartPlatform?.currentUser?.();
     if (requested) {
-      const exact = records.find(
-        (record) =>
-          String(record.returnId) === String(requested) ||
-          String(record.id) === String(requested),
-      );
+      const exact = records.find((record) => String(record.returnId) === String(requested) || String(record.id) === String(requested));
+      if (!exact) return [];
+      const group = (window.DartGroups?.groupReturns?.(records) || []).find((entry) => entry.records.includes(exact));
+      return group?.records || [exact];
+    }
+    const own = user?.customerId ? records.filter((record) => String(record.clientId) === String(user.customerId)) : [];
+    if (own.length) return own.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    if (lastId) {
+      const exact = records.find((record) => String(record.returnId) === String(lastId) || String(record.id) === String(lastId));
       return exact ? [exact] : [];
     }
-    const lastId = sessionStorage.getItem("dart_last_return_id");
-    if (lastId) {
-      const last = records.find(
-        (record) =>
-          String(record.returnId) === String(lastId) ||
-          String(record.id) === String(lastId),
-      );
-      if (last) return [last];
-    }
-    const user = window.DartPlatform?.currentUser?.();
-    if (!user?.customerId) return [];
-    return records
-      .filter((record) => String(record.clientId) === String(user.customerId))
-      .sort(
-        (first, second) =>
-          new Date(second.createdAt || 0) - new Date(first.createdAt || 0),
-      );
+    return [];
   }
 
   function markerIcon(type) {
-    const icon = type === "courier" ? "fa-motorcycle" : "fa-location-dot";
-    return L.divIcon({
-      className: "dart-route-pin",
-      html: `<span class="${type}"><i class="fa-solid ${icon}"></i></span>`,
-      iconSize: [42, 42],
-      iconAnchor: [21, 40],
-    });
+    return L.divIcon({ className: "dart-route-pin", html: `<span class="${type}"><i class="fa-solid ${type === "courier" ? "fa-motorcycle" : "fa-location-dot"}"></i></span>`, iconSize: [42, 42], iconAnchor: [21, 40] });
   }
 
-  function setMapDisabled(disabled, message = "") {
-    const shell = document.getElementById("trackingMapShell");
-    const overlay = document.getElementById("trackingMapDisabled");
-    shell?.classList.toggle("is-disabled", disabled);
-    if (overlay) {
-      overlay.hidden = !disabled;
-      if (message) overlay.textContent = message;
-    }
+  function fullAddress(record) {
+    return record.fullAddress || [record.building, record.street, record.area, record.governorate, record.country].filter(Boolean).join("، ");
   }
 
-  function setSummary(message) {
-    const summary = document.getElementById("trackingMapSummary");
-    if (summary) summary.textContent = message;
-  }
-
-  function setEta(message) {
-    const eta = document.getElementById("etaTime");
-    if (eta) eta.textContent = message;
-  }
-
-  function ensureMap() {
-    if (
-      map ||
-      typeof L === "undefined" ||
-      !document.getElementById("tracking-map")
-    )
-      return map;
-    map = L.map("tracking-map", {
-      zoomControl: false,
-      attributionControl: false,
-    }).setView([30.0444, 31.2357], 12);
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      { maxZoom: 19, subdomains: "abcd" },
-    ).addTo(map);
-    window.trackingMap = map;
-    return map;
-  }
-
-  function clearMovingRoute() {
-    if (!map) return;
-    if (courierMarker) {
-      map.removeLayer(courierMarker);
-      courierMarker = null;
-    }
-    if (routeLine) {
-      map.removeLayer(routeLine);
-      routeLine = null;
-    }
-    lastRouteKey = "";
-  }
-
-  async function updateRoute(order, courier, destination) {
-    const key = `${courier.lat.toFixed(4)},${courier.lng.toFixed(4)}:${destination.lat.toFixed(4)},${destination.lng.toFixed(4)}`;
-    if (key === lastRouteKey) return;
-    lastRouteKey = key;
-    try {
-      const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${courier.lng},${courier.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`,
-      );
-      const data = await response.json();
-      const route = data.routes?.[0];
-      if (!route) throw new Error("No route");
-      const points = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-      if (routeLine) routeLine.setLatLngs(points);
-      else
-        routeLine = L.polyline(points, {
-          color: "#2563eb",
-          weight: 5,
-          opacity: 0.9,
-          lineCap: "round",
-          lineJoin: "round",
-        }).addTo(map);
-      const minutes = Math.max(1, Math.round(route.duration / 60));
-      const distance = (route.distance / 1000).toFixed(1);
-      setSummary(`Representative is approximately ${distance} km away.`);
-      setEta(`ETA: ${minutes} mins`);
-    } catch {
-      lastRouteKey = "";
-      setSummary(
-        "The live location is visible, but route time is temporarily unavailable.",
-      );
-      setEta("ETA: Updating");
-    }
-  }
-
-  function updateMap(order) {
-    const hasRepresentative = Boolean(
-      order.representativeId || order.representativeBusinessId,
-    );
-    const currentMap = ensureMap();
-    if (!currentMap) {
-      setSummary("The map service could not be loaded.");
-      setEta("ETA: Not determined");
+  function createMap(container, record, shell, overlay, summary) {
+    const destination = { lat: Number(record.latitude), lng: Number(record.longitude) };
+    const courier = { lat: Number(record.courierLocation?.lat), lng: Number(record.courierLocation?.lng) };
+    const hasDestination = Number.isFinite(destination.lat) && Number.isFinite(destination.lng) && destination.lat && destination.lng;
+    if (!container || typeof L === "undefined" || !hasDestination) {
+      shell?.classList.add("is-disabled");
+      if (overlay) { overlay.hidden = false; overlay.textContent = hasDestination ? "Map unavailable" : "Saved coordinates are unavailable"; }
+      if (summary) summary.textContent = fullAddress(record) || "Address unavailable";
       return;
     }
-
-    const destination = {
-      lat: Number(order.latitude),
-      lng: Number(order.longitude),
-    };
-    const courier = {
-      lat: Number(order.courierLocation?.lat),
-      lng: Number(order.courierLocation?.lng),
-    };
-    const hasDestination =
-      Number.isFinite(destination.lat) &&
-      Number.isFinite(destination.lng) &&
-      destination.lat &&
-      destination.lng;
-    const hasCourier =
-      Number.isFinite(courier.lat) &&
-      Number.isFinite(courier.lng) &&
-      courier.lat &&
-      courier.lng;
-    const deliveryStarted = Boolean(order.deliveryStartedAt);
-
-    if (!hasDestination) {
-      setMapDisabled(true, "Delivery location is not available");
-      setSummary("This order has no saved delivery coordinates.");
-      setEta("ETA: Not determined");
-      clearMovingRoute();
-      return;
-    }
-
-    if (destinationMarker)
-      destinationMarker.setLatLng([destination.lat, destination.lng]);
-    else
-      destinationMarker = L.marker([destination.lat, destination.lng], {
-        icon: markerIcon("destination"),
-      })
-        .addTo(currentMap)
-        .bindPopup("Your delivery address");
-
-    // BEGIN Waiting map — show the real destination under a 20% black layer.
-    if (!hasRepresentative || !deliveryStarted) {
-      clearMovingRoute();
-      currentMap.setView([destination.lat, destination.lng], 15);
-      setMapDisabled(
-        true,
-        hasRepresentative
-          ? "Waiting for the representative to start this delivery"
-          : "Representative not assigned yet",
-      );
-      setSummary(
-        hasRepresentative
-          ? "Delivery address is fixed. The live route starts when the representative presses Start Delivery."
-          : "Delivery address is fixed. Waiting for a representative assignment.",
-      );
-      setEta("ETA: Not determined");
-      setTimeout(() => currentMap.invalidateSize(), 60);
-      return;
-    }
-    // END Waiting map.
-
-    setMapDisabled(false);
-
-    if (hasCourier) {
-      if (courierMarker) courierMarker.setLatLng([courier.lat, courier.lng]);
-      else
-        courierMarker = L.marker([courier.lat, courier.lng], {
-          icon: markerIcon("courier"),
-        })
-          .addTo(currentMap)
-          .bindPopup("Dart representative");
-      currentMap.fitBounds(
-        [
-          [destination.lat, destination.lng],
-          [courier.lat, courier.lng],
-        ],
-        { padding: [55, 55], maxZoom: 16 },
-      );
-      if (order.status === "Delivered") {
-        setSummary("This order has been delivered.");
-        setEta("Delivered");
-      } else {
-        const age =
-          Date.now() - Date.parse(order.courierLocation?.updatedAt || 0);
-        if (age > 120000) {
-          setSummary("Waiting for a fresh representative location update…");
-          setEta("ETA: Updating");
-        } else {
-          updateRoute(order, courier, destination);
-        }
-      }
+    const map = L.map(container, { zoomControl: false, attributionControl: false }).setView([destination.lat, destination.lng], 15);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19, subdomains: "abcd" }).addTo(map);
+    L.marker([destination.lat, destination.lng], { icon: markerIcon("destination") }).addTo(map).bindPopup("Saved destination");
+    maps.set(container, map);
+    const started = Boolean(record.deliveryStartedAt || record.pickupStartedAt);
+    const hasRep = Boolean(record.representativeId || record.representativeBusinessId);
+    const hasCourier = Number.isFinite(courier.lat) && Number.isFinite(courier.lng) && courier.lat && courier.lng;
+    if (started && hasCourier) {
+      L.marker([courier.lat, courier.lng], { icon: markerIcon("courier") }).addTo(map).bindPopup("Dart representative");
+      L.polyline([[destination.lat, destination.lng], [courier.lat, courier.lng]], { color: "#2563eb", weight: 4, opacity: .82 }).addTo(map);
+      map.fitBounds([[destination.lat, destination.lng], [courier.lat, courier.lng]], { padding: [45, 45], maxZoom: 16 });
+      shell?.classList.remove("is-disabled");
+      if (overlay) overlay.hidden = true;
+      if (summary) summary.textContent = "The representative location is updating automatically.";
     } else {
-      clearMovingRoute();
-      currentMap.setView([destination.lat, destination.lng], 15);
-      setSummary(
-        "Delivery has started. Waiting for the first representative location update…",
-      );
-      setEta("ETA: Updating");
+      shell?.classList.add("is-disabled");
+      if (overlay) { overlay.hidden = false; overlay.textContent = hasRep ? "Waiting for the representative to start" : "Waiting for representative assignment"; }
+      if (summary) summary.textContent = `Saved destination: ${fullAddress(record) || "-"}`;
     }
-    setTimeout(() => currentMap.invalidateSize(), 60);
+    setTimeout(() => map.invalidateSize(), 60);
   }
 
-  function renderProgress(order) {
-    const statusIndex = {
-      New: 0,
-      Accepted: 0,
-      Preparing: 1,
-      "Out With Representative": 2,
-      "Representative On The Way": 3,
-      Delivered: 4,
-    };
-    const index = statusIndex[order.status] ?? 0;
-    const steps = document.querySelectorAll(".tracking-card .step");
-    steps.forEach((step, stepIndex) => {
-      step.classList.toggle("active", stepIndex <= index);
-      const circle = step.querySelector(".circle");
-      if (circle)
-        circle.textContent = stepIndex < index ? "✓" : String(stepIndex + 1);
+  function statusIndex(order) {
+    return ({ New: 0, Accepted: 0, Preparing: 1, "Out With Representative": 2, "Representative On The Way": 3, Delivered: 4 })[order.status] ?? 0;
+  }
+
+  function templateFragment(id) {
+    return document.getElementById(id)?.content?.cloneNode(true) || null;
+  }
+
+  function appendDivider(container) {
+    const divider = templateFragment("tracking-unit-divider-template");
+    if (divider) container.appendChild(divider);
+  }
+
+  function appendOrderLine(container, description, amount) {
+    const fragment = templateFragment("order-tracking-line-template");
+    if (!fragment) return;
+    fragment.querySelector('[data-order-line-field="description"]').textContent = description;
+    fragment.querySelector('[data-order-line-field="amount"]').textContent = amount;
+    container.appendChild(fragment);
+  }
+
+  function renderOrderUnit(order) {
+    const fragment = templateFragment("order-tracking-unit-template");
+    if (!fragment) return null;
+    const unit = fragment.querySelector("[data-order-unit]");
+    unit.querySelector('[data-order-unit-field="id"]').textContent = `Order #${order.orderId || "-"}`;
+    unit.querySelector('[data-order-unit-field="status"]').textContent = order.status || "New";
+    unit.querySelector('[data-order-unit-field="date"]').textContent = `${order.date || "-"} ${order.time || ""}`.trim();
+    unit.querySelector('[data-order-unit-field="total"]').textContent = money(orderTotal(order));
+    const lines = unit.querySelector("[data-order-unit-lines]");
+    if (!(order.priceSnapshot || []).length) appendOrderLine(lines, "Item details are being prepared.", "—");
+    (order.priceSnapshot || []).forEach((line) => {
+      const quantity = Number(line.qty) || 1;
+      appendOrderLine(
+        lines,
+        `${quantity}× ${line.name || line.modelCode || "Item"} · ${line.size || "-"} · ${line.color || "-"}`,
+        money((Number(line.finalUnitPrice) || 0) * quantity),
+      );
     });
-    const progress = document.querySelector(".tracking-card .stepper-progress");
-    if (progress) progress.style.width = `${Math.min(100, index * 25)}%`;
-    if (["Refused", "Cancelled"].includes(order.status)) setEta(order.status);
+    return fragment;
+  }
+
+  function renderOrders() {
+    const list = document.getElementById("orderTrackingList"), template = document.getElementById("order-tracking-card-template");
+    if (!list || !template) return;
+    maps.forEach((map) => { try { map.remove(); } catch {} }); maps.clear(); list.replaceChildren();
+    const groups = orderGroups(currentOrders());
+    if (!groups.length) {
+      const empty = templateFragment("order-tracking-empty-template");
+      if (empty) list.appendChild(empty);
+      return;
+    }
+    groups.forEach((group) => {
+      const fragment = template.content.cloneNode(true), card = fragment.querySelector("[data-order-tracking-card]"), records = group.records;
+      const first = records[0], minimum = Math.min(...records.map(statusIndex));
+      card.querySelector('[data-order-field="id"]').textContent = records.length > 1 ? `${records.length} orders in one delivery group` : `Order ID: #${first.orderId}`;
+      card.querySelector('[data-order-field="date"]').textContent = records.length > 1 ? "Same customer, country, governorate, area and street" : `Date: ${first.date || "-"} ${first.time || ""}`;
+      const items = card.querySelector("[data-order-items]");
+      records.forEach((record, index) => {
+        if (index) appendDivider(items);
+        const unit = renderOrderUnit(record);
+        if (unit) items.appendChild(unit);
+      });
+      card.querySelectorAll("[data-order-step]").forEach((step, index) => {
+        step.classList.toggle("active", index <= minimum);
+        step.querySelector(".circle").textContent = index < minimum ? "✓" : String(index + 1);
+      });
+      card.querySelector("[data-order-progress]").style.width = `${minimum * 25}%`;
+      const representatives = new Set(records.map((record) => record.representativeId).filter(Boolean));
+      const assigned = representatives.size === 1;
+      card.querySelector('[data-order-field="representative"]').textContent = assigned ? first.representativeName || "Dart representative" : "Representative not assigned yet";
+      card.querySelector('[data-order-field="representativeMeta"]').textContent = assigned ? `Courier ID: ${first.representativeBusinessId || first.representativeId}` : "Waiting for assignment";
+      const call = card.querySelector("[data-order-call]"); call.hidden = !assigned || !first.representativePhone; call.href = call.hidden ? "#" : `tel:${first.representativePhone}`;
+      card.querySelector("[data-order-eta]").textContent = first.deliveryStartedAt ? "Live trip" : "ETA: Not determined";
+      list.appendChild(fragment);
+      const inserted = list.lastElementChild;
+      createMap(inserted.querySelector("[data-order-map]"), first, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"));
+    });
   }
 
   function publicReturnState(record) {
     const value = window.DartReturns?.publicStatus(record) || "Under Review";
     if (value === "Rejected") return { label: "مرفوض", index: 1, rejected: true };
-    if (value === "Return Completed") return { label: "تم إتمام المرتجع", index: 2, rejected: false };
     if (value === "Approved") return { label: "تمت الموافقة", index: 1, rejected: false };
     return { label: "جاري المراجعة", index: 0, rejected: false };
   }
 
-  function updateReturnMap(record, card) {
-    const container = card.querySelector("[data-return-map]"),
-      shell = card.querySelector("[data-return-map-shell]"),
-      overlay = card.querySelector("[data-return-map-disabled]"),
-      summary = card.querySelector("[data-return-map-summary]"),
-      destination = { lat: Number(record.latitude), lng: Number(record.longitude) },
-      courier = {
-        lat: Number(record.courierLocation?.lat),
-        lng: Number(record.courierLocation?.lng),
-      },
-      hasDestination = [destination.lat, destination.lng].every(Number.isFinite) && destination.lat && destination.lng,
-      hasCourier = [courier.lat, courier.lng].every(Number.isFinite) && courier.lat && courier.lng,
-      started = record.status === "Pickup On The Way" && Boolean(record.pickupStartedAt);
-    if (!container || typeof L === "undefined" || !hasDestination) {
-      shell?.classList.add("is-disabled");
-      if (overlay) {
-        overlay.hidden = false;
-        overlay.textContent = hasDestination ? "تعذر تحميل الخريطة" : "إحداثيات عنوان الاستلام غير متاحة";
-      }
-      if (summary) summary.textContent = "عنوان الاستلام النصي محفوظ مع الطلب.";
-      return;
-    }
-    const trackingMap = L.map(container, { zoomControl: false, attributionControl: false }).setView(
-      [destination.lat, destination.lng],
-      15,
-    );
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      subdomains: "abcd",
-    }).addTo(trackingMap);
-    L.marker([destination.lat, destination.lng], { icon: markerIcon("destination") })
-      .addTo(trackingMap)
-      .bindPopup("عنوان استلام المرتجع");
-    returnMaps.set(String(record.id), trackingMap);
-    if (started && hasCourier) {
-      L.marker([courier.lat, courier.lng], { icon: markerIcon("courier") })
-        .addTo(trackingMap)
-        .bindPopup("مندوب Dart");
-      L.polyline(
-        [
-          [destination.lat, destination.lng],
-          [courier.lat, courier.lng],
-        ],
-        { color: "#2563eb", weight: 4, opacity: 0.8 },
-      ).addTo(trackingMap);
-      trackingMap.fitBounds(
-        [
-          [destination.lat, destination.lng],
-          [courier.lat, courier.lng],
-        ],
-        { padding: [45, 45], maxZoom: 16 },
-      );
-      shell?.classList.remove("is-disabled");
-      if (overlay) overlay.hidden = true;
-      if (summary) summary.textContent = "المندوب في طريقه لاستلام القطعة — الموقع يتحدث تلقائيًا.";
-    } else {
-      shell?.classList.add("is-disabled");
-      if (overlay) {
-        overlay.hidden = false;
-        overlay.textContent = record.status === "Completed"
-          ? "تم استلام القطعة"
-          : record.representativeId
-            ? "بانتظار بدء المندوب لعملية الاستلام"
-            : "بانتظار تعيين المندوب";
-      }
-      if (summary)
-        summary.textContent = record.status === "Completed"
-          ? "تمت عملية الاستلام، وتنتظر القطعة فحص Dart الداخلي."
-          : "مكان الاستلام محفوظ، وسيظهر تحرك المندوب عند بدء العملية.";
-    }
-    setTimeout(() => trackingMap.invalidateSize(), 60);
+  function renderReturnUnit(record) {
+    const state = publicReturnState(record), exchange = window.DartReturns?.isExchange(record) || record.requestType === "Exchange";
+    const fee = Number(record.customerCourierFee) || 0;
+    const fragment = templateFragment("return-tracking-unit-template");
+    if (!fragment) return null;
+    const unit = fragment.querySelector("[data-return-unit]");
+    const status = unit.querySelector('[data-return-unit-field="status"]');
+    unit.querySelector('[data-return-unit-field="id"]').textContent = record.returnId || record.id || "-";
+    status.textContent = state.label;
+    status.classList.toggle("is-rejected", state.rejected);
+    unit.querySelector('[data-return-unit-field="type"]').textContent = exchange ? "استبدال" : "استرجاع";
+    unit.querySelector('[data-return-unit-field="originalItem"]').textContent = record.itemCode || "-";
+    const replacementRow = unit.querySelector("[data-return-unit-replacement]");
+    replacementRow.hidden = !exchange;
+    unit.querySelector('[data-return-unit-field="replacementItem"]').textContent = record.replacementItemCode || `${record.requestedColor || "-"} / ${record.requestedSize || "-"}`;
+    unit.querySelector('[data-return-unit-field="netAmount"]').textContent = money(record.originalNetAmount || 0);
+    unit.querySelector('[data-return-unit-field="courierFee"]').textContent = fee ? money(fee) : "لا توجد";
+    const rejectionRow = unit.querySelector("[data-return-unit-rejection]");
+    rejectionRow.hidden = !state.rejected;
+    unit.querySelector('[data-return-unit-field="rejectionReason"]').textContent = record.rejectionReason || "-";
+    return fragment;
   }
 
   function renderReturns() {
-    const list = document.getElementById("returnTrackingList"),
-      template = document.getElementById("return-tracking-card-template");
+    const list = document.getElementById("returnTrackingList"), template = document.getElementById("return-tracking-card-template");
     if (!list || !template) return;
-    returnMaps.forEach((trackingMap) => {
-      try {
-        trackingMap.remove();
-      } catch {}
-    });
-    returnMaps.clear();
     list.replaceChildren();
-    const records = currentReturns();
-    if (!records.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty-state";
-      empty.textContent = "لا يوجد طلب استبدال أو استرجاع مطابق حاليًا.";
-      list.appendChild(empty);
+    const records = currentReturns(), groups = window.DartGroups?.groupReturns?.(records) || records.map((record) => ({ records: [record] }));
+    if (!groups.length) {
+      const empty = templateFragment("return-tracking-empty-template");
+      if (empty) list.appendChild(empty);
       return;
     }
-    records.forEach((record) => {
-      const fragment = template.content.cloneNode(true),
-        card = fragment.querySelector("[data-return-tracking-card]"),
-        state = publicReturnState(record),
-        isExchange = window.DartReturns?.isExchange(record) || record.requestType === "Exchange",
-        customerFee = Number(record.customerCourierFee) || 0,
-        values = {
-          id: `رقم الطلب: ${record.returnId || record.id}`,
-          date: `التاريخ: ${record.date || "-"}`,
-          status: state.label,
-          type: isExchange ? "طلب استبدال" : "طلب استرجاع",
-          originalItem: record.itemCode || "-",
-          replacementItem: record.replacementItemCode || `${record.requestedColor || "-"} / ${record.requestedSize || "-"}`,
-          netAmount: money(record.originalNetAmount || 0),
-          courierFee: customerFee > 0
-            ? `${money(customerFee)} تُدفع مباشرة للمندوب`
-            : "لا توجد رسوم على العميل",
-          address: record.fullAddress || [record.building, record.street, record.area, record.governorate].filter(Boolean).join("، ") || "-",
-          rejectionReason: record.rejectionReason || "-",
-          representative: record.representativeName || "لم يتم تعيين مندوب بعد",
-          representativeMeta: record.representativeBusinessId
-            ? `رقم المندوب: ${record.representativeBusinessId}`
-            : "بانتظار الموافقة والتعيين",
-        };
-      Object.entries(values).forEach(([field, value]) => {
-        const element = card.querySelector(`[data-return-field="${field}"]`);
-        if (element) element.textContent = value;
+    groups.forEach((group) => {
+      const fragment = template.content.cloneNode(true), card = fragment.querySelector("[data-return-tracking-card]"), rows = group.records, first = rows[0];
+      const states = rows.map(publicReturnState), minimum = Math.min(...states.map((state) => state.index));
+      card.querySelector('[data-return-field="id"]').textContent = rows.length > 1 ? `${rows.length} طلبات في مشوار استلام واحد` : `رقم الطلب: ${first.returnId || first.id}`;
+      card.querySelector('[data-return-field="date"]').textContent = rows.length > 1 ? "كل طلب وقطعة مستقلان" : `التاريخ: ${first.date || "-"}`;
+      card.querySelector('[data-return-field="status"]').textContent = rows.length > 1 ? "مجموعة استلام" : states[0].label;
+      const details = card.querySelector("[data-return-items]");
+      rows.forEach((record, index) => {
+        if (index) appendDivider(details);
+        const unit = renderReturnUnit(record);
+        if (unit) details.appendChild(unit);
       });
-      card.querySelector("[data-return-replacement-row]").hidden = !isExchange;
-      card.querySelector("[data-return-rejection-row]").hidden = !state.rejected;
-      card.querySelectorAll("[data-return-step]").forEach((step, index) => {
-        const active = index <= state.index && !state.rejected;
-        step.classList.toggle("active", active);
-        const circle = step.querySelector(".circle");
-        if (circle) circle.textContent = active && index < state.index ? "✓" : String(index + 1);
-      });
-      if (state.rejected) {
-        const approvalStep = card.querySelector('[data-return-step="approval"]');
-        approvalStep?.classList.add("is-rejected");
-        const text = approvalStep?.querySelector(".step-text");
-        if (text) text.textContent = "مرفوض";
-      }
-      const progress = card.querySelector("[data-return-progress]");
-      if (progress) progress.style.width = state.rejected ? "50%" : `${state.index * 50}%`;
-      const call = card.querySelector("[data-return-call]");
-      call.hidden = !record.representativePhone;
-      call.href = record.representativePhone ? `tel:${record.representativePhone}` : "#";
+      card.querySelectorAll("[data-return-step]").forEach((step, index) => { step.classList.toggle("active", index <= minimum); step.querySelector(".circle").textContent = index < minimum ? "✓" : String(index + 1); });
+      card.querySelector("[data-return-progress]").style.width = `${minimum * 50}%`;
+      card.querySelector('[data-return-field="representative"]').textContent = first.representativeName || "لم يتم تعيين مندوب بعد";
+      card.querySelector('[data-return-field="representativeMeta"]').textContent = first.representativeBusinessId ? `رقم المندوب: ${first.representativeBusinessId}` : "بانتظار الموافقة والتعيين";
+      const call = card.querySelector("[data-return-call]"); call.hidden = !first.representativePhone; call.href = call.hidden ? "#" : `tel:${first.representativePhone}`;
       list.appendChild(fragment);
-      updateReturnMap(record, list.lastElementChild);
+      const inserted = list.lastElementChild;
+      createMap(inserted.querySelector("[data-return-map]"), first, inserted.querySelector("[data-return-map-shell]"), inserted.querySelector("[data-return-map-disabled]"), inserted.querySelector("[data-return-map-summary]"));
     });
   }
 
-  function renderEmpty() {
-    const card = document.querySelector(".tracking-card");
-    if (!card) return;
-    setMapDisabled(true, "No order selected");
-    setSummary("Open the tracking link from your order or place a new order.");
-    setEta("ETA: Not determined");
-    const orderId = card.querySelector(".order-id");
-    if (orderId) orderId.textContent = "No active order";
-    const date = card.querySelector(".order-header div div:nth-child(2)");
-    if (date) date.textContent = "Order details will appear here.";
-    const items = card.querySelector(".items-box");
-    if (items)
-      items.innerHTML =
-        '<div class="empty-state">No active order matches this tracking link. Delivered orders are removed from tracking.</div>';
-    const driver = card.querySelector(".driver-box");
-    if (driver)
-      driver.innerHTML =
-        "<div data-representative-empty>Representative not assigned yet</div>";
-    document
-      .querySelectorAll(".tracking-card .step")
-      .forEach((step) => step.classList.remove("active"));
-    const progress = card.querySelector(".stepper-progress");
-    if (progress) progress.style.width = "0%";
-  }
-
-  function render() {
-    const card = document.querySelector(".tracking-card");
-    if (!card) return;
-    const order = currentOrder();
-    if (!order) {
-      renderEmpty();
-      renderReturns();
-      return;
-    }
-
-    const orderId = card.querySelector(".order-id");
-    if (orderId) orderId.textContent = `Order ID: #${order.orderId}`;
-    const date = card.querySelector(".order-header div div:nth-child(2)");
-    if (date)
-      date.textContent = `Date: ${order.date || "-"} ${order.time || ""}`;
-
-    const items = card.querySelector(".items-box");
-    if (items) {
-      items.innerHTML = `<div class="items-title">Order Items:</div>${(order.priceSnapshot || []).map((line) => `<div class="item-row"><span>${Number(line.qty) || 1}× ${esc(line.name || line.modelCode || "Item")} · ${esc(line.size || "-")} · ${esc(line.color || "-")}</span><strong>${esc(money((Number(line.finalUnitPrice) || 0) * (Number(line.qty) || 1)))}</strong></div>`).join("") || '<div class="item-row"><span>Item details are being prepared.</span><strong>—</strong></div>'}<hr><div class="item-row tracking-final-row"><span>Total:</span><strong>${esc(money(orderTotal(order)))}</strong></div>`;
-    }
-
-    renderProgress(order);
-    const representativeAssigned = Boolean(
-      order.representativeId || order.representativeBusinessId,
-    );
-    const driverName = card.querySelector(".driver-box div div:first-child");
-    const driverMeta = card.querySelector(".driver-box div div:nth-child(2)");
-    if (driverName)
-      driverName.textContent = representativeAssigned
-        ? order.representativeName || "Dart representative"
-        : "Representative not assigned yet";
-    if (driverMeta)
-      driverMeta.textContent = representativeAssigned
-        ? `Courier (ID: ${order.representativeBusinessId || order.representativeId})`
-        : "Waiting for assignment";
-    const call = card.querySelector(".btn-call");
-    if (call) {
-      const visible =
-        representativeAssigned && Boolean(order.representativePhone);
-      call.hidden = !visible;
-      call.href = visible ? `tel:${order.representativePhone}` : "#";
-    }
-
-    updateMap(order);
-    renderReturns();
-  }
-
-  window.DartTracking = { render, currentOrder, currentReturns, renderReturns };
-
-  document.addEventListener("DOMContentLoaded", () => {
-    if (!document.querySelector(".tracking-card")) return;
-    // A platform DOMContentLoaded handler may already have delegated the first render
-    // to this module. Remove only a foreign legacy map, never this module's own map.
-    if (window.trackingMap && window.trackingMap !== map) {
-      try {
-        window.trackingMap.remove();
-      } catch {}
-      window.trackingMap = null;
-    }
-    render();
-    setInterval(() => {
-      if (!document.hidden) render();
-    }, 4000);
-  });
-  window.addEventListener("storage", (event) => {
-    if (["dart_orders", "dart_returns"].includes(event.key)) render();
-  });
+  function render() { renderOrders(); renderReturns(); }
+  window.DartTracking = { render, currentOrder, currentOrders, currentReturns, renderReturns, orderGroups };
+  document.addEventListener("DOMContentLoaded", render);
+  window.addEventListener("storage", (event) => { if (["dart_orders", "dart_returns"].includes(event.key)) render(); });
+  window.addEventListener("dart:data-changed", (event) => { if (["dart_orders", "dart_returns"].includes(event.detail?.key)) render(); });
+  setInterval(() => { if (!document.hidden) render(); }, 4000);
 })();

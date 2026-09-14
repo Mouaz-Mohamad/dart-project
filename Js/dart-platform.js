@@ -25,7 +25,13 @@
   });
   const API_BASE = String(window.DART_API_BASE_URL || "").replace(/\/$/, "");
   const CART_RESERVATION_MS = 15 * 60 * 1000;
-  const BIRTHDAY_DISCOUNT_PERCENT = 30;
+  const configuredBirthdayPercent = Number(
+    window.DartSiteSettings?.get?.().birthdayDiscountPercent,
+  );
+  const BIRTHDAY_DISCOUNT_PERCENT = Math.max(
+    0,
+    Math.min(100, Number.isFinite(configuredBirthdayPercent) ? configuredBirthdayPercent : 30),
+  );
   const BIRTHDAY_REWARD_DAYS = 7;
   const CAIRO_TIME_ZONE = "Africa/Cairo";
 
@@ -781,7 +787,7 @@
     }
     const orders = read(KEYS.orders, []),
       orderId = nextCode("K", orders, "orderId");
-    const subtotal = snapshots.reduce(
+    let subtotal = snapshots.reduce(
       (sum, line) => sum + line.finalUnitPrice,
       0,
     );
@@ -792,7 +798,7 @@
     let discountRate = Math.max(
       0,
       Math.min(
-        0.4,
+        1,
         typeof appliedDiscountRate !== "undefined"
           ? Number(appliedDiscountRate) || 0
           : 0,
@@ -826,17 +832,30 @@
         appliedCard = null;
         discountRate = 0;
       } else {
-        discountRate = 0.4;
+        discountRate = Math.max(
+          0,
+          Math.min(1, Number(appliedCard.discountPercent ?? window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40) / 100),
+        );
       }
     }
+    const sitePromotion = window.DartSiteSettings?.activeSiteDiscount?.() || null;
+    if (sitePromotion) {
+      appliedCard = null;
+      discountRate = Math.max(0, Math.min(1, Number(sitePromotion.percent || 0) / 100));
+    }
     // Birthday always takes priority and never consumes Dart Card quota.
+    // Full priority is Birthday, then site-wide promotion, then Dart Card. Never stack.
     if (birthdayReward) {
       appliedCard = null;
       discountRate = Math.max(
         0,
-        Math.min(1, Number(birthdayReward.discountPercent || 30) / 100),
+        Math.min(1, Number(birthdayReward.discountPercent ?? 30) / 100),
       );
     }
+    const orderLevelPromotion = birthdayReward || sitePromotion || appliedCard ||
+      (discountRate > 0 ? window.dartAppliedPromotion : null);
+    if (orderLevelPromotion)
+      subtotal = snapshots.reduce((sum, line) => sum + Number(line.originalUnitPrice || line.finalUnitPrice || 0), 0);
     const discountAmount = subtotal * discountRate;
     const finalAmount = Math.max(0, subtotal - discountAmount);
     const order = {
@@ -864,6 +883,8 @@
       finalAmount,
       reasonDeduction: birthdayReward
         ? "Birthday gift"
+        : sitePromotion
+          ? "Site-wide discount"
         : appliedCard
           ? "Dart Card"
         : discountRate
@@ -873,11 +894,14 @@
       birthdayRewardId: birthdayReward?.id || "",
       promotionType: birthdayReward
         ? "Birthday"
+        : sitePromotion
+          ? "Site"
         : appliedCard
           ? "Dart Card"
           : discountRate
             ? "Promotion"
             : "",
+      siteDiscountPercent: sitePromotion ? Number(sitePromotion.percent) || 0 : 0,
       paymentMethod: "Cash on Delivery",
       paymentStatus: "Unpaid",
       amountPaid: 0,
@@ -1095,7 +1119,7 @@
   }
 
   function renderFeedbackEligibility() {
-    const section = document.querySelector(".feedback-section");
+    const section = document.getElementById("reviewForm")?.closest(".feedback-section");
     if (!section || section.dataset.eligibilityRendered) return;
     const user = currentUser(),
       eligible =
@@ -1330,7 +1354,14 @@
     const result = document.getElementById("serialSearchResult");
     if (!result) return;
     const content = result.querySelector(".serial-result-content");
-    if (!content) return;
+    const title = document.getElementById("serialResultTitle");
+    const message = document.getElementById("serialResultMessage");
+    const icon = document.getElementById("serialResultIcon");
+    const iconGlyph = document.getElementById("serialResultIconGlyph");
+    const product = document.getElementById("serialProduct");
+    const skeletonImage = document.getElementById("serialSkeletonImage");
+    const skeletonCopy = document.getElementById("serialSkeletonCopy");
+    if (!content || !title || !message || !icon || !iconGlyph || !product) return;
     const code = String(form.elements.serial_number?.value || "")
       .trim()
       .toLowerCase();
@@ -1345,11 +1376,18 @@
           (row.clientId || row.clientName),
       );
     result.hidden = false;
+    result.classList.remove("is-idle");
+    content.classList.remove("serial-result-skeleton");
+    if (skeletonImage) skeletonImage.hidden = true;
+    if (skeletonCopy) skeletonCopy.hidden = true;
+    icon.hidden = false;
     result.classList.toggle("is-authentic", Boolean(item));
     result.classList.toggle("is-missing", !item);
     if (!item) {
-      content.innerHTML =
-        '<div class="serial-result-icon"><i class="fa-solid fa-xmark"></i></div><h2 id="serialResultTitle">Item Not Found</h2><p>This code does not match a sold item in the official Dart registry.</p>';
+      iconGlyph.className = "fa-solid fa-xmark";
+      title.textContent = "Item Not Found";
+      message.textContent = "This code does not match a sold item in the official Dart registry.";
+      product.hidden = true;
       return;
     }
     const owner =
@@ -1360,7 +1398,18 @@
     const model = DartCatalog.model(item.modelId),
       productName = model?.name || item.modelName || "Dart item",
       image = DartCatalog.cover(model, item.color);
-    content.innerHTML = `<div class="serial-result-icon"><i class="fa-solid fa-check"></i></div><h2 id="serialResultTitle">Authentic Dart Item</h2><p>This sold item is verified in the official Dart registry.</p><div class="serial-product"><img class="serial-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(`${productName} in ${item.color || "its registered color"}`)}"><div class="serial-product-details"><div><small>Product</small><strong>${escapeHtml(productName)}</strong></div><div><small>Item Code</small><strong>${escapeHtml(item.itemCode)}</strong></div><div><small>Size</small><strong>${escapeHtml(item.size || "-")}</strong></div><div><small>Color</small><strong>${escapeHtml(item.color || "-")}</strong></div><div class="serial-owner"><small>Registered owner</small><strong>${escapeHtml(customerNameParts(owner, 2))}</strong></div></div></div>`;
+    iconGlyph.className = "fa-solid fa-check";
+    title.textContent = "Authentic Dart Item";
+    message.textContent = "This sold item is verified in the official Dart registry.";
+    const imageElement = document.getElementById("serialProductImage");
+    imageElement.src = image;
+    imageElement.alt = `${productName} in ${item.color || "its registered color"}`;
+    document.getElementById("serialProductName").textContent = productName;
+    document.getElementById("serialProductCode").textContent = item.itemCode;
+    document.getElementById("serialProductSize").textContent = item.size || "-";
+    document.getElementById("serialProductColor").textContent = item.color || "-";
+    document.getElementById("serialProductOwner").textContent = customerNameParts(owner, 2);
+    product.hidden = false;
   }
 
   // BEGIN Birthday celebration, countdown and vertical navbar ticker.
@@ -1378,14 +1427,16 @@
     const track = document.querySelector(".dart-nav-ticker-track");
     if (!track) return;
     const reward = visibleBirthdayReward(),
-      messages = ["Welcome to Dart"];
+      configured = window.DartSiteSettings?.activeAnnouncements?.() || [],
+      birthdayPercent = Number(reward?.discountPercent ?? BIRTHDAY_DISCOUNT_PERCENT),
+      messages = configured.length ? configured.map((row) => row.text) : ["Welcome to Dart"];
     if (reward)
       messages.push(
         reward.status === "Reserved"
-          ? "Your 30% birthday gift is reserved for your current order"
-          : "Your birthday gift is ready — 30% OFF for 7 days",
+          ? `Your ${birthdayPercent}% birthday gift is reserved for your current order`
+          : `Your birthday gift is ready — ${birthdayPercent}% OFF for 7 days`,
       );
-    const signature = `${reward?.id || "none"}:${reward?.status || ""}`;
+    const signature = JSON.stringify([reward?.id || "none", reward?.status || "", messages]);
     if (track.dataset.signature === signature) return;
     track.dataset.signature = signature;
     track.innerHTML = messages
@@ -2057,11 +2108,6 @@
         event.preventDefault();
         alert("تسجيل الدخول الاجتماعي غير مفعّل حاليًا.");
       }
-      const serialClose = event.target.closest(".serial-result-close");
-      if (serialClose) {
-        document.getElementById("serialSearchResult").hidden = true;
-      }
-      if (event.target.id === "serialSearchResult") event.target.hidden = true;
     });
   }
 

@@ -82,6 +82,21 @@ Each model owns one reusable size chart; do not create a separate HTML table for
 - A size must be unique inside its model. Each published row needs at least one positive measurement. Measurement fields are nullable; never invent missing values.
 - Catalogue search/filter parameters should support `query`, `category`, `size`, `color`, `availability`, `minPrice`, `maxPrice` and `sort`. Return facets/counts from the same inventory snapshot so the visible filters cannot advertise unavailable combinations.
 
+### Public product-card pricing
+
+`GET /api/v1/products` should expose the effective display price without exposing cost:
+
+```json
+{
+  "originalPrice": 600,
+  "price": 480,
+  "effectiveDiscountPercent": 20,
+  "discountSource": "Site"
+}
+```
+
+`discountSource` is `Site`, `Model` or an empty string. Model and site-wide discounts never stack. When an active site-wide discount exists it takes precedence for the current product-card display and checkout; otherwise the model discount applies. Recalculate these fields on the server and snapshot the accepted order line so later price changes never rewrite old sales.
+
 ## Customer authentication
 
 - `POST /api/v1/auth/register`
@@ -209,9 +224,10 @@ Customer requests begin as `Pending Request`. Admin may reject them with a requi
 - `POST /api/v1/representatives/me/returns/:id/start`, `/location`, `/failed` and `/complete`. Apply the fresh-location and 1 km validation used for delivery confirmation.
 - A completed `Refund` reduces revenue and cash by that physical line's original net customer amount. Allocate any order-level discount proportionally across physical lines. The original delivery component is not separately refunded.
 - A completed `Exchange` never changes order revenue. Its replacement must be the same model/design, may use another color/size, and inherits the exact original line price/cost plus its proportional order discount. The replacement inherits the physical exchange-chain ID.
-- Exchange allowance is per physical exchange chain. Only completion consumes it: Dart pays the representative 50 EGP for the first completed exchange; the customer pays the representative 50 EGP directly for every later exchange. For every completed refund, the customer pays the representative 100 EGP directly. Customer-paid fees never enter Dart revenue or Cash Flow.
+- Exchange allowance is per physical exchange chain. Only completion consumes it: Dart pays the representative 50 EGP for the first completed exchange; every later exchange uses the configured customer-paid fee (initially 50 EGP). Every refund uses the configured customer-paid fee (initially 100 EGP). Snapshot both fees when the request is created; later setting changes do not rewrite open or completed requests. Customer-paid fees never enter Dart revenue or Cash Flow.
 - After representative completion, the original item becomes `Return Inspection`. Admin records `Good` or `Damaged`. `Good` restores it to `In stock`, retaining original cost and using the model's current selling price. `Damaged` creates one damage record. A damaged refund stays in original COGS; a damaged exchange adds one damage loss because its replacement remains the sold line.
 - Apply completion, refund/exchange line movement, fees, inventory, Dart Card reversal for a refund, audit events and notifications in one idempotent database transaction.
+- `POST /api/v1/admin/returns/:id/rollback` moves exactly one workflow step backward and requires an optimistic-lock version plus an idempotency key. The same transaction must restore every field changed by that step: held/sold/inspection inventory, refund totals and payment status, exchange order lines, Dart Card usage, courier-fee state and inspection damage rows. Never delete the original events; append `RETURN_ROLLBACK` with actor, reason, old/new state and the reversed transaction/event ID. Reject rollback with `409` if later dependent activity makes an exact reversal unsafe.
 
 ## Per-order delivery activation
 
@@ -259,7 +275,7 @@ The server creates one reward per customer and birthday year:
 
 ## Dart Card manual benefit
 
-- `POST /api/v1/admin/dart-cards` grants an Additional Benefit manually. The default and only current benefit is `40%`, up to `10` net retained pieces, with editable issue/expiry dates defaulting to today and one year later.
+- `POST /api/v1/admin/dart-cards` grants an Additional Benefit manually. Its percentage is copied from the current Dart Card setting (initially `40%`) and then remains immutable on that card, for up to `10` net retained pieces, with editable issue/expiry dates defaulting to today and one year later.
 - Reject a second active Dart Card for the same customer with HTTP `409`.
 - A completed `Refund` for an item bought with Dart Card decrements its consumed-piece count exactly once. An exchange does not change the count. Reactivate a quota-completed card only if it is still within its expiry date.
 - The profile may display the most recent inactive/expired card; the server response must expose its status rather than deleting its history.
@@ -290,8 +306,9 @@ All finance endpoints require the admin role, accept/return ISO-8601 timestamps,
 - COGS uses every delivered line's immutable `costSnapshot`. A completed `Good` return reverses that line's COGS; a completed `Damaged` return does not restore inventory and stays in COGS.
 - Model/item cost already contains the owner's complete normal per-piece factory, delivery and related cost (for example, the stated 100 EGP delivery component). Never add an automatic normal-order shipping expense on top of it.
 - `Total Selling = Delivered sales recognized in the period − completed refund amounts in the period`.
-- `Total Cost = net sold-piece COGS + recognized operating expenses + COD/settlement fees + Dart-paid representative fees + non-duplicated damage write-offs`.
-- `Total Profit = Total Selling − Total Cost`.
+- The Brand overview `Total Cost` is the owner's full liability for the selected period: immutable acquisition cost of every physical item entered in that period, whether sold or still in stock, plus recognized operating expenses, COD/settlement fees, Dart-paid representative fees and non-duplicated write-offs for older stock damaged in the period.
+- The Brand overview `Total Profit = Total Selling − Brand Total Cost`.
+- The P&L report keeps conventional matching: net sold-piece COGS plus recognized operating expenses, COD/settlement fees, Dart-paid representative fees and non-duplicated damage write-offs. This is intentionally separate from the owner-liability Brand card.
 - Pre-sale damage is written off once using its immutable damage `costSnapshot`. A damaged refunded item already present in delivered COGS is not written off again. A damaged exchanged item is written off once because the replacement occupies the delivered order line.
 - Operating expenses are recognized on `expenseDate` for P&L. Only `Paid` expenses with a `paidAt` instant affect Cash Flow. `Void` records affect neither.
 - COD provider fees are recognized as expense and cash outflow on settlement date. Invoice documents never create revenue or expense by themselves; they reference the authoritative order or expense to prevent duplication.
@@ -309,6 +326,21 @@ All finance endpoints require the admin role, accept/return ISO-8601 timestamps,
 - `GET /api/v1/admin/finance/reports/:report?start=<ISO>&end=<ISO>` where `report` is `pnl`, `cash-flow`, `cod`, `model-profitability`, `marketing`, `budgets` or `alerts`.
 
 Mutations use idempotency keys plus optimistic version checks. Deletion archives finance records and retains their references; settled COD receipts are reversed by an explicit reversal entry rather than edited or deleted. Maintain one append-only finance audit event per mutation with actor, timestamp, before/after values and reason.
+
+## Site settings and immutable policy snapshots
+
+- `GET/PATCH /api/v1/admin/site-settings` controls the two hero image asset IDs, founder image asset ID, timed announcements, typing scenes/styles/speeds, per-model storefront-card rules, default new-model markup, site-wide discount, Birthday discount, Dart Card discount, refund customer fee and repeated-exchange customer fee.
+- Validate uploaded image assets server-side and store only asset IDs in settings. If one hero image is configured, the API returns it as the effective day and night image.
+- Settings changes create append-only audit events. Existing models, orders, rewards, cards and return requests keep their stored snapshots. New settings affect only records created afterward, except presentation-only settings such as images, text and card visibility.
+- Checkout applies exactly one discount using this priority: Birthday, active site-wide discount, then Dart Card. Persist the selected source and percentage on the order.
+
+## Delivery and pickup grouping
+
+- The server may create a shared `deliveryGroupId` only for unassigned orders owned by the same customer whose normalized country, governorate, area and street are all equal. Building and floor do not split the route group.
+- Representative assignment is the grouping cutoff. Assigning the selected order rows freezes that group; a later order starts a separate group even when its address matches. Every order and physical line remains an independent record and state machine.
+- Apply the same rules to approved return/refund/exchange requests using their newly entered pickup address and `pickupGroupId`. Assignment operates only on explicitly selected return rows.
+- Customer tracking may present one visual card per active group, with each order/request and its lines separated inside it. Completed returns disappear from active tracking but remain in authenticated history and dashboard reports.
+- Normalize comparison values consistently on the server (trim, case-fold and collapse whitespace) and reject multi-selection assignment when customer or route fields do not match.
 
 ## COD reconciliation
 

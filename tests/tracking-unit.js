@@ -42,11 +42,12 @@ localStorage.setItem('dart_returns', JSON.stringify([
 vm.runInContext(fs.readFileSync('Js/dart-tracking.js','utf8'), context, {filename:'Js/dart-tracking.js'});
 assert(window.DartTracking.currentOrder().orderId === 'K-2', 'Tracking should use the signed-in customer latest order when no query is present');
 sessionStorage.setItem('dart_last_order_id','K-1');
-assert(window.DartTracking.currentOrder().orderId === 'K-1', 'Tracking should remember the order created in checkout');
+assert(window.DartTracking.currentOrders().length === 2, 'A signed-in customer must see every active order, even when checkout saved one last order ID');
+assert(window.DartTracking.currentOrder().orderId === 'K-2', 'The latest active customer order remains first while all groups stay visible');
 context.location.search='?order=K-3';
 assert(window.DartTracking.currentOrder().orderId === 'K-3', 'Explicit tracking links should select their exact order');
 context.location.search='';
-assert(window.DartTracking.currentReturns().length === 2, 'Signed-in customers must see their own return cards automatically');
+assert(window.DartTracking.currentReturns().length === 1, 'Completed returns must leave active tracking while pending returns remain visible');
 sessionStorage.setItem('dart_last_return_id','R-1');
 assert(window.DartTracking.currentReturns()[0].returnId === 'R-1', 'Tracking must remember the newly created return request');
 context.location.search='?return=R-3';

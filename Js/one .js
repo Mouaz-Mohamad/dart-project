@@ -324,8 +324,21 @@ function createProductCard(item, template) {
     const code = card.querySelector('.product-code');
     if (code) code.textContent = `Code : ${item.code}`;
 
-    const price = card.querySelector('.product-price');
-    if (price) price.textContent = `EGP ${Math.trunc(Number(item.price) || 0)}`;
+    const currentPrice = card.querySelector('[data-product-price="current"], .product-price');
+    const oldPrice = card.querySelector('[data-product-price="old"]');
+    const discountBadge = card.querySelector('[data-product-price="discount"]');
+    const finalPrice = Math.max(0, Number(item.price) || 0);
+    const originalPrice = Math.max(finalPrice, Number(item.originalPrice) || finalPrice);
+    const effectiveDiscount = Math.min(100, Math.max(0, Number(item.effectiveDiscountPercent) || 0));
+    if (currentPrice) currentPrice.textContent = `EGP ${Math.trunc(finalPrice)}`;
+    if (oldPrice) {
+        oldPrice.textContent = `EGP ${Math.trunc(originalPrice)}`;
+        oldPrice.hidden = !effectiveDiscount;
+    }
+    if (discountBadge) {
+        discountBadge.textContent = `خصم ${Math.round(effectiveDiscount)}%`;
+        discountBadge.hidden = !effectiveDiscount;
+    }
 
     let totalStock = 0;
     if (item.stock) {
@@ -796,9 +809,10 @@ function updateCartCount() {
 
 function syncBirthdayCheckoutDiscount(showNotice = false) {
     const birthdayReward = window.DartPlatform?.activeBirthdayReward?.();
+    const sitePromotion = birthdayReward ? null : window.DartSiteSettings?.activeSiteDiscount?.();
     const customer = window.DartPlatform?.currentUser?.();
     const cartQuantity = cartData.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
-    const dartCard = birthdayReward
+    const dartCard = birthdayReward || sitePromotion
         ? null
         : window.DartPlatform?.activeDartCard?.(customer, cartQuantity);
     const discountInput = document.getElementById('discountInput');
@@ -808,7 +822,7 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
 
     if (birthdayReward) {
         window.dartAppliedPromotion = { ...birthdayReward, type: 'Birthday' };
-        appliedDiscountRate = Math.max(0, Math.min(1, Number(birthdayReward.discountPercent || 30) / 100));
+        appliedDiscountRate = Math.max(0, Math.min(1, Number(birthdayReward.discountPercent ?? 30) / 100));
         if (discountInput) {
             discountInput.value = `BIRTHDAY ${Math.round(appliedDiscountRate * 100)}% — AUTO`;
             discountInput.disabled = true;
@@ -827,11 +841,33 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         return true;
     }
 
-    if (dartCard) {
-        window.dartAppliedPromotion = { ...dartCard, type: 'Dart Card', percent: 40 };
-        appliedDiscountRate = 0.4;
+    if (sitePromotion) {
+        window.dartAppliedPromotion = { ...sitePromotion, type: 'Site' };
+        appliedDiscountRate = Math.max(0, Math.min(1, Number(sitePromotion.percent || 0) / 100));
         if (discountInput) {
-            discountInput.value = 'DART CARD 40% — AUTO';
+            discountInput.value = `SITE ${Math.round(appliedDiscountRate * 100)}% — AUTO`;
+            discountInput.disabled = true;
+        }
+        if (discountBtn) {
+            discountBtn.disabled = true;
+            discountBtn.textContent = 'Applied';
+        }
+        if (discountBox && !note) {
+            note = document.createElement('p');
+            note.className = 'birthday-auto-discount-note';
+            discountBox.insertAdjacentElement('afterend', note);
+        }
+        if (note) note.textContent = 'The active site-wide discount is applied automatically. Discounts are not combined.';
+        if (showNotice) showToast(`تم تطبيق خصم الموقع ${Math.round(appliedDiscountRate * 100)}% تلقائيًا.`);
+        return true;
+    }
+
+    if (dartCard) {
+        const cardPercent = Number(dartCard.discountPercent ?? window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40);
+        window.dartAppliedPromotion = { ...dartCard, type: 'Dart Card', percent: cardPercent };
+        appliedDiscountRate = Math.max(0, Math.min(1, cardPercent / 100));
+        if (discountInput) {
+            discountInput.value = `DART CARD ${Math.round(cardPercent)}% — AUTO`;
             discountInput.disabled = true;
         }
         if (discountBtn) {
@@ -844,11 +880,11 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
             discountBox.insertAdjacentElement('afterend', note);
         }
         if (note) note.textContent = 'Your active Dart Card discount is applied automatically to eligible items.';
-        if (showNotice) showToast('تم تطبيق خصم Dart Card بنسبة 40% تلقائيًا.');
+        if (showNotice) showToast(`تم تطبيق خصم Dart Card بنسبة ${Math.round(cardPercent)}% تلقائيًا.`);
         return true;
     }
 
-    if (['Birthday', 'Dart Card'].includes(window.dartAppliedPromotion?.type)) {
+    if (['Birthday', 'Site', 'Dart Card'].includes(window.dartAppliedPromotion?.type)) {
         window.dartAppliedPromotion = null;
         appliedDiscountRate = 0;
     }
@@ -870,7 +906,12 @@ function updateCartTotals() {
     const totalEl = document.getElementById('totalVal');
     const discountEl = document.getElementById('discountVal');
 
-    let subtotal = cartData.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const hasOrderPromotion = Boolean(window.dartAppliedPromotion && appliedDiscountRate > 0);
+    let subtotal = cartData.reduce((sum, item) => {
+        const model = DartCatalog.model(item.id);
+        const price = hasOrderPromotion ? Number(model?.selling || item.price) : Number(item.price || 0);
+        return sum + price * Number(item.quantity || 0);
+    }, 0);
     let discountAmount = subtotal * appliedDiscountRate;
     let finalTotal = subtotal - discountAmount;
 
@@ -1049,12 +1090,12 @@ function initCartAndCheckoutEvents() {
                         cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0) <= Number(card.itemLimit || card.purchasedLimit || 10)-Number(card.purchasedItems||0) &&
                         (!card.expDate || (() => { const parts=String(card.expDate).split(/[-/]/).map(Number);const expiry=parts[0]>999?new Date(parts[0],parts[1]-1,parts[2],23,59,59):new Date(parts[2],parts[1]-1,parts[0],23,59,59);return expiry>=today; })())
                     );
-                    if (promotion) promotion.percent = 40;
+                if (promotion) promotion.percent = Number(promotion.discountPercent ?? window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40);
                 }
             } catch {}
             if (promotion) {
                 window.dartAppliedPromotion = promotion;
-                appliedDiscountRate = Math.min(0.40, Math.max(0, Number(promotion.percent || promotion.discount) / 100));
+                appliedDiscountRate = Math.min(1, Math.max(0, Number(promotion.percent || promotion.discount) / 100));
                 showToast(`تم تطبيق خصم ${Math.round(appliedDiscountRate * 100)}% بنجاح!`);
             } else {
                 window.dartAppliedPromotion = null;
@@ -1886,11 +1927,9 @@ function restoreCompletedState() {
 document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([
         loadSection('header-container', 'sections/Nav-Bar.html'),
-        loadSection('search-serial-container', 'sections/search-serial.html'),
         loadSection('leaderboard-card', 'sections/leaderboard-card.html'),
         loadSection('birthday', 'sections/birthday.html'),
         loadSection('feedback-form', 'sections/form-feedback.html'),
-        loadSection('return-form', 'sections/form-return.html'),
         loadSection('contact-form', 'sections/form-contact.html'),
         loadSection('story', 'sections/story.html'),
         loadSection('dart-for-you', 'sections/dart-for-you.html'),
@@ -1916,9 +1955,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 // =========================================
 // --. الازرار الي بتحولني الي اقسام وصفحات مختلفه
 // =========================================
-document.getElementById("btnToProducts").addEventListener("click", function () {
-    window.location.href = "products.html";
-});
+document.querySelectorAll("[data-go-products]").forEach((button) =>
+    button.addEventListener("click", function () { window.location.href = "products.html"; }),
+);
 
 
 
@@ -1934,7 +1973,7 @@ const typingContainer = document.getElementById("dartTyping");
 // كل كلمة تقدر تتحكم فيها بشكل منفصل
 // ==========================================
 
-const scenes = [
+const defaultScenes = [
 
     // =========================
     // SCENE 1
@@ -2068,15 +2107,20 @@ const scenes = [
 
 ];
 
+const siteTyping = window.DartSiteSettings?.get?.().typing || {};
+const scenes = Array.isArray(siteTyping.scenes) && siteTyping.scenes.length
+    ? siteTyping.scenes
+    : defaultScenes;
+
 
 // ==========================================
 // SETTINGS
 // ==========================================
 
-const typingSpeed = 70;       // سرعة الكتابة
-const deletingSpeed = 10;     // سرعة المسح
-const wordDelay = 100;        // الوقت بين كل كلمة
-const nextSceneDelay = 400;   // الوقت قبل الجملة الجديدة
+const typingSpeed = Math.max(10, Number(siteTyping.typingSpeed) || 70);
+const deletingSpeed = Math.max(5, Number(siteTyping.deletingSpeed) || 10);
+const wordDelay = Math.max(0, Number(siteTyping.wordDelay) || 100);
+const nextSceneDelay = Math.max(0, Number(siteTyping.nextSceneDelay) || 400);
 
 
 // ==========================================
@@ -2149,7 +2193,7 @@ function typeScene() {
 
     span.style.color = word.color || "#111111";
 
-    span.style.fontSize = word.size || "60px";
+    span.style.fontSize = window.DartSiteSettings?.heroWordSize?.(word.size, 60) || `${Math.max(10, Number.parseFloat(word.size) || 60)}px`;
 
     span.style.fontWeight = word.weight || "400";
 
@@ -2283,4 +2327,4 @@ function nextScene() {
 // START
 // ==========================================
 
-typeScene();
+if (typingContainer && scenes.length) typeScene();

@@ -716,10 +716,20 @@ section{
 
 .dart-controls {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
     align-items: center;
+    gap: 12px;
     margin-bottom: 12px;
 }
+
+.dart-chart-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dart-chart-title strong { color: #111827; font-size: 16px; }
+.dart-chart-title small { color: #64748b; font-size: 10px; }
 
 /* شريط التقييم الملاحي (السنة) متناسق مع خلفية الشاشة */
 .dart-nav-controls {
@@ -1444,6 +1454,10 @@ section{
 .dart-notification.read .notif-dot { background:#bbb; }
 .dart-notification time { font-size: 10px; opacity:.65; white-space: nowrap; }
 .dart-empty-state { padding: 22px; text-align:center; opacity:.65; }
+.dart-operation-group-head { display:grid; gap:3px; min-width:max-content; margin:10px 0 4px; border-inline-start:4px solid #ab012b; border-radius:9px; background:#f8f3f4; padding:10px 14px; color:#4b1422; }
+.dart-operation-group-head strong { font-size:13px; }
+.dart-operation-group-head span,.dart-operation-group-head small { font-size:10px; color:#6b7280; }
+.dart-return-bulk-assign { min-height:38px; margin-inline-start:8px; border:1px solid #ab012b; border-radius:8px; background:#fff; color:#ab012b; padding:7px 12px; font-weight:800; }
 
 .dart-kpi-inline { font-size: 11px; opacity: .75; display:block; margin-top:3px; }
 .row-deleted .model-checkbox { pointer-events: none; }
@@ -1481,7 +1495,6 @@ section{
 .row-action-btns::-webkit-scrollbar{display:none;}
 #models .row-action-btns,#items .row-action-btns,#customers .row-action-btns{width:200px;min-width:200px;}
 #orders .row-action-btns{width:500px;min-width:500px;}
-#returns .row-action-btns{width:200px;min-width:200px;}
 #representative .row-action-btns{width:300px;min-width:300px;}
 
 .dart-item-thumb{width:16px!important;height:20px!important;min-width:16px;max-width:16px;object-fit:cover!important;cursor:zoom-in;border-radius:2px;border:1px solid #ddd;margin:auto;}

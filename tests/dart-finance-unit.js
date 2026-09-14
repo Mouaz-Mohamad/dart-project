@@ -195,4 +195,16 @@ const september = finance.periodRange("custom", { start: "2026-09-01", end: "202
 assert.strictEqual(september.previous.start.getDate(), 22);
 assert.strictEqual(september.previous.end.getDate(), 31);
 
+const ownerCostScenario = finance.calculateSummary(baseData({
+  models: [{ id: "M1", modelId: "M-1", cost: 400 }],
+  items: [{ id: "I1", itemCode: "I-1", modelId: "M-1", costSnapshot: 400, createdAt: "2026-09-02", status: "Sold" }],
+  orders: [{ ...deliveredOrder, totalPrice: 600, finalAmount: 420, discount: 30, orderLevelDiscountAmount: 180, priceSnapshot: [{ itemCode: "I-1", modelCode: "M-1", qty: 1, originalUnitPrice: 600, finalUnitPrice: 600, costSnapshot: 400 }] }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(ownerCostScenario.netRevenue, 420, "A 30% order discount on 600 EGP must produce 420 EGP total selling.");
+assert.strictEqual(ownerCostScenario.physicalItemCost, 400, "Brand cost must include every physical piece added in the period.");
+assert.strictEqual(ownerCostScenario.brandTotalCost, 400);
+assert.strictEqual(ownerCostScenario.brandNetProfit, 20, "Brand profit must be total selling minus complete Brand cost.");
+const customerMetric = finance.brandMetrics(baseData({ customers: [{ id: "C1", clientId: "DA-1", registeredAt: "2026-09-12T10:00:00Z" }] }), range("2026-09-01", "2026-09-30"), finance.calculateSummary(baseData(), range("2026-09-01", "2026-09-30")));
+assert.strictEqual(customerMetric.customers, 1, "Customer KPI must recognize the registeredAt field used by dashboard-created customers.");
+
 console.log("Dart finance unit tests passed.");

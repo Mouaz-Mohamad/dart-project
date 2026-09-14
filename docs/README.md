@@ -15,6 +15,10 @@ This package contains the customer website, Dart Eye dashboard and the represent
 
 The dashboard also includes Finance V1: a shared period filter with previous-period comparison, accurate period-based financial cards, Returning Customers/Goals/Financial Analysis charts, flexible goal CRUD, expenses, budgets, invoice control, COD reconciliation, P&L, Cash Flow, model profitability, marketing analytics and record-driven alerts. Every finance collection starts empty. No demonstration sales, costs or targets are seeded.
 
+Settings now controls public presentation and future commercial defaults: day/night hero images, timed under-nav announcements, hero typing content/styles/timing, founder image, model-color card visibility, new-model markup, a non-stacking site discount, Birthday/Dart Card rates and customer-paid return/exchange fees. All editors and repeatable templates live in dashboard HTML and are addressed by stable IDs; JavaScript only fills and binds them.
+
+Unassigned orders are visually grouped only when the customer plus normalized country, governorate, area and street match. Representative assignment freezes the group. Returns use the same pickup-address rule, selected-row assignment and independent record statuses. Active tracking shows grouped cards with separated order/request details; completed return pickups remain in history but disappear from the active tracking page.
+
 ## V7 — Empty dashboard and shared catalogue
 
 This version starts with no models, physical items, customers or orders. At the first visit on each browser origin, `dart-catalog.js` clears the previous Dart prototype data once, as requested by the owner. The `dart_v7_empty_start_completed` marker prevents subsequent resets. New entries survive reloads. There is no automatic demo seeding. This does not delete data on a remote server.
@@ -50,6 +54,7 @@ node tests/dashboard-v9-unit.js
 node tests/v9-requested-features.js
 node tests/dart-finance-unit.js
 node tests/finance-dashboard-contract.js
+node tests/settings-and-groups-unit.js
 python3 tests/static_checks.py
 node tests/seo_checks.js
 node tests/catalog-browser.js
@@ -71,10 +76,10 @@ See `CODE_MAP.md` and `VERIFICATION_REPORT.md` for implementation boundaries and
 ## V9 birthday and card experience
 
 - The Brand dashboard birthday widget remains visible all day as an unsent WhatsApp queue. It retains the current message batch before 20:00 Cairo, rolls to the next day's birthdays at 20:00, includes newly added matching clients immediately and removes only clients whose messages were queued.
-- Logged-in customers receive one 30% Birthday reward from 00:00 Cairo on their birthday for seven calendar days. It is applied automatically, used once, never stacks and always takes priority over Dart Card without spending Dart Card quota.
+- Logged-in customers receive one Birthday reward from 00:00 Cairo on their birthday for seven calendar days. Its percentage is copied from the dashboard setting (30% initially), applied automatically, used once, never stacked and always takes priority over the site-wide discount and Dart Card without spending Dart Card quota.
 - The supplied birthday artwork is the celebration-card background. Its countdown sits in the reserved top area; closing it hides it while browsing internally, and a genuinely new site entry shows it again while the reward is visible.
 - The storefront and dashboard additions remain a localStorage prototype. WhatsApp sending, authoritative clocks, reward locking, checkout validation and deletion authorization must be implemented by the backend described in `API_CONTRACT.md`.
-- The dashboard can grant the fixed 40% / 10-piece Dart Card manually through `Additional Benefit`; issue and expiry dates remain editable.
+- The dashboard can grant the configured Dart Card percentage (40% initially) for up to 10 pieces manually through `Additional Benefit`; issue and expiry dates remain editable and each created card keeps its own snapshot.
 - Public Leaderboard points come only from `Delivered` item codes and refresh when delivery/return data changes; creating an order adds no points.
 - Checkout requires a signed-in customer. Customer sign-in is remembered until explicit logout, and one person may keep separate customer and representative accounts with the same contact details.
 
@@ -82,7 +87,7 @@ See `CODE_MAP.md` and `VERIFICATION_REPORT.md` for implementation boundaries and
 
 - Contact Us submissions enter the dashboard Review section with source `Contact Us`. Status, rating and title stay `-`; the Review source filter separates contact messages from customer reviews.
 - A customer return/exchange starts at `Pending Request` with a newly entered Cairo/Giza pickup address. Admin accepts/rejects with a visible reason, then assigns a representative. The request appears automatically in customer tracking and in the assigned representative portal. The representative starts live pickup, records completion or a failed attempt, and the admin then inspects the original piece as Good or Damaged.
-- A refund subtracts the original item's proportional net price only when pickup completes. An exchange keeps the original net sale price and supports another color/size of the same model. The first completed exchange costs Dart 50 EGP; later exchanges cost the customer 50 EGP, and refunds cost the customer 100 EGP, all customer fees paid directly to the representative.
+- A refund subtracts the original item's proportional net price only when pickup completes. An exchange keeps the original net sale price and supports another color/size of the same model. The first completed exchange costs Dart 50 EGP; later exchanges and refunds copy their configurable customer fee (initially 50/100 EGP) when the request is created, paid directly to the representative.
 - The tracking map initializes immediately around the saved order destination. It remains behind a 20% black layer until the assigned representative presses Start Delivery for that specific order. The start action records `deliveryStartedAt`; only then can live location and route/ETA appear.
 - Top Clients has mutually exclusive month/year filters. Month defaults to This Month and Year to None. If both become None, the month returns to This Month. Ranking uses delivered order count first and net spending after refunds second.
 - Client age is calculated from birthday in Client rows, Top Clients and Birthday. Client History compares the last complete month with the preceding complete month for order-count and spending trends.

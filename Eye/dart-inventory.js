@@ -219,7 +219,13 @@
         `${Math.trunc(selling * (1 - discount / 100))} EGP`;
     };
     $("modal-cost").oninput = () => {
-      $("modal-selling").value = String(Number($("modal-cost").value) * 1.5);
+      if (!$("modal-edit-id").value) {
+        const configuredMarkup = Number(window.DartSiteSettings?.get?.().defaultMarkupPercent);
+        const markup = Math.max(0, Number.isFinite(configuredMarkup) ? configuredMarkup : 50);
+        $("modal-selling").value = String(
+          Math.round((Number($("modal-cost").value) * (1 + markup / 100) + Number.EPSILON) * 100) / 100,
+        );
+      }
       calc();
     };
     $("modal-selling").oninput = calc;
@@ -329,7 +335,7 @@
         colorOptions: structuredClone(draft.colors),
         updatedAt: stamp(),
       };
-      payload.discountedPrice = C.price(payload);
+      payload.discountedPrice = C.modelPrice(payload);
       payload.colors = payload.colorOptions
         .filter(C.active)
         .map((c) => c.name)

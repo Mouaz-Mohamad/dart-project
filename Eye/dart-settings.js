@@ -181,3 +181,286 @@
     if (event.key === "Escape" && modal.classList.contains("active")) closeResetModal();
   });
 })(typeof window !== "undefined" ? window : globalThis);
+
+/* Site controls use only the static forms/templates declared in Dart Eye.html. */
+(function (root) {
+  "use strict";
+  if (!root.document || !root.DartSiteSettings) return;
+
+  const $ = (id) => document.getElementById(id);
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  const number = (id, fallback = 0) => {
+    const value = Number($(id)?.value);
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const uid = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+  function announce(message, error = false) {
+    const status = $("settings-reset-status");
+    if (!status) return;
+    status.hidden = false;
+    status.textContent = message;
+    status.dataset.state = error ? "error" : "success";
+  }
+
+  function audit(before, after, note) {
+    let rows = [];
+    try { rows = JSON.parse(localStorage.getItem("dart_audit") || "[]"); } catch {}
+    rows.unshift({
+      id: uid("AUD"), action: "SITE_SETTINGS_UPDATED", entityType: "settings",
+      entityId: "site", before, after, details: { note }, timestamp: new Date().toISOString(), actorRole: "Admin",
+    });
+    localStorage.setItem("dart_audit", JSON.stringify(rows.slice(0, 2000)));
+  }
+
+  function saveSettings(next, note) {
+    const before = root.DartSiteSettings.get();
+    const saved = root.DartSiteSettings.save(next);
+    audit(before, saved, note);
+    announce("تم حفظ الإعدادات. ستُطبّق على العمليات الجديدة والواجهة العامة.");
+    return saved;
+  }
+
+  function fillGeneral(settings) {
+    $("settings-default-markup").value = settings.defaultMarkupPercent;
+    $("settings-birthday-discount").value = settings.birthdayDiscountPercent;
+    $("settings-card-discount").value = settings.dartCardDiscountPercent;
+    $("settings-refund-fee").value = settings.refundCustomerFee;
+    $("settings-repeat-exchange-fee").value = settings.repeatExchangeCustomerFee;
+    $("settings-site-discount-enabled").checked = Boolean(settings.siteDiscount.enabled);
+    $("settings-site-discount-percent").value = settings.siteDiscount.percent;
+    $("settings-site-discount-start").value = settings.siteDiscount.startsAt || "";
+    $("settings-site-discount-end").value = settings.siteDiscount.endsAt || "";
+  }
+
+  async function previewAsset(asset, image, fallback) {
+    if (!image) return;
+    if (!asset) { image.src = fallback; return; }
+    try {
+      await root.DartCatalog?.loadImage?.(asset);
+      image.src = root.DartCatalog?.imageSrc?.(asset) || fallback;
+    } catch { image.src = fallback; }
+  }
+
+  function renderMedia(settings) {
+    previewAsset(settings.heroDayImage, $("settings-hero-day-preview"), "../Photos/hero 2.png");
+    previewAsset(settings.heroNightImage || settings.heroDayImage, $("settings-hero-night-preview"), "../Photos/hero 2.png");
+    previewAsset(settings.founderImage, $("settings-founder-preview"), "../Photos/me.png");
+  }
+
+  function renderAnnouncements(settings) {
+    const list = $("settings-announcements-list"), template = $("settings-announcement-row-template");
+    if (!list || !template) return;
+    list.replaceChildren();
+    settings.announcements.forEach((row) => {
+      const fragment = template.content.cloneNode(true);
+      const element = fragment.querySelector("[data-announcement-row]");
+      element.dataset.id = row.id;
+      element.querySelector('[data-announcement-field="text"]').textContent = row.text;
+      element.querySelector('[data-announcement-field="dates"]').textContent = `${row.startsAt || "Always"} → ${row.endsAt || "Always"}`;
+      element.querySelector('[data-announcement-field="status"]').textContent = row.enabled === false ? "Paused" : "Active";
+      list.appendChild(fragment);
+    });
+    if (!settings.announcements.length) {
+      const empty = document.createElement("p");
+      empty.className = "dart-settings-empty";
+      empty.textContent = "No scheduled announcements yet.";
+      list.appendChild(empty);
+    }
+  }
+
+  function addTypingRow(scene, hold, word) {
+    const template = $("settings-typing-row-template"), container = $("settings-typing-rows");
+    if (!template || !container) return;
+    const fragment = template.content.cloneNode(true), row = fragment.querySelector("[data-typing-row]");
+    row.querySelector('[data-typing-field="scene"]').value = scene;
+    row.querySelector('[data-typing-field="hold"]').value = hold;
+    row.querySelector('[data-typing-field="text"]').value = word?.text || "";
+    row.querySelector('[data-typing-field="color"]').value = word?.color || "#ffffff";
+    row.querySelector('[data-typing-field="size"]').value = Number(word?.size) || 36;
+    row.querySelector('[data-typing-field="weight"]').value = Number(word?.weight) || 400;
+    container.appendChild(fragment);
+  }
+
+  function renderTyping(settings) {
+    const typing = settings.typing;
+    $("settings-typing-speed").value = typing.typingSpeed;
+    $("settings-deleting-speed").value = typing.deletingSpeed;
+    $("settings-word-delay").value = typing.wordDelay;
+    $("settings-scene-delay").value = typing.nextSceneDelay;
+    $("settings-typing-rows").replaceChildren();
+    typing.scenes.forEach((scene, index) =>
+      (scene.words || []).forEach((word) => addTypingRow(index + 1, scene.hold || 0, word)),
+    );
+  }
+
+  function renderModelCards(settings) {
+    const list = $("settings-model-cards-list"), template = $("settings-model-card-row-template");
+    if (!list || !template) return;
+    let models = [];
+    try { models = JSON.parse(localStorage.getItem("dart_models") || "[]"); } catch {}
+    models = models.filter((model) => !model.isDeleted && !model.isArchived && model.active !== false);
+    list.replaceChildren();
+    models.forEach((model) => {
+      const fragment = template.content.cloneNode(true), row = fragment.querySelector("[data-model-card-row]");
+      const rule = settings.modelCards[model.modelId] || { mode: "all", count: 1, colors: [] };
+      row.dataset.modelId = model.modelId;
+      row.querySelector('[data-model-field="name"]').textContent = model.name || model.modelId;
+      row.querySelector('[data-model-field="code"]').textContent = model.modelId;
+      row.querySelector('[data-model-field="mode"]').value = rule.mode || "all";
+      row.querySelector('[data-model-field="count"]').value = Math.max(1, Number(rule.count) || 1);
+      const colors = row.querySelector("[data-model-colors]");
+      (model.colorOptions || []).filter((color) => color.active !== false && !color.isArchived && !color.isDeleted).forEach((color) => {
+        const label = document.createElement("label"), input = document.createElement("input"), text = document.createElement("span");
+        input.type = "checkbox";
+        input.value = color.name;
+        input.checked = (rule.colors || []).includes(color.name);
+        text.textContent = color.name;
+        label.append(input, text);
+        colors.appendChild(label);
+      });
+      syncModelRow(row);
+      list.appendChild(fragment);
+    });
+    if (!models.length) {
+      const empty = document.createElement("p");
+      empty.className = "dart-settings-empty";
+      empty.textContent = "Add a model first, then its card controls will appear here.";
+      list.appendChild(empty);
+    }
+  }
+
+  function syncModelRow(row) {
+    const mode = row.querySelector('[data-model-field="mode"]')?.value;
+    row.querySelector("[data-model-count-wrap]").hidden = mode !== "count";
+    row.querySelector("[data-model-colors]").hidden = mode !== "custom";
+  }
+
+  function resetAnnouncementForm() {
+    $("settings-announcement-form")?.reset();
+    $("settings-announcement-id").value = "";
+    $("settings-announcement-enabled").checked = true;
+    $("save-announcement").textContent = "Add announcement";
+    $("cancel-announcement-edit").hidden = true;
+  }
+
+  $("settings-commerce-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const next = root.DartSiteSettings.get();
+    next.defaultMarkupPercent = Math.max(0, number("settings-default-markup", 50));
+    next.birthdayDiscountPercent = Math.min(100, Math.max(0, number("settings-birthday-discount", 30)));
+    next.dartCardDiscountPercent = Math.min(100, Math.max(0, number("settings-card-discount", 40)));
+    next.refundCustomerFee = Math.max(0, number("settings-refund-fee", 100));
+    next.repeatExchangeCustomerFee = Math.max(0, number("settings-repeat-exchange-fee", 50));
+    saveSettings(next, "Pricing and future-record fee defaults updated");
+  });
+
+  $("settings-site-discount-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const start = $("settings-site-discount-start").value, end = $("settings-site-discount-end").value;
+    if (start && end && end < start) return announce("تاريخ نهاية الخصم يجب أن يكون بعد تاريخ البداية.", true);
+    const next = root.DartSiteSettings.get();
+    next.siteDiscount = {
+      enabled: $("settings-site-discount-enabled").checked,
+      percent: Math.min(100, Math.max(0, number("settings-site-discount-percent", 0))),
+      startsAt: start, endsAt: end,
+    };
+    saveSettings(next, "Site-wide discount updated");
+  });
+
+  $("settings-media-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const next = root.DartSiteSettings.get();
+    const uploads = [
+      ["settings-hero-day", "heroDayImage"], ["settings-hero-night", "heroNightImage"], ["settings-founder-image", "founderImage"],
+    ];
+    try {
+      for (const [id, key] of uploads) {
+        const file = $(id).files?.[0];
+        if (file) next[key] = await root.DartCatalog.saveImage(file);
+      }
+      saveSettings(next, "Site media replaced");
+      event.target.reset();
+      renderMedia(next);
+    } catch (error) { announce(error.message || "تعذر حفظ الصورة.", true); }
+  });
+
+  $("clear-media-settings")?.addEventListener("click", () => {
+    const next = root.DartSiteSettings.get();
+    next.heroDayImage = null; next.heroNightImage = null; next.founderImage = null;
+    saveSettings(next, "Site media restored to original files");
+    renderMedia(next);
+  });
+
+  $("settings-announcement-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const start = $("settings-announcement-start").value, end = $("settings-announcement-end").value;
+    if (start && end && end < start) return announce("تاريخ نهاية الخبر يجب أن يكون بعد تاريخ البداية.", true);
+    const next = root.DartSiteSettings.get(), editId = $("settings-announcement-id").value;
+    const payload = { id: editId || uid("NEWS"), text: $("settings-announcement-text").value.trim(), startsAt: start, endsAt: end, order: number("settings-announcement-order", 0), enabled: $("settings-announcement-enabled").checked, updatedAt: new Date().toISOString() };
+    const existing = next.announcements.find((row) => row.id === editId);
+    if (existing) Object.assign(existing, payload); else next.announcements.push({ ...payload, createdAt: payload.updatedAt });
+    saveSettings(next, editId ? "Announcement updated" : "Announcement added");
+    resetAnnouncementForm(); renderAnnouncements(next);
+  });
+
+  $("settings-announcements-list")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-announcement-action]"), row = button?.closest("[data-announcement-row]");
+    if (!button || !row) return;
+    const settings = root.DartSiteSettings.get(), item = settings.announcements.find((entry) => entry.id === row.dataset.id);
+    if (!item) return;
+    if (button.dataset.announcementAction === "delete") {
+      if (!root.confirm("Delete this scheduled announcement?")) return;
+      settings.announcements = settings.announcements.filter((entry) => entry.id !== item.id);
+      saveSettings(settings, "Announcement deleted"); renderAnnouncements(settings); return;
+    }
+    $("settings-announcement-id").value = item.id;
+    $("settings-announcement-text").value = item.text;
+    $("settings-announcement-start").value = item.startsAt || "";
+    $("settings-announcement-end").value = item.endsAt || "";
+    $("settings-announcement-order").value = item.order || 0;
+    $("settings-announcement-enabled").checked = item.enabled !== false;
+    $("save-announcement").textContent = "Save announcement";
+    $("cancel-announcement-edit").hidden = false;
+  });
+  $("cancel-announcement-edit")?.addEventListener("click", resetAnnouncementForm);
+
+  $("add-typing-word")?.addEventListener("click", () => {
+    const rows = [...document.querySelectorAll("[data-typing-row]")];
+    addTypingRow(Math.max(1, Number(rows.at(-1)?.querySelector('[data-typing-field="scene"]')?.value) || 1), 2000, null);
+  });
+  $("settings-typing-rows")?.addEventListener("click", (event) => event.target.closest("[data-typing-remove]")?.closest("[data-typing-row]")?.remove());
+  $("settings-typing-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const grouped = new Map();
+    document.querySelectorAll("[data-typing-row]").forEach((row) => {
+      const scene = Math.max(1, Number(row.querySelector('[data-typing-field="scene"]').value) || 1);
+      if (!grouped.has(scene)) grouped.set(scene, { hold: Math.max(0, Number(row.querySelector('[data-typing-field="hold"]').value) || 0), words: [] });
+      grouped.get(scene).words.push({ text: row.querySelector('[data-typing-field="text"]').value.trim(), color: row.querySelector('[data-typing-field="color"]').value, size: Math.max(10, Number(row.querySelector('[data-typing-field="size"]').value) || 36), weight: Math.min(900, Math.max(100, Number(row.querySelector('[data-typing-field="weight"]').value) || 400)) });
+    });
+    if (!grouped.size) return announce("أضف كلمة واحدة على الأقل للهيرو.", true);
+    const next = root.DartSiteSettings.get();
+    next.typing = { typingSpeed: Math.max(10, number("settings-typing-speed", 70)), deletingSpeed: Math.max(5, number("settings-deleting-speed", 10)), wordDelay: Math.max(0, number("settings-word-delay", 100)), nextSceneDelay: Math.max(0, number("settings-scene-delay", 400)), scenes: [...grouped.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1]) };
+    saveSettings(next, "Hero typing animation updated");
+  });
+
+  $("settings-model-cards-list")?.addEventListener("change", (event) => {
+    const row = event.target.closest("[data-model-card-row]"); if (row) syncModelRow(row);
+  });
+  $("settings-model-cards-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const next = root.DartSiteSettings.get(); next.modelCards = {};
+    document.querySelectorAll("[data-model-card-row]").forEach((row) => {
+      const mode = row.querySelector('[data-model-field="mode"]').value;
+      next.modelCards[row.dataset.modelId] = { mode, count: Math.max(1, Number(row.querySelector('[data-model-field="count"]').value) || 1), colors: [...row.querySelectorAll('[data-model-colors] input:checked')].map((input) => input.value) };
+    });
+    saveSettings(next, "Product card color visibility updated");
+  });
+
+  function init() {
+    const settings = root.DartSiteSettings.get();
+    fillGeneral(settings); renderMedia(settings); renderAnnouncements(settings); renderTyping(settings); renderModelCards(settings);
+  }
+  document.addEventListener("DOMContentLoaded", init);
+  root.addEventListener("dart:data-changed", (event) => { if (event.detail?.key === "dart_models") renderModelCards(root.DartSiteSettings.get()); });
+})(typeof window !== "undefined" ? window : globalThis);

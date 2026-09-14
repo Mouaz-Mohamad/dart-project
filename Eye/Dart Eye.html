@@ -148,7 +148,7 @@
                     </div>
 
                     <div class="cost-cont">
-                        <button type="button" class="dart-info-btn" data-info-title="Total Cost" data-info-text="Sold-piece cost plus operating expenses, representative fees and non-duplicated damage loss inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
+                        <button type="button" class="dart-info-btn" data-info-title="Total Cost" data-info-text="Cost of all physical pieces added in the period plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
                             <h4><i class="fa-solid fa-coins"></i> Total Cost</h4>
                             <span class="variance">—</span>
@@ -168,6 +168,7 @@
 
                 <div class="dart-chart-card">
                     <div class="dart-controls">
+                        <div class="dart-chart-title"><strong>Total Sales</strong><small>Delivered net sales by month</small></div>
                         <div class="dart-nav-controls">
                             <button type="button" class="dart-nav-btn" onclick="navigate(-1)">❮</button>
                             <span id="displayLabel">2026</span>
@@ -261,7 +262,7 @@
                     </article>
                     <article id="financial-analysis-card" class="dart-finance-panel dart-financial-analysis-panel">
                         <div class="dart-panel-head">
-                            <div><h3>Financial Analysis</h3><p>Revenue, total cost and net profit.</p></div>
+                            <div><h3>Financial Analysis</h3><p>Total sales, complete Brand cost and resulting net profit.</p></div>
                             <span id="dart-financial-period" class="dart-panel-badge"></span>
                         </div>
                         <div class="dart-chart-frame">
@@ -409,6 +410,7 @@
                     <i class='bx bx-trash'></i>
                     <span>Delete</span>
                 </button>
+                <button type="button" id="assign-selected-returns" class="dart-return-bulk-assign"><i class="fa-solid fa-motorcycle"></i> Assign selected pickups</button>
             </div>
 
             <div class="cont-titel">
@@ -798,6 +800,7 @@
                             <button class="action-btn btn-delete" type="button" title="Archive"><i class="bx bx-minus-circle"></i></button>
                             <button class="action-btn btn-hard-delete" type="button" title="Permanent delete"><i class="bx bx-trash"></i></button>
                             <button class="action-btn btn-edit" type="button" title="Edit"><i class="bx bx-edit"></i></button>
+                            <button class="return-rollback-btn dart-back-btn" type="button" data-return-action="rollback" title="Back one step" aria-label="Back one return step"><i class="bx bx-undo"></i></button>
                             <button class="return-accept-btn" type="button" data-return-action="accept">Accept</button>
                             <button class="return-reject-btn" type="button" data-return-action="reject">Reject</button>
                             <button class="return-assign-btn" type="button" data-return-action="assign">Assign Rep</button>
@@ -821,6 +824,13 @@
                         <span class="text-item w300 overflow" data-return-field="reason"></span>
                         <span class="text-item w300 overflow" data-return-field="rejectionReason"></span>
                         <span class="text-item w150" data-return-field="orderId"></span>
+                    </div>
+                </template>
+                <template id="dashboard-operation-group-template">
+                    <div class="dart-operation-group-head" data-operation-group-heading>
+                        <strong data-operation-group-field="title"></strong>
+                        <span data-operation-group-field="route"></span>
+                        <small data-operation-group-field="note"></small>
                     </div>
                 </template>
             </div>
@@ -1103,6 +1113,104 @@
             </header>
 
             <div id="settings-content" class="dart-settings-grid">
+                <article id="settings-commerce-card" class="dart-settings-card dart-settings-form-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-calculator"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>PRICING &amp; FEES</span>
+                        <h2>New-record defaults</h2>
+                        <p>تُحفظ القيمة داخل الطلب أو المرتجع الجديد. السجلات القديمة لا تتغير.</p>
+                    </div>
+                    <form id="settings-commerce-form" class="dart-settings-fields">
+                        <label for="settings-default-markup">Default model markup %<input id="settings-default-markup" type="number" min="0" max="1000" step="1" required></label>
+                        <label for="settings-birthday-discount">Birthday discount %<input id="settings-birthday-discount" type="number" min="0" max="100" step="1" required></label>
+                        <label for="settings-card-discount">Dart Card discount %<input id="settings-card-discount" type="number" min="0" max="100" step="1" required></label>
+                        <label for="settings-refund-fee">Refund customer fee (EGP)<input id="settings-refund-fee" type="number" min="0" step="1" required></label>
+                        <label for="settings-repeat-exchange-fee">Repeat exchange fee (EGP)<input id="settings-repeat-exchange-fee" type="number" min="0" step="1" required></label>
+                        <button id="save-commerce-settings" type="submit" class="dart-settings-save">Save pricing &amp; fees</button>
+                    </form>
+                </article>
+
+                <article id="settings-site-discount-card" class="dart-settings-card dart-settings-form-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-percent"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>STORE PROMOTION</span>
+                        <h2>Site-wide discount</h2>
+                        <p>الأولوية: عيد الميلاد، ثم خصم الموقع، ثم Dart Card. لا يتم جمع خصمين.</p>
+                    </div>
+                    <form id="settings-site-discount-form" class="dart-settings-fields">
+                        <label class="dart-settings-check" for="settings-site-discount-enabled"><input id="settings-site-discount-enabled" type="checkbox"> Enable site-wide discount</label>
+                        <label for="settings-site-discount-percent">Discount %<input id="settings-site-discount-percent" type="number" min="0" max="100" step="1"></label>
+                        <label for="settings-site-discount-start">Start date<input id="settings-site-discount-start" type="date"></label>
+                        <label for="settings-site-discount-end">End date<input id="settings-site-discount-end" type="date"></label>
+                        <button id="save-site-discount-settings" type="submit" class="dart-settings-save">Save store discount</button>
+                    </form>
+                </article>
+
+                <article id="settings-media-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-regular fa-images"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>SITE MEDIA</span>
+                        <h2>Hero &amp; founder images</h2>
+                        <p>صورة النهار من 6 صباحًا إلى 6 مساءً بتوقيت القاهرة. عند وجود صورة واحدة تُستخدم في الفترتين.</p>
+                    </div>
+                    <form id="settings-media-form" class="dart-settings-media-grid">
+                        <label for="settings-hero-day">Day hero image<input id="settings-hero-day" type="file" accept="image/jpeg,image/png,image/webp"><img id="settings-hero-day-preview" alt="Day hero preview"></label>
+                        <label for="settings-hero-night">Night hero image<input id="settings-hero-night" type="file" accept="image/jpeg,image/png,image/webp"><img id="settings-hero-night-preview" alt="Night hero preview"></label>
+                        <label for="settings-founder-image">Founder image<input id="settings-founder-image" type="file" accept="image/jpeg,image/png,image/webp"><img id="settings-founder-preview" alt="Founder preview"></label>
+                        <div class="dart-settings-media-actions"><button id="save-media-settings" type="submit" class="dart-settings-save">Upload &amp; replace selected</button><button id="clear-media-settings" type="button" class="dart-settings-secondary">Use original images</button></div>
+                    </form>
+                </article>
+
+                <article id="settings-announcements-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-bullhorn"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>UNDER NAV</span>
+                        <h2>Scheduled announcements</h2>
+                        <p>أضف عدة أخبار بفترة ظهور. رسالة عيد الميلاد تظل تلقائية وأساسية.</p>
+                    </div>
+                    <form id="settings-announcement-form" class="dart-settings-fields">
+                        <input id="settings-announcement-id" type="hidden">
+                        <label class="dart-settings-field-wide" for="settings-announcement-text">Announcement<input id="settings-announcement-text" type="text" maxlength="180" required></label>
+                        <label for="settings-announcement-start">Start date<input id="settings-announcement-start" type="date"></label>
+                        <label for="settings-announcement-end">End date<input id="settings-announcement-end" type="date"></label>
+                        <label for="settings-announcement-order">Order<input id="settings-announcement-order" type="number" min="0" step="1" value="0"></label>
+                        <label class="dart-settings-check" for="settings-announcement-enabled"><input id="settings-announcement-enabled" type="checkbox" checked> Active</label>
+                        <button id="save-announcement" type="submit" class="dart-settings-save">Add announcement</button>
+                        <button id="cancel-announcement-edit" type="button" class="dart-settings-secondary" hidden>Cancel edit</button>
+                    </form>
+                    <div id="settings-announcements-list" class="dart-settings-list"></div>
+                    <template id="settings-announcement-row-template"><div class="dart-settings-list-row" data-announcement-row><div><strong data-announcement-field="text"></strong><small data-announcement-field="dates"></small></div><span data-announcement-field="status"></span><button type="button" data-announcement-action="edit">Edit</button><button type="button" data-announcement-action="delete">Delete</button></div></template>
+                </article>
+
+                <article id="settings-typing-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-keyboard"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>HERO WORDS</span>
+                        <h2>Typing animation</h2>
+                        <p>كل صف كلمة. رقم المشهد يحدد الكلمات التي تظهر معًا وترتيب الصفوف يحدد ترتيبها.</p>
+                    </div>
+                    <form id="settings-typing-form" class="dart-settings-fields">
+                        <label for="settings-typing-speed">Typing speed ms<input id="settings-typing-speed" type="number" min="10" step="1"></label>
+                        <label for="settings-deleting-speed">Deleting speed ms<input id="settings-deleting-speed" type="number" min="5" step="1"></label>
+                        <label for="settings-word-delay">Word delay ms<input id="settings-word-delay" type="number" min="0" step="1"></label>
+                        <label for="settings-scene-delay">Next scene delay ms<input id="settings-scene-delay" type="number" min="0" step="1"></label>
+                        <div id="settings-typing-rows" class="dart-settings-typing-rows dart-settings-field-wide"></div>
+                        <button id="add-typing-word" type="button" class="dart-settings-secondary">Add word</button>
+                        <button id="save-typing-settings" type="submit" class="dart-settings-save">Save animation</button>
+                    </form>
+                    <template id="settings-typing-row-template"><div class="dart-settings-typing-row" data-typing-row><label>Scene<input data-typing-field="scene" type="number" min="1" step="1" required></label><label>Hold ms<input data-typing-field="hold" type="number" min="0" step="1" required></label><label>Text<input data-typing-field="text" type="text" maxlength="80" required></label><label>Color<input data-typing-field="color" type="color" required></label><label>Size px<input data-typing-field="size" type="number" min="10" max="120" required></label><label>Weight<input data-typing-field="weight" type="number" min="100" max="900" step="100" required></label><button type="button" data-typing-remove aria-label="Delete word"><i class="fa-solid fa-trash"></i></button></div></template>
+                </article>
+
+                <article id="settings-model-cards-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-shirt"></i></div>
+                    <div class="dart-settings-card-copy"><span>PRODUCT CARDS</span><h2>Colors shown per model</h2><p>يتطبق على Home وProducts، بينما نافذة الموديل تظل تعرض كل ألوان التصميم.</p></div>
+                    <form id="settings-model-cards-form">
+                        <div id="settings-model-cards-list" class="dart-settings-list"></div>
+                        <button id="save-model-card-settings" type="submit" class="dart-settings-save">Save product card display</button>
+                    </form>
+                    <template id="settings-model-card-row-template"><div class="dart-settings-model-row" data-model-card-row><div><strong data-model-field="name"></strong><small data-model-field="code"></small></div><label>Cards<select data-model-field="mode"><option value="all">All colors</option><option value="one">One card</option><option value="two">Two cards</option><option value="count">Custom number</option><option value="custom">Choose colors</option></select></label><label data-model-count-wrap hidden>Number<input data-model-field="count" type="number" min="1" step="1" value="1"></label><div data-model-colors class="dart-settings-color-options"></div></div></template>
+                </article>
+
                 <article id="settings-reset-card" class="dart-settings-card dart-settings-danger-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <div class="dart-settings-card-copy">
@@ -1850,6 +1958,8 @@
 </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="../Js/dart-site-settings.js"></script>
+    <script src="../Js/dart-groups.js"></script>
     <script src="../Js/dart-address.js"></script>
     <script src="../Js/dart-catalog.js"></script>
     <script src="../Js/dart-returns.js"></script>

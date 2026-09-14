@@ -18,9 +18,9 @@ const dashboardFixes = read("Eye/dart-fixes.js");
 const representativePortal = read("Js/dart-rep.js");
 const dashboardHtml = read("Eye/Dart Eye.html");
 const tracking = read("Js/dart-tracking.js");
-const styles = read("CSS/fixes.css");
+const styles = read("CSS/Stayle 1.css");
 const profile = read("profile.html");
-const returnsFragment = read("sections/form-return.html");
+const returnsFragment = read("form-return.html");
 const nav = read("sections/Nav-Bar.html");
 const footer = read("sections/footer.html");
 
@@ -63,7 +63,7 @@ for (const id of [
 requireText(dashboard, 'dartCommitHardDelete("only")', "Delete-only choice is not wired.");
 requireText(dashboard, 'dartCommitHardDelete("cascade")', "Cascade delete choice is not wired.");
 requireText(dashboard, 'grantType: "Manual Additional Benefit"', "Manual Dart Card grant is missing.");
-requireText(dashboard, 'discountPercent: 40', "Manual Dart Card discount must stay fixed at 40%.");
+requireText(dashboard, 'DartSiteSettings?.get?.().dartCardDiscountPercent', "New Dart Cards must use the configurable Settings discount.");
 requireText(dashboard, 'itemLimit: 10', "Manual Dart Card limit must stay fixed at 10 pieces.");
 
 // Product verification, leaderboard, simplified return and tracking.
@@ -74,7 +74,7 @@ requireText(platform, 'order.status === "Delivered"', "Leaderboard must count de
 for (const rank of [1, 2, 3]) requireText(styles, `.leaderboard-item.rank-${rank}`, `Leaderboard rank ${rank} styling is missing.`);
 if (/name=["']model_code["']/i.test(returnsFragment)) errors.push("Public return form must not request Model Code.");
 requireText(platform, "modelCode = orderLine?.modelCode || inventoryItem?.modelId", "Return Model Code must be derived automatically.");
-requirePattern(tracking, /order\.status\s*!==\s*["']Delivered["']/, "Delivered orders must be excluded from tracking.");
+requireText(tracking, '["Delivered", "Cancelled", "Refused"].includes(order.status)', "Completed orders must be excluded from active tracking.");
 
 // Profile card and five prepared social destinations.
 requireText(profile, 'src="Photos/dart-logo-white.png"', "Profile Dart Card must use the white logo.");

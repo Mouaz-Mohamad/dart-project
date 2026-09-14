@@ -469,6 +469,23 @@
     );
   }
 
+  function wrapOperationalGroups(list, records, type) {
+    const groups = type === "order"
+      ? window.DartGroups?.groupOrders?.(records)
+      : window.DartGroups?.groupReturns?.(records);
+    (groups || []).filter((group) => group.records.length > 1).forEach((group) => {
+      const attribute = type === "order" ? "data-order-id" : "data-return-id";
+      const cards = group.records.map((record) => [...list.querySelectorAll(`[${attribute}]`)].find((card) => String(card.getAttribute(attribute)) === String(record.id))).filter(Boolean);
+      if (cards.length < 2) return;
+      const template = document.getElementById("rep-operational-group-template");
+      if (!template) return;
+      const fragment = template.content.cloneNode(true), wrapper = fragment.querySelector("[data-rep-operational-group]");
+      wrapper.querySelector('[data-rep-group-field="title"]').textContent = type === "order" ? `${cards.length} orders · one delivery route` : `${cards.length} returns · one pickup route`;
+      cards[0].before(fragment);
+      cards.forEach((card) => wrapper.appendChild(card));
+    });
+  }
+
   function renderReturns(rep) {
     const list = document.getElementById("repReturnsList"),
       template = document.getElementById("rep-return-card-template");
@@ -527,6 +544,7 @@
       card.querySelector('[data-return-field="proximity"]').classList.toggle("is-ready", proximity.ok);
       list.appendChild(fragment);
     });
+    wrapOperationalGroups(list, records, "return");
   }
 
   function renderOrders() {
@@ -588,6 +606,7 @@
         })
         .join("") ||
       '<div class="empty-state">No active orders are assigned to you.</div>';
+    wrapOperationalGroups(list, orders, "order");
     renderReturns(rep);
     ensureLocationWatch();
   }
@@ -711,6 +730,12 @@
     if (!["Representative Assigned", "Pickup On The Way"].includes(record.status))
       throw new Error("This pickup cannot be started in its current status.");
     const previous = record.status;
+    if (record.status === "Representative Assigned")
+      record.pickupSnapshot = window.DartReturns?.captureWorkflowSnapshot?.(
+        record,
+        ["pickupStartedAt", "courierLocation", "updatedAt"],
+        now(),
+      ) || null;
     record.status = "Pickup On The Way";
     record.pickupStartedAt = record.pickupStartedAt || now();
     record.updatedAt = now();
@@ -759,6 +784,25 @@
     if (!originalItem) throw new Error("The original physical item could not be found.");
     if (!order) throw new Error("The original delivered order could not be found.");
 
+    const replacement = isExchange
+      ? items.find((item) => String(item.itemCode) === String(record.replacementItemCode))
+      : null;
+    if (isExchange && !record.exchangeCompletionApplied &&
+        (!replacement || String(replacement.status).toLowerCase() !== "processing/held"))
+      throw new Error("The held replacement item is no longer available.");
+    const cards = isRefund && order.dartCardId ? read(KEYS.cards, []) : [];
+    const card = order.dartCardId
+      ? cards.find((row) => String(row.cardId) === String(order.dartCardId))
+      : null;
+    record.completionSnapshot = window.DartReturns?.captureCompletionSnapshot?.(
+      record,
+      originalItem,
+      replacement,
+      order,
+      card,
+      completedAt,
+    ) || null;
+
     originalItem.status = "Return Inspection";
     originalItem.returnRequestId = record.id;
     originalItem.exchangeChainId = record.exchangeChainId || originalItem.exchangeChainId || originalItem.itemCode;
@@ -772,8 +816,6 @@
       record.refundAmount = refundAmount;
       record.financialCompletionApplied = true;
       if (order.dartCardId && order.dartCardUsageRecorded && !record.dartCardUsageReversed) {
-        const cards = read(KEYS.cards, []),
-          card = cards.find((row) => String(row.cardId) === String(order.dartCardId));
         if (card) {
           card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - 1));
           card.requestedProducts = (card.requestedProducts || []).filter(
@@ -793,11 +835,6 @@
     }
 
     if (isExchange && !record.exchangeCompletionApplied) {
-      const replacement = items.find(
-        (item) => String(item.itemCode) === String(record.replacementItemCode),
-      );
-      if (!replacement || String(replacement.status).toLowerCase() !== "processing/held")
-        throw new Error("The held replacement item is no longer available.");
       replacement.status = "Sold";
       replacement.orderId = order.orderId;
       replacement.clientId = order.clientId;

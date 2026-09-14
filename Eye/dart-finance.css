@@ -200,6 +200,8 @@
   overflow: visible;
   box-sizing: border-box;
   margin: 16px 0 22px;
+  isolation: isolate;
+  contain: layout;
 }
 
 #brand.active-section {
@@ -236,6 +238,7 @@
   grid-auto-flow: row;
   align-items: stretch;
   gap: 13px;
+  grid-template-rows: auto;
 }
 
 .dart-financial-analysis-panel {

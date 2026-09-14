@@ -43,22 +43,33 @@ if dashboard.count('id="size-chart-modal"') != 1: errors.append('Dashboard must 
 for page_name in ['index.html','products.html']:
     page=(ROOT/page_name).read_text(encoding='utf-8')
     if page.count('id="productSizeChartPanel"') != 1: errors.append(f'{page_name} must contain exactly one reusable product size-chart panel')
+    for price_field in ['old','current','discount']:
+        if f'data-product-price="{price_field}"' not in page: errors.append(f'{page_name} product template missing {price_field} price field')
+
+if 'class="return-rollback-btn dart-back-btn"' not in dashboard:
+    errors.append('Dashboard return template is missing the one-step rollback action')
 
 address=(ROOT/'Js/dart-address.js').read_text(encoding='utf-8')
 for required_text in ['DELIVERY_BOUNDS','isSupportedDeliveryResult','outside-delivery-zone','Giza','floor']:
     if required_text not in address: errors.append(f'Address module missing delivery-zone rule: {required_text}')
 
 rep=(ROOT/'rep.html').read_text(encoding='utf-8')
-for required in ['repAuthCard','repLoginForm','repRegisterForm','repChangePasswordForm','repOrdersList','repReturnsList','rep-return-card-template','repLocationStatus']:
+for required in ['repAuthCard','repLoginForm','repRegisterForm','repChangePasswordForm','repOrdersList','repReturnsList','rep-return-card-template','rep-operational-group-template','repLocationStatus']:
     if f'id="{required}"' not in rep: errors.append(f'Representative portal missing #{required}')
 if 'id="repDeliveryMap"' in rep: errors.append('Representative portal must not include an embedded map')
 
 tracking=(ROOT/'track.html').read_text(encoding='utf-8')
-for required in ['trackingMapShell','tracking-map','trackingMapDisabled','trackingMapSummary','etaTime','returnTrackingSection','returnTrackingList','return-tracking-card-template']:
+for required in ['orderTrackingList','order-tracking-card-template','order-tracking-unit-template','order-tracking-line-template','returnTrackingSection','returnTrackingList','return-tracking-card-template','return-tracking-unit-template']:
     if f'id="{required}"' not in tracking: errors.append(f'Tracking page missing #{required}')
+if 'innerHTML' in (ROOT/'Js/dart-tracking.js').read_text(encoding='utf-8'):
+    errors.append('Tracking JavaScript must fill the static HTML templates instead of generating markup strings')
 
-fixes=(ROOT/'CSS/fixes.css').read_text(encoding='utf-8')
-if not re.search(r'#representative\s+\.row-action-btns\s*\{[^}]*width:\s*300px',fixes,re.S):
+serial=(ROOT/'search-serial.html').read_text(encoding='utf-8')
+for required in ['serialSearchResult','serialResultTitle','serialResultMessage','serialProduct','serialProductImage','serialProductName','serialProductCode','serialProductSize','serialProductColor','serialProductOwner']:
+    if f'id="{required}"' not in serial: errors.append(f'Serial page missing static result field #{required}')
+
+dashboard_styles=(ROOT/'Eye/dart.css').read_text(encoding='utf-8')
+if not re.search(r'#representative\s+\.row-action-btns\s*\{[^}]*width:\s*300px',dashboard_styles,re.S):
     errors.append('Representative Action cell must be fixed at 300px')
 
 checkout_code=(ROOT/'Js/one .js').read_text(encoding='utf-8')

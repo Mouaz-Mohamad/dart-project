@@ -60,8 +60,26 @@
   const model = (code) => models().find((m) => m.modelId === code);
   const colors = (m) => (Array.isArray(m?.colorOptions) ? m.colorOptions : []);
   const sizes = (m) => (Array.isArray(m?.sizeOptions) ? m.sizeOptions : []);
-  const price = (m) =>
-    Math.max(0, Number(m?.selling || 0) * (1 - Number(m?.discount || 0) / 100));
+  const discountPercent = (value) =>
+    Math.min(100, Math.max(0, Number(value) || 0));
+  const modelPrice = (m) =>
+    Math.max(0, Number(m?.selling || 0) * (1 - discountPercent(m?.discount) / 100));
+  const pricing = (m) => {
+    const originalPrice = Math.max(0, Number(m?.selling || 0));
+    const siteDiscount = window.DartSiteSettings?.activeSiteDiscount?.();
+    const effectiveDiscountPercent = siteDiscount
+      ? discountPercent(siteDiscount.percent)
+      : discountPercent(m?.discount);
+    return {
+      originalPrice,
+      finalPrice: Math.max(0, originalPrice * (1 - effectiveDiscountPercent / 100)),
+      effectiveDiscountPercent,
+      discountSource: effectiveDiscountPercent
+        ? siteDiscount ? "Site" : "Model"
+        : "",
+    };
+  };
+  const price = (m) => pricing(m).finalPrice;
   // END One-time reset and repositories.
 
   // BEGIN Shared image storage. Blobs live once in IndexedDB; models hold IDs only.
@@ -254,13 +272,17 @@
               assetId: img.id,
             })),
           );
+        const currentPricing = pricing(m);
         return {
           id: m.modelId,
           code: m.modelId,
           title: m.name,
           category: m.category,
           description: m.description || "",
-          price: price(m),
+          price: currentPricing.finalPrice,
+          originalPrice: currentPricing.originalPrice,
+          effectiveDiscountPercent: currentPricing.effectiveDiscountPercent,
+          discountSource: currentPricing.discountSource,
           selling: Number(m.selling),
           discount: Number(m.discount) || 0,
           stock,
@@ -276,7 +298,7 @@
   }
   function snapshot(m, i) {
     const original = Number(m.selling) || 0,
-      final = price(m);
+      final = modelPrice(m);
     return {
       itemId: i.id,
       itemCode: i.itemCode,
@@ -305,10 +327,13 @@
     colors,
     sizes,
     price,
+    pricing,
+    modelPrice,
     cover,
     placeholder,
     imageSrc,
     saveImage,
+    loadImage,
     loadModelImages,
     preloadImages,
     available,

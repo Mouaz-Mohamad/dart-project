@@ -7,30 +7,30 @@
     <meta name="color-scheme" content="light">
 
     <!-- SEO الأساسي -->
-    <title>تواصل مع Dart | خدمة العملاء</title>
-    <meta name="description" content="تواصل مع فريق Dart للاستفسار عن المنتجات والطلبات والشحن والاستبدال والاسترجاع.">
+    <title>تتبع قطعتك | Dart</title>
+    <meta name="description" content="تحقق من كود قطعة Dart واعرض بيانات القطعة المباعة المسجلة.">
     <meta name="author" content="Dart">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-    <link rel="canonical" href="https://dart-project-psi.vercel.app/Contact%20us.html">
+    <link rel="canonical" href="https://dart-project-psi.vercel.app/search-serial.html">
 
     <!-- Open Graph / Facebook & WhatsApp -->
     <meta property="og:site_name" content="Dart">
-    <meta property="og:title" content="تواصل مع Dart | خدمة العملاء">
-    <meta property="og:description" content="تواصل مع فريق Dart بخصوص المنتجات والطلبات والتوصيل والاستبدال والاسترجاع.">
+    <meta property="og:title" content="تتبع قطعتك | Dart">
+    <meta property="og:description" content="تحقق من كود قطعة Dart المباعة.">
     <meta property="og:image" content="https://dart-project-psi.vercel.app/Photos/1080px.png">
     <meta property="og:image:secure_url" content="https://dart-project-psi.vercel.app/Photos/1080px.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1080">
     <meta property="og:image:height" content="1080">
     <meta property="og:image:alt" content="شعار براند Dart للملابس الرجالية">
-    <meta property="og:url" content="https://dart-project-psi.vercel.app/Contact%20us.html">
+    <meta property="og:url" content="https://dart-project-psi.vercel.app/search-serial.html">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ar_EG">
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="تواصل مع Dart | خدمة العملاء">
-    <meta name="twitter:description" content="تواصل مع فريق Dart بخصوص المنتجات والطلبات والتوصيل والاستبدال والاسترجاع.">
+    <meta name="twitter:title" content="تتبع قطعتك | Dart">
+    <meta name="twitter:description" content="تحقق من كود قطعة Dart المباعة.">
     <meta name="twitter:image" content="https://dart-project-psi.vercel.app/Photos/1080px.png">
     <meta name="twitter:image:alt" content="شعار براند Dart للملابس الرجالية">
 
@@ -52,20 +52,20 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "ContactPage",
-      "name": "تواصل مع Dart",
-      "url": "https://dart-project-psi.vercel.app/Contact%20us.html",
-      "description": "صفحة التواصل مع خدمة عملاء Dart.",
+      "@type": "WebPage",
+      "name": "تتبع قطعتك | Dart",
+      "url": "https://dart-project-psi.vercel.app/search-serial.html",
+      "description": "صفحة التحقق من قطعة Dart المباعة.",
       "inLanguage": "ar-EG",
       "isPartOf": { "@id": "https://dart-project-psi.vercel.app/#website" }
     }
     </script>
     </head>
 
-    <body>
+    <body class="dart-serial-page">
             <div class="mother">
                 <header id="header-container" aria-label="Main Navigation"></header>
-                <main class="#">
+                <main>
                     <section class="search-serial dja-flexdir margin-top" aria-label="Product Authenticity Check | التحقق من أصالة القطعة">
                         <h1>Trace your unique edition</h1>
                         <form class="search-container dja" id="serialSearchForm" novalidate>
@@ -75,16 +75,32 @@
                                 <i class="fas fa-search"></i>
                             </button>
                         </form>
-                        <div id="serialSearchResult" class="serial-result" role="dialog" aria-modal="true" aria-live="polite" aria-labelledby="serialResultTitle" hidden>   </div>                             
-                        <div class="serial-result-card">
-                            <button type="button" class="serial-result-close" aria-label="Close">&times;</button>
-                            <div class="serial-result-content"></div>
+                        <div id="serialSearchResult" class="serial-result serial-result-card is-idle" role="status" aria-live="polite" aria-labelledby="serialResultTitle">
+                            <div class="serial-result-content serial-result-skeleton">
+                                <div id="serialSkeletonImage" class="serial-skeleton-image" aria-hidden="true"></div>
+                                <div id="serialSkeletonCopy" class="serial-skeleton-copy" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                                <div id="serialResultIcon" class="serial-result-icon" hidden><i id="serialResultIconGlyph" class="fa-solid fa-check" aria-hidden="true"></i></div>
+                                <h2 id="serialResultTitle">Enter an item code</h2>
+                                <p id="serialResultMessage">بيانات القطعة المباعة ستظهر في هذا الكرت.</p>
+                                <div id="serialProduct" class="serial-product" hidden>
+                                    <img id="serialProductImage" class="serial-product-image" src="Photos/hero 2.png" alt="Dart item verification preview">
+                                    <div class="serial-product-details">
+                                        <div><small>Product</small><strong id="serialProductName"></strong></div>
+                                        <div><small>Item Code</small><strong id="serialProductCode"></strong></div>
+                                        <div><small>Size</small><strong id="serialProductSize"></strong></div>
+                                        <div><small>Color</small><strong id="serialProductColor"></strong></div>
+                                        <div class="serial-owner"><small>Registered owner</small><strong id="serialProductOwner"></strong></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 </main>
                 <footer id="footer" aria-label="footer."></footer>
             </div>
 
+        <script src="Js/dart-site-settings.js"></script>
+        <script src="Js/dart-groups.js"></script>
         <script src="Js/dart-catalog.js"></script>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src="Js/dart-address.js"></script>

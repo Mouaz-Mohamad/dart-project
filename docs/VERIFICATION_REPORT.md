@@ -79,3 +79,13 @@ The environment still has no installed Chromium binary, so the included browser 
 - Verified that a damaged physical item contributes its cost once, including an exchanged item whose damaged original is no longer present on the order line.
 - Verified the return/exchange flow across the customer form, public tracking, dashboard approval/assignment, representative pickup and post-pickup inspection. Exchange replacements retain the exact original net price and chain history.
 - All JavaScript syntax, accounting, return-policy, representative, tracking, dashboard-contract, Settings, platform, Cairo/Giza address, static HTML/assets/accessibility and SEO checks passed. Chromium is not installed in this environment, so the included browser-only visual suite remains for CI or staging.
+
+## Settings, grouping and tracking V11 verification — 2026-09-14
+
+- Fixed the Brand customer count to recognize the customer `registeredAt` field and added an isolated regression assertion.
+- Added dashboard settings for day/night hero media, founder media, scheduled announcements, editable hero typing scenes, model-card color visibility, future-model markup, non-stacking site-wide discounts, configurable Birthday/Dart Card percentages and configurable customer return/exchange fees. Configuration changes are audit logged.
+- Preserved old commercial records: model/order/discount/fee snapshots do not change when a future default changes. A configured value of zero is treated as a valid setting rather than falling back to the old default.
+- Added deterministic grouping for unassigned orders and returns using the same customer plus country, governorate, area and street. Assignment freezes the shared group ID; selected records and their lines remain independently actionable.
+- Rebuilt active tracking to display separate cards for separate groups, one grouped card with dividers for matching records, and no completed-return card. The profile and dashboard retain completed history.
+- Replaced the authenticity result modal with a persistent skeleton/result card and retained sold-item validation. Removed the visual return-eligibility blocker while preserving submit-time validation.
+- Reworked the original dashboard chart to show period-derived Total Sales only. Verified the owner accounting example: 600 EGP list selling less 30% equals 420 EGP Total Selling; 400 EGP physical cost yields 20 EGP Brand Total Profit.

@@ -1,4 +1,12 @@
-# V8 changes
+# Dart Project changelog
+
+## V11 site control, grouping and tracking — 2026-09-14
+
+- Added complete site-control settings with audited, backend-ready records and future-only commercial defaults.
+- Added exact pre-assignment grouping for matching customer/address orders and returns, plus selected-row return assignment.
+- Added multi-order/multi-return tracking cards, persistent serial-result skeleton, same-model exchange options and completed-return hiding.
+- Fixed the Brand customer count and converted the original chart to real Total Sales values.
+- Updated Brand Total Cost to the owner's all-physical-items liability formula while retaining conventional matched COGS in P&L.
 
 ## Returns, exchanges and accounting completion — 2026-09-13
 

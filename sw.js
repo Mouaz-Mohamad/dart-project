@@ -1,5 +1,5 @@
-// Return/exchange pickup flow and accounting UI refresh.
-const CACHE = 'dart-static-v10-returns';
+// Hero pricing, return rollback and storefront CSS architecture refresh.
+const CACHE = 'dart-static-v12-maintenance';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));

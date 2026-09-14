@@ -602,6 +602,36 @@
     return result;
   }
 
+  function physicalItemAcquisitionCost(data, range) {
+    const seen = new Set();
+    return roundMoney(data.items.filter((item) => !item.isDeleted)
+      .filter((item) => within(recordCreatedAt(item), range))
+      .reduce((sum, item) => {
+        const key = String(item.itemCode || item.id || "");
+        if (seen.has(key)) return sum;
+        seen.add(key);
+        const model = modelFor(data, item.modelId);
+        const cost = Number.isFinite(Number(item.costSnapshot)) ? finiteNumber(item.costSnapshot) : finiteNumber(model?.cost);
+        return sum + Math.max(0, cost);
+      }, 0));
+  }
+
+  function incrementalDamageCost(data, range) {
+    const acquired = new Set(data.items.filter((item) => within(recordCreatedAt(item), range)).map((item) => String(item.itemCode || item.id)));
+    const seen = new Set();
+    return roundMoney(data.damage.filter(active)
+      .filter((record) => ["damaged", "destroyed"].includes(String(record.status || "").toLowerCase()))
+      .filter((record) => within(record.destroyedAt || record.inspectedAt || record.updatedAt || record.date || record.createdAt, range))
+      .reduce((sum, record) => {
+        const key = String(record.itemCode || record.id || "");
+        if (seen.has(key) || acquired.has(key)) return sum;
+        seen.add(key);
+        const item = itemFor(data, record.itemCode), model = modelFor(data, record.modelId || item?.modelId);
+        const cost = Number.isFinite(Number(record.costSnapshot)) ? finiteNumber(record.costSnapshot) : Number.isFinite(Number(item?.costSnapshot)) ? finiteNumber(item.costSnapshot) : finiteNumber(model?.cost);
+        return sum + Math.max(0, cost);
+      }, 0));
+  }
+
   function calculateSummary(input, range) {
     const data = dashboardData(input);
     const delivered = deliveredOrders(data, range);
@@ -632,6 +662,10 @@
     const totalCost = roundMoney(netCogs + totalOperatingExpenses);
     const grossProfit = roundMoney(netRevenue - netCogs);
     const netProfit = roundMoney(netRevenue - totalCost);
+    const physicalItemCost = physicalItemAcquisitionCost(data, range);
+    const incrementalDamage = incrementalDamageCost(data, range);
+    const brandTotalCost = roundMoney(physicalItemCost + operatingExpenses + codFees + returnCourierCosts + incrementalDamage);
+    const brandNetProfit = roundMoney(netRevenue - brandTotalCost);
     const grossSoldUnits = delivered.reduce(
       (sum, order) => sum + orderLines(order).reduce((lineTotal, line) => lineTotal + Math.max(1, finiteNumber(line.qty, 1)), 0),
       0,
@@ -685,6 +719,10 @@
       totalCost,
       grossProfit,
       netProfit,
+      physicalItemCost,
+      incrementalDamage,
+      brandTotalCost,
+      brandNetProfit,
       margin: netRevenue ? (netProfit / netRevenue) * 100 : 0,
       grossMargin: netRevenue ? (grossProfit / netRevenue) * 100 : 0,
       deliveredOrders: delivered.length,
@@ -956,7 +994,7 @@
   }
 
   function recordCreatedAt(record) {
-    return record?.createdAt || record?.orderCreatedAt || record?.regDate || record?.date;
+    return record?.createdAt || record?.orderCreatedAt || record?.registeredAt || record?.regDate || record?.date;
   }
 
   function inStockItems(data, range) {
@@ -1082,8 +1120,8 @@
     const previous = calculateSummary(data, range.previous);
     const mappings = [
       [".sales-cont", current.netRevenue, previous.netRevenue, false],
-      [".cost-cont", current.totalCost, previous.totalCost, true],
-      [".profit-cont", current.netProfit, previous.netProfit, false],
+      [".cost-cont", current.brandTotalCost, previous.brandTotalCost, true],
+      [".profit-cont", current.brandNetProfit, previous.brandNetProfit, false],
     ];
     mappings.forEach(([selector, value, prior, inverse]) => {
       const card = document.querySelector(`#brand ${selector}`);
@@ -1094,8 +1132,8 @@
     });
     [
       [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
-      [".cost-cont", "Total Cost", "Sold-piece cost plus operating expenses, representative fees and non-duplicated damage loss in the selected period."],
-      [".profit-cont", "Total Profit", "Total Selling minus Total Cost for the selected period."],
+      [".cost-cont", "Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage from older stock."],
+      [".profit-cont", "Total Profit", "Total Selling minus the complete Brand Total Cost for the selected period."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
       if (info) {
@@ -1177,8 +1215,8 @@
           ? bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })
           : `${bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}–${bucketEnd.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
         revenue: summary.netRevenue,
-        cost: summary.totalCost,
-        profit: summary.netProfit,
+        cost: summary.brandTotalCost,
+        profit: summary.brandNetProfit,
       });
       cursor = startOfDay(addDays(bucketEnd, 1));
     }
@@ -1186,7 +1224,7 @@
   }
 
   function renderFinancialChart(data, range, summary) {
-    const empty = summary.netRevenue === 0 && summary.totalCost === 0;
+    const empty = summary.netRevenue === 0 && summary.brandTotalCost === 0;
     toggleChartEmpty("dart-financial-empty", empty);
     const canvas = document.getElementById("dart-financial-chart");
     if (canvas) canvas.hidden = empty;

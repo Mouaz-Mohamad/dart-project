@@ -19,75 +19,49 @@
       <header id="header-container" aria-label="Main Navigation"></header>
 
       <main>
-<div class="tracking-card">
-  <!-- Map Container -->
-  <div id="trackingMapShell" class="tracking-map-shell is-disabled">
-    <div id="tracking-map" aria-label="Live delivery map"></div>
-    <div id="trackingMapDisabled" class="tracking-map-disabled">Representative not assigned yet</div>
-  </div>
-  <div id="trackingMapSummary" class="tracking-map-summary" role="status">Delivery location has not been activated.</div>
-  <div class="content">
-    
-    <!-- Order Header -->
-    <div class="order-header">
-      <div>
-        <div class="order-id">Order ID</div>
-        <div style="font-size: 11px; color: #64748b;">Date</div>
-      </div>
-      <div id="etaTime" class="eta-badge">ETA: 15 mins</div>
+<div id="orderTrackingList" class="order-tracking-list"></div>
+
+<template id="order-tracking-card-template">
+  <article class="tracking-card" data-order-tracking-card>
+    <div class="tracking-map-shell is-disabled" data-order-map-shell>
+      <div class="tracking-order-map" data-order-map aria-label="Live delivery map"></div>
+      <div class="tracking-map-disabled" data-order-map-disabled>Representative not assigned yet</div>
     </div>
-
-    <!-- 5 Steps Timeline -->
-    <div class="stepper">
-      <div class="stepper-progress" style="width: 75%;"></div>
-
-      <div class="step active">
-        <div class="circle">✓</div>
-        <span class="step-text">Confirmed</span>
+    <div class="tracking-map-summary" data-order-map-summary role="status">Delivery location has not been activated.</div>
+    <div class="content">
+      <div class="order-header"><div><div class="order-id" data-order-field="id"></div><div class="tracking-order-date" data-order-field="date"></div></div><div class="eta-badge" data-order-eta>ETA: Not determined</div></div>
+      <div class="stepper">
+        <div class="stepper-progress" data-order-progress></div>
+        <div class="step" data-order-step="0"><div class="circle">1</div><span class="step-text">Confirmed</span></div>
+        <div class="step" data-order-step="1"><div class="circle">2</div><span class="step-text">Preparing</span></div>
+        <div class="step" data-order-step="2"><div class="circle">3</div><span class="step-text">Picked Up</span></div>
+        <div class="step" data-order-step="3"><div class="circle">4</div><span class="step-text">On the Way</span></div>
+        <div class="step" data-order-step="4"><div class="circle">5</div><span class="step-text">Delivered</span></div>
       </div>
-      <div class="step active">
-        <div class="circle">✓</div>
-        <span class="step-text">Preparing</span>
-      </div>
-      <div class="step active">
-        <div class="circle">✓</div>
-        <span class="step-text">Picked Up</span>
-      </div>
-      <div class="step active">
-        <div class="circle">4</div>
-        <span class="step-text">On the Way</span>
-      </div>
-      <div class="step">
-        <div class="circle">5</div>
-        <span class="step-text">Delivered</span>
-      </div>
+      <div class="items-box empty-state" data-order-items></div>
+      <div class="driver-box"><div><div data-order-field="representative"></div><div data-order-field="representativeMeta"></div></div><a href="#" class="btn-call" data-order-call hidden>Call</a></div>
     </div>
+  </article>
+</template>
 
-    <!-- Order Items Summary -->
-    <div class="items-box">
-      <div class="items-title">Order Items:</div>
-      <div class="item-row">
-        <span>Loading order items…</span>
-        <strong>—</strong>
-      </div>
-      <hr style="border-color: #e2e8f0; margin: 8px 0;">
-      <div class="item-row" style="font-weight: bold; color: #0f172a;">
-        <span>Total:</span>
-        <span>—</span>
-      </div>
-    </div>
+<template id="order-tracking-unit-template">
+  <section class="dart-tracked-order-unit" data-order-unit>
+    <div class="dart-tracked-unit-head"><strong data-order-unit-field="id"></strong><span data-order-unit-field="status"></span></div>
+    <small data-order-unit-field="date"></small>
+    <div data-order-unit-lines></div>
+    <div class="item-row tracking-final-row"><span>Total</span><strong data-order-unit-field="total"></strong></div>
+  </section>
+</template>
 
-    <!-- Driver Info -->
-    <div class="driver-box">
-      <div>
-        <div style="font-weight:bold; font-size: 14px; color: #0f172a;">Representative not assigned</div>
-        <div style="font-size:11px; color:#64748b;">Waiting for assignment</div>
-      </div>
-      <a href="#" class="btn-call" hidden>Call</a>
-    </div>
+<template id="order-tracking-line-template">
+  <div class="item-row"><span data-order-line-field="description"></span><strong data-order-line-field="amount"></strong></div>
+</template>
 
-  </div>
-</div>
+<template id="tracking-unit-divider-template"><hr class="dart-tracking-order-divider"></template>
+
+<template id="order-tracking-empty-template">
+  <div class="tracking-card empty-state">لا يوجد أوردر نشط مطابق. الأوردر المستلم يختفي من التتبع النشط ويظل في حسابك.</div>
+</template>
 
 <section id="returnTrackingSection" class="return-tracking-section" aria-labelledby="returnTrackingTitle">
   <div class="return-tracking-heading">
@@ -115,21 +89,29 @@
         <div class="step" data-return-step="approval"><div class="circle">2</div><span class="step-text">تمت الموافقة</span></div>
         <div class="step" data-return-step="completed"><div class="circle">3</div><span class="step-text">تم إتمام المرتجع</span></div>
       </div>
-      <div class="items-box return-tracking-details">
-        <div class="items-title" data-return-field="type"></div>
-        <div class="item-row"><span>القطعة الأصلية</span><strong data-return-field="originalItem"></strong></div>
-        <div class="item-row" data-return-replacement-row><span>القطعة البديلة</span><strong data-return-field="replacementItem"></strong></div>
-        <div class="item-row"><span>القيمة الأصلية بعد الخصم</span><strong data-return-field="netAmount"></strong></div>
-        <div class="item-row"><span>رسوم المندوب</span><strong data-return-field="courierFee"></strong></div>
-        <div class="item-row"><span>عنوان الاستلام</span><strong data-return-field="address"></strong></div>
-        <div class="item-row" data-return-rejection-row hidden><span>سبب الرفض</span><strong data-return-field="rejectionReason"></strong></div>
-      </div>
+      <div class="items-box empty-state return-tracking-details" data-return-items></div>
       <div class="driver-box">
         <div><div class="return-rep-name" data-return-field="representative"></div><div class="return-rep-meta" data-return-field="representativeMeta"></div></div>
         <a href="#" class="btn-call" data-return-call hidden>اتصال</a>
       </div>
     </div>
   </article>
+</template>
+
+<template id="return-tracking-unit-template">
+  <section class="dart-tracked-order-unit" data-return-unit>
+    <div class="dart-tracked-unit-head"><strong data-return-unit-field="id"></strong><span data-return-unit-field="status"></span></div>
+    <div class="item-row"><span>النوع</span><strong data-return-unit-field="type"></strong></div>
+    <div class="item-row"><span>القطعة الأصلية</span><strong data-return-unit-field="originalItem"></strong></div>
+    <div class="item-row" data-return-unit-replacement><span>القطعة البديلة</span><strong data-return-unit-field="replacementItem"></strong></div>
+    <div class="item-row"><span>السعر الصافي الأصلي</span><strong data-return-unit-field="netAmount"></strong></div>
+    <div class="item-row"><span>رسوم العميل للمندوب</span><strong data-return-unit-field="courierFee"></strong></div>
+    <div class="item-row" data-return-unit-rejection hidden><span>سبب الرفض</span><strong data-return-unit-field="rejectionReason"></strong></div>
+  </section>
+</template>
+
+<template id="return-tracking-empty-template">
+  <div class="empty-state">لا يوجد طلب استبدال أو استرجاع نشط. الطلب المكتمل يظل محفوظًا في سجل الحساب والداشبورد.</div>
 </template>
       </main>
 
@@ -139,6 +121,8 @@
 <!-- Leaflet JS -->
   <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="Js/dart-site-settings.js"></script>
+<script src="Js/dart-groups.js"></script>
 <script src="Js/dart-catalog.js"></script>
 <script src="Js/dart-returns.js"></script>
     <script src="Js/one .js"></script>

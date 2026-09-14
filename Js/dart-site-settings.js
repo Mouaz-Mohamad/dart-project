@@ -1,0 +1,197 @@
+/* ========================================================================== */
+/* DART SITE SETTINGS — browser repository prepared for a future backend API  */
+/* ========================================================================== */
+(function (root) {
+  "use strict";
+
+  const STORAGE_KEY = "dart_site_settings";
+  const defaults = Object.freeze({
+    version: 1,
+    heroDayImage: null,
+    heroNightImage: null,
+    founderImage: null,
+    defaultMarkupPercent: 50,
+    birthdayDiscountPercent: 30,
+    dartCardDiscountPercent: 40,
+    refundCustomerFee: 100,
+    repeatExchangeCustomerFee: 50,
+    siteDiscount: { enabled: false, percent: 0, startsAt: "", endsAt: "" },
+    announcements: [],
+    modelCards: {},
+    typing: {
+      typingSpeed: 70,
+      deletingSpeed: 10,
+      wordDelay: 100,
+      nextSceneDelay: 400,
+      scenes: [
+        { hold: 2000, words: [{ text: "Dart |", color: "#AB012B", size: 50, weight: 600 }, { text: "For You", color: "#ffffff", size: 50, weight: 400 }] },
+        { hold: 2000, words: [{ text: "Delivered Fast", color: "#ffffff", size: 35, weight: 400 }, { text: "up to", color: "#ffffff", size: 35, weight: 400 }, { text: "12h.", color: "#AB012B", size: 50, weight: 600 }] },
+        { hold: 2500, words: [{ text: "30%", color: "#AB012B", size: 40, weight: 700 }, { text: "birthday", color: "#ffffff", size: 30, weight: 500 }, { text: "discount.", color: "#ffffff", size: 30, weight: 800 }] },
+        { hold: 2200, words: [{ text: "Easy", color: "#AB012B", size: 50, weight: 500 }, { text: "R&E", color: "#ffffff", size: 30, weight: 300 }] },
+        { hold: 2200, words: [{ text: "Made", color: "#ffffff", size: 30, weight: 300 }, { text: "For You", color: "#AB012B", size: 40, weight: 500 }] },
+      ],
+    },
+  });
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function number(value, fallback, min = 0, max = 1000000) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+  }
+
+  function heroWordSize(value, fallback = 36) {
+    const pixels = number(parseFloat(value), fallback, 10, 120);
+    return `${pixels}px`;
+  }
+
+  function normalizeTypingScenes(scenes) {
+    if (!Array.isArray(scenes) || !scenes.length) return clone(defaults.typing.scenes);
+    const normalized = scenes
+      .map((scene) => ({
+        hold: number(scene?.hold, 2000, 0, 60000),
+        words: (Array.isArray(scene?.words) ? scene.words : [])
+          .map((word) => ({
+            text: String(word?.text || "").trim(),
+            color: String(word?.color || "#ffffff"),
+            size: number(parseFloat(word?.size), 36, 10, 120),
+            weight: number(word?.weight, 400, 100, 900),
+          }))
+          .filter((word) => word.text),
+      }))
+      .filter((scene) => scene.words.length);
+    return normalized.length ? normalized : clone(defaults.typing.scenes);
+  }
+
+  function merge(raw = {}) {
+    const value = raw && typeof raw === "object" ? raw : {};
+    return {
+      ...clone(defaults),
+      ...value,
+      siteDiscount: { ...defaults.siteDiscount, ...(value.siteDiscount || {}) },
+      typing: {
+        ...clone(defaults.typing),
+        ...(value.typing || {}),
+        scenes: normalizeTypingScenes(value.typing?.scenes),
+      },
+      announcements: Array.isArray(value.announcements) ? value.announcements : [],
+      modelCards: value.modelCards && typeof value.modelCards === "object" ? value.modelCards : {},
+    };
+  }
+
+  function get() {
+    try {
+      return merge(JSON.parse(root.localStorage?.getItem(STORAGE_KEY) || "{}"));
+    } catch {
+      return merge();
+    }
+  }
+
+  function save(value) {
+    const normalized = merge(value);
+    root.localStorage?.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    root.dispatchEvent?.(new CustomEvent("dart:site-settings-changed", { detail: normalized }));
+    root.dispatchEvent?.(new CustomEvent("dart:data-changed", { detail: { key: STORAGE_KEY } }));
+    return normalized;
+  }
+
+  function cairoParts(value = new Date()) {
+    try {
+      return Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Cairo",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(value).filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
+    } catch {
+      return { year: value.getFullYear(), month: value.getMonth() + 1, day: value.getDate(), hour: value.getHours() };
+    }
+  }
+
+  function cairoDateKey(value = new Date()) {
+    const p = cairoParts(value);
+    return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+  }
+
+  function activeSiteDiscount(value = new Date(), settings = get()) {
+    const discount = settings.siteDiscount || {};
+    if (!discount.enabled) return null;
+    const percent = number(discount.percent, 0, 0, 100);
+    if (!percent) return null;
+    const today = cairoDateKey(value);
+    if (discount.startsAt && today < discount.startsAt) return null;
+    if (discount.endsAt && today > discount.endsAt) return null;
+    return { type: "Site", percent, startsAt: discount.startsAt || "", endsAt: discount.endsAt || "" };
+  }
+
+  function activeAnnouncements(value = new Date(), settings = get()) {
+    const today = cairoDateKey(value);
+    return settings.announcements
+      .filter((row) => row && row.enabled !== false && String(row.text || "").trim())
+      .filter((row) => (!row.startsAt || row.startsAt <= today) && (!row.endsAt || row.endsAt >= today))
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  }
+
+  function visibleColors(modelId, colors, settings = get()) {
+    const all = Array.isArray(colors) ? colors : [];
+    const rule = settings.modelCards?.[modelId] || { mode: "all" };
+    if (rule.mode === "custom") {
+      const chosen = new Set((rule.colors || []).map(String));
+      const filtered = all.filter((color) => chosen.has(String(color.name)));
+      return filtered.length ? filtered : all.slice(0, 1);
+    }
+    if (rule.mode === "one") return all.slice(0, 1);
+    if (rule.mode === "two") return all.slice(0, 2);
+    if (rule.mode === "count") return all.slice(0, Math.max(1, Number(rule.count) || 1));
+    return all;
+  }
+
+  async function resolveImage(asset, fallback) {
+    if (!asset) return fallback;
+    try {
+      await root.DartCatalog?.loadImage?.(asset);
+      return root.DartCatalog?.imageSrc?.(asset) || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  async function applyPublicMedia() {
+    const settings = get();
+    const hero = root.document?.querySelector(".hero > img[data-dart-hero]");
+    if (hero) {
+      const isDay = cairoParts().hour >= 6 && cairoParts().hour < 18;
+      const selected = isDay
+        ? settings.heroDayImage || settings.heroNightImage
+        : settings.heroNightImage || settings.heroDayImage;
+      hero.src = await resolveImage(selected, hero.getAttribute("src") || "/Photos/hero 2.png");
+      hero.dataset.timeMode = isDay ? "day" : "night";
+    }
+    const founder = root.document?.getElementById("dart-founder-image");
+    if (founder && settings.founderImage)
+      founder.src = await resolveImage(settings.founderImage, founder.getAttribute("src") || "/Photos/me.png");
+  }
+
+  const api = {
+    STORAGE_KEY,
+    defaults,
+    get,
+    save,
+    cairoParts,
+    cairoDateKey,
+    activeSiteDiscount,
+    activeAnnouncements,
+    visibleColors,
+    applyPublicMedia,
+    number,
+    heroWordSize,
+  };
+  root.DartSiteSettings = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+
+  if (!root.document) return;
+  root.document.addEventListener("DOMContentLoaded", applyPublicMedia);
+  root.document.addEventListener("dart:sections-loaded", applyPublicMedia);
+  root.addEventListener("dart:site-settings-changed", applyPublicMedia);
+})(typeof window !== "undefined" ? window : globalThis);

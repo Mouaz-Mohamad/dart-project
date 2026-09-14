@@ -88,6 +88,49 @@
   box-shadow: 0 8px 26px rgba(31, 20, 22, .04);
 }
 
+.dart-settings-form-card { grid-template-columns: 46px minmax(170px, .55fr) minmax(320px, 1.45fr); align-items: start; }
+.dart-settings-wide { grid-column: 1 / -1; }
+.dart-settings-fields { display:grid; grid-template-columns:repeat(2,minmax(140px,1fr)); gap:11px; }
+.dart-settings-fields label,.dart-settings-media-grid label,.dart-settings-typing-row label,.dart-settings-model-row label { display:grid; gap:5px; color:#4b5563; font-size:11px; font-weight:750; }
+.dart-settings-fields input,.dart-settings-fields select,.dart-settings-typing-row input,.dart-settings-model-row input,.dart-settings-model-row select { width:100%; min-height:38px; border:1px solid #d8dadd; border-radius:8px; background:#fff; padding:7px 9px; color:#17191d; box-sizing:border-box; }
+.dart-settings-field-wide { grid-column:1 / -1; }
+.dart-settings-check { display:flex!important; align-items:center; gap:8px; }
+.dart-settings-check input { width:17px; min-height:17px; }
+.dart-settings-save,.dart-settings-secondary,.dart-settings-list-row button,.dart-settings-typing-row button { min-height:38px; border:1px solid #d6c5c9; border-radius:8px; background:#fff; color:#6f1028; padding:8px 12px; font-weight:800; }
+.dart-settings-save { border-color:#ab012b; background:#ab012b; color:#fff; }
+.dart-settings-save:hover { background:#850020; }
+.dart-settings-media-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.dart-settings-media-grid img { width:100%; aspect-ratio:16 / 9; object-fit:cover; border:1px dashed #d6c5c9; border-radius:10px; background:#f6f2f3; }
+.dart-settings-media-grid label:last-of-type img { aspect-ratio:4 / 5; }
+.dart-settings-media-actions { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:8px; }
+.dart-settings-list { display:grid; gap:8px; margin:13px 0; }
+.dart-settings-list-row,.dart-settings-model-row { display:grid; grid-template-columns:minmax(180px,1fr) auto auto auto; gap:9px; align-items:center; border:1px solid #ebe4e6; border-radius:10px; padding:10px; }
+.dart-settings-list-row small,.dart-settings-model-row small { display:block; margin-top:3px; color:#7b8490; }
+.dart-settings-typing-rows { display:grid; gap:8px; }
+.dart-settings-typing-row { display:grid; grid-template-columns:70px 90px minmax(140px,1fr) 70px 72px 80px 40px; gap:7px; align-items:end; border:1px solid #ebe4e6; border-radius:10px; padding:9px; }
+.dart-settings-typing-row input[type="color"] { padding:3px; }
+.dart-settings-model-row { grid-template-columns:minmax(170px,1fr) 180px 100px minmax(220px,1.4fr); }
+.dart-settings-color-options { display:flex; flex-wrap:wrap; gap:7px; }
+.dart-settings-color-options label { display:flex; align-items:center; gap:5px; }
+.dart-settings-color-options input { width:15px; min-height:15px; }
+
+@media (max-width:900px) {
+  .dart-settings-form-card { grid-template-columns:42px minmax(0,1fr); }
+  .dart-settings-form-card > form { grid-column:1 / -1; }
+  .dart-settings-media-grid { grid-template-columns:1fr; }
+  .dart-settings-media-actions { grid-column:auto; }
+  .dart-settings-typing-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dart-settings-typing-row [data-typing-remove] { grid-column:1 / -1; }
+  .dart-settings-model-row { grid-template-columns:1fr; align-items:stretch; }
+}
+
+@media (max-width:520px) {
+  .dart-settings-fields { grid-template-columns:1fr; }
+  .dart-settings-field-wide { grid-column:auto; }
+  .dart-settings-list-row { grid-template-columns:1fr auto auto; }
+  .dart-settings-list-row > div { grid-column:1 / -1; }
+}
+
 .dart-settings-danger-card {
   grid-column: 1 / -1;
   border-color: #efc4c0;

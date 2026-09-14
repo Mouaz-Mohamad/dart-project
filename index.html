@@ -94,11 +94,11 @@
 
                 <!-- Hero secthion -->
                 <section class="hero">
-                    <img <img src="/Photos/hero 2.png" alt="Hero" loading="eager">
+                    <img id="dart-hero-image" data-dart-hero src="/Photos/hero 2.png" alt="Hero" loading="eager">
                     <h1 class="dart-hero-title">
                         <span id="dartTyping"></span><span class="dart-cursor">|</span>
                     </h1>
-                    <button id="btnToProducts" class="btn-go-product">Shope Now</button>
+                    <button id="btnToProducts" data-go-products type="button" class="btn-go-product">Shop Now</button>
                 </section>
 
 
@@ -127,13 +127,17 @@
                             <div class="product-code" dir="rtl"></div>
                             <div class="product-title"></div>
                             <div class="product-footer djasb">
-                                <span class="product-price"></span>
+                                <div class="product-pricing" data-product-pricing>
+                                    <span class="product-old-price" data-product-price="old" hidden></span>
+                                    <span class="product-price" data-product-price="current"></span>
+                                    <span class="product-discount-badge" data-product-price="discount" hidden></span>
+                                </div>
                                 <button type="button" class="cart-btn dja">Buy &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
                             </div>
                             </div>
                         </div>
                     </div>
-                    <button id="btnToProducts" class="btn-go-product">Shope Now</button>
+                    <button id="btnToAllProducts" data-go-products type="button" class="btn-go-product">Shop Now</button>
                 </section>
                 <div class="margen2020"></div>
                 <section id="birthday"></section>
@@ -242,6 +246,8 @@
             <footer id="footer" aria-label="footer."></footer>
     
     </div>
+    <script src="Js/dart-site-settings.js"></script>
+    <script src="Js/dart-groups.js"></script>
     <script src="Js/dart-catalog.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="Js/dart-address.js"></script>

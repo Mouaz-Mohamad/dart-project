@@ -12,7 +12,7 @@
   const $ = (id) => document.getElementById(id);
   function cards() {
     return C.products().flatMap((p) =>
-      p.colorOptions
+      (window.DartSiteSettings?.visibleColors?.(p.id, p.colorOptions) || p.colorOptions)
         .filter((c) => c.images?.length)
         .map((c) => ({
           ...p,
