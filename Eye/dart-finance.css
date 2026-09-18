@@ -605,7 +605,7 @@
 }
 
 .dart-finance-empty-cell {
-  height: 150px;
+  height: 250px;
   color: #7b848f;
   text-align: center !important;
 }
@@ -732,7 +732,7 @@
   grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(130px, .7fr));
   gap: 12px;
   align-items: center;
-  min-width: 760px;
+
   padding: 11px 15px;
 }
 

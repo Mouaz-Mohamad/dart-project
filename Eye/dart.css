@@ -976,7 +976,7 @@ section{
 .chart-box-tow {
     background: #ffffff;
     border-radius: 12px;
-    padding: 20px;
+    padding: 7px;
     border: 1px solid #e5e5e5;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     width: 100%;
@@ -1179,7 +1179,7 @@ section{
   .card-inf-2 .span-img {
     width: 100% !important;
     flex-direction: column !important;
-    gap: 2px !important;
+    gap: 12px !important;
     font-size: 0.8rem !important;
   }
 
@@ -1536,7 +1536,7 @@ section{
 .kpi-tone-5{background:#fdf2f8}.kpi-tone-5 .kpi-card-head>i{color:#db2777}
 
 .chart-one{align-items:stretch!important;gap:14px!important;}
-.financial-summary,.dart-chart-card{height:auto!important;min-height:300px;}
+.financial-summary,.dart-chart-card{height:auto!important;min-height:110px;}
 .chart-box-tow{margin-top:18px!important;margin-bottom:20px!important;}
 .chart-body-tow{min-height:320px;}
 
