@@ -1,5 +1,22 @@
 # V7 — خريطة الكود
 
+## Backend Foundation V0.1
+
+| المسار | المسؤولية |
+|---|---|
+| `backend/src/server.ts` | تشغيل Express وإغلاق HTTP/PostgreSQL بصورة آمنة |
+| `backend/src/app.ts` | تركيب الـmiddleware والـrate limit وCORS ومسارات `/api/v1` |
+| `backend/src/config/` | التحقق الصارم من البيئة والـlogger مع إخفاء الحقول الحساسة |
+| `backend/src/database/pool.ts` | اتصال PostgreSQL وفحص الجاهزية |
+| `backend/src/database/migrate.ts` | Migrations مرتبة مع checksum وadvisory lock ومنع التنفيذ خارج الترتيب |
+| `backend/migrations/0001_platform_foundation.sql` | `audit_logs` و`outbox_events` و`idempotency_keys` |
+| `backend/src/database/seed.ts` | Seed تجريبي يتطلب تفعيلًا صريحًا وممنوع في Production |
+| `backend/src/modules/health/` | Liveness وReadiness بدون تسريب أخطاء قاعدة البيانات |
+| `backend/tests/` | اختبارات الإعدادات والصحة والترتيب والـseed واختبار PostgreSQL اختياري معزول |
+| `backend/openapi.yaml` | العقد المنفذ حاليًا فقط؛ بقية العقود ما زالت داخل `docs/API_CONTRACT.md` |
+
+لم يتم توصيل أي تدفق واجهة بالـBackend في هذه الدفعة. `Js/dart-platform.js` يظل نقطة الربط الحالية، ويُنقل كل Domain لاحقًا بعد اعتماده دون fallback صامت إلى `localStorage` في Production.
+
 الملفات الجديدة مقسمة بتعليقات BEGIN / END، وتعليقات BACKEND تحدد نقاط استبدال التخزين المحلي بالخادم. لم يتغير شكل وهوية المشروع الأساسية.
 
 | الملف | المسؤولية |

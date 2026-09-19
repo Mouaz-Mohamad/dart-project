@@ -1,0 +1,20 @@
+# Backend dependencies and build output
+backend/node_modules/
+backend/dist/
+backend/coverage/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Local database/tool state
+backend/.postgres-data/
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db

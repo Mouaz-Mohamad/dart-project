@@ -4,6 +4,13 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+IGNORED_PARTS = {'node_modules', 'dist', 'coverage', '.git'}
+
+def project_files(pattern):
+    return (
+        path for path in ROOT.rglob(pattern)
+        if path.is_file() and not IGNORED_PARTS.intersection(path.relative_to(ROOT).parts)
+    )
 
 class Parser(HTMLParser):
     def __init__(self):
@@ -17,7 +24,7 @@ class Parser(HTMLParser):
         if tag=='link' and data.get('href') and ('stylesheet' in data.get('rel','') or data.get('rel')=='manifest'): self.assets.append(data['href'])
 
 errors=[]
-for path in ROOT.rglob('*.html'):
+for path in project_files('*.html'):
     parser=Parser(); parser.feed(path.read_text(encoding='utf-8'))
     duplicates=sorted({item for item in parser.ids if parser.ids.count(item)>1})
     if duplicates: errors.append(f'{path.relative_to(ROOT)} duplicate IDs: {duplicates}')
@@ -80,7 +87,7 @@ dashboard_ops=(ROOT/'Eye/dart-operations-v4.js').read_text(encoding='utf-8')
 if "emptyKeys.forEach(key => write(key, []))" in dashboard_ops:
     errors.append('Dashboard still clears website orders during first initialization')
 
-all_code='\n'.join(path.read_text(encoding='utf-8') for pattern in ('*.js','*.html') for path in ROOT.rglob(pattern))
+all_code='\n'.join(path.read_text(encoding='utf-8') for pattern in ('*.js','*.html') for path in project_files(pattern))
 for forbidden in [r'toFixed\(2\)', r'\.00 EGP', r'step="0\.01"']:
     if re.search(forbidden,all_code): errors.append(f'Forbidden decimal display remains: {forbidden}')
 

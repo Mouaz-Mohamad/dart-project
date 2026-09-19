@@ -9,6 +9,8 @@ This package contains one canonical copy of every runtime page and shared asset.
 - `Icons/` contains SVG icons only.
 - `sections/` contains reusable HTML fragments only. `sections/leaderboard-card.html` is the single Leaderboard fragment.
 - `Eye/` contains the dashboard page and all dashboard-only CSS, JavaScript and images.
+- `backend/` contains the server-authoritative TypeScript/Express service, PostgreSQL migrations, OpenAPI contract and backend tests.
+- `.agents/skills/dart-quality-review/` contains the mandatory pre-completion review skill.
 - `tests/` contains automated checks only.
 - `docs/` contains project reports, code maps and the backend API contract.
 

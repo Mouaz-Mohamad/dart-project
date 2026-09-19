@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: Dart Backend API
+  version: 0.1.0
+  description: Server-authoritative API for Dart | for you.
+servers:
+  - url: /api/v1
+paths:
+  /health/live:
+    get:
+      summary: Process liveness
+      operationId: getLiveness
+      responses:
+        "200":
+          description: The API process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liveness"
+  /health/ready:
+    get:
+      summary: Dependency readiness
+      operationId: getReadiness
+      responses:
+        "200":
+          description: Required dependencies are ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "503":
+          description: At least one required dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+components:
+  schemas:
+    Liveness:
+      type: object
+      required: [status, service, version, startedAt, timestamp]
+      properties:
+        status: { type: string, const: ok }
+        service: { type: string, const: dart-backend }
+        version: { type: string }
+        startedAt: { type: string, format: date-time }
+        timestamp: { type: string, format: date-time }
+    Readiness:
+      type: object
+      required: [status, checks, timestamp]
+      properties:
+        status: { type: string, enum: [ready, not_ready] }
+        checks:
+          type: object
+          required: [database]
+          properties:
+            database: { type: string, enum: [up, down] }
+        timestamp: { type: string, format: date-time }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            requestId: { type: string }

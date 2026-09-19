@@ -2,6 +2,21 @@
 
 The frontend currently uses localStorage as an executable prototype. The backend must become the only source of truth. Set `window.DART_API_BASE_URL` before `Js/dart-platform.js` when API integration begins.
 
+## Implemented foundation — 2026-09-19
+
+- The provider-neutral TypeScript/Express service lives under `backend/`.
+- `GET /api/v1/health/live` reports process liveness without depending on PostgreSQL.
+- `GET /api/v1/health/ready` reports PostgreSQL readiness and returns `503` without leaking connection details when unavailable.
+- Migration `0001_platform_foundation.sql` adds append-only `audit_logs`, transactional `outbox_events`, and hashed `idempotency_keys` storage.
+- Customer, catalogue, inventory, order, authentication and messaging endpoints below remain contracts until their individual implementation slices are approved.
+- Production must never fall back silently to `localStorage` when the API is unavailable.
+
+## Approved notification channels
+
+- Routine `ORDER_PLACED`, `ORDER_OUT_FOR_DELIVERY`, and `ORDER_DELIVERED` notifications use Email, Web Push, and in-site notifications.
+- WhatsApp is limited to interactive order confirmation, birthday messages, and post-delivery review requests.
+- WhatsApp order confirmation applies to every order, waits four hours, and sends one reminder after two hours. It remains a later Phase 1 implementation item; it is not part of the current foundation endpoints.
+
 ## Non-negotiable server rules
 
 - Use Node.js with Express and a transactional database selected by the backend developer. PostgreSQL is recommended for orders, unique identities, inventory reservations and reporting.
@@ -19,17 +34,18 @@ The frontend currently uses localStorage as an executable prototype. The backend
 
 ```json
 {
-  "subtotal": 1000,
+  "subtotal": 100000,
   "discountPercent": 30,
-  "discountAmount": 300,
-  "finalAmount": 700,
+  "discountAmount": 30000,
+  "finalAmount": 70000,
   "amountPaid": 0,
   "amountRefunded": 0,
-  "currency": "EGP"
+  "currency": "EGP",
+  "unit": "PIASTRE"
 }
 ```
 
-Money must be stored as integer piastres or a database decimal. The current UI displays whole EGP and removes the fractional display portion (`780.90` is shown as `780 EGP`). The backend must never reconstruct a final amount from untrusted browser values; define the final production rounding/accounting policy explicitly before accepting online payments.
+Money must be stored and calculated as integer piastres only. The current UI may convert those integers to an EGP display value, but the backend must never reconstruct a final amount from untrusted browser values or use floating-point money.
 
 ## Canonical address object
 

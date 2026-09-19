@@ -1,5 +1,15 @@
 # V9 verification — 2026-09-11
 
+## Backend Foundation V0.1 verification — 2026-09-19
+
+- Backend lint, TypeScript type checking and production build passed.
+- 13 backend tests passed for environment validation, production seed blocking, liveness, PostgreSQL-down readiness, CORS rejection, structured 404/invalid-JSON responses, migration ordering/checksums and seed opt-in. Three real-PostgreSQL assertions are included but skipped automatically when `TEST_DATABASE_URL` is absent.
+- A built server smoke test returned `200` for `/api/v1/health/live` and a non-leaking `503` for `/api/v1/health/ready` while PostgreSQL was intentionally unavailable.
+- Production dependency audit reported zero known vulnerabilities.
+- Existing non-browser platform, representative, tracking, address, dashboard, finance, settings, accounting, CSS and SEO tests passed. Static HTML/assets/accessibility/integer-money and JavaScript syntax checks also passed.
+- Chromium-only catalogue/browser tests could not run because this environment has no Chromium executable. Docker/PostgreSQL are also unavailable here, so the isolated migration integration suite remains for a local or CI run with `TEST_DATABASE_URL`.
+- No storefront or Dart Eye runtime file was changed. The existing `manifest.json` line-ending-only modification was present before this backend work and remains untouched.
+
 ## Clean structure and SEO
 
 - Removed the recursively duplicated project copies from `CSS/`, `Icons/`, `sections/` and `sections/sections`.

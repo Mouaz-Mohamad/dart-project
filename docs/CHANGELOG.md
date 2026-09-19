@@ -1,5 +1,16 @@
 # Dart Project changelog
 
+## Backend Foundation V0.1 — 2026-09-19
+
+- Added the provider-neutral `backend/` modular-monolith foundation using Node.js, Express, TypeScript and PostgreSQL.
+- Added validated environment configuration, structured request IDs/logging, secure defaults, CORS allowlisting, rate limiting, consistent error responses and graceful shutdown.
+- Added liveness/readiness endpoints under `/api/v1/health` and an initial OpenAPI document.
+- Added checksum-protected ordered SQL migrations with a PostgreSQL advisory lock and a single-next-migration command.
+- Added append-only audit storage, transactional outbox storage and hashed idempotency-key storage.
+- Added explicitly enabled, production-blocked synthetic seed infrastructure.
+- Recorded the approved channel split: Email/Web Push/in-site for routine order states; WhatsApp only for interactive confirmation, birthday and post-delivery review requests.
+- Kept every storefront and Dart Eye runtime file unchanged; API migration remains incremental and requires approval per domain.
+
 ## V11 site control, grouping and tracking — 2026-09-14
 
 - Added complete site-control settings with audited, backend-ready records and future-only commercial defaults.

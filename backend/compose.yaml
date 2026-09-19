@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: dart-postgres
+    environment:
+      POSTGRES_DB: dart
+      POSTGRES_USER: dart
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dart_local_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - dart_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dart -d dart"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  dart_postgres_data:

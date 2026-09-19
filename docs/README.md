@@ -43,6 +43,21 @@ python3 -m http.server 4173
 
 Then open `http://localhost:4173/`.
 
+### Backend foundation
+
+The first provider-neutral Node.js/Express/TypeScript foundation now lives in `backend/`. It does not replace any storefront flow yet.
+
+```bash
+cd backend
+npm install
+docker compose up -d postgres
+cp .env.example .env
+npm run db:migrate
+npm run dev
+```
+
+Run `npm run check` for backend lint, type checking and tests. Docker/PostgreSQL are required only for applying the real migration and running the optional database integration test; see `backend/README.md`.
+
 ## Checks
 
 ```bash
