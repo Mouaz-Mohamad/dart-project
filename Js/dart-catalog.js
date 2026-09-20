@@ -398,8 +398,10 @@
       !sizes(m).some((s) => active(s) && s.name === String(size))
     )
       return 0;
-    if (!IS_ADMIN && remoteStock && !owner) {
-      return Number(remoteStock.get(JSON.stringify([m.modelId, color, String(size)])) || 0);
+    if (!IS_ADMIN && remoteStock) {
+      return Number(
+        remoteStock.get(JSON.stringify([m.modelId, color, String(size)])) || 0,
+      );
     }
     return items().filter(
       (i) =>
