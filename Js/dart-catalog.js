@@ -393,6 +393,36 @@
     return changed;
   }
 
+  async function loadCompressibleImage(file) {
+    if (typeof createImageBitmap === "function") {
+      const bitmap = await createImageBitmap(file);
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        cleanup: () => bitmap.close?.(),
+      };
+    }
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const node = new Image();
+        node.onload = () => resolve(node);
+        node.onerror = () => reject(new Error("Could not decode this product image."));
+        node.src = objectUrl;
+      });
+      return {
+        source: image,
+        width: image.naturalWidth || image.width,
+        height: image.naturalHeight || image.height,
+        cleanup: () => URL.revokeObjectURL(objectUrl),
+      };
+    } catch (error) {
+      URL.revokeObjectURL(objectUrl);
+      throw error;
+    }
+  }
+
   async function compressImage(file) {
     if (
       !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
@@ -400,28 +430,35 @@
     )
       throw new Error("Choose JPG, PNG or WebP, up to 15 MB.");
 
-    const bitmap = await createImageBitmap(file);
-    const maxDimension = 1400;
-    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext("2d", { alpha: false });
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-
-    let quality = 0.8;
-    let blob = null;
-    while (quality >= 0.56) {
-      blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/webp", quality),
+    const image = await loadCompressibleImage(file);
+    try {
+      const maxDimension = 1400;
+      const scale = Math.min(
+        1,
+        maxDimension / Math.max(image.width, image.height),
       );
-      if (blob && blob.size <= 4 * 1024 * 1024) break;
-      quality -= 0.08;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Image compression is unavailable in this browser.");
+      context.drawImage(image.source, 0, 0, canvas.width, canvas.height);
+
+      let quality = 0.8;
+      let blob = null;
+      while (quality >= 0.56) {
+        blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/webp", quality),
+        );
+        if (blob && blob.size <= 4 * 1024 * 1024) break;
+        quality -= 0.08;
+      }
+      if (!blob || blob.size > 4 * 1024 * 1024)
+        throw new Error("Could not compress this image below 4 MB.");
+      return blob;
+    } finally {
+      image.cleanup();
     }
-    if (!blob || blob.size > 4 * 1024 * 1024)
-      throw new Error("Could not compress this image below 4 MB.");
-    return blob;
   }
 
   async function saveImage(file) {
