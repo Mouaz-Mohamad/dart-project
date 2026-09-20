@@ -33,8 +33,14 @@ export function createCatalogAssetRouter(
       response.status(404).json({ error: { code: "ASSET_NOT_FOUND", message: "Image not found" } });
       return;
     }
+    const etag = `"${asset.sha256}"`;
     response.setHeader("Content-Type", asset.contentType);
-    response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    response.setHeader("ETag", etag);
+    response.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    if (request.headers["if-none-match"] === etag) {
+      response.status(304).end();
+      return;
+    }
     response.status(200).send(asset.content);
   });
 
