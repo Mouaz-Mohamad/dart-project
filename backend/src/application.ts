@@ -21,6 +21,8 @@ import { createCatalogAssetRouter } from "./modules/catalog/catalog.asset.routes
 import type { CatalogAssetService } from "./modules/catalog/catalog.asset.service.js";
 import { createCommerceRouter } from "./modules/commerce/commerce.routes.js";
 import type { CommerceService } from "./modules/commerce/commerce.service.js";
+import { createSiteSettingsRouter } from "./modules/settings/site-settings.routes.js";
+import type { SiteSettingsService } from "./modules/settings/site-settings.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -28,6 +30,7 @@ export interface AppDependencies extends HealthDependencies {
   catalogService?: CatalogService;
   catalogAssetService?: CatalogAssetService;
   commerceService?: CommerceService;
+  siteSettingsService?: SiteSettingsService;
 }
 
 // Vercel's Express builder resolves Helmet's callable default export as a module namespace.
@@ -85,6 +88,9 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       }
       if (dependencies.commerceService) {
         app.use("/api/v1", createCommerceRouter(dependencies.commerceService, dependencies.identityService, config));
+      }
+      if (dependencies.siteSettingsService) {
+        app.use("/api/v1", createSiteSettingsRouter(dependencies.siteSettingsService, dependencies.identityService, config));
       }
     }
   }
