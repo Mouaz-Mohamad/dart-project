@@ -11,17 +11,6 @@ CREATE TABLE cart_reservations (
 
 CREATE INDEX cart_reservations_expiry_idx ON cart_reservations (expires_at);
 
--- Legacy browser reservations cannot be trusted after server-authoritative migration.
--- Release them before enforcing the foreign key to the new server reservation table.
-UPDATE inventory_items
-   SET status='In stock',
-       cart_reservation_id=NULL,
-       reservation_until=NULL,
-       version=version+1,
-       updated_at=now()
- WHERE cart_reservation_id IS NOT NULL
-    OR lower(status)='cart reserved';
-
 ALTER TABLE inventory_items
   ADD CONSTRAINT inventory_items_cart_reservation_fk
   FOREIGN KEY (cart_reservation_id)
