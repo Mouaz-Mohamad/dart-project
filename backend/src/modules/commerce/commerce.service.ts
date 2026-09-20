@@ -347,14 +347,132 @@ export class CommerceService {
       const settingsResult = await client.query<{ data: Record<string, unknown> }>(
         "SELECT data FROM site_settings WHERE id='main'",
       );
-      const siteDiscountPercent = activeSiteDiscountPercent(settingsResult.rows[0]?.data || {});
+      const settings = settingsResult.rows[0]?.data || {};
+      const siteDiscountPercent = activeSiteDiscountPercent(settings);
+
+      const customerPromotionResult = await client.query<{
+        client_code: string;
+        birthday: string | null;
+      }>(
+        "SELECT client_code, birthday::text FROM customers WHERE user_id=$1 FOR SHARE",
+        [customerUserId],
+      );
+      const customerPromotion = customerPromotionResult.rows[0];
+      if (!customerPromotion) {
+        throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
+      }
+
+      const promotionStatesResult = await client.query<{
+        domain: string;
+        version: string;
+        data: unknown[];
+      }>(
+        `SELECT domain, version::text, data
+           FROM dashboard_domain_state
+          WHERE domain IN ('birthday_rewards','cards')
+          FOR UPDATE`,
+      );
+      const promotionStates = new Map(
+        promotionStatesResult.rows.map((row) => [
+          row.domain,
+          {
+            version: Number(row.version || 1),
+            data: Array.isArray(row.data) ? row.data : [],
+          },
+        ]),
+      );
+      const birthdayState = promotionStates.get("birthday_rewards");
+      const cardState = promotionStates.get("cards");
+      if (!birthdayState || !cardState) {
+        throw new AppError(500, "PROMOTION_STATE_MISSING", "Promotion state is not initialized");
+      }
+
+      let promotion: Record<string, unknown> | null = null;
+      let promotionPercent = 0;
+      let birthdayReward: Record<string, unknown> | null = null;
+      let appliedCard: Record<string, unknown> | null = null;
+
+      const birthday = birthdayWindow(customerPromotion.birthday);
+      if (birthday) {
+        const rewardId = `BDAY-${customerPromotion.client_code}-${birthday.year}`;
+        birthdayReward = (birthdayState.data as Record<string, unknown>[]).find(
+          (row) => String(row.id || "") === rewardId,
+        ) || null;
+        if (!birthdayReward) {
+          birthdayReward = {
+            id: rewardId,
+            customerId: customerPromotion.client_code,
+            type: "Birthday",
+            discountPercent: Math.min(
+              100,
+              Math.max(0, Number(settings.birthdayDiscountPercent) || 30),
+            ),
+            startsAt: birthday.startsAt,
+            expiresAt: birthday.expiresAt,
+            status: "Active",
+            usedCount: 0,
+            createdAt: new Date().toISOString(),
+          };
+          birthdayState.data.unshift(birthdayReward);
+        }
+        if (String(birthdayReward.status || "Active") === "Active") {
+          promotionPercent = Math.min(
+            100,
+            Math.max(0, Number(birthdayReward.discountPercent) || 30),
+          );
+          promotion = {
+            type: "Birthday",
+            percent: promotionPercent,
+            rewardId,
+          };
+        }
+      }
+
+      if (!promotion && siteDiscountPercent > 0) {
+        promotionPercent = siteDiscountPercent;
+        promotion = { type: "Site", percent: promotionPercent };
+      }
+
+      if (!promotion) {
+        const nowMs = Date.now();
+        appliedCard = (cardState.data as Record<string, unknown>[]).find((row) => {
+          if (
+            String(row.clientId || "") !== customerPromotion.client_code ||
+            String(row.status || "") !== "Active" ||
+            Boolean(row.isArchived) ||
+            Boolean(row.isDeleted)
+          ) return false;
+          const limit = Number(row.itemLimit || row.purchasedLimit || 10);
+          const used = Number(row.purchasedItems || 0);
+          const reserved = Number(row.reservedItems || 0);
+          const expiry = flexibleDateExpiry(row.expDate);
+          return (
+            limit - used - reserved >= itemResult.rows.length &&
+            (!expiry || expiry >= nowMs)
+          );
+        }) || null;
+        if (appliedCard) {
+          promotionPercent = Math.min(
+            100,
+            Math.max(
+              0,
+              Number(appliedCard.discountPercent ?? settings.dartCardDiscountPercent) || 40,
+            ),
+          );
+          promotion = {
+            type: "Dart Card",
+            percent: promotionPercent,
+            cardId: String(appliedCard.cardId || appliedCard.id || ""),
+          };
+        }
+      }
 
       let subtotalMinor = 0;
       let finalMinor = 0;
       const itemSnapshots = itemResult.rows.map((row) => {
         const sellingMinor = Number(row.selling_minor);
         const modelDiscountPercent = Number(row.discount_percent || 0);
-        const effectiveDiscountPercent = siteDiscountPercent || modelDiscountPercent;
+        const effectiveDiscountPercent = promotionPercent || modelDiscountPercent;
         const finalUnitMinor = finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
         subtotalMinor += sellingMinor;
         finalMinor += finalUnitMinor;
@@ -368,9 +486,6 @@ export class CommerceService {
         };
       });
       const orderDiscountMinor = Math.max(0, subtotalMinor - finalMinor);
-      const promotion = siteDiscountPercent
-        ? { type: "Site", percent: siteDiscountPercent }
-        : null;
 
       const orderResult = await client.query<{ id: string; order_code: string; created_at: Date }>(
         `INSERT INTO orders (
@@ -387,10 +502,55 @@ export class CommerceService {
           JSON.stringify(input.contact),
           JSON.stringify(input.address),
           input.deliveryNotes || "",
-          JSON.stringify({ reservationId: input.reservationId }),
+          JSON.stringify({
+            reservationId: input.reservationId,
+            birthdayRewardId: promotion?.type === "Birthday" ? promotion.rewardId : "",
+            dartCardId: promotion?.type === "Dart Card" ? promotion.cardId : "",
+          }),
         ],
       );
       const order = orderResult.rows[0]!;
+
+      if (promotion?.type === "Birthday" && birthdayReward) {
+        birthdayReward.status = "Reserved";
+        birthdayReward.orderId = order.order_code;
+        birthdayReward.reservedAt = new Date().toISOString();
+        await client.query(
+          `UPDATE dashboard_domain_state
+              SET data=$2::jsonb, version=$3, updated_at=now()
+            WHERE domain=$1`,
+          [
+            "birthday_rewards",
+            JSON.stringify(birthdayState.data),
+            birthdayState.version + 1,
+          ],
+        );
+      }
+
+      if (promotion?.type === "Dart Card" && appliedCard) {
+        const reservedItems = Number(appliedCard.reservedItems || 0) + itemResult.rows.length;
+        appliedCard.reservedItems = reservedItems;
+        const reservedOrders = Array.isArray(appliedCard.reservedOrders)
+          ? appliedCard.reservedOrders as Record<string, unknown>[]
+          : [];
+        reservedOrders.push({
+          orderId: order.order_code,
+          itemCount: itemResult.rows.length,
+          itemCodes: itemResult.rows.map((row) => row.item_code),
+          reservedAt: new Date().toISOString(),
+        });
+        appliedCard.reservedOrders = reservedOrders;
+        await client.query(
+          `UPDATE dashboard_domain_state
+              SET data=$2::jsonb, version=$3, updated_at=now()
+            WHERE domain=$1`,
+          [
+            "cards",
+            JSON.stringify(cardState.data),
+            cardState.version + 1,
+          ],
+        );
+      }
 
       for (const snapshot of itemSnapshots) {
         const row = snapshot.row;
