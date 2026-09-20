@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { createHmac, randomUUID } from "node:crypto";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import {
@@ -75,10 +76,38 @@ const checkoutSchema = z.object({
   promotionCode: z.string().trim().min(1).max(120).optional(),
 });
 
+const GUEST_CART_COOKIE = "dart_guest_cart";
+
+function guestCartOwnerHash(
+  request: Request,
+  response: Response,
+  config: Pick<AppConfig, "authPepper" | "nodeEnv">,
+  createIfMissing: boolean,
+): string | null {
+  let token =
+    typeof request.cookies?.[GUEST_CART_COOKIE] === "string"
+      ? String(request.cookies[GUEST_CART_COOKIE])
+      : "";
+  if (!/^[0-9a-f-]{36}$/i.test(token)) {
+    if (!createIfMissing) return null;
+    token = randomUUID();
+    response.cookie(GUEST_CART_COOKIE, token, {
+      httpOnly: true,
+      secure: config.nodeEnv === "production",
+      sameSite: "lax",
+      path: "/api/v1",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+  }
+  return createHmac("sha256", config.authPepper)
+    .update(`guest-cart:${token}`)
+    .digest("hex");
+}
+
 export function createCommerceRouter(
   commerce: CommerceService,
   identity: IdentityService,
-  config: Pick<AppConfig, "sessionCookieName" | "authPepper">,
+  config: Pick<AppConfig, "sessionCookieName" | "authPepper" | "nodeEnv">,
 ): Router {
   const router = Router();
   const signedIn = authenticate(identity, config);
@@ -150,6 +179,7 @@ export function createCommerceRouter(
         body.reservationId,
         body.lines,
         request.auth!.userId,
+        guestCartOwnerHash(request, response, config, true) ?? undefined,
       );
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json(result);
@@ -169,14 +199,24 @@ export function createCommerceRouter(
 
   router.put("/cart/reservation", async (request, response) => {
     const body = reserveSchema.parse(request.body);
-    const result = await commerce.reserveCart(body.reservationId, body.lines);
+    const ownerHash = guestCartOwnerHash(request, response, config, true);
+    if (!ownerHash) {
+      throw new Error("Unable to establish guest cart ownership");
+    }
+    const result = await commerce.reserveCart(
+      body.reservationId,
+      body.lines,
+      undefined,
+      ownerHash,
+    );
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json(result);
   });
 
   router.delete("/cart/reservation/:reservationId", async (request, response) => {
     const id = reservationId.parse(request.params.reservationId);
-    await commerce.releaseCart(id);
+    const ownerHash = guestCartOwnerHash(request, response, config, false);
+    if (ownerHash) await commerce.releaseCart(id, ownerHash);
     response.status(204).end();
   });
 
@@ -418,6 +458,7 @@ export function createCommerceRouter(
         request.auth!.userId,
         body,
         String(request.id),
+        guestCartOwnerHash(request, response, config, false) ?? undefined,
       );
       response.status(201).json({ order: result });
     },
