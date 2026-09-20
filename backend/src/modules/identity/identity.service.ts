@@ -761,6 +761,164 @@ export class IdentityService {
     return { profile: await this.profile(account), ...(verification ? { verification } : {}) };
   }
 
+  public async adminSetAccountState(
+    account: AuthenticatedAccount,
+    targetUserId: string,
+    targetType: "customer" | "representative",
+    action: "suspend" | "activate" | "delete",
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    const permission =
+      targetType === "customer" ? "customers.manage" : "representatives.manage";
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes(permission) ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage this account");
+    }
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<{
+        status: string;
+        email_verified_at: Date | null;
+        deleted_at: Date | null;
+      }>(
+        `SELECT status, email_verified_at, deleted_at
+           FROM users
+          WHERE id=$1 AND account_type=$2
+          FOR UPDATE`,
+        [targetUserId, targetType],
+      );
+      const user = locked.rows[0];
+      if (!user) {
+        throw new AppError(404, "ACCOUNT_NOT_FOUND", "Account not found");
+      }
+      if (user.deleted_at) {
+        throw new AppError(409, "ACCOUNT_DELETED", "Deleted accounts cannot be changed");
+      }
+
+      if (action === "suspend") {
+        if (user.status !== "active") {
+          throw new AppError(409, "ACCOUNT_STATE_INVALID", "Only active accounts can be suspended");
+        }
+        await client.query(
+          `UPDATE users
+              SET status='suspended',
+                  session_version=session_version+1,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [targetUserId],
+        );
+        if (targetType === "representative") {
+          await client.query(
+            `UPDATE representatives
+                SET approval_status='suspended', updated_at=now()
+              WHERE user_id=$1 AND approval_status='approved'`,
+            [targetUserId],
+          );
+        }
+      }
+
+      if (action === "activate") {
+        if (user.status !== "suspended") {
+          throw new AppError(409, "ACCOUNT_STATE_INVALID", "Only suspended accounts can be restored");
+        }
+        if (targetType === "representative") {
+          const rep = await client.query<{
+            approved_by: string | null;
+            approved_at: Date | null;
+            approval_status: string;
+          }>(
+            `SELECT approved_by::text, approved_at, approval_status
+               FROM representatives
+              WHERE user_id=$1
+              FOR UPDATE`,
+            [targetUserId],
+          );
+          const representative = rep.rows[0];
+          if (!representative?.approved_by || !representative.approved_at) {
+            throw new AppError(
+              409,
+              "REPRESENTATIVE_APPROVAL_REQUIRED",
+              "Representative must be approved before activation",
+            );
+          }
+          await client.query(
+            `UPDATE representatives
+                SET approval_status='approved', updated_at=now()
+              WHERE user_id=$1`,
+            [targetUserId],
+          );
+        }
+        await client.query(
+          `UPDATE users
+              SET status='active',
+                  session_version=session_version+1,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [targetUserId],
+        );
+      }
+
+      if (action === "delete") {
+        await client.query(
+          `UPDATE users
+              SET status=CASE
+                    WHEN email_verified_at IS NULL THEN 'pending_verification'
+                    ELSE 'deleted'
+                  END,
+                  deleted_at=now(),
+                  session_version=session_version+1,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [targetUserId],
+        );
+        if (targetType === "representative") {
+          await client.query(
+            `UPDATE representatives
+                SET approval_status=CASE
+                      WHEN approval_status IN ('approved','suspended') THEN 'suspended'
+                      ELSE approval_status
+                    END,
+                    updated_at=now()
+              WHERE user_id=$1`,
+            [targetUserId],
+          );
+        }
+      }
+
+      await client.query(
+        `UPDATE sessions
+            SET revoked_at=COALESCE(revoked_at, now()),
+                revoke_reason=COALESCE(revoke_reason, $2)
+          WHERE user_id=$1 AND revoked_at IS NULL`,
+        [targetUserId, `admin_${action}`],
+      );
+
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        `ACCOUNT_${action.toUpperCase()}`,
+        targetType === "customer" ? "customers" : "representatives",
+        targetUserId,
+        metadata,
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async adminUpdateCustomer(
     account: AuthenticatedAccount,
     customerUserId: string,
