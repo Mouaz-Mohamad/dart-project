@@ -202,6 +202,14 @@ export class CatalogService {
         if (!id || !itemCode || !modelId) throw new AppError(422, "ITEM_ID_REQUIRED", "Item id, code and model are required");
         if (!modelIds.has(modelId)) throw new AppError(422, "ITEM_MODEL_INVALID", "Every item must reference an existing model");
         itemIds.add(id);
+        const requestedStatus = text(raw.status, "In stock");
+        const hasReservation =
+          requestedStatus.toLowerCase() === "cart reserved" &&
+          Boolean(raw.cartReservationId) &&
+          Boolean(raw.reservationUntil);
+        const status = requestedStatus.toLowerCase() === "cart reserved" && !hasReservation
+          ? "In stock"
+          : requestedStatus;
         await client.query(
           `INSERT INTO inventory_items (
              id,item_code,model_id,color,size,status,active,is_archived,is_deleted,
@@ -216,10 +224,10 @@ export class CatalogService {
              order_id=EXCLUDED.order_id, purchase_date=EXCLUDED.purchase_date, legacy=EXCLUDED.legacy,
              version=inventory_items.version+1, updated_at=now()`,
           [
-            id,itemCode,modelId,text(raw.color),text(raw.size),text(raw.status,"In stock"),
+            id,itemCode,modelId,text(raw.color),text(raw.size),status,
             bool(raw.active,true),bool(raw.isArchived),bool(raw.isDeleted),
-            raw.cartReservationId ? String(raw.cartReservationId) : null,
-            raw.reservationUntil ? String(raw.reservationUntil) : null,
+            hasReservation ? String(raw.cartReservationId) : null,
+            hasReservation ? String(raw.reservationUntil) : null,
             raw.orderId ? String(raw.orderId) : null,
             raw.purchaseDate ? String(raw.purchaseDate) : null,
             JSON.stringify(raw), raw.createdAt ? String(raw.createdAt) : null,
