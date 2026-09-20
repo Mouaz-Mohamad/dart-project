@@ -72,6 +72,7 @@ const checkoutSchema = z.object({
     addressSource: z.string().trim().max(80).optional(),
   }),
   deliveryNotes: z.string().trim().max(1000).optional(),
+  promotionCode: z.string().trim().min(1).max(120).optional(),
 });
 
 export function createCommerceRouter(
@@ -82,6 +83,19 @@ export function createCommerceRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
+
+  router.get(
+    "/me/promotions/validate",
+    signedIn,
+    requireAccountType("customer"),
+    async (request, response) => {
+      const code = z.string().trim().min(1).max(120).parse(request.query.code);
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(
+        await commerce.validatePromotionCode(request.auth!.userId, code),
+      );
+    },
+  );
 
   router.put(
     "/me/preferences/address",
