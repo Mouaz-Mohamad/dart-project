@@ -58,6 +58,16 @@ const context = vm.createContext({
   dartSaveAll() {},
   dartRefreshAll() {},
 });
+context.window = context;
+context.DartState = {
+  read(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+    catch { return fallback; }
+  },
+  write(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  },
+};
 
 function loadSegment(startMarker, endMarker) {
   const start = source.indexOf(startMarker);
@@ -226,11 +236,6 @@ for (const key of [
   "cardsData",
   "damageData",
 ]) assert.equal(context[key].length, 0, `cascade must clear linked ${key}`);
-for (const key of [
-  "dart_users",
-  "dart_birthday_rewards",
-  "dart_birthday_messages",
-  "dart_message_queue",
-]) assert.equal(JSON.parse(localStorage.getItem(key)).length, 0, `cascade must clear linked ${key}`);
+assert.equal(JSON.parse(localStorage.getItem("dart_users")).length, 0, "legacy development cascade must clear the linked login");
 
 console.log("PASS dashboard birthday queue and both hard-delete modes");

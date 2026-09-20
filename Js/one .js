@@ -1242,7 +1242,7 @@ function initCartAndCheckoutEvents() {
                         const summary = changes.length
                             ? changes
                                 .map(change =>
-                                    `${change.modelId} — ${change.color} / ${change.size}: EGP ${Number(change.previousUnitPrice || 0).toFixed(2)} → EGP ${Number(change.currentUnitPrice || 0).toFixed(2)}`
+                                    `${change.modelId} — ${change.color} / ${change.size}: EGP ${Math.trunc(Number(change.previousUnitPrice) || 0)} → EGP ${Math.trunc(Number(change.currentUnitPrice) || 0)}`
                                 )
                                 .join("\n")
                             : "One or more product prices changed.";

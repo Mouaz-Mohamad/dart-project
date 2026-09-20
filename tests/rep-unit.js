@@ -3,7 +3,8 @@ class Storage{constructor(){this.data=new Map()}getItem(k){return this.data.has(
 const localStorage=new Storage(),sessionStorage=new Storage(),callbacks={};
 const document={addEventListener(type,callback){(callbacks[type]??=[]).push(callback)},getElementById(){return null},querySelector(){return null},hidden:false};
 const window={addEventListener(){}};window.window=window;
-const context=vm.createContext({window,document,localStorage,sessionStorage,crypto:webcrypto,TextEncoder,Image:class{},FileReader:class{},navigator:{},location:{},fetch:async()=>{},L:undefined,alert(){},confirm(){return true},prompt(){return null},setInterval(){},setTimeout(){},console,Date,Math,JSON,Object,Array,String,Number,Boolean,RegExp,Error,Set,Map});
+window.DartState={read(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}},write(key,value){localStorage.setItem(key,JSON.stringify(value))},remove(key){localStorage.removeItem(key)}};
+const context=vm.createContext({window,document,localStorage,sessionStorage,crypto:webcrypto,TextEncoder,Image:class{},FileReader:class{},navigator:{},location:{protocol:'http:',hostname:'localhost'},fetch:async()=>{},L:undefined,alert(){},confirm(){return true},prompt(){return null},setInterval(){},setTimeout(){},console,Date,Math,JSON,Object,Array,String,Number,Boolean,RegExp,Error,Set,Map});
 async function sha(value){const digest=await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('')}
 function assert(ok,message){if(!ok)throw new Error(message)}
 (async()=>{

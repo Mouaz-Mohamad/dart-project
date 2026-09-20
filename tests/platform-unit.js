@@ -35,6 +35,7 @@ const productsData = [1, 2, 3].map((id, index) => ({
 
 const listeners = {};
 const document = {
+  cookie: "",
   addEventListener(type, callback) {
     (listeners[type] ||= []).push(callback);
   },
@@ -70,7 +71,7 @@ const context = vm.createContext({
     throw new Error("not used");
   },
   navigator: {},
-  location: { assign() {}, replace() {}, href: "" },
+  location: { assign() {}, replace() {}, href: "", origin: "", protocol: "http:", hostname: "localhost", pathname: "/Eye/unit-test" },
   MutationObserver: class {
     observe() {}
   },
@@ -82,6 +83,7 @@ const context = vm.createContext({
     return 0;
   },
   clearTimeout() {},
+  clearInterval() {},
   Event: class {
     constructor(type) {
       this.type = type;
@@ -111,6 +113,15 @@ window.window = window;
 window.document = document;
 window.localStorage = localStorage;
 window.sessionStorage = sessionStorage;
+window.setInterval = context.setInterval;
+window.DartState = {
+  read(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+    catch { return fallback; }
+  },
+  write(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
+  remove(key) { localStorage.removeItem(key); },
+};
 
 vm.runInContext(fs.readFileSync("Js/dart-catalog.js", "utf8"), context);
 context.DartCatalog = window.DartCatalog;
@@ -357,100 +368,8 @@ function form(values) {
     "password reset request must reach dashboard storage",
   );
 
-  // BEGIN Leaderboard regression — count retained items, not completed returns.
-  const leaderboardList = {
-    dataset: {},
-    innerHTML: "",
-    querySelector(selector) {
-      return selector === "h1" ? { outerHTML: "<h1>Leaderboard</h1>" } : null;
-    },
-  };
-  document.querySelector = (selector) =>
-    selector === ".leaderboard-list" ? leaderboardList : null;
-  const deliveredAt = new Date().toISOString();
-  localStorage.setItem(
-    "dart_customers",
-    JSON.stringify([
-      { id: "C-LB", clientId: "DA-LB", clientName: "Leaderboard Customer" },
-    ]),
-  );
-  localStorage.setItem(
-    "dart_orders",
-    JSON.stringify([
-      {
-        id: "O-LB",
-        orderId: "O-LB",
-        clientId: "DA-LB",
-        status: "Delivered",
-        deliveredAt,
-        finalAmount: 2500,
-        totalProducts: 5,
-        items: ["LB-1", "LB-2", "LB-3", "LB-4", "LB-5"],
-      },
-      {
-        id: "O-LB-NEW",
-        orderId: "O-LB-NEW",
-        clientId: "DA-LB",
-        status: "New",
-        createdAt: deliveredAt,
-        finalAmount: 1000,
-        totalProducts: 2,
-        items: ["LB-6", "LB-7"],
-      },
-    ]),
-  );
-  localStorage.setItem(
-    "dart_returns",
-    JSON.stringify([
-      {
-        returnId: "R-GOOD",
-        orderId: "O-LB",
-        clientId: "DA-LB",
-        itemCode: "LB-1",
-        status: "Good",
-        isPostDeliveryReturn: true,
-      },
-      {
-        returnId: "R-PENDING",
-        orderId: "O-LB",
-        clientId: "DA-LB",
-        itemCode: "LB-2",
-        status: "Pending Inspection",
-        isPostDeliveryReturn: true,
-      },
-      {
-        returnId: "R-REJECTED",
-        orderId: "O-LB",
-        clientId: "DA-LB",
-        itemCode: "LB-3",
-        status: "Rejected",
-        isPostDeliveryReturn: true,
-      },
-    ]),
-  );
-  platform.renderLeaderboard();
-  assert(
-    leaderboardList.innerHTML.includes("4 PIC"),
-    "new orders must not count; five delivered items minus one completed return must display 4 PIC",
-  );
-  const changedOrders = JSON.parse(localStorage.getItem("dart_orders"));
-  changedOrders[1].status = "Delivered";
-  changedOrders[1].deliveredAt = deliveredAt;
-  localStorage.setItem("dart_orders", JSON.stringify(changedOrders));
-  platform.renderLeaderboard();
-  assert(
-    leaderboardList.innerHTML.includes("6 PIC"),
-    "the same order must count as soon as its status becomes Delivered",
-  );
-  const changedReturns = JSON.parse(localStorage.getItem("dart_returns"));
-  changedReturns[1].status = "Damaged";
-  localStorage.setItem("dart_returns", JSON.stringify(changedReturns));
-  platform.renderLeaderboard();
-  assert(
-    leaderboardList.innerHTML.includes("5 PIC"),
-    "leaderboard must refresh immediately when another return is completed",
-  );
-  // END Leaderboard regression.
+  // Leaderboard totals are now covered by the server commerce service tests.
+  // The storefront must not reconstruct business totals from browser state.
 
   // BEGIN V9 birthday reward regression.
   const fixedBirthdayWindow = platform.birthdayWindow(
@@ -555,6 +474,7 @@ function form(values) {
     },
   ];
   platform.logout();
+  context.cartData = [{ id: "DA-ONE", title: "Product 1", price: 600, quantity: 1, size: "M", color: "Black" }];
   let guestCheckoutRejected = false;
   try {
     await platform.checkout(validForm);

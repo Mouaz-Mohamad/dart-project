@@ -20,6 +20,7 @@ const document = {
 };
 const window = {addEventListener(){},DartPlatform:{currentUser(){return {customerId:'DA-1'};}}};
 window.window = window;
+window.DartState={read(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}}};
 const context = vm.createContext({
   window,document,localStorage,sessionStorage,location:{search:''},URLSearchParams,
   L:undefined,fetch:async()=>({json:async()=>({})}),setInterval(){},setTimeout(){},

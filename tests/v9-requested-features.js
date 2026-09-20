@@ -16,6 +16,7 @@ const checkout = read("Js/one .js");
 const dashboard = read("Eye/dart.js");
 const dashboardFixes = read("Eye/dart-fixes.js");
 const representativePortal = read("Js/dart-rep.js");
+const commerceService = read("backend/src/modules/commerce/commerce.service.ts");
 const dashboardHtml = read("Eye/Dart Eye.html");
 const tracking = read("Js/dart-tracking.js");
 const styles = read("CSS/Stayle 1.css");
@@ -48,7 +49,7 @@ requireText(platform, 'reward.status = new Date() < new Date(reward.expiresAt)',
 // Dashboard birthday message queue remains visible and rolls over at 8 PM.
 requireText(dashboard, "const targetOffset = cairo.hour >= 20 ? 1 : 0", "Birthday queue must roll over at 8 PM Cairo while staying visible.");
 requireText(dashboard, 'row.birthdayDate === key', "Birthday send history must be scoped to the target date.");
-requireText(dashboardFixes, 'localStorage.setItem(\'dart_birthday_messages\'', "Queued birthday clients must be recorded and removed from the widget.");
+requireText(dashboardFixes, "DartDomainState.write('dart_birthday_messages', history)", "Queued birthday clients must be recorded through server-backed state and removed from the widget.");
 requireText(dashboardFixes, "renderBirthdayWidget();", "Birthday widget must refresh immediately after queueing.");
 
 // Requested dashboard controls.
@@ -68,9 +69,9 @@ requireText(dashboard, 'itemLimit: 10', "Manual Dart Card limit must stay fixed 
 
 // Product verification, leaderboard, simplified return and tracking.
 requireText(platform, 'customerNameParts(owner, 2)', "Serial verification must show the owner's first two names.");
-requireText(platform, 'customerNameParts(row.customer.clientName, 3)', "Leaderboard must show the first three names.");
-requireText(platform, "candidates.slice(0, 3)", "Leaderboard must show no more than three candidates.");
-requireText(platform, 'order.status === "Delivered"', "Leaderboard must count delivered orders only.");
+requireText(commerceService, ".slice(0, 3);", "Leaderboard must expose only the first three name parts.");
+requireText(commerceService, ".slice(0, 3)\n        .map", "Leaderboard API must show no more than three candidates.");
+requireText(commerceService, "o.status='Delivered'", "Leaderboard must count delivered orders only.");
 for (const rank of [1, 2, 3]) requireText(styles, `.leaderboard-item.rank-${rank}`, `Leaderboard rank ${rank} styling is missing.`);
 if (/name=["']model_code["']/i.test(returnsFragment)) errors.push("Public return form must not request Model Code.");
 requireText(platform, "modelCode = orderLine?.modelCode || inventoryItem?.modelId", "Return Model Code must be derived automatically.");

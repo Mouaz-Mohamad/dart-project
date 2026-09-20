@@ -1639,7 +1639,7 @@
       return;
     }
 
-    const rows = publicLeaderboardRows || [];
+    const rows = (publicLeaderboardRows || []).slice(0, 3);
     const signature = `${publicLeaderboardPeriod}:${JSON.stringify(rows)}`;
     if (list.dataset.dartLeaderboardSignature === signature) return;
 

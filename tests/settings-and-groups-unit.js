@@ -6,6 +6,11 @@ global.localStorage = {
   getItem(key) { return memory.has(key) ? memory.get(key) : null; },
   setItem(key, value) { memory.set(key, String(value)); },
 };
+global.location = { origin: "", pathname: "/" };
+global.DartState = {
+  read(key, fallback) { try { return JSON.parse(global.localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
+  write(key, value) { global.localStorage.setItem(key, JSON.stringify(value)); },
+};
 const settings = require("../Js/dart-site-settings.js");
 const zeroSettings = settings.save({ ...settings.get(), defaultMarkupPercent: 0, birthdayDiscountPercent: 0, dartCardDiscountPercent: 0 });
 assert.strictEqual(zeroSettings.defaultMarkupPercent, 0, "Zero is a valid future-model markup setting");
@@ -45,5 +50,7 @@ assert.strictEqual(returns.length, 1);
 assert.strictEqual(returns[0].records.length, 2, "Completed return pickups must disappear from active groups");
 
 delete global.localStorage;
+delete global.location;
+delete global.DartState;
 
 console.log("PASS configurable settings grouping contract");

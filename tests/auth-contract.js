@@ -22,8 +22,8 @@ assert(signup.includes('id="customerEmailVerificationForm"'), "Email OTP form is
 assert(signup.includes('minlength="12"'), "Customer password UI must enforce the 12-character minimum");
 
 assert(representative.includes("Representative login requires the secure account API"), "Representative production login must fail closed");
-assert(representative.includes("Registration was not saved"), "Incomplete representative registration must fail explicitly");
-assert(representative.includes("if (API_ENABLED) return [];"), "API representative sessions must not read local assigned orders");
+assert(representative.includes("Representative registration requires the secure account API"), "Production representative registration must fail closed without the API");
+assert(representative.includes("if (API_ENABLED) return apiWork.orders || [];"), "API representative sessions must read assigned orders only from the server work snapshot");
 
 assert(admin.includes("/api/v1/admin/auth/login"), "Admin login endpoint is not wired");
 assert(admin.includes("/api/v1/admin/auth/mfa/setup"), "Admin MFA setup is not wired");

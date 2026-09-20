@@ -178,6 +178,104 @@
     return setCache(payload.settings || {});
   }
 
+  async function checkForChanges() {
+    if (!API_BASE || root.document?.hidden) return;
+    try {
+      const payload = await api("/api/v1/site-settings");
+      const remoteVersion = Number(payload.version || 0);
+      if (remoteVersion && remoteVersion !== serverVersion) {
+        serverVersion = remoteVersion;
+        setCache(payload.settings || {});
+      }
+    } catch (error) {
+      if (error.status !== 401)
+        console.warn("Dart site settings live refresh failed", error);
+    }
+  }
+
+  function cairoParts(value = new Date()) {
+    try {
+      return Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Cairo",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(value).filter((part) => part.type !== "literal")
+        .map((part) => [part.type, Number(part.value)]));
+    } catch {
+      return { year: value.getFullYear(), month: value.getMonth() + 1, day: value.getDate(), hour: value.getHours() };
+    }
+  }
+
+  function cairoDateKey(value = new Date()) {
+    const parts = cairoParts(value);
+    return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+  }
+
+  function activeSiteDiscount(value = new Date(), settings = get()) {
+    const discount = settings.siteDiscount || {};
+    const percent = number(discount.percent, 0, 0, 100);
+    const today = cairoDateKey(value);
+    if (!discount.enabled || !percent) return null;
+    if (discount.startsAt && today < discount.startsAt) return null;
+    if (discount.endsAt && today > discount.endsAt) return null;
+    return { type: "Site", percent, startsAt: discount.startsAt || "", endsAt: discount.endsAt || "" };
+  }
+
+  function activeAnnouncements(value = new Date(), settings = get()) {
+    const today = cairoDateKey(value);
+    return settings.announcements
+      .filter((row) => row && row.enabled !== false && String(row.text || "").trim())
+      .filter((row) => (!row.startsAt || row.startsAt <= today) && (!row.endsAt || row.endsAt >= today))
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  }
+
+  function visibleColors(modelId, colors, settings = get()) {
+    const all = Array.isArray(colors) ? colors : [];
+    const rule = settings.modelCards?.[modelId] || { mode: "all" };
+    if (rule.mode === "custom") {
+      const chosen = new Set((rule.colors || []).map(String));
+      const filtered = all.filter((color) => chosen.has(String(color.name)));
+      return filtered.length ? filtered : all.slice(0, 1);
+    }
+    if (rule.mode === "one") return all.slice(0, 1);
+    if (rule.mode === "two") return all.slice(0, 2);
+    if (rule.mode === "count") return all.slice(0, Math.max(1, Number(rule.count) || 1));
+    return all;
+  }
+
+  async function resolveImage(asset, fallback) {
+    if (!asset) return fallback;
+    try {
+      await root.DartCatalog?.loadImage?.(asset);
+      return root.DartCatalog?.imageSrc?.(asset) || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  async function applyPublicMedia() {
+    const settings = get();
+    const hero = root.document?.querySelector(".hero > img[data-dart-hero]");
+    if (hero) {
+      const isDay = cairoParts().hour >= 6 && cairoParts().hour < 18;
+      const selected = isDay
+        ? settings.heroDayImage || settings.heroNightImage
+        : settings.heroNightImage || settings.heroDayImage;
+      hero.src = await resolveImage(selected, hero.getAttribute("src") || "/Photos/hero 2.png");
+      hero.dataset.timeMode = isDay ? "day" : "night";
+    }
+    const founder = root.document?.getElementById("dart-founder-image");
+    if (founder && settings.founderImage)
+      founder.src = await resolveImage(settings.founderImage, founder.getAttribute("src") || "/Photos/me.png");
+  }
+
+  const siteSettingsApi = {
+    STORAGE_KEY, defaults, get, save, hydrate, sync, checkForChanges,
+    serverVersion: () => serverVersion,
+    cairoParts, cairoDateKey, activeSiteDiscount, activeAnnouncements,
+    visibleColors, applyPublicMedia, number, heroWordSize,
+  };
+
   root.DartSiteSettings = siteSettingsApi;
   if (typeof module !== "undefined" && module.exports) module.exports = siteSettingsApi;
 

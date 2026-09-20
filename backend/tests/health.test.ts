@@ -22,6 +22,10 @@ const config: AppConfig = {
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
   mfaEncryptionKey: Buffer.alloc(32, 7),
+  automationWebhookUrl: null,
+  automationWebhookSecret: null,
+  outboxCronSecret: null,
+  outboxBatchSize: 20,
 };
 
 function appWith(databasePing: () => Promise<void>) {

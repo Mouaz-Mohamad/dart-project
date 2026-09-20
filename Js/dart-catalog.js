@@ -231,6 +231,9 @@
     });
     return resolveAssetUrl(result.urlPath, id) || assetPath(id);
   }
+  async function loadImage(asset) {
+    return imageSrc(asset);
+  }
   async function preloadImages() { window.dispatchEvent(new Event("dart:images-ready")); }
   async function loadModelImages() { window.dispatchEvent(new Event("dart:images-ready")); }
   async function migrateLegacyAssets() { return false; }

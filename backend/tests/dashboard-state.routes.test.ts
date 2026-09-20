@@ -25,6 +25,10 @@ const config: AppConfig = {
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
   mfaEncryptionKey: Buffer.alloc(32, 6),
+  automationWebhookUrl: null,
+  automationWebhookSecret: null,
+  outboxCronSecret: null,
+  outboxBatchSize: 20,
 };
 
 const sessionId = "123e4567-e89b-12d3-a456-426614174100";
