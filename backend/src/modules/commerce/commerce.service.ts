@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 
@@ -992,6 +993,334 @@ export class CommerceService {
         status: nextStatus,
         finalAmount: Number(order.final_minor) / 100,
       };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async adminReturnAction(
+    actorId: string,
+    returnRef: string,
+    input: {
+      action: "approve" | "reject" | "assign" | "inspect";
+      replacementItemCode?: string | undefined;
+      reason?: string | undefined;
+      representativeId?: string | undefined;
+      condition?: "Good" | "Damaged" | undefined;
+    },
+    requestId: string,
+  ): Promise<Record<string, unknown>> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      );
+      const returnsState = returnsStateResult.rows[0];
+      const rows = Array.isArray(returnsState?.data)
+        ? returnsState!.data as Record<string, unknown>[]
+        : [];
+      const record = rows.find(
+        (row) =>
+          String(row.id || "") === returnRef ||
+          String(row.returnId || "") === returnRef,
+      );
+      if (!record || record.isDeleted) {
+        throw new AppError(404, "RETURN_NOT_FOUND", "Return request not found");
+      }
+
+      const previousStatus = String(record.status || "");
+      const now = new Date().toISOString();
+      let inventoryChanged = false;
+
+      if (input.action === "approve") {
+        if (previousStatus !== "Pending Request") {
+          throw new AppError(409, "RETURN_STATE_INVALID", "Only pending return requests can be approved");
+        }
+
+        if (String(record.requestType || "") === "Exchange") {
+          const replacementCode = String(input.replacementItemCode || "").trim();
+          if (!replacementCode) {
+            throw new AppError(422, "EXCHANGE_REPLACEMENT_REQUIRED", "Choose a replacement item");
+          }
+          const replacementResult = await client.query<{
+            id: string;
+            item_code: string;
+            model_id: string;
+            color: string;
+            size: string;
+            status: string;
+          }>(
+            `SELECT id, item_code, model_id, color, size, status
+               FROM inventory_items
+              WHERE item_code=$1
+                AND active
+                AND NOT is_archived
+                AND NOT is_deleted
+              FOR UPDATE`,
+            [replacementCode],
+          );
+          const replacement = replacementResult.rows[0];
+          if (!replacement || String(replacement.status).toLowerCase() !== "in stock") {
+            throw new AppError(409, "EXCHANGE_STOCK_UNAVAILABLE", "Replacement item is no longer in stock");
+          }
+          if (
+            String(replacement.model_id) !== String(record.modelId || "") ||
+            String(replacement.color) !== String(record.requestedColor || "") ||
+            String(replacement.size) !== String(record.requestedSize || "")
+          ) {
+            throw new AppError(
+              409,
+              "EXCHANGE_VARIANT_MISMATCH",
+              "Replacement must match the requested model, color and size",
+            );
+          }
+          await client.query(
+            `UPDATE inventory_items
+                SET status='Processing/Held',
+                    order_id=$2,
+                    return_request_id=$3,
+                    cart_reservation_id=NULL,
+                    reservation_until=NULL,
+                    version=version+1,
+                    updated_at=now()
+              WHERE id=$1`,
+            [
+              replacement.id,
+              String(record.orderId || ""),
+              String(record.id || returnRef),
+            ],
+          );
+          record.replacementItemCode = replacement.item_code;
+          record.replacementItemId = replacement.id;
+          record.replacementLineSnapshot = {
+            ...(record.originalLineSnapshot as Record<string, unknown> || {}),
+            itemId: replacement.id,
+            itemCode: replacement.item_code,
+            modelCode: replacement.model_id,
+            color: replacement.color,
+            size: replacement.size,
+            exchangedFromItemCode: record.itemCode || "",
+          };
+          inventoryChanged = true;
+        }
+
+        record.status = "Approved - Awaiting Representative";
+        record.acceptedAt = now;
+        record.updatedAt = now;
+        record.inspectionStatus = String(record.inspectionStatus || "Pending");
+      }
+
+      if (input.action === "reject") {
+        if (previousStatus !== "Pending Request") {
+          throw new AppError(409, "RETURN_STATE_INVALID", "Only pending return requests can be rejected");
+        }
+        const reason = String(input.reason || "").trim();
+        if (reason.length < 3) {
+          throw new AppError(422, "RETURN_REJECTION_REASON_REQUIRED", "A rejection reason is required");
+        }
+        record.status = "Rejected";
+        record.rejectionReason = reason;
+        record.rejectedAt = now;
+        record.updatedAt = now;
+      }
+
+      if (input.action === "assign") {
+        if (previousStatus !== "Approved - Awaiting Representative") {
+          throw new AppError(409, "RETURN_STATE_INVALID", "Approve the return before assigning a representative");
+        }
+        const representativeRef = String(input.representativeId || "").trim();
+        const representativeResult = await client.query<{
+          user_id: string;
+          representative_code: string;
+          full_name: string;
+          phone: string | null;
+        }>(
+          `SELECT r.user_id::text, r.representative_code, r.full_name,
+                  (
+                    SELECT p.phone_display
+                      FROM account_phones p
+                     WHERE p.user_id=r.user_id
+                       AND p.account_type='representative'
+                     ORDER BY p.is_primary DESC, p.created_at
+                     LIMIT 1
+                  ) AS phone
+             FROM representatives r
+             JOIN users u ON u.id=r.user_id
+            WHERE (r.user_id::text=$1 OR r.representative_code=$1)
+              AND r.approval_status='approved'
+              AND u.status='active'
+            LIMIT 1`,
+          [representativeRef],
+        );
+        const representative = representativeResult.rows[0];
+        if (!representative) {
+          throw new AppError(409, "REPRESENTATIVE_UNAVAILABLE", "Choose an active representative");
+        }
+        record.status = "Representative Assigned";
+        record.representativeId = representative.user_id;
+        record.representativeBusinessId = representative.representative_code;
+        record.representativeName = representative.full_name;
+        record.representativePhone = representative.phone || "";
+        record.pickupGroupId = String(record.pickupGroupId || `RPG-${Date.now()}`);
+        record.assignedAt = now;
+        record.updatedAt = now;
+      }
+
+      if (input.action === "inspect") {
+        if (
+          !record.isPostDeliveryReturn ||
+          (!record.completedAt && previousStatus !== "Completed") ||
+          String(record.inspectionStatus || "Pending") !== "Pending"
+        ) {
+          throw new AppError(409, "RETURN_INSPECTION_INVALID", "This return is not awaiting inspection");
+        }
+        const condition = input.condition;
+        if (!condition) {
+          throw new AppError(422, "RETURN_CONDITION_REQUIRED", "Choose Good or Damaged");
+        }
+
+        const itemCode = String(record.itemCode || "");
+        const itemResult = await client.query<{ id: string; model_id: string; color: string; size: string }>(
+          `SELECT id, model_id, color, size
+             FROM inventory_items
+            WHERE item_code=$1
+            FOR UPDATE`,
+          [itemCode],
+        );
+        const item = itemResult.rows[0];
+        if (!item) {
+          throw new AppError(409, "RETURN_ITEM_NOT_FOUND", "Returned physical item not found");
+        }
+
+        if (condition === "Good") {
+          await client.query(
+            `UPDATE inventory_items
+                SET status='In stock',
+                    order_id=NULL,
+                    purchase_date=NULL,
+                    return_request_id=NULL,
+                    cart_reservation_id=NULL,
+                    reservation_until=NULL,
+                    version=version+1,
+                    updated_at=now()
+              WHERE id=$1`,
+            [item.id],
+          );
+        } else {
+          await client.query(
+            `UPDATE inventory_items
+                SET status='Damaged',
+                    return_request_id=$2,
+                    version=version+1,
+                    updated_at=now()
+              WHERE id=$1`,
+            [item.id, String(record.id || returnRef)],
+          );
+
+          const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
+            "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
+          );
+          const damageState = damageStateResult.rows[0];
+          const damageRows = Array.isArray(damageState?.data)
+            ? damageState!.data as Record<string, unknown>[]
+            : [];
+          if (!damageRows.some((row) => String(row.itemCode || "") === itemCode && !row.isDeleted)) {
+            damageRows.unshift({
+              id: randomUUID(),
+              damageId: `DMG-${Date.now()}`,
+              itemCode,
+              modelId: item.model_id,
+              color: item.color,
+              size: item.size,
+              status: "Damaged",
+              reason: String(record.reason || "Return inspection - Damaged"),
+              date: now,
+              createdAt: now,
+              inspectedAt: now,
+              orderId: String(record.orderId || ""),
+              returnId: String(record.returnId || ""),
+              requestType: String(record.requestType || "Refund"),
+              clientId: String(record.clientId || ""),
+              isArchived: false,
+              isDeleted: false,
+              isChecked: false,
+            });
+          }
+          await client.query(
+            `UPDATE dashboard_domain_state
+                SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
+              WHERE domain='damage'`,
+            [
+              JSON.stringify(damageRows),
+              Number(damageState?.version || 1) + 1,
+              actorId,
+            ],
+          );
+        }
+
+        record.inspectionStatus = condition;
+        record.inspectedAt = now;
+        record.updatedAt = now;
+        inventoryChanged = true;
+      }
+
+      const activityLog = Array.isArray(record.activityLog)
+        ? record.activityLog as Record<string, unknown>[]
+        : [];
+      activityLog.push({
+        id: randomUUID(),
+        action: `RETURN_${input.action.toUpperCase()}`,
+        previousStatus,
+        newStatus: record.status,
+        timestamp: now,
+        actorRole: "Admin",
+        actorId,
+        ...(input.condition ? { condition: input.condition } : {}),
+      });
+      record.activityLog = activityLog;
+
+      await client.query(
+        `UPDATE dashboard_domain_state
+            SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
+          WHERE domain='returns'`,
+        [
+          JSON.stringify(rows),
+          Number(returnsState?.version || 1) + 1,
+          actorId,
+        ],
+      );
+
+      if (inventoryChanged) {
+        await client.query(
+          "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+        );
+      }
+
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+         ) VALUES ('staff',$1,$2,'returns',$3,$4,$5::jsonb)`,
+        [
+          actorId,
+          `RETURN_${input.action.toUpperCase()}`,
+          String(record.id || returnRef),
+          requestId,
+          JSON.stringify({
+            returnId: record.returnId || "",
+            previousStatus,
+            newStatus: record.status,
+            representativeId: record.representativeId || "",
+            condition: input.condition || "",
+          }),
+        ],
+      );
+
+      await client.query("COMMIT");
+      return record;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
