@@ -170,8 +170,12 @@
       model.sizeChart = {unit:byId('dashboard-size-chart-unit').value || 'cm', rows:normalizedRows, updatedAt:new Date().toISOString()};
       model.updatedAt = new Date().toISOString();
       if (typeof dartAudit === 'function') dartAudit('SIZE_CHART_UPDATED', 'models', model.id, {sizeChart:previous}, {sizeChart:model.sizeChart}, 'Customer size chart updated');
-      if (typeof dartSaveAll === 'function') dartSaveAll();
-      else localStorage.setItem('dart_models', JSON.stringify(modelsData));
+      if (window.DartCatalog?.write) {
+        window.DartCatalog.write('dart_models', modelsData);
+        if (window.DartCatalog.sync) await window.DartCatalog.sync();
+      } else if (typeof dartSaveAll === 'function') {
+        dartSaveAll();
+      }
       if (typeof dartRefreshAll === 'function') dartRefreshAll();
       setStatus('Size chart saved and published to the product modal.', 'success');
       setTimeout(() => {
