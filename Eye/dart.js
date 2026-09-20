@@ -4726,9 +4726,12 @@ function openEditModal(id, sectionKey) {
   if (sectionKey === "representative") {
     document.getElementById("modal-rep-id").value = x.id;
     document.getElementById("modal-representative-name").value = x.name || "";
-    document.getElementById("modal-representative-id").value = x.repId || "";
+    const repIdInput = document.getElementById("modal-representative-id");
+    repIdInput.value = x.repId || "";
+    repIdInput.readOnly = Boolean(x.serverAuthoritative);
     const nationalIdInput = document.getElementById("modal-representative-national-id");
     nationalIdInput.value = "";
+    nationalIdInput.readOnly = Boolean(x.serverAuthoritative);
     nationalIdInput.placeholder = x.nationalIdLast4
       ? `••••••••••${x.nationalIdLast4}`
       : "14-digit national ID";
