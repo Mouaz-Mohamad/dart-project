@@ -796,6 +796,15 @@ export class CommerceService {
         if (!orderCode) continue;
         const rawStatus = String(raw.status || "New");
         const status = allowedStatuses.has(rawStatus) ? rawStatus : "Needs Attention";
+        const existingOrderResult = await client.query<{
+          id: string;
+          status: string;
+          promotion: Record<string, unknown> | null;
+        }>(
+          "SELECT id::text, status, promotion FROM orders WHERE order_code=$1 FOR UPDATE",
+          [orderCode],
+        );
+        const existingOrder = existingOrderResult.rows[0] || null;
         const clientCode = String(raw.clientId || "").trim();
         const customerResult = clientCode
           ? await client.query<{ user_id: string }>(
@@ -836,11 +845,22 @@ export class CommerceService {
           addressSource: String(raw.addressSource || ""),
         };
         const promotion = raw.promotionType
-          ? { type: String(raw.promotionType), percent: Number(raw.discount || 0) }
+          ? {
+              type: String(raw.promotionType),
+              percent: Number(raw.discount || 0),
+              ...(String(raw.promotionType) === "Birthday"
+                ? { rewardId: String(raw.birthdayRewardId || existingOrder?.promotion?.rewardId || "") }
+                : {}),
+              ...(String(raw.promotionType) === "Dart Card"
+                ? { cardId: String(raw.dartCardId || existingOrder?.promotion?.cardId || "") }
+                : {}),
+            }
+          : existingOrder?.promotion || null;
+        const deliveredAt = status === "Delivered"
+          ? String(raw.deliveredAt || new Date().toISOString())
           : null;
-        const deliveredAt = raw.deliveredAt ? String(raw.deliveredAt) : null;
 
-        await client.query(
+        const upserted = await client.query<{ id: string }>(
           `INSERT INTO orders (
              order_code, customer_user_id, status, payment_method, payment_status,
              subtotal_minor, order_discount_minor, final_minor,
@@ -869,9 +889,10 @@ export class CommerceService {
              is_archived=EXCLUDED.is_archived,
              is_deleted=EXCLUDED.is_deleted,
              legacy=EXCLUDED.legacy,
-             delivered_at=COALESCE(EXCLUDED.delivered_at, orders.delivered_at),
+             delivered_at=EXCLUDED.delivered_at,
              version=orders.version+1,
-             updated_at=now()`,
+             updated_at=now()
+           RETURNING id::text`,
           [
             orderCode,
             customerUserId,
@@ -895,6 +916,18 @@ export class CommerceService {
             deliveredAt,
           ],
         );
+        const orderDbId = upserted.rows[0]?.id;
+        if (orderDbId) {
+          await this.applyOrderStatusTransition(
+            client,
+            orderDbId,
+            orderCode,
+            existingOrder?.status || null,
+            status,
+            promotion,
+            actorId,
+          );
+        }
       }
 
       const nextVersion = currentVersion + 1;
