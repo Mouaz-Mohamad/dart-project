@@ -92,6 +92,7 @@ export class CatalogService {
   async publicCatalog(): Promise<{ version: number; models: Record<string, unknown>[]; stock: Record<string, number> }> {
     const client = await this.pool.connect();
     try {
+      await client.query("BEGIN");
       await this.releaseExpiredReservations(client);
       const versionResult = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
@@ -113,7 +114,7 @@ export class CatalogService {
       for (const row of stockResult.rows) {
         stock[JSON.stringify([row.model_id, row.color, row.size])] = Number(row.quantity);
       }
-      return {
+      const payload = {
         version: Number(versionResult.rows[0]?.version || 1),
         models: modelResult.rows.map((row) => ({
           modelId: row.model_id,
@@ -131,6 +132,11 @@ export class CatalogService {
         })),
         stock,
       };
+      await client.query("COMMIT");
+      return payload;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
     } finally {
       client.release();
     }
