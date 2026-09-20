@@ -73,6 +73,7 @@ interface AdminOrderRow {
   subtotal_minor: string | number;
   order_discount_minor: string | number;
   final_minor: string | number;
+  delivery_cost_minor: string | number;
   payment_method: string;
   payment_status: string;
   amount_paid_minor: string | number;
@@ -774,6 +775,15 @@ export class CommerceService {
         "SELECT data FROM site_settings WHERE id='main'",
       );
       const settings = settingsResult.rows[0]?.data || {};
+      const configuredDeliveryCost = Number(settings.deliveryCostPerPiece);
+      const deliveryCostPerPieceMinor = Math.round(
+        Math.max(
+          0,
+          Number.isFinite(configuredDeliveryCost)
+            ? configuredDeliveryCost
+            : 100,
+        ) * 100,
+      );
       const siteDiscountPercent = activeSiteDiscountPercent(settings);
 
       const customerPromotionResult = await client.query<{
@@ -950,18 +960,22 @@ export class CommerceService {
         };
       });
       const orderDiscountMinor = Math.max(0, subtotalMinor - finalMinor);
+      const deliveryCostMinor =
+        itemSnapshots.length * deliveryCostPerPieceMinor;
 
       const orderResult = await client.query<{ id: string; order_code: string; created_at: Date }>(
         `INSERT INTO orders (
-           customer_user_id, subtotal_minor, order_discount_minor, final_minor, promotion,
-           contact_snapshot, delivery_address, delivery_notes, order_source, legacy
-         ) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,'Website',$9::jsonb)
+           customer_user_id, subtotal_minor, order_discount_minor, final_minor,
+           delivery_cost_minor, promotion, contact_snapshot, delivery_address,
+           delivery_notes, order_source, legacy
+         ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,'Website',$10::jsonb)
          RETURNING id, order_code, created_at`,
         [
           customerUserId,
           subtotalMinor,
           orderDiscountMinor,
           finalMinor,
+          deliveryCostMinor,
           promotion ? JSON.stringify(promotion) : null,
           JSON.stringify(input.contact),
           JSON.stringify(input.address),
@@ -1104,6 +1118,8 @@ export class CommerceService {
         discount: promotionPercent,
         orderLevelDiscountAmount: orderDiscountMinor / 100,
         finalAmount: finalMinor / 100,
+        deliveryCost: deliveryCostMinor / 100,
+        deliveryCostPerPiece: deliveryCostPerPieceMinor / 100,
         promotionType: promotion?.type || "",
         promotionCode: promotion?.type === "Promotion" ? String(promotion.code || "") : "",
         birthdayRewardId: promotion?.type === "Birthday" ? String(promotion.rewardId || "") : "",
@@ -2684,6 +2700,7 @@ export class CommerceService {
           totalPrice: Number(row.subtotal_minor || 0) / 100,
           orderLevelDiscountAmount: Number(row.order_discount_minor || 0) / 100,
           finalAmount: Number(row.final_minor || 0) / 100,
+          deliveryCost: Number(row.delivery_cost_minor || 0) / 100,
           paymentMethod: row.payment_method,
           paymentStatus: row.payment_status,
           amountPaid: Number(row.amount_paid_minor || 0) / 100,
@@ -2890,6 +2907,23 @@ export class CommerceService {
         throw new AppError(422, "ORDER_ITEMS_REQUIRED", "A manual order must contain at least one physical item");
       }
 
+      const manualSettingsResult = await client.query<{ data: Record<string, unknown> }>(
+        "SELECT data FROM site_settings WHERE id='main'",
+      );
+      const configuredManualDeliveryCost = Number(
+        manualSettingsResult.rows[0]?.data?.deliveryCostPerPiece,
+      );
+      const manualDeliveryCostPerPieceMinor = Math.round(
+        Math.max(
+          0,
+          Number.isFinite(configuredManualDeliveryCost)
+            ? configuredManualDeliveryCost
+            : 100,
+        ) * 100,
+      );
+      const manualDeliveryCostMinor =
+        itemCodes.length * manualDeliveryCostPerPieceMinor;
+
       const clientCode = String(input.clientId || "").trim();
       const customerResult =
         clientCode && clientCode !== "-"
@@ -2922,17 +2956,18 @@ export class CommerceService {
       const inserted = await client.query<{ id: string; order_code: string }>(
         `INSERT INTO orders (
            customer_user_id, status, payment_method, payment_status,
-           subtotal_minor, order_discount_minor, final_minor,
+           subtotal_minor, order_discount_minor, final_minor, delivery_cost_minor,
            amount_paid_minor, amount_refunded_minor, contact_snapshot,
            delivery_address, delivery_notes, order_source, legacy
          ) VALUES (
-           $1,'New',$2,$3,0,0,0,0,0,$4::jsonb,$5::jsonb,$6,$7,$8::jsonb
+           $1,'New',$2,$3,0,0,0,$4,0,0,$5::jsonb,$6::jsonb,$7,$8,$9::jsonb
          )
          RETURNING id::text, order_code`,
         [
           customerUserId,
           String(input.paymentMethod || "Cash on Delivery"),
           String(input.paymentStatus || "Unpaid"),
+          manualDeliveryCostMinor,
           JSON.stringify(contact),
           JSON.stringify(address),
           String(input.deliveryNotes || ""),
@@ -2940,6 +2975,8 @@ export class CommerceService {
           JSON.stringify({
             clientId: clientCode || "-",
             source: "Manual Admin",
+            deliveryCost: manualDeliveryCostMinor / 100,
+            deliveryCostPerPiece: manualDeliveryCostPerPieceMinor / 100,
           }),
         ],
       );
@@ -4083,6 +4120,7 @@ export class CommerceService {
       subtotal_minor: string;
       order_discount_minor: string;
       final_minor: string;
+      delivery_cost_minor: string;
       amount_paid_minor: string;
       amount_refunded_minor: string;
       promotion: Record<string, unknown> | null;
@@ -4105,7 +4143,8 @@ export class CommerceService {
     }>(
       `SELECT o.id, o.order_code, o.status, o.payment_method, o.payment_status,
               o.subtotal_minor::text, o.order_discount_minor::text, o.final_minor::text,
-              o.amount_paid_minor::text, o.amount_refunded_minor::text, o.promotion,
+              o.delivery_cost_minor::text, o.amount_paid_minor::text,
+              o.amount_refunded_minor::text, o.promotion,
               o.contact_snapshot, o.delivery_address, o.delivery_notes,
               o.created_at, o.updated_at, o.delivered_at, o.delivery_started_at,
               r.user_id::text AS representative_user_id,
@@ -4185,6 +4224,7 @@ export class CommerceService {
         totalPrice: subtotal,
         orderLevelDiscountAmount: discountAmount,
         finalAmount: Number(row.final_minor) / 100,
+        deliveryCost: Number(row.delivery_cost_minor || 0) / 100,
         amountPaid: Number(row.amount_paid_minor) / 100,
         amountRefunded: Number(row.amount_refunded_minor) / 100,
         discount: Number(row.promotion?.percent || 0),
