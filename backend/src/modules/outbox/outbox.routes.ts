@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
 import type { AppConfig } from "../../config/env.js";
 import type { OutboxService } from "./outbox.service.js";
@@ -15,7 +15,7 @@ export function createOutboxRouter(
 ): Router {
   const router = Router();
 
-  async function process(request: import("express").Request, response: import("express").Response) {
+  async function process(request: Request, response: Response) {
     const expected = config.outboxCronSecret;
     const authorization = String(request.get("authorization") || "");
     const token = authorization.startsWith("Bearer ")
