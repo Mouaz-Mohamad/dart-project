@@ -1,6 +1,9 @@
 import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
-import { CommerceService } from "../src/modules/commerce/commerce.service.js";
+import {
+  CommerceService,
+  detectCartPriceChanges,
+} from "../src/modules/commerce/commerce.service.js";
 
 describe("CommerceService public leaderboard", () => {
   it("ranks delivered orders, subtracts completed refunds, keeps exchanges, and excludes active Dart Card holders", async () => {
@@ -127,5 +130,73 @@ describe("CommerceService public leaderboard", () => {
     ]);
     expect(result.rows.some((row) => row.name.includes("Card Holder"))).toBe(false);
     expect(release).toHaveBeenCalledOnce();
+  });
+});
+
+
+describe("cart price review", () => {
+  it("detects a changed unit price after reservation", () => {
+    const changes = detectCartPriceChanges(
+      [
+        {
+          modelId: "M-1",
+          color: "Burgundy",
+          size: "M",
+          quantity: 1,
+          discountPercent: 0,
+          finalUnitMinor: 60000,
+        },
+      ],
+      [
+        {
+          model_id: "M-1",
+          color: "Burgundy",
+          size: "M",
+          selling_minor: "60000",
+          discount_percent: "0",
+        },
+      ],
+      10,
+    );
+
+    expect(changes).toEqual([
+      {
+        modelId: "M-1",
+        color: "Burgundy",
+        size: "M",
+        quantity: 1,
+        previousUnitPrice: 600,
+        currentUnitPrice: 540,
+        previousDiscountPercent: 0,
+        currentDiscountPercent: 10,
+      },
+    ]);
+  });
+
+  it("does not require review when reserved and current prices match", () => {
+    const changes = detectCartPriceChanges(
+      [
+        {
+          modelId: "M-1",
+          color: "Black",
+          size: "L",
+          quantity: 2,
+          discountPercent: 20,
+          finalUnitMinor: 48000,
+        },
+      ],
+      [
+        {
+          model_id: "M-1",
+          color: "Black",
+          size: "L",
+          selling_minor: "60000",
+          discount_percent: "20",
+        },
+      ],
+      0,
+    );
+
+    expect(changes).toEqual([]);
   });
 });
