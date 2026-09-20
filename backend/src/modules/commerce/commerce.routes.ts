@@ -75,6 +75,7 @@ const checkoutSchema = z.object({
   }),
   deliveryNotes: z.string().trim().max(1000).optional(),
   promotionCode: z.string().trim().min(1).max(120).optional(),
+  acceptPriceChanges: z.boolean().optional(),
 });
 
 const GUEST_CART_COOKIE = "dart_guest_cart";
