@@ -21,33 +21,11 @@ export class DashboardStateService {
       [DASHBOARD_DOMAINS],
     );
     const versions = Object.fromEntries(
-      DASHBOARD_DOMAINS.map((domain) => [domain, 0]),
+      DASHBOARD_DOMAINS.map((domain) => [domain, 1]),
     ) as Record<DashboardDomain, number>;
     for (const row of result.rows) {
       versions[row.domain] = Number(row.version || 1);
     }
-    return versions;
-  }
-
-  async versions(): Promise<Record<DashboardDomain, number>> {
-    const result = await this.pool.query<{ domain: DashboardDomain; version: string }>(
-      "SELECT domain, version::text FROM dashboard_domain_state",
-    );
-    const versions = Object.fromEntries(
-      DASHBOARD_DOMAINS.map((domain) => [domain, 1]),
-    ) as Record<DashboardDomain, number>;
-    for (const row of result.rows) versions[row.domain] = Number(row.version || 1);
-    return versions;
-  }
-
-  async versions(): Promise<Record<DashboardDomain, number>> {
-    const result = await this.pool.query<{ domain: DashboardDomain; version: string }>(
-      "SELECT domain, version::text FROM dashboard_domain_state",
-    );
-    const versions = Object.fromEntries(
-      DASHBOARD_DOMAINS.map((domain) => [domain, 1]),
-    ) as Record<DashboardDomain, number>;
-    for (const row of result.rows) versions[row.domain] = Number(row.version || 1);
     return versions;
   }
 
