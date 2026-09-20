@@ -150,7 +150,7 @@
       serverVersion = Number(state.version || 1);
 
       const migrationDone = localStorage.getItem(LEGACY_MIGRATION_KEY) === "1";
-      if (!force && !migrationDone) {
+      if (!force && !migrationDone && serverVersion === 1) {
         const mergedModels = structuredClone(state.models || []);
         const mergedItems = structuredClone(state.items || []);
         const modelIds = new Set(
