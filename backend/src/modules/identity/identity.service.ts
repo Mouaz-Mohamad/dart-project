@@ -761,6 +761,134 @@ export class IdentityService {
     return { profile: await this.profile(account), ...(verification ? { verification } : {}) };
   }
 
+  public async adminUpdateCustomer(
+    account: AuthenticatedAccount,
+    customerUserId: string,
+    input: {
+      name: string;
+      email: string;
+      phone1: string;
+      phone2?: string | undefined;
+      birthday?: string | null | undefined;
+      dartCardDrawEligible?: boolean | undefined;
+    },
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("customers.manage") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage customers");
+    }
+
+    const email = input.email.trim();
+    const emailNormalized = normalizeEmail(email);
+    const displayPhones = [input.phone1, input.phone2].filter(
+      (value): value is string => Boolean(value?.trim()),
+    );
+    const normalizedPhones = normalizePhonesOrThrow(displayPhones);
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<{
+        email: string;
+        email_normalized: string;
+      }>(
+        `SELECT email, email_normalized
+           FROM users
+          WHERE id=$1 AND account_type='customer' AND deleted_at IS NULL
+          FOR UPDATE`,
+        [customerUserId],
+      );
+      const current = locked.rows[0];
+      if (!current) {
+        throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
+      }
+
+      const contactsChanged =
+        current.email_normalized !== emailNormalized ||
+        (
+          await client.query<{ values: string[] }>(
+            `SELECT COALESCE(
+               array_agg(phone_normalized ORDER BY is_primary DESC, created_at),
+               ARRAY[]::text[]
+             ) AS values
+               FROM account_phones
+              WHERE user_id=$1 AND account_type='customer'`,
+            [customerUserId],
+          )
+        ).rows[0]!.values.join("|") !== normalizedPhones.join("|");
+
+      await client.query(
+        `UPDATE customers
+            SET full_name=$2,
+                birthday=$3::date,
+                dart_card_draw_eligible=COALESCE($4, dart_card_draw_eligible),
+                updated_at=now()
+          WHERE user_id=$1`,
+        [
+          customerUserId,
+          input.name.trim(),
+          input.birthday || null,
+          input.dartCardDrawEligible ?? null,
+        ],
+      );
+
+      await client.query(
+        `UPDATE users
+            SET email=$2,
+                email_normalized=$3,
+                email_verified_at=now(),
+                status=CASE WHEN status='deleted' THEN status ELSE 'active' END,
+                session_version=session_version + CASE WHEN $4 THEN 1 ELSE 0 END,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [customerUserId, email, emailNormalized, contactsChanged],
+      );
+
+      await client.query(
+        "DELETE FROM account_phones WHERE user_id=$1 AND account_type='customer'",
+        [customerUserId],
+      );
+      await this.insertPhones(
+        client,
+        customerUserId,
+        "customer",
+        displayPhones,
+        normalizedPhones,
+      );
+
+      if (contactsChanged) {
+        await client.query(
+          `UPDATE sessions
+              SET revoked_at=COALESCE(revoked_at, now()),
+                  revoke_reason=COALESCE(revoke_reason, 'admin_identity_update')
+            WHERE user_id=$1 AND revoked_at IS NULL`,
+          [customerUserId],
+        );
+      }
+
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "CUSTOMER_ADMIN_UPDATED",
+        "customers",
+        customerUserId,
+        metadata,
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
   public async requestPasswordReset(
     accountType: AccountType,
     identifier: string,
