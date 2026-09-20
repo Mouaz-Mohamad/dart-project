@@ -77,6 +77,9 @@
     document.body.classList.remove("dart-admin-locked");
     authView.hidden = true;
     logoutButton.hidden = false;
+    window.DartCatalog?.hydrate?.().catch((error) => {
+      console.error("Unable to load server catalogue after dashboard sign-in", error);
+    });
   }
 
   async function beginMfaSetup() {
