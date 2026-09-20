@@ -621,7 +621,7 @@ function renderModalCarousel(images, altText) {
 
     track.innerHTML = slides.map(src => `
         <div class="carousel-slide">
-            <img src="${src}" alt="${altText || ''}" loading="lazy">
+            <img src="${escapeCatalogHtml(src)}" alt="${escapeCatalogHtml(altText || '')}" loading="lazy">
         </div>
     `).join('');
 
