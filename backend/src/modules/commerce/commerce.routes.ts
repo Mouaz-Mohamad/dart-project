@@ -334,6 +334,18 @@ export function createCommerceRouter(
   );
 
   router.get(
+    "/admin/orders-version",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("orders.read"),
+    async (_request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json({ version: await commerce.adminOrdersVersion() });
+    },
+  );
+
+  router.get(
     "/admin/orders-state",
     signedIn,
     requireAccountType("staff"),
