@@ -172,7 +172,7 @@
       if (typeof dartAudit === 'function') dartAudit('SIZE_CHART_UPDATED', 'models', model.id, {sizeChart:previous}, {sizeChart:model.sizeChart}, 'Customer size chart updated');
       if (window.DartCatalog?.write) {
         window.DartCatalog.write('dart_models', modelsData);
-        if (window.DartCatalog.sync) await window.DartCatalog.sync();
+        if (window.DartCatalog.syncAdminState) await window.DartCatalog.syncAdminState();
       } else if (typeof dartSaveAll === 'function') {
         dartSaveAll();
       }
