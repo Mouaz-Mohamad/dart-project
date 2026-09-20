@@ -9,10 +9,8 @@
   const MAX_SAVED_IMAGE_BYTES = 650 * 1024;
   let dashboardAddress = null;
 
-  const read = (key, fallback = []) => {
-    try { const parsed = JSON.parse(localStorage.getItem(key)); return parsed ?? fallback; }
-    catch { return fallback; }
-  };
+  const read = (key, fallback = []) =>
+    window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
     if (key === 'dart_orders' && window.DartOrdersApi) {
       window.DartOrdersApi.write(value);
@@ -22,7 +20,7 @@
       window.DartDomainState.write(key, value);
       return;
     }
-    localStorage.setItem(key, JSON.stringify(value));
+    window.DartState?.write?.(key, value, { source: 'operations-v4' });
   };
   const field = id => document.getElementById(id);
   const value = id => String(field(id)?.value || '').trim();

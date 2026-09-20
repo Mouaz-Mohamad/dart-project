@@ -76,6 +76,7 @@
   }
 
   function readJSON(key, fallback) {
+    if (root.DartState?.isBusinessKey?.(key)) return root.DartState.read(key, fallback);
     const storage = getStorage();
     if (!storage) return fallback;
     try {
@@ -89,6 +90,10 @@
   function writeJSON(key, value) {
     if (root.DartDomainState?.domainForStorageKey?.(key)) {
       root.DartDomainState.write(key, value);
+      return;
+    }
+    if (root.DartState?.isBusinessKey?.(key)) {
+      root.DartState.write(key, value, { source: "finance" });
       return;
     }
     const storage = getStorage();

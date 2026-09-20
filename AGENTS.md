@@ -62,3 +62,12 @@ Refer to `Codex_Master_Prompt.md` for the full phased roadmap (Phase 1–5) and 
 - Vercel must build an affected project at most once per approved batch. Frontend-only batches skip API builds; backend-only batches skip storefront builds; mixed batches build each affected project once.
 - A non-batch commit reaching GitHub must be treated as non-deployable by Vercel. Only an explicit user instruction to deploy before seven changes may override the normal batching rule.
 - After every batch push, verify GitHub status plus the production aliases for both `dart-project` and `dart-api` before calling the batch live.
+
+
+## Database-only browser-state rule
+
+- PostgreSQL is the only persistent source of truth for business data.
+- Browser localStorage / IndexedDB must never persist models, items, customers, orders, returns, reviews, cards, representatives, finance records, promotions, notifications, message queues, saved addresses, carts, audit records, or product-image bytes.
+- Browser persistence is allowed only for non-business UI preferences and ephemeral session/navigation identifiers.
+- `window.DartState` is an in-memory projection only; every durable write must go through an API and every reload must rehydrate from PostgreSQL.
+- Run `node tests/database-authoritative-storage.cjs` before publishing.

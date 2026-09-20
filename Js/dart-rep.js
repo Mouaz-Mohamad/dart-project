@@ -41,20 +41,10 @@
   let latestApiLocation = null;
   let lastLocationSyncAt = 0;
 
-  const read = (key, fallback = []) => {
-    try {
-      return JSON.parse(localStorage.getItem(key)) ?? fallback;
-    } catch {
-      return fallback;
-    }
-  };
+  const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
-    if (API_ENABLED && API_REQUIRED) {
-      throw new Error(
-        `Local representative business-state writes are disabled in production (${key}).`,
-      );
-    }
-    localStorage.setItem(key, JSON.stringify(value));
+    if (API_REQUIRED) throw new Error(`Representative business-state writes require the secure API (${key}).`);
+    window.DartState?.write?.(key, value, { source: "rep-dev" });
   };
   const now = () => new Date().toISOString();
   const uid = (prefix) => {
@@ -228,10 +218,9 @@
         const match = String(rep.repId || "").match(/^Rep-(\d+)$/i);
         return Math.max(current, match ? Number(match[1]) : 0);
       },
-      Number(localStorage.getItem("dart_counter_rep")) || 0,
+      0,
     );
     const next = max + 1;
-    localStorage.setItem("dart_counter_rep", String(next));
     return `Rep-${next}`;
   }
 
@@ -243,7 +232,7 @@
       !session.repId ||
       Date.parse(session.expiresAt) <= Date.now()
     ) {
-      localStorage.removeItem(KEYS.session);
+      window.DartState?.remove?.(KEYS.session, { source: "rep" });
       return null;
     }
     return session;
@@ -1361,7 +1350,7 @@
         }
       } else {
         if (rep) audit("REP_LOGOUT", rep.id);
-        localStorage.removeItem(KEYS.session);
+        window.DartState?.remove?.(KEYS.session, { source: "rep" });
       }
       activeOrderIds.clear();
       activeReturnIds.clear();

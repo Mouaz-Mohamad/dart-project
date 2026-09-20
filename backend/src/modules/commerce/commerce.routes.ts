@@ -220,6 +220,21 @@ export function createCommerceRouter(
     response.status(200).json(result);
   });
 
+  router.get(
+    "/cart/reservation/:reservationId",
+    rateLimit({ windowMs: 600000, limit: 80, standardHeaders: "draft-8", legacyHeaders: false }),
+    async (request, response) => {
+      const id = reservationId.parse(request.params.reservationId);
+      const ownerHash = guestCartOwnerHash(request, response, config, true);
+      if (!ownerHash) {
+        response.status(200).json({ cart: null });
+        return;
+      }
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.guestCart(id, ownerHash));
+    },
+  );
+
   router.delete("/cart/reservation/:reservationId", rateLimit({ windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const id = reservationId.parse(request.params.reservationId);
     const ownerHash = guestCartOwnerHash(request, response, config, false);

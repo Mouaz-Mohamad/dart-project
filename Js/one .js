@@ -47,7 +47,7 @@ async function hydratePublicReviews() {
     }
 }
 
-let cartData = JSON.parse(localStorage.getItem('dart_cart')) || [];
+let cartData = window.DartState?.read?.('dart_cart', []) || [];
 let appliedDiscountRate = 0;
 
 let selectedSize = null;
@@ -1011,7 +1011,7 @@ function renderCart() {
 }
 
 async function saveCartToLocalStorage() {
-    const previous = JSON.parse(localStorage.getItem('dart_cart') || '[]');
+    const previous = structuredClone(window.DartState?.read?.('dart_cart', []) || []);
     try {
         if (window.DartPlatform?.reserveCart) {
             await window.DartPlatform.reserveCart(cartData);
@@ -1019,7 +1019,7 @@ async function saveCartToLocalStorage() {
             if (!DART_LOCAL_DEMO_MODE) {
                 throw new Error("تعذر الاتصال بخدمة حجز السلة. لم يتم حفظ التغيير.");
             }
-            localStorage.setItem('dart_cart', JSON.stringify(cartData));
+            throw new Error("خدمة السلة متاحة من خلال قاعدة البيانات فقط.");
         }
         if (window.dartAppliedPromotion?.cardId) {
             const used=Number(window.dartAppliedPromotion.purchasedItems||0),limit=Number(window.dartAppliedPromotion.itemLimit||window.dartAppliedPromotion.purchasedLimit||10),count=cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0);
@@ -1028,7 +1028,7 @@ async function saveCartToLocalStorage() {
         return true;
     } catch (error) {
         cartData = previous;
-        localStorage.setItem('dart_cart', JSON.stringify(previous));
+        window.DartState?.write?.('dart_cart', previous, { source: 'cart-rollback' });
         showToast(error.message || 'تعذر حجز القطعة. حاول مرة أخرى.');
         return false;
     }
@@ -1045,7 +1045,7 @@ function initCartAndCheckoutEvents() {
     const discountInput = document.getElementById('discountInput');
 
     window.DartPlatform?.cleanupCartReservations?.();
-    cartData = JSON.parse(localStorage.getItem('dart_cart') || '[]');
+    cartData = window.DartState?.read?.('dart_cart', []) || [];
     if (cartView) cartView.style.display = 'block';
 
     renderCart();
@@ -1139,7 +1139,7 @@ function initCartAndCheckoutEvents() {
                 }
                 try {
                     const today = new Date();
-                    promotion = (JSON.parse(localStorage.getItem('dart_promotions')) || []).find(item =>
+                    promotion = (window.DartState?.read?.('dart_promotions', []) || []).find(item =>
                         String(item.code || '').toUpperCase() === code &&
                         item.status === 'Active' &&
                         (!item.startsAt || new Date(item.startsAt) <= today) &&
@@ -1196,7 +1196,7 @@ function initCartAndCheckoutEvents() {
                     sessionStorage.setItem('dart_last_order_id', order.orderId);
                     sessionStorage.setItem('dart_internal_navigation', '1');
                     cartData = [];
-                    localStorage.setItem('dart_cart', '[]');
+                    window.DartState?.write?.('dart_cart', [], { source: 'cart' });
                     appliedDiscountRate = 0;
                     updateCartCount();
                     renderCart();
@@ -1236,7 +1236,7 @@ function initCartAndCheckoutEvents() {
                                     line.priceReviewedAt = new Date().toISOString();
                                 });
                         });
-                        localStorage.setItem('dart_cart', JSON.stringify(cartData));
+                        window.DartState?.write?.('dart_cart', cartData, { source: 'cart' });
                         renderCart();
 
                         try {
@@ -1247,7 +1247,7 @@ function initCartAndCheckoutEvents() {
                             sessionStorage.setItem('dart_last_order_id', order.orderId);
                             sessionStorage.setItem('dart_internal_navigation', '1');
                             cartData = [];
-                            localStorage.setItem('dart_cart', '[]');
+                            window.DartState?.write?.('dart_cart', [], { source: 'cart' });
                             appliedDiscountRate = 0;
                             updateCartCount();
                             renderCart();
@@ -1476,7 +1476,7 @@ function initAddressMap() {
                     console.warn('Saved address sync failed', error);
                 });
             } else {
-                localStorage.setItem('user_last_address', JSON.stringify(selectedAddressData));
+                throw new Error('Saved addresses require the secure API.');
             }
         }
 
@@ -1492,13 +1492,9 @@ function initAddressMap() {
             return true;
         };
 
-        const savedLoc = localStorage.getItem('user_last_address');
+        const savedLoc = window.DartState?.read?.('user_last_address', null);
         let restoredSavedLocation = false;
-        if (savedLoc) {
-            try {
-                restoredSavedLocation = applySavedLocation(JSON.parse(savedLoc));
-            } catch {}
-        }
+        if (savedLoc) restoredSavedLocation = applySavedLocation(savedLoc);
         if (!restoredSavedLocation) fetchGPS();
 
         window.addEventListener('dart:saved-address-hydrated', event => {
@@ -1559,7 +1555,7 @@ function initAddressMap() {
                         console.warn('Saved address clear failed', error);
                     }
                 } else {
-                    localStorage.removeItem('user_last_address');
+                    window.DartState?.remove?.('user_last_address', { source: 'checkout' });
                 }
                 selectedAddressData = null;
                 if (input) input.value = '';

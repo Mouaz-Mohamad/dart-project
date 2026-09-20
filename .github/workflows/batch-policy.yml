@@ -21,3 +21,5 @@ jobs:
           grep -Fq '[deploy]' <<<"$COMMIT_MESSAGE" || { echo 'Missing [deploy] marker'; exit 1; }
       - name: Validate Vercel deployment config
         run: node backend/scripts/check-vercel-config.mjs
+      - name: Database-authoritative browser storage check
+        run: node tests/database-authoritative-storage.cjs

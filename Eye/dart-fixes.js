@@ -1,15 +1,7 @@
 (function () {
   'use strict';
 
-  const emptyDefault = (key, assign) => { if (!localStorage.getItem(key)) assign([]); };
-  emptyDefault('dart_models', value => { modelsData = value; });
-  emptyDefault('dart_items', value => { itemsData = value; });
-  emptyDefault('dart_customers', value => { customersData = value; });
-  emptyDefault('dart_orders', value => { ordersData = value; });
-  emptyDefault('dart_returns', value => { returnsData = value; });
-  emptyDefault('dart_reviews', value => { reviewsData = value; });
-  emptyDefault('dart_cards', value => { cardsData = value; });
-  if (typeof representativeData !== 'undefined' && !localStorage.getItem('dart_representatives')) representativeData = [];
+  // Business collections are hydrated from PostgreSQL through the shared adapters.
 
   const email = value => String(value || '').trim().toLowerCase();
   const phone = value => {
@@ -27,7 +19,7 @@
        wantedPhones.some(value => [phone(customer.phone1), phone(customer.phone2)].includes(value))));
     if (window.DartAdminApi) return dashboardMatch || null;
     if (window.DartDomainState) return dashboardMatch;
-    const users = JSON.parse(localStorage.getItem('dart_users') || '[]');
+    const users = window.DartState?.read?.('dart_users', []) || [];
     const editingCustomer = customersData.find(customer => String(customer.id) === String(editId || ''));
     const userMatch = users.find(user => user.customerId !== editingCustomer?.clientId &&
       ((wantedEmail && email(user.email) === wantedEmail) || wantedPhones.some(value => [phone(user.phone1), phone(user.phone2)].includes(value))));
@@ -65,8 +57,8 @@
       const selected = [...document.querySelectorAll('#birthday-feed .bday-checkbox:checked')]
         .map(box => box.closest('[data-client-id]')).filter(Boolean);
       if (!selected.length) { alert('اختر عميلًا واحدًا على الأقل.'); return; }
-      const queue = JSON.parse(localStorage.getItem('dart_message_queue') || '[]');
-      const history = JSON.parse(localStorage.getItem('dart_birthday_messages') || '[]');
+      const queue = structuredClone(window.DartState?.read?.('dart_message_queue', []) || []);
+      const history = structuredClone(window.DartState?.read?.('dart_birthday_messages', []) || []);
       const birthdayDiscountPercent = Math.max(
         0,
         Math.min(
@@ -109,9 +101,6 @@
           window.DartDomainState.syncDomain?.('message_queue'),
           window.DartDomainState.syncDomain?.('birthday_messages'),
         ]);
-      } else if (['localhost', '127.0.0.1'].includes(location.hostname)) {
-        localStorage.setItem('dart_message_queue', JSON.stringify(queue));
-        localStorage.setItem('dart_birthday_messages', JSON.stringify(history));
       } else {
         throw new Error('Birthday messaging requires the secure server state.');
       }
@@ -120,8 +109,7 @@
     });
   });
 
-  window.addEventListener('storage', event => {
-    if (!event.key?.startsWith('dart_')) return;
+  window.addEventListener('dart:data-changed', () => {
     try { loadAllDataFromStorage(false); dartRefreshAll(); } catch (error) { console.warn('Dashboard sync failed', error); }
   });
 })();

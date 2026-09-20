@@ -15,6 +15,7 @@
   const logoutButton = document.getElementById("dart-admin-logout");
   let onboardingChallengeId = "";
   let onboardingSetupToken = "";
+  let csrfMemory = "";
 
   if (!API_BASE) {
     if (
@@ -34,8 +35,7 @@
   }
 
   function csrfToken() {
-    const stored = localStorage.getItem(CSRF_STORAGE_KEY);
-    if (stored) return stored;
+    if (csrfMemory) return csrfMemory;
     return document.cookie
       .split("; ")
       .find((row) => row.startsWith("dart_csrf="))
@@ -59,7 +59,7 @@
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
     const payload = await response.json().catch(() => ({}));
-    if (payload?.csrfToken) localStorage.setItem(CSRF_STORAGE_KEY, payload.csrfToken);
+    if (payload?.csrfToken) csrfMemory = payload.csrfToken;
     if (!response.ok) {
       const error = new Error(payload?.error?.message || "Request failed");
       error.status = response.status;
@@ -111,32 +111,8 @@
   }
 
   function clearAdminPrivateCache() {
-    [
-      "dart_models",
-      "dart_items",
-      "dart_customers",
-      "dart_orders",
-      "dart_returns",
-      "dart_reviews",
-      "dart_cards",
-      "dart_representatives",
-      "dart_damage",
-      "dart_notifications",
-      "dart_contact_messages",
-      "dart_birthday_rewards",
-      "dart_birthday_messages",
-      "dart_message_queue",
-      "dart_promotions",
-      "dart_audit",
-      "dart_finance_expenses",
-      "dart_finance_budgets",
-      "dart_finance_invoices",
-      "dart_finance_goals",
-      "dart_finance_marketing",
-      "dart_finance_cod_settlements",
-      "dart_finance_audit",
-      "dart_draw_eligibility_audit",
-    ].forEach((key) => localStorage.removeItem(key));
+    window.DartState?.clearBusiness?.();
+    csrfMemory = "";
   }
 
   function lock() {
@@ -154,13 +130,13 @@
       if (can("catalog.manage") && window.DartCatalog?.hydrate) {
         await window.DartCatalog.hydrate();
       } else {
-        localStorage.removeItem("dart_models");
-        localStorage.removeItem("dart_items");
+        window.DartState?.remove?.("dart_models");
+        window.DartState?.remove?.("dart_items");
       }
       if (can("orders.read") && window.DartOrdersApi?.hydrate) {
         await window.DartOrdersApi.hydrate();
       } else {
-        localStorage.removeItem("dart_orders");
+        window.DartState?.remove?.("dart_orders");
       }
       if (can("dashboard_state.read") && window.DartDomainState?.hydrateAll) {
         await window.DartDomainState.hydrateAll();
@@ -350,7 +326,6 @@
     try {
       await request("/api/v1/auth/logout", { method: "POST" });
     } finally {
-      localStorage.removeItem(CSRF_STORAGE_KEY);
       clearAdminPrivateCache();
       lock();
       loginForm.reset();

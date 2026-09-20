@@ -2,9 +2,7 @@
   "use strict";
 
   const maps = new Map();
-  const read = (key, fallback = []) => {
-    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
-  };
+  const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const money = (value) => `${Math.trunc(Number(value) || 0)} EGP`;
   const orderTotal = (order) => Number.isFinite(Number(order?.finalAmount))
     ? Math.max(0, Number(order.finalAmount))

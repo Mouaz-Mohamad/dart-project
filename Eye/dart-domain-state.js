@@ -36,17 +36,12 @@
   const deniedDomains = new Set();
 
   function readLocal(storageKey) {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    return window.DartState?.read?.(storageKey, []) || [];
   }
 
   function cache(storageKey, data, domain) {
     const value = Array.isArray(data) ? data : [];
-    localStorage.setItem(storageKey, JSON.stringify(value));
+    window.DartState?.write?.(storageKey, value, { source: `domain:${domain}` });
     window.dispatchEvent(
       new CustomEvent("dart:domain-hydrated", {
         detail: { domain, storageKey, version: versions.get(domain) || 0, data: value },
@@ -55,8 +50,6 @@
   }
 
   function csrfToken() {
-    const stored = localStorage.getItem(CSRF_STORAGE_KEY);
-    if (stored) return stored;
     return document.cookie
       .split("; ")
       .find((row) => row.startsWith("dart_csrf="))
@@ -111,35 +104,11 @@
     return payload;
   }
 
-  async function hydrateDomain(domain, force = false) {
+  async function hydrateDomain(domain, _force = false) {
     const storageKey = STORAGE_BY_DOMAIN[domain];
     if (!storageKey) return [];
-    const local = readLocal(storageKey);
-    let payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`);
+    const payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`);
     versions.set(domain, Number(payload.version || 1));
-
-    const migrationKey = `${LEGACY_MIGRATION_PREFIX}${domain}`;
-    const migrationDone = localStorage.getItem(migrationKey) === "1";
-    if (
-      !force &&
-      !migrationDone &&
-      Number(payload.version || 1) === 1 &&
-      (payload.data || []).length === 0 &&
-      local.length > 0
-    ) {
-      payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`, {
-        method: "PUT",
-        body: {
-          expectedVersion: versions.get(domain),
-          data: await sanitizeDomainData(domain, local),
-        },
-      });
-      versions.set(domain, Number(payload.version || versions.get(domain)));
-    }
-    if (!force && !migrationDone) {
-      localStorage.setItem(migrationKey, "1");
-    }
-
     dirty.delete(domain);
     cache(storageKey, payload.data || [], domain);
     return payload.data || [];
@@ -190,11 +159,11 @@
   function write(storageKey, data) {
     const domain = DOMAIN_BY_STORAGE[storageKey];
     if (!domain) {
-      localStorage.setItem(storageKey, JSON.stringify(data));
+      window.DartState?.write?.(storageKey, data, { source: "dashboard" });
       return true;
     }
     if (deniedDomains.has(domain)) {
-      localStorage.removeItem(storageKey);
+      window.DartState?.remove?.(storageKey, { source: "permission" });
       window.dispatchEvent(
         new CustomEvent("dart:domain-write-denied", {
           detail: { domain, storageKey },
@@ -202,7 +171,7 @@
       );
       return false;
     }
-    localStorage.setItem(storageKey, JSON.stringify(Array.isArray(data) ? data : []));
+    window.DartState?.write?.(storageKey, Array.isArray(data) ? data : [], { source: `domain:${domain}:edit` });
     dirty.add(domain);
     schedule(domain);
     return true;
@@ -211,7 +180,7 @@
   async function hydrateAudit(limit = 500) {
     const payload = await api(`/api/v1/admin/audit?limit=${encodeURIComponent(limit)}`);
     const audit = Array.isArray(payload.audit) ? payload.audit : [];
-    localStorage.setItem("dart_audit", JSON.stringify(audit));
+    window.DartState?.write?.("dart_audit", audit, { source: "audit" });
     window.dispatchEvent(new CustomEvent("dart:audit-hydrated", { detail: { audit } }));
     return audit;
   }
@@ -240,7 +209,7 @@
           const storageKey = STORAGE_BY_DOMAIN[domain];
           versions.delete(domain);
           dirty.delete(domain);
-          localStorage.removeItem(storageKey);
+          window.DartState?.remove?.(storageKey, { source: "permission" });
           window.dispatchEvent(
             new CustomEvent("dart:domain-hydrated", {
               detail: { domain, storageKey, version: 0, data: [] },
@@ -254,7 +223,7 @@
       await hydrateAudit();
     } catch (error) {
       if (error.status === 403) {
-        localStorage.removeItem("dart_audit");
+        window.DartState?.remove?.("dart_audit", { source: "permission" });
         window.dispatchEvent(
           new CustomEvent("dart:audit-hydrated", { detail: { audit: [] } }),
         );

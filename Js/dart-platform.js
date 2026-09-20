@@ -47,16 +47,9 @@
   const BIRTHDAY_REWARD_DAYS = 7;
   const CAIRO_TIME_ZONE = "Africa/Cairo";
 
-  const read = (key, fallback) => {
-    try {
-      const value = localStorage.getItem(key);
-      return value ? JSON.parse(value) : fallback;
-    } catch {
-      return fallback;
-    }
-  };
+  const read = (key, fallback) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
-    localStorage.setItem(key, JSON.stringify(value));
+    window.DartState?.write?.(key, value, { source: "platform" });
     if (
       [
         KEYS.items,
@@ -390,6 +383,8 @@
     ).join("");
   }
 
+  let csrfMemory = "";
+
   async function apiRequest(path, options = {}) {
     if (!API_BASE)
       throw Object.assign(new Error("API_NOT_CONFIGURED"), {
@@ -397,7 +392,7 @@
       });
     const method = String(options.method || "GET").toUpperCase();
     const csrfToken =
-      localStorage.getItem(CSRF_STORAGE_KEY) ||
+      csrfMemory ||
       document.cookie
         .split("; ")
         .find((row) => row.startsWith("dart_csrf="))
@@ -420,7 +415,7 @@
           : options.body,
     });
     const payload = await response.json().catch(() => ({}));
-    if (payload?.csrfToken) localStorage.setItem(CSRF_STORAGE_KEY, payload.csrfToken);
+    if (payload?.csrfToken) csrfMemory = payload.csrfToken;
     if (!response.ok)
       throw Object.assign(
         new Error(payload?.error?.message || payload.message || "Request failed"),
@@ -471,17 +466,9 @@
       [KEYS.birthdayRewards, payload.birthdayRewards || []],
       [KEYS.birthdayMessages, payload.birthdayMessages || []],
     ];
-    snapshots.forEach(([key, value]) => {
-      localStorage.setItem(key, JSON.stringify(value));
-      window.dispatchEvent(
-        new CustomEvent("dart:data-changed", { detail: { key } }),
-      );
-    });
-    if (payload.savedAddress) {
-      localStorage.setItem("user_last_address", JSON.stringify(payload.savedAddress));
-    } else {
-      localStorage.removeItem("user_last_address");
-    }
+    snapshots.forEach(([key, value]) => write(key, value));
+    if (payload.savedAddress) write("user_last_address", payload.savedAddress);
+    else window.DartState?.remove?.("user_last_address", { source: "platform" });
     window.dispatchEvent(
       new CustomEvent("dart:saved-address-hydrated", {
         detail: { address: payload.savedAddress || null },
@@ -520,14 +507,14 @@
         body: normalized,
       });
       const saved = payload.savedAddress || normalized;
-      localStorage.setItem("user_last_address", JSON.stringify(saved));
+      write("user_last_address", saved);
       return saved;
     }
 
     if (API_REQUIRED) {
       throw new Error("Saved addresses require an authenticated Dart account.");
     }
-    localStorage.setItem("user_last_address", JSON.stringify(normalized));
+    write("user_last_address", normalized);
     return normalized;
   }
 
@@ -536,13 +523,13 @@
       await apiRequest("/api/v1/me/preferences/address", {
         method: "DELETE",
       });
-      localStorage.removeItem("user_last_address");
+      window.DartState?.remove?.("user_last_address", { source: "platform" });
       return;
     }
     if (API_REQUIRED) {
       throw new Error("Saved addresses require an authenticated Dart account.");
     }
-    localStorage.removeItem("user_last_address");
+    window.DartState?.remove?.("user_last_address", { source: "platform" });
   }
 
   async function hydrateApiSession() {
@@ -607,7 +594,7 @@
     if (API_BASE) return apiUserCache ? { userId: apiUserCache.id, api: true } : null;
     const session = read(KEYS.session, null);
     if (!session || !session.userId) {
-      localStorage.removeItem(KEYS.session);
+      window.DartState?.remove?.(KEYS.session, { source: "platform" });
       return null;
     }
     return session;
@@ -860,7 +847,7 @@
       KEYS.birthdayMessages,
       "dart_cart",
       "user_last_address",
-    ].forEach((key) => localStorage.removeItem(key));
+    ].forEach((key) => window.DartState?.remove?.(key, { source: "logout" }));
     [
       API_USER_CACHE_KEY,
       "dart_cart_reservation_id",
@@ -874,7 +861,7 @@
       try {
         await apiRequest("/api/v1/auth/logout", { method: "POST" });
       } finally {
-        localStorage.removeItem(CSRF_STORAGE_KEY);
+        csrfMemory = "";
         cacheApiUser(null);
         clearCustomerPrivateCache();
       }
@@ -882,7 +869,7 @@
     }
     const user = currentUser();
     if (user) audit("LOGOUT", "customers", user.customerId);
-    localStorage.removeItem(KEYS.session);
+    window.DartState?.remove?.(KEYS.session, { source: "platform" });
     clearCustomerPrivateCache();
   }
 
@@ -1278,41 +1265,37 @@
   }
 
   async function hydrateCustomerCart() {
-    if (!API_BASE || !currentUser()) return read("dart_cart", []);
-    const localCart = read("dart_cart", []);
-    const payload = await apiRequest("/api/v1/me/cart");
+    if (!API_BASE) return read("dart_cart", []);
+    let payload;
+    if (currentUser()) {
+      payload = await apiRequest("/api/v1/me/cart");
+    } else {
+      payload = await apiRequest(`/api/v1/cart/reservation/${encodeURIComponent(CART_RESERVATION_ID)}`).catch((error) => {
+        if ([404, 409].includes(error.status)) return { cart: null };
+        throw error;
+      });
+    }
     const remote = payload?.cart || null;
-
     if (!remote) {
-      if (localCart.length) {
-        await reserveCart(localCart);
-        return read("dart_cart", []);
-      }
       write("dart_cart", []);
       if (typeof cartData !== "undefined") cartData = [];
       if (typeof renderCart === "function") renderCart();
       if (typeof updateCartCount === "function") updateCartCount();
       return [];
     }
-
     setCartReservationId(remote.reservationId);
     const products = getProducts();
     const hydrated = (remote.lines || []).map((line) => {
-      const product = products.find(
-        (row) =>
-          String(row.code || row.id) === String(line.modelId),
-      );
+      const product = products.find((row) => String(row.code || row.id) === String(line.modelId));
       const model = DartCatalog.model(String(line.modelId));
       return {
         id: String(line.modelId),
         title: product?.title || model?.name || String(line.modelId),
         price: Number(product?.price ?? DartCatalog.price(model) ?? 0),
-        size: String(line.size),
-        color: String(line.color),
+        size: String(line.size), color: String(line.color),
         quantity: Number(line.quantity) || 1,
         image: DartCatalog.cover(model, String(line.color)),
-        reservationId: CART_RESERVATION_ID,
-        reservationUntil: remote.expiresAt,
+        reservationId: CART_RESERVATION_ID, reservationUntil: remote.expiresAt,
       };
     });
     write("dart_cart", hydrated);
@@ -3181,10 +3164,8 @@
         if (!window.DartCatalog?.isServerAuthoritative?.()) {
           await window.DartCatalog?.hydrate?.();
         }
-        if (currentUser()) {
-          await hydrateCustomerCommerce();
-          await hydrateCustomerCart();
-        }
+        if (currentUser()) await hydrateCustomerCommerce();
+        await hydrateCustomerCart();
       } catch (error) {
         console.warn(
           "Dart account/catalog service is temporarily unavailable.",
@@ -3269,19 +3250,6 @@
   window.addEventListener("focus", () => {
     void hydratePublicLeaderboard();
     if (currentUser()) void hydrateCustomerCommerce();
-  });
-  window.addEventListener("storage", (event) => {
-    if (event.key === KEYS.orders && document.querySelector(".tracking-card"))
-      renderTracking();
-    if (
-      [KEYS.birthdayRewards, KEYS.session, KEYS.orders].includes(event.key)
-    )
-      renderBirthdayExperience();
-    if (
-      [KEYS.orders, KEYS.returns, KEYS.customers, KEYS.cards].includes(event.key)
-    )
-      renderLeaderboard();
-    if (event.key === KEYS.session) wireAccountLink();
   });
   window.addEventListener("dart:data-changed", (event) => {
     if (

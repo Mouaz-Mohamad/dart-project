@@ -27,39 +27,8 @@
     return removed;
   }
 
-  function clearCatalogMedia(indexedDBApi = root.indexedDB) {
-    if (!indexedDBApi) return Promise.resolve(false);
-    return new Promise((resolve, reject) => {
-      const request = indexedDBApi.open(CATALOG_MEDIA_DATABASE);
-      request.onupgradeneeded = () => {
-        if (!request.result.objectStoreNames.contains("images")) request.result.createObjectStore("images");
-      };
-      request.onerror = () => reject(request.error || new Error("Could not open saved image storage."));
-      request.onsuccess = () => {
-        const connection = request.result;
-        if (!connection.objectStoreNames.contains("images")) {
-          connection.close();
-          resolve(true);
-          return;
-        }
-        const transaction = connection.transaction("images", "readwrite");
-        transaction.objectStore("images").clear();
-        transaction.oncomplete = () => {
-          connection.close();
-          resolve(true);
-        };
-        transaction.onerror = () => {
-          const error = transaction.error || new Error("Could not clear saved product images.");
-          connection.close();
-          reject(error);
-        };
-        transaction.onabort = () => {
-          const error = transaction.error || new Error("Clearing saved product images was cancelled.");
-          connection.close();
-          reject(error);
-        };
-      };
-    });
+  function clearCatalogMedia() {
+    return Promise.resolve(true);
   }
 
   const api = {
@@ -164,6 +133,7 @@
 
       // PostgreSQL committed successfully; browser state can now be discarded safely.
       await clearCatalogMedia();
+      root.DartState?.clearBusiness?.();
       clearDartStorage(root.localStorage);
       clearDartStorage(root.sessionStorage);
 
@@ -320,7 +290,7 @@
     const list = $("settings-model-cards-list"), template = $("settings-model-card-row-template");
     if (!list || !template) return;
     let models = [];
-    try { models = JSON.parse(localStorage.getItem("dart_models") || "[]"); } catch {}
+    models = root.DartState?.read?.("dart_models", []) || [];
     models = models.filter((model) => !model.isDeleted && !model.isArchived && model.active !== false);
     list.replaceChildren();
     models.forEach((model) => {

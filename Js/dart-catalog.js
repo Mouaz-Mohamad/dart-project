@@ -53,33 +53,24 @@
     return map;
   }
 
-  const readCache = new Map();
-  const read = (key, fallback = []) => {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw === null) return fallback;
-      const cached = readCache.get(key);
-      if (cached?.raw === raw) return cached.value;
-      const value = JSON.parse(raw) ?? fallback;
-      readCache.set(key, { raw, value });
-      return value;
-    } catch {
-      return fallback;
-    }
-  };
+  const read = (key, fallback = []) =>
+    window.DartState?.read?.(key, fallback) ?? fallback;
   const cacheWrite = (key, data) => {
-    const raw = JSON.stringify(data);
-    localStorage.setItem(key, raw);
-    readCache.set(key, { raw, value: data });
-    window.dispatchEvent(
-      new CustomEvent("dart:data-changed", { detail: { key } }),
-    );
+    window.DartState?.write?.(key, data, { source: "catalog" });
   };
+  let csrfMemory = "";
 
   async function api(path, options = {}) {
     if (!API_BASE) throw new Error("Catalogue API is not configured.");
     const method = String(options.method || "GET").toUpperCase();
-    const csrf = localStorage.getItem(CSRF_STORAGE_KEY);
+    const csrf =
+      csrfMemory ||
+      document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("dart_csrf="))
+        ?.split("=")
+        .slice(1)
+        .join("=");
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
       method,
@@ -92,7 +83,7 @@
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
     const payload = await response.json().catch(() => ({}));
-    if (payload?.csrfToken) localStorage.setItem(CSRF_STORAGE_KEY, payload.csrfToken);
+    if (payload?.csrfToken) csrfMemory = payload.csrfToken;
     if (!response.ok) {
       const error = new Error(payload?.error?.message || "Catalogue request failed");
       error.status = response.status;
@@ -141,82 +132,12 @@
     }
   };
 
-  async function hydrateCatalog(force = false) {
-    if (!API_BASE) return;
+  async function hydrateCatalog(_force = false) {
+    if (!API_BASE) throw new Error("Catalogue API is not configured.");
     if (IS_ADMIN) {
-      const localModels = read("dart_models", []);
-      const localItems = read("dart_items", []);
-      let state = await api("/api/v1/admin/catalog-state");
+      const state = await api("/api/v1/admin/catalog-state");
       serverVersion = Number(state.version || 1);
-
-      const migrationDone = localStorage.getItem(LEGACY_MIGRATION_KEY) === "1";
-      if (!force && !migrationDone && serverVersion === 1) {
-        const mergedModels = structuredClone(state.models || []);
-        const mergedItems = structuredClone(state.items || []);
-        const modelIds = new Set(
-          mergedModels
-            .map((row) => String(row?.modelId || row?.id || ""))
-            .filter(Boolean),
-        );
-        const itemIds = new Set(
-          mergedItems.map((row) => String(row?.id || "")).filter(Boolean),
-        );
-        const itemCodes = new Set(
-          mergedItems.map((row) => String(row?.itemCode || "")).filter(Boolean),
-        );
-        let changed = false;
-
-        for (const modelRow of localModels) {
-          const modelId = String(modelRow?.modelId || modelRow?.id || "");
-          if (!modelId || modelIds.has(modelId)) continue;
-          mergedModels.push(structuredClone(modelRow));
-          modelIds.add(modelId);
-          changed = true;
-        }
-
-        for (const itemRow of localItems) {
-          const id = String(itemRow?.id || "");
-          const itemCode = String(itemRow?.itemCode || "");
-          if (
-            (!id && !itemCode) ||
-            (id && itemIds.has(id)) ||
-            (itemCode && itemCodes.has(itemCode))
-          ) continue;
-          mergedItems.push(structuredClone(itemRow));
-          if (id) itemIds.add(id);
-          if (itemCode) itemCodes.add(itemCode);
-          changed = true;
-        }
-
-        const assetsChanged = await migrateLegacyAssets(mergedModels);
-        if (changed || assetsChanged) {
-          state = await api("/api/v1/admin/catalog-state", {
-            method: "PUT",
-            body: {
-              expectedVersion: serverVersion,
-              models: mergedModels,
-              items: mergedItems,
-            },
-          });
-          serverVersion = Number(state.version || serverVersion);
-        }
-        localStorage.setItem(LEGACY_MIGRATION_KEY, "1");
-      } else {
-        const migratedServerModels = structuredClone(state.models || []);
-        const assetsChanged = await migrateLegacyAssets(migratedServerModels);
-        if (assetsChanged) {
-          state = await api("/api/v1/admin/catalog-state", {
-            method: "PUT",
-            body: {
-              expectedVersion: serverVersion,
-              models: migratedServerModels,
-              items: state.items || [],
-            },
-          });
-          serverVersion = Number(state.version || serverVersion);
-        }
-      }
-
+      catalogDirty = false;
       cacheWrite("dart_models", state.models || []);
       cacheWrite("dart_items", state.items || []);
       remoteStock = null;
@@ -224,15 +145,15 @@
       const state = await api("/api/v1/catalog");
       serverVersion = Number(state.version || 1);
       cacheWrite("dart_models", state.models || []);
+      cacheWrite("dart_items", []);
       remoteStock = stockMapFromPayload(state.stock || {});
     }
     await preloadImages().catch(() => {});
-    window.dispatchEvent(
-      new CustomEvent("dart:catalog-hydrated", {
-        detail: { version: serverVersion, admin: IS_ADMIN },
-      }),
-    );
+    window.dispatchEvent(new CustomEvent("dart:catalog-hydrated", {
+      detail: { version: serverVersion, admin: IS_ADMIN },
+    }));
   }
+
 
 
   const active = (record) =>
@@ -281,50 +202,11 @@
 
   // BEGIN Shared image storage. Images are compressed client-side and persisted server-side.
   const imageURLs = new Map();
-  let database;
-
-  function db() {
-    if (!database)
-      database = new Promise((resolve, reject) => {
-        const request = indexedDB.open("dart-catalog-media-v7", 1);
-        request.onupgradeneeded = () => {
-          if (!request.result.objectStoreNames.contains("images"))
-            request.result.createObjectStore("images");
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    return database;
-  }
-
-  async function imageBlob(id) {
-    if (!id || typeof indexedDB === "undefined") return null;
-    const store = (await db()).transaction("images").objectStore("images");
-    return new Promise((resolve, reject) => {
-      const request = store.get(id);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async function rememberLocalBlob(id, blob) {
-    if (!id || !blob || typeof indexedDB === "undefined") return;
-    const connection = await db();
-    await new Promise((resolve, reject) => {
-      const tx = connection.transaction("images", "readwrite");
-      tx.objectStore("images").put(blob, id);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-  }
 
   function assetPath(id) {
     const encodedId = encodeURIComponent(String(id || ""));
-    return API_BASE
-      ? `${API_BASE}/api/v1/catalog/assets/${encodedId}`
-      : `/api/v1/catalog/assets/${encodedId}`;
+    return API_BASE ? `${API_BASE}/api/v1/catalog/assets/${encodedId}` : `/api/v1/catalog/assets/${encodedId}`;
   }
-
   function resolveAssetUrl(value, assetId = "") {
     const raw = String(value || "").trim();
     if (!raw) return assetId ? assetPath(assetId) : "";
@@ -332,7 +214,6 @@
     if (raw.startsWith("/")) return API_BASE ? `${API_BASE}${raw}` : raw;
     return raw;
   }
-
   function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -341,146 +222,71 @@
       reader.readAsDataURL(blob);
     });
   }
-
   async function uploadAssetBlob(id, name, blob) {
     if (!IS_ADMIN || !API_BASE) throw new Error("Dashboard authentication is required to upload product images.");
-    if (!blob || blob.size > 4 * 1024 * 1024)
-      throw new Error("Compressed product image is too large.");
+    if (!blob || blob.size > 4 * 1024 * 1024) throw new Error("Compressed product image is too large.");
     const result = await api("/api/v1/admin/catalog/assets", {
       method: "PUT",
-      body: {
-        assetId: id,
-        originalName: name || "",
-        contentType: blob.type || "image/webp",
-        base64: await blobToBase64(blob),
-      },
+      body: { assetId: id, originalName: name || "", contentType: blob.type || "image/webp", base64: await blobToBase64(blob) },
     });
     return resolveAssetUrl(result.urlPath, id) || assetPath(id);
   }
-
-  async function loadImage(asset) {
-    if (!asset?.id || imageURLs.has(asset.id) || !IS_ADMIN) return;
-    const blob = await imageBlob(asset.id);
-    if (blob) imageURLs.set(asset.id, URL.createObjectURL(blob));
-  }
-
-  async function preloadImages() {
-    if (!IS_ADMIN) {
-      window.dispatchEvent(new Event("dart:images-ready"));
-      return;
-    }
-    const assets = models().flatMap((m) =>
-      colors(m).flatMap((color) => color.images || []),
-    );
-    await Promise.all(assets.map((asset) => loadImage(asset).catch(() => {})));
-    window.dispatchEvent(new Event("dart:images-ready"));
-  }
-
-  async function loadModelImages(code) {
-    if (!IS_ADMIN) return;
-    await Promise.all(
-      colors(model(code))
-        .flatMap((color) => color.images || [])
-        .map((asset) => loadImage(asset).catch(() => {})),
-    );
-  }
-
-  async function migrateLegacyAssets(targetModels) {
-    if (!IS_ADMIN || !API_BASE || !Array.isArray(targetModels)) return false;
-    let changed = false;
-    for (const modelRow of targetModels) {
-      for (const color of colors(modelRow)) {
-        for (const asset of color.images || []) {
-          if (!asset?.id || asset.url) continue;
-          const blob = await imageBlob(asset.id).catch(() => null);
-          if (!blob) continue;
-          const url = await uploadAssetBlob(asset.id, asset.name || "", blob);
-          asset.url = url;
-          imageURLs.set(asset.id, URL.createObjectURL(blob));
-          changed = true;
-        }
-      }
-    }
-    return changed;
-  }
+  async function preloadImages() { window.dispatchEvent(new Event("dart:images-ready")); }
+  async function loadModelImages() { window.dispatchEvent(new Event("dart:images-ready")); }
+  async function migrateLegacyAssets() { return false; }
 
   async function loadCompressibleImage(file) {
-    if (typeof createImageBitmap === "function") {
-      const bitmap = await createImageBitmap(file);
-      return {
-        source: bitmap,
-        width: bitmap.width,
-        height: bitmap.height,
-        cleanup: () => bitmap.close?.(),
-      };
-    }
     const objectUrl = URL.createObjectURL(file);
     try {
       const image = await new Promise((resolve, reject) => {
-        const node = new Image();
-        node.onload = () => resolve(node);
-        node.onerror = () => reject(new Error("Could not decode this product image."));
-        node.src = objectUrl;
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("Could not read the selected image."));
+        element.src = objectUrl;
       });
-      return {
-        source: image,
-        width: image.naturalWidth || image.width,
-        height: image.naturalHeight || image.height,
-        cleanup: () => URL.revokeObjectURL(objectUrl),
-      };
+      return { source: image, width: image.naturalWidth, height: image.naturalHeight, cleanup: () => URL.revokeObjectURL(objectUrl) };
     } catch (error) {
       URL.revokeObjectURL(objectUrl);
       throw error;
     }
   }
-
   async function compressImage(file) {
-    if (
-      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-      file.size > 15 * 1024 * 1024
-    )
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 15 * 1024 * 1024)
       throw new Error("Choose JPG, PNG or WebP, up to 15 MB.");
-
     const image = await loadCompressibleImage(file);
     try {
       const maxDimension = 1400;
-      const scale = Math.min(
-        1,
-        maxDimension / Math.max(image.width, image.height),
-      );
+      const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(image.width * scale));
       canvas.height = Math.max(1, Math.round(image.height * scale));
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Image compression is unavailable in this browser.");
       context.drawImage(image.source, 0, 0, canvas.width, canvas.height);
-
-      let quality = 0.8;
-      let blob = null;
+      let quality = 0.8, blob = null;
       while (quality >= 0.56) {
-        blob = await new Promise((resolve) =>
-          canvas.toBlob(resolve, "image/webp", quality),
-        );
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
         if (blob && blob.size <= 4 * 1024 * 1024) break;
         quality -= 0.08;
       }
-      if (!blob || blob.size > 4 * 1024 * 1024)
-        throw new Error("Could not compress this image below 4 MB.");
+      if (!blob || blob.size > 4 * 1024 * 1024) throw new Error("Could not compress this image below 4 MB.");
       return blob;
-    } finally {
-      image.cleanup();
-    }
+    } finally { image.cleanup(); }
   }
-
   async function saveImage(file) {
     const blob = await compressImage(file);
     const id = uid();
-    await rememberLocalBlob(id, blob);
-    imageURLs.set(id, URL.createObjectURL(blob));
-    const url = await uploadAssetBlob(id, file.name, blob);
-    return { id, name: file.name, url };
+    const preview = URL.createObjectURL(blob);
+    imageURLs.set(id, preview);
+    try {
+      const url = await uploadAssetBlob(id, file.name, blob);
+      return { id, name: file.name, url };
+    } catch (error) {
+      imageURLs.delete(id);
+      URL.revokeObjectURL(preview);
+      throw error;
+    }
   }
-
   const imageSrc = (asset) => {
     if (!asset) return placeholder;
     const local = imageURLs.get(asset.id);
@@ -489,15 +295,11 @@
     if (asset.id && API_BASE) return assetPath(asset.id);
     return placeholder;
   };
-
   function cover(m, colorName) {
     const color = colors(m).find((row) => norm(row.name) === norm(colorName));
-    return imageSrc(
-      color?.images?.[0] ||
-        colors(m).find((row) => row.images?.length)?.images?.[0],
-    );
+    return imageSrc(color?.images?.[0] || colors(m).find((row) => row.images?.length)?.images?.[0]);
   }
-  // END Shared image storage.
+  // END Shared image storage.  // END Shared image storage.
 
   // BEGIN Inventory projections. Quantities are derived; no editable stock counters.
   function available(m, size, color, owner = "") {
@@ -737,14 +539,6 @@
   });
   startLiveRefresh();
 
-  window.addEventListener("storage", (e) => {
-    if (["dart_models", "dart_items", "dart_orders"].includes(e.key)) {
-      preloadImages();
-      window.dispatchEvent(
-        new CustomEvent("dart:data-changed", { detail: { key: e.key } }),
-      );
-    }
-  });
   preloadImages();
   hydrateCatalog().catch((error) => {
     console.error("Dart catalogue hydration failed", error);

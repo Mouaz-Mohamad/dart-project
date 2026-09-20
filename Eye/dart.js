@@ -19,7 +19,7 @@ function saveDataToStorage(key, data) {
     window.DartDomainState.write(key, data);
     return;
   }
-  localStorage.setItem(key, JSON.stringify(data));
+  window.DartState?.write?.(key, data, { source: "dashboard" });
 }
 
 // تنسيق الصفوف والترتيب
@@ -363,11 +363,7 @@ function setupCardModal() {
 function dartSyncUserCardFlags() {
   if (window.DartDomainState) return;
   let users;
-  try {
-    users = JSON.parse(localStorage.getItem("dart_users") || "[]");
-  } catch {
-    users = [];
-  }
+  users = window.DartState?.read?.("dart_users", []) || [];
   users.forEach((user) => {
     user.dartCard = cardsData.some(
       (card) =>
@@ -377,7 +373,7 @@ function dartSyncUserCardFlags() {
       ? "yes"
       : "no";
   });
-  localStorage.setItem("dart_users", JSON.stringify(users));
+  window.DartState?.write?.("dart_users", users, { source: "dashboard" });
 }
 
 // ==========================================
@@ -1095,7 +1091,7 @@ function dartSaveAll() {
   saveDataToStorage("dart_damage", damageData);
   saveDataToStorage("dart_notifications", notificationData);
   saveDataToStorage("dart_audit", auditData);
-  localStorage.setItem("dart_schema_version", String(DART_SCHEMA_VERSION));
+  // Business schema state is server-authoritative.
 }
 
 function getRowClass(item) {
@@ -1441,15 +1437,11 @@ async function dartCommitHardDelete(mode) {
 
     if (!serverMode && impact.clientCodes.size) {
       let users;
-      try {
-        users = JSON.parse(localStorage.getItem("dart_users") || "[]");
-      } catch {
-        users = [];
-      }
+      users = window.DartState?.read?.("dart_users", []) || [];
       users = users.filter(
         (row) => !impact.clientCodes.has(String(row.customerId)),
       );
-      localStorage.setItem("dart_users", JSON.stringify(users));
+      window.DartState?.write?.("dart_users", users, { source: "dashboard" });
     }
   }
 
@@ -1655,11 +1647,7 @@ function dartUpdateBirthdayRewardForOrder(order, target) {
   if (window.DartOrdersApi) return;
   if (!order?.birthdayRewardId) return;
   let rewards;
-  try {
-    rewards = JSON.parse(localStorage.getItem("dart_birthday_rewards") || "[]");
-  } catch {
-    rewards = [];
-  }
+  rewards = window.DartState?.read?.("dart_birthday_rewards", []) || [];
   const reward = rewards.find((row) => row.id === order.birthdayRewardId);
   if (!reward) return;
   if (target === "Delivered") {
@@ -1676,7 +1664,7 @@ function dartUpdateBirthdayRewardForOrder(order, target) {
   if (window.DartDomainState?.write) {
     window.DartDomainState.write("dart_birthday_rewards", rewards);
   } else if (["localhost", "127.0.0.1"].includes(location.hostname)) {
-    localStorage.setItem("dart_birthday_rewards", JSON.stringify(rewards));
+    window.DartState?.write?.("dart_birthday_rewards", rewards, { source: "dashboard" });
   } else {
     throw new Error("Birthday rewards require the secure server state.");
   }
@@ -3425,71 +3413,11 @@ const DART_TOP_SIZES = [
 ];
 
 function dartMigrateSequentialIds() {
-  if (localStorage.getItem(DART_V3_ID_MIGRATION_KEY) === "1") return;
-  const clientMap = new Map(),
-    orderMap = new Map(),
-    returnMap = new Map(),
-    repMap = new Map();
-  customersData.forEach((c, i) => {
-    const old = c.clientId;
-    c.clientId = `DA-${i + 1}`;
-    if (old) clientMap.set(String(old), c.clientId);
-  });
-  ordersData.forEach((o, i) => {
-    const old = o.orderId;
-    o.orderId = `K-${i + 1}`;
-    if (old) orderMap.set(String(old), o.orderId);
-  });
-  returnsData.forEach((r, i) => {
-    const old = r.returnId;
-    r.returnId = `R-${i + 1}`;
-    if (old) returnMap.set(String(old), r.returnId);
-  });
-  representativeData.forEach((r, i) => {
-    const old = r.repId;
-    r.repId = `Rep-${i + 1}`;
-    if (old) repMap.set(String(old), r.repId);
-  });
-  ordersData.forEach((o) => {
-    if (clientMap.has(String(o.clientId)))
-      o.clientId = clientMap.get(String(o.clientId));
-  });
-  itemsData.forEach((i) => {
-    if (clientMap.has(String(i.clientId)))
-      i.clientId = clientMap.get(String(i.clientId));
-    if (orderMap.has(String(i.orderId)))
-      i.orderId = orderMap.get(String(i.orderId));
-  });
-  returnsData.forEach((r) => {
-    if (clientMap.has(String(r.clientId)))
-      r.clientId = clientMap.get(String(r.clientId));
-    if (orderMap.has(String(r.orderId)))
-      r.orderId = orderMap.get(String(r.orderId));
-  });
-  damageData.forEach((d) => {
-    if (clientMap.has(String(d.clientId)))
-      d.clientId = clientMap.get(String(d.clientId));
-    if (orderMap.has(String(d.orderId)))
-      d.orderId = orderMap.get(String(d.orderId));
-    if (returnMap.has(String(d.returnId)))
-      d.returnId = returnMap.get(String(d.returnId));
-  });
-  cardsData.forEach((c) => {
-    if (clientMap.has(String(c.clientId)))
-      c.clientId = clientMap.get(String(c.clientId));
-  });
-  localStorage.setItem(DART_V3_ID_MIGRATION_KEY, "1");
+  return false;
 }
 
-function loadAllDataFromStorage(persistMigrations = true) {
-  const load = (k, fallback) => {
-    try {
-      const v = localStorage.getItem(k);
-      return v ? JSON.parse(v) : fallback;
-    } catch {
-      return fallback;
-    }
-  };
+function loadAllDataFromStorage(_persistMigrations = true) {
+  const load = (key, fallback) => window.DartState?.read?.(key, fallback) ?? fallback;
   modelsData = load("dart_models", modelsData);
   itemsData = load("dart_items", itemsData);
   customersData = load("dart_customers", customersData);
@@ -3501,52 +3429,6 @@ function loadAllDataFromStorage(persistMigrations = true) {
   damageData = load("dart_damage", []);
   notificationData = load("dart_notifications", []);
   auditData = load("dart_audit", []);
-  [
-    modelsData,
-    itemsData,
-    customersData,
-    ordersData,
-    returnsData,
-    reviewsData,
-    cardsData,
-    representativeData,
-    damageData,
-  ].forEach((arr) =>
-    arr.forEach((x) => {
-      if (x.isArchived === undefined) x.isArchived = Boolean(x.isDeleted);
-      x.isDeleted = Boolean(x.isArchived);
-      if (x.isChecked === undefined) x.isChecked = false;
-    }),
-  );
-  ordersData.forEach((o) => {
-    const legacy = {
-      Pending: "New",
-      "Out for Delivery": "Out With Representative",
-    };
-    o.status = legacy[o.status] || o.status || "New";
-    o.activityLog = Array.isArray(o.activityLog) ? o.activityLog : [];
-    o.paymentStatus = o.paymentStatus || "Unpaid";
-    o.orderSource = o.orderSource || "Manual";
-    o.amountPaid = Number(o.amountPaid) || 0;
-    o.amountRefunded = Number(o.amountRefunded) || 0;
-    o.createdAt = o.createdAt || o.orderCreatedAt || dartNowISO();
-    if (!Array.isArray(o.priceSnapshot)) o.priceSnapshot = [];
-  });
-  reviewsData.forEach((r) => {
-    r.createdAt =
-      r.createdAt ||
-      (() => {
-        const d = dartDateValue(r.date);
-        return d ? d.toISOString() : dartNowISO();
-      })();
-  });
-  // BEGIN Initialization migrations: storage-event refreshes must never write stale arrays.
-  if (persistMigrations) {
-    dartMigrateSequentialIds();
-    dartEnsureMonthlyDartCardWinners();
-    dartSaveAll();
-  }
-  // END Initialization migrations
 }
 
 function renderModels(dataArray) {
@@ -3701,9 +3583,7 @@ function dartRollbackOrderOneStep(order) {
     if (!serverAuthoritative && order.birthdayRewardId) {
       let rewards;
       try {
-        rewards = JSON.parse(
-          localStorage.getItem("dart_birthday_rewards") || "[]",
-        );
+        rewards = window.DartState?.read?.("dart_birthday_rewards", []) || [];
       } catch {
         rewards = [];
       }
@@ -3718,10 +3598,7 @@ function dartRollbackOrderOneStep(order) {
         if (window.DartDomainState?.write) {
           window.DartDomainState.write("dart_birthday_rewards", rewards);
         } else {
-          localStorage.setItem(
-            "dart_birthday_rewards",
-            JSON.stringify(rewards),
-          );
+          window.DartState?.write?.("dart_birthday_rewards", rewards, { source: "dashboard" });
         }
       }
     }
@@ -4330,13 +4207,7 @@ function dartBirthdayMessageBatch(reference = new Date()) {
       day: targetDate.getUTCDate(),
     },
     key = `${target.year}-${String(target.month).padStart(2, "0")}-${String(target.day).padStart(2, "0")}`,
-    history = (() => {
-      try {
-        return JSON.parse(localStorage.getItem("dart_birthday_messages") || "[]");
-      } catch {
-        return [];
-      }
-    })(),
+    history = window.DartState?.read?.("dart_birthday_messages", []) || [],
     all = customersData.filter(dartIsActive).filter((customer) => {
       const birthday = dartBirthdayMonthDay(customer.birthday);
       return (
@@ -4541,7 +4412,7 @@ function dartEnsureMonthlyDartCardWinners() {
     prev = new Date(now.getFullYear(), now.getMonth() - 1, 1),
     key = dartMonthKey(prev),
     marker = `dart_card_awarded_${key}`;
-  if (localStorage.getItem(marker) === "1") return;
+  if (cardsData.some((card) => card.awardMonth === key && !card.isDeleted)) return;
   cardsData.forEach((card) => {
     if (card.status === "Active") {
       const expiredByItems =
@@ -4587,7 +4458,6 @@ function dartEnsureMonthlyDartCardWinners() {
     .sort((a, b) => b.count - a.count || b.spent - a.spent);
   if (!candidates.length) {
     dartSyncUserCardFlags();
-    localStorage.setItem(marker, "1");
     return;
   }
   const maxCount = candidates[0].count,
@@ -4634,7 +4504,7 @@ function dartEnsureMonthlyDartCardWinners() {
     }
   });
   dartSyncUserCardFlags();
-  localStorage.setItem(marker, "1");
+  // Award rows are the durable monthly marker.
 }
 
 function dartInStockSellingValue() {
@@ -5992,20 +5862,13 @@ updateBrandAnalytics = function () {
 
 // Permanent monotonic counters: a business ID is never reused even after hard delete.
 function dartNextBusinessCode(prefix, data, field) {
-  const key = `dart_counter_${String(prefix).toLowerCase()}`;
-  const re = new RegExp(
-    `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`,
-    "i",
-  );
-  let stored = Number(localStorage.getItem(key)) || 0,
-    existing = 0;
-  (data || []).forEach((x) => {
-    const m = String(x?.[field] || "").match(re);
-    if (m) existing = Math.max(existing, Number(m[1]) || 0);
-  });
-  const next = Math.max(stored, existing) + 1;
-  localStorage.setItem(key, String(next));
-  return `${prefix}-${next}`;
+  const safePrefix = String(prefix || "").replace(/[^A-Za-z0-9_-]/g, "");
+  const re = new RegExp("^" + safePrefix + "-(\\d+)$", "i");
+  const existing = (data || []).reduce((max, row) => {
+    const match = String(row?.[field] || "").match(re);
+    return Math.max(max, match ? Number(match[1]) || 0 : 0);
+  }, 0);
+  return safePrefix + "-" + (existing + 1);
 }
 
 function dartCreateInspectionReturns(order, reason = "Refused delivery") {
@@ -6246,40 +6109,5 @@ function dartTotalInventoryCost() {
     }, 0);
 }
 // Ensure migrated sequences reserve their highest number and migrate review references too.
-const dartMigrateSequentialIdsPrevious = dartMigrateSequentialIds;
-dartMigrateSequentialIds = function () {
-  if (localStorage.getItem(DART_V3_ID_MIGRATION_KEY) === "1") return;
-  const oldClients = customersData.map((c) => String(c.clientId || ""));
-  dartMigrateSequentialIdsPrevious();
-  const clientMap = new Map(
-    oldClients.map((old, i) => [old, customersData[i]?.clientId]),
-  );
-  reviewsData.forEach((r) => {
-    if (clientMap.has(String(r.clientId)))
-      r.clientId = clientMap.get(String(r.clientId));
-  });
-  const max = (arr, field, prefix) =>
-    arr.reduce((m, x) => {
-      const q = String(x?.[field] || "").match(
-        new RegExp(`^${prefix}-(\\d+)$`, "i"),
-      );
-      return Math.max(m, q ? Number(q[1]) : 0);
-    }, 0);
-  localStorage.setItem(
-    "dart_counter_k",
-    String(max(ordersData, "orderId", "K")),
-  );
-  localStorage.setItem(
-    "dart_counter_da",
-    String(max(customersData, "clientId", "DA")),
-  );
-  localStorage.setItem(
-    "dart_counter_r",
-    String(max(returnsData, "returnId", "R")),
-  );
-  localStorage.setItem(
-    "dart_counter_rep",
-    String(max(representativeData, "repId", "Rep")),
-  );
-  dartSaveAll();
-};
+// Legacy browser sequence migration removed: PostgreSQL/API own durable business state.
+dartMigrateSequentialIds = function () { return false; };

@@ -102,7 +102,7 @@
     const direct = root.DartSiteSettings?.get?.();
     if (direct) return direct;
     try {
-      return JSON.parse(root.localStorage?.getItem("dart_site_settings") || "{}");
+      return root.DartSiteSettings?.get?.() || {};
     } catch {
       return {};
     }

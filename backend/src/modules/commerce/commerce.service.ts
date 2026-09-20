@@ -838,6 +838,78 @@ export class CommerceService {
     }
   }
 
+  public async guestCart(
+    reservationId: string,
+    guestOwnerHash: string,
+  ): Promise<{
+    cart: null | {
+      reservationId: string;
+      expiresAt: string;
+      lines: Array<{ modelId: string; color: string; size: string; quantity: number }>;
+    };
+  }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await this.releaseExpired(client);
+      const reservation = await client.query<{
+        id: string;
+        expires_at: Date;
+        customer_user_id: string | null;
+        guest_owner_hash: string | null;
+      }>(
+        `SELECT id, expires_at, customer_user_id::text, guest_owner_hash
+           FROM cart_reservations
+          WHERE id=$1 AND expires_at > now()
+          FOR SHARE`,
+        [reservationId],
+      );
+      const row = reservation.rows[0];
+      if (!row) {
+        await client.query("COMMIT");
+        return { cart: null };
+      }
+      if (row.customer_user_id || !row.guest_owner_hash || row.guest_owner_hash !== guestOwnerHash) {
+        throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "This guest cart belongs to another browser");
+      }
+      const lines = await client.query<{
+        model_id: string;
+        color: string;
+        size: string;
+        quantity: string;
+      }>(
+        `SELECT model_id, color, size, count(*)::text AS quantity
+           FROM inventory_items
+          WHERE cart_reservation_id=$1
+            AND lower(status)='cart reserved'
+            AND reservation_until > now()
+            AND active AND NOT is_archived AND NOT is_deleted
+          GROUP BY model_id, color, size
+          ORDER BY model_id, color, size`,
+        [row.id],
+      );
+      await client.query("COMMIT");
+      if (!lines.rows.length) return { cart: null };
+      return {
+        cart: {
+          reservationId: row.id,
+          expiresAt: row.expires_at.toISOString(),
+          lines: lines.rows.map((line) => ({
+            modelId: line.model_id,
+            color: line.color,
+            size: line.size,
+            quantity: Number(line.quantity || 0),
+          })),
+        },
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async releaseCustomerCart(customerUserId: string): Promise<void> {
     const client = await this.pool.connect();
     try {

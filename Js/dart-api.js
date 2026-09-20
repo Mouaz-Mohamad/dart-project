@@ -3,10 +3,10 @@
 
   const BASE = String(root.DART_API_BASE_URL || root.location?.origin || "").replace(/\/$/, "");
   const CSRF_KEY = "dart_csrf_token";
+  let csrfMemory = "";
 
   function csrfToken() {
-    const stored = root.localStorage?.getItem(CSRF_KEY);
-    if (stored) return stored;
+    if (csrfMemory) return csrfMemory;
     const cookie = root.document?.cookie
       ?.split("; ")
       .find((row) => row.startsWith("dart_csrf="))
@@ -43,7 +43,7 @@
     const payload = response.status === 204
       ? {}
       : await response.json().catch(() => ({}));
-    if (payload?.csrfToken) root.localStorage?.setItem(CSRF_KEY, payload.csrfToken);
+    if (payload?.csrfToken) csrfMemory = payload.csrfToken;
     if (!response.ok) {
       const error = new Error(payload?.error?.message || payload?.message || "Request failed");
       error.status = response.status;

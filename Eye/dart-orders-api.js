@@ -11,15 +11,11 @@
   let syncChain = Promise.resolve();
 
   function readLocal() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch {
-      return [];
-    }
+    return window.DartState?.read?.(STORAGE_KEY, []) || [];
   }
 
   function cache(orders) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.isArray(orders) ? orders : []));
+    window.DartState?.write?.(STORAGE_KEY, Array.isArray(orders) ? orders : [], { source: "orders" });
     window.dispatchEvent(
       new CustomEvent("dart:orders-hydrated", {
         detail: { version: serverVersion, orders: Array.isArray(orders) ? orders : [] },
@@ -28,8 +24,6 @@
   }
 
   function csrfToken() {
-    const stored = localStorage.getItem(CSRF_STORAGE_KEY);
-    if (stored) return stored;
     return document.cookie
       .split("; ")
       .find((row) => row.startsWith("dart_csrf="))
@@ -106,7 +100,7 @@
   }
 
   function write(orders) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.isArray(orders) ? orders : []));
+    window.DartState?.write?.(STORAGE_KEY, Array.isArray(orders) ? orders : [], { source: "orders:edit" });
     dirty = true;
     scheduleSync();
   }
@@ -153,28 +147,9 @@
     return payload.orders || [];
   }
 
-  async function hydrate(force = false) {
-    const localOrders = readLocal();
-    let payload = await api("/api/v1/admin/orders-state");
+  async function hydrate(_force = false) {
+    const payload = await api("/api/v1/admin/orders-state");
     serverVersion = Number(payload.version || 1);
-
-    const migrationDone = localStorage.getItem(LEGACY_MIGRATION_KEY) === "1";
-    if (
-      !force &&
-      !migrationDone &&
-      serverVersion === 1 &&
-      (payload.orders || []).length === 0 &&
-      localOrders.length > 0
-    ) {
-      payload = await api("/api/v1/admin/orders-state", {
-        method: "PUT",
-        body: { expectedVersion: serverVersion, orders: localOrders },
-      });
-      serverVersion = Number(payload.version || serverVersion);
-    }
-    if (!force && !migrationDone) {
-      localStorage.setItem(LEGACY_MIGRATION_KEY, "1");
-    }
     dirty = false;
     cache(payload.orders || []);
     return payload.orders || [];

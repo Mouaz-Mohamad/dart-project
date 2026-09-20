@@ -112,3 +112,8 @@ See `CODE_MAP.md` and `VERIFICATION_REPORT.md` for implementation boundaries and
 - Run `node tests/v8-features-browser.js` with Playwright/Chromium for the V8 end-to-end checks.
 
 See `VERIFICATION_REPORT.md` for the current verification results.
+
+
+## Database-authoritative browser state
+
+All durable commerce and dashboard data is sourced from PostgreSQL through the API. The browser keeps only an in-memory projection in `window.DartState`; localStorage is limited to UI preferences and session/navigation helpers. Product images are compressed in the browser and uploaded to the catalogue asset API, not persisted in IndexedDB. Customer and guest carts are restored from server cart reservations.
