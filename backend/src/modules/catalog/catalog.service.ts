@@ -166,6 +166,139 @@ export class CatalogService {
     };
   }
 
+  async damageAction(
+    damageRef: string,
+    status: "Repaired" | "Destroyed",
+    actorId: string,
+    requestId: string,
+  ): Promise<{ damage: Record<string, unknown>; item: Record<string, unknown> }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
+      );
+      const damageState = damageStateResult.rows[0];
+      const damageRows = Array.isArray(damageState?.data)
+        ? damageState!.data as Record<string, unknown>[]
+        : [];
+      const damage = damageRows.find(
+        (row) =>
+          String(row.id || "") === damageRef ||
+          String(row.damageId || "") === damageRef,
+      );
+      if (!damage || damage.isDeleted) {
+        throw new AppError(404, "DAMAGE_NOT_FOUND", "Damage record not found");
+      }
+      if (!["Damaged", "Repaired", "Destroyed"].includes(String(damage.status || ""))) {
+        throw new AppError(409, "DAMAGE_STATE_INVALID", "Damage record is not in a manageable state");
+      }
+
+      const itemCode = String(damage.itemCode || "").trim();
+      const itemResult = await client.query<{
+        id: string;
+        item_code: string;
+        model_id: string;
+        color: string;
+        size: string;
+        status: string;
+      }>(
+        `SELECT id, item_code, model_id, color, size, status
+           FROM inventory_items
+          WHERE item_code=$1
+          FOR UPDATE`,
+        [itemCode],
+      );
+      const item = itemResult.rows[0];
+      if (!item) {
+        throw new AppError(404, "DAMAGE_ITEM_NOT_FOUND", "Damaged physical item not found");
+      }
+
+      const previousStatus = String(damage.status || "Damaged");
+      const now = new Date().toISOString();
+      damage.status = status;
+      damage.updatedAt = now;
+      if (status === "Repaired") {
+        damage.repairDate = now;
+        damage.destroyedAt = null;
+        await client.query(
+          `UPDATE inventory_items
+              SET status='In stock',
+                  active=true,
+                  is_archived=false,
+                  is_deleted=false,
+                  order_id=NULL,
+                  purchase_date=NULL,
+                  cart_reservation_id=NULL,
+                  reservation_until=NULL,
+                  return_request_id=NULL,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [item.id],
+        );
+      } else {
+        damage.destroyedAt = now;
+        await client.query(
+          `UPDATE inventory_items
+              SET status='Destroyed',
+                  active=false,
+                  cart_reservation_id=NULL,
+                  reservation_until=NULL,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [item.id],
+        );
+      }
+
+      await client.query(
+        `UPDATE dashboard_domain_state
+            SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
+          WHERE domain='damage'`,
+        [
+          JSON.stringify(damageRows),
+          Number(damageState?.version || 1) + 1,
+          actorId,
+        ],
+      );
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id,
+           old_values, new_values, metadata
+         ) VALUES ('staff',$1,'DAMAGE_STATUS_CHANGED','damage',$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)`,
+        [
+          actorId,
+          String(damage.id || damageRef),
+          requestId,
+          JSON.stringify({ status: previousStatus }),
+          JSON.stringify({ status }),
+          JSON.stringify({ itemCode }),
+        ],
+      );
+      await client.query("COMMIT");
+      return {
+        damage,
+        item: {
+          id: item.id,
+          itemCode: item.item_code,
+          modelId: item.model_id,
+          color: item.color,
+          size: item.size,
+          status: status === "Repaired" ? "In stock" : "Destroyed",
+        },
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async adminState(): Promise<CatalogState> {
     const client = await this.pool.connect();
     try {
