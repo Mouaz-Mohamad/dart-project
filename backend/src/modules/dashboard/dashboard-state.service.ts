@@ -3,8 +3,9 @@ import { AppError } from "../../http/app-error.js";
 
 export const DASHBOARD_DOMAINS = [
   "customers","returns","reviews","cards","representatives","damage",
-  "notifications","contacts","finance_expenses","finance_budgets",
-  "finance_invoices","finance_goals","finance_marketing","finance_settlements",
+  "notifications","contacts","birthday_rewards","birthday_messages","message_queue","promotions",
+  "finance_expenses","finance_budgets","finance_invoices","finance_goals","finance_marketing",
+  "finance_settlements","finance_audit","draw_audit",
 ] as const;
 
 export type DashboardDomain = typeof DASHBOARD_DOMAINS[number];
