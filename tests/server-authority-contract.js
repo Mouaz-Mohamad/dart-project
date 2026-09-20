@@ -18,7 +18,7 @@ assert.match(
 );
 assert.match(
   catalog,
-  /function assetPath(id)[\s\S]*API_BASE[\s\S]*catalog\/assets/,
+  /function assetPath\(id\)[\s\S]*catalog\/assets[\s\S]*API_BASE/,
   "catalog assets must resolve through the configured API base",
 );
 assert.match(
