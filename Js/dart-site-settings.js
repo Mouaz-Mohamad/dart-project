@@ -5,6 +5,12 @@
   "use strict";
 
   const STORAGE_KEY = "dart_site_settings";
+  const API_BASE = String(root.DART_API_BASE_URL || root.location?.origin || "").replace(/\/$/, "");
+  const IS_ADMIN = /\/Eye\//i.test(root.location?.pathname || "");
+  const CSRF_STORAGE_KEY = "dart_csrf_token";
+  let serverVersion = 0;
+  let cachedSettings = null;
+  let syncTimer = 0;
   const defaults = Object.freeze({
     version: 1,
     heroDayImage: null,
@@ -81,20 +87,121 @@
     };
   }
 
-  function get() {
+  function localRaw() {
     try {
-      return merge(JSON.parse(root.localStorage?.getItem(STORAGE_KEY) || "{}"));
+      return JSON.parse(root.localStorage?.getItem(STORAGE_KEY) || "{}");
     } catch {
-      return merge();
+      return {};
     }
   }
 
-  function save(value) {
-    const normalized = merge(value);
-    root.localStorage?.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  function announce(normalized) {
     root.dispatchEvent?.(new CustomEvent("dart:site-settings-changed", { detail: normalized }));
     root.dispatchEvent?.(new CustomEvent("dart:data-changed", { detail: { key: STORAGE_KEY } }));
+  }
+
+  function setCache(value, persist = true) {
+    const normalized = merge(value);
+    cachedSettings = normalized;
+    if (persist) root.localStorage?.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    announce(normalized);
     return normalized;
+  }
+
+  async function api(path, options = {}) {
+    if (!API_BASE) throw new Error("Site settings API is not configured.");
+    const method = String(options.method || "GET").toUpperCase();
+    const cookieCsrf = root.document?.cookie
+      ?.split("; ")
+      .find((row) => row.startsWith("dart_csrf="))
+      ?.split("=")
+      .slice(1)
+      .join("=");
+    const csrf = root.localStorage?.getItem(CSRF_STORAGE_KEY) || cookieCsrf;
+    const response = await fetch(`${API_BASE}${path}`, {
+      credentials: "include",
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrf
+          ? { "X-CSRF-Token": decodeURIComponent(csrf) }
+          : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload?.error?.message || "Site settings request failed");
+      error.status = response.status;
+      error.code = payload?.error?.code;
+      throw error;
+    }
+    return payload;
+  }
+
+  function get() {
+    if (cachedSettings) return cachedSettings;
+    cachedSettings = merge(localRaw());
+    return cachedSettings;
+  }
+
+  async function sync() {
+    if (!IS_ADMIN || !API_BASE || !serverVersion) return get();
+    const payload = await api("/api/v1/admin/site-settings", {
+      method: "PUT",
+      body: { expectedVersion: serverVersion, settings: get() },
+    });
+    serverVersion = Number(payload.version || serverVersion);
+    return setCache(payload.settings || get());
+  }
+
+  function scheduleSync() {
+    if (!IS_ADMIN || !API_BASE) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      void sync().catch(async (error) => {
+        console.error("Dart site settings sync failed", error);
+        if (error.status === 409) await hydrate(true).catch(() => {});
+      });
+    }, 150);
+  }
+
+  function save(value) {
+    const normalized = setCache(value);
+    scheduleSync();
+    return normalized;
+  }
+
+  async function hydrate(force = false) {
+    if (!API_BASE) return get();
+    const previousLocal = localRaw();
+    const payload = await api("/api/v1/site-settings");
+    serverVersion = Number(payload.version || 1);
+    const serverSettings = payload.settings && typeof payload.settings === "object"
+      ? payload.settings
+      : {};
+    const serverEmpty = Object.keys(serverSettings).length === 0;
+    const localHasData = Object.keys(previousLocal).length > 0;
+
+    if (IS_ADMIN && !force && serverEmpty && localHasData) {
+      cachedSettings = merge(previousLocal);
+      return await sync();
+    }
+    return setCache(serverSettings);
+  }
+
+  async function checkForChanges() {
+    if (!API_BASE || root.document?.hidden) return;
+    try {
+      const payload = await api("/api/v1/site-settings");
+      const remoteVersion = Number(payload.version || 0);
+      if (remoteVersion && remoteVersion !== serverVersion) {
+        serverVersion = remoteVersion;
+        setCache(payload.settings || {});
+      }
+    } catch (error) {
+      if (error.status !== 401) console.warn("Dart site settings live refresh failed", error);
+    }
   }
 
   function cairoParts(value = new Date()) {
@@ -178,6 +285,10 @@
     defaults,
     get,
     save,
+    hydrate,
+    sync,
+    checkForChanges,
+    serverVersion: () => serverVersion,
     cairoParts,
     cairoDateKey,
     activeSiteDiscount,
@@ -191,7 +302,17 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 
   if (!root.document) return;
-  root.document.addEventListener("DOMContentLoaded", applyPublicMedia);
+  root.document.addEventListener("DOMContentLoaded", () => {
+    applyPublicMedia();
+    hydrate().then(applyPublicMedia).catch((error) => {
+      if (error.status !== 401) console.warn("Dart site settings hydration failed", error);
+    });
+  });
   root.document.addEventListener("dart:sections-loaded", applyPublicMedia);
   root.addEventListener("dart:site-settings-changed", applyPublicMedia);
+  root.addEventListener("focus", checkForChanges);
+  root.document.addEventListener("visibilitychange", () => {
+    if (!root.document.hidden) checkForChanges();
+  });
+  root.setInterval?.(checkForChanges, 5000);
 })(typeof window !== "undefined" ? window : globalThis);
