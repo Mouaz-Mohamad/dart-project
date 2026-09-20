@@ -67,6 +67,13 @@
       if (!selected.length) { alert('اختر عميلًا واحدًا على الأقل.'); return; }
       const queue = JSON.parse(localStorage.getItem('dart_message_queue') || '[]');
       const history = JSON.parse(localStorage.getItem('dart_birthday_messages') || '[]');
+      const birthdayDiscountPercent = Math.max(
+        0,
+        Math.min(
+          100,
+          Number(window.DartSiteSettings?.get?.().birthdayDiscountPercent) || 30,
+        ),
+      );
       selected.forEach((row, index) => {
         const recordId = row.dataset.clientId;
         const birthdayDate = row.dataset.birthdayDate;
@@ -80,8 +87,8 @@
           customerName: customer.clientName,
           phone: customer.phone1,
           birthdayDate,
-          type: 'birthday-30-percent',
-          discountPercent: 30,
+          type: 'birthday-discount',
+          discountPercent: birthdayDiscountPercent,
           rewardDays: 7,
           status: 'Pending API',
           createdAt: new Date().toISOString()
@@ -109,7 +116,7 @@
         throw new Error('Birthday messaging requires the secure server state.');
       }
       renderBirthdayWidget();
-      alert('تم تسجيل رسائل خصم عيد الميلاد 30% وإخفاء العملاء من البوكس. سيقوم الـBackend بالإرسال الفعلي.');
+      alert(`تم تسجيل رسائل خصم عيد الميلاد ${birthdayDiscountPercent}% وإخفاء العملاء من البوكس. سيقوم الـBackend بالإرسال الفعلي.`);
     });
   });
 
