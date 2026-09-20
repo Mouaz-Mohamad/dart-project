@@ -192,10 +192,12 @@
       await request("/api/v1/auth/logout", { method: "POST" });
     } finally {
       localStorage.removeItem(CSRF_STORAGE_KEY);
+      clearAdminPrivateCache();
       lock();
       loginForm.reset();
       loginForm.hidden = false;
       mfaForm.hidden = true;
+      location.reload();
     }
   });
 
