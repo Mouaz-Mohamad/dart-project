@@ -361,6 +361,7 @@ function setupCardModal() {
 }
 
 function dartSyncUserCardFlags() {
+  if (window.DartDomainState) return;
   let users;
   try {
     users = JSON.parse(localStorage.getItem("dart_users") || "[]");
@@ -1370,7 +1371,11 @@ function dartCommitHardDelete(mode) {
                 String(row.customerId || row.clientId || ""),
               ),
           );
-          localStorage.setItem(key, JSON.stringify(rows));
+          if (window.DartDomainState?.domainForStorageKey?.(key)) {
+            window.DartDomainState.write(key, rows);
+          } else {
+            localStorage.setItem(key, JSON.stringify(rows));
+          }
         },
       );
     }
@@ -1560,7 +1565,11 @@ function dartUpdateBirthdayRewardForOrder(order, target) {
     reward.reservedAt = null;
     order.birthdayRewardUsageRecorded = false;
   }
-  localStorage.setItem("dart_birthday_rewards", JSON.stringify(rewards));
+  if (window.DartDomainState?.write) {
+    window.DartDomainState.write("dart_birthday_rewards", rewards);
+  } else {
+    localStorage.setItem("dart_birthday_rewards", JSON.stringify(rewards));
+  }
 }
 
 function dartApplyTransition(order, target, meta = {}) {
