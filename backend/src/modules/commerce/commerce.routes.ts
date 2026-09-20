@@ -116,6 +116,16 @@ export function createCommerceRouter(
     },
   );
 
+  router.get(
+    "/me/commerce",
+    signedIn,
+    requireAccountType("customer"),
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.customerSnapshot(request.auth!.userId));
+    },
+  );
+
   router.post(
     "/orders",
     signedIn,
