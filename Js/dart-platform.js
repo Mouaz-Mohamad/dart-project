@@ -1875,17 +1875,24 @@
       const line = order?.priceSnapshot?.find(
         (entry) => String(entry.itemCode) === String(code?.value.trim()),
       );
-      const original = read(KEYS.items, []).find(
-        (item) => String(item.itemCode) === String(code?.value.trim()),
+      if (!line?.modelCode) return [];
+      const model = window.DartCatalog?.model?.(line.modelCode);
+      if (!model) return [];
+      const available = Number(
+        window.DartCatalog?.available?.(
+          model,
+          String(line.size || ""),
+          String(line.color || ""),
+        ) || 0,
       );
-      const modelId = line?.modelCode || original?.modelId;
-      return read(KEYS.items, []).filter(
-        (item) =>
-          !item.isArchived &&
-          !item.isDeleted &&
-          String(item.status || "").toLowerCase() === "in stock" &&
-          String(item.modelId) === String(modelId),
-      );
+      if (available <= 0) return [];
+      return Array.from({ length: available }, (_, index) => ({
+        id: `server-stock-${index}`,
+        modelId: line.modelCode,
+        color: line.color,
+        size: line.size,
+        status: "In stock",
+      }));
     };
 
     const refreshSizes = () => {
@@ -2055,6 +2062,25 @@
           // BEGIN Contact Us -> dashboard Review inbox.
           // BACKEND: create this record through one authenticated/admin-readable inbox endpoint.
           const values = Object.fromEntries(new FormData(form));
+          if (API_BASE) {
+            try {
+              await apiRequest("/api/v1/contact", {
+                method: "POST",
+                body: {
+                  fullName: values.full_name,
+                  email: values.email,
+                  phone1: values.phone1,
+                  ...(values.phone2 ? { phone2: values.phone2 } : {}),
+                  message: values.message,
+                },
+              });
+              form.reset();
+              setStatus(form, "تم استلام رسالتك وسنتواصل معك.");
+            } catch (error) {
+              setStatus(form, error.message, true);
+            }
+            return;
+          }
           const customers = read(KEYS.customers, []);
           const customer = customers.find(
             (row) =>
@@ -2093,6 +2119,31 @@
           const values = Object.fromEntries(new FormData(form)),
             user = currentUser(),
             orders = read(KEYS.orders, []);
+          if (API_BASE) {
+            if (!user) {
+              setStatus(form, "سجل الدخول أولًا لإرسال تقييم.", true);
+              return;
+            }
+            try {
+              await apiRequest("/api/v1/reviews", {
+                method: "POST",
+                body: {
+                  rating: Number(values.rating),
+                  title: values.title,
+                  review: values.review,
+                },
+              });
+              form.reset();
+              form.elements.full_name.value = user.name;
+              form.elements.phone1.value = displayPhone(user.phone1);
+              form.elements.phone2.value = displayPhone(user.phone2);
+              form.elements.email.value = user.email;
+              setStatus(form, "تم إرسال التقييم للمراجعة.");
+            } catch (error) {
+              setStatus(form, error.message, true);
+            }
+            return;
+          }
           const eligible =
             user &&
             orders.some(
@@ -2148,6 +2199,54 @@
           const requestType = rules?.normalizeType(values.request_type) || "";
           if (!requestType) {
             setStatus(form, "اختر استبدال أو استرجاع.", true);
+            return;
+          }
+          if (API_BASE) {
+            try {
+              const result = await apiRequest("/api/v1/returns", {
+                method: "POST",
+                body: {
+                  itemCode: values.item_code,
+                  requestType,
+                  reason: values.reason,
+                  ...(values.notes ? { notes: values.notes } : {}),
+                  ...(requestType === "Exchange"
+                    ? {
+                        requestedColor: values.exchange_color,
+                        requestedSize: values.exchange_size,
+                      }
+                    : {}),
+                  address: {
+                    country: values.country,
+                    governorate: values.governorate,
+                    area: values.area,
+                    street: values.street,
+                    building: values.building,
+                    floor: values.floor,
+                    latitude: Number(values.latitude),
+                    longitude: Number(values.longitude),
+                    ...(values.full_address ? { fullAddress: values.full_address } : {}),
+                    addressSource:
+                      addressValidation.source || form.dataset.dartAddressSource || "map",
+                  },
+                },
+              });
+              sessionStorage.setItem("dart_last_return_id", result.returnId);
+              await hydrateCustomerCommerce();
+              form.reset();
+              const trackingLink = document.getElementById("return-tracking-link");
+              if (trackingLink) {
+                trackingLink.href = `track.html?return=${encodeURIComponent(result.returnId)}`;
+                trackingLink.hidden = false;
+              }
+              setStatus(
+                form,
+                `تم إنشاء الطلب ${result.returnId}. سيظهر تلقائيًا في صفحة تتبع طلبك.`,
+              );
+              renderProfile();
+            } catch (error) {
+              setStatus(form, error.message, true);
+            }
             return;
           }
           const orders = read(KEYS.orders, []);
