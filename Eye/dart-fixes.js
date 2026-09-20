@@ -25,6 +25,7 @@
     const dashboardMatch = customersData.find(customer => String(customer.id) !== String(editId || '') &&
       ((wantedEmail && email(customer.email) === wantedEmail) ||
        wantedPhones.some(value => [phone(customer.phone1), phone(customer.phone2)].includes(value))));
+    if (window.DartAdminApi) return dashboardMatch || null;
     const users = JSON.parse(localStorage.getItem('dart_users') || '[]');
     const editingCustomer = customersData.find(customer => String(customer.id) === String(editId || ''));
     const userMatch = users.find(user => user.customerId !== editingCustomer?.clientId &&
