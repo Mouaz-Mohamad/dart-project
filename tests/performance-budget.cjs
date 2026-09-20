@@ -5,8 +5,8 @@ const failures = [];
 const rootHtml = fs.readdirSync(".").filter((name) => name.endsWith(".html"));
 for (const file of rootHtml) {
   const source = fs.readFileSync(file, "utf8");
-  const headMarkup = source.match(/<head\\b[\\s\\S]*?<\\/head>/i)?.[0] || "";
-  if (/>\\\\n\\s*</.test(headMarkup)) {
+  const headMarkup = source.match(/<head\b[\s\S]*?<\/head>/i)?.[0] || "";
+  if (/>\\n\s*</.test(headMarkup)) {
     failures.push(`${file}: <head> contains a literal \\n escape instead of a real newline`);
   }
   const faviconTags = source.match(/<link\b[^>]*rel=["'](?:icon|apple-touch-icon)["'][^>]*>/gi) || [];
@@ -59,11 +59,11 @@ if (totalJsBytes > 900 * 1024) {
 }
 
 const imageFiles = walk("Photos").filter((file) => /\.(?:png|jpe?g|webp)$/i.test(file));
-const maxImageBytes = 2700 * 1024;
+const maxImageBytes = 2500 * 1024;
 for (const file of imageFiles) {
   const size = fs.statSync(file).size;
   if (size > maxImageBytes) {
-    failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 2.7MB legacy image ceiling`);
+    failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 2.5MB legacy image ceiling`);
   }
 }
 

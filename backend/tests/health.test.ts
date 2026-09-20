@@ -45,6 +45,10 @@ describe("health API", () => {
     expect(response.status).toBe(200);
     expect(response.body.status).toBe("ok");
     expect(response.headers["x-request-id"]).toBeTruthy();
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["x-frame-options"]).toBe("SAMEORIGIN");
+    expect(response.headers["x-powered-by"]).toBeUndefined();
   });
 
   it("reports readiness only when PostgreSQL responds", async () => {

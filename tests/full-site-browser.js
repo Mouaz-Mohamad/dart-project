@@ -208,16 +208,14 @@ const server = http.createServer((request, response) => {
   );
   for (const target of dashboardTargets) {
     const controls = dashboard.locator(`a[data-target="${target}"]`);
-    let activated = false;
-    for (let index = 0; index < await controls.count(); index += 1) {
-      const control = controls.nth(index);
-      if (await control.isVisible()) {
-        await control.click();
-        activated = true;
-        break;
-      }
-    }
-    if (!activated) await controls.last().evaluate((node) => node.click());
+    assert.ok(
+      (await controls.count()) > 0,
+      `dashboard navigation control must exist for ${target}`,
+    );
+    // Desktop and mobile menus contain duplicate targets. Trigger the real DOM
+    // listener directly so the smoke verifies application navigation rather
+    // than viewport hit-testing for an intentionally hidden duplicate link.
+    await controls.first().evaluate((node) => node.click());
     assert.equal(
       await dashboard.locator(`#${target}`).evaluate((node) => node.classList.contains("active-section")),
       true,

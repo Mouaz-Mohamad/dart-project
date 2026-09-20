@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runMigrations } from "../src/database/migrate.js";
+import { CommerceService } from "../src/modules/commerce/commerce.service.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const schemaName = `dart_test_${randomUUID().replaceAll("-", "")}`;
@@ -20,7 +21,7 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
     await adminPool.query(`CREATE SCHEMA "${schemaName}"`);
     testPool = new Pool({
       connectionString: databaseUrl,
-      max: 1,
+      max: 4,
       options: `-c search_path=${schemaName},public`,
     });
     await runMigrations(testPool, migrationsPath);
@@ -72,6 +73,70 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       "SELECT name FROM dart_schema_migrations ORDER BY name",
     );
     expect(applied.rows.map((row) => row.name)).toEqual(expectedMigrations);
+  });
+
+  it("is a no-op when every migration is already current", async () => {
+    await expect(runMigrations(testPool!, migrationsPath)).resolves.toEqual([]);
+  });
+
+  it("allows only one cart to reserve the final physical item under concurrency", async () => {
+    const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
+    const modelId = `CONC-${suffix}`;
+    const itemId = `ITEM-${suffix}`;
+    const itemCode = `IT-${suffix}`;
+
+    await testPool!.query(
+      `INSERT INTO catalog_models (
+         model_id, name, cost_minor, selling_minor, size_options, color_options
+       ) VALUES ($1,$2,40000,60000,$3::jsonb,$4::jsonb)`,
+      [
+        modelId,
+        "Concurrency Test",
+        JSON.stringify([{ name: "M", active: true }]),
+        JSON.stringify([{ name: "Black", active: true }]),
+      ],
+    );
+    await testPool!.query(
+      `INSERT INTO inventory_items (id, item_code, model_id, color, size, status)
+       VALUES ($1,$2,$3,'Black','M','In stock')`,
+      [itemId, itemCode, modelId],
+    );
+
+    const commerce = new CommerceService(testPool!);
+    const line = [{ modelId, color: "Black", size: "M", quantity: 1 }];
+    const results = await Promise.allSettled([
+      commerce.reserveCart(
+        `CART-A-${suffix}`,
+        line,
+        undefined,
+        "a".repeat(64),
+      ),
+      commerce.reserveCart(
+        `CART-B-${suffix}`,
+        line,
+        undefined,
+        "b".repeat(64),
+      ),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(rejected?.reason).toMatchObject({
+      code: "STOCK_INSUFFICIENT",
+      statusCode: 409,
+    });
+
+    const item = await testPool!.query<{
+      status: string;
+      cart_reservation_id: string | null;
+    }>(
+      "SELECT status, cart_reservation_id FROM inventory_items WHERE id=$1",
+      [itemId],
+    );
+    expect(item.rows[0]?.status).toBe("Cart Reserved");
+    expect(item.rows[0]?.cart_reservation_id).toMatch(/^CART-[AB]-/);
   });
 
   it("enforces append-only audit records", async () => {
