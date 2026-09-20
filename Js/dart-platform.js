@@ -435,14 +435,19 @@
   async function hydrateCustomerCommerce() {
     if (!API_BASE || !apiUserCache) return null;
     const payload = await apiRequest("/api/v1/me/commerce");
-    localStorage.setItem(KEYS.orders, JSON.stringify(payload.orders || []));
-    localStorage.setItem(KEYS.returns, JSON.stringify(payload.returns || []));
-    localStorage.setItem(KEYS.cards, JSON.stringify(payload.cards || []));
-    [KEYS.orders, KEYS.returns, KEYS.cards].forEach((key) =>
+    const snapshots = [
+      [KEYS.orders, payload.orders || []],
+      [KEYS.returns, payload.returns || []],
+      [KEYS.cards, payload.cards || []],
+      [KEYS.birthdayRewards, payload.birthdayRewards || []],
+      [KEYS.birthdayMessages, payload.birthdayMessages || []],
+    ];
+    snapshots.forEach(([key, value]) => {
+      localStorage.setItem(key, JSON.stringify(value));
       window.dispatchEvent(
         new CustomEvent("dart:data-changed", { detail: { key } }),
-      ),
-    );
+      );
+    });
     return payload;
   }
 
