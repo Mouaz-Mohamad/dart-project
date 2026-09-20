@@ -951,7 +951,6 @@
 
   const api = {
     STORAGE_KEYS,
-    API_ENDPOINTS,
     GOAL_METRICS,
     repository: FinanceRepository,
     parseDate,
