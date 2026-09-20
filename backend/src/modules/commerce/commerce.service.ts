@@ -2229,11 +2229,12 @@ export class CommerceService {
       );
     }
 
-    if (["Cancelled", "Refused"].includes(nextStatus)) {
+    if (nextStatus === "Cancelled") {
       await client.query(
         `UPDATE inventory_items
             SET status='In stock',
                 order_id=NULL,
+                return_request_id=NULL,
                 cart_reservation_id=NULL,
                 reservation_until=NULL,
                 version=version+1,
@@ -2241,6 +2242,19 @@ export class CommerceService {
           WHERE item_code = ANY($1::text[])
             AND lower(status) <> 'sold'`,
         [desiredCodes],
+      );
+    } else if (nextStatus === "Refused") {
+      await client.query(
+        `UPDATE inventory_items
+            SET status='Return Inspection',
+                order_id=$2,
+                cart_reservation_id=NULL,
+                reservation_until=NULL,
+                version=version+1,
+                updated_at=now()
+          WHERE item_code = ANY($1::text[])
+            AND lower(status) <> 'sold'`,
+        [desiredCodes, orderCode],
       );
     } else if (nextStatus !== "Delivered" && nextStatus !== "Returned") {
       await client.query(
