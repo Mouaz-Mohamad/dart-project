@@ -657,7 +657,7 @@ export class CommerceService {
       }>(
         `SELECT domain, version::text, data
            FROM dashboard_domain_state
-          WHERE domain IN ('birthday_rewards','cards')
+          WHERE domain IN ('birthday_rewards','cards','promotions')
           FOR UPDATE`,
       );
       const promotionStates = new Map(
@@ -671,7 +671,8 @@ export class CommerceService {
       );
       const birthdayState = promotionStates.get("birthday_rewards");
       const cardState = promotionStates.get("cards");
-      if (!birthdayState || !cardState) {
+      const promotionsState = promotionStates.get("promotions");
+      if (!birthdayState || !cardState || !promotionsState) {
         throw new AppError(500, "PROMOTION_STATE_MISSING", "Promotion state is not initialized");
       }
 
@@ -755,6 +756,43 @@ export class CommerceService {
         }
       }
 
+      if (!promotion && input.promotionCode) {
+        const normalizedCode = String(input.promotionCode).trim().toUpperCase();
+        const codePromotion = (promotionsState.data as Record<string, unknown>[]).find(
+          (row) =>
+            String(row.code || "").trim().toUpperCase() === normalizedCode &&
+            String(row.status || "Active").toLowerCase() === "active" &&
+            !row.isArchived &&
+            !row.isDeleted,
+        );
+        if (
+          !codePromotion ||
+          !promotionDateActive(codePromotion) ||
+          !promotionPercent(codePromotion)
+        ) {
+          throw new AppError(
+            409,
+            "PROMOTION_INVALID",
+            "Promotion code is invalid, expired or no longer active",
+          );
+        }
+        const stats = await customerPurchaseStats(client, customerUserId);
+        if (!promotionTargetsCustomer(codePromotion, stats)) {
+          throw new AppError(
+            409,
+            "PROMOTION_NOT_ELIGIBLE",
+            "This promotion is not available for this account",
+          );
+        }
+        promotionPercent = promotionPercent(codePromotion);
+        promotion = {
+          id: String(codePromotion.id || ""),
+          type: "Promotion",
+          code: normalizedCode,
+          percent: promotionPercent,
+        };
+      }
+
       let subtotalMinor = 0;
       let finalMinor = 0;
       const itemSnapshots = itemResult.rows.map((row) => {
@@ -794,6 +832,7 @@ export class CommerceService {
             reservationId: input.reservationId,
             birthdayRewardId: promotion?.type === "Birthday" ? promotion.rewardId : "",
             dartCardId: promotion?.type === "Dart Card" ? promotion.cardId : "",
+            promotionCode: promotion?.type === "Promotion" ? promotion.code : "",
           }),
         ],
       );
@@ -928,6 +967,7 @@ export class CommerceService {
         orderLevelDiscountAmount: orderDiscountMinor / 100,
         finalAmount: finalMinor / 100,
         promotionType: promotion?.type || "",
+        promotionCode: promotion?.type === "Promotion" ? String(promotion.code || "") : "",
         birthdayRewardId: promotion?.type === "Birthday" ? String(promotion.rewardId || "") : "",
         dartCardId: promotion?.type === "Dart Card" ? String(promotion.cardId || "") : "",
         paymentMethod: "Cash on Delivery",
