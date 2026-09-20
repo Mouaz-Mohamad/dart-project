@@ -865,12 +865,14 @@
       } finally {
         localStorage.removeItem(CSRF_STORAGE_KEY);
         cacheApiUser(null);
+        clearCustomerPrivateCache();
       }
       return;
     }
     const user = currentUser();
     if (user) audit("LOGOUT", "customers", user.customerId);
     localStorage.removeItem(KEYS.session);
+    clearCustomerPrivateCache();
   }
 
   async function verifyEmail(challengeId, code) {
