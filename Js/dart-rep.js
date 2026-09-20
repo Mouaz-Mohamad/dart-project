@@ -1113,6 +1113,9 @@
       async (position) => {
         const rep = currentRep();
         if (API_ENABLED) {
+          const currentTime = Date.now();
+          if (currentTime - lastLocationSyncAt < 4000) return;
+          lastLocationSyncAt = currentTime;
           try {
             const payload = await window.DartApi.request("/api/v1/representatives/location", {
               method: "PUT",
