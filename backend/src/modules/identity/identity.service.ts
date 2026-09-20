@@ -2699,12 +2699,35 @@ export class IdentityService {
 
   private async permissionsForUser(userId: string, client: Pool | PoolClient = this.pool): Promise<string[]> {
     const result = await client.query<{ key: string }>(
-      `SELECT DISTINCT permissions.key
-       FROM user_roles
-       JOIN role_permissions ON role_permissions.role_id = user_roles.role_id
-       JOIN permissions ON permissions.id = role_permissions.permission_id
-       WHERE user_roles.user_id = $1 AND user_roles.revoked_at IS NULL
-       ORDER BY permissions.key`,
+      `SELECT p.key
+         FROM permissions p
+         LEFT JOIN user_permission_overrides override
+           ON override.user_id=$1 AND override.permission_id=p.id
+        WHERE CASE
+          WHEN p.key IN (
+            'profile.read_own',
+            'profile.update_own',
+            'sessions.read_own',
+            'sessions.revoke_own'
+          ) THEN EXISTS (
+            SELECT 1
+              FROM user_roles ur
+              JOIN role_permissions rp ON rp.role_id=ur.role_id
+             WHERE ur.user_id=$1
+               AND ur.revoked_at IS NULL
+               AND rp.permission_id=p.id
+          )
+          WHEN override.allowed IS NOT NULL THEN override.allowed
+          ELSE EXISTS (
+            SELECT 1
+              FROM user_roles ur
+              JOIN role_permissions rp ON rp.role_id=ur.role_id
+             WHERE ur.user_id=$1
+               AND ur.revoked_at IS NULL
+               AND rp.permission_id=p.id
+          )
+        END
+        ORDER BY p.key`,
       [userId],
     );
     return result.rows.map((row) => row.key);
