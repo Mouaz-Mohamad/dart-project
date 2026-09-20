@@ -80,6 +80,7 @@
       if (window.DartSiteSettings?.hydrate) await window.DartSiteSettings.hydrate();
       if (window.DartCatalog?.hydrate) await window.DartCatalog.hydrate();
       if (window.DartOrdersApi?.hydrate) await window.DartOrdersApi.hydrate();
+      if (window.DartDomainState?.hydrateAll) await window.DartDomainState.hydrateAll();
     } catch (error) {
       console.error("Unable to hydrate dashboard state after sign-in", error);
       lock();
