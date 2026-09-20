@@ -459,6 +459,706 @@ export class IdentityService {
     }
   }
 
+  public async startStaffOnboarding(
+    emailInput: string,
+    metadata: RequestMetadata,
+  ): Promise<{ challengeId: string; expiresAt: Date }> {
+    const emailNormalized = normalizeEmail(emailInput);
+    const fallback = {
+      challengeId: randomUUID(),
+      expiresAt: new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000),
+    };
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const invitationResult = await client.query<{
+        id: string;
+        email: string;
+        email_normalized: string;
+      }>(
+        `SELECT id::text, email, email_normalized
+           FROM staff_invitations
+          WHERE email_normalized=$1
+            AND status='pending'
+            AND (expires_at IS NULL OR expires_at > now())
+          FOR UPDATE`,
+        [emailNormalized],
+      );
+      const invitation = invitationResult.rows[0];
+      if (!invitation) {
+        await client.query("COMMIT");
+        return fallback;
+      }
+
+      const existingUser = await client.query<{ id: string }>(
+        `SELECT id::text
+           FROM users
+          WHERE account_type='staff'
+            AND email_normalized=$1
+            AND deleted_at IS NULL
+          LIMIT 1`,
+        [emailNormalized],
+      );
+      if (existingUser.rows[0]) {
+        await client.query("COMMIT");
+        return fallback;
+      }
+
+      await client.query(
+        `UPDATE staff_onboarding_challenges
+            SET consumed_at=COALESCE(consumed_at, now())
+          WHERE invitation_id=$1 AND consumed_at IS NULL`,
+        [invitation.id],
+      );
+
+      const challengeId = randomUUID();
+      const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      const expiresAt = new Date(
+        Date.now() + this.config.emailOtpTtlMinutes * 60_000,
+      );
+      await client.query(
+        `INSERT INTO staff_onboarding_challenges (
+           id, invitation_id, code_hash, expires_at
+         ) VALUES ($1,$2,$3,$4)`,
+        [
+          challengeId,
+          invitation.id,
+          digest(
+            `staff-onboarding:${challengeId}:${otp}`,
+            this.config.authPepper,
+          ),
+          expiresAt,
+        ],
+      );
+      await client.query(
+        `INSERT INTO outbox_events (
+           aggregate_type, aggregate_id, event_type, payload, deduplication_key
+         ) VALUES ('staff_invitation',$1,'STAFF_ONBOARDING_CODE_REQUESTED',$2::jsonb,$3)
+         ON CONFLICT (deduplication_key) DO NOTHING`,
+        [
+          invitation.id,
+          JSON.stringify({
+            channel: "email",
+            to: invitation.email,
+            template: "staff_onboarding_code",
+            encryptedParameters: {
+              otp: encryptSecret(
+                otp,
+                this.config.mfaEncryptionKey,
+              ).toString("base64"),
+            },
+            expiresAt: expiresAt.toISOString(),
+          }),
+          `staff-onboarding-code:${challengeId}`,
+        ],
+      );
+      await this.audit(
+        client,
+        "system",
+        null,
+        "STAFF_ONBOARDING_CODE_REQUESTED",
+        "staff_invitations",
+        invitation.id,
+        metadata,
+        { emailHash: digest(`staff-email:${emailNormalized}`, this.config.authPepper) },
+      );
+      await client.query("COMMIT");
+      return { challengeId, expiresAt };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async verifyStaffOnboarding(
+    challengeId: string,
+    code: string,
+    metadata: RequestMetadata,
+  ): Promise<{ setupToken: string; expiresAt: Date }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{
+        invitation_id: string;
+        code_hash: string;
+        attempts_remaining: number;
+        expires_at: Date;
+        consumed_at: Date | null;
+        status: string;
+      }>(
+        `SELECT c.invitation_id::text, c.code_hash, c.attempts_remaining,
+                c.expires_at, c.consumed_at, i.status
+           FROM staff_onboarding_challenges c
+           JOIN staff_invitations i ON i.id=c.invitation_id
+          WHERE c.id=$1
+          FOR UPDATE OF c, i`,
+        [challengeId],
+      );
+      const row = result.rows[0];
+      if (
+        !row ||
+        row.status !== "pending" ||
+        row.consumed_at ||
+        row.expires_at.getTime() <= Date.now() ||
+        row.attempts_remaining <= 0
+      ) {
+        throw new AppError(
+          400,
+          "STAFF_ONBOARDING_INVALID",
+          "The setup code is invalid or expired",
+        );
+      }
+      const expected = digest(
+        `staff-onboarding:${challengeId}:${code}`,
+        this.config.authPepper,
+      );
+      if (!safeEqual(expected, row.code_hash)) {
+        await client.query(
+          `UPDATE staff_onboarding_challenges
+              SET attempts_remaining=GREATEST(0, attempts_remaining-1)
+            WHERE id=$1`,
+          [challengeId],
+        );
+        await client.query("COMMIT");
+        throw new AppError(
+          400,
+          "STAFF_ONBOARDING_CODE_INVALID",
+          "The setup code is invalid or expired",
+        );
+      }
+      const setupToken = randomToken(32);
+      await client.query(
+        `UPDATE staff_onboarding_challenges
+            SET verified_at=now(),
+                setup_token_hash=$2
+          WHERE id=$1`,
+        [
+          challengeId,
+          digest(
+            `staff-setup:${challengeId}:${setupToken}`,
+            this.config.authPepper,
+          ),
+        ],
+      );
+      await this.audit(
+        client,
+        "system",
+        null,
+        "STAFF_ONBOARDING_EMAIL_VERIFIED",
+        "staff_invitations",
+        row.invitation_id,
+        metadata,
+      );
+      await client.query("COMMIT");
+      return { setupToken, expiresAt: row.expires_at };
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async completeStaffOnboarding(
+    challengeId: string,
+    setupToken: string,
+    password: string,
+    metadata: RequestMetadata,
+  ): Promise<IssuedSession> {
+    passwordPolicyOrThrow(password);
+    const passwordHash = await hashPassword(password);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{
+        invitation_id: string;
+        email: string;
+        email_normalized: string;
+        display_name: string;
+        is_owner: boolean;
+        mfa_required: boolean;
+        permission_keys: unknown[];
+        invitation_status: string;
+        expires_at: Date;
+        verified_at: Date | null;
+        setup_token_hash: string | null;
+        consumed_at: Date | null;
+      }>(
+        `SELECT i.id::text AS invitation_id, i.email, i.email_normalized,
+                i.display_name, i.is_owner, i.mfa_required,
+                i.permission_keys,
+                i.status AS invitation_status,
+                c.expires_at, c.verified_at, c.setup_token_hash, c.consumed_at
+           FROM staff_onboarding_challenges c
+           JOIN staff_invitations i ON i.id=c.invitation_id
+          WHERE c.id=$1
+          FOR UPDATE OF c, i`,
+        [challengeId],
+      );
+      const row = result.rows[0];
+      const tokenHash = digest(
+        `staff-setup:${challengeId}:${setupToken}`,
+        this.config.authPepper,
+      );
+      if (
+        !row ||
+        row.invitation_status !== "pending" ||
+        !row.verified_at ||
+        !row.setup_token_hash ||
+        !safeEqual(tokenHash, row.setup_token_hash) ||
+        row.consumed_at ||
+        row.expires_at.getTime() <= Date.now()
+      ) {
+        throw new AppError(
+          400,
+          "STAFF_ONBOARDING_INVALID",
+          "The setup session is invalid or expired",
+        );
+      }
+
+      if (row.is_owner) {
+        const existingOwner = await client.query<{ id: string }>(
+          "SELECT user_id::text AS id FROM staff_users WHERE is_owner LIMIT 1 FOR UPDATE",
+        );
+        if (existingOwner.rows[0]) {
+          throw new AppError(
+            409,
+            "OWNER_ALREADY_EXISTS",
+            "The Owner account has already been activated",
+          );
+        }
+      }
+
+      const duplicate = await client.query<{ id: string }>(
+        `SELECT id::text
+           FROM users
+          WHERE account_type='staff'
+            AND email_normalized=$1
+            AND deleted_at IS NULL
+          LIMIT 1`,
+        [row.email_normalized],
+      );
+      if (duplicate.rows[0]) {
+        throw new AppError(
+          409,
+          "STAFF_ACCOUNT_ALREADY_EXISTS",
+          "This Staff account has already been activated",
+        );
+      }
+
+      const userId = randomUUID();
+      await client.query(
+        `INSERT INTO users (
+           id, account_type, email, email_normalized, password_hash,
+           status, email_verified_at, must_change_password
+         ) VALUES ($1,'staff',$2,$3,$4,'active',now(),false)`,
+        [userId, row.email, row.email_normalized, passwordHash],
+      );
+      await client.query(
+        `INSERT INTO staff_users (
+           user_id, display_name, is_owner, mfa_required
+         ) VALUES ($1,$2,$3,$4)`,
+        [userId, row.display_name, row.is_owner, row.mfa_required],
+      );
+      await this.assignRole(
+        client,
+        userId,
+        row.is_owner ? "Owner" : "Staff",
+      );
+
+      if (!row.is_owner) {
+        const permissionKeys = Array.isArray(row.permission_keys)
+          ? row.permission_keys
+              .map((value) => String(value || "").trim())
+              .filter(Boolean)
+          : [];
+        if (permissionKeys.length) {
+          const validPermissions = await client.query<{ id: string; key: string }>(
+            `SELECT id::text, key
+               FROM permissions
+              WHERE key = ANY($1::text[])`,
+            [permissionKeys],
+          );
+          if (validPermissions.rows.length !== new Set(permissionKeys).size) {
+            throw new AppError(
+              409,
+              "STAFF_INVITATION_PERMISSION_INVALID",
+              "One or more invited permissions no longer exist",
+            );
+          }
+          for (const permission of validPermissions.rows) {
+            await client.query(
+              `INSERT INTO user_permission_overrides (
+                 user_id, permission_id, allowed, granted_by
+               ) VALUES ($1,$2,true,$1)
+               ON CONFLICT (user_id, permission_id) DO UPDATE SET
+                 allowed=true,
+                 updated_at=now()`,
+              [userId, permission.id],
+            );
+          }
+        }
+      }
+
+      await client.query(
+        `UPDATE staff_onboarding_challenges
+            SET consumed_at=now()
+          WHERE id=$1`,
+        [challengeId],
+      );
+      await client.query(
+        `UPDATE staff_invitations
+            SET status='claimed',
+                claimed_by=$2,
+                claimed_at=now(),
+                updated_at=now()
+          WHERE id=$1`,
+        [row.invitation_id, userId],
+      );
+      const session = await this.issueSession(
+        client,
+        userId,
+        !row.mfa_required,
+        metadata,
+      );
+      await this.audit(
+        client,
+        "staff",
+        userId,
+        row.is_owner ? "OWNER_ACCOUNT_ACTIVATED" : "STAFF_ACCOUNT_ACTIVATED",
+        "staff_users",
+        userId,
+        metadata,
+        { invitationId: row.invitation_id },
+      );
+      await client.query("COMMIT");
+      return session;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  public async createStaffInvitation(
+    account: AuthenticatedAccount,
+    input: {
+      email: string;
+      displayName: string;
+      permissionKeys: string[];
+      mfaRequired: boolean;
+    },
+    metadata: RequestMetadata,
+  ): Promise<{ invitationId: string; email: string }> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("staff.manage") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(
+        403,
+        "FORBIDDEN",
+        "You do not have permission to invite staff",
+      );
+    }
+    const owner = await this.pool.query<{ is_owner: boolean }>(
+      "SELECT is_owner FROM staff_users WHERE user_id=$1",
+      [account.userId],
+    );
+    if (!owner.rows[0]?.is_owner) {
+      throw new AppError(
+        403,
+        "OWNER_REQUIRED",
+        "Only the Owner can invite Staff accounts",
+      );
+    }
+
+    const emailNormalized = normalizeEmail(input.email);
+    const permissionKeys = [
+      ...new Set(input.permissionKeys.map((key) => key.trim()).filter(Boolean)),
+    ];
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const existingUser = await client.query<{ id: string }>(
+        `SELECT id::text
+           FROM users
+          WHERE account_type='staff'
+            AND email_normalized=$1
+            AND deleted_at IS NULL
+          LIMIT 1`,
+        [emailNormalized],
+      );
+      if (existingUser.rows[0]) {
+        throw new AppError(
+          409,
+          "STAFF_ACCOUNT_ALREADY_EXISTS",
+          "A Staff account with this email already exists",
+        );
+      }
+
+      if (permissionKeys.length) {
+        const valid = await client.query<{ key: string }>(
+          "SELECT key FROM permissions WHERE key = ANY($1::text[])",
+          [permissionKeys],
+        );
+        if (valid.rows.length !== permissionKeys.length) {
+          throw new AppError(
+            422,
+            "INVALID_PERMISSION",
+            "One or more selected permissions do not exist",
+          );
+        }
+      }
+
+      await client.query(
+        `UPDATE staff_invitations
+            SET status='revoked', updated_at=now()
+          WHERE email_normalized=$1 AND status='pending'`,
+        [emailNormalized],
+      );
+      const invitation = await client.query<{ id: string }>(
+        `INSERT INTO staff_invitations (
+           email, email_normalized, display_name, is_owner, mfa_required,
+           permission_keys, status, invited_by, expires_at
+         ) VALUES ($1,$2,$3,false,$4,$5::jsonb,'pending',$6,now()+interval '30 days')
+         RETURNING id::text`,
+        [
+          input.email.trim(),
+          emailNormalized,
+          input.displayName.trim(),
+          input.mfaRequired,
+          JSON.stringify(permissionKeys),
+          account.userId,
+        ],
+      );
+      await client.query(
+        `INSERT INTO outbox_events (
+           aggregate_type, aggregate_id, event_type, payload, deduplication_key
+         ) VALUES ('staff_invitation',$1,'STAFF_INVITED',$2::jsonb,$3)
+         ON CONFLICT (deduplication_key) DO NOTHING`,
+        [
+          invitation.rows[0]!.id,
+          JSON.stringify({
+            channel: "email",
+            to: input.email.trim(),
+            template: "staff_invited",
+            setupUrl: "/Eye/Dart%20Eye.html",
+            expiresInDays: 30,
+          }),
+          `staff-invited:${invitation.rows[0]!.id}`,
+        ],
+      );
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_INVITED",
+        "staff_invitations",
+        invitation.rows[0]!.id,
+        metadata,
+        { emailHash: digest(`staff-email:${emailNormalized}`, this.config.authPepper), permissionKeys },
+      );
+      await client.query("COMMIT");
+      return {
+        invitationId: invitation.rows[0]!.id,
+        email: input.email.trim(),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  public async staffDirectory(
+    account: AuthenticatedAccount,
+  ): Promise<{
+    permissions: Array<{ key: string; description: string }>;
+    invitations: Array<Record<string, unknown>>;
+    staff: Array<Record<string, unknown>>;
+  }> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("staff.read") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to read Staff accounts");
+    }
+
+    const [permissionsResult, invitationsResult, staffResult] = await Promise.all([
+      this.pool.query<{ key: string; description: string }>(
+        "SELECT key, description FROM permissions ORDER BY key",
+      ),
+      this.pool.query<{
+        id: string;
+        email: string;
+        display_name: string;
+        permission_keys: unknown[];
+        status: string;
+        expires_at: Date | null;
+        created_at: Date;
+      }>(
+        `SELECT id::text, email, display_name, permission_keys, status,
+                expires_at, created_at
+           FROM staff_invitations
+          WHERE is_owner=false
+          ORDER BY created_at DESC
+          LIMIT 500`,
+      ),
+      this.pool.query<{
+        user_id: string;
+        staff_code: string;
+        display_name: string;
+        is_owner: boolean;
+        mfa_required: boolean;
+        email: string;
+        status: string;
+        created_at: Date;
+      }>(
+        `SELECT s.user_id::text, s.staff_code, s.display_name, s.is_owner,
+                s.mfa_required, u.email, u.status, s.created_at
+           FROM staff_users s
+           JOIN users u ON u.id=s.user_id
+          WHERE u.deleted_at IS NULL
+          ORDER BY s.is_owner DESC, s.created_at`,
+      ),
+    ]);
+
+    const staff = [];
+    for (const row of staffResult.rows) {
+      const effective = await this.permissionsForUser(row.user_id);
+      staff.push({
+        id: row.user_id,
+        staffCode: row.staff_code,
+        name: row.display_name,
+        email: row.email,
+        status: row.status,
+        isOwner: row.is_owner,
+        mfaRequired: row.mfa_required,
+        permissions: effective,
+        createdAt: row.created_at.toISOString(),
+      });
+    }
+    return {
+      permissions: permissionsResult.rows,
+      invitations: invitationsResult.rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        name: row.display_name,
+        permissions: Array.isArray(row.permission_keys)
+          ? row.permission_keys
+          : [],
+        status: row.status,
+        expiresAt: row.expires_at?.toISOString() || null,
+        createdAt: row.created_at.toISOString(),
+      })),
+      staff,
+    };
+  }
+
+  public async setStaffPermissions(
+    account: AuthenticatedAccount,
+    staffUserId: string,
+    permissionKeys: string[],
+    metadata: RequestMetadata,
+  ): Promise<string[]> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("staff.manage") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage Staff");
+    }
+    const ownerCheck = await this.pool.query<{ is_owner: boolean }>(
+      "SELECT is_owner FROM staff_users WHERE user_id=$1",
+      [account.userId],
+    );
+    if (!ownerCheck.rows[0]?.is_owner) {
+      throw new AppError(403, "OWNER_REQUIRED", "Only the Owner can change Staff permissions");
+    }
+    const target = await this.pool.query<{ is_owner: boolean }>(
+      "SELECT is_owner FROM staff_users WHERE user_id=$1",
+      [staffUserId],
+    );
+    if (!target.rows[0]) {
+      throw new AppError(404, "STAFF_NOT_FOUND", "Staff account not found");
+    }
+    if (target.rows[0].is_owner) {
+      throw new AppError(409, "OWNER_PERMISSIONS_PROTECTED", "Owner permissions cannot be reduced");
+    }
+
+    const uniqueKeys = [
+      ...new Set(permissionKeys.map((key) => key.trim()).filter(Boolean)),
+    ];
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const allPermissions = await client.query<{ id: string; key: string }>(
+        "SELECT id::text, key FROM permissions ORDER BY key",
+      );
+      const validKeys = new Set(allPermissions.rows.map((row) => row.key));
+      if (uniqueKeys.some((key) => !validKeys.has(key))) {
+        throw new AppError(422, "INVALID_PERMISSION", "One or more selected permissions do not exist");
+      }
+
+      await client.query(
+        "DELETE FROM user_permission_overrides WHERE user_id=$1",
+        [staffUserId],
+      );
+      const selected = new Set(uniqueKeys);
+      for (const permission of allPermissions.rows) {
+        await client.query(
+          `INSERT INTO user_permission_overrides (
+             user_id, permission_id, allowed, granted_by
+           ) VALUES ($1,$2,$3,$4)`,
+          [
+            staffUserId,
+            permission.id,
+            selected.has(permission.key),
+            account.userId,
+          ],
+        );
+      }
+      await client.query(
+        `UPDATE users
+            SET session_version=session_version+1, updated_at=now(), version=version+1
+          WHERE id=$1`,
+        [staffUserId],
+      );
+      await client.query(
+        `UPDATE sessions
+            SET revoked_at=COALESCE(revoked_at, now()),
+                revoke_reason=COALESCE(revoke_reason, 'permissions_changed')
+          WHERE user_id=$1 AND revoked_at IS NULL`,
+        [staffUserId],
+      );
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_PERMISSIONS_UPDATED",
+        "staff_users",
+        staffUserId,
+        metadata,
+        { permissionKeys: uniqueKeys },
+      );
+      await client.query("COMMIT");
+      return this.permissionsForUser(staffUserId);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async login(
     accountType: AccountType,
     identifier: string,
