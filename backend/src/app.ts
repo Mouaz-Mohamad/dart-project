@@ -1,8 +1,8 @@
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import express, { type Express } from "express";
-import rateLimit from "express-rate-limit";
-import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
+import * as helmetModule from "helmet";
 import type { Logger } from "pino";
 import type { AppConfig } from "./config/env.js";
 import { AppError } from "./http/app-error.js";
@@ -27,7 +27,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   if (config.trustProxyHops > 0) app.set("trust proxy", config.trustProxyHops);
 
   app.use(requestContext(dependencies.logger));
-  app.use(helmet());
+  app.use(helmetModule.default());
   app.use(
     cors({
       credentials: true,
