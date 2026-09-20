@@ -4248,28 +4248,87 @@ function setupCustomerModal() {
       document.getElementById("custCountry").value = "Egypt";
       openModal(modal);
     });
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = document.getElementById("modal-customer-edit-id").value,
       p = {
-        clientName: document.getElementById("custName").value,
+        clientName: document.getElementById("custName").value.trim(),
         birthday: document.getElementById("custBirthday").value || "-",
-        phone1: document.getElementById("custPhone1").value,
-        phone2: document.getElementById("custPhone2").value || "-",
-        email: document.getElementById("custEmail").value || "",
+        phone1: document.getElementById("custPhone1").value.trim(),
+        phone2: document.getElementById("custPhone2").value.trim() || "-",
+        email: document.getElementById("custEmail").value.trim(),
         country: document.getElementById("custCountry").value || "Egypt",
         governorate: document.getElementById("custGovernorate").value || "",
       };
+
     if (id) {
-      const x = customersData.find((c) => String(c.id) === String(id)),
-        old = { ...x };
+      const x = customersData.find((customer) => String(customer.id) === String(id));
+      if (!x) return;
+      const oldValues = { ...x };
+
+      if (x.serverAuthoritative) {
+        if (!window.DartAdminApi?.request) {
+          alert("Secure admin API is unavailable.");
+          return;
+        }
+        try {
+          await window.DartAdminApi.request(
+            `/api/v1/admin/customers/${encodeURIComponent(x.id)}`,
+            {
+              method: "PATCH",
+              body: {
+                name: p.clientName,
+                email: p.email,
+                phone1: p.phone1,
+                ...(p.phone2 && p.phone2 !== "-" ? { phone2: p.phone2 } : {}),
+                birthday: p.birthday && p.birthday !== "-" ? p.birthday : null,
+                dartCardDrawEligible: x.dartCardDrawEligible !== false,
+              },
+            },
+          );
+        } catch (error) {
+          alert(error.message || "Customer update failed.");
+          return;
+        }
+      }
+
       Object.assign(x, p);
-      dartAudit("EDIT", "customers", x.id, old, p);
+      dartAudit("EDIT", "customers", x.id, oldValues, p);
+
+      if (window.DartDomainState?.write) {
+        window.DartDomainState.write("dart_customers", customersData);
+        if (window.DartDomainState.syncDomain) {
+          try {
+            await window.DartDomainState.syncDomain("customers");
+          } catch (error) {
+            console.warn("Customer CRM state sync failed", error);
+          }
+        }
+        if (x.serverAuthoritative && window.DartDomainState.hydrateDomain) {
+          await window.DartDomainState.hydrateDomain("customers", true);
+        }
+      } else {
+        dartSaveAll();
+      }
     } else {
+      const duplicate = customersData.find(
+        (row) =>
+          String(row.email || "").toLowerCase() === p.email.toLowerCase() ||
+          [row.phone1, row.phone2].some(
+            (phone) =>
+              String(phone || "").replace(/\D/g, "") ===
+              String(p.phone1 || "").replace(/\D/g, ""),
+          ),
+      );
+      if (duplicate) {
+        alert("Email or phone is already registered.");
+        return;
+      }
       const x = {
         id: dartUid("CDB"),
         clientId: dartNextBusinessCode("DA", customersData, "clientId"),
         dartCard: "no",
+        serverAuthoritative: false,
         isArchived: false,
         isDeleted: false,
         isChecked: false,
@@ -4278,8 +4337,13 @@ function setupCustomerModal() {
       };
       customersData.push(x);
       dartAudit("CREATE", "customers", x.id, {}, x);
+      if (window.DartDomainState?.write) {
+        window.DartDomainState.write("dart_customers", customersData);
+      } else {
+        dartSaveAll();
+      }
     }
-    dartSaveAll();
+
     dartRefreshAll();
     closeModal(modal);
   });
