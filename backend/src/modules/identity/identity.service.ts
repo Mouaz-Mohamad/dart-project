@@ -1054,6 +1054,19 @@ export class IdentityService {
   ): Promise<void> {
     const user = await this.findLogin(accountType, identifier);
     const identifierHash = digest(`reset-identifier:${normalizeIdentifier(identifier)}`, this.config.authPepper);
+    if (user) {
+      const existing = await this.pool.query<{ id: string }>(
+        `SELECT id::text
+           FROM password_reset_requests
+          WHERE user_id=$1
+            AND account_type=$2
+            AND status='pending'
+          ORDER BY requested_at DESC
+          LIMIT 1`,
+        [user.id, accountType],
+      );
+      if (existing.rows[0]) return;
+    }
     const result = await this.pool.query<{ id: string }>(
       `INSERT INTO password_reset_requests (user_id, account_type, identifier_hash)
        VALUES ($1, $2, $3) RETURNING id`,
@@ -1081,6 +1094,103 @@ export class IdentityService {
         metadata,
       );
     }
+  }
+
+  public async listPasswordResetRequests(
+    account: AuthenticatedAccount,
+  ): Promise<Array<Record<string, unknown>>> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("staff.sessions_revoke") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage password reset requests");
+    }
+
+    const result = await this.pool.query<{
+      id: string;
+      user_id: string | null;
+      account_type: string;
+      status: string;
+      requested_at: Date;
+      email: string | null;
+      customer_name: string | null;
+      customer_code: string | null;
+      representative_name: string | null;
+      representative_code: string | null;
+      phone: string | null;
+    }>(
+      `SELECT pr.id::text, pr.user_id::text, pr.account_type, pr.status, pr.requested_at,
+              u.email,
+              c.full_name AS customer_name,
+              c.client_code AS customer_code,
+              r.full_name AS representative_name,
+              r.representative_code,
+              (
+                SELECT ap.phone_display
+                  FROM account_phones ap
+                 WHERE ap.user_id=pr.user_id
+                   AND ap.account_type=pr.account_type
+                 ORDER BY ap.is_primary DESC, ap.created_at
+                 LIMIT 1
+              ) AS phone
+         FROM password_reset_requests pr
+         LEFT JOIN users u ON u.id=pr.user_id
+         LEFT JOIN customers c
+           ON c.user_id=pr.user_id AND pr.account_type='customer'
+         LEFT JOIN representatives r
+           ON r.user_id=pr.user_id AND pr.account_type='representative'
+        WHERE pr.status='pending'
+        ORDER BY pr.requested_at DESC
+        LIMIT 500`,
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      accountType: row.account_type,
+      status: row.status,
+      name:
+        row.customer_name ||
+        row.representative_name ||
+        row.email ||
+        "Unknown account",
+      code: row.customer_code || row.representative_code || "",
+      email: row.email || "",
+      phone: row.phone || "",
+      requestedAt: row.requested_at.toISOString(),
+      matchedAccount: Boolean(row.user_id),
+    }));
+  }
+
+  public async cancelPasswordResetRequest(
+    account: AuthenticatedAccount,
+    requestId: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("staff.sessions_revoke") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage password reset requests");
+    }
+    const result = await this.pool.query(
+      `UPDATE password_reset_requests
+          SET status='cancelled'
+        WHERE id=$1 AND status='pending'`,
+      [requestId],
+    );
+    if (!result.rowCount) {
+      throw new AppError(404, "RESET_REQUEST_NOT_FOUND", "Pending reset request not found");
+    }
+    await this.writeAudit(
+      account,
+      "PASSWORD_RESET_CANCELLED",
+      "password_reset_requests",
+      requestId,
+      metadata,
+    );
   }
 
   public async setupMfa(account: AuthenticatedAccount): Promise<{ secret: string; otpauthUri: string }> {
