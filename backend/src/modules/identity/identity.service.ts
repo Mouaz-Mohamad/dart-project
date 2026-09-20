@@ -1162,6 +1162,89 @@ export class IdentityService {
     }
   }
 
+  public async adminCreatePasswordResetRequest(
+    account: AuthenticatedAccount,
+    targetUserId: string,
+    targetType: "customer" | "representative",
+    metadata: RequestMetadata,
+  ): Promise<{ requestId: string }> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("staff.sessions_revoke") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to create password reset requests");
+    }
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const user = await client.query<{
+        id: string;
+        email: string;
+      }>(
+        `SELECT id::text, email
+           FROM users
+          WHERE id=$1
+            AND account_type=$2
+            AND deleted_at IS NULL
+          FOR UPDATE`,
+        [targetUserId, targetType],
+      );
+      const row = user.rows[0];
+      if (!row) {
+        throw new AppError(404, "ACCOUNT_NOT_FOUND", "Account not found");
+      }
+
+      const existing = await client.query<{ id: string }>(
+        `SELECT id::text
+           FROM password_reset_requests
+          WHERE user_id=$1
+            AND account_type=$2
+            AND status='pending'
+          ORDER BY requested_at DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [targetUserId, targetType],
+      );
+      let requestId = existing.rows[0]?.id;
+      if (!requestId) {
+        const created = await client.query<{ id: string }>(
+          `INSERT INTO password_reset_requests (
+             user_id, account_type, identifier_hash
+           ) VALUES ($1,$2,$3)
+           RETURNING id::text`,
+          [
+            targetUserId,
+            targetType,
+            digest(
+              `reset-identifier:${normalizeIdentifier(row.email)}`,
+              this.config.authPepper,
+            ),
+          ],
+        );
+        requestId = created.rows[0]!.id;
+      }
+
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "PASSWORD_RESET_REQUEST_CREATED_BY_ADMIN",
+        "password_reset_requests",
+        requestId,
+        metadata,
+      );
+      await client.query("COMMIT");
+      return { requestId };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async listPasswordResetRequests(
     account: AuthenticatedAccount,
   ): Promise<Array<Record<string, unknown>>> {
