@@ -2474,6 +2474,15 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       const record = sectionsMap[sectionKey]?.data.find(
         (value) => String(value.id) === String(id),
       );
+      if (sectionKey === "orders" && record && window.DartOrdersApi?.stateAction) {
+        const action = dartIsArchived(record) ? "restore" : "archive";
+        try {
+          await window.DartOrdersApi.stateAction(record.orderId || record.id, action);
+        } catch (error) {
+          alert(error.message || "Order state update failed.");
+        }
+        return;
+      }
       if (
         record?.serverAuthoritative &&
         ["customers", "representative"].includes(sectionKey)
@@ -2497,6 +2506,19 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       const record = sectionsMap[sectionKey]?.data.find(
         (value) => String(value.id) === String(id),
       );
+      if (sectionKey === "orders" && record && window.DartOrdersApi?.stateAction) {
+        if (
+          !confirm(
+            "Soft-delete this order from operational views? Financial snapshots, item history and audit records will be preserved.",
+          )
+        ) return;
+        try {
+          await window.DartOrdersApi.stateAction(record.orderId || record.id, "delete");
+        } catch (error) {
+          alert(error.message || "Order deletion failed.");
+        }
+        return;
+      }
       if (
         record?.serverAuthoritative &&
         ["customers", "representative"].includes(sectionKey)
