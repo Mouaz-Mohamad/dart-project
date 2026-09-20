@@ -2350,6 +2350,245 @@ export class CommerceService {
     }
   }
 
+  public async updateAdminOrder(
+    actorId: string,
+    orderRef: string,
+    input: {
+      clientId?: string | undefined;
+      clientName: string;
+      phone1: string;
+      phone2?: string | undefined;
+      email?: string | undefined;
+      paymentMethod?: string | undefined;
+      paymentStatus?: string | undefined;
+      amountPaid?: number | undefined;
+      amountRefunded?: number | undefined;
+      orderSource?: string | undefined;
+      deliveryNotes?: string | undefined;
+      itemCodes: string[];
+      discountPercent?: number | undefined;
+      country?: string | undefined;
+      governorate?: string | undefined;
+      area?: string | undefined;
+      street?: string | undefined;
+      building?: string | undefined;
+      floor?: string | undefined;
+      latitude?: string | undefined;
+      longitude?: string | undefined;
+      fullAddress?: string | undefined;
+    },
+    requestId: string,
+  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const versionResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM domain_state_versions WHERE domain='orders' FOR UPDATE",
+      );
+      const currentVersion = Number(versionResult.rows[0]?.version || 1);
+
+      const existingResult = await client.query<{
+        id: string;
+        order_code: string;
+        status: string;
+        subtotal_minor: string;
+        order_discount_minor: string;
+        final_minor: string;
+      }>(
+        `SELECT id::text, order_code, status, subtotal_minor::text,
+                order_discount_minor::text, final_minor::text
+           FROM orders
+          WHERE (id::text=$1 OR order_code=$1)
+            AND NOT is_deleted
+          FOR UPDATE`,
+        [orderRef],
+      );
+      const existing = existingResult.rows[0];
+      if (!existing) {
+        throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+      }
+
+      const itemCodes = [...new Set(
+        input.itemCodes.map((code) => String(code || "").trim()).filter(Boolean),
+      )];
+      if (!itemCodes.length) {
+        throw new AppError(422, "ORDER_ITEMS_REQUIRED", "An order must contain at least one physical item");
+      }
+
+      const currentCodesResult = await client.query<{ item_code: string }>(
+        "SELECT item_code FROM order_items WHERE order_id=$1 ORDER BY created_at, id",
+        [existing.id],
+      );
+      const currentCodes = currentCodesResult.rows.map((row) => row.item_code);
+      const itemSetChanged =
+        currentCodes.length !== itemCodes.length ||
+        currentCodes.some((code) => !itemCodes.includes(code));
+      const financiallyLocked = ["Delivered", "Returned"].includes(existing.status);
+      const requestedDiscount = Math.min(
+        100,
+        Math.max(0, Number(input.discountPercent) || 0),
+      );
+      const existingDiscountPercent =
+        Number(existing.subtotal_minor) > 0
+          ? (Number(existing.order_discount_minor) / Number(existing.subtotal_minor)) * 100
+          : 0;
+
+      if (
+        financiallyLocked &&
+        (itemSetChanged || Math.abs(requestedDiscount - existingDiscountPercent) > 0.01)
+      ) {
+        throw new AppError(
+          409,
+          "ORDER_FINANCIAL_SNAPSHOT_LOCKED",
+          "Delivered or returned orders keep their original items and price snapshot",
+        );
+      }
+
+      const clientCode = String(input.clientId || "").trim();
+      const customerResult =
+        clientCode && clientCode !== "-"
+          ? await client.query<{ user_id: string }>(
+              "SELECT user_id::text FROM customers WHERE client_code=$1 LIMIT 1",
+              [clientCode],
+            )
+          : { rows: [] as { user_id: string }[] };
+      const customerUserId = customerResult.rows[0]?.user_id || null;
+
+      if (!financiallyLocked) {
+        await this.syncAdminOrderItems(
+          client,
+          existing.id,
+          existing.order_code,
+          { items: itemCodes },
+          existing.status,
+          existing.status,
+        );
+      }
+
+      const totals = await client.query<{ subtotal_minor: string }>(
+        `SELECT COALESCE(sum(final_unit_minor),0)::text AS subtotal_minor
+           FROM order_items
+          WHERE order_id=$1`,
+        [existing.id],
+      );
+      const subtotalMinor = financiallyLocked
+        ? Number(existing.subtotal_minor)
+        : Number(totals.rows[0]?.subtotal_minor || 0);
+      const discountMinor = financiallyLocked
+        ? Number(existing.order_discount_minor)
+        : Math.min(
+            subtotalMinor,
+            Math.round((subtotalMinor * requestedDiscount) / 100),
+          );
+      const finalMinor = financiallyLocked
+        ? Number(existing.final_minor)
+        : Math.max(0, subtotalMinor - discountMinor);
+      const amountPaidMinor = Math.min(
+        finalMinor,
+        Math.max(0, Math.round((Number(input.amountPaid) || 0) * 100)),
+      );
+      const amountRefundedMinor = Math.min(
+        amountPaidMinor,
+        Math.max(0, Math.round((Number(input.amountRefunded) || 0) * 100)),
+      );
+
+      const contact = {
+        name: String(input.clientName || "").trim(),
+        phone1: String(input.phone1 || "").trim(),
+        phone2: String(input.phone2 || "").trim(),
+        email: String(input.email || "").trim(),
+      };
+      const address = {
+        country: String(input.country || "Egypt"),
+        governorate: String(input.governorate || ""),
+        area: String(input.area || ""),
+        street: String(input.street || ""),
+        building: String(input.building || ""),
+        floor: String(input.floor || ""),
+        latitude: String(input.latitude || ""),
+        longitude: String(input.longitude || ""),
+        fullAddress: String(input.fullAddress || ""),
+        addressSource: "Manual Admin",
+      };
+
+      await client.query(
+        `UPDATE orders
+            SET customer_user_id=COALESCE($2, customer_user_id),
+                payment_method=$3,
+                payment_status=$4,
+                subtotal_minor=$5,
+                order_discount_minor=$6,
+                final_minor=$7,
+                amount_paid_minor=$8,
+                amount_refunded_minor=$9,
+                promotion=$10::jsonb,
+                contact_snapshot=$11::jsonb,
+                delivery_address=$12::jsonb,
+                delivery_notes=$13,
+                order_source=$14,
+                legacy=legacy || $15::jsonb,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [
+          existing.id,
+          customerUserId,
+          String(input.paymentMethod || "Cash on Delivery"),
+          String(input.paymentStatus || "Unpaid"),
+          subtotalMinor,
+          discountMinor,
+          finalMinor,
+          amountPaidMinor,
+          amountRefundedMinor,
+          requestedDiscount
+            ? JSON.stringify({
+                type: "Manual Order Discount",
+                percent: requestedDiscount,
+              })
+            : null,
+          JSON.stringify(contact),
+          JSON.stringify(address),
+          String(input.deliveryNotes || ""),
+          String(input.orderSource || "Manual"),
+          JSON.stringify({
+            clientId: clientCode || "-",
+            discount: requestedDiscount,
+            reasonDeduction: requestedDiscount ? "Order discount" : "-",
+          }),
+        ],
+      );
+
+      const nextVersion = currentVersion + 1;
+      await client.query(
+        "UPDATE domain_state_versions SET version=$2, updated_at=now() WHERE domain=$1",
+        ["orders", nextVersion],
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+         ) VALUES ('staff',$1,'MANUAL_ORDER_UPDATED','orders',$2,$3,$4::jsonb)`,
+        [
+          actorId,
+          existing.id,
+          requestId,
+          JSON.stringify({
+            orderCode: existing.order_code,
+            financiallyLocked,
+            itemSetChanged,
+            discountPercent: requestedDiscount,
+          }),
+        ],
+      );
+      await client.query("COMMIT");
+      return await this.adminOrders();
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async replaceAdminOrders(
     expectedVersion: number,
     orders: Record<string, unknown>[],
