@@ -43,6 +43,47 @@ interface LockedItem {
   discount_percent: string;
 }
 
+interface AdminOrderSnapshot {
+  itemId?: string;
+  itemCode?: string;
+  modelCode?: string;
+  name?: string;
+  color?: string;
+  size?: string;
+  qty?: number;
+  originalUnitPrice?: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  finalUnitPrice?: number;
+  costSnapshot?: number;
+}
+
+interface AdminOrderRow {
+  id: string;
+  order_code: string;
+  status: string;
+  created_at: Date | string;
+  delivered_at: Date | string | null;
+  client_code: string | null;
+  contact_snapshot: Record<string, unknown> | null;
+  delivery_address: Record<string, unknown> | null;
+  item_rows: AdminOrderSnapshot[] | null;
+  subtotal_minor: string | number;
+  order_discount_minor: string | number;
+  final_minor: string | number;
+  payment_method: string;
+  payment_status: string;
+  amount_paid_minor: string | number;
+  amount_refunded_minor: string | number;
+  promotion: Record<string, unknown> | null;
+  delivery_notes: string;
+  order_source: string;
+  is_archived: boolean;
+  is_deleted: boolean;
+  version: string | number;
+  legacy: Record<string, unknown> | null;
+}
+
 function normalized(value: string): string {
   return String(value || "").trim();
 }
@@ -438,7 +479,7 @@ export class CommerceService {
     const versionResult = await this.pool.query<{ version: string }>(
       "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
     );
-    const result = await this.pool.query<any>(
+    const result = await this.pool.query<AdminOrderRow>(
       `SELECT o.*, c.client_code,
           COALESCE((
             SELECT jsonb_agg(
@@ -467,7 +508,7 @@ export class CommerceService {
     );
     return {
       version: Number(versionResult.rows[0]?.version || 1),
-      orders: result.rows.map((row: any) => {
+      orders: result.rows.map((row) => {
         const legacy = row.legacy && typeof row.legacy === "object" ? row.legacy : {};
         const contact = row.contact_snapshot || {};
         const address = row.delivery_address || {};
@@ -487,7 +528,7 @@ export class CommerceService {
           phone1: contact.phone1 || legacy.phone1 || "",
           phone2: contact.phone2 || legacy.phone2 || "-",
           email: contact.email || legacy.email || "",
-          items: snapshots.length ? snapshots.map((line: any) => line.itemCode) : legacy.items || [],
+          items: snapshots.length ? snapshots.map((line) => line.itemCode) : legacy.items || [],
           totalProducts: snapshots.length ? snapshots.length : Number(legacy.totalProducts || 0),
           priceSnapshot: snapshots,
           totalPrice: Number(row.subtotal_minor || 0) / 100,
