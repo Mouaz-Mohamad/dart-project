@@ -7,7 +7,6 @@ import { IdentityService } from "./modules/identity/identity.service.js";
 import { CatalogService } from "./modules/catalog/catalog.service.js";
 import { CatalogAssetService } from "./modules/catalog/catalog.asset.service.js";
 import { CommerceService } from "./modules/commerce/commerce.service.js";
-import { AdminOrdersService } from "./modules/commerce/admin-orders.service.js";
 import { SiteSettingsService } from "./modules/settings/site-settings.service.js";
 import { DashboardStateService } from "./modules/dashboard/dashboard-state.service.js";
 import { CustomerInteractionService } from "./modules/commerce/customer-interaction.service.js";
@@ -22,7 +21,6 @@ export const identityService = new IdentityService(database, config);
 export const catalogService = new CatalogService(database);
 export const catalogAssetService = new CatalogAssetService(database);
 export const commerceService = new CommerceService(database);
-export const adminOrdersService = new AdminOrdersService(database);
 export const siteSettingsService = new SiteSettingsService(database);
 export const dashboardStateService = new DashboardStateService(database);
 export const customerInteractionService = new CustomerInteractionService(database);
@@ -40,7 +38,6 @@ const app = createApp(config, {
   catalogService,
   catalogAssetService,
   commerceService,
-  adminOrdersService,
   siteSettingsService,
   dashboardStateService,
   customerInteractionService,
