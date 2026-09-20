@@ -432,11 +432,27 @@
     return apiUserCache;
   }
 
+  async function hydrateCustomerCommerce() {
+    if (!API_BASE || !apiUserCache) return null;
+    const payload = await apiRequest("/api/v1/me/commerce");
+    localStorage.setItem(KEYS.orders, JSON.stringify(payload.orders || []));
+    localStorage.setItem(KEYS.returns, JSON.stringify(payload.returns || []));
+    localStorage.setItem(KEYS.cards, JSON.stringify(payload.cards || []));
+    [KEYS.orders, KEYS.returns, KEYS.cards].forEach((key) =>
+      window.dispatchEvent(
+        new CustomEvent("dart:data-changed", { detail: { key } }),
+      ),
+    );
+    return payload;
+  }
+
   async function hydrateApiSession() {
     if (!API_BASE) return null;
     try {
       const payload = await apiRequest("/api/v1/me");
-      return cacheApiUser(payload.user);
+      const user = cacheApiUser(payload.user);
+      if (user) await hydrateCustomerCommerce();
+      return user;
     } catch (error) {
       if (error.status === 401) return cacheApiUser(null);
       throw error;
@@ -640,7 +656,9 @@
         method: "POST",
         body: { identifier, password },
       });
-      return cacheApiUser(payload.user);
+      const user = cacheApiUser(payload.user);
+      await hydrateCustomerCommerce();
+      return user;
     }
     if (API_REQUIRED)
       throw new Error("تعذر تسجيل الدخول لأن خدمة الحسابات غير مهيأة.");
@@ -881,7 +899,10 @@
       if (typeof cartData !== "undefined") cartData = [];
       write("dart_cart", []);
       window.dartAppliedPromotion = null;
-      await window.DartCatalog?.checkForServerChanges?.();
+      await Promise.all([
+        window.DartCatalog?.checkForServerChanges?.(),
+        hydrateCustomerCommerce(),
+      ]);
       return response.order;
     }
 
@@ -2953,6 +2974,7 @@
     login,
     verifyEmail,
     hydrateApiSession,
+    hydrateCustomerCommerce,
     logout,
     currentUser,
     checkout,
