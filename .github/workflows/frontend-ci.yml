@@ -36,7 +36,8 @@ jobs:
           set -euo pipefail
           find Eye Js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           node --check sw.js
-      - name: Finance regression tests
+      - name: Frontend regression contracts
         run: |
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js
+          node tests/server-authority-contract.js
