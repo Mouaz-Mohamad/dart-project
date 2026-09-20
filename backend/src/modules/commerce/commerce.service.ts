@@ -97,6 +97,25 @@ function normalized(value: string): string {
   return String(value || "").trim();
 }
 
+function distanceKm(
+  latitude1: number,
+  longitude1: number,
+  latitude2: number,
+  longitude2: number,
+): number {
+  const radians = (value: number) => (value * Math.PI) / 180;
+  const firstLat = radians(latitude1);
+  const secondLat = radians(latitude2);
+  const latitudeDelta = radians(latitude2 - latitude1);
+  const longitudeDelta = radians(longitude2 - longitude1);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(firstLat) *
+      Math.cos(secondLat) *
+      Math.sin(longitudeDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
 function finalModelPriceMinor(sellingMinor: number, discountPercent: number): number {
   return Math.max(0, Math.round(sellingMinor * (1 - Math.min(100, Math.max(0, discountPercent)) / 100)));
 }
@@ -680,6 +699,307 @@ export class CommerceService {
     }
   }
 
+  public async representativeWork(
+    representativeUserId: string,
+  ): Promise<{ orders: Record<string, unknown>[]; returns: Record<string, unknown>[] }> {
+    const ordersResult = await this.pool.query<{
+      id: string;
+      order_code: string;
+      status: string;
+      payment_method: string;
+      payment_status: string;
+      final_minor: string;
+      contact_snapshot: Record<string, unknown>;
+      delivery_address: Record<string, unknown>;
+      delivery_notes: string;
+      created_at: Date;
+      delivery_started_at: Date | null;
+      item_rows: Array<Record<string, unknown>>;
+    }>(
+      `SELECT o.id::text, o.order_code, o.status, o.payment_method, o.payment_status,
+              o.final_minor::text, o.contact_snapshot, o.delivery_address,
+              o.delivery_notes, o.created_at, o.delivery_started_at,
+              COALESCE((
+                SELECT jsonb_agg(
+                  jsonb_build_object(
+                    'itemId', oi.inventory_item_id,
+                    'itemCode', oi.item_code,
+                    'modelCode', oi.model_id,
+                    'name', oi.model_name,
+                    'color', oi.color,
+                    'size', oi.size,
+                    'qty', 1,
+                    'finalUnitPrice', oi.final_unit_minor / 100.0
+                  )
+                  ORDER BY oi.created_at
+                )
+                FROM order_items oi
+                WHERE oi.order_id=o.id
+              ), '[]'::jsonb) AS item_rows
+         FROM orders o
+        WHERE o.representative_user_id=$1
+          AND NOT o.is_deleted
+          AND NOT o.is_archived
+          AND o.status NOT IN ('Delivered','Refused','Cancelled','Returned')
+        ORDER BY o.created_at`,
+      [representativeUserId],
+    );
+
+    const representative = await this.pool.query<{ representative_code: string }>(
+      "SELECT representative_code FROM representatives WHERE user_id=$1",
+      [representativeUserId],
+    );
+    const repCode = representative.rows[0]?.representative_code || "";
+    const returnsState = await this.pool.query<{ data: unknown[] }>(
+      "SELECT data FROM dashboard_domain_state WHERE domain='returns'",
+    );
+    const returns = (Array.isArray(returnsState.rows[0]?.data)
+      ? returnsState.rows[0]!.data
+      : []
+    ).filter((raw) => {
+      const row = raw as Record<string, unknown>;
+      return (
+        [representativeUserId, repCode].includes(String(row.representativeId || "")) &&
+        !row.isDeleted &&
+        !row.isArchived &&
+        ["Representative Assigned", "Pickup On The Way"].includes(String(row.status || ""))
+      );
+    }) as Record<string, unknown>[];
+
+    return {
+      orders: ordersResult.rows.map((row) => {
+        const contact = row.contact_snapshot || {};
+        const address = row.delivery_address || {};
+        return {
+          id: row.id,
+          orderId: row.order_code,
+          status: row.status,
+          paymentMethod: row.payment_method,
+          paymentStatus: row.payment_status,
+          finalAmount: Number(row.final_minor) / 100,
+          clientName: contact.name || "Customer",
+          phone1: contact.phone1 || "",
+          phone2: contact.phone2 || "",
+          email: contact.email || "",
+          country: address.country || "",
+          governorate: address.governorate || "",
+          area: address.area || "",
+          street: address.street || "",
+          building: address.building || "",
+          floor: address.floor || "",
+          latitude: address.latitude || "",
+          longitude: address.longitude || "",
+          fullAddress: address.fullAddress || "",
+          deliveryNotes: row.delivery_notes,
+          createdAt: row.created_at.toISOString(),
+          deliveryStartedAt: row.delivery_started_at?.toISOString() || null,
+          priceSnapshot: row.item_rows || [],
+          items: (row.item_rows || []).map((item) => item.itemCode),
+        };
+      }),
+      returns,
+    };
+  }
+
+  public async updateRepresentativeLocation(
+    representativeUserId: string,
+    latitude: number,
+    longitude: number,
+    accuracyMeters: number | null,
+  ): Promise<{ updatedAt: string }> {
+    const active = await this.pool.query(
+      `SELECT 1
+         FROM orders
+        WHERE representative_user_id=$1
+          AND status='Representative On The Way'
+          AND NOT is_deleted
+        LIMIT 1`,
+      [representativeUserId],
+    );
+    const activeReturns = await this.pool.query<{ data: unknown[] }>(
+      "SELECT data FROM dashboard_domain_state WHERE domain='returns'",
+    );
+    const repCodeResult = await this.pool.query<{ representative_code: string }>(
+      "SELECT representative_code FROM representatives WHERE user_id=$1 AND approval_status='approved'",
+      [representativeUserId],
+    );
+    const repCode = repCodeResult.rows[0]?.representative_code || "";
+    const hasActiveReturn = (Array.isArray(activeReturns.rows[0]?.data)
+      ? activeReturns.rows[0]!.data
+      : []
+    ).some((raw) => {
+      const row = raw as Record<string, unknown>;
+      return (
+        [representativeUserId, repCode].includes(String(row.representativeId || "")) &&
+        String(row.status || "") === "Pickup On The Way"
+      );
+    });
+    if (!active.rowCount && !hasActiveReturn) {
+      throw new AppError(409, "NO_ACTIVE_TRIP", "Start an assigned delivery or pickup before sharing location");
+    }
+
+    const result = await this.pool.query<{ updated_at: Date }>(
+      `INSERT INTO representative_locations (
+         representative_user_id, latitude, longitude, accuracy_meters, updated_at
+       ) VALUES ($1,$2,$3,$4,now())
+       ON CONFLICT (representative_user_id) DO UPDATE SET
+         latitude=EXCLUDED.latitude,
+         longitude=EXCLUDED.longitude,
+         accuracy_meters=EXCLUDED.accuracy_meters,
+         updated_at=now()
+       RETURNING updated_at`,
+      [representativeUserId, latitude, longitude, accuracyMeters],
+    );
+    return { updatedAt: result.rows[0]!.updated_at.toISOString() };
+  }
+
+  public async representativeOrderAction(
+    representativeUserId: string,
+    orderCode: string,
+    action: "start" | "cancel" | "delivered",
+  ): Promise<Record<string, unknown>> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const orderResult = await client.query<{
+        id: string;
+        status: string;
+        promotion: Record<string, unknown> | null;
+        delivery_address: Record<string, unknown>;
+        payment_method: string;
+        final_minor: string;
+      }>(
+        `SELECT id::text, status, promotion, delivery_address,
+                payment_method, final_minor::text
+           FROM orders
+          WHERE order_code=$1
+            AND representative_user_id=$2
+            AND NOT is_deleted
+          FOR UPDATE`,
+        [orderCode, representativeUserId],
+      );
+      const order = orderResult.rows[0];
+      if (!order) {
+        throw new AppError(404, "ASSIGNED_ORDER_NOT_FOUND", "This order is not assigned to your account");
+      }
+
+      let nextStatus: string;
+      if (action === "start") {
+        if (!["Out With Representative", "Representative On The Way"].includes(order.status)) {
+          throw new AppError(409, "ORDER_STATE_INVALID", "This delivery cannot be started from its current status");
+        }
+        nextStatus = "Representative On The Way";
+      } else if (action === "cancel") {
+        if (order.status !== "Representative On The Way") {
+          throw new AppError(409, "ORDER_STATE_INVALID", "This delivery is not currently active");
+        }
+        nextStatus = "Out With Representative";
+      } else {
+        if (order.status !== "Representative On The Way") {
+          throw new AppError(409, "ORDER_STATE_INVALID", "Start delivery before confirming it");
+        }
+        const locationResult = await client.query<{
+          latitude: number;
+          longitude: number;
+          updated_at: Date;
+        }>(
+          `SELECT latitude, longitude, updated_at
+             FROM representative_locations
+            WHERE representative_user_id=$1
+            FOR UPDATE`,
+          [representativeUserId],
+        );
+        const location = locationResult.rows[0];
+        if (!location || Date.now() - location.updated_at.getTime() > 2 * 60_000) {
+          throw new AppError(409, "LOCATION_STALE", "Refresh your location before confirming delivery");
+        }
+        const destinationLat = Number(order.delivery_address?.latitude);
+        const destinationLng = Number(order.delivery_address?.longitude);
+        if (
+          !Number.isFinite(destinationLat) ||
+          !Number.isFinite(destinationLng) ||
+          !destinationLat ||
+          !destinationLng
+        ) {
+          throw new AppError(409, "DELIVERY_COORDINATES_MISSING", "Customer delivery coordinates are missing");
+        }
+        const distance = distanceKm(
+          location.latitude,
+          location.longitude,
+          destinationLat,
+          destinationLng,
+        );
+        if (distance > 1) {
+          throw new AppError(
+            409,
+            "DELIVERY_TOO_FAR",
+            `You must be within 1 km of the delivery address; current distance is ${distance.toFixed(2)} km`,
+          );
+        }
+        nextStatus = "Delivered";
+      }
+
+      await client.query(
+        `UPDATE orders SET
+           status=$2,
+           delivery_started_at=CASE
+             WHEN $2='Representative On The Way'
+               THEN COALESCE(delivery_started_at, now())
+             ELSE NULL
+           END,
+           delivered_at=CASE WHEN $2='Delivered' THEN now() ELSE NULL END,
+           payment_status=CASE
+             WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Paid'
+             ELSE payment_status
+           END,
+           amount_paid_minor=CASE
+             WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN final_minor
+             WHEN $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 0
+             ELSE amount_paid_minor
+           END,
+           version=version+1,
+           updated_at=now()
+         WHERE id=$1`,
+        [order.id, nextStatus],
+      );
+      await this.applyOrderStatusTransition(
+        client,
+        order.id,
+        orderCode,
+        order.status,
+        nextStatus,
+        order.promotion,
+        representativeUserId,
+        "representative",
+      );
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, metadata
+         ) VALUES ('representative',$1,$2,'orders',$3,$4::jsonb)`,
+        [
+          representativeUserId,
+          `REPRESENTATIVE_ORDER_${action.toUpperCase()}`,
+          orderCode,
+          JSON.stringify({ from: order.status, to: nextStatus }),
+        ],
+      );
+      await client.query("COMMIT");
+      return {
+        orderId: orderCode,
+        status: nextStatus,
+        finalAmount: Number(order.final_minor) / 100,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async adminOrders(): Promise<{ version: number; orders: Record<string, unknown>[] }> {
     const versionResult = await this.pool.query<{ version: string }>(
       "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
@@ -1027,6 +1347,7 @@ export class CommerceService {
     nextStatus: string,
     promotion: Record<string, unknown> | null,
     actorId: string,
+    actorType: "staff" | "representative" = "staff",
   ): Promise<void> {
     if (previousStatus === nextStatus) return;
 
@@ -1192,11 +1513,12 @@ export class CommerceService {
     await client.query(
       `INSERT INTO order_events (
          order_id, event_type, from_status, to_status, actor_type, actor_id, metadata
-       ) VALUES ($1,'STATUS_CHANGED',$2,$3,'staff',$4,$5::jsonb)`,
+       ) VALUES ($1,'STATUS_CHANGED',$2,$3,$4,$5,$6::jsonb)`,
       [
         orderId,
         previousStatus,
         nextStatus,
+        actorType,
         actorId,
         JSON.stringify({ orderCode }),
       ],
