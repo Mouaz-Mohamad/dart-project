@@ -92,6 +92,10 @@
   }
 
   function writeJSON(key, value) {
+    if (root.DartDomainState?.domainForStorageKey?.(key)) {
+      root.DartDomainState.write(key, value);
+      return;
+    }
     const storage = getStorage();
     if (!storage) return;
     storage.setItem(key, JSON.stringify(value));
