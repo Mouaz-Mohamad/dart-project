@@ -59,7 +59,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const send = document.getElementById('sendBdayBtn');
-    if (send) send.addEventListener('click', () => {
+    if (send) send.addEventListener('click', async () => {
       const selected = [...document.querySelectorAll('#birthday-feed .bday-checkbox:checked')]
         .map(box => box.closest('[data-client-id]')).filter(Boolean);
       if (!selected.length) { alert('اختر عميلًا واحدًا على الأقل.'); return; }
@@ -93,8 +93,17 @@
           status: 'Queued for Backend'
         });
       });
-      localStorage.setItem('dart_message_queue', JSON.stringify(queue));
-      localStorage.setItem('dart_birthday_messages', JSON.stringify(history));
+      if (window.DartDomainState?.write) {
+        window.DartDomainState.write('dart_message_queue', queue);
+        window.DartDomainState.write('dart_birthday_messages', history);
+        await Promise.all([
+          window.DartDomainState.syncDomain?.('message_queue'),
+          window.DartDomainState.syncDomain?.('birthday_messages'),
+        ]);
+      } else {
+        localStorage.setItem('dart_message_queue', JSON.stringify(queue));
+        localStorage.setItem('dart_birthday_messages', JSON.stringify(history));
+      }
       renderBirthdayWidget();
       alert('تم تسجيل رسائل خصم عيد الميلاد 30% وإخفاء العملاء من البوكس. سيقوم الـBackend بالإرسال الفعلي.');
     });
