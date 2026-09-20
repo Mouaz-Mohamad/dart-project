@@ -42,6 +42,29 @@ export function createCatalogRouter(
     response.status(200).json(await catalog.publicCatalog());
   });
 
+  router.post(
+    "/admin/damage/:damageRef/action",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("damage.manage"),
+    async (request, response) => {
+      const damageRef = z.string().trim().min(1).max(160).parse(request.params.damageRef);
+      const body = z.object({
+        status: z.enum(["Repaired", "Destroyed"]),
+      }).parse(request.body);
+      response.status(200).json(
+        await catalog.damageAction(
+          damageRef,
+          body.status,
+          request.auth!.userId,
+          String(request.id),
+        ),
+      );
+    },
+  );
+
   router.get(
     "/admin/catalog-state",
     signedIn,
