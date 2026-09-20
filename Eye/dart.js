@@ -1741,7 +1741,38 @@ function dartReturnReplacementCandidates(record) {
   );
 }
 
-function dartApproveReturn(record, replacementItemCode = "") {
+async function dartRefreshReturnServerState() {
+  if (window.DartDomainState?.hydrateDomain) {
+    await window.DartDomainState.hydrateDomain("returns", true);
+    await window.DartDomainState.hydrateDomain("damage", true);
+  }
+  if (window.DartCatalog?.hydrate) {
+    await window.DartCatalog.hydrate(true);
+  }
+}
+
+async function dartAdminReturnAction(record, body) {
+  if (!window.DartAdminApi?.request) return null;
+  const payload = await window.DartAdminApi.request(
+    `/api/v1/admin/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
+    { method: "POST", body },
+  );
+  await dartRefreshReturnServerState();
+  return payload.return || null;
+}
+
+async function dartApproveReturn(record, replacementItemCode = "") {
+  if (window.DartAdminApi?.request) {
+    try {
+      await dartAdminReturnAction(record, {
+        action: "approve",
+        ...(replacementItemCode ? { replacementItemCode } : {}),
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message || "Return approval failed." };
+    }
+  }
   if (!record || record.status !== "Pending Request") return { ok: false, message: "Request is no longer pending." };
   let replacement = null;
   if (dartReturnIsExchange(record)) {
@@ -1781,7 +1812,18 @@ function dartApproveReturn(record, replacementItemCode = "") {
   return { ok: true };
 }
 
-function dartRejectReturn(record, reason) {
+async function dartRejectReturn(record, reason) {
+  if (window.DartAdminApi?.request) {
+    try {
+      await dartAdminReturnAction(record, {
+        action: "reject",
+        reason: String(reason || "").trim(),
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message || "Return rejection failed." };
+    }
+  }
   if (!record || record.status !== "Pending Request") return { ok: false, message: "Request is no longer pending." };
   if (!String(reason || "").trim()) return { ok: false, message: "A rejection reason is required." };
   record.rejectionSnapshot = dartReturnRules()?.captureWorkflowSnapshot?.(
@@ -1801,7 +1843,18 @@ function dartRejectReturn(record, reason) {
   return { ok: true };
 }
 
-function dartAssignReturnRepresentative(record, representativeId, pickupGroupId = "") {
+async function dartAssignReturnRepresentative(record, representativeId, pickupGroupId = "") {
+  if (window.DartAdminApi?.request) {
+    try {
+      await dartAdminReturnAction(record, {
+        action: "assign",
+        representativeId: String(representativeId || ""),
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message || "Representative assignment failed." };
+    }
+  }
   if (!record || record.status !== "Approved - Awaiting Representative") return { ok: false, message: "Approve the request before assigning a representative." };
   const representative = dartFindRepById(representativeId);
   if (!representative || !dartIsActive(representative) || representative.status !== "Active") return { ok: false, message: "Choose an active representative." };
@@ -1826,7 +1879,18 @@ function dartAssignReturnRepresentative(record, representativeId, pickupGroupId 
   return { ok: true };
 }
 
-function dartInspectReturn(record, condition) {
+async function dartInspectReturn(record, condition) {
+  if (window.DartAdminApi?.request) {
+    try {
+      await dartAdminReturnAction(record, {
+        action: "inspect",
+        condition,
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message || "Return inspection failed." };
+    }
+  }
   if (!record) return;
   const isLegacyRefusal = !record.isPostDeliveryReturn && record.status === "Pending Inspection";
   const canInspectCompleted = record.isPostDeliveryReturn &&
