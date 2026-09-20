@@ -2068,7 +2068,28 @@ function renderDamage(dataArray) {
     ),
   );
 }
-function dartSetDamageStatus(d, status) {
+async function dartSetDamageStatus(d, status) {
+  if (!d) return { ok: false, message: "Damage record not found." };
+
+  if (window.DartAdminApi?.request) {
+    try {
+      await window.DartAdminApi.request(
+        `/api/v1/admin/damage/${encodeURIComponent(d.damageId || d.id)}/action`,
+        { method: "POST", body: { status } },
+      );
+      if (window.DartDomainState?.hydrateDomain) {
+        await window.DartDomainState.hydrateDomain("damage", true);
+      }
+      if (window.DartCatalog?.hydrate) {
+        await window.DartCatalog.hydrate(true);
+      }
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message || "Damage action failed." };
+    }
+  }
+
+
   const it = dartFindItemByCode(d.itemCode),
     old = d.status;
   d.status = status;
@@ -2364,13 +2385,17 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     }
     if (sectionKey === "damage") {
       const d = damageData.find((x) => String(x.id) === String(id));
-      if (e.target.closest(".dart-repair-btn"))
-        dartSetDamageStatus(d, "Repaired");
+      if (e.target.closest(".dart-repair-btn")) {
+        const result = await dartSetDamageStatus(d, "Repaired");
+        if (result?.ok === false) alert(result.message || "Repair failed");
+      }
       if (
         e.target.closest(".dart-destroy-btn") &&
         confirm("Mark this physical item as permanently Destroyed?")
-      )
-        dartSetDamageStatus(d, "Destroyed");
+      ) {
+        const result = await dartSetDamageStatus(d, "Destroyed");
+        if (result?.ok === false) alert(result.message || "Destroy failed");
+      }
     }
     if (sectionKey === "customers") {
       const x = customersData.find((v) => String(v.id) === String(id));
