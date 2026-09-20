@@ -82,6 +82,15 @@ interface AdminOrderRow {
   is_deleted: boolean;
   version: string | number;
   legacy: Record<string, unknown> | null;
+  representative_user_id: string | null;
+  representative_code: string | null;
+  representative_name: string | null;
+  representative_phone: string | null;
+  delivery_started_at: Date | string | null;
+  courier_latitude: number | null;
+  courier_longitude: number | null;
+  courier_accuracy_meters: number | null;
+  courier_location_updated_at: Date | string | null;
 }
 
 function normalized(value: string): string {
@@ -677,6 +686,21 @@ export class CommerceService {
     );
     const result = await this.pool.query<AdminOrderRow>(
       `SELECT o.*, c.client_code,
+          r.user_id::text AS representative_user_id,
+          r.representative_code,
+          r.full_name AS representative_name,
+          (
+            SELECT p.phone_display
+              FROM account_phones p
+             WHERE p.user_id=r.user_id
+               AND p.account_type='representative'
+             ORDER BY p.is_primary DESC, p.created_at
+             LIMIT 1
+          ) AS representative_phone,
+          rl.latitude AS courier_latitude,
+          rl.longitude AS courier_longitude,
+          rl.accuracy_meters AS courier_accuracy_meters,
+          rl.updated_at AS courier_location_updated_at,
           COALESCE((
             SELECT jsonb_agg(
               jsonb_build_object(
@@ -700,6 +724,8 @@ export class CommerceService {
           ), '[]'::jsonb) AS item_rows
         FROM orders o
         LEFT JOIN customers c ON c.user_id=o.customer_user_id
+        LEFT JOIN representatives r ON r.user_id=o.representative_user_id
+        LEFT JOIN representative_locations rl ON rl.representative_user_id=r.user_id
         ORDER BY o.created_at DESC`,
     );
     return {
@@ -754,6 +780,22 @@ export class CommerceService {
           addressSource: address.addressSource || legacy.addressSource || "",
           deliveryNotes: row.delivery_notes || legacy.deliveryNotes || "",
           orderSource: row.order_source || legacy.orderSource || "Website",
+          representativeId: row.representative_user_id || "",
+          representativeBusinessId: row.representative_code || "",
+          representativeName: row.representative_name || "",
+          representativePhone: row.representative_phone || "",
+          deliveryStartedAt: row.delivery_started_at || legacy.deliveryStartedAt || null,
+          courierLocation:
+            row.status === "Representative On The Way" &&
+            row.courier_latitude !== null &&
+            row.courier_longitude !== null
+              ? {
+                  lat: row.courier_latitude,
+                  lng: row.courier_longitude,
+                  accuracy: row.courier_accuracy_meters,
+                  updatedAt: row.courier_location_updated_at,
+                }
+              : null,
           isArchived: row.is_archived,
           isDeleted: row.is_deleted,
           version: Number(row.version || 1),
