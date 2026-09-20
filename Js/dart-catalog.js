@@ -250,8 +250,10 @@
     encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="280"><rect width="100%" height="100%" fill="#f4f2f1"/><text x="120" y="140" text-anchor="middle" fill="#666" font-size="16">Dart — No image</text></svg>',
     );
-  const models = () => read("dart_models");
-  const items = () => read("dart_items");
+  const models = () =>
+    !IS_ADMIN && !serverVersion ? [] : read("dart_models");
+  const items = () =>
+    IS_ADMIN ? read("dart_items") : [];
   const model = (code) => models().find((m) => m.modelId === code);
   const colors = (m) => (Array.isArray(m?.colorOptions) ? m.colorOptions : []);
   const sizes = (m) => (Array.isArray(m?.sizeOptions) ? m.sizeOptions : []);
