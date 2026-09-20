@@ -4,6 +4,13 @@
 
 // التخزين المحلي
 function saveDataToStorage(key, data) {
+  if (
+    window.DartCatalog &&
+    ["dart_models", "dart_items"].includes(key)
+  ) {
+    window.DartCatalog.write(key, data);
+    return;
+  }
   localStorage.setItem(key, JSON.stringify(data));
 }
 
@@ -528,6 +535,24 @@ document.addEventListener("DOMContentLoaded", () => {
   setupReturnModal();
   setupReviewModal();
   setupCardModal();
+});
+
+
+window.addEventListener("dart:catalog-hydrated", () => {
+  if (!window.DartCatalog) return;
+  modelsData = window.DartCatalog.models();
+  itemsData = window.DartCatalog.items();
+  if (typeof renderModels === "function") renderModels(modelsData);
+  if (typeof renderItems === "function") renderItems(itemsData);
+  if (typeof dartRefreshAll === "function") dartRefreshAll();
+});
+
+window.addEventListener("dart:catalog-synced", () => {
+  if (!window.DartCatalog) return;
+  modelsData = window.DartCatalog.models();
+  itemsData = window.DartCatalog.items();
+  if (typeof renderModels === "function") renderModels(modelsData);
+  if (typeof renderItems === "function") renderItems(itemsData);
 });
 
 // ===========================================
