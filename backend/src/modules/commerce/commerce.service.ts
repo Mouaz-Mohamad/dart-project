@@ -855,6 +855,23 @@ export class CommerceService {
             )
           : { rows: [] as { user_id: string }[] };
         const customerUserId = customerResult.rows[0]?.user_id || null;
+        const representativeRef = String(
+          raw.representativeId || raw.representativeBusinessId || "",
+        ).trim();
+        const representativeResult = representativeRef
+          ? await client.query<{ user_id: string }>(
+              `SELECT user_id::text
+                 FROM representatives
+                WHERE user_id::text=$1 OR representative_code=$1
+                LIMIT 1`,
+              [representativeRef],
+            )
+          : { rows: [] as { user_id: string }[] };
+        const representativeUserId = representativeResult.rows[0]?.user_id || null;
+        const deliveryStartedAt =
+          status === "Representative On The Way"
+            ? String(raw.deliveryStartedAt || raw.representativeOnWayAt || new Date().toISOString())
+            : null;
         const subtotalMinor = Math.max(0, Math.round((Number(raw.totalPrice) || 0) * 100));
         const discountMinor = Math.max(
           0,
@@ -907,11 +924,12 @@ export class CommerceService {
              order_code, customer_user_id, status, payment_method, payment_status,
              subtotal_minor, order_discount_minor, final_minor,
              amount_paid_minor, amount_refunded_minor, promotion, contact_snapshot,
-             delivery_address, delivery_notes, order_source, is_archived, is_deleted,
-             legacy, created_at, updated_at, delivered_at
+             delivery_address, delivery_notes, order_source, representative_user_id,
+             delivery_started_at, is_archived, is_deleted, legacy,
+             created_at, updated_at, delivered_at
            ) VALUES (
-             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17,
-             $18::jsonb,COALESCE($19::timestamptz,now()),now(),$20::timestamptz
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,
+             $17::timestamptz,$18,$19,$20::jsonb,COALESCE($21::timestamptz,now()),now(),$22::timestamptz
            )
            ON CONFLICT (order_code) DO UPDATE SET
              customer_user_id=COALESCE(EXCLUDED.customer_user_id, orders.customer_user_id),
@@ -928,6 +946,8 @@ export class CommerceService {
              delivery_address=EXCLUDED.delivery_address,
              delivery_notes=EXCLUDED.delivery_notes,
              order_source=EXCLUDED.order_source,
+             representative_user_id=EXCLUDED.representative_user_id,
+             delivery_started_at=EXCLUDED.delivery_started_at,
              is_archived=EXCLUDED.is_archived,
              is_deleted=EXCLUDED.is_deleted,
              legacy=EXCLUDED.legacy,
@@ -951,6 +971,8 @@ export class CommerceService {
             JSON.stringify(address),
             String(raw.deliveryNotes || ""),
             String(raw.orderSource || "Manual"),
+            representativeUserId,
+            deliveryStartedAt,
             Boolean(raw.isArchived),
             Boolean(raw.isDeleted),
             JSON.stringify(raw),
