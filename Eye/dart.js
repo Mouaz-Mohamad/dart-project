@@ -4181,6 +4181,14 @@ function setupCustomerModal() {
     closeModal(modal);
   });
 }
+async function dartHashSensitiveValue(value) {
+  const bytes = new TextEncoder().encode(String(value || ""));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function setupRepresentativeModal() {
   const modal = document.getElementById("representative-modal"),
     form = document.getElementById("rep-form");
@@ -4195,16 +4203,32 @@ function setupRepresentativeModal() {
       field.value = dartNextBusinessCode("Rep", representativeData, "repId");
     openModal(modal);
   });
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const id = document.getElementById("modal-rep-id").value,
-      p = {
+    const id = document.getElementById("modal-rep-id").value;
+    const existing = id
+      ? representativeData.find((r) => String(r.id) === String(id))
+      : null;
+    const rawNationalId = document
+      .getElementById("modal-representative-national-id")
+      .value.trim();
+    if (rawNationalId && !/^\d{14}$/.test(rawNationalId)) {
+      alert("الرقم القومي يجب أن يكون 14 رقمًا.");
+      return;
+    }
+    const nationalIdHash = rawNationalId
+      ? await dartHashSensitiveValue(rawNationalId)
+      : existing?.nationalIdHash || "";
+    const nationalIdLast4 = rawNationalId
+      ? rawNationalId.slice(-4)
+      : existing?.nationalIdLast4 || "";
+    const p = {
         name: document.getElementById("modal-representative-name").value,
         repId: id
           ? document.getElementById("modal-representative-id").value || ""
           : dartNextBusinessCode("Rep", representativeData, "repId"),
-        nationalId: document.getElementById("modal-representative-national-id")
-          .value,
+        nationalIdHash,
+        nationalIdLast4,
         address: document.getElementById("modal-representative-address").value,
         phone1: document.getElementById("modal-rep-phone1").value,
         phone2: document.getElementById("modal-rep-phone2").value || "-",
@@ -4386,8 +4410,11 @@ function openEditModal(id, sectionKey) {
     document.getElementById("modal-rep-id").value = x.id;
     document.getElementById("modal-representative-name").value = x.name || "";
     document.getElementById("modal-representative-id").value = x.repId || "";
-    document.getElementById("modal-representative-national-id").value =
-      x.nationalId || "";
+    const nationalIdInput = document.getElementById("modal-representative-national-id");
+    nationalIdInput.value = "";
+    nationalIdInput.placeholder = x.nationalIdLast4
+      ? `••••••••••${x.nationalIdLast4}`
+      : "14-digit national ID";
     document.getElementById("modal-representative-address").value =
       x.address || "";
     document.getElementById("modal-rep-phone1").value = x.phone1 || "";
