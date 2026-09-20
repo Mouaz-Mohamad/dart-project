@@ -121,11 +121,13 @@ const coreBusinessKeys = [
 for (const path of [...walkJsFiles("Eye"), ...walkJsFiles("Js")]) {
   const source = read(path);
   for (const key of coreBusinessKeys) {
-    assert.doesNotMatch(
-      source,
-      new RegExp(
-        `localStorage\\.setItem\\(\\s*["'\\`]\${key}["'\\`]`,
-      ),
+    const forbiddenForms = [
+      `localStorage.setItem("${key}"`,
+      `localStorage.setItem('${key}'`,
+      "localStorage.setItem(`" + key + "`",
+    ];
+    assert.ok(
+      forbiddenForms.every((form) => !source.includes(form)),
       `${path} must not write ${key} directly to localStorage`,
     );
   }
