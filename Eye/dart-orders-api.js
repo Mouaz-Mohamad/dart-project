@@ -162,6 +162,7 @@
     if (
       !force &&
       !migrationDone &&
+      serverVersion === 1 &&
       (payload.orders || []).length === 0 &&
       localOrders.length > 0
     ) {
