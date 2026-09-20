@@ -3,8 +3,9 @@ CREATE SEQUENCE dart_return_request_seq START WITH 1;
 CREATE TABLE dashboard_domain_state (
   domain TEXT PRIMARY KEY CHECK (domain IN (
     'customers','returns','reviews','cards','representatives','damage',
-    'notifications','contacts','finance_expenses','finance_budgets',
-    'finance_invoices','finance_goals','finance_marketing','finance_settlements'
+    'notifications','contacts','birthday_rewards','birthday_messages','message_queue','promotions',
+    'finance_expenses','finance_budgets','finance_invoices','finance_goals',
+    'finance_marketing','finance_settlements','finance_audit','draw_audit'
   )),
   data JSONB NOT NULL DEFAULT '[]'::jsonb,
   version BIGINT NOT NULL DEFAULT 1 CHECK (version > 0),
@@ -17,8 +18,9 @@ CREATE TABLE dashboard_domain_state (
 INSERT INTO dashboard_domain_state (domain)
 VALUES
   ('customers'),('returns'),('reviews'),('cards'),('representatives'),('damage'),
-  ('notifications'),('contacts'),('finance_expenses'),('finance_budgets'),
-  ('finance_invoices'),('finance_goals'),('finance_marketing'),('finance_settlements')
+  ('notifications'),('contacts'),('birthday_rewards'),('birthday_messages'),('message_queue'),('promotions'),
+  ('finance_expenses'),('finance_budgets'),('finance_invoices'),('finance_goals'),
+  ('finance_marketing'),('finance_settlements'),('finance_audit'),('draw_audit')
 ON CONFLICT (domain) DO NOTHING;
 
 INSERT INTO permissions (key, description) VALUES
