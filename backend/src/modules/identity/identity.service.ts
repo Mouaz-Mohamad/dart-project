@@ -368,6 +368,14 @@ export class IdentityService {
     if (!/^\d{14}$/.test(input.nationalId)) {
       throw new AppError(422, "INVALID_NATIONAL_ID", "National ID must contain 14 digits");
     }
+    if (input.address.trim().length < 8) {
+      throw new AppError(422, "INVALID_ADDRESS", "Enter the full address written on the ID");
+    }
+    const documents = [
+      ["id_front", parsePrivateRepresentativeImage(input.idFrontImage)],
+      ["id_back", parsePrivateRepresentativeImage(input.idBackImage)],
+      ["face", parsePrivateRepresentativeImage(input.faceImage)],
+    ] as const;
     const email = input.email.trim();
     const phones = [input.phone1, input.phone2].filter((value): value is string => Boolean(value?.trim()));
     const normalizedPhones = normalizePhonesOrThrow(phones);
@@ -386,16 +394,33 @@ export class IdentityService {
       await this.insertPhones(client, userId, "representative", phones, normalizedPhones);
       const representative = await client.query<{ representative_code: string }>(
         `INSERT INTO representatives (
-          user_id, full_name, national_id_hash, national_id_last4
-        ) VALUES ($1, $2, $3, $4)
+          user_id, full_name, national_id_hash, national_id_last4, address_text
+        ) VALUES ($1, $2, $3, $4, $5)
         RETURNING representative_code`,
         [
           userId,
           input.name.trim(),
           digest(`national-id:${input.nationalId}`, this.config.authPepper),
           input.nationalId.slice(-4),
+          input.address.trim(),
         ],
       );
+      for (const [documentType, document] of documents) {
+        await client.query(
+          `INSERT INTO representative_documents (
+             representative_user_id, document_type, content_type,
+             encrypted_payload, byte_size, content_sha256
+           ) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [
+            userId,
+            documentType,
+            document.contentType,
+            encryptSecret(document.canonicalDataUrl, this.config.mfaEncryptionKey),
+            document.bytes.length,
+            document.sha256,
+          ],
+        );
+      }
       await this.assignRole(client, userId, "Representative");
       await this.audit(
         client,
@@ -405,6 +430,20 @@ export class IdentityService {
         "representatives",
         userId,
         metadata,
+      );
+      await client.query(
+        `INSERT INTO outbox_events (
+           aggregate_type, aggregate_id, event_type, payload, deduplication_key
+         ) VALUES ('representative',$1,'REPRESENTATIVE_APPROVAL_REQUESTED',$2::jsonb,$3)
+         ON CONFLICT (deduplication_key) DO NOTHING`,
+        [
+          userId,
+          JSON.stringify({
+            representativeCode: representative.rows[0]!.representative_code,
+            name: input.name.trim(),
+          }),
+          `representative-approval:${userId}`,
+        ],
       );
       await client.query("COMMIT");
       return {
