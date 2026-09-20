@@ -4,6 +4,7 @@
   const API_BASE = String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
   const STORAGE_KEY = "dart_orders";
   const CSRF_STORAGE_KEY = "dart_csrf_token";
+  const LEGACY_MIGRATION_KEY = "dart_orders_server_migration_v1";
   let serverVersion = 0;
   let dirty = false;
   let syncTimer = 0;
@@ -157,12 +158,21 @@
     let payload = await api("/api/v1/admin/orders-state");
     serverVersion = Number(payload.version || 1);
 
-    if (!force && (payload.orders || []).length === 0 && localOrders.length > 0) {
+    const migrationDone = localStorage.getItem(LEGACY_MIGRATION_KEY) === "1";
+    if (
+      !force &&
+      !migrationDone &&
+      (payload.orders || []).length === 0 &&
+      localOrders.length > 0
+    ) {
       payload = await api("/api/v1/admin/orders-state", {
         method: "PUT",
         body: { expectedVersion: serverVersion, orders: localOrders },
       });
       serverVersion = Number(payload.version || serverVersion);
+    }
+    if (!force && !migrationDone) {
+      localStorage.setItem(LEGACY_MIGRATION_KEY, "1");
     }
     dirty = false;
     cache(payload.orders || []);
