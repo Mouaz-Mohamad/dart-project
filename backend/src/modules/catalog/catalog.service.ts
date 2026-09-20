@@ -270,7 +270,7 @@ export class CatalogService {
                 version=version+1,
                 updated_by=$3,
                 updated_at=now()
-          WHERE domain='damage'
+          WHERE domain=$1
             AND version=$4`,
         [
           "damage",
