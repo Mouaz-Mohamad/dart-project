@@ -72,7 +72,14 @@
   }
 
   function markerIcon(type) {
-    return L.divIcon({ className: "dart-route-pin", html: `<span class="${type}"><i class="fa-solid ${type === "courier" ? "fa-motorcycle" : "fa-location-dot"}"></i></span>`, iconSize: [42, 42], iconAnchor: [21, 40] });
+    const safeType = type === "courier" ? "courier" : "customer";
+    const iconClass = safeType === "courier" ? "fa-motorcycle" : "fa-location-dot";
+    return L.divIcon({
+      className: "dart-route-pin",
+      html: `<span class="${safeType}"><i class="fa-solid ${iconClass}"></i></span>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 40],
+    });
   }
 
   function fullAddress(record) {
