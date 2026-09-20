@@ -110,6 +110,21 @@
     scheduleSync();
   }
 
+  async function stateAction(orderRef, action) {
+    const payload = await api(
+      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/state`,
+      {
+        method: "POST",
+        body: { action },
+      },
+    );
+    serverVersion = Number(payload.version || serverVersion || 1);
+    dirty = false;
+    cache(payload.orders || []);
+    await refreshRelatedServerState();
+    return payload.orders || [];
+  }
+
   async function createManual(order) {
     const payload = await api("/api/v1/admin/orders", {
       method: "POST",
@@ -183,6 +198,7 @@
     hydrate,
     createManual,
     updateManual,
+    stateAction,
     sync,
     write,
     read: readLocal,
