@@ -1701,6 +1701,7 @@
     const log = readJSON(STORAGE_KEYS.drawAudit, []);
     log.unshift({
       id: uid("DRAW"),
+      action: "DART_CARD_DRAW_ELIGIBILITY_CHANGED",
       clientRecordId: customer.id,
       clientId: customer.clientId,
       clientName: customer.clientName,
