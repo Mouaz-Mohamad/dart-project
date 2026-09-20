@@ -28,8 +28,30 @@ const deliveredOrder = {
   paymentMethod: "Cash on Delivery",
   paymentStatus: "Unpaid",
   amountRefunded: 0,
+  deliveryCost: 0,
   priceSnapshot: [{ itemCode: "I-1", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 }],
 };
+
+
+const deliveryCostSummary = finance.calculateSummary(baseData({
+  orders: [{
+    ...deliveredOrder,
+    id: "ORDER-DELIVERY-COST",
+    orderId: "K-DELIVERY-COST",
+    finalAmount: 2000,
+    deliveryCost: 200,
+    priceSnapshot: [
+      { itemCode: "SHIP-1", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 },
+      { itemCode: "SHIP-2", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 },
+    ],
+  }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(deliveryCostSummary.deliveryCosts, 200, "Two delivered pieces at 100 EGP each must recognize 200 EGP delivery cost.");
+assert.strictEqual(deliveryCostSummary.netRevenue, 2000, "Delivery cost is a Dart cost and must not increase what the customer pays.");
+assert.strictEqual(deliveryCostSummary.netCogs, 800);
+assert.strictEqual(deliveryCostSummary.totalCost, 1000, "P&L Total Cost must include immutable COGS plus the delivery snapshot.");
+assert.strictEqual(deliveryCostSummary.netProfit, 1000);
+assert.strictEqual(deliveryCostSummary.cashOut, 200, "Delivery cost must be reflected in Dart cash outflow.");
 
 const returnedData = baseData({
   orders: [{ ...deliveredOrder, amountRefunded: 1000, refundedAt: "2026-09-05T10:00:00+03:00" }],
