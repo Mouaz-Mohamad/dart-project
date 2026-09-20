@@ -1095,7 +1095,11 @@ function initCartAndCheckoutEvents() {
             }
 
             let promotion = null;
-            if (window.DartPlatform?.apiRequest && window.DartPlatform?.currentUser?.()) {
+            if (window.DartPlatform?.apiRequest) {
+                if (!window.DartPlatform?.currentUser?.()) {
+                    showToast("سجل الدخول أولاً للتحقق من كود الخصم.");
+                    return;
+                }
                 try {
                     const payload = await window.DartPlatform.apiRequest(
                         `/api/v1/me/promotions/validate?code=${encodeURIComponent(code)}`
