@@ -39,10 +39,12 @@
             parsed[1],
             parsed[2],
           );
-          map.set(
-            normalizedKey,
-            Number(map.get(normalizedKey) || 0) + quantity,
-          );
+          if (normalizedKey !== rawKey) {
+            map.set(
+              normalizedKey,
+              Number(map.get(normalizedKey) || 0) + quantity,
+            );
+          }
         }
       } catch {
         // Ignore malformed legacy stock keys; exact key remains available.
