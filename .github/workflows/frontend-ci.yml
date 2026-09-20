@@ -8,12 +8,14 @@ on:
       - "Js/**"
       - "sw.js"
       - ".github/workflows/frontend-ci.yml"
+      - "tests/**"
   pull_request:
     paths:
       - "Eye/**"
       - "Js/**"
       - "sw.js"
       - ".github/workflows/frontend-ci.yml"
+      - "tests/**"
 
 permissions:
   contents: read
@@ -34,3 +36,7 @@ jobs:
           set -euo pipefail
           find Eye Js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           node --check sw.js
+      - name: Finance regression tests
+        run: |
+          node tests/dart-finance-unit.js
+          node tests/finance-dashboard-contract.js
