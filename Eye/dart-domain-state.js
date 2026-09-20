@@ -12,12 +12,18 @@
     dart_damage: "damage",
     dart_notifications: "notifications",
     dart_contact_messages: "contacts",
+    dart_birthday_rewards: "birthday_rewards",
+    dart_birthday_messages: "birthday_messages",
+    dart_message_queue: "message_queue",
+    dart_promotions: "promotions",
     dart_finance_expenses: "finance_expenses",
     dart_finance_budgets: "finance_budgets",
     dart_finance_invoices: "finance_invoices",
     dart_finance_goals: "finance_goals",
     dart_finance_marketing: "finance_marketing",
     dart_finance_cod_settlements: "finance_settlements",
+    dart_finance_audit: "finance_audit",
+    dart_draw_eligibility_audit: "draw_audit",
   });
   const STORAGE_BY_DOMAIN = Object.freeze(
     Object.fromEntries(Object.entries(DOMAIN_BY_STORAGE).map(([key, domain]) => [domain, key])),
