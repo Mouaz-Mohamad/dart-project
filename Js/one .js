@@ -13,8 +13,9 @@ productsData.forEach(product => {
     usedProductCodes.add(product.code);
 });
 
-// Public reviews are server-authoritative; local data is only a temporary fallback.
+// Public reviews are server-authoritative. Production never falls back to stale browser data.
 let reviewsData = [];
+let reviewsLoadFailed = false;
 
 async function hydratePublicReviews() {
     try {
@@ -25,24 +26,18 @@ async function hydratePublicReviews() {
         if (!response.ok) throw new Error('Reviews request failed');
         const payload = await response.json();
         const incoming = Array.isArray(payload.reviews) ? payload.reviews : [];
-        const changed = JSON.stringify(incoming) !== JSON.stringify(reviewsData);
+        const changed =
+            reviewsLoadFailed ||
+            JSON.stringify(incoming) !== JSON.stringify(reviewsData);
+        reviewsLoadFailed = false;
         reviewsData = incoming;
         if (changed && typeof renderReviewsLogic === 'function') renderReviewsLogic();
         return reviewsData;
-    } catch {
-        try {
-            reviewsData = (JSON.parse(localStorage.getItem('dart_reviews')) || [])
-                .filter(review => review.status === 'Active' && !review.isArchived && !review.isDeleted)
-                .map(review => ({
-                    name: review.clientName || 'Dart Customer',
-                    date: review.date || '',
-                    rating: Number(review.rating) || 0,
-                    title: review.title || '',
-                    comment: review.review || ''
-                }));
-        } catch {
-            reviewsData = [];
-        }
+    } catch (error) {
+        reviewsLoadFailed = true;
+        reviewsData = [];
+        if (typeof renderReviewsLogic === 'function') renderReviewsLogic();
+        console.warn('Dart reviews are temporarily unavailable.', error);
         return reviewsData;
     }
 }
@@ -389,7 +384,21 @@ function renderReviewsLogic() {
     if (reviewsContainer && reviewTemplate) {
         [...reviewsContainer.children].forEach(child => { if (child.id !== 'reviewTemplate') child.remove(); });
         if (!reviewsData.length) {
-            reviewsContainer.appendChild(createUiState('empty', 'No reviews yet', 'Verified customer reviews will appear here after delivered orders.'));
+            reviewsContainer.appendChild(
+                reviewsLoadFailed
+                    ? createUiState(
+                        'error',
+                        'Reviews temporarily unavailable',
+                        'Verified reviews could not be loaded from Dart right now.',
+                        'Retry',
+                        () => void hydratePublicReviews()
+                    )
+                    : createUiState(
+                        'empty',
+                        'No reviews yet',
+                        'Verified customer reviews will appear here after delivered orders.'
+                    )
+            );
             return;
         }
         reviewsData.forEach(item => {
