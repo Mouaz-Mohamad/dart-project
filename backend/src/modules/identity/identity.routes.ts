@@ -2,7 +2,6 @@ import { Router, type Request, type Response } from "express";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
-import { AppError } from "../../http/app-error.js";
 import {
   authenticate,
   csrfProtection,
