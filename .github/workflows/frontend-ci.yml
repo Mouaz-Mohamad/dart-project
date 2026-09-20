@@ -47,6 +47,7 @@ jobs:
       - name: Frontend regression contracts
         run: |
           node tests/database-authoritative-storage.cjs
+          node tests/performance-budget.cjs
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js
           node tests/server-authority-contract.js

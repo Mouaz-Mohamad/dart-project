@@ -302,3 +302,20 @@
   .dart-confetti-piece,
   .dart-balloon { animation-play-state: paused; }
 }
+
+
+/* Performance containment: defer rendering of below-the-fold reusable sections. */
+@supports (content-visibility: auto) {
+  #birthday,
+  #feedback-form,
+  #contact-form,
+  #story,
+  #dart-for-you,
+  #birthday-details,
+  #card-details,
+  #why,
+  #footer {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 420px;
+  }
+}
