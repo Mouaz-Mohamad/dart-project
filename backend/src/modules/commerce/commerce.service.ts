@@ -250,6 +250,152 @@ function flexibleDateExpiry(value: unknown): number | null {
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
 
+  public async publicLeaderboard(): Promise<{
+    period: string;
+    rows: Array<{
+      rank: number;
+      name: string;
+      orders: number;
+      items: number;
+    }>;
+  }> {
+    const client = await this.pool.connect();
+    try {
+      const deliveredResult = await client.query<{
+        client_code: string;
+        full_name: string;
+        order_code: string;
+        final_minor: string;
+        item_codes: string[];
+      }>(
+        `SELECT c.client_code,
+                c.full_name,
+                o.order_code,
+                o.final_minor::text,
+                COALESCE(
+                  array_agg(oi.item_code ORDER BY oi.created_at, oi.id)
+                    FILTER (WHERE oi.id IS NOT NULL),
+                  ARRAY[]::text[]
+                ) AS item_codes
+           FROM orders o
+           JOIN customers c ON c.user_id=o.customer_user_id
+           LEFT JOIN order_items oi ON oi.order_id=o.id
+          WHERE o.status='Delivered'
+            AND NOT o.is_deleted
+            AND NOT o.is_archived
+            AND COALESCE(o.delivered_at, o.updated_at) >=
+                (date_trunc('month', now() AT TIME ZONE 'Africa/Cairo') AT TIME ZONE 'Africa/Cairo')
+            AND COALESCE(o.delivered_at, o.updated_at) <
+                ((date_trunc('month', now() AT TIME ZONE 'Africa/Cairo') + interval '1 month') AT TIME ZONE 'Africa/Cairo')
+          GROUP BY c.client_code, c.full_name, o.id
+          ORDER BY COALESCE(o.delivered_at, o.updated_at), o.order_code`,
+      );
+
+      const stateResult = await client.query<{ domain: string; data: unknown[] }>(
+        `SELECT domain, data
+           FROM dashboard_domain_state
+          WHERE domain IN ('returns','cards')`,
+      );
+      const states = new Map(
+        stateResult.rows.map((row) => [
+          row.domain,
+          Array.isArray(row.data) ? row.data : [],
+        ]),
+      );
+
+      const excludedClients = new Set(
+        (states.get("cards") || [])
+          .map((raw) => raw as Record<string, unknown>)
+          .filter(
+            (card) =>
+              String(card.status || "").toLowerCase() === "active" &&
+              !card.isArchived &&
+              !card.isDeleted,
+          )
+          .map((card) => String(card.clientId || "")),
+      );
+
+      const completedRefundItems = new Set(
+        (states.get("returns") || [])
+          .map((raw) => raw as Record<string, unknown>)
+          .filter((record) => {
+            const status = String(record.status || "").trim().toLowerCase();
+            const requestType = String(record.requestType || "").trim().toLowerCase();
+            const completed = Boolean(
+              record.completedAt ||
+                ["completed", "good", "damaged", "bad"].includes(status),
+            );
+            return (
+              record.isPostDeliveryReturn === true &&
+              !record.isDeleted &&
+              requestType !== "exchange" &&
+              completed
+            );
+          })
+          .map((record) => String(record.itemCode || ""))
+          .filter(Boolean),
+      );
+
+      const byCustomer = new Map<
+        string,
+        {
+          name: string;
+          orders: number;
+          items: number;
+          spentMinor: number;
+        }
+      >();
+
+      for (const order of deliveredResult.rows) {
+        if (excludedClients.has(order.client_code)) continue;
+        const current = byCustomer.get(order.client_code) || {
+          name: order.full_name,
+          orders: 0,
+          items: 0,
+          spentMinor: 0,
+        };
+        current.orders += 1;
+        current.items += (order.item_codes || []).filter(
+          (itemCode) => !completedRefundItems.has(String(itemCode)),
+        ).length;
+        current.spentMinor += Number(order.final_minor || 0);
+        byCustomer.set(order.client_code, current);
+      }
+
+      const publicName = (value: string) => {
+        const parts = String(value || "")
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 3);
+        return parts.length ? parts.join(" ") : "Dart Customer";
+      };
+
+      const rows = [...byCustomer.values()]
+        .filter((row) => row.orders > 0)
+        .sort(
+          (left, right) =>
+            right.orders - left.orders ||
+            right.items - left.items ||
+            right.spentMinor - left.spentMinor,
+        )
+        .slice(0, 3)
+        .map((row, index) => ({
+          rank: index + 1,
+          name: publicName(row.name),
+          orders: row.orders,
+          items: Math.max(0, row.items),
+        }));
+
+      return {
+        period: cairoDateKey().slice(0, 7),
+        rows,
+      };
+    } finally {
+      client.release();
+    }
+  }
+
   public async validatePromotionCode(
     customerUserId: string,
     code: string,
