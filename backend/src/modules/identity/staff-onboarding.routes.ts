@@ -3,6 +3,7 @@ import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import type { IdentityService } from "./identity.service.js";
+import type { OutboxService } from "../outbox/outbox.service.js";
 
 function limiter() {
   return rateLimit({
@@ -42,6 +43,7 @@ export function createStaffOnboardingRouter(
     AppConfig,
     "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite"
   >,
+  outbox?: OutboxService,
 ): Router {
   const router = Router();
 
@@ -54,6 +56,7 @@ export function createStaffOnboardingRouter(
         ? { userAgent: request.get("user-agent")! }
         : {}),
     });
+    await outbox?.processBatch(5).catch(() => undefined);
     response.status(202).json({
       challengeId: result.challengeId,
       expiresAt: result.expiresAt.toISOString(),
