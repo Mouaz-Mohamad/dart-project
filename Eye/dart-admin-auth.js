@@ -17,6 +17,7 @@
   let onboardingSetupToken = "";
   let csrfMemory = "";
   let compatibilityPromise = null;
+  const HYDRATION_TIMEOUT_MS = 12000;
 
   if (!API_BASE) {
     if (
@@ -156,32 +157,79 @@
     logoutButton.hidden = true;
   }
 
+  async function hydrateStage(label, task) {
+    let timer = 0;
+    const work = Promise.resolve()
+      .then(task)
+      .catch((error) => {
+        const failure = error instanceof Error
+          ? error
+          : new Error(String(error || "Dashboard hydration failed"));
+        failure.dartHydrationStage = label;
+        throw failure;
+      });
+    const timeout = new Promise((_, reject) => {
+      timer = window.setTimeout(() => {
+        const error = new Error(`${label} hydration timed out`);
+        error.code = "DASHBOARD_HYDRATION_TIMEOUT";
+        error.dartHydrationStage = label;
+        reject(error);
+      }, HYDRATION_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([work, timeout]);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
   async function unlock() {
     const can = (permission) => window.DartAdminAccess?.can?.(permission) === true;
     try {
       if (window.DartSiteSettings?.hydrate) {
-        await window.DartSiteSettings.hydrate(!can("settings.manage"));
+        await hydrateStage(
+          "site-settings",
+          () => window.DartSiteSettings.hydrate(!can("settings.manage")),
+        );
       }
       if (can("catalog.manage") && window.DartCatalog?.hydrate) {
-        await window.DartCatalog.hydrate();
+        await hydrateStage("catalog", () => window.DartCatalog.hydrate());
       } else {
         window.DartState?.remove?.("dart_models");
         window.DartState?.remove?.("dart_items");
       }
       if (can("orders.read") && window.DartOrdersApi?.hydrate) {
-        await window.DartOrdersApi.hydrate();
+        await hydrateStage("orders", () => window.DartOrdersApi.hydrate());
       } else {
         window.DartState?.remove?.("dart_orders");
       }
       if (can("dashboard_state.read") && window.DartDomainState?.hydrateAll) {
-        await window.DartDomainState.hydrateAll();
+        await hydrateStage(
+          "dashboard-state",
+          () => window.DartDomainState.hydrateAll(),
+        );
       }
     } catch (error) {
-      console.error("Unable to hydrate dashboard state after sign-in", error);
+      const stage = error?.dartHydrationStage || "database";
+      window.DartAdminHydration = Object.freeze({
+        ready: false,
+        stage,
+        code: error?.code || "DASHBOARD_HYDRATION_FAILED",
+      });
+      console.error("Unable to hydrate dashboard state after sign-in", { stage, error });
       lock();
-      status(loginForm, "Database connection failed. Dashboard remains locked.", true);
+      status(
+        loginForm,
+        `Database connection failed while loading ${stage}. Dashboard remains locked.`,
+        true,
+      );
       throw error;
     }
+    window.DartAdminHydration = Object.freeze({
+      ready: true,
+      stage: "complete",
+      code: null,
+    });
     document.body.classList.remove("dart-admin-locked");
     authView.hidden = true;
     logoutButton.hidden = false;

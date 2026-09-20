@@ -29,6 +29,9 @@ assert(admin.includes("/api/v1/admin/auth/login"), "Admin login endpoint is not 
 assert(admin.includes("/api/v1/admin/auth/mfa/setup"), "Admin MFA setup is not wired");
 assert(admin.includes("/api/v1/admin/auth/mfa/confirm"), "Admin MFA confirmation is not wired");
 assert(admin.includes("Dashboard access is blocked"), "Production dashboard must fail closed without API configuration");
+assert(admin.includes("DASHBOARD_HYDRATION_TIMEOUT"), "Dashboard authoritative hydration must have a bounded timeout");
+assert(admin.includes("DartAdminHydration"), "Dashboard must expose authoritative hydration readiness/failure state");
+assert(admin.includes("Dashboard remains locked."), "Dashboard must remain locked when required server hydration fails");
 assert(dashboard.includes('id="dart-admin-auth"'), "Dashboard auth gate HTML is missing");
 assert(dashboard.includes('src="dart-admin-auth.js"'), "Dashboard auth gate script is not loaded");
 

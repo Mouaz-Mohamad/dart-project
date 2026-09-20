@@ -5,6 +5,10 @@ const failures = [];
 const rootHtml = fs.readdirSync(".").filter((name) => name.endsWith(".html"));
 for (const file of rootHtml) {
   const source = fs.readFileSync(file, "utf8");
+  const headMarkup = source.match(/<head\\b[\\s\\S]*?<\\/head>/i)?.[0] || "";
+  if (/>\\\\n\\s*</.test(headMarkup)) {
+    failures.push(`${file}: <head> contains a literal \\n escape instead of a real newline`);
+  }
   const faviconTags = source.match(/<link\b[^>]*rel=["'](?:icon|apple-touch-icon)["'][^>]*>/gi) || [];
   for (const tag of faviconTags) {
     if (/logo-1to1\.png|dart_logo\.png/i.test(tag)) {

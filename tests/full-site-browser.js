@@ -108,6 +108,13 @@ const server = http.createServer((request, response) => {
     page.on("pageerror", (error) =>
       failures.push(`${relativeUrl}: ${error.message}`),
     );
+    page.on("requestfailed", (request) => {
+      if (request.url().startsWith(origin)) {
+        failures.push(
+          `${relativeUrl}: request failed ${request.url()} (${request.failure()?.errorText || "unknown"})`,
+        );
+      }
+    });
     page.on("response", (response) => {
       if (response.url().startsWith(origin) && response.status() >= 400)
         failures.push(`${relativeUrl}: ${response.status()} ${response.url()}`);
