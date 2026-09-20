@@ -95,6 +95,7 @@
     document.body.classList.remove("dart-admin-locked");
     authView.hidden = true;
     logoutButton.hidden = false;
+    window.dispatchEvent(new CustomEvent("dart:admin-authenticated"));
   }
 
   async function beginMfaSetup() {
