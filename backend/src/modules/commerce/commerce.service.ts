@@ -196,6 +196,34 @@ export class CommerceService {
       await client.query("BEGIN");
       await this.releaseExpired(client);
 
+      if (customerUserId) {
+        const otherReservations = await client.query<{ id: string }>(
+          `SELECT id
+             FROM cart_reservations
+            WHERE customer_user_id=$1 AND id<>$2
+            FOR UPDATE`,
+          [customerUserId, reservationId],
+        );
+        const otherIds = otherReservations.rows.map((row) => row.id);
+        if (otherIds.length) {
+          await client.query(
+            `UPDATE inventory_items
+                SET status='In stock',
+                    cart_reservation_id=NULL,
+                    reservation_until=NULL,
+                    version=version+1,
+                    updated_at=now()
+              WHERE cart_reservation_id = ANY($1::text[])
+                AND lower(status)='cart reserved'`,
+            [otherIds],
+          );
+          await client.query(
+            "DELETE FROM cart_reservations WHERE id = ANY($1::text[])",
+            [otherIds],
+          );
+        }
+      }
+
       await client.query(
         `UPDATE inventory_items
             SET status='In stock', cart_reservation_id=NULL, reservation_until=NULL,
@@ -288,6 +316,124 @@ export class CommerceService {
       );
       await client.query("COMMIT");
       return { reservationId, expiresAt, reservedItems };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async customerCart(
+    customerUserId: string,
+  ): Promise<{
+    cart: null | {
+      reservationId: string;
+      expiresAt: string;
+      lines: Array<{ modelId: string; color: string; size: string; quantity: number }>;
+    };
+  }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await this.releaseExpired(client);
+      const reservation = await client.query<{
+        id: string;
+        expires_at: Date;
+      }>(
+        `SELECT id, expires_at
+           FROM cart_reservations
+          WHERE customer_user_id=$1
+            AND expires_at > now()
+          ORDER BY updated_at DESC
+          LIMIT 1
+          FOR SHARE`,
+        [customerUserId],
+      );
+      const row = reservation.rows[0];
+      if (!row) {
+        await client.query("COMMIT");
+        return { cart: null };
+      }
+      const lines = await client.query<{
+        model_id: string;
+        color: string;
+        size: string;
+        quantity: string;
+      }>(
+        `SELECT model_id, color, size, count(*)::text AS quantity
+           FROM inventory_items
+          WHERE cart_reservation_id=$1
+            AND lower(status)='cart reserved'
+            AND reservation_until > now()
+            AND active
+            AND NOT is_archived
+            AND NOT is_deleted
+          GROUP BY model_id, color, size
+          ORDER BY model_id, color, size`,
+        [row.id],
+      );
+      await client.query("COMMIT");
+      if (!lines.rows.length) {
+        return { cart: null };
+      }
+      return {
+        cart: {
+          reservationId: row.id,
+          expiresAt: row.expires_at.toISOString(),
+          lines: lines.rows.map((line) => ({
+            modelId: line.model_id,
+            color: line.color,
+            size: line.size,
+            quantity: Number(line.quantity || 0),
+          })),
+        },
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async releaseCustomerCart(customerUserId: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const reservations = await client.query<{ id: string }>(
+        `SELECT id
+           FROM cart_reservations
+          WHERE customer_user_id=$1
+          FOR UPDATE`,
+        [customerUserId],
+      );
+      const ids = reservations.rows.map((row) => row.id);
+      let changed = false;
+      if (ids.length) {
+        const released = await client.query(
+          `UPDATE inventory_items
+              SET status='In stock',
+                  cart_reservation_id=NULL,
+                  reservation_until=NULL,
+                  version=version+1,
+                  updated_at=now()
+            WHERE cart_reservation_id = ANY($1::text[])
+              AND lower(status)='cart reserved'`,
+          [ids],
+        );
+        changed = (released.rowCount ?? 0) > 0;
+        await client.query(
+          "DELETE FROM cart_reservations WHERE id = ANY($1::text[])",
+          [ids],
+        );
+      }
+      if (changed) {
+        await client.query(
+          "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+        );
+      }
+      await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
