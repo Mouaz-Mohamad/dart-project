@@ -6,6 +6,18 @@
 (function () {
   "use strict";
   // Production: never wipe browser state on load. Server hydration owns business data.
+  const API_BASE = String(
+    window.DART_API_BASE_URL || location.origin,
+  ).replace(/\/$/, "");
+  const CSRF_STORAGE_KEY = "dart_csrf_token";
+  const LEGACY_MIGRATION_KEY = "dart_catalog_server_migration_v1";
+  const IS_ADMIN = /\/Eye\//i.test(location.pathname);
+  let serverVersion = 0;
+  let remoteStock = null;
+  let syncTimer = 0;
+  let syncChain = Promise.resolve();
+  let catalogDirty = false;
+
   const readCache = new Map();
   const read = (key, fallback = []) => {
     try {
@@ -102,23 +114,58 @@
       let state = await api("/api/v1/admin/catalog-state");
       serverVersion = Number(state.version || 1);
 
-      if (
-        !force &&
-        (state.models || []).length === 0 &&
-        (state.items || []).length === 0 &&
-        (localModels.length > 0 || localItems.length > 0)
-      ) {
-        const migratedLocalModels = structuredClone(localModels);
-        await migrateLegacyAssets(migratedLocalModels);
-        state = await api("/api/v1/admin/catalog-state", {
-          method: "PUT",
-          body: {
-            expectedVersion: serverVersion,
-            models: migratedLocalModels,
-            items: localItems,
-          },
-        });
-        serverVersion = Number(state.version || serverVersion);
+      const migrationDone = localStorage.getItem(LEGACY_MIGRATION_KEY) === "1";
+      if (!force && !migrationDone) {
+        const mergedModels = structuredClone(state.models || []);
+        const mergedItems = structuredClone(state.items || []);
+        const modelIds = new Set(
+          mergedModels
+            .map((row) => String(row?.modelId || row?.id || ""))
+            .filter(Boolean),
+        );
+        const itemIds = new Set(
+          mergedItems.map((row) => String(row?.id || "")).filter(Boolean),
+        );
+        const itemCodes = new Set(
+          mergedItems.map((row) => String(row?.itemCode || "")).filter(Boolean),
+        );
+        let changed = false;
+
+        for (const modelRow of localModels) {
+          const modelId = String(modelRow?.modelId || modelRow?.id || "");
+          if (!modelId || modelIds.has(modelId)) continue;
+          mergedModels.push(structuredClone(modelRow));
+          modelIds.add(modelId);
+          changed = true;
+        }
+
+        for (const itemRow of localItems) {
+          const id = String(itemRow?.id || "");
+          const itemCode = String(itemRow?.itemCode || "");
+          if (
+            (!id && !itemCode) ||
+            (id && itemIds.has(id)) ||
+            (itemCode && itemCodes.has(itemCode))
+          ) continue;
+          mergedItems.push(structuredClone(itemRow));
+          if (id) itemIds.add(id);
+          if (itemCode) itemCodes.add(itemCode);
+          changed = true;
+        }
+
+        const assetsChanged = await migrateLegacyAssets(mergedModels);
+        if (changed || assetsChanged) {
+          state = await api("/api/v1/admin/catalog-state", {
+            method: "PUT",
+            body: {
+              expectedVersion: serverVersion,
+              models: mergedModels,
+              items: mergedItems,
+            },
+          });
+          serverVersion = Number(state.version || serverVersion);
+        }
+        localStorage.setItem(LEGACY_MIGRATION_KEY, "1");
       } else {
         const migratedServerModels = structuredClone(state.models || []);
         const assetsChanged = await migrateLegacyAssets(migratedServerModels);
@@ -151,6 +198,7 @@
       }),
     );
   }
+
 
   const active = (record) =>
     record &&
@@ -192,7 +240,7 @@
     };
   };
   const price = (m) => pricing(m).finalPrice;
-  // END One-time reset and repositories.
+  // END Server-backed repositories.
 
   // BEGIN Shared image storage. Images are compressed client-side and persisted server-side.
   const imageURLs = new Map();
