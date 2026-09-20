@@ -126,6 +126,58 @@ export function createCommerceRouter(
     },
   );
 
+  router.get(
+    "/representatives/work",
+    signedIn,
+    requireAccountType("representative"),
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.representativeWork(request.auth!.userId));
+    },
+  );
+
+  router.put(
+    "/representatives/location",
+    signedIn,
+    csrf,
+    requireAccountType("representative"),
+    async (request, response) => {
+      const body = z.object({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        accuracyMeters: z.number().min(0).max(5000).nullable().optional(),
+      }).parse(request.body);
+      response.status(200).json(
+        await commerce.updateRepresentativeLocation(
+          request.auth!.userId,
+          body.latitude,
+          body.longitude,
+          body.accuracyMeters ?? null,
+        ),
+      );
+    },
+  );
+
+  router.post(
+    "/representatives/orders/:orderCode/action",
+    signedIn,
+    csrf,
+    requireAccountType("representative"),
+    async (request, response) => {
+      const orderCode = z.string().trim().min(2).max(120).parse(request.params.orderCode);
+      const body = z.object({
+        action: z.enum(["start", "cancel", "delivered"]),
+      }).parse(request.body);
+      response.status(200).json({
+        order: await commerce.representativeOrderAction(
+          request.auth!.userId,
+          orderCode,
+          body.action,
+        ),
+      });
+    },
+  );
+
   router.post(
     "/orders",
     signedIn,
