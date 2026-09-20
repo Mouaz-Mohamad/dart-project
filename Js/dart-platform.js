@@ -963,6 +963,10 @@
               addressValidation?.source || form.dataset.dartAddressSource || "map",
           },
           deliveryNotes: details.deliveryNotes || "",
+          ...(window.dartAppliedPromotion?.type === "Promotion" &&
+          window.dartAppliedPromotion?.code
+            ? { promotionCode: String(window.dartAppliedPromotion.code) }
+            : {}),
         },
       });
       if (typeof cartData !== "undefined") cartData = [];
