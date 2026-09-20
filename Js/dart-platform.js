@@ -839,6 +839,25 @@
     return stored;
   }
 
+  function clearCustomerPrivateCache() {
+    [
+      KEYS.customers,
+      KEYS.orders,
+      KEYS.returns,
+      KEYS.cards,
+      KEYS.birthdayRewards,
+      KEYS.birthdayMessages,
+      "dart_cart",
+      "user_last_address",
+    ].forEach((key) => localStorage.removeItem(key));
+    [
+      API_USER_CACHE_KEY,
+      "dart_cart_reservation_id",
+      "dart_pending_email_verification",
+    ].forEach((key) => sessionStorage.removeItem(key));
+    if (typeof cartData !== "undefined") cartData = [];
+  }
+
   async function logout() {
     if (API_BASE) {
       try {
