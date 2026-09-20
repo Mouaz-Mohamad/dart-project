@@ -12,7 +12,17 @@
     try { const parsed = JSON.parse(localStorage.getItem(key)); return parsed ?? fallback; }
     catch { return fallback; }
   };
-  const write = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+  const write = (key, value) => {
+    if (key === 'dart_orders' && window.DartOrdersApi) {
+      window.DartOrdersApi.write(value);
+      return;
+    }
+    if (window.DartDomainState?.domainForStorageKey?.(key)) {
+      window.DartDomainState.write(key, value);
+      return;
+    }
+    localStorage.setItem(key, JSON.stringify(value));
+  };
   const field = id => document.getElementById(id);
   const value = id => String(field(id)?.value || '').trim();
   const now = () => new Date().toISOString();
