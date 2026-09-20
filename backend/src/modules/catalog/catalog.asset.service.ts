@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 
 const ALLOWED = new Set(["image/jpeg","image/png","image/webp"]);
-const MAX_BYTES = 6 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024;
 
 export class CatalogAssetService {
   constructor(private readonly pool: Pool) {}
@@ -33,7 +33,7 @@ export class CatalogAssetService {
     }
     const content = Buffer.from(input.base64, "base64");
     if (!content.length || content.length > MAX_BYTES) {
-      throw new AppError(422, "ASSET_SIZE_INVALID", "Image must be between 1 byte and 6 MB");
+      throw new AppError(422, "ASSET_SIZE_INVALID", "Compressed image must be between 1 byte and 4 MB");
     }
     const digest = createHash("sha256").update(content).digest("hex");
     await this.pool.query(
