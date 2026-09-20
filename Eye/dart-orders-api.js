@@ -95,6 +95,17 @@
     scheduleSync();
   }
 
+  async function createManual(order) {
+    const payload = await api("/api/v1/admin/orders", {
+      method: "POST",
+      body: order,
+    });
+    serverVersion = Number(payload.version || serverVersion || 1);
+    dirty = false;
+    cache(payload.orders || []);
+    return payload.orders || [];
+  }
+
   async function hydrate(force = false) {
     const localOrders = readLocal();
     let payload = await api("/api/v1/admin/orders-state");
@@ -141,6 +152,7 @@
 
   window.DartOrdersApi = {
     hydrate,
+    createManual,
     sync,
     write,
     read: readLocal,
