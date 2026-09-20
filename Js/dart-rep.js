@@ -57,8 +57,15 @@
     localStorage.setItem(key, JSON.stringify(value));
   };
   const now = () => new Date().toISOString();
-  const uid = (prefix) =>
-    `${prefix}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+  const uid = (prefix) => {
+    const randomPart =
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : Array.from(crypto.getRandomValues(new Uint32Array(4)))
+            .map((value) => value.toString(36))
+            .join("-");
+    return `${prefix}-${randomPart}`;
+  };
   const esc = (value) =>
     String(value ?? "").replace(
       /[&<>'"]/g,
