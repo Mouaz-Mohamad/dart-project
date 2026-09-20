@@ -13,7 +13,7 @@ const serviceWorker = read("sw.js");
 
 assert.match(
   catalog,
-  /ifs*(s*!IS_ADMINs*&&s*remoteStocks*)/,
+  /if\s*\(\s*!IS_ADMIN\s*&&\s*remoteStock\s*\)/,
   "storefront availability must use server stock even when a cart reservation exists",
 );
 assert.match(
@@ -63,7 +63,7 @@ assert.match(
 );
 assert.match(
   serviceWorker,
-  /\.(?:js\|css)[\s\S]*fetch\(request\)/,
+  /\.(?:js|css)[\s\S]*fetch\(request\)/,
   "JavaScript and CSS must prefer the network so devices do not run stale business logic",
 );
 
