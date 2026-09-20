@@ -29,6 +29,17 @@ export class DashboardStateService {
     return versions;
   }
 
+  async versions(): Promise<Record<DashboardDomain, number>> {
+    const result = await this.pool.query<{ domain: DashboardDomain; version: string }>(
+      "SELECT domain, version::text FROM dashboard_domain_state",
+    );
+    const versions = Object.fromEntries(
+      DASHBOARD_DOMAINS.map((domain) => [domain, 1]),
+    ) as Record<DashboardDomain, number>;
+    for (const row of result.rows) versions[row.domain] = Number(row.version || 1);
+    return versions;
+  }
+
   async read(domain: DashboardDomain): Promise<{ domain: DashboardDomain; version: number; data: unknown[] }> {
     const result = await this.pool.query<{ version: string; data: unknown[] }>(
       "SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1",
