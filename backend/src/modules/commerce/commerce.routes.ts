@@ -244,6 +244,35 @@ export function createCommerceRouter(
   );
 
   router.post(
+    "/admin/returns/manual",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("returns.manage"),
+    async (request, response) => {
+      const body = z.object({
+        existingReturnId: z.string().trim().min(1).max(120).optional(),
+        itemCode: z.string().trim().min(1).max(120),
+        reason: z.string().trim().min(1).max(500),
+        condition: z.enum(["Good", "Bad"]),
+        refundAmount: z.number().min(0).max(10_000_000),
+        clientName: z.string().trim().max(160).optional(),
+        phone1: z.string().trim().max(40).optional(),
+        phone2: z.string().trim().max(40).optional(),
+        email: z.string().trim().email().max(320).optional(),
+      }).parse(request.body);
+      response.status(200).json({
+        return: await commerce.adminManualReturn(
+          request.auth!.userId,
+          body,
+          String(request.id),
+        ),
+      });
+    },
+  );
+
+  router.post(
     "/admin/returns/:returnRef/action",
     signedIn,
     csrf,
