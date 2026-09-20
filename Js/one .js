@@ -1,6 +1,8 @@
 // ==========================================
 // 1. مصفوفات البيانات (المنتجات، التقييمات، والمخزون)
 // ==========================================
+const DART_LOCAL_DEMO_MODE = ["localhost", "127.0.0.1"].includes(location.hostname);
+
 let productsData = DartCatalog.products();
 
 // Keep model codes unique until the real catalog API becomes the source of truth.
@@ -1011,8 +1013,14 @@ function renderCart() {
 async function saveCartToLocalStorage() {
     const previous = JSON.parse(localStorage.getItem('dart_cart') || '[]');
     try {
-        if (window.DartPlatform?.reserveCart) await window.DartPlatform.reserveCart(cartData);
-        else localStorage.setItem('dart_cart', JSON.stringify(cartData));
+        if (window.DartPlatform?.reserveCart) {
+            await window.DartPlatform.reserveCart(cartData);
+        } else {
+            if (!DART_LOCAL_DEMO_MODE) {
+                throw new Error("تعذر الاتصال بخدمة حجز السلة. لم يتم حفظ التغيير.");
+            }
+            localStorage.setItem('dart_cart', JSON.stringify(cartData));
+        }
         if (window.dartAppliedPromotion?.cardId) {
             const used=Number(window.dartAppliedPromotion.purchasedItems||0),limit=Number(window.dartAppliedPromotion.itemLimit||window.dartAppliedPromotion.purchasedLimit||10),count=cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0);
             if(count>limit-used){window.dartAppliedPromotion=null;appliedDiscountRate=0;showToast(`تم إلغاء Dart Card: المتبقي في الكارت ${Math.max(0,limit-used)} قطع.`);}
@@ -1125,6 +1133,10 @@ function initCartAndCheckoutEvents() {
                     return;
                 }
             } else {
+                if (!DART_LOCAL_DEMO_MODE) {
+                    showToast("تعذر الاتصال بخدمة الخصومات. لم يتم تطبيق أي خصم.");
+                    return;
+                }
                 try {
                     const today = new Date();
                     promotion = (JSON.parse(localStorage.getItem('dart_promotions')) || []).find(item =>
@@ -1250,6 +1262,11 @@ function initCartAndCheckoutEvents() {
                     }
                     showToast(error.message || "تعذر إنشاء الطلب.");
                 }
+                return;
+            }
+
+            if (!DART_LOCAL_DEMO_MODE) {
+                showToast("خدمة إتمام الطلب غير متاحة الآن. لم يتم إنشاء أي طلب.");
                 return;
             }
 
