@@ -2072,227 +2072,129 @@ const defaultScenes = [
 
 ];
 
-const siteTyping = window.DartSiteSettings?.get?.().typing || {};
-const scenes = Array.isArray(siteTyping.scenes) && siteTyping.scenes.length
-    ? siteTyping.scenes
-    : defaultScenes;
-
-
-// ==========================================
-// SETTINGS
-// ==========================================
-
-const typingSpeed = Math.max(10, Number(siteTyping.typingSpeed) || 70);
-const deletingSpeed = Math.max(5, Number(siteTyping.deletingSpeed) || 10);
-const wordDelay = Math.max(0, Number(siteTyping.wordDelay) || 100);
-const nextSceneDelay = Math.max(0, Number(siteTyping.nextSceneDelay) || 400);
-
-
-// ==========================================
-// VARIABLES
-// ==========================================
-
+let scenes = [];
+let typingSpeed = 70;
+let deletingSpeed = 10;
+let wordDelay = 100;
+let nextSceneDelay = 400;
 let sceneIndex = 0;
 let wordIndex = 0;
 let charIndex = 0;
-
-
-// ==========================================
-// CAPITALIZE
-// يحول:
-// fast delivery
-// إلى:
-// Fast Delivery
-// ==========================================
+let typingRunId = 0;
 
 function capitalizeWords(text) {
-
-    return text.replace(
+    return String(text || '').replace(
         /(^|\s)([a-z])/g,
-        function(match, space, letter) {
-            return space + letter.toUpperCase();
-        }
+        (match, space, letter) => space + letter.toUpperCase()
     );
 }
 
+function typingSettings() {
+    const current = window.DartSiteSettings?.get?.().typing || {};
+    return {
+        scenes: Array.isArray(current.scenes) && current.scenes.length
+            ? current.scenes
+            : defaultScenes,
+        typingSpeed: Math.max(10, Number(current.typingSpeed) || 70),
+        deletingSpeed: Math.max(5, Number(current.deletingSpeed) || 10),
+        wordDelay: Math.max(0, Number(current.wordDelay) || 100),
+        nextSceneDelay: Math.max(0, Number(current.nextSceneDelay) || 400),
+    };
+}
 
-// ==========================================
-// START TYPING SCENE
-// ==========================================
+function scheduleTyping(callback, delay, runId) {
+    window.setTimeout(() => {
+        if (runId === typingRunId) callback(runId);
+    }, Math.max(0, Number(delay) || 0));
+}
 
-function typeScene() {
-
+function typeScene(runId = typingRunId) {
+    if (!typingContainer || runId !== typingRunId || !scenes.length) return;
     const scene = scenes[sceneIndex];
-
-
-    // ======================================
-    // لو خلصنا كل كلمات الجملة
-    // ======================================
+    if (!scene) return;
 
     if (wordIndex >= scene.words.length) {
-        setTimeout(function() {
-            deleteScene();
-        }, scene.hold);
+        scheduleTyping(deleteScene, Number(scene.hold) || 0, runId);
         return;
     }
-    // ======================================
-    // الكلمة الحالية
-    // ======================================
 
     const word = scene.words[wordIndex];
-
-    // تحويل أول حرف إلى Capital
     const formattedText = capitalizeWords(word.text);
-
-    // ======================================
-    // إنشاء Span للكلمة
-    // ======================================
-
     const span = document.createElement("span");
-
     span.classList.add("dart-word");
-
-    // ======================================
-    // تطبيق تصميم الكلمة
-    // ======================================
-
     span.style.color = word.color || "#111111";
-
-    span.style.fontSize = window.DartSiteSettings?.heroWordSize?.(word.size, 60) || `${Math.max(10, Number.parseFloat(word.size) || 60)}px`;
-
-    span.style.fontWeight = word.weight || "400";
-
-    // مهم عشان الحجم والستايل يشتغلوا صح
+    span.style.fontSize =
+        window.DartSiteSettings?.heroWordSize?.(word.size, 60) ||
+        `${Math.max(10, Number.parseFloat(word.size) || 60)}px`;
+    span.style.fontWeight = String(word.weight || "400");
     span.style.display = "inline-block";
-
-    // إضافة الكلمة للـHTML
     typingContainer.appendChild(span);
-    // نبدأ من أول حرف
     charIndex = 0;
 
-
-    // ======================================
-    // كتابة الحروف
-    // ======================================
-
-    function typeCharacter() {
-        charIndex++;
-        span.textContent = formattedText.substring(
-            0,
-            charIndex
-        );
-        // لسه فيه حروف
+    const typeCharacter = () => {
+        if (runId !== typingRunId || !span.isConnected) return;
+        charIndex += 1;
+        span.textContent = formattedText.substring(0, charIndex);
         if (charIndex < formattedText.length) {
-            setTimeout(
-                typeCharacter,
-                typingSpeed
-            );
+            scheduleTyping(typeCharacter, typingSpeed, runId);
+            return;
         }
-        // خلصنا الكلمة
-        else {
-
-            // إضافة مسافة حقيقية
-            const space = document.createTextNode(" ");
-
-            typingContainer.appendChild(space);
-
-            // نروح للكلمة التالية
-            wordIndex++;
-            setTimeout(
-                typeScene,
-                wordDelay
-            );
-        }
-    }
+        typingContainer.appendChild(document.createTextNode(" "));
+        wordIndex += 1;
+        scheduleTyping(typeScene, wordDelay, runId);
+    };
     typeCharacter();
 }
-// ==========================================
-// DELETE SCENE
-// ==========================================
 
-function deleteScene() {
-
-    // نجيب كل الكلمات
+function deleteScene(runId = typingRunId) {
+    if (!typingContainer || runId !== typingRunId) return;
     const words = typingContainer.querySelectorAll(".dart-word");
-    // آخر كلمة
     const lastWord = words[words.length - 1];
-
-    // ======================================
-    // لو مفيش كلمات خلاص
-    // ======================================
 
     if (!lastWord) {
         typingContainer.innerHTML = "";
-        nextScene();
+        nextScene(runId);
         return;
     }
 
-    // ======================================
-    // النص الموجود داخل آخر كلمة
-    // ======================================
-
-    const currentText = lastWord.textContent;
-
-    // ======================================
-    // لو لسه فيها حروف
-    // ======================================
-
+    const currentText = lastWord.textContent || "";
     if (currentText.length > 0) {
-
-        lastWord.textContent =
-            currentText.substring(
-                0,
-                currentText.length - 1
-            );
-
-        setTimeout(
-            deleteScene,
-            deletingSpeed
-        );
+        lastWord.textContent = currentText.substring(0, currentText.length - 1);
+        scheduleTyping(deleteScene, deletingSpeed, runId);
+        return;
     }
 
-    // ======================================
-    // الكلمة اتمسحت بالكامل
-    // ======================================
-
-    else {
-        lastWord.remove();
-        setTimeout(
-            deleteScene,
-            deletingSpeed
-        );
-    }
+    lastWord.remove();
+    scheduleTyping(deleteScene, deletingSpeed, runId);
 }
-// ==========================================
-// NEXT SCENE
-// ==========================================
 
-function nextScene() {
-    // تنظيف الكلام القديم
+function nextScene(runId = typingRunId) {
+    if (!typingContainer || runId !== typingRunId || !scenes.length) return;
     typingContainer.innerHTML = "";
-
-    // Reset
     wordIndex = 0;
     charIndex = 0;
-
-    // الجملة التالية
-    sceneIndex++;
-    // لو وصلنا لآخر جملة
-    // نرجع لأول جملة
-    if (sceneIndex >= scenes.length) {
-        sceneIndex = 0;
-    }
-    setTimeout(
-        typeScene,
-        nextSceneDelay
-    );
+    sceneIndex = (sceneIndex + 1) % scenes.length;
+    scheduleTyping(typeScene, nextSceneDelay, runId);
 }
 
-// ==========================================
-// START
-// ==========================================
+function restartHeroTyping() {
+    const current = typingSettings();
+    scenes = current.scenes;
+    typingSpeed = current.typingSpeed;
+    deletingSpeed = current.deletingSpeed;
+    wordDelay = current.wordDelay;
+    nextSceneDelay = current.nextSceneDelay;
+    sceneIndex = 0;
+    wordIndex = 0;
+    charIndex = 0;
+    typingRunId += 1;
+    if (!typingContainer) return;
+    typingContainer.innerHTML = "";
+    if (scenes.length) typeScene(typingRunId);
+}
 
-if (typingContainer && scenes.length) typeScene();
+restartHeroTyping();
+window.addEventListener("dart:site-settings-changed", restartHeroTyping);
 
 
 // Keep public reviews current without a page reload.
