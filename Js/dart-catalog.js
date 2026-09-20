@@ -317,8 +317,10 @@
   }
 
   function assetPath(id) {
-    const path = `/api/v1/catalog/assets/${encodeURIComponent(String(id || ""))}`;
-    return API_BASE ? `${API_BASE}${path}` : path;
+    const encodedId = encodeURIComponent(String(id || ""));
+    return API_BASE
+      ? `${API_BASE}/api/v1/catalog/assets/${encodedId}`
+      : `/api/v1/catalog/assets/${encodedId}`;
   }
 
   function resolveAssetUrl(value, assetId = "") {
