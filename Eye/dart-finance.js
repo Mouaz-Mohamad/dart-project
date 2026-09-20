@@ -1752,6 +1752,13 @@
     root.addEventListener("storage", (event) => {
       if (Object.values(STORAGE_KEYS).includes(event.key) || ["dart_orders", "dart_returns", "dart_items", "dart_models", "dart_customers", "dart_damage"].includes(event.key)) renderAllFinance();
     });
+    root.addEventListener("dart:domain-hydrated", (event) => {
+      if (
+        ["finance_expenses","finance_budgets","finance_invoices","finance_goals","finance_marketing","finance_settlements","customers","returns","damage"].includes(event.detail?.domain)
+      ) renderAllFinance();
+    });
+    root.addEventListener("dart:orders-hydrated", renderAllFinance);
+    root.addEventListener("dart:catalog-hydrated", renderAllFinance);
   }
 
   function wrapDashboardRefresh() {
