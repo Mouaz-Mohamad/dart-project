@@ -2716,6 +2716,7 @@ export class CommerceService {
     cards: unknown[];
     birthdayRewards: unknown[];
     birthdayMessages: unknown[];
+    savedAddress: Record<string, unknown> | null;
   }> {
     const customerResult = await this.pool.query<{ client_code: string }>(
       "SELECT client_code FROM customers WHERE user_id=$1",
@@ -2805,9 +2806,15 @@ export class CommerceService {
       [customerUserId],
     );
 
-    const states = await this.pool.query<{ domain: string; data: unknown[] }>(
-      "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards','birthday_rewards','birthday_messages')",
-    );
+    const [states, preferencesResult] = await Promise.all([
+      this.pool.query<{ domain: string; data: unknown[] }>(
+        "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards','birthday_rewards','birthday_messages')",
+      ),
+      this.pool.query<{ last_address: Record<string, unknown> | null }>(
+        "SELECT last_address FROM customer_preferences WHERE customer_user_id=$1",
+        [customerUserId],
+      ),
+    ]);
     const stateByDomain = new Map(states.rows.map((row) => [row.domain, Array.isArray(row.data) ? row.data : []]));
     const onlyCustomer = (rows: unknown[]) => rows.filter((raw) => {
       const row = raw as Record<string, unknown>;
@@ -2880,7 +2887,49 @@ export class CommerceService {
       cards: onlyCustomer(stateByDomain.get("cards") || []),
       birthdayRewards: onlyCustomer(stateByDomain.get("birthday_rewards") || []),
       birthdayMessages: onlyCustomer(stateByDomain.get("birthday_messages") || []),
+      savedAddress: preferencesResult.rows[0]?.last_address || null,
     };
+  }
+
+  public async saveCustomerAddress(
+    customerUserId: string,
+    address: Record<string, unknown> | null,
+    requestId: string,
+  ): Promise<Record<string, unknown> | null> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO customer_preferences (
+           customer_user_id, last_address, updated_at
+         ) VALUES ($1,$2::jsonb,now())
+         ON CONFLICT (customer_user_id) DO UPDATE SET
+           last_address=EXCLUDED.last_address,
+           updated_at=now()`,
+        [customerUserId, address ? JSON.stringify(address) : null],
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+         ) VALUES ('customer',$1,$2,'customer_preferences',$1::text,$3,$4::jsonb)`,
+        [
+          customerUserId,
+          address ? "CUSTOMER_ADDRESS_SAVED" : "CUSTOMER_ADDRESS_CLEARED",
+          requestId,
+          JSON.stringify({
+            governorate: String(address?.governorate || ""),
+            hasCoordinates: Boolean(address?.lat && address?.lng),
+          }),
+        ],
+      );
+      await client.query("COMMIT");
+      return address;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async releaseExpired(client: PoolClient): Promise<void> {
