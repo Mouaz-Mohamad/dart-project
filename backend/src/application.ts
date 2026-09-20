@@ -104,6 +104,11 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   );
   app.use(express.json({ limit: "512kb", strict: true }));
   app.use(cookieParser());
+  app.use((_request, response, next) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.setHeader("Pragma", "no-cache");
+    next();
+  });
 
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
