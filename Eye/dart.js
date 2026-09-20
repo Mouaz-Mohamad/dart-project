@@ -1572,6 +1572,16 @@ function dartUpdateBirthdayRewardForOrder(order, target) {
   }
 }
 
+function dartPersistOrderWorkflow() {
+  if (window.DartOrdersApi) {
+    saveDataToStorage("dart_orders", ordersData);
+    saveDataToStorage("dart_notifications", notificationData);
+    localStorage.setItem("dart_audit", JSON.stringify(auditData));
+    return;
+  }
+  dartSaveAll();
+}
+
 function dartApplyTransition(order, target, meta = {}) {
   if (!dartCanTransition(order, target))
     return {
@@ -1579,7 +1589,8 @@ function dartApplyTransition(order, target, meta = {}) {
       message: `Invalid transition: ${order.status} → ${target}`,
     };
   const prev = order.status,
-    now = dartNowISO();
+    now = dartNowISO(),
+    serverAuthoritative = Boolean(window.DartOrdersApi);
   if (target === "Out With Representative" && !meta.representativeId)
     return { ok: false, needsRep: true };
   if (
@@ -1609,13 +1620,15 @@ function dartApplyTransition(order, target, meta = {}) {
   };
   if (stamps[target]) order[stamps[target]] = now;
   if (target === "Delivered") {
-    (order.items || []).forEach((code) => {
-      const it = dartFindItemByCode(code);
-      if (it) {
-        it.status = "Sold";
-        it.purchaseDate = new Date().toLocaleDateString("en-GB");
-      }
-    });
+    if (!serverAuthoritative) {
+      (order.items || []).forEach((code) => {
+        const it = dartFindItemByCode(code);
+        if (it) {
+          it.status = "Sold";
+          it.purchaseDate = new Date().toLocaleDateString("en-GB");
+        }
+      });
+    }
     if (
       order.paymentMethod &&
       String(order.paymentMethod).toLowerCase().includes("cash") &&
@@ -1625,7 +1638,7 @@ function dartApplyTransition(order, target, meta = {}) {
       order.amountPaid = dartOrderNet(order);
       order.paidAt = now;
     }
-    if (order.dartCardId && !order.dartCardUsageRecorded) {
+    if (!serverAuthoritative && order.dartCardId && !order.dartCardUsageRecorded) {
       const card = cardsData.find(
         (c) => c.cardId === order.dartCardId && c.status === "Active",
       );
@@ -1652,15 +1665,19 @@ function dartApplyTransition(order, target, meta = {}) {
   if (target === "Refused") {
     order.refusalReason = meta.reason || "Other";
     order.refusalNotes = meta.notes || "";
-    dartCreateInspectionReturns(order, order.refusalReason);
+    if (!serverAuthoritative)
+      dartCreateInspectionReturns(order, order.refusalReason);
   }
   if (target === "Cancelled") {
     order.cancelledByRole = meta.actorRole || "Admin";
     order.cancelledBy = meta.actorId || null;
     order.cancellationReason = meta.reason || "Cancelled";
-    dartReleaseOrderItems(order, "In stock");
+    if (!serverAuthoritative) dartReleaseOrderItems(order, "In stock");
   }
-  if (["Delivered", "Cancelled", "Refused"].includes(target))
+  if (
+    !serverAuthoritative &&
+    ["Delivered", "Cancelled", "Refused"].includes(target)
+  )
     dartUpdateBirthdayRewardForOrder(order, target);
   dartLogOrder(order, meta.type || "STATUS_CHANGED", prev, target, meta);
   dartAudit(
@@ -1679,8 +1696,10 @@ function dartApplyTransition(order, target, meta = {}) {
     order.id,
     target === "Needs Attention" ? "warning" : "info",
   );
-  dartSaveAll();
-  dartRefreshAll();
+  if (!meta.suppressRefresh) {
+    dartPersistOrderWorkflow();
+    dartRefreshAll();
+  }
   return { ok: true };
 }
 function dartBatchTransition(orders, target, meta = {}) {
@@ -1709,7 +1728,7 @@ function dartBatchTransition(orders, target, meta = {}) {
     if (deliveryGroupId) o.deliveryGroupId = deliveryGroupId;
     dartApplyTransition(o, target, { ...meta, suppressRefresh: true });
   });
-  dartSaveAll();
+  dartPersistOrderWorkflow();
   dartRefreshAll();
   return { ok: true };
 }
