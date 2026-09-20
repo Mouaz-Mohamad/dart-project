@@ -354,6 +354,30 @@ export function createIdentityRouter(
   );
 
   router.patch(
+    "/admin/customers/:id/dart-card-draw-eligibility",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("customers.manage"),
+    async (request, response) => {
+      const body = z.object({
+        eligible: z.boolean(),
+        reason: z.string().trim().max(500).default(""),
+      }).parse(request.body);
+      response.status(200).json(
+        await service.adminSetCustomerDrawEligibility(
+          request.auth!,
+          uuid.parse(request.params.id),
+          body.eligible,
+          body.reason,
+          metadata(request),
+        ),
+      );
+    },
+  );
+
+  router.patch(
     "/admin/customers/:id",
     signedIn,
     csrf,
