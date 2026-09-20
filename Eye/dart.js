@@ -816,12 +816,15 @@ function populateModelsDatalist() {
   const datalist = document.getElementById("models-list");
   if (!datalist) return;
 
-  datalist.innerHTML = modelsData
-    .filter((m) => !m.isDeleted)
-    .map(
-      (m) => `<option value="${m.modelId}">${m.name} - ${m.category}</option>`,
-    )
-    .join("");
+  const options = modelsData
+    .filter((model) => !model.isDeleted)
+    .map((model) => {
+      const option = document.createElement("option");
+      option.value = String(model.modelId || "");
+      option.textContent = `${String(model.name || "")} - ${String(model.category || "")}`;
+      return option;
+    });
+  datalist.replaceChildren(...options);
 }
 
 const ctxTow = document.getElementById("analyticsChartTow").getContext("2d");
@@ -935,8 +938,13 @@ function updateChartTow(period, btn) {
   analyticsChartTow.data.datasets[1].data = selectedData.sales;
   analyticsChartTow.update();
 
-  document.getElementById("chartNoteTextTow").innerHTML =
-    `<strong>ملاحظة:</strong> ${selectedData.note}`;
+  const chartNote = document.getElementById("chartNoteTextTow");
+  if (chartNote) {
+    chartNote.replaceChildren();
+    const label = document.createElement("strong");
+    label.textContent = "ملاحظة:";
+    chartNote.append(label, document.createTextNode(` ${String(selectedData.note || "")}`));
+  }
 }
 
 function exportChartPNGTow() {
