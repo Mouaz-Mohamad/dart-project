@@ -496,6 +496,7 @@ export function createCommerceRouter(
 
   router.post(
     "/representatives/orders/:orderCode/action",
+    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
@@ -516,6 +517,7 @@ export function createCommerceRouter(
 
   router.post(
     "/representatives/returns/:returnRef/action",
+    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),

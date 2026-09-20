@@ -1594,6 +1594,7 @@ export class CommerceService {
         WHERE representative_user_id=$1
           AND status='Representative On The Way'
           AND NOT is_deleted
+          AND NOT is_archived
         LIMIT 1`,
       [representativeUserId],
     );
@@ -1656,12 +1657,22 @@ export class CommerceService {
           WHERE order_code=$1
             AND representative_user_id=$2
             AND NOT is_deleted
+            AND NOT is_archived
           FOR UPDATE`,
         [orderCode, representativeUserId],
       );
       const order = orderResult.rows[0];
       if (!order) {
         throw new AppError(404, "ASSIGNED_ORDER_NOT_FOUND", "This order is not assigned to your account");
+      }
+
+      if (action === "start" && order.status === "Representative On The Way") {
+        await client.query("COMMIT");
+        return {
+          orderId: orderCode,
+          status: order.status,
+          finalAmount: Number(order.final_minor) / 100,
+        };
       }
 
       let nextStatus: string;
@@ -1798,7 +1809,7 @@ export class CommerceService {
       await client.query("BEGIN");
 
       const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const returnsState = returnsStateResult.rows[0];
       const returnsRows = Array.isArray(returnsState?.data)
@@ -2616,7 +2627,7 @@ export class CommerceService {
     try {
       await client.query("BEGIN");
       const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const returnsState = returnsStateResult.rows[0];
       const rows = Array.isArray(returnsState?.data)
@@ -2977,7 +2988,7 @@ export class CommerceService {
       }
 
       const stateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const state = stateResult.rows[0];
       const rows = Array.isArray(state?.data) ? state!.data as Record<string, unknown>[] : [];
@@ -2989,6 +3000,11 @@ export class CommerceService {
       );
       if (!record) {
         throw new AppError(404, "ASSIGNED_RETURN_NOT_FOUND", "This return is not assigned to your account");
+      }
+
+      if (action === "start" && String(record.status || "") === "Pickup On The Way") {
+        await client.query("COMMIT");
+        return record;
       }
 
       const previousStatus = String(record.status || "");
@@ -3086,6 +3102,9 @@ export class CommerceService {
                   promotion, payment_status
              FROM orders
             WHERE order_code=$1
+              AND status='Delivered'
+              AND NOT is_deleted
+              AND NOT is_archived
             FOR UPDATE`,
           [orderCode],
         );
@@ -4666,7 +4685,7 @@ export class CommerceService {
       const legacy = context?.legacy || {};
       const reason = String(legacy.refusalReason || "Refused delivery");
       const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const returnsState = returnsStateResult.rows[0];
       const returnsRows = Array.isArray(returnsState?.data)
