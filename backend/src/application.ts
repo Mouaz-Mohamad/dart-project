@@ -14,6 +14,8 @@ import {
   type HealthDependencies,
 } from "./modules/health/health.routes.js";
 import { createIdentityRouter } from "./modules/identity/identity.routes.js";
+import { createStaffOnboardingRouter } from "./modules/identity/staff-onboarding.routes.js";
+import { createStaffManagementRouter } from "./modules/identity/staff-management.routes.js";
 import type { IdentityService } from "./modules/identity/identity.service.js";
 import { createCatalogRouter } from "./modules/catalog/catalog.routes.js";
 import type { CatalogService } from "./modules/catalog/catalog.service.js";
@@ -116,6 +118,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
     app.use("/api/v1", createIdentityRouter(dependencies.identityService, config));
+    app.use("/api/v1", createStaffOnboardingRouter(dependencies.identityService, config));
+    app.use("/api/v1", createStaffManagementRouter(dependencies.identityService, config));
 
     if (dependencies.catalogService) {
       app.use(
