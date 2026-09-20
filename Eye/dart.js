@@ -4432,45 +4432,78 @@ function setupRepresentativeModal() {
   if (!form || form.dataset.dartV3) return;
   form.dataset.dartV3 = "1";
   form.dataset.dartV2 = "1";
+
   document.getElementById("openRepModalBtn")?.addEventListener("click", () => {
     form.reset();
     document.getElementById("modal-rep-id").value = "";
     const field = document.getElementById("modal-representative-id");
-    if (field)
+    if (field) {
       field.value = dartNextBusinessCode("Rep", representativeData, "repId");
+      field.readOnly = false;
+    }
+    const nationalIdInput = document.getElementById("modal-representative-national-id");
+    if (nationalIdInput) {
+      nationalIdInput.value = "";
+      nationalIdInput.readOnly = false;
+      nationalIdInput.placeholder = "14-digit national ID";
+    }
     openModal(modal);
   });
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const id = document.getElementById("modal-rep-id").value;
     const existing = id
       ? representativeData.find((r) => String(r.id) === String(id))
       : null;
+    const serverAuthoritative = Boolean(existing?.serverAuthoritative);
     const rawNationalId = document
       .getElementById("modal-representative-national-id")
       .value.trim();
-    if (rawNationalId && !/^\d{14}$/.test(rawNationalId)) {
+
+    if (serverAuthoritative && rawNationalId) {
+      alert("لا يمكن تغيير الرقم القومي للحساب المسجل من هذا المحرر.");
+      return;
+    }
+    if (!serverAuthoritative && rawNationalId && !/^\d{14}$/.test(rawNationalId)) {
       alert("الرقم القومي يجب أن يكون 14 رقمًا.");
       return;
     }
+
+    const requestedRepId =
+      document.getElementById("modal-representative-id").value.trim();
+    if (
+      serverAuthoritative &&
+      requestedRepId &&
+      requestedRepId !== String(existing.repId || "")
+    ) {
+      alert("Rep ID للحساب المسجل ثابت ولا يمكن تغييره.");
+      return;
+    }
+
     const nationalIdHash = rawNationalId
       ? await dartHashSensitiveValue(rawNationalId)
       : existing?.nationalIdHash || "";
     const nationalIdLast4 = rawNationalId
       ? rawNationalId.slice(-4)
       : existing?.nationalIdLast4 || "";
+
     const p = {
-        name: document.getElementById("modal-representative-name").value,
-        repId: id
-          ? document.getElementById("modal-representative-id").value || ""
+      name: document.getElementById("modal-representative-name").value.trim(),
+      repId: serverAuthoritative
+        ? existing.repId
+        : id
+          ? requestedRepId
           : dartNextBusinessCode("Rep", representativeData, "repId"),
-        nationalIdHash,
-        nationalIdLast4,
-        address: document.getElementById("modal-representative-address").value,
-        phone1: document.getElementById("modal-rep-phone1").value,
-        phone2: document.getElementById("modal-rep-phone2").value || "-",
-        status: "Active",
-      };
+      nationalIdHash,
+      nationalIdLast4,
+      address: document.getElementById("modal-representative-address").value.trim(),
+      phone1: document.getElementById("modal-rep-phone1").value.trim(),
+      phone2: document.getElementById("modal-rep-phone2").value.trim() || "-",
+      status: existing?.status || "Active",
+    };
+
     if (
       representativeData.some(
         (r) => r.repId === p.repId && String(r.id) !== String(id),
@@ -4479,15 +4512,58 @@ function setupRepresentativeModal() {
       alert("Rep ID مستخدم بالفعل.");
       return;
     }
-    if (id) {
-      const x = representativeData.find((r) => String(r.id) === String(id)),
-        old = { ...x };
-      Object.assign(x, p);
-      dartAudit("EDIT", "representative", x.id, old, p);
+
+    if (existing) {
+      const old = { ...existing };
+
+      if (serverAuthoritative) {
+        if (!window.DartAdminApi?.request) {
+          alert("Secure admin API is unavailable.");
+          return;
+        }
+        try {
+          await window.DartAdminApi.request(
+            `/api/v1/admin/representatives/${encodeURIComponent(existing.id)}`,
+            {
+              method: "PATCH",
+              body: {
+                name: p.name,
+                email: existing.email,
+                phone1: p.phone1,
+                ...(p.phone2 && p.phone2 !== "-" ? { phone2: p.phone2 } : {}),
+                address: p.address,
+              },
+            },
+          );
+        } catch (error) {
+          alert(error.message || "Representative update failed.");
+          return;
+        }
+      }
+
+      Object.assign(existing, p);
+      dartAudit("EDIT", "representative", existing.id, old, p);
+
+      if (window.DartDomainState?.write) {
+        window.DartDomainState.write("dart_representatives", representativeData);
+        if (window.DartDomainState.syncDomain) {
+          try {
+            await window.DartDomainState.syncDomain("representatives");
+          } catch (error) {
+            console.warn("Representative CRM state sync failed", error);
+          }
+        }
+        if (serverAuthoritative && window.DartDomainState.hydrateDomain) {
+          await window.DartDomainState.hydrateDomain("representatives", true);
+        }
+      } else {
+        dartSaveAll();
+      }
     } else {
       const x = {
         id: dartUid("RDB"),
         date: new Date().toLocaleDateString("en-GB"),
+        serverAuthoritative: false,
         isArchived: false,
         isDeleted: false,
         isChecked: false,
@@ -4495,13 +4571,17 @@ function setupRepresentativeModal() {
       };
       representativeData.push(x);
       dartAudit("CREATE", "representative", x.id, {}, x);
+      if (window.DartDomainState?.write) {
+        window.DartDomainState.write("dart_representatives", representativeData);
+      } else {
+        dartSaveAll();
+      }
     }
-    dartSaveAll();
+
     dartRefreshAll();
     closeModal(modal);
   });
 }
-
 function setupReviewModal() {
   const modal = document.getElementById("customer-review-modal"),
     form = document.getElementById("customer-review-form");
