@@ -1171,11 +1171,14 @@ export class CommerceService {
       }
 
       if (input.action === "inspect") {
-        if (
-          !record.isPostDeliveryReturn ||
-          (!record.completedAt && previousStatus !== "Completed") ||
-          String(record.inspectionStatus || "Pending") !== "Pending"
-        ) {
+        const isLegacyRefusal =
+          !record.isPostDeliveryReturn &&
+          previousStatus === "Pending Inspection";
+        const isCompletedPostDelivery =
+          Boolean(record.isPostDeliveryReturn) &&
+          (Boolean(record.completedAt) || previousStatus === "Completed") &&
+          String(record.inspectionStatus || "Pending") === "Pending";
+        if (!isLegacyRefusal && !isCompletedPostDelivery) {
           throw new AppError(409, "RETURN_INSPECTION_INVALID", "This return is not awaiting inspection");
         }
         const condition = input.condition;
@@ -1263,6 +1266,7 @@ export class CommerceService {
         }
 
         record.inspectionStatus = condition;
+        if (isLegacyRefusal) record.status = condition;
         record.inspectedAt = now;
         record.updatedAt = now;
         inventoryChanged = true;
@@ -2272,8 +2276,13 @@ export class CommerceService {
   ): Promise<void> {
     if (previousStatus === nextStatus) return;
 
-    const itemRows = await client.query<{ item_code: string }>(
-      "SELECT item_code FROM order_items WHERE order_id=$1 ORDER BY created_at, id",
+    const itemRows = await client.query<{
+      item_code: string;
+      model_id: string;
+      color: string;
+      size: string;
+    }>(
+      "SELECT item_code, model_id, color, size FROM order_items WHERE order_id=$1 ORDER BY created_at, id",
       [orderId],
     );
     const itemCodes = itemRows.rows.map((row) => row.item_code);
@@ -2294,12 +2303,13 @@ export class CommerceService {
         [orderCode, new Date().toISOString().slice(0, 10), orderId],
       );
       inventoryChanged = updated.rowCount ?? 0;
-    } else if (["Cancelled", "Refused"].includes(nextStatus)) {
+    } else if (nextStatus === "Cancelled") {
       const updated = await client.query(
         `UPDATE inventory_items i
             SET status='In stock',
                 purchase_date=NULL,
                 order_id=NULL,
+                return_request_id=NULL,
                 cart_reservation_id=NULL,
                 reservation_until=NULL,
                 version=version+1,
@@ -2310,6 +2320,100 @@ export class CommerceService {
         [orderId],
       );
       inventoryChanged = updated.rowCount ?? 0;
+    } else if (nextStatus === "Refused") {
+      const updated = await client.query(
+        `UPDATE inventory_items i
+            SET status='Return Inspection',
+                purchase_date=NULL,
+                cart_reservation_id=NULL,
+                reservation_until=NULL,
+                version=version+1,
+                updated_at=now()
+           FROM order_items oi
+          WHERE oi.order_id=$1
+            AND oi.inventory_item_id=i.id`,
+        [orderId],
+      );
+      inventoryChanged = updated.rowCount ?? 0;
+
+      const contextResult = await client.query<{
+        client_code: string | null;
+        contact_snapshot: Record<string, unknown>;
+        legacy: Record<string, unknown>;
+      }>(
+        `SELECT c.client_code, o.contact_snapshot, o.legacy
+           FROM orders o
+           LEFT JOIN customers c ON c.user_id=o.customer_user_id
+          WHERE o.id=$1`,
+        [orderId],
+      );
+      const context = contextResult.rows[0];
+      const contact = context?.contact_snapshot || {};
+      const legacy = context?.legacy || {};
+      const reason = String(legacy.refusalReason || "Refused delivery");
+      const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      );
+      const returnsState = returnsStateResult.rows[0];
+      const returnsRows = Array.isArray(returnsState?.data)
+        ? returnsState!.data as Record<string, unknown>[]
+        : [];
+      let returnsChanged = false;
+
+      for (const item of itemRows.rows) {
+        const exists = returnsRows.some(
+          (row) =>
+            String(row.orderId || "") === orderCode &&
+            String(row.itemCode || "") === item.item_code &&
+            !row.isPostDeliveryReturn &&
+            !row.isDeleted,
+        );
+        if (exists) continue;
+
+        const sequence = await client.query<{ value: string }>(
+          "SELECT nextval('dart_return_request_seq')::text AS value",
+        );
+        const returnRecordId = randomUUID();
+        const returnId = `R-${sequence.rows[0]!.value}`;
+        const createdAt = new Date().toISOString();
+        returnsRows.push({
+          id: returnRecordId,
+          returnId,
+          modelId: item.model_id,
+          itemCode: item.item_code,
+          status: "Pending Inspection",
+          date: createdAt.slice(0, 10),
+          createdAt,
+          clientName: String(contact.name || ""),
+          clientId: context?.client_code || "",
+          phone1: String(contact.phone1 || ""),
+          phone2: String(contact.phone2 || ""),
+          email: String(contact.email || ""),
+          reason,
+          orderId: orderCode,
+          isPostDeliveryReturn: false,
+          isArchived: false,
+          isDeleted: false,
+          isChecked: false,
+        });
+        await client.query(
+          "UPDATE inventory_items SET return_request_id=$2 WHERE item_code=$1",
+          [item.item_code, returnRecordId],
+        );
+        returnsChanged = true;
+      }
+
+      if (returnsChanged) {
+        await client.query(
+          `UPDATE dashboard_domain_state
+              SET data=$2::jsonb, version=$3, updated_at=now()
+            WHERE domain='returns'`,
+          [
+            JSON.stringify(returnsRows),
+            Number(returnsState?.version || 1) + 1,
+          ],
+        );
+      }
     } else if (
       ["New","Accepted","Preparing","Out With Representative","Representative On The Way","Needs Attention"].includes(nextStatus)
     ) {
