@@ -72,6 +72,10 @@ function money(value: number): number {
   return Math.round(value) / 100;
 }
 
+function metric(value: number): number {
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : 0;
+}
+
 function toMinor(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed * 100)) : 0;
@@ -157,6 +161,7 @@ export class FinanceService {
   public async summary(start: string, end: string): Promise<FinanceSummary> {
     const client = await this.pool.connect();
     try {
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       const deliveredResult = await client.query<DeliveredOrderRow>(
         `SELECT o.id::text,
                 o.order_code,
@@ -268,8 +273,8 @@ export class FinanceService {
         .filter((row) => inRange(row.paidAt || row.date, start, end))
         .reduce((sum, row) => sum + toMinor(row.amount), 0);
 
-      const settlements = (states.get("finance_settlements") || [])
-        .filter(active)
+      const allSettlements = (states.get("finance_settlements") || []).filter(active);
+      const settlements = allSettlements
         .filter((row) => inRange(row.settlementDate, start, end));
       const codFeesMinor = settlements.reduce(
         (sum, row) => sum + toMinor(row.fee),
@@ -280,7 +285,7 @@ export class FinanceService {
         0,
       );
       const settledOrderIds = new Set(
-        settlements.map((row) => String(row.orderId || "")).filter(Boolean),
+        allSettlements.map((row) => String(row.orderId || "")).filter(Boolean),
       );
 
       const damageRows = (states.get("damage") || [])
@@ -381,6 +386,7 @@ export class FinanceService {
 
       const customerOrders = new Map<string, number>();
       for (const order of deliveredResult.rows) {
+        if (!order.customer_user_id) continue;
         customerOrders.set(
           order.customer_user_id,
           (customerOrders.get(order.customer_user_id) || 0) + 1,
@@ -407,10 +413,7 @@ export class FinanceService {
           Number(order.amount_paid_minor || 0) > 0
             ? Number(order.amount_paid_minor)
             : Number(order.final_minor || 0);
-        fallbackCodCashInMinor += Math.max(
-          0,
-          paidMinor - Number(order.amount_refunded_minor || 0),
-        );
+        fallbackCodCashInMinor += Math.max(0, paidMinor);
       }
 
       const cashInMinor =
@@ -448,7 +451,7 @@ export class FinanceService {
       const marketingSpend = money(marketingMinor.spend);
       const marketingRevenue = money(marketingMinor.revenue);
 
-      return {
+      const summary: FinanceSummary = {
         grossRevenue: money(grossRevenueMinor),
         refunds: money(refundsMinor),
         netRevenue: money(netRevenueMinor),
@@ -469,25 +472,26 @@ export class FinanceService {
         incrementalDamage: money(incrementalDamageMinor),
         brandTotalCost: money(brandTotalCostMinor),
         brandNetProfit: money(brandNetProfitMinor),
-        margin:
-          netRevenueMinor !== 0 ? (netProfitMinor / netRevenueMinor) * 100 : 0,
-        grossMargin:
-          netRevenueMinor !== 0 ? (grossProfitMinor / netRevenueMinor) * 100 : 0,
+        margin: netRevenueMinor !== 0
+          ? metric((netProfitMinor / netRevenueMinor) * 100)
+          : 0,
+        grossMargin: netRevenueMinor !== 0
+          ? metric((grossProfitMinor / netRevenueMinor) * 100)
+          : 0,
         deliveredOrders: deliveredResult.rows.length,
         grossSoldUnits,
         returnedUnits,
         soldUnits,
         averageOrderValue:
           deliveredResult.rows.length > 0
-            ? money(netRevenueMinor) / deliveredResult.rows.length
+            ? money(Math.round(netRevenueMinor / deliveredResult.rows.length))
             : 0,
         uniqueCustomers,
         returningCustomers,
         oneTimeCustomers,
-        repeatRate:
-          uniqueCustomers > 0
-            ? (returningCustomers / uniqueCustomers) * 100
-            : 0,
+        repeatRate: uniqueCustomers > 0
+          ? metric((returningCustomers / uniqueCustomers) * 100)
+          : 0,
         cashIn: money(cashInMinor),
         cashOut: money(cashOutMinor),
         netCashFlow: money(cashInMinor - cashOutMinor),
@@ -496,28 +500,33 @@ export class FinanceService {
         marketing: {
           spend: marketingSpend,
           revenue: marketingRevenue,
-          roas: marketingSpend ? marketingRevenue / marketingSpend : 0,
+          roas: marketingSpend ? metric(marketingRevenue / marketingSpend) : 0,
           cac:
             marketingMinor.orders > 0
-              ? marketingSpend / marketingMinor.orders
+              ? metric(marketingSpend / marketingMinor.orders)
               : 0,
           ctr:
             marketingMinor.impressions > 0
-              ? (marketingMinor.clicks / marketingMinor.impressions) * 100
+              ? metric((marketingMinor.clicks / marketingMinor.impressions) * 100)
               : 0,
           cpc:
             marketingMinor.clicks > 0
-              ? marketingSpend / marketingMinor.clicks
+              ? metric(marketingSpend / marketingMinor.clicks)
               : 0,
           conversion:
             marketingMinor.clicks > 0
-              ? (marketingMinor.orders / marketingMinor.clicks) * 100
+              ? metric((marketingMinor.orders / marketingMinor.clicks) * 100)
               : 0,
           impressions: marketingMinor.impressions,
           clicks: marketingMinor.clicks,
           orders: marketingMinor.orders,
         },
       };
+      await client.query("COMMIT");
+      return summary;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }

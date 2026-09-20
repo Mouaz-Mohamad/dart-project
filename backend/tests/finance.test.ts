@@ -1,0 +1,97 @@
+import { describe, expect, it, vi } from "vitest";
+import { FinanceService } from "../src/modules/finance/finance.service.js";
+
+function financePool(options: { failDelivered?: boolean } = {}) {
+  const queries: string[] = [];
+  const client = {
+    query: vi.fn(async (sql: string) => {
+      queries.push(sql);
+      if (sql.startsWith("BEGIN") || sql === "COMMIT" || sql === "ROLLBACK") {
+        return { rows: [], rowCount: 0 };
+      }
+      if (sql.includes("FROM orders o") && sql.includes("sum(oi.cost_snapshot_minor)")) {
+        if (options.failDelivered) throw new Error("database unavailable");
+        return {
+          rows: [
+            {
+              id: "1", order_code: "K-1", customer_user_id: null,
+              final_minor: "10001", delivery_cost_minor: "0",
+              payment_method: "COD", payment_status: "Paid",
+              amount_paid_minor: "10001", amount_refunded_minor: "0",
+              event_at: new Date("2026-09-10T10:00:00Z"), cogs_minor: "0", sold_units: "1",
+            },
+            {
+              id: "2", order_code: "K-2", customer_user_id: "customer-1",
+              final_minor: "5000", delivery_cost_minor: "0",
+              payment_method: "Cash on Delivery", payment_status: "Refunded",
+              amount_paid_minor: "5000", amount_refunded_minor: "2000",
+              event_at: new Date("2026-09-11T10:00:00Z"), cogs_minor: "0", sold_units: "1",
+            },
+          ],
+        };
+      }
+      if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: [] };
+      if (sql.includes("FROM inventory_items")) return { rows: [] };
+      if (sql.includes("SELECT DISTINCT oi.item_code")) return { rows: [] };
+      if (sql.includes("FROM dashboard_domain_state")) {
+        return {
+          rows: [
+            {
+              domain: "returns",
+              data: [{
+                id: "return-1", orderId: "K-2", itemCode: "I-2",
+                requestType: "Refund", status: "Completed",
+                isPostDeliveryReturn: true, completedAt: "2026-09-12T10:00:00Z",
+                refundAmount: 20, inspectionStatus: "Damaged",
+              }],
+            },
+            {
+              domain: "finance_settlements",
+              data: [{
+                id: "settlement-1", orderId: "K-1", amountReceived: 100.01,
+                fee: 0, settlementDate: "2026-10-01",
+              }],
+            },
+            { domain: "damage", data: [] },
+            { domain: "finance_expenses", data: [] },
+            { domain: "finance_marketing", data: [] },
+          ],
+        };
+      }
+      throw new Error(`Unexpected finance query: ${sql}`);
+    }),
+    release: vi.fn(),
+  };
+  return {
+    pool: { connect: vi.fn(async () => client) },
+    client,
+    queries,
+  };
+}
+
+describe("finance summary integrity", () => {
+  it("uses one snapshot and keeps refunds as cash-out instead of deducting them twice", async () => {
+    const fixture = financePool();
+    const summary = await new FinanceService(fixture.pool as never).summary(
+      "2026-09-01",
+      "2026-09-30",
+    );
+
+    expect(fixture.queries[0]).toBe("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+    expect(fixture.queries.at(-1)).toBe("COMMIT");
+    expect(summary.cashIn).toBe(50);
+    expect(summary.refundCashOut).toBe(20);
+    expect(summary.netCashFlow).toBe(30);
+    expect(summary.uniqueCustomers).toBe(1);
+    expect(summary.averageOrderValue).toBe(65.01);
+  });
+
+  it("rolls the read transaction back when a finance query fails", async () => {
+    const fixture = financePool({ failDelivered: true });
+    await expect(
+      new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30"),
+    ).rejects.toThrow("database unavailable");
+    expect(fixture.queries.at(-1)).toBe("ROLLBACK");
+    expect(fixture.client.release).toHaveBeenCalledOnce();
+  });
+});
