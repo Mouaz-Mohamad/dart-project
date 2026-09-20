@@ -240,6 +240,17 @@
   function syncBirthdayRewards(user = currentUser(), reference = new Date()) {
     if (!user?.customerId) return null;
     const rewards = read(KEYS.birthdayRewards, []);
+    if (API_REQUIRED) {
+      const windowData = birthdayWindow(user.birthday, reference);
+      if (!windowData) return null;
+      return (
+        rewards.find(
+          (row) =>
+            row.id === birthdayRewardId(user.customerId, windowData.year) &&
+            ["Active", "Reserved"].includes(row.status),
+        ) || null
+      );
+    }
     let changed = false;
     rewards.forEach((reward) => {
       if (reward.customerId !== user.customerId) return;
@@ -344,6 +355,7 @@
   }
 
   function updateBirthdayRewardForOrder(order, targetStatus) {
+    if (API_REQUIRED) return;
     if (!order?.birthdayRewardId) return;
     const rewards = read(KEYS.birthdayRewards, []);
     const reward = rewards.find((row) => row.id === order.birthdayRewardId);
