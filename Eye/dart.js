@@ -3336,13 +3336,101 @@ function renderRepresentative(dataArray) {
       ).length,
       total = ordersData.filter(
         (o) => String(o.representativeId) === String(r.id),
-      ).length;
+      ).length,
+      pending = r.serverAuthoritative && r.status === "Pending Approval",
+      secureActions = r.serverAuthoritative
+        ? `<button class="action-btn dart-rep-docs" title="Verification documents"><i class="bx bx-id-card"></i></button>
+           ${pending ? '<button class="action-btn dart-rep-approve" title="Approve"><i class="bx bx-check-circle"></i></button><button class="action-btn dart-rep-reject" title="Reject"><i class="bx bx-x-circle"></i></button>' : ""}`
+        : "",
+      maskedNationalId = r.nationalIdLast4
+        ? `••••••••••${dartEsc(r.nationalIdLast4)}`
+        : "-";
     c.insertAdjacentHTML(
       "beforeend",
-      `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""}><div class="w300 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-history-entity="representative"><i class="bx bx-history"></i></button></div><span class="text-item w200">${dartEsc(r.name)}</span><span class="text-item w150">${dartEsc(r.repId)}</span><span class="text-item w100" style="color:${r.status === "Active" ? "#10b981" : "#ef4444"}">${dartEsc(r.status)}</span><span class="text-item w150">${dartEsc(r.nationalId || "-")}</span><span class="text-item w150">${current}</span><span class="text-item w100">${total}</span><span class="text-item w150">${dartEsc(r.phone1)}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w200">${dartEsc(r.address || "-")}</span><span class="text-item w150">${dartEsc(r.date || "-")}</span></div>`,
+      `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""}><div class="w300 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-history-entity="representative"><i class="bx bx-history"></i></button>${secureActions}</div><span class="text-item w200">${dartEsc(r.name)}</span><span class="text-item w150">${dartEsc(r.repId)}</span><span class="text-item w150" style="color:${r.status === "Active" ? "#10b981" : r.status === "Pending Approval" ? "#f59e0b" : "#ef4444"}">${dartEsc(r.status)}</span><span class="text-item w150">${maskedNationalId}</span><span class="text-item w150">${current}</span><span class="text-item w100">${total}</span><span class="text-item w150">${dartEsc(r.phone1)}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w200">${dartEsc(r.address || "-")}</span><span class="text-item w150">${dartEsc(r.createdAt ? new Date(r.createdAt).toLocaleDateString() : r.date || "-")}</span></div>`,
     );
   });
 }
+
+async function dartRefreshRepresentativesFromServer() {
+  if (!window.DartDomainState?.hydrateDomain) return;
+  await window.DartDomainState.hydrateDomain("representatives", true);
+}
+
+async function dartReviewRepresentativeDocuments(representativeId) {
+  if (!window.DartAdminApi?.request) {
+    throw new Error("Secure admin API is unavailable.");
+  }
+  const types = [
+    ["id_front", "National ID — front"],
+    ["id_back", "National ID — back"],
+    ["face", "Face verification"],
+  ];
+  const documents = [];
+  for (const [type, label] of types) {
+    const payload = await window.DartAdminApi.request(
+      `/api/v1/admin/representatives/${encodeURIComponent(representativeId)}/documents/${type}`,
+    );
+    documents.push({ label, dataUrl: payload.document?.dataUrl || "" });
+  }
+  const viewer = window.open("", "_blank", "noopener,noreferrer");
+  if (!viewer) throw new Error("Allow pop-ups to review verification documents.");
+  viewer.document.title = "Dart Representative Verification";
+  viewer.document.body.innerHTML =
+    '<main style="font-family:Arial,sans-serif;max-width:900px;margin:30px auto;padding:0 20px"><h1>Representative verification</h1><p>Private review session. Do not share these documents.</p></main>';
+  const main = viewer.document.querySelector("main");
+  documents.forEach(({ label, dataUrl }) => {
+    const section = viewer.document.createElement("section");
+    section.style.marginBottom = "28px";
+    const heading = viewer.document.createElement("h2");
+    heading.textContent = label;
+    const image = viewer.document.createElement("img");
+    image.src = dataUrl;
+    image.alt = label;
+    image.style.maxWidth = "100%";
+    image.style.borderRadius = "12px";
+    section.append(heading, image);
+    main.appendChild(section);
+  });
+}
+
+document.addEventListener("click", async (event) => {
+  const row = event.target.closest("#representative-container [data-id]");
+  if (!row) return;
+  const representativeId = row.dataset.id;
+  const approve = event.target.closest(".dart-rep-approve");
+  const reject = event.target.closest(".dart-rep-reject");
+  const docs = event.target.closest(".dart-rep-docs");
+  if (!approve && !reject && !docs) return;
+
+  try {
+    if (docs) {
+      await dartReviewRepresentativeDocuments(representativeId);
+      return;
+    }
+    if (!window.DartAdminApi?.request) {
+      throw new Error("Secure admin API is unavailable.");
+    }
+    if (approve) {
+      if (!confirm("Approve this representative account?")) return;
+      await window.DartAdminApi.request(
+        `/api/v1/admin/representatives/${encodeURIComponent(representativeId)}/approve`,
+        { method: "POST" },
+      );
+    }
+    if (reject) {
+      const reason = prompt("Reason for rejecting this representative:");
+      if (!reason || reason.trim().length < 3) return;
+      await window.DartAdminApi.request(
+        `/api/v1/admin/representatives/${encodeURIComponent(representativeId)}/reject`,
+        { method: "POST", body: { reason: reason.trim() } },
+      );
+    }
+    await dartRefreshRepresentativesFromServer();
+  } catch (error) {
+    alert(error.message || "Representative action failed.");
+  }
+});
 
 function dartApplyFilters(key, data) {
   const state = dartFilterState[key] || {},
