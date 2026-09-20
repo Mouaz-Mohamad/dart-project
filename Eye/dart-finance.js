@@ -19,17 +19,7 @@
     period: "dart_finance_period",
   });
 
-  const API_ENDPOINTS = Object.freeze({
-    summary: "GET /api/v1/admin/finance/summary?start&end&compare=previous",
-    expenses: "/api/v1/admin/finance/expenses",
-    budgets: "/api/v1/admin/finance/budgets",
-    invoices: "/api/v1/admin/finance/invoices",
-    goals: "/api/v1/admin/goals",
-    marketing: "/api/v1/admin/finance/marketing",
-    settlements: "/api/v1/admin/finance/cod-settlements",
-    reports: "GET /api/v1/admin/finance/reports/:report?start&end",
-    drawEligibility: "/api/v1/admin/customers/:customerId/dart-card-draw-eligibility",
-  });
+
 
   const EXPENSE_CATEGORIES = [
     "Marketing",
@@ -1633,35 +1623,65 @@
     });
   }
 
-  function changeDrawEligibility(id) {
+  async function changeDrawEligibility(id) {
     if (typeof customersData === "undefined") return;
     const customer = customersData.find((entry) => String(entry.id) === String(id));
     if (!customer || !active(customer)) return;
+
     const before = customer.dartCardDrawEligible !== false;
     const after = !before;
-    const reason = root.prompt(`${after ? "Include" : "Exclude"} ${customer.clientName} ${after ? "in" : "from"} the Dart Card draw. Optional reason:`, "");
+    const reason = root.prompt(
+      `${after ? "Include" : "Exclude"} ${customer.clientName} ${after ? "in" : "from"} the Dart Card draw. Optional reason:`,
+      "",
+    );
     if (reason === null) return;
+
+    if (customer.serverAuthoritative) {
+      if (!root.DartAdminApi?.request) {
+        root.alert("Secure admin API is unavailable.");
+        return;
+      }
+      try {
+        await root.DartAdminApi.request(
+          `/api/v1/admin/customers/${encodeURIComponent(customer.id)}/dart-card-draw-eligibility`,
+          {
+            method: "PATCH",
+            body: { eligible: after, reason: reason.trim() },
+          },
+        );
+      } catch (error) {
+        root.alert(error.message || "Could not update Dart Card draw eligibility.");
+        return;
+      }
+    }
+
     customer.dartCardDrawEligible = after;
     customer.dartCardDrawEligibilityUpdatedAt = new Date().toISOString();
+
     const log = readJSON(STORAGE_KEYS.drawAudit, []);
-    const event = {
-      id: uid("DRAW"), clientRecordId: customer.id, clientId: customer.clientId, clientName: customer.clientName,
-      before, after, reason: reason.trim(), actorRole: "Admin", actorId: null, timestamp: new Date().toISOString(),
-    };
-    log.unshift(event);
+    log.unshift({
+      id: uid("DRAW"),
+      clientRecordId: customer.id,
+      clientId: customer.clientId,
+      clientName: customer.clientName,
+      before,
+      after,
+      reason: reason.trim(),
+      actorRole: "Admin",
+      actorId: null,
+      timestamp: new Date().toISOString(),
+    });
     writeJSON(STORAGE_KEYS.drawAudit, log);
-    try {
-      if (typeof dartAudit === "function") dartAudit("DART_CARD_DRAW_ELIGIBILITY_CHANGED", "customers", customer.id, { dartCardDrawEligible: before }, { dartCardDrawEligible: after }, reason.trim());
+
+    if (customer.serverAuthoritative && root.DartDomainState?.hydrateDomain) {
+      await root.DartDomainState.hydrateDomain("customers", true).catch(() => {});
+      await root.DartDomainState.hydrateAudit?.().catch(() => {});
+    } else {
       if (typeof dartSaveAll === "function") dartSaveAll();
-      const users = readJSON("dart_users", []);
-      users.forEach((user) => {
-        if (String(user.customerId) === String(customer.clientId)) user.dartCardDrawEligible = after;
-      });
-      writeJSON("dart_users", users);
-      if (typeof dartRefreshAll === "function") dartRefreshAll();
-    } catch {
-      renderAllFinance();
     }
+
+    if (typeof dartRefreshAll === "function") dartRefreshAll();
+    else renderAllFinance();
   }
 
   function activateFinance(tab = state.financeTab) {
@@ -1728,7 +1748,7 @@
       event.preventDefault();
       saveFinanceForm(event.target);
     });
-    document.addEventListener("click", (event) => {
+    document.addEventListener("click", async (event) => {
       const financeLink = event.target.closest('[data-target="finance"]');
       if (financeLink) { event.preventDefault(); activateFinance(); return; }
       const tab = event.target.closest("[data-finance-tab]");
@@ -1746,7 +1766,7 @@
       const exportButton = event.target.closest("[data-finance-export]");
       if (exportButton) { exportReport(exportButton.dataset.financeExport); return; }
       const draw = event.target.closest("[data-dart-draw-toggle]");
-      if (draw) { changeDrawEligibility(draw.dataset.id); return; }
+      if (draw) { await changeDrawEligibility(draw.dataset.id); return; }
       if (event.target.closest(".dart-finance-modal-close,.dart-finance-modal-cancel") || event.target.id === "dart-finance-modal") closeFinanceModal();
     });
     root.addEventListener("storage", (event) => {
