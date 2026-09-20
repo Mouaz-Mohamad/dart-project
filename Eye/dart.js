@@ -457,13 +457,13 @@ const sectionsMap = {
   },
   representative: {
     get data() {
-      return cardsData;
+      return representativeData;
     },
     set data(v) {
-      cardsData = v;
+      representativeData = v;
     },
-    render: renderCards,
-    storageKey: "dart_cards",
+    render: renderRepresentative,
+    storageKey: "dart_representatives",
   },
 };
 
