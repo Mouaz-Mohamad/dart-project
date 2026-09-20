@@ -425,7 +425,13 @@ export class FinanceService {
       const marketingRows = (states.get("finance_marketing") || [])
         .filter(active)
         .filter((row) => inRange(row.date, start, end));
-      const marketingMinor = marketingRows.reduce(
+      const marketingMinor = marketingRows.reduce<{
+        spend: number;
+        revenue: number;
+        impressions: number;
+        clicks: number;
+        orders: number;
+      }>(
         (result, row) => {
           result.spend += toMinor(row.spend);
           result.revenue += toMinor(row.attributedRevenue);
