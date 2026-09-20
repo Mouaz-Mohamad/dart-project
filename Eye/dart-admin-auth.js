@@ -2,6 +2,7 @@
   "use strict";
 
   const API_BASE = String(\n    window.DART_API_BASE_URL ||\n      (location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)\n        ? "https://dart-api-dusky.vercel.app"\n        : ""),\n  ).replace(/\/$/, "");
+  const CSRF_STORAGE_KEY = "dart_csrf_token";
   const authView = document.getElementById("dart-admin-auth");
   const loginForm = document.getElementById("dart-admin-login-form");
   const mfaForm = document.getElementById("dart-admin-mfa-form");
@@ -25,6 +26,8 @@
   }
 
   function csrfToken() {
+    const stored = localStorage.getItem(CSRF_STORAGE_KEY);
+    if (stored) return stored;
     return document.cookie
       .split("; ")
       .find((row) => row.startsWith("dart_csrf="))
@@ -48,6 +51,7 @@
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
     const payload = await response.json().catch(() => ({}));
+    if (payload?.csrfToken) localStorage.setItem(CSRF_STORAGE_KEY, payload.csrfToken);
     if (!response.ok) {
       const error = new Error(payload?.error?.message || "Request failed");
       error.status = response.status;
@@ -139,6 +143,7 @@
     try {
       await request("/api/v1/auth/logout", { method: "POST" });
     } finally {
+      localStorage.removeItem(CSRF_STORAGE_KEY);
       lock();
       loginForm.reset();
       loginForm.hidden = false;
