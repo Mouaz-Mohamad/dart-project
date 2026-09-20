@@ -29,6 +29,8 @@ import { createCustomerInteractionRouter } from "./modules/commerce/customer-int
 import type { CustomerInteractionService } from "./modules/commerce/customer-interaction.service.js";
 import { createPlatformAdminRouter } from "./modules/platform/platform-admin.routes.js";
 import type { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
+import { createFinanceRouter } from "./modules/finance/finance.routes.js";
+import type { FinanceService } from "./modules/finance/finance.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -40,6 +42,7 @@ export interface AppDependencies extends HealthDependencies {
   dashboardStateService?: DashboardStateService;
   customerInteractionService?: CustomerInteractionService;
   platformAdminService?: PlatformAdminService;
+  financeService?: FinanceService;
 }
 
 // Vercel's Express builder resolves Helmet's callable default export as a module namespace.
@@ -179,6 +182,16 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         "/api/v1",
         createPlatformAdminRouter(
           dependencies.platformAdminService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.financeService) {
+      app.use(
+        "/api/v1",
+        createFinanceRouter(
+          dependencies.financeService,
           dependencies.identityService,
           config,
         ),
