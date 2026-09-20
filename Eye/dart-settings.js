@@ -223,16 +223,6 @@
     status.dataset.state = error ? "error" : "success";
   }
 
-  function audit(before, after, note) {
-    let rows = [];
-    try { rows = JSON.parse(localStorage.getItem("dart_audit") || "[]"); } catch {}
-    rows.unshift({
-      id: uid("AUD"), action: "SITE_SETTINGS_UPDATED", entityType: "settings",
-      entityId: "site", before, after, details: { note }, timestamp: new Date().toISOString(), actorRole: "Admin",
-    });
-    localStorage.setItem("dart_audit", JSON.stringify(rows.slice(0, 2000)));
-  }
-
   async function saveSettings(next, note) {
     const before = clone(root.DartSiteSettings.get());
     root.DartSiteSettings.save(next);
@@ -240,7 +230,9 @@
       const saved = root.DartSiteSettings.sync
         ? await root.DartSiteSettings.sync()
         : root.DartSiteSettings.get();
-      audit(before, saved, note);
+      void before;
+      void note;
+      await root.DartDomainState?.hydrateAudit?.().catch(() => {});
       announce("تم حفظ الإعدادات في قاعدة البيانات وتطبيقها على الواجهة العامة.");
       return saved;
     } catch (error) {
