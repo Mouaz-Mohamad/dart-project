@@ -39,6 +39,7 @@
   let locationPermissionBlocked = false;
   let apiWork = { orders: [], returns: [] };
   let latestApiLocation = null;
+  let lastLocationSyncAt = 0;
 
   const read = (key, fallback = []) => {
     try {
