@@ -198,7 +198,7 @@ export function createCommerceRouter(
     },
   );
 
-  router.put("/cart/reservation", async (request, response) => {
+  router.put("/cart/reservation", rateLimit({ windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const body = reserveSchema.parse(request.body);
     const ownerHash = guestCartOwnerHash(request, response, config, true);
     if (!ownerHash) {
