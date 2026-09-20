@@ -51,6 +51,34 @@ function finalModelPriceMinor(sellingMinor: number, discountPercent: number): nu
   return Math.max(0, Math.round(sellingMinor * (1 - Math.min(100, Math.max(0, discountPercent)) / 100)));
 }
 
+function cairoDateKey(value = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const map = Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
+  );
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function activeSiteDiscountPercent(settings: Record<string, unknown>): number {
+  const raw = settings.siteDiscount;
+  if (!raw || typeof raw !== "object") return 0;
+  const discount = raw as Record<string, unknown>;
+  if (discount.enabled !== true) return 0;
+  const percent = Math.min(100, Math.max(0, Number(discount.percent) || 0));
+  if (!percent) return 0;
+  const today = cairoDateKey();
+  const startsAt = String(discount.startsAt || "");
+  const endsAt = String(discount.endsAt || "");
+  if (startsAt && today < startsAt) return 0;
+  if (endsAt && today > endsAt) return 0;
+  return percent;
+}
+
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
 
@@ -241,30 +269,46 @@ export class CommerceService {
         throw new AppError(409, "RESERVATION_EMPTY", "No reserved items remain in this cart");
       }
 
+      const settingsResult = await client.query<{ data: Record<string, unknown> }>(
+        "SELECT data FROM site_settings WHERE id='main'",
+      );
+      const siteDiscountPercent = activeSiteDiscountPercent(settingsResult.rows[0]?.data || {});
+
       let subtotalMinor = 0;
+      let finalMinor = 0;
       const itemSnapshots = itemResult.rows.map((row) => {
         const sellingMinor = Number(row.selling_minor);
-        const discountPercent = Number(row.discount_percent || 0);
-        const finalUnitMinor = finalModelPriceMinor(sellingMinor, discountPercent);
-        subtotalMinor += finalUnitMinor;
+        const modelDiscountPercent = Number(row.discount_percent || 0);
+        const effectiveDiscountPercent = siteDiscountPercent || modelDiscountPercent;
+        const finalUnitMinor = finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
+        subtotalMinor += sellingMinor;
+        finalMinor += finalUnitMinor;
         return {
           row,
           sellingMinor,
-          discountPercent,
+          modelDiscountPercent,
+          effectiveDiscountPercent,
           finalUnitMinor,
           costMinor: Number(row.cost_minor),
         };
       });
+      const orderDiscountMinor = Math.max(0, subtotalMinor - finalMinor);
+      const promotion = siteDiscountPercent
+        ? { type: "Site", percent: siteDiscountPercent }
+        : null;
 
       const orderResult = await client.query<{ id: string; order_code: string; created_at: Date }>(
         `INSERT INTO orders (
-           customer_user_id, subtotal_minor, order_discount_minor, final_minor,
+           customer_user_id, subtotal_minor, order_discount_minor, final_minor, promotion,
            contact_snapshot, delivery_address, delivery_notes, order_source, legacy
-         ) VALUES ($1,$2,0,$2,$3::jsonb,$4::jsonb,$5,'Website',$6::jsonb)
+         ) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,'Website',$9::jsonb)
          RETURNING id, order_code, created_at`,
         [
           customerUserId,
           subtotalMinor,
+          orderDiscountMinor,
+          finalMinor,
+          promotion ? JSON.stringify(promotion) : null,
           JSON.stringify(input.contact),
           JSON.stringify(input.address),
           input.deliveryNotes || "",
@@ -289,7 +333,7 @@ export class CommerceService {
             row.color,
             row.size,
             snapshot.sellingMinor,
-            snapshot.discountPercent,
+            snapshot.modelDiscountPercent,
             snapshot.finalUnitMinor,
             snapshot.costMinor,
           ],
@@ -337,7 +381,7 @@ export class CommerceService {
             orderId: order.id,
             orderCode: order.order_code,
             customerUserId,
-            totalMinor: subtotalMinor,
+            totalMinor: finalMinor,
           }),
           `order.created:${order.id}`,
         ],
@@ -354,7 +398,10 @@ export class CommerceService {
         createdAt: order.created_at.toISOString(),
         totalProducts: itemSnapshots.length,
         totalPrice: subtotalMinor / 100,
-        finalAmount: subtotalMinor / 100,
+        discount: siteDiscountPercent,
+        orderLevelDiscountAmount: orderDiscountMinor / 100,
+        finalAmount: finalMinor / 100,
+        promotionType: promotion?.type || "",
         paymentMethod: "Cash on Delivery",
         paymentStatus: "Unpaid",
         items: itemSnapshots.map((snapshot) => snapshot.row.item_code),
@@ -367,7 +414,7 @@ export class CommerceService {
           size: snapshot.row.size,
           qty: 1,
           originalUnitPrice: snapshot.sellingMinor / 100,
-          discountPercent: snapshot.discountPercent,
+          discountPercent: snapshot.effectiveDiscountPercent,
           discountAmount: (snapshot.sellingMinor - snapshot.finalUnitMinor) / 100,
           finalUnitPrice: snapshot.finalUnitMinor / 100,
           costSnapshot: snapshot.costMinor / 100,
