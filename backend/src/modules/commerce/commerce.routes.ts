@@ -71,6 +71,44 @@ export function createCommerceRouter(
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
 
+  router.get(
+    "/me/cart",
+    signedIn,
+    requireAccountType("customer"),
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.customerCart(request.auth!.userId));
+    },
+  );
+
+  router.put(
+    "/me/cart/reservation",
+    signedIn,
+    csrf,
+    requireAccountType("customer"),
+    async (request, response) => {
+      const body = reserveSchema.parse(request.body);
+      const result = await commerce.reserveCart(
+        body.reservationId,
+        body.lines,
+        request.auth!.userId,
+      );
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(result);
+    },
+  );
+
+  router.delete(
+    "/me/cart/reservation",
+    signedIn,
+    csrf,
+    requireAccountType("customer"),
+    async (request, response) => {
+      await commerce.releaseCustomerCart(request.auth!.userId);
+      response.status(204).end();
+    },
+  );
+
   router.put("/cart/reservation", async (request, response) => {
     const body = reserveSchema.parse(request.body);
     const result = await commerce.reserveCart(body.reservationId, body.lines);
