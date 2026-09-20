@@ -3176,9 +3176,18 @@
     if (API_BASE) {
       try {
         await hydrateApiSession();
-        if (currentUser()) await hydrateCustomerCart();
+        if (!window.DartCatalog?.isServerAuthoritative?.()) {
+          await window.DartCatalog?.hydrate?.();
+        }
+        if (currentUser()) {
+          await hydrateCustomerCommerce();
+          await hydrateCustomerCart();
+        }
       } catch (error) {
-        console.warn("Dart account service is temporarily unavailable.", error.code || "API_ERROR");
+        console.warn(
+          "Dart account/catalog service is temporarily unavailable.",
+          error.code || "API_ERROR",
+        );
       }
     }
     if (redirectRememberedCustomer()) return;
