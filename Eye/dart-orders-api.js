@@ -145,12 +145,10 @@
         return;
       }
       if (dirty) await sync();
-      const payload = await api("/api/v1/admin/orders-state");
+      const payload = await api("/api/v1/admin/orders-version");
       const remoteVersion = Number(payload.version || 0);
       if (remoteVersion && remoteVersion !== serverVersion) {
-        serverVersion = remoteVersion;
-        dirty = false;
-        cache(payload.orders || []);
+        await hydrate(true);
       }
     } catch (error) {
       if (error.status !== 401) console.warn("Dart order live refresh failed", error);
