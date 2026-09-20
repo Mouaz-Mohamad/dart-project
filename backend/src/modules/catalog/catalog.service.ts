@@ -187,7 +187,7 @@ export class CatalogService {
     try {
       await client.query("BEGIN");
       const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage'",
       );
       const damageState = damageStateResult.rows[0];
       const damageRows = Array.isArray(damageState?.data)
@@ -263,16 +263,29 @@ export class CatalogService {
         );
       }
 
-      await client.query(
+      const damageVersion = Number(damageState?.version || 1);
+      const damageUpdate = await client.query(
         `UPDATE dashboard_domain_state
-            SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
-          WHERE domain='damage'`,
+            SET data=$2::jsonb,
+                version=version+1,
+                updated_by=$3,
+                updated_at=now()
+          WHERE domain='damage'
+            AND version=$4`,
         [
+          "damage",
           JSON.stringify(damageRows),
-          Number(damageState?.version || 1) + 1,
           actorId,
+          damageVersion,
         ],
       );
+      if (!damageUpdate.rowCount) {
+        throw new AppError(
+          409,
+          "DAMAGE_VERSION_CONFLICT",
+          "Damage records changed while this action was being saved; reload and retry",
+        );
+      }
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
       );
