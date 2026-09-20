@@ -66,6 +66,60 @@ export class DashboardStateService {
     }
   }
 
+  async audit(input: {
+    limit?: number;
+    entityType?: string;
+    entityId?: string;
+  } = {}): Promise<Record<string, unknown>[]> {
+    const limit = Math.min(1500, Math.max(1, Number(input.limit) || 500));
+    const values: unknown[] = [];
+    const conditions: string[] = [];
+    if (input.entityType) {
+      values.push(input.entityType);
+      conditions.push(`entity_type=$${values.length}`);
+    }
+    if (input.entityId) {
+      values.push(input.entityId);
+      conditions.push(`entity_id=$${values.length}`);
+    }
+    values.push(limit);
+    const result = await this.pool.query<{
+      id: string;
+      actor_type: string;
+      actor_id: string | null;
+      action: string;
+      entity_type: string;
+      entity_id: string;
+      old_values: Record<string, unknown> | null;
+      new_values: Record<string, unknown> | null;
+      metadata: Record<string, unknown>;
+      request_id: string | null;
+      occurred_at: Date;
+    }>(
+      `SELECT id::text, actor_type, actor_id::text, action, entity_type, entity_id,
+              old_values, new_values, metadata, request_id, occurred_at
+         FROM audit_logs
+        ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+        ORDER BY occurred_at DESC
+        LIMIT $${values.length}`,
+      values,
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      action: row.action,
+      entityType: row.entity_type,
+      entityId: row.entity_id,
+      timestamp: row.occurred_at.toISOString(),
+      oldValues: row.old_values || {},
+      newValues: row.new_values || {},
+      actorRole: row.actor_type,
+      actorId: row.actor_id,
+      note: String(row.metadata?.note || row.metadata?.message || ""),
+      metadata: row.metadata || {},
+      requestId: row.request_id,
+    }));
+  }
+
   async publicReviews(): Promise<unknown[]> {
     const state = await this.read("reviews");
     return state.data.filter((raw) => {
