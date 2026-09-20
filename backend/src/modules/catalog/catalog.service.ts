@@ -45,6 +45,7 @@ interface AdminInventoryItemRow {
   reservation_until: Date | string | null;
   order_id: string | null;
   purchase_date: Date | string | null;
+  cost_snapshot_minor: string | number;
   legacy: Record<string, unknown>;
   version: string | number;
   created_at: Date | string;
@@ -344,8 +345,8 @@ export class CatalogService {
       );
       const items = await client.query<AdminInventoryItemRow>(
         `SELECT id, item_code, model_id, color, size, status, active, is_archived, is_deleted,
-                cart_reservation_id, reservation_until, order_id, purchase_date, legacy, version,
-                created_at, updated_at
+                cart_reservation_id, reservation_until, order_id, purchase_date,
+                cost_snapshot_minor, legacy, version, created_at, updated_at
            FROM inventory_items ORDER BY created_at DESC`,
       );
       return {
@@ -385,6 +386,7 @@ export class CatalogService {
           reservationUntil: row.reservation_until || undefined,
           orderId: row.order_id || undefined,
           purchaseDate: row.purchase_date || undefined,
+          costSnapshot: money(row.cost_snapshot_minor),
           version: Number(row.version),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -408,10 +410,12 @@ export class CatalogService {
       }
 
       const modelIds = new Set<string>();
+      const modelCosts = new Map<string, number>();
       for (const raw of models) {
         const modelId = text(raw.modelId);
         if (!modelId) throw new AppError(422, "MODEL_ID_REQUIRED", "Model code is required");
         modelIds.add(modelId);
+        modelCosts.set(modelId, minor(raw.cost));
         await client.query(
           `INSERT INTO catalog_models (
              model_id, name, category, description, cost_minor, selling_minor, discount_percent,
@@ -468,9 +472,10 @@ export class CatalogService {
         await client.query(
           `INSERT INTO inventory_items (
              id,item_code,model_id,color,size,status,active,is_archived,is_deleted,
-             cart_reservation_id,reservation_until,order_id,purchase_date,legacy,version,created_at,updated_at
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz,$12,$13,$14::jsonb,1,
-                     COALESCE($15::timestamptz, now()),now())
+             cart_reservation_id,reservation_until,order_id,purchase_date,cost_snapshot_minor,
+             legacy,version,created_at,updated_at
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz,$12,$13,$14,$15::jsonb,1,
+                     COALESCE($16::timestamptz, now()),now())
            ON CONFLICT (id) DO UPDATE SET
              item_code=EXCLUDED.item_code,
              model_id=EXCLUDED.model_id,
@@ -500,6 +505,9 @@ export class CatalogService {
             hasReservation ? String(raw.reservationUntil) : null,
             raw.orderId ? String(raw.orderId) : null,
             raw.purchaseDate ? String(raw.purchaseDate) : null,
+            Number.isFinite(Number(raw.costSnapshot))
+              ? minor(raw.costSnapshot)
+              : modelCosts.get(modelId) ?? 0,
             JSON.stringify(raw), raw.createdAt ? String(raw.createdAt) : null,
           ],
         );
