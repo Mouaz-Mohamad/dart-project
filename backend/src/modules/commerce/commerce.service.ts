@@ -679,6 +679,128 @@ export class CommerceService {
     }
   }
 
+  public async customerSnapshot(customerUserId: string): Promise<{
+    orders: Record<string, unknown>[];
+    returns: unknown[];
+    cards: unknown[];
+  }> {
+    const customerResult = await this.pool.query<{ client_code: string }>(
+      "SELECT client_code FROM customers WHERE user_id=$1",
+      [customerUserId],
+    );
+    const clientCode = customerResult.rows[0]?.client_code;
+    if (!clientCode) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
+
+    const ordersResult = await this.pool.query<{
+      id: string;
+      order_code: string;
+      status: string;
+      payment_method: string;
+      payment_status: string;
+      subtotal_minor: string;
+      order_discount_minor: string;
+      final_minor: string;
+      amount_paid_minor: string;
+      amount_refunded_minor: string;
+      promotion: Record<string, unknown> | null;
+      contact_snapshot: Record<string, unknown>;
+      delivery_address: Record<string, unknown>;
+      delivery_notes: string;
+      created_at: Date;
+      updated_at: Date;
+      delivered_at: Date | null;
+      items: Array<Record<string, unknown>>;
+    }>(
+      `SELECT o.id, o.order_code, o.status, o.payment_method, o.payment_status,
+              o.subtotal_minor::text, o.order_discount_minor::text, o.final_minor::text,
+              o.amount_paid_minor::text, o.amount_refunded_minor::text, o.promotion,
+              o.contact_snapshot, o.delivery_address, o.delivery_notes,
+              o.created_at, o.updated_at, o.delivered_at,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'itemId', oi.inventory_item_id,
+                    'itemCode', oi.item_code,
+                    'modelCode', oi.model_id,
+                    'name', oi.model_name,
+                    'color', oi.color,
+                    'size', oi.size,
+                    'qty', 1,
+                    'originalUnitPrice', oi.original_unit_minor / 100.0,
+                    'discountPercent', oi.model_discount_percent,
+                    'discountAmount', (oi.original_unit_minor - oi.final_unit_minor) / 100.0,
+                    'finalUnitPrice', oi.final_unit_minor / 100.0,
+                    'costSnapshot', oi.cost_snapshot_minor / 100.0
+                  ) ORDER BY oi.created_at, oi.id
+                ) FILTER (WHERE oi.id IS NOT NULL),
+                '[]'::jsonb
+              ) AS items
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id=o.id
+        WHERE o.customer_user_id=$1 AND NOT o.is_deleted
+        GROUP BY o.id
+        ORDER BY o.created_at DESC`,
+      [customerUserId],
+    );
+
+    const states = await this.pool.query<{ domain: string; data: unknown[] }>(
+      "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards')",
+    );
+    const stateByDomain = new Map(states.rows.map((row) => [row.domain, Array.isArray(row.data) ? row.data : []]));
+    const onlyCustomer = (rows: unknown[]) => rows.filter((raw) => {
+      const row = raw as Record<string, unknown>;
+      return String(row.clientId || "") === clientCode && !row.isDeleted;
+    });
+
+    const orders = ordersResult.rows.map((row) => {
+      const subtotal = Number(row.subtotal_minor) / 100;
+      const discountAmount = Number(row.order_discount_minor) / 100;
+      const contact = row.contact_snapshot || {};
+      const address = row.delivery_address || {};
+      return {
+        id: row.id,
+        orderId: row.order_code,
+        clientId: clientCode,
+        status: row.status,
+        paymentMethod: row.payment_method,
+        paymentStatus: row.payment_status,
+        totalPrice: subtotal,
+        orderLevelDiscountAmount: discountAmount,
+        finalAmount: Number(row.final_minor) / 100,
+        amountPaid: Number(row.amount_paid_minor) / 100,
+        amountRefunded: Number(row.amount_refunded_minor) / 100,
+        discount: Number(row.promotion?.percent || 0),
+        promotionType: String(row.promotion?.type || ""),
+        priceSnapshot: row.items,
+        items: row.items.map((item) => item.itemCode),
+        totalProducts: row.items.length,
+        name: contact.name || "",
+        phone1: contact.phone1 || "",
+        phone2: contact.phone2 || "",
+        email: contact.email || "",
+        country: address.country || "",
+        governorate: address.governorate || "",
+        area: address.area || "",
+        street: address.street || "",
+        building: address.building || "",
+        floor: address.floor || "",
+        latitude: address.latitude || "",
+        longitude: address.longitude || "",
+        fullAddress: address.fullAddress || "",
+        deliveryNotes: row.delivery_notes,
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+        ...(row.delivered_at ? { deliveredAt: row.delivered_at.toISOString() } : {}),
+      };
+    });
+
+    return {
+      orders,
+      returns: onlyCustomer(stateByDomain.get("returns") || []),
+      cards: onlyCustomer(stateByDomain.get("cards") || []),
+    };
+  }
+
   private async releaseExpired(client: PoolClient): Promise<void> {
     const result = await client.query(
       `UPDATE inventory_items
