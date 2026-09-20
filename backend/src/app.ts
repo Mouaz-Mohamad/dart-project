@@ -10,6 +10,7 @@ import { CommerceService } from "./modules/commerce/commerce.service.js";
 import { SiteSettingsService } from "./modules/settings/site-settings.service.js";
 import { DashboardStateService } from "./modules/dashboard/dashboard-state.service.js";
 import { CustomerInteractionService } from "./modules/commerce/customer-interaction.service.js";
+import { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
 
 // Vercel discovers Express entrypoints from direct imports in this file.
 void express;
@@ -24,6 +25,7 @@ export const commerceService = new CommerceService(database);
 export const siteSettingsService = new SiteSettingsService(database);
 export const dashboardStateService = new DashboardStateService(database);
 export const customerInteractionService = new CustomerInteractionService(database);
+export const platformAdminService = new PlatformAdminService(database);
 
 database.on("error", (error) => {
   logger.error({ err: error }, "Unexpected PostgreSQL pool error");
@@ -41,6 +43,7 @@ const app = createApp(config, {
   siteSettingsService,
   dashboardStateService,
   customerInteractionService,
+  platformAdminService,
 });
 
 export default app;
