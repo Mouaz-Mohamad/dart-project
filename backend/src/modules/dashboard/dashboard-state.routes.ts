@@ -30,6 +30,23 @@ export function createDashboardStateRouter(
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
 
+  router.get(
+    "/admin/audit",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("dashboard_state.read"),
+    async (request, response) => {
+      const query = z.object({
+        limit: z.coerce.number().int().min(1).max(1500).optional(),
+        entityType: z.string().trim().min(1).max(120).optional(),
+        entityId: z.string().trim().min(1).max(200).optional(),
+      }).parse(request.query);
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json({ audit: await state.audit(query) });
+    },
+  );
+
   router.get("/reviews", async (_request, response) => {
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json({ reviews: await state.publicReviews() });
