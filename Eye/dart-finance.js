@@ -428,6 +428,32 @@
     return (order?.items || []).map((itemCode) => ({ itemCode, qty: 1 }));
   }
 
+  function deliveryCostForOrder(order) {
+    if (Number.isFinite(Number(order?.deliveryCost))) {
+      return Math.max(0, finiteNumber(order.deliveryCost));
+    }
+    const settings = root.DartSiteSettings?.get?.() || {};
+    const configured = Number(settings.deliveryCostPerPiece);
+    const perPiece = Math.max(
+      0,
+      Number.isFinite(configured) ? configured : 100,
+    );
+    const quantity = orderLines(order).reduce(
+      (sum, line) => sum + Math.max(1, finiteNumber(line.qty, 1)),
+      0,
+    );
+    return roundMoney(perPiece * quantity);
+  }
+
+  function deliveredDeliveryCost(data, range) {
+    return roundMoney(
+      deliveredOrders(data, range).reduce(
+        (sum, order) => sum + deliveryCostForOrder(order),
+        0,
+      ),
+    );
+  }
+
   function refundAmountForRange(data, range) {
     const returns = data.returns.filter(completedReturn);
     let total = uniqueCompletedReturns(data, range)
@@ -652,13 +678,23 @@
     const damageLoss = damageWriteOff(data, range);
     const damageValue = damagedInventoryValue(data, range);
     const returnCourierCosts = returnLogisticsCost(data, range);
-    const totalOperatingExpenses = roundMoney(operatingExpenses + codFees + damageLoss + returnCourierCosts);
+    const deliveryCosts = deliveredDeliveryCost(data, range);
+    const totalOperatingExpenses = roundMoney(
+      operatingExpenses + codFees + damageLoss + returnCourierCosts + deliveryCosts,
+    );
     const totalCost = roundMoney(netCogs + totalOperatingExpenses);
     const grossProfit = roundMoney(netRevenue - netCogs);
     const netProfit = roundMoney(netRevenue - totalCost);
     const physicalItemCost = physicalItemAcquisitionCost(data, range);
     const incrementalDamage = incrementalDamageCost(data, range);
-    const brandTotalCost = roundMoney(physicalItemCost + operatingExpenses + codFees + returnCourierCosts + incrementalDamage);
+    const brandTotalCost = roundMoney(
+      physicalItemCost +
+        operatingExpenses +
+        codFees +
+        returnCourierCosts +
+        deliveryCosts +
+        incrementalDamage,
+    );
     const brandNetProfit = roundMoney(netRevenue - brandTotalCost);
     const grossSoldUnits = delivered.reduce(
       (sum, order) => sum + orderLines(order).reduce((lineTotal, line) => lineTotal + Math.max(1, finiteNumber(line.qty, 1)), 0),
@@ -694,7 +730,9 @@
     );
     const paidExpenseCashOut = roundMoney(paidExpenses(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
     const refundCashOut = refunds;
-    const cashOut = roundMoney(paidExpenseCashOut + codFees + returnCourierCosts + refundCashOut);
+    const cashOut = roundMoney(
+      paidExpenseCashOut + codFees + returnCourierCosts + deliveryCosts + refundCashOut,
+    );
 
     const marketing = marketingStats(data, range);
     return {
@@ -709,6 +747,7 @@
       damageLoss,
       damageValue,
       returnCourierCosts,
+      deliveryCosts,
       totalOperatingExpenses,
       totalCost,
       grossProfit,
@@ -926,6 +965,8 @@
     operationalAlerts,
     damagedInventoryValue,
     returnLogisticsCost,
+    deliveryCostForOrder,
+    deliveredDeliveryCost,
     brandMetrics,
     dashboardData,
     money,
@@ -1126,7 +1167,7 @@
     });
     [
       [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
-      [".cost-cont", "Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage from older stock."],
+      [".cost-cont", "Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, delivery cost snapshots, Dart-paid representative fees and non-duplicated damage from older stock."],
       [".profit-cont", "Total Profit", "Total Selling minus the complete Brand Total Cost for the selected period."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
@@ -1274,7 +1315,7 @@
       </div>
       <div class="dart-finance-two-col">
         <article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}
-          <dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl>
+          <dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Delivery costs</dt><dd>(${money(current.deliveryCosts)})</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl>
         </article>
         <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Actual recognized expenses against active budgets.", '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>')}
           <div class="dart-budget-stack">${budgets.length ? budgets.slice(0, 5).map((budget) => `<div class="dart-budget-line"><div><strong>${escapeHTML(budget.name)}</strong><span>${money(budget.actual)} / ${money(budget.amount)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, budget.utilization))}%" class="${budget.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(budget.utilization)} used · ${money(budget.remaining)} remaining</small></div>`).join("") : '<div class="dart-finance-empty">No budgets have been added.</div>'}</div>
@@ -1330,10 +1371,10 @@
     return `${sectionToolbar("Cash Flow", "Cash basis: collected order cash less paid expenses, completed refunds and Dart-paid representative fees.", '<button type="button" class="dart-finance-secondary" data-finance-export="cashflow">Export CSV</button>')}
       <div class="dart-finance-kpi-grid dart-finance-kpi-grid-three">
         ${kpiCard("Cash In", money(current.cashIn), "Recorded COD receipts", "fa-solid fa-arrow-down", "green", { current: current.cashIn, previous: previous.cashIn })}
-        ${kpiCard("Cash Out", money(current.cashOut), "Paid expenses + refunds + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
+        ${kpiCard("Cash Out", money(current.cashOut), "Paid expenses + refunds + delivery + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
         ${kpiCard("Net Cash Change", money(current.netCashFlow), range.label, "fa-solid fa-scale-balanced", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
       </div>
-      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow.</p></article>`;
+      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Delivery costs</dt><dd>(${money(current.deliveryCosts)})</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow.</p></article>`;
   }
 
   function codRows(data, range) {
@@ -1727,8 +1768,8 @@
       downloadCSV(`dart-${report}-${stamp}.csv`, headers, rows.map((row) => headers.map((key) => row[key] ?? "")));
       return;
     }
-    if (report === "pnl") downloadCSV(`dart-pnl-${stamp}.csv`, ["Account", "Amount EGP"], [["Gross Revenue", summary.grossRevenue], ["Refunds", -summary.refunds], ["Total Selling", summary.netRevenue], ["Sold-piece Cost", -summary.netCogs], ["Operating Expenses", -summary.operatingExpenses], ["Settlement Fees", -summary.codFees], ["Representative Exchange Fees", -summary.returnCourierCosts], ["Damage Write-offs", -summary.damageLoss], ["Total Profit", summary.netProfit]]);
-    else if (report === "cashflow") downloadCSV(`dart-cash-flow-${stamp}.csv`, ["Cash Flow", "Amount EGP"], [["Cash In", summary.cashIn], ["Paid Expenses", -summary.paidExpenseCashOut], ["Completed Refunds", -summary.refundCashOut], ["Dart-paid Representative Fees", -summary.returnCourierCosts], ["Settlement Fees", -summary.codFees], ["Net Cash Flow", summary.netCashFlow]]);
+    if (report === "pnl") downloadCSV(`dart-pnl-${stamp}.csv`, ["Account", "Amount EGP"], [["Gross Revenue", summary.grossRevenue], ["Refunds", -summary.refunds], ["Total Selling", summary.netRevenue], ["Sold-piece Cost", -summary.netCogs], ["Operating Expenses", -summary.operatingExpenses], ["Delivery Costs", -summary.deliveryCosts], ["Settlement Fees", -summary.codFees], ["Representative Exchange Fees", -summary.returnCourierCosts], ["Damage Write-offs", -summary.damageLoss], ["Total Profit", summary.netProfit]]);
+    else if (report === "cashflow") downloadCSV(`dart-cash-flow-${stamp}.csv`, ["Cash Flow", "Amount EGP"], [["Cash In", summary.cashIn], ["Paid Expenses", -summary.paidExpenseCashOut], ["Delivery Costs", -summary.deliveryCosts], ["Completed Refunds", -summary.refundCashOut], ["Dart-paid Representative Fees", -summary.returnCourierCosts], ["Settlement Fees", -summary.codFees], ["Net Cash Flow", summary.netCashFlow]]);
     else if (report === "cod") downloadCSV(`dart-cod-${stamp}.csv`, ["Order", "Due", "Received", "Remaining", "Status"], codRows(data, range).map((row) => [row.order.orderId || row.order.id, row.due, row.received, row.remaining, row.status]));
     else if (report === "models") downloadCSV(`dart-model-profitability-${stamp}.csv`, ["Model Code", "Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin %"], modelProfitability(data, range).map((row) => [row.modelCode, row.modelName, row.units, row.revenue, row.cogs, row.profit, decimal(row.margin)]));
     else if (report === "drawlog") {
