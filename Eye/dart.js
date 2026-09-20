@@ -2293,6 +2293,115 @@ function setupHeaderBatchActions() {
 function dartSectionKeyFromContainer(container) {
   return container.closest(".dashboard-section")?.id;
 }
+let dartPasswordResetRequests = [];
+
+async function dartLoadPasswordResetRequests(openAfterLoad = false) {
+  if (!window.DartAdminApi?.request) return [];
+  const payload = await window.DartAdminApi.request(
+    "/api/v1/admin/password-reset-requests",
+  );
+  dartPasswordResetRequests = Array.isArray(payload.requests)
+    ? payload.requests
+    : [];
+
+  const count = document.getElementById("passwordRequestsCount");
+  if (count) count.textContent = String(dartPasswordResetRequests.length);
+
+  const list = document.getElementById("password-requests-list");
+  if (list) {
+    list.replaceChildren();
+    if (!dartPasswordResetRequests.length) {
+      const empty = document.createElement("p");
+      empty.className = "dart-empty-state";
+      empty.textContent = "No pending password reset requests.";
+      list.appendChild(empty);
+    } else {
+      dartPasswordResetRequests.forEach((request) => {
+        const row = document.createElement("div");
+        row.className = "dart-password-request-row";
+        row.dataset.requestId = String(request.id);
+
+        const info = document.createElement("div");
+        info.className = "dart-password-request-info";
+        const title = document.createElement("strong");
+        title.textContent = [request.name, request.code].filter(Boolean).join(" · ");
+        const meta = document.createElement("small");
+        meta.textContent = [
+          request.accountType,
+          request.email,
+          request.phone,
+          request.requestedAt
+            ? new Date(request.requestedAt).toLocaleString()
+            : "",
+        ].filter(Boolean).join(" · ");
+        info.append(title, meta);
+
+        if (!request.matchedAccount) {
+          const unmatched = document.createElement("span");
+          unmatched.className = "dart-sensitive-note";
+          unmatched.textContent = "No matching account — can only cancel this request.";
+          info.appendChild(unmatched);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "dart-password-request-actions";
+
+        if (request.matchedAccount) {
+          const passwordInput = document.createElement("input");
+          passwordInput.type = "password";
+          passwordInput.minLength = 12;
+          passwordInput.maxLength = 200;
+          passwordInput.autocomplete = "new-password";
+          passwordInput.placeholder = "Temporary password (12+ characters)";
+          passwordInput.dataset.temporaryPassword = "1";
+
+          const setButton = document.createElement("button");
+          setButton.type = "button";
+          setButton.className = "action-btn dart-set-temporary-password";
+          setButton.textContent = "Set temporary password";
+          actions.append(passwordInput, setButton);
+        }
+
+        const cancelButton = document.createElement("button");
+        cancelButton.type = "button";
+        cancelButton.className = "action-btn dart-cancel-reset-request";
+        cancelButton.textContent = "Cancel request";
+        actions.appendChild(cancelButton);
+
+        row.append(info, actions);
+        list.appendChild(row);
+      });
+    }
+  }
+
+  if (openAfterLoad) {
+    openModal(document.getElementById("password-requests-modal"));
+  }
+  return dartPasswordResetRequests;
+}
+
+async function dartRequestCustomerPasswordReset(customer) {
+  if (!customer?.serverAuthoritative || !window.DartAdminApi?.request) {
+    return {
+      ok: false,
+      message: "This CRM-only customer does not have a secure login account.",
+    };
+  }
+  try {
+    await window.DartAdminApi.request("/api/v1/auth/forgot-password", {
+      method: "POST",
+      body: {
+        identifier: customer.email || customer.phone1,
+        accountType: "customer",
+      },
+    });
+    await dartLoadPasswordResetRequests(false);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error.message || "Password reset request failed." };
+  }
+}
+
 async function dartAdminAccountState(sectionKey, record, action) {
   if (!window.DartAdminApi?.request || !record?.serverAuthoritative) {
     return { ok: false, message: "Secure account API is unavailable." };
@@ -2465,17 +2574,12 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       const x = customersData.find((v) => String(v.id) === String(id));
       if (e.target.closest("[data-client-profile]")) dartShowClientProfile(x);
       if (e.target.closest(".dart-reset-password-btn")) {
-        dartAudit("PASSWORD_RESET_REQUESTED", "customers", x.id, {}, {});
-        dartNotify(
-          "password_reset",
-          "Password reset requested",
-          `${x.clientName}: password reset must be completed by the secure backend/customer flow.`,
-          "customers",
-          x.id,
-        );
-        alert(
-          "تم تسجيل طلب Reset Password. في النسخة الحالية لا يتم حفظ أو عرض كلمة مرور حقيقية.",
-        );
+        const result = await dartRequestCustomerPasswordReset(x);
+        if (!result.ok) {
+          alert(result.message || "Password reset request failed.");
+        } else {
+          alert("تم تسجيل طلب Reset Password في قاعدة البيانات.");
+        }
       }
     }
     if (e.target.closest("[data-history-entity]"))
@@ -2925,6 +3029,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSearchFilter();
   setupHeaderBatchActions();
   setupAllDelegatedEvents();
+  setupPasswordResetRequests();
   setupGlobalModalTriggers();
   setupModelModal();
   setupItemModal();
@@ -4868,6 +4973,74 @@ function openEditModal(id, sectionKey) {
     document.getElementById("damage-status").value = x.status || "Damaged";
     openModal(document.getElementById("damage-modal"));
   }
+}
+
+function setupPasswordResetRequests() {
+  const openButton = document.getElementById("openPasswordRequestsBtn");
+  if (openButton && !openButton.dataset.dartBound) {
+    openButton.dataset.dartBound = "1";
+    openButton.addEventListener("click", async () => {
+      try {
+        await dartLoadPasswordResetRequests(true);
+      } catch (error) {
+        alert(error.message || "Could not load password reset requests.");
+      }
+    });
+  }
+
+  const list = document.getElementById("password-requests-list");
+  if (list && !list.dataset.dartBound) {
+    list.dataset.dartBound = "1";
+    list.addEventListener("click", async (event) => {
+      const row = event.target.closest("[data-request-id]");
+      if (!row) return;
+      const requestId = row.dataset.requestId;
+
+      if (event.target.closest(".dart-cancel-reset-request")) {
+        if (!confirm("Cancel this password reset request?")) return;
+        try {
+          await window.DartAdminApi.request(
+            `/api/v1/admin/password-reset-requests/${encodeURIComponent(requestId)}/cancel`,
+            { method: "POST" },
+          );
+          await dartLoadPasswordResetRequests(false);
+        } catch (error) {
+          alert(error.message || "Could not cancel the request.");
+        }
+        return;
+      }
+
+      if (event.target.closest(".dart-set-temporary-password")) {
+        const input = row.querySelector("[data-temporary-password]");
+        const temporaryPassword = String(input?.value || "");
+        if (temporaryPassword.length < 12) {
+          alert("Temporary password must be at least 12 characters.");
+          input?.focus();
+          return;
+        }
+        try {
+          await window.DartAdminApi.request(
+            `/api/v1/admin/password-reset-requests/${encodeURIComponent(requestId)}/temporary-password`,
+            {
+              method: "POST",
+              body: { temporaryPassword },
+            },
+          );
+          if (input) input.value = "";
+          await dartLoadPasswordResetRequests(false);
+        } catch (error) {
+          if (input) input.value = "";
+          alert(error.message || "Could not set the temporary password.");
+        }
+      }
+    });
+  }
+
+  void dartLoadPasswordResetRequests(false).catch((error) => {
+    if (error?.status !== 401 && error?.status !== 403) {
+      console.warn("Password reset request refresh failed", error);
+    }
+  });
 }
 
 function setupAllDelegatedEvents() {
