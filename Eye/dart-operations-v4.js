@@ -393,7 +393,6 @@
     const payload = await request('/api/v1/admin/representatives');
     const rows = Array.isArray(payload.representatives) ? payload.representatives : [];
     representativeData = rows;
-    localStorage.setItem('dart_representatives', JSON.stringify(rows));
     return rows;
   }
 
