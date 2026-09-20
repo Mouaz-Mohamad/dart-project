@@ -1568,8 +1568,10 @@ function dartUpdateBirthdayRewardForOrder(order, target) {
   }
   if (window.DartDomainState?.write) {
     window.DartDomainState.write("dart_birthday_rewards", rewards);
-  } else {
+  } else if (["localhost", "127.0.0.1"].includes(location.hostname)) {
     localStorage.setItem("dart_birthday_rewards", JSON.stringify(rewards));
+  } else {
+    throw new Error("Birthday rewards require the secure server state.");
   }
 }
 
