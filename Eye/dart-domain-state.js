@@ -32,6 +32,7 @@
   const dirty = new Set();
   const timers = new Map();
   const queues = new Map();
+  const deniedDomains = new Set();
 
   function readLocal(storageKey) {
     try {
@@ -178,11 +179,21 @@
     const domain = DOMAIN_BY_STORAGE[storageKey];
     if (!domain) {
       localStorage.setItem(storageKey, JSON.stringify(data));
-      return;
+      return true;
+    }
+    if (deniedDomains.has(domain)) {
+      localStorage.removeItem(storageKey);
+      window.dispatchEvent(
+        new CustomEvent("dart:domain-write-denied", {
+          detail: { domain, storageKey },
+        }),
+      );
+      return false;
     }
     localStorage.setItem(storageKey, JSON.stringify(Array.isArray(data) ? data : []));
     dirty.add(domain);
     schedule(domain);
+    return true;
   }
 
   async function hydrateAudit(limit = 500) {
@@ -205,8 +216,40 @@
 
   async function hydrateAll() {
     const domains = Object.keys(STORAGE_BY_DOMAIN);
-    const results = await Promise.all(domains.map((domain) => hydrateDomain(domain)));
-    await hydrateAudit().catch((error) => console.warn("Dart audit hydration failed", error));
+    const results = await Promise.all(
+      domains.map(async (domain) => {
+        try {
+          const data = await hydrateDomain(domain);
+          deniedDomains.delete(domain);
+          return data;
+        } catch (error) {
+          if (error.status !== 403) throw error;
+          deniedDomains.add(domain);
+          const storageKey = STORAGE_BY_DOMAIN[domain];
+          versions.delete(domain);
+          dirty.delete(domain);
+          localStorage.removeItem(storageKey);
+          window.dispatchEvent(
+            new CustomEvent("dart:domain-hydrated", {
+              detail: { domain, storageKey, version: 0, data: [] },
+            }),
+          );
+          return [];
+        }
+      }),
+    );
+    try {
+      await hydrateAudit();
+    } catch (error) {
+      if (error.status === 403) {
+        localStorage.removeItem("dart_audit");
+        window.dispatchEvent(
+          new CustomEvent("dart:audit-hydrated", { detail: { audit: [] } }),
+        );
+      } else {
+        console.warn("Dart audit hydration failed", error);
+      }
+    }
     return Object.fromEntries(domains.map((domain, index) => [domain, results[index]]));
   }
 
