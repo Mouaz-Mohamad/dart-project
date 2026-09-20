@@ -23,3 +23,8 @@ The previous workflow produced many tiny commits and therefore many automatic Ve
 - A commit without both required markers is intentionally skipped by Vercel.
 - Documentation-only and policy-only changes do not rebuild the storefront or API.
 - If a batch changes both frontend and backend, each affected Vercel project builds at most once for that batch.
+
+
+## Backend cron guard
+
+The API project is currently constrained by Vercel Hobby cron scheduling. Its built-in Vercel Cron is a once-daily safety net, and `backend/scripts/check-vercel-config.mjs` rejects a more frequent schedule before a batch is considered healthy. Faster transactional retries can be driven by n8n through the protected outbox processor without creating additional Vercel deployments.

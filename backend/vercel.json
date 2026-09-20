@@ -4,7 +4,7 @@
   "crons": [
     {
       "path": "/api/v1/internal/outbox/process",
-      "schedule": "*/5 * * * *"
+      "schedule": "17 3 * * *"
     }
   ]
 }

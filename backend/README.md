@@ -50,3 +50,10 @@ Applied migration checksums are recorded in `dart_schema_migrations`. Editing an
 ## Current scope and boundaries
 
 Identity/Auth, sessions, basic deny-by-default roles, Owner TOTP, customer Email OTP, reset requests and representative approval boundaries are present. Granular employee permission editing, catalogue, inventory, orders, notifications delivery workers and representative private-document storage remain separate approved increments.
+
+
+## Transactional outbox retries on Vercel Hobby
+
+The API keeps immediate event dispatch for normal transactional flows. The Vercel Cron entry is only a daily safety retry because the Hobby plan accepts schedules that run at most once per day. Faster retry cadence must come from an external scheduler such as the existing n8n automation layer calling the protected outbox processor endpoint.
+
+The protected processor is `POST /api/v1/internal/outbox/process` with `Authorization: Bearer <OUTBOX_CRON_SECRET>`. Keep that secret server-side only. Failed outbox rows keep their own retry timing and are safe to claim concurrently through PostgreSQL locking.
