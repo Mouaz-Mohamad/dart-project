@@ -120,6 +120,40 @@ function activeSiteDiscountPercent(settings: Record<string, unknown>): number {
   return percent;
 }
 
+function birthdayWindow(
+  birthday: string | null | undefined,
+  reference = new Date(),
+): { year: number; startsAt: string; expiresAt: string } | null {
+  const match = String(birthday || "").match(/^\d{4}-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const today = cairoDateKey(reference).split("-").map(Number);
+  const currentYear = today[0]!;
+  const todayUtc = Date.UTC(today[0]!, today[1]! - 1, today[2]!);
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  for (const year of [currentYear, currentYear - 1]) {
+    const start = Date.UTC(year, month - 1, day);
+    const end = start + 7 * 86_400_000;
+    if (todayUtc >= start && todayUtc < end) {
+      const key = (value: number) => new Date(value).toISOString().slice(0, 10);
+      return { year, startsAt: key(start), expiresAt: key(end) };
+    }
+  }
+  return null;
+}
+
+function flexibleDateExpiry(value: unknown): number | null {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const parts = text.split(/[-/]/).map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+  const [a, b, d] = parts;
+  const year = a! > 999 ? a! : d!;
+  const month = b!;
+  const day = a! > 999 ? d! : a!;
+  return Date.UTC(year, month - 1, day, 23, 59, 59, 999);
+}
+
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
 
