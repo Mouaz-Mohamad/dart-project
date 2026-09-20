@@ -177,7 +177,7 @@ const server = http.createServer((request, response) => {
   await receipt.close();
 
   const tracking = await open("track.html");
-  assert.equal(await tracking.locator("#trackingMapShell").count(), 1);
+  assert.equal(await tracking.locator("[data-order-map-shell]").count(), 1);
   await tracking.close();
 
   const dashboard = await open("Eye/Dart%20Eye.html");

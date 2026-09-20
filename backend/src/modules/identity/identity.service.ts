@@ -435,7 +435,7 @@ export class IdentityService {
         `INSERT INTO outbox_events (
            aggregate_type, aggregate_id, event_type, payload, deduplication_key
          ) VALUES ('representative',$1,'REPRESENTATIVE_APPROVAL_REQUESTED',$2::jsonb,$3)
-         ON CONFLICT (deduplication_key) DO NOTHING`,
+         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
         [
           userId,
           JSON.stringify({
@@ -534,7 +534,7 @@ export class IdentityService {
         `INSERT INTO outbox_events (
            aggregate_type, aggregate_id, event_type, payload, deduplication_key
          ) VALUES ('staff_invitation',$1,'STAFF_ONBOARDING_CODE_REQUESTED',$2::jsonb,$3)
-         ON CONFLICT (deduplication_key) DO NOTHING`,
+         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
         [
           invitation.id,
           JSON.stringify({
@@ -941,7 +941,7 @@ export class IdentityService {
         `INSERT INTO outbox_events (
            aggregate_type, aggregate_id, event_type, payload, deduplication_key
          ) VALUES ('staff_invitation',$1,'STAFF_INVITED',$2::jsonb,$3)
-         ON CONFLICT (deduplication_key) DO NOTHING`,
+         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
         [
           invitation.rows[0]!.id,
           JSON.stringify({

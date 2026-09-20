@@ -1457,7 +1457,7 @@ export class CommerceService {
         `INSERT INTO outbox_events (
            aggregate_type, aggregate_id, event_type, payload, deduplication_key
          ) VALUES ('order',$1,'order.created',$2::jsonb,$3)
-         ON CONFLICT (deduplication_key) DO NOTHING`,
+         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
         [
           order.id,
           JSON.stringify({
@@ -3868,7 +3868,7 @@ export class CommerceService {
         `INSERT INTO outbox_events (
            aggregate_type, aggregate_id, event_type, payload, deduplication_key
          ) VALUES ('order',$1,'order.created',$2::jsonb,$3)
-         ON CONFLICT (deduplication_key) DO NOTHING`,
+         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
         [
           order.id,
           JSON.stringify({
