@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { generateSecret, generateURI, verify as verifyTotp } from "otplib";
 import type { Pool, PoolClient } from "pg";
 import type { AppConfig } from "../../config/env.js";
@@ -71,7 +71,11 @@ export interface RegisterRepresentativeInput {
   phone1: string;
   phone2?: string | undefined;
   nationalId: string;
+  address: string;
   password: string;
+  idFrontImage: string;
+  idBackImage: string;
+  faceImage: string;
 }
 
 export interface IdentityPublicProfile {
@@ -111,6 +115,31 @@ function normalizePhonesOrThrow(phones: string[]): string[] {
 
 function ipHash(ipAddress: string | undefined, pepper: string): string | null {
   return ipAddress ? digest(`ip:${ipAddress}`, pepper) : null;
+}
+
+function parsePrivateRepresentativeImage(value: string): {
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  bytes: Buffer;
+  canonicalDataUrl: string;
+  sha256: string;
+} {
+  const match = String(value || "").match(
+    /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/,
+  );
+  if (!match) {
+    throw new AppError(422, "REPRESENTATIVE_IMAGE_INVALID", "Verification images must be JPG, PNG or WebP");
+  }
+  const contentType = match[1] as "image/jpeg" | "image/png" | "image/webp";
+  const bytes = Buffer.from(match[2]!, "base64");
+  if (!bytes.length || bytes.length > 1024 * 1024) {
+    throw new AppError(422, "REPRESENTATIVE_IMAGE_TOO_LARGE", "Each compressed verification image must be 1 MB or smaller");
+  }
+  return {
+    contentType,
+    bytes,
+    canonicalDataUrl: `data:${contentType};base64,${bytes.toString("base64")}`,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
 }
 
 export class IdentityService {
