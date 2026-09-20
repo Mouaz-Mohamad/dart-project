@@ -24,7 +24,7 @@ const cartLineSchema = z.object({
 
 const reserveSchema = z.object({
   reservationId,
-  lines: z.array(cartLineSchema).max(20),
+  lines: z.array(cartLineSchema).min(1).max(20),
 }).superRefine((value, context) => {
   const total = value.lines.reduce((sum, line) => sum + line.quantity, 0);
   if (total > 20) {
@@ -68,10 +68,10 @@ const checkoutSchema = z.object({
     street: z.string().trim().min(1).max(200),
     building: z.string().trim().min(1).max(120),
     floor: z.string().trim().min(1).max(80),
-    latitude: z.string().trim().min(1).max(80),
-    longitude: z.string().trim().min(1).max(80),
+    latitude: z.coerce.number().finite().min(-90).max(90).transform(String),
+    longitude: z.coerce.number().finite().min(-180).max(180).transform(String),
     fullAddress: z.string().trim().max(600).optional(),
-    addressSource: z.string().trim().max(80).optional(),
+    addressSource: z.enum(["map", "manual"]),
   }),
   deliveryNotes: z.string().trim().max(1000).optional(),
   promotionCode: z.string().trim().min(1).max(120).optional(),
@@ -543,11 +543,18 @@ export function createCommerceRouter(
     requireAccountType("customer"),
     async (request, response) => {
       const body = checkoutSchema.parse(request.body);
+      const idempotencyKey = z.string()
+        .trim()
+        .min(16)
+        .max(128)
+        .regex(/^[A-Za-z0-9:_-]+$/)
+        .parse(request.get("Idempotency-Key"));
       const result = await commerce.checkout(
         request.auth!.userId,
         body,
         String(request.id),
         guestCartOwnerHash(request, response, config, false) ?? undefined,
+        idempotencyKey,
       );
       response.status(201).json({ order: result });
     },

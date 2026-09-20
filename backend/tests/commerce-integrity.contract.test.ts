@@ -9,8 +9,38 @@ const routes = readFileSync(
   new URL("../src/modules/commerce/commerce.routes.ts", import.meta.url),
   "utf8",
 );
+const platform = readFileSync(
+  new URL("../../Js/dart-platform.js", import.meta.url),
+  "utf8",
+);
 
 describe("commerce concurrency and representative safety contracts", () => {
+  it("enforces checkout idempotency inside the order transaction", () => {
+    expect(routes).toContain('request.get("Idempotency-Key")');
+    expect(service).toContain("INSERT INTO idempotency_keys");
+    expect(service).toContain('status === "completed" && existing.response_body');
+    expect(service).toContain("IDEMPOTENCY_KEY_REUSED");
+    expect(service).toMatch(/SET status='completed', response_code=201, response_body=/);
+    expect(platform).toContain('"Idempotency-Key": `checkout-${CART_RESERVATION_ID}`');
+    expect(platform.indexOf('setCartReservationId(uid("CART"))')).toBeGreaterThan(
+      platform.indexOf('await apiRequest("/api/v1/orders"'),
+    );
+  });
+
+  it("fails closed when a guest reservation has no matching owner proof", () => {
+    expect(service.match(/!\w+\.guest_owner_hash/g)?.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("verifies every reserved item moved to the created order", () => {
+    expect(service).toContain("inventoryUpdate.rowCount");
+    expect(service).toContain("RESERVATION_CHANGED");
+  });
+
+  it("validates checkout coordinates and address provenance", () => {
+    expect(routes).toContain('z.coerce.number().finite().min(-90).max(90).transform(String)');
+    expect(routes).toContain('z.enum(["map", "manual"])');
+  });
+
   it("serializes every mutable return-state read", () => {
     const mutableReturnReads = service.match(
       /SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'(?: FOR UPDATE)?/g,

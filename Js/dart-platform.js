@@ -401,6 +401,7 @@
         .join("=");
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
+      ...options,
       headers: {
         "Content-Type": "application/json",
         ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken
@@ -408,7 +409,6 @@
           : {}),
         ...(options.headers || {}),
       },
-      ...options,
       body:
         options.body && typeof options.body !== "string"
           ? JSON.stringify(options.body)
@@ -979,6 +979,7 @@
     if (API_BASE) {
       const response = await apiRequest("/api/v1/orders", {
         method: "POST",
+        headers: { "Idempotency-Key": `checkout-${CART_RESERVATION_ID}` },
         body: {
           reservationId: CART_RESERVATION_ID,
           contact: {
@@ -1010,6 +1011,7 @@
       });
       if (typeof cartData !== "undefined") cartData = [];
       write("dart_cart", []);
+      setCartReservationId(uid("CART"));
       window.dartAppliedPromotion = null;
       await Promise.all([
         window.DartCatalog?.checkForServerChanges?.(),

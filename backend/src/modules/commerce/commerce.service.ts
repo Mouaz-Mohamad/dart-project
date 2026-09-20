@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 
@@ -537,8 +537,7 @@ export class CommerceService {
           }
           if (
             !current.customer_user_id &&
-            current.guest_owner_hash &&
-            current.guest_owner_hash !== guestOwnerHash
+            (!current.guest_owner_hash || current.guest_owner_hash !== guestOwnerHash)
           ) {
             throw new AppError(
               403,
@@ -556,8 +555,8 @@ export class CommerceService {
           }
           if (
             current.customer_user_id ||
-            (current.guest_owner_hash &&
-              current.guest_owner_hash !== guestOwnerHash)
+            !current.guest_owner_hash ||
+            current.guest_owner_hash !== guestOwnerHash
           ) {
             throw new AppError(
               403,
@@ -979,8 +978,8 @@ export class CommerceService {
       }
       if (
         reservation.customer_user_id ||
-        (reservation.guest_owner_hash &&
-          reservation.guest_owner_hash !== guestOwnerHash)
+        !reservation.guest_owner_hash ||
+        reservation.guest_owner_hash !== guestOwnerHash
       ) {
         throw new AppError(
           403,
@@ -1016,11 +1015,52 @@ export class CommerceService {
     input: CheckoutInput,
     requestId: string,
     guestOwnerHash?: string,
+    idempotencyKey?: string,
   ): Promise<Record<string, unknown>> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
       await this.releaseExpired(client);
+
+      if (!idempotencyKey) {
+        throw new AppError(400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required");
+      }
+      const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
+      const requestHash = createHash("sha256")
+        .update(JSON.stringify({ customerUserId, input }))
+        .digest("hex");
+      const insertedKey = await client.query<{ id: string }>(
+        `INSERT INTO idempotency_keys (scope, key_hash, request_hash, expires_at)
+         VALUES ($1,$2,$3,now() + interval '24 hours')
+         ON CONFLICT (scope, key_hash) DO NOTHING
+         RETURNING id::text`,
+        [`order.create:${customerUserId}`, keyHash, requestHash],
+      );
+      if (!insertedKey.rows.length) {
+        const existingKey = await client.query<{
+          request_hash: string;
+          status: string;
+          response_body: Record<string, unknown> | null;
+        }>(
+          `SELECT request_hash, status, response_body
+             FROM idempotency_keys
+            WHERE scope=$1 AND key_hash=$2 AND expires_at > now()
+            FOR UPDATE`,
+          [`order.create:${customerUserId}`, keyHash],
+        );
+        const existing = existingKey.rows[0];
+        if (!existing) {
+          throw new AppError(409, "IDEMPOTENCY_KEY_EXPIRED", "Retry checkout with a new idempotency key");
+        }
+        if (existing.request_hash !== requestHash) {
+          throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used for different checkout data");
+        }
+        if (existing.status === "completed" && existing.response_body) {
+          await client.query("COMMIT");
+          return existing.response_body;
+        }
+        throw new AppError(409, "CHECKOUT_IN_PROGRESS", "This checkout is already being processed");
+      }
 
       const reservationResult = await client.query<{
         customer_user_id: string | null;
@@ -1044,8 +1084,7 @@ export class CommerceService {
       }
       if (
         !reservation.customer_user_id &&
-        reservation.guest_owner_hash &&
-        reservation.guest_owner_hash !== guestOwnerHash
+        (!reservation.guest_owner_hash || reservation.guest_owner_hash !== guestOwnerHash)
       ) {
         throw new AppError(
           403,
@@ -1381,7 +1420,7 @@ export class CommerceService {
         );
       }
 
-      await client.query(
+      const inventoryUpdate = await client.query(
         `UPDATE inventory_items
             SET status='Processing/Held',
                 order_id=$2,
@@ -1392,6 +1431,9 @@ export class CommerceService {
           WHERE cart_reservation_id=$1`,
         [input.reservationId, order.order_code],
       );
+      if ((inventoryUpdate.rowCount ?? 0) !== itemSnapshots.length) {
+        throw new AppError(409, "RESERVATION_CHANGED", "Reserved inventory changed during checkout");
+      }
       await client.query("DELETE FROM cart_reservations WHERE id=$1", [input.reservationId]);
 
       await client.query(
@@ -1433,9 +1475,7 @@ export class CommerceService {
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
       );
-      await client.query("COMMIT");
-
-      return {
+      const checkoutResponse = {
         id: order.id,
         orderId: order.order_code,
         status: "New",
@@ -1472,8 +1512,16 @@ export class CommerceService {
         ...input.address,
         deliveryNotes: input.deliveryNotes || "",
       };
+      await client.query(
+        `UPDATE idempotency_keys
+            SET status='completed', response_code=201, response_body=$3::jsonb, updated_at=now()
+          WHERE scope=$1 AND key_hash=$2`,
+        [`order.create:${customerUserId}`, keyHash, JSON.stringify(checkoutResponse)],
+      );
+      await client.query("COMMIT");
+      return checkoutResponse;
     } catch (error) {
-      await client.query("ROLLBACK");
+      await client.query("ROLLBACK").catch(() => undefined);
       throw error;
     } finally {
       client.release();
