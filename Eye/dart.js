@@ -3357,7 +3357,8 @@ function dartRollbackOrderOneStep(order) {
   )
     return { ok: false, message: "لا يمكن الرجوع خطوة من هذه الحالة." };
   const prevStatus = order.status,
-    target = dartPreviousStatus(prevStatus);
+    target = dartPreviousStatus(prevStatus),
+    serverAuthoritative = Boolean(window.DartOrdersApi);
   if (!target) return { ok: false, message: "لا توجد خطوة سابقة." };
   if (
     !confirm(
@@ -3366,13 +3367,15 @@ function dartRollbackOrderOneStep(order) {
   )
     return { ok: false, message: "cancelled" };
   if (prevStatus === "Delivered") {
-    (order.items || []).forEach((code) => {
-      const it = dartFindItemByCode(code);
-      if (it && it.status === "Sold") {
-        it.status = "Processing/Held";
-        it.purchaseDate = "";
-      }
-    });
+    if (!serverAuthoritative) {
+      (order.items || []).forEach((code) => {
+        const it = dartFindItemByCode(code);
+        if (it && it.status === "Sold") {
+          it.status = "Processing/Held";
+          it.purchaseDate = "";
+        }
+      });
+    }
     order.deliveredAt = null;
     if (
       order.paymentMethod &&
@@ -3383,7 +3386,7 @@ function dartRollbackOrderOneStep(order) {
       order.amountPaid = 0;
       order.paidAt = null;
     }
-    if (order.birthdayRewardId) {
+    if (!serverAuthoritative && order.birthdayRewardId) {
       let rewards;
       try {
         rewards = JSON.parse(
@@ -3441,7 +3444,7 @@ function dartRollbackOrderOneStep(order) {
     order.id,
     "warning",
   );
-  dartSaveAll();
+  dartPersistOrderWorkflow();
   dartRefreshAll();
   return { ok: true };
 }
