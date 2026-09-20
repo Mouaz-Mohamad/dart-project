@@ -944,7 +944,7 @@ function renderCart() {
         card.querySelector('.qty-value').textContent = item.quantity;
         card.querySelector('.p-total').textContent = Math.trunc(item.price * item.quantity);
 
-        card.querySelector('.increase').addEventListener('click', () => {
+        card.querySelector('.increase').addEventListener('click', async () => {
             const product = productsData.find(p => p.id === item.id);
             const availableStock = product ? getAvailableStock(product, item.size, item.color) : 0;
 
@@ -954,21 +954,21 @@ function renderCart() {
             }
 
             cartData[index].quantity += 1;
-            saveCartToLocalStorage();
+            if (!await saveCartToLocalStorage()) return renderCart();
             renderCart();
         });
 
-        card.querySelector('.decrease').addEventListener('click', () => {
+        card.querySelector('.decrease').addEventListener('click', async () => {
             if (cartData[index].quantity > 1) {
                 cartData[index].quantity -= 1;
-                saveCartToLocalStorage();
+                if (!await saveCartToLocalStorage()) return renderCart();
                 renderCart();
             }
         });
 
-        card.querySelector('.remove-item-btn').addEventListener('click', () => {
+        card.querySelector('.remove-item-btn').addEventListener('click', async () => {
             cartData.splice(index, 1);
-            saveCartToLocalStorage();
+            if (!await saveCartToLocalStorage()) return renderCart();
             renderCart();
         });
 
@@ -979,10 +979,10 @@ function renderCart() {
     updateCartCount();
 }
 
-function saveCartToLocalStorage() {
+async function saveCartToLocalStorage() {
     const previous = JSON.parse(localStorage.getItem('dart_cart') || '[]');
     try {
-        if (window.DartPlatform?.reserveCart) window.DartPlatform.reserveCart(cartData);
+        if (window.DartPlatform?.reserveCart) await window.DartPlatform.reserveCart(cartData);
         else localStorage.setItem('dart_cart', JSON.stringify(cartData));
         if (window.dartAppliedPromotion?.cardId) {
             const used=Number(window.dartAppliedPromotion.purchasedItems||0),limit=Number(window.dartAppliedPromotion.itemLimit||window.dartAppliedPromotion.purchasedLimit||10),count=cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0);
@@ -991,6 +991,7 @@ function saveCartToLocalStorage() {
         return true;
     } catch (error) {
         cartData = previous;
+        localStorage.setItem('dart_cart', JSON.stringify(previous));
         showToast(error.message || 'تعذر حجز القطعة. حاول مرة أخرى.');
         return false;
     }
@@ -1013,7 +1014,7 @@ function initCartAndCheckoutEvents() {
     renderCart();
 
     if (modalBuyBtn) {
-        modalBuyBtn.addEventListener('click', () => {
+        modalBuyBtn.addEventListener('click', async () => {
             if (!selectedSize) {
                 setProductOptionStatus('Choose an available size before adding this product.', 'error');
                 showToast('Choose a size first.');
@@ -1051,7 +1052,7 @@ function initCartAndCheckoutEvents() {
                 });
             }
 
-            if (!saveCartToLocalStorage()) { renderCart(); return; }
+            if (!await saveCartToLocalStorage()) { renderCart(); return; }
             showToast("تم إضافة المنتج إلى السلة بنجاح!");
             updateCartCount();
             showCartBanner(activeProduct.title);
@@ -1166,7 +1167,7 @@ function initCartAndCheckoutEvents() {
             }
 
             cartData = [];
-            saveCartToLocalStorage();
+            await saveCartToLocalStorage();
             appliedDiscountRate = 0;
             updateCartCount();
             showToast("تم إتمام طلبك بنجاح! شكراً لك.");
