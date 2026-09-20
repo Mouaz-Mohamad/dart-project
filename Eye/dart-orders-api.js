@@ -106,6 +106,20 @@
     return payload.orders || [];
   }
 
+  async function updateManual(orderRef, order) {
+    const payload = await api(
+      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}`,
+      {
+        method: "PATCH",
+        body: order,
+      },
+    );
+    serverVersion = Number(payload.version || serverVersion || 1);
+    dirty = false;
+    cache(payload.orders || []);
+    return payload.orders || [];
+  }
+
   async function hydrate(force = false) {
     const localOrders = readLocal();
     let payload = await api("/api/v1/admin/orders-state");
@@ -153,6 +167,7 @@
   window.DartOrdersApi = {
     hydrate,
     createManual,
+    updateManual,
     sync,
     write,
     read: readLocal,
