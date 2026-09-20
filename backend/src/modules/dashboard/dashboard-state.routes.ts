@@ -28,6 +28,25 @@ const SENSITIVE_DOMAIN_PERMISSIONS: Partial<
     write: "representatives.manage",
   },
   damage: { read: "damage.manage", write: "damage.manage" },
+  reviews: { read: "reviews.read", write: "reviews.manage" },
+  contacts: { read: "contacts.read", write: "contacts.manage" },
+  cards: { read: "loyalty.read", write: "loyalty.manage" },
+  birthday_rewards: { read: "loyalty.read", write: "loyalty.manage" },
+  birthday_messages: { read: "messaging.read", write: "messaging.manage" },
+  message_queue: { read: "messaging.read", write: "messaging.manage" },
+  notifications: {
+    read: "notifications.read",
+    write: "notifications.manage",
+  },
+  promotions: { read: "promotions.read", write: "promotions.manage" },
+  finance_expenses: { read: "finance.read", write: "finance.manage" },
+  finance_budgets: { read: "finance.read", write: "finance.manage" },
+  finance_invoices: { read: "finance.read", write: "finance.manage" },
+  finance_goals: { read: "finance.read", write: "finance.manage" },
+  finance_marketing: { read: "finance.read", write: "finance.manage" },
+  finance_settlements: { read: "finance.read", write: "finance.manage" },
+  finance_audit: { read: "finance.read", write: "finance.manage" },
+  draw_audit: { read: "loyalty.read", write: "loyalty.manage" },
 };
 
 function requireSensitiveDomainPermission(
