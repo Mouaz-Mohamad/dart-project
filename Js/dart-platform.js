@@ -74,9 +74,18 @@
   const now = () => new Date().toISOString();
   const uid = (prefix) =>
     `${prefix}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
-  const CART_RESERVATION_ID =
+  let CART_RESERVATION_ID =
     sessionStorage.getItem("dart_cart_reservation_id") || uid("CART");
   sessionStorage.setItem("dart_cart_reservation_id", CART_RESERVATION_ID);
+
+  function setCartReservationId(value) {
+    const next = String(value || "").trim();
+    if (!next) return CART_RESERVATION_ID;
+    CART_RESERVATION_ID = next;
+    sessionStorage.setItem("dart_cart_reservation_id", CART_RESERVATION_ID);
+    if (window.DartPlatform) window.DartPlatform.cartReservationId = CART_RESERVATION_ID;
+    return CART_RESERVATION_ID;
+  }
   const ENTERED_FROM_INTERNAL_NAVIGATION =
     sessionStorage.getItem("dart_internal_navigation") === "1";
   const PAGE_NAVIGATION_TYPE =
@@ -1157,12 +1166,61 @@
     status.classList.toggle("is-success", !error);
   }
 
+  async function hydrateCustomerCart() {
+    if (!API_BASE || !currentUser()) return read("dart_cart", []);
+    const localCart = read("dart_cart", []);
+    const payload = await apiRequest("/api/v1/me/cart");
+    const remote = payload?.cart || null;
+
+    if (!remote) {
+      if (localCart.length) {
+        await reserveCart(localCart);
+        return read("dart_cart", []);
+      }
+      write("dart_cart", []);
+      if (typeof cartData !== "undefined") cartData = [];
+      if (typeof renderCart === "function") renderCart();
+      if (typeof updateCartCount === "function") updateCartCount();
+      return [];
+    }
+
+    setCartReservationId(remote.reservationId);
+    const products = getProducts();
+    const hydrated = (remote.lines || []).map((line) => {
+      const product = products.find(
+        (row) =>
+          String(row.code || row.id) === String(line.modelId),
+      );
+      const model = DartCatalog.model(String(line.modelId));
+      return {
+        id: String(line.modelId),
+        title: product?.title || model?.name || String(line.modelId),
+        price: Number(product?.price ?? DartCatalog.price(model) ?? 0),
+        size: String(line.size),
+        color: String(line.color),
+        quantity: Number(line.quantity) || 1,
+        image: DartCatalog.cover(model, String(line.color)),
+        reservationId: CART_RESERVATION_ID,
+        reservationUntil: remote.expiresAt,
+      };
+    });
+    write("dart_cart", hydrated);
+    if (typeof cartData !== "undefined") cartData = hydrated;
+    if (typeof renderCart === "function") renderCart();
+    if (typeof updateCartCount === "function") updateCartCount();
+    updateCartReservationTimer();
+    return hydrated;
+  }
+
   async function releaseCartReservation(clearCart = true) {
     if (API_BASE) {
       try {
-        await apiRequest(`/api/v1/cart/reservation/${encodeURIComponent(CART_RESERVATION_ID)}`, {
-          method: "DELETE",
-        });
+        await apiRequest(
+          currentUser()
+            ? "/api/v1/me/cart/reservation"
+            : `/api/v1/cart/reservation/${encodeURIComponent(CART_RESERVATION_ID)}`,
+          { method: "DELETE" },
+        );
       } catch (error) {
         if (![404, 409].includes(error.status)) throw error;
       }
@@ -1267,13 +1325,17 @@
         size: String(line.size),
         quantity: Number(line.quantity),
       }));
-      const payload = await apiRequest("/api/v1/cart/reservation", {
-        method: "PUT",
-        body: {
-          reservationId: CART_RESERVATION_ID,
-          lines,
+      const payload = await apiRequest(
+        currentUser() ? "/api/v1/me/cart/reservation" : "/api/v1/cart/reservation",
+        {
+          method: "PUT",
+          body: {
+            reservationId: CART_RESERVATION_ID,
+            lines,
+          },
         },
-      });
+      );
+      setCartReservationId(payload.reservationId || CART_RESERVATION_ID);
       cart.forEach((line) => {
         line.reservationId = CART_RESERVATION_ID;
         line.reservationUntil = payload.expiresAt;
@@ -3012,6 +3074,7 @@
     if (API_BASE) {
       try {
         await hydrateApiSession();
+        if (currentUser()) await hydrateCustomerCart();
       } catch (error) {
         console.warn("Dart account service is temporarily unavailable.", error.code || "API_ERROR");
       }
@@ -3106,6 +3169,7 @@
     verifyEmail,
     hydrateApiSession,
     hydrateCustomerCommerce,
+    hydrateCustomerCart,
     logout,
     currentUser,
     checkout,
