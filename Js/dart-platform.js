@@ -428,6 +428,7 @@
         status: response.status,
         payload,
         code: payload?.error?.code,
+        details: payload?.error?.details,
       },
       );
     return payload;
@@ -933,7 +934,7 @@
     return "";
   }
 
-  async function checkout(form) {
+  async function checkout(form, options = {}) {
     cleanupCartReservations();
     const cart =
       typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
@@ -1013,6 +1014,7 @@
               addressValidation?.source || form.dataset.dartAddressSource || "map",
           },
           deliveryNotes: details.deliveryNotes || "",
+          ...(options.acceptPriceChanges ? { acceptPriceChanges: true } : {}),
           ...(window.dartAppliedPromotion?.type === "Promotion" &&
           window.dartAppliedPromotion?.code
             ? { promotionCode: String(window.dartAppliedPromotion.code) }
