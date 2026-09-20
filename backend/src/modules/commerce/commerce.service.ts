@@ -431,6 +431,251 @@ export class CommerceService {
     }
   }
 
+  public async adminOrders(): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    const versionResult = await this.pool.query<{ version: string }>(
+      "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
+    );
+    const result = await this.pool.query<any>(
+      `SELECT o.*, c.client_code,
+          COALESCE((
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'itemId', oi.inventory_item_id,
+                'itemCode', oi.item_code,
+                'modelCode', oi.model_id,
+                'name', oi.model_name,
+                'color', oi.color,
+                'size', oi.size,
+                'qty', 1,
+                'originalUnitPrice', oi.original_unit_minor / 100.0,
+                'discountPercent', oi.model_discount_percent,
+                'discountAmount', (oi.original_unit_minor - oi.final_unit_minor) / 100.0,
+                'finalUnitPrice', oi.final_unit_minor / 100.0,
+                'costSnapshot', oi.cost_snapshot_minor / 100.0
+              )
+              ORDER BY oi.created_at
+            )
+            FROM order_items oi
+            WHERE oi.order_id=o.id
+          ), '[]'::jsonb) AS item_rows
+        FROM orders o
+        LEFT JOIN customers c ON c.user_id=o.customer_user_id
+        ORDER BY o.created_at DESC`,
+    );
+    return {
+      version: Number(versionResult.rows[0]?.version || 1),
+      orders: result.rows.map((row: any) => {
+        const legacy = row.legacy && typeof row.legacy === "object" ? row.legacy : {};
+        const contact = row.contact_snapshot || {};
+        const address = row.delivery_address || {};
+        const snapshots = Array.isArray(row.item_rows) && row.item_rows.length
+          ? row.item_rows
+          : Array.isArray(legacy.priceSnapshot) ? legacy.priceSnapshot : [];
+        return {
+          ...legacy,
+          id: row.id,
+          orderId: row.order_code,
+          status: row.status,
+          createdAt: row.created_at,
+          orderCreatedAt: row.created_at,
+          deliveredAt: row.delivered_at || legacy.deliveredAt,
+          clientId: row.client_code || legacy.clientId || "",
+          clientName: contact.name || legacy.clientName || "",
+          phone1: contact.phone1 || legacy.phone1 || "",
+          phone2: contact.phone2 || legacy.phone2 || "-",
+          email: contact.email || legacy.email || "",
+          items: snapshots.length ? snapshots.map((line: any) => line.itemCode) : legacy.items || [],
+          totalProducts: snapshots.length ? snapshots.length : Number(legacy.totalProducts || 0),
+          priceSnapshot: snapshots,
+          totalPrice: Number(row.subtotal_minor || 0) / 100,
+          orderLevelDiscountAmount: Number(row.order_discount_minor || 0) / 100,
+          finalAmount: Number(row.final_minor || 0) / 100,
+          paymentMethod: row.payment_method,
+          paymentStatus: row.payment_status,
+          amountPaid: Number(row.amount_paid_minor || 0) / 100,
+          amountRefunded: Number(row.amount_refunded_minor || 0) / 100,
+          promotionType: row.promotion?.type || legacy.promotionType || "",
+          discount: Number(row.promotion?.percent || legacy.discount || 0),
+          country: address.country || legacy.country || "",
+          governorate: address.governorate || legacy.governorate || "",
+          area: address.area || legacy.area || "",
+          street: address.street || legacy.street || "",
+          building: address.building || legacy.building || "",
+          floor: address.floor || legacy.floor || "",
+          latitude: address.latitude || legacy.latitude || "",
+          longitude: address.longitude || legacy.longitude || "",
+          fullAddress: address.fullAddress || legacy.fullAddress || "",
+          addressSource: address.addressSource || legacy.addressSource || "",
+          deliveryNotes: row.delivery_notes || legacy.deliveryNotes || "",
+          orderSource: row.order_source || legacy.orderSource || "Website",
+          isArchived: row.is_archived,
+          isDeleted: row.is_deleted,
+          version: Number(row.version || 1),
+        };
+      }),
+    };
+  }
+
+  public async replaceAdminOrders(
+    expectedVersion: number,
+    orders: Record<string, unknown>[],
+    actorId: string,
+    requestId: string,
+  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    const client = await this.pool.connect();
+    const allowedStatuses = new Set([
+      "New",
+      "Accepted",
+      "Preparing",
+      "Out With Representative",
+      "Representative On The Way",
+      "Delivered",
+      "Refused",
+      "Cancelled",
+      "Returned",
+      "Needs Attention",
+    ]);
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<{ version: string }>(
+        "SELECT version::text FROM domain_state_versions WHERE domain='orders' FOR UPDATE",
+      );
+      const currentVersion = Number(locked.rows[0]?.version || 1);
+      if (currentVersion !== expectedVersion) {
+        throw new AppError(409, "ORDERS_VERSION_CONFLICT", "Orders changed on another device; reload and retry");
+      }
+
+      for (const raw of orders) {
+        const orderCode = String(raw.orderId || "").trim();
+        if (!orderCode) continue;
+        const rawStatus = String(raw.status || "New");
+        const status = allowedStatuses.has(rawStatus) ? rawStatus : "Needs Attention";
+        const clientCode = String(raw.clientId || "").trim();
+        const customerResult = clientCode
+          ? await client.query<{ user_id: string }>(
+              "SELECT user_id FROM customers WHERE client_code=$1",
+              [clientCode],
+            )
+          : { rows: [] as { user_id: string }[] };
+        const customerUserId = customerResult.rows[0]?.user_id || null;
+        const subtotalMinor = Math.max(0, Math.round((Number(raw.totalPrice) || 0) * 100));
+        const discountMinor = Math.max(
+          0,
+          Math.round((Number(raw.orderLevelDiscountAmount) || 0) * 100),
+        );
+        const finalMinor = Math.max(
+          0,
+          Math.round(
+            (Number.isFinite(Number(raw.finalAmount))
+              ? Number(raw.finalAmount)
+              : Number(raw.totalPrice || 0) - Number(raw.orderLevelDiscountAmount || 0)) * 100,
+          ),
+        );
+        const contact = {
+          name: String(raw.clientName || ""),
+          phone1: String(raw.phone1 || ""),
+          phone2: String(raw.phone2 || ""),
+          email: String(raw.email || ""),
+        };
+        const address = {
+          country: String(raw.country || ""),
+          governorate: String(raw.governorate || ""),
+          area: String(raw.area || ""),
+          street: String(raw.street || ""),
+          building: String(raw.building || ""),
+          floor: String(raw.floor || ""),
+          latitude: String(raw.latitude || ""),
+          longitude: String(raw.longitude || ""),
+          fullAddress: String(raw.fullAddress || ""),
+          addressSource: String(raw.addressSource || ""),
+        };
+        const promotion = raw.promotionType
+          ? { type: String(raw.promotionType), percent: Number(raw.discount || 0) }
+          : null;
+        const deliveredAt = raw.deliveredAt ? String(raw.deliveredAt) : null;
+
+        await client.query(
+          `INSERT INTO orders (
+             order_code, customer_user_id, status, payment_method, payment_status,
+             subtotal_minor, order_discount_minor, final_minor,
+             amount_paid_minor, amount_refunded_minor, promotion, contact_snapshot,
+             delivery_address, delivery_notes, order_source, is_archived, is_deleted,
+             legacy, created_at, updated_at, delivered_at
+           ) VALUES (
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17,
+             $18::jsonb,COALESCE($19::timestamptz,now()),now(),$20::timestamptz
+           )
+           ON CONFLICT (order_code) DO UPDATE SET
+             customer_user_id=COALESCE(EXCLUDED.customer_user_id, orders.customer_user_id),
+             status=EXCLUDED.status,
+             payment_method=EXCLUDED.payment_method,
+             payment_status=EXCLUDED.payment_status,
+             subtotal_minor=EXCLUDED.subtotal_minor,
+             order_discount_minor=EXCLUDED.order_discount_minor,
+             final_minor=EXCLUDED.final_minor,
+             amount_paid_minor=EXCLUDED.amount_paid_minor,
+             amount_refunded_minor=EXCLUDED.amount_refunded_minor,
+             promotion=EXCLUDED.promotion,
+             contact_snapshot=EXCLUDED.contact_snapshot,
+             delivery_address=EXCLUDED.delivery_address,
+             delivery_notes=EXCLUDED.delivery_notes,
+             order_source=EXCLUDED.order_source,
+             is_archived=EXCLUDED.is_archived,
+             is_deleted=EXCLUDED.is_deleted,
+             legacy=EXCLUDED.legacy,
+             delivered_at=COALESCE(EXCLUDED.delivered_at, orders.delivered_at),
+             version=orders.version+1,
+             updated_at=now()`,
+          [
+            orderCode,
+            customerUserId,
+            status,
+            String(raw.paymentMethod || "Cash on Delivery"),
+            String(raw.paymentStatus || "Unpaid"),
+            subtotalMinor,
+            discountMinor,
+            finalMinor,
+            Math.max(0, Math.round((Number(raw.amountPaid) || 0) * 100)),
+            Math.max(0, Math.round((Number(raw.amountRefunded) || 0) * 100)),
+            promotion ? JSON.stringify(promotion) : null,
+            JSON.stringify(contact),
+            JSON.stringify(address),
+            String(raw.deliveryNotes || ""),
+            String(raw.orderSource || "Manual"),
+            Boolean(raw.isArchived),
+            Boolean(raw.isDeleted),
+            JSON.stringify(raw),
+            raw.createdAt ? String(raw.createdAt) : null,
+            deliveredAt,
+          ],
+        );
+      }
+
+      const nextVersion = currentVersion + 1;
+      await client.query(
+        "UPDATE domain_state_versions SET version=$2, updated_at=now() WHERE domain=$1",
+        ["orders", nextVersion],
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+         ) VALUES ('staff',$1,'ORDER_STATE_SYNCED','orders','bulk',$2,$3::jsonb)`,
+        [
+          actorId,
+          requestId,
+          JSON.stringify({ previousVersion: currentVersion, newVersion: nextVersion, count: orders.length }),
+        ],
+      );
+      await client.query("COMMIT");
+      return await this.adminOrders();
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   private async releaseExpired(client: PoolClient): Promise<void> {
     const result = await client.query(
       `UPDATE inventory_items
