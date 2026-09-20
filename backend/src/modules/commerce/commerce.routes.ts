@@ -84,6 +84,33 @@ export function createCommerceRouter(
     response.status(204).end();
   });
 
+  router.post(
+    "/admin/returns/:returnRef/action",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("returns.manage"),
+    async (request, response) => {
+      const returnRef = z.string().trim().min(2).max(120).parse(request.params.returnRef);
+      const body = z.object({
+        action: z.enum(["approve", "reject", "assign", "inspect"]),
+        replacementItemCode: z.string().trim().min(1).max(120).optional(),
+        reason: z.string().trim().min(3).max(500).optional(),
+        representativeId: z.string().trim().min(1).max(120).optional(),
+        condition: z.enum(["Good", "Damaged"]).optional(),
+      }).parse(request.body);
+      response.status(200).json({
+        return: await commerce.adminReturnAction(
+          request.auth!.userId,
+          returnRef,
+          body,
+          String(request.id),
+        ),
+      });
+    },
+  );
+
   router.get(
     "/admin/orders-state",
     signedIn,
