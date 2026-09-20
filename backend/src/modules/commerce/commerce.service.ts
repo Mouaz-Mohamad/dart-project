@@ -31,6 +31,7 @@ export interface CheckoutInput {
   };
   deliveryNotes?: string | undefined;
   promotionCode?: string | undefined;
+  acceptPriceChanges?: boolean | undefined;
 }
 
 interface LockedItem {
@@ -589,6 +590,13 @@ export class CommerceService {
         "SELECT now() + interval '15 minutes' AS expires_at",
       );
       const expiresAt = expiresResult.rows[0]!.expires_at;
+      const settingsResult = await client.query<{ data: Record<string, unknown> }>(
+        "SELECT data FROM site_settings WHERE id='main'",
+      );
+      const reservationSiteDiscountPercent = activeSiteDiscountPercent(
+        settingsResult.rows[0]?.data || {},
+      );
+      const pricingSnapshot: Array<Record<string, unknown>> = [];
 
       await client.query(
         `INSERT INTO cart_reservations (
@@ -612,8 +620,11 @@ export class CommerceService {
         const modelResult = await client.query<{
           size_options: Array<{ name?: string; active?: boolean }> | null;
           color_options: Array<{ name?: string; active?: boolean }> | null;
+          selling_minor: string;
+          discount_percent: string;
         }>(
-          `SELECT size_options, color_options
+          `SELECT size_options, color_options,
+                  selling_minor::text, discount_percent::text
              FROM catalog_models
             WHERE model_id=$1 AND active AND NOT is_archived AND NOT is_deleted
             FOR SHARE`,
@@ -632,6 +643,23 @@ export class CommerceService {
         if (!sizeOk || !colorOk) {
           throw new AppError(409, "VARIANT_UNAVAILABLE", "A selected size or color is no longer available");
         }
+
+        const sellingMinor = Number(model.selling_minor || 0);
+        const modelDiscountPercent = Number(model.discount_percent || 0);
+        const effectiveCatalogDiscountPercent =
+          reservationSiteDiscountPercent || modelDiscountPercent;
+        pricingSnapshot.push({
+          modelId,
+          color,
+          size,
+          quantity,
+          sellingMinor,
+          discountPercent: effectiveCatalogDiscountPercent,
+          finalUnitMinor: finalModelPriceMinor(
+            sellingMinor,
+            effectiveCatalogDiscountPercent,
+          ),
+        });
 
         const available = await client.query<{ id: string }>(
           `SELECT id
@@ -668,6 +696,14 @@ export class CommerceService {
         );
         reservedItems += ids.length;
       }
+
+      await client.query(
+        `UPDATE cart_reservations
+            SET pricing_snapshot=$2::jsonb,
+                updated_at=now()
+          WHERE id=$1`,
+        [reservationId, JSON.stringify(pricingSnapshot)],
+      );
 
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
@@ -871,8 +907,10 @@ export class CommerceService {
         customer_user_id: string | null;
         guest_owner_hash: string | null;
         expires_at: Date;
+        pricing_snapshot: Array<Record<string, unknown>>;
       }>(
-        `SELECT customer_user_id::text, guest_owner_hash, expires_at
+        `SELECT customer_user_id::text, guest_owner_hash, expires_at,
+                pricing_snapshot
            FROM cart_reservations
           WHERE id=$1
           FOR UPDATE`,
@@ -938,6 +976,68 @@ export class CommerceService {
         ) * 100,
       );
       const siteDiscountPercent = activeSiteDiscountPercent(settings);
+
+      const reservedPricing = Array.isArray(reservation.pricing_snapshot)
+        ? reservation.pricing_snapshot
+        : [];
+      if (reservedPricing.length) {
+        const priceChanges: Array<Record<string, unknown>> = [];
+        const currentByVariant = new Map<string, {
+          sellingMinor: number;
+          discountPercent: number;
+          finalUnitMinor: number;
+        }>();
+
+        for (const row of itemResult.rows) {
+          const key = JSON.stringify([row.model_id, row.color, row.size]);
+          if (!currentByVariant.has(key)) {
+            const sellingMinor = Number(row.selling_minor || 0);
+            const modelDiscountPercent = Number(row.discount_percent || 0);
+            const discountPercent =
+              siteDiscountPercent || modelDiscountPercent;
+            currentByVariant.set(key, {
+              sellingMinor,
+              discountPercent,
+              finalUnitMinor: finalModelPriceMinor(
+                sellingMinor,
+                discountPercent,
+              ),
+            });
+          }
+        }
+
+        for (const snapshot of reservedPricing) {
+          const key = JSON.stringify([
+            String(snapshot.modelId || ""),
+            String(snapshot.color || ""),
+            String(snapshot.size || ""),
+          ]);
+          const current = currentByVariant.get(key);
+          if (!current) continue;
+          const previousFinalMinor = Number(snapshot.finalUnitMinor || 0);
+          if (previousFinalMinor !== current.finalUnitMinor) {
+            priceChanges.push({
+              modelId: snapshot.modelId,
+              color: snapshot.color,
+              size: snapshot.size,
+              quantity: Number(snapshot.quantity || 1),
+              previousUnitPrice: previousFinalMinor / 100,
+              currentUnitPrice: current.finalUnitMinor / 100,
+              previousDiscountPercent: Number(snapshot.discountPercent || 0),
+              currentDiscountPercent: current.discountPercent,
+            });
+          }
+        }
+
+        if (priceChanges.length && !input.acceptPriceChanges) {
+          throw new AppError(
+            409,
+            "PRICE_CHANGED",
+            "One or more cart prices changed. Review and confirm the current prices before checkout.",
+            { changes: priceChanges },
+          );
+        }
+      }
 
       const customerPromotionResult = await client.query<{
         client_code: string;
