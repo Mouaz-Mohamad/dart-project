@@ -1,4 +1,4 @@
-import { createServer, type Server } from "node:http";
+import type { Server } from "node:http";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config/env.js";
 import { createLogger } from "./config/logger.js";
@@ -27,8 +27,7 @@ const app = createApp(config, {
 let server: Server | undefined;
 
 if (shouldStartHttpListener()) {
-  server = createServer(app);
-  server.listen(config.port, () => {
+  server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "Dart backend listening");
   });
 }
