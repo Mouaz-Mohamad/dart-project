@@ -25,6 +25,7 @@
   });
   const API_BASE = String(\n    window.DART_API_BASE_URL ||\n      (location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)\n        ? "https://dart-api-dusky.vercel.app"\n        : ""),\n  ).replace(/\/$/, "");
   const API_USER_CACHE_KEY = "dart_api_user_cache";
+  const CSRF_STORAGE_KEY = "dart_csrf_token";
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;
@@ -365,12 +366,14 @@
         code: "API_NOT_CONFIGURED",
       });
     const method = String(options.method || "GET").toUpperCase();
-    const csrfToken = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("dart_csrf="))
-      ?.split("=")
-      .slice(1)
-      .join("=");
+    const csrfToken =
+      localStorage.getItem(CSRF_STORAGE_KEY) ||
+      document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("dart_csrf="))
+        ?.split("=")
+        .slice(1)
+        .join("=");
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
       headers: {
@@ -387,6 +390,7 @@
           : options.body,
     });
     const payload = await response.json().catch(() => ({}));
+    if (payload?.csrfToken) localStorage.setItem(CSRF_STORAGE_KEY, payload.csrfToken);
     if (!response.ok)
       throw Object.assign(
         new Error(payload?.error?.message || payload.message || "Request failed"),
@@ -732,6 +736,7 @@
       try {
         await apiRequest("/api/v1/auth/logout", { method: "POST" });
       } finally {
+        localStorage.removeItem(CSRF_STORAGE_KEY);
         cacheApiUser(null);
       }
       return;
