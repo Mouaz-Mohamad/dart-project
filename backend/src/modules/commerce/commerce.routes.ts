@@ -20,7 +20,16 @@ const cartLineSchema = z.object({
 
 const reserveSchema = z.object({
   reservationId,
-  lines: z.array(cartLineSchema).max(50),
+  lines: z.array(cartLineSchema).max(20),
+}).superRefine((value, context) => {
+  const total = value.lines.reduce((sum, line) => sum + line.quantity, 0);
+  if (total > 20) {
+    context.addIssue({
+      code: "custom",
+      path: ["lines"],
+      message: "A cart can reserve at most 20 physical items",
+    });
+  }
 });
 
 const checkoutSchema = z.object({
