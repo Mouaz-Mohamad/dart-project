@@ -1325,14 +1325,92 @@ function dartCanHardDelete(sectionKey, id) {
 }
 
 let dartPendingHardDelete = null;
-function dartCommitHardDelete(mode) {
+function dartHardDeleteRelations(preview) {
+  return (preview?.counts || []).filter(
+    (row) => row.key !== preview.sectionKey || row.count > 1,
+  );
+}
+
+async function dartSyncHardDeleteSection(sectionKey) {
+  if (["models", "items"].includes(sectionKey)) {
+    await window.DartCatalog?.syncAdminState?.();
+    await window.DartCatalog?.hydrate?.(true);
+    return;
+  }
+  if (sectionKey === "orders") {
+    await window.DartOrdersApi?.hydrate?.(true);
+    return;
+  }
+  const domainBySection = {
+    customers: "customers",
+    returns: "returns",
+    review: "reviews",
+    card: "cards",
+    representative: "representatives",
+    damage: "damage",
+  };
+  const domain = domainBySection[sectionKey];
+  if (domain) {
+    await window.DartDomainState?.syncDomain?.(domain);
+    await window.DartDomainState?.hydrateDomain?.(domain, true);
+  }
+  await window.DartDomainState?.hydrateAudit?.().catch(() => {});
+}
+
+async function dartRollbackHardDeleteSection(sectionKey) {
+  try {
+    if (["models", "items"].includes(sectionKey)) {
+      await window.DartCatalog?.hydrate?.(true);
+      return;
+    }
+    if (sectionKey === "orders") {
+      await window.DartOrdersApi?.hydrate?.(true);
+      return;
+    }
+    const domainBySection = {
+      customers: "customers",
+      returns: "returns",
+      review: "reviews",
+      card: "cards",
+      representative: "representatives",
+      damage: "damage",
+    };
+    const domain = domainBySection[sectionKey];
+    if (domain) await window.DartDomainState?.hydrateDomain?.(domain, true);
+  } finally {
+    dartRefreshAll();
+  }
+}
+
+async function dartCommitHardDelete(mode) {
   const preview = dartPendingHardDelete;
   if (!preview) return;
-  const { sectionKey, id, target, impact } = preview,
-    sec = sectionsMap[sectionKey];
+
+  const { sectionKey, id, target, impact } = preview;
+  const sec = sectionsMap[sectionKey];
+  const serverMode = Boolean(window.DartAdminApi?.request);
+  const linked = dartHardDeleteRelations(preview);
+
+  if (serverMode && (mode === "cascade" || linked.length)) {
+    alert(
+      "Permanent cascade delete is blocked in production for linked business records. Archive/soft-delete this record instead, or use Reset All Data when you intentionally need a full platform purge.",
+    );
+    return;
+  }
+
+  if (
+    serverMode &&
+    target?.serverAuthoritative &&
+    ["customers", "representative"].includes(sectionKey)
+  ) {
+    alert("Secure customer and representative accounts must be deleted through the account API.");
+    return;
+  }
+
   if (mode === "only") {
     sec.data = sec.data.filter((row) => String(row.id) !== String(id));
   } else {
+    // Legacy/local development fallback only. Production never enters this branch.
     modelsData = modelsData.filter((row) => !impact.models.has(String(row.id)));
     itemsData = itemsData.filter((row) => !impact.items.has(String(row.id)));
     customersData = customersData.filter(
@@ -1346,7 +1424,8 @@ function dartCommitHardDelete(mode) {
       (row) => !impact.representative.has(String(row.id)),
     );
     damageData = damageData.filter((row) => !impact.damage.has(String(row.id)));
-    if (impact.clientCodes.size) {
+
+    if (!serverMode && impact.clientCodes.size) {
       let users;
       try {
         users = JSON.parse(localStorage.getItem("dart_users") || "[]");
@@ -1357,29 +1436,9 @@ function dartCommitHardDelete(mode) {
         (row) => !impact.clientCodes.has(String(row.customerId)),
       );
       localStorage.setItem("dart_users", JSON.stringify(users));
-      ["dart_birthday_rewards", "dart_birthday_messages", "dart_message_queue"].forEach(
-        (key) => {
-          let rows;
-          try {
-            rows = JSON.parse(localStorage.getItem(key) || "[]");
-          } catch {
-            rows = [];
-          }
-          rows = rows.filter(
-            (row) =>
-              !impact.clientCodes.has(
-                String(row.customerId || row.clientId || ""),
-              ),
-          );
-          if (window.DartDomainState?.domainForStorageKey?.(key)) {
-            window.DartDomainState.write(key, rows);
-          } else {
-            localStorage.setItem(key, JSON.stringify(rows));
-          }
-        },
-      );
     }
   }
+
   customersData.forEach((customer) => {
     customer.dartCard = cardsData.some(
       (card) =>
@@ -1389,6 +1448,7 @@ function dartCommitHardDelete(mode) {
       ? "yes"
       : "no";
   });
+
   dartSyncUserCardFlags();
   dartAudit(
     mode === "cascade" ? "PERMANENT_DELETE_WITH_LINKS" : "PERMANENT_DELETE_ONLY",
@@ -1398,30 +1458,63 @@ function dartCommitHardDelete(mode) {
     {},
   );
   dartSaveAll();
+
+  if (serverMode) {
+    try {
+      await dartSyncHardDeleteSection(sectionKey);
+    } catch (error) {
+      await dartRollbackHardDeleteSection(sectionKey);
+      alert(error.message || "Permanent delete was not committed to the database.");
+      return;
+    }
+  }
+
   dartRefreshAll();
   closeModal(document.getElementById("hard-delete-modal"));
   dartPendingHardDelete = null;
 }
 
 function deletePermanently(id, sectionKey) {
-  const preview = dartDeleteImpact(sectionKey, id),
-    modal = document.getElementById("hard-delete-modal");
+  const preview = dartDeleteImpact(sectionKey, id);
+  const modal = document.getElementById("hard-delete-modal");
   if (!preview || !modal) return;
+
+  const linked = dartHardDeleteRelations(preview);
+  if (window.DartAdminApi?.request && linked.length) {
+    alert(
+      `Permanent delete is blocked because this record has linked business history: ${linked
+        .map((row) => `${row.label} (${row.count})`)
+        .join(" · ")}. Use Archive/Soft Delete instead.`,
+    );
+    return;
+  }
+
   dartPendingHardDelete = preview;
   document.getElementById("hard-delete-summary").textContent =
-    "اختر طريقة الحذف لهذه المرة. الحذف النهائي لا يمكن استرجاعه.";
-  const linked = preview.counts.filter(
-      (row) => row.key !== sectionKey || row.count > 1,
-    ),
-    relations = document.getElementById("hard-delete-relations");
+    window.DartAdminApi?.request
+      ? "This record has no linked business history. Permanent deletion will be committed to the database."
+      : "اختر طريقة الحذف لهذه المرة. الحذف النهائي لا يمكن استرجاعه.";
+
+  const relations = document.getElementById("hard-delete-relations");
   relations.classList.toggle("is-empty", !linked.length);
   relations.innerHTML = linked.length
-    ? `<strong>Linked data:</strong> ${linked.map((row) => `${dartEsc(row.label)} (${row.count})`).join(" · ")}`
+    ? `<strong>Linked data:</strong> ${linked
+        .map((row) => `${dartEsc(row.label)} (${row.count})`)
+        .join(" · ")}`
     : "No linked records were found.";
-  document.getElementById("hard-delete-only").onclick = () =>
-    dartCommitHardDelete("only");
-  document.getElementById("hard-delete-cascade").onclick = () =>
-    dartCommitHardDelete("cascade");
+
+  const onlyButton = document.getElementById("hard-delete-only");
+  const cascadeButton = document.getElementById("hard-delete-cascade");
+  onlyButton.onclick = () => dartCommitHardDelete("only");
+
+  if (window.DartAdminApi?.request) {
+    cascadeButton.hidden = true;
+    cascadeButton.onclick = null;
+  } else {
+    cascadeButton.hidden = false;
+    cascadeButton.onclick = () => dartCommitHardDelete("cascade");
+  }
+
   document.getElementById("hard-delete-cancel").onclick = () => {
     dartPendingHardDelete = null;
     closeModal(modal);
