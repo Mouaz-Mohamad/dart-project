@@ -210,7 +210,7 @@
     return Object.fromEntries(domains.map((domain, index) => [domain, results[index]]));
   }
 
-  async function checkDomain(domain) {
+  async function checkDomain(domain, remoteVersion = 0) {
     if (document.hidden) return;
     try {
       if (!versions.get(domain)) {
@@ -221,11 +221,8 @@
         await syncDomain(domain);
         return;
       }
-      const payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`);
-      const remoteVersion = Number(payload.version || 0);
       if (remoteVersion && remoteVersion !== versions.get(domain)) {
-        versions.set(domain, remoteVersion);
-        cache(STORAGE_BY_DOMAIN[domain], payload.data || [], domain);
+        await hydrateDomain(domain, true);
       }
     } catch (error) {
       if (error.status !== 401) console.warn(`Dart ${domain} live refresh failed`, error);
@@ -234,40 +231,16 @@
 
   async function checkAll() {
     if (document.hidden) return;
-    const domains = Object.keys(STORAGE_BY_DOMAIN);
-
-    for (const domain of domains.filter((name) => dirty.has(name))) {
-      try {
-        await syncDomain(domain);
-      } catch (error) {
-        console.error(`Dart ${domain} sync failed`, error);
-        if (error.status === 409) await hydrateDomain(domain, true).catch(() => {});
-      }
-    }
-
     try {
       const payload = await api("/api/v1/admin/domain-state-versions");
-      const remoteVersions = payload.versions || {};
-      const changed = domains.filter((domain) => {
-        const remoteVersion = Number(remoteVersions[domain] || 0);
-        return (
-          remoteVersion &&
-          versions.get(domain) &&
-          remoteVersion !== versions.get(domain) &&
-          !dirty.has(domain)
-        );
-      });
+      const remoteVersions = payload?.versions || {};
       await Promise.all(
-        changed.map((domain) =>
-          hydrateDomain(domain, true).catch((error) => {
-            if (error.status !== 401)
-              console.warn(`Dart ${domain} live refresh failed`, error);
-          }),
+        Object.keys(STORAGE_BY_DOMAIN).map((domain) =>
+          checkDomain(domain, Number(remoteVersions[domain] || 0)),
         ),
       );
     } catch (error) {
-      if (error.status !== 401)
-        console.warn("Dart dashboard live version check failed", error);
+      if (error.status !== 401) console.warn("Dart dashboard live refresh failed", error);
     }
   }
 
