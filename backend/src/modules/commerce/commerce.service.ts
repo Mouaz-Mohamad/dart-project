@@ -41,7 +41,7 @@ interface LockedItem {
   color: string;
   size: string;
   model_name: string;
-  cost_minor: string;
+  cost_snapshot_minor: string;
   selling_minor: string;
   discount_percent: string;
 }
@@ -992,8 +992,8 @@ export class CommerceService {
 
       const itemResult = await client.query<LockedItem>(
         `SELECT i.id, i.item_code, i.model_id, i.color, i.size,
-                m.name AS model_name, m.cost_minor::text, m.selling_minor::text,
-                m.discount_percent::text
+                m.name AS model_name, i.cost_snapshot_minor::text,
+                m.selling_minor::text, m.discount_percent::text
            FROM inventory_items i
            JOIN catalog_models m ON m.model_id=i.model_id
           WHERE i.cart_reservation_id=$1
@@ -1211,7 +1211,7 @@ export class CommerceService {
           modelDiscountPercent,
           effectiveDiscountPercent,
           finalUnitMinor,
-          costMinor: Number(row.cost_minor),
+          costMinor: Number(row.cost_snapshot_minor),
         };
       });
       const orderDiscountMinor = Math.max(0, subtotalMinor - finalMinor);
@@ -4347,13 +4347,13 @@ export class CommerceService {
       status: string;
       order_id: string | null;
       model_name: string;
-      cost_minor: string;
+      cost_snapshot_minor: string;
       selling_minor: string;
       discount_percent: string;
     }>(
       `SELECT i.id, i.item_code, i.model_id, i.color, i.size, i.status, i.order_id,
-              m.name AS model_name, m.cost_minor::text, m.selling_minor::text,
-              m.discount_percent::text
+              m.name AS model_name, i.cost_snapshot_minor::text,
+              m.selling_minor::text, m.discount_percent::text
          FROM inventory_items i
          JOIN catalog_models m ON m.model_id=i.model_id
         WHERE i.item_code = ANY($1::text[])
@@ -4433,7 +4433,7 @@ export class CommerceService {
         : finalModelPriceMinor(originalUnitMinor, modelDiscountPercent);
       const costSnapshotMinor = Number.isFinite(Number(snapshot.costSnapshot))
         ? Math.max(0, Math.round(Number(snapshot.costSnapshot) * 100))
-        : Number(item.cost_minor);
+        : Number(item.cost_snapshot_minor);
 
       await client.query(
         `INSERT INTO order_items (
