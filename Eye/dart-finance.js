@@ -61,6 +61,11 @@
     modalId: null,
   };
   const requestedInitialSection = getStorage()?.getItem("dart_active_section") || "";
+  const serverFinanceSummaries = new Map();
+  const serverFinancePending = new Map();
+  const serverFinanceErrors = new Map();
+  let serverFinanceDenied = false;
+  let serverFinanceRefreshTimer = 0;
 
   function getStorage() {
     try {
@@ -956,6 +961,8 @@
     parseDate,
     periodRange,
     calculateSummary,
+    authoritativeSummary,
+    hydrateAuthoritativeFinance,
     comparison,
     invoiceStatus,
     budgetRows,
@@ -992,6 +999,82 @@
     return periodRange(state.period.preset, state.period);
   }
 
+  function financeRangeKey(range) {
+    return `${dateInputValue(range.start)}:${dateInputValue(range.end)}`;
+  }
+
+  function authoritativeSummary(range) {
+    return serverFinanceSummaries.get(financeRangeKey(range)) || null;
+  }
+
+  function financeSummaryError(range) {
+    return serverFinanceErrors.get(financeRangeKey(range)) || null;
+  }
+
+  async function hydrateServerFinanceSummary(range, force = false) {
+    if (!root.DartAdminApi?.request || serverFinanceDenied) return null;
+    const key = financeRangeKey(range);
+    if (!force && serverFinanceSummaries.has(key)) {
+      return serverFinanceSummaries.get(key);
+    }
+    if (serverFinancePending.has(key)) return serverFinancePending.get(key);
+
+    const promise = root.DartAdminApi.request(
+      `/api/v1/admin/finance/summary?start=${encodeURIComponent(dateInputValue(range.start))}&end=${encodeURIComponent(dateInputValue(range.end))}`,
+    )
+      .then((payload) => {
+        const summary = payload?.summary || null;
+        if (!summary) throw new Error("Finance summary response is incomplete.");
+        serverFinanceSummaries.set(key, summary);
+        serverFinanceErrors.delete(key);
+        return summary;
+      })
+      .catch((error) => {
+        serverFinanceErrors.set(key, error);
+        if (error?.status === 403) serverFinanceDenied = true;
+        throw error;
+      })
+      .finally(() => serverFinancePending.delete(key));
+
+    serverFinancePending.set(key, promise);
+    return promise;
+  }
+
+  async function hydrateAuthoritativeFinance(range = currentRange(), force = false) {
+    if (serverFinanceDenied) return;
+    try {
+      await Promise.all([
+        hydrateServerFinanceSummary(range, force),
+        hydrateServerFinanceSummary(range.previous, force),
+      ]);
+    } catch (error) {
+      if (error?.status !== 403)
+        console.warn("Dart server finance summary refresh failed", error);
+    }
+    renderAllFinance();
+  }
+
+  function invalidateAuthoritativeFinance() {
+    serverFinanceSummaries.clear();
+    serverFinanceErrors.clear();
+    clearTimeout(serverFinanceRefreshTimer);
+    serverFinanceRefreshTimer = root.setTimeout(
+      () => void hydrateAuthoritativeFinance(currentRange(), true),
+      120,
+    );
+  }
+
+  function financeSummaryStatusMarkup(range) {
+    if (serverFinanceDenied) {
+      return '<div class="dart-finance-empty">Finance access is not available for this account.</div>';
+    }
+    const error = financeSummaryError(range) || financeSummaryError(range.previous);
+    if (error) {
+      return '<div class="dart-finance-empty">Authoritative finance totals are temporarily unavailable. No browser-calculated totals are being shown.</div>';
+    }
+    return '<div class="dart-finance-empty">Loading authoritative finance totals…</div>';
+  }
+
   function savePeriodState() {
     writeJSON(STORAGE_KEYS.period, state.period);
   }
@@ -1015,6 +1098,7 @@
     }
     savePeriodState();
     syncPeriodInputs();
+    invalidateAuthoritativeFinance();
     renderAllFinance();
   }
 
@@ -1150,8 +1234,26 @@
     if (!document.getElementById("brand")) return;
     const data = dashboardData();
     const range = currentRange();
-    const current = calculateSummary(data, range);
-    const previous = calculateSummary(data, range.previous);
+    const current = authoritativeSummary(range);
+    const previous = authoritativeSummary(range.previous);
+
+    if (!current || !previous) {
+      void hydrateAuthoritativeFinance(range);
+      const unavailable = serverFinanceDenied || financeSummaryError(range);
+      [
+        [".sales-cont", unavailable ? "Unavailable" : "Loading…"],
+        [".cost-cont", unavailable ? "Unavailable" : "Loading…"],
+        [".profit-cont", unavailable ? "Unavailable" : "Loading…"],
+      ].forEach(([selector, label]) => {
+        const card = document.querySelector(`#brand ${selector}`);
+        const amount = card?.querySelector(".sales");
+        const variance = card?.querySelector(".variance");
+        if (amount) amount.textContent = label;
+        if (variance) variance.textContent = "";
+      });
+      return;
+    }
+
     const mappings = [
       [".sales-cont", current.netRevenue, previous.netRevenue, false],
       [".cost-cont", current.brandTotalCost, previous.brandTotalCost, true],
@@ -1433,8 +1535,19 @@
     if (!content) return;
     const data = dashboardData();
     const range = currentRange();
-    const current = calculateSummary(data, range);
-    const previous = calculateSummary(data, range.previous);
+    const current = authoritativeSummary(range);
+    const previous = authoritativeSummary(range.previous);
+    const summaryTabs = new Set(["overview", "pnl", "cashflow", "marketing", "alerts"]);
+
+    if (summaryTabs.has(state.financeTab) && (!current || !previous)) {
+      void hydrateAuthoritativeFinance(range);
+      content.innerHTML = financeSummaryStatusMarkup(range);
+      document.querySelectorAll("[data-finance-tab]").forEach((button) =>
+        button.classList.toggle("active", button.dataset.financeTab === state.financeTab),
+      );
+      return;
+    }
+
     const renderers = {
       overview: () => renderFinanceOverview(data, range, current, previous),
       expenses: () => renderExpenses(data, range),
@@ -1816,10 +1929,19 @@
     root.addEventListener("dart:domain-hydrated", (event) => {
       if (
         ["finance_expenses","finance_budgets","finance_invoices","finance_goals","finance_marketing","finance_settlements","customers","returns","damage"].includes(event.detail?.domain)
-      ) renderAllFinance();
+      ) {
+        invalidateAuthoritativeFinance();
+        renderAllFinance();
+      }
     });
-    root.addEventListener("dart:orders-hydrated", renderAllFinance);
-    root.addEventListener("dart:catalog-hydrated", renderAllFinance);
+    root.addEventListener("dart:orders-hydrated", () => {
+      invalidateAuthoritativeFinance();
+      renderAllFinance();
+    });
+    root.addEventListener("dart:catalog-hydrated", () => {
+      invalidateAuthoritativeFinance();
+      renderAllFinance();
+    });
   }
 
   function wrapDashboardRefresh() {
@@ -1865,7 +1987,15 @@
   document.addEventListener("DOMContentLoaded", () => {
     renderPeriodControls();
     renderAllFinance();
+    void hydrateAuthoritativeFinance(currentRange());
     const saved = getStorage()?.getItem("dart_active_section");
     if (requestedInitialSection === "finance" || saved === "finance") activateFinance();
   });
+  root.addEventListener("focus", () => {
+    if (!serverFinanceDenied) void hydrateAuthoritativeFinance(currentRange(), true);
+  });
+  root.setInterval(() => {
+    if (!document.hidden && !serverFinanceDenied)
+      void hydrateAuthoritativeFinance(currentRange(), true);
+  }, 15000);
 })(typeof window !== "undefined" ? window : globalThis);
