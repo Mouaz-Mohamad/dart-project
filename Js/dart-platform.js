@@ -512,7 +512,7 @@
     ) {
       throw new Error("Saved address is incomplete.");
     }
-    localStorage.setItem("user_last_address", JSON.stringify(normalized));
+
     if (API_BASE && currentUser()) {
       const payload = await apiRequest("/api/v1/me/preferences/address", {
         method: "PUT",
@@ -522,16 +522,26 @@
       localStorage.setItem("user_last_address", JSON.stringify(saved));
       return saved;
     }
+
+    if (API_REQUIRED) {
+      throw new Error("Saved addresses require an authenticated Dart account.");
+    }
+    localStorage.setItem("user_last_address", JSON.stringify(normalized));
     return normalized;
   }
 
   async function clearCustomerAddress() {
-    localStorage.removeItem("user_last_address");
     if (API_BASE && currentUser()) {
       await apiRequest("/api/v1/me/preferences/address", {
         method: "DELETE",
       });
+      localStorage.removeItem("user_last_address");
+      return;
     }
+    if (API_REQUIRED) {
+      throw new Error("Saved addresses require an authenticated Dart account.");
+    }
+    localStorage.removeItem("user_last_address");
   }
 
   async function hydrateApiSession() {
@@ -1505,8 +1515,10 @@
         );
     if (eligible) {
       section.dataset.eligibilityRendered = "1";
+      section.querySelector(".feedback-access-message")?.remove();
       const form = section.querySelector("#reviewForm");
       if (form) {
+        form.hidden = false;
         form.elements.full_name.value = user.name;
         form.elements.phone1.value = displayPhone(user.phone1);
         form.elements.phone2.value = displayPhone(user.phone2);
@@ -1521,10 +1533,12 @@
     section.dataset.eligibilityRendered = "1";
     const form = section.querySelector("#reviewForm");
     if (form) form.hidden = true;
-    section.insertAdjacentHTML(
-      "beforeend",
-      '<div class="feedback-access-message"><i class="fa-solid fa-bag-shopping"></i><h2>شارك تجربتك بعد استلام طلبك الأول</h2><p>قم بطلب قطعة من Dart، وبعد تسليم الطلب ستتمكن من إرسال تقييمك.</p><a href="products.html" class="submit-btn-form">عرض المنتجات</a></div>',
-    );
+    if (!section.querySelector(".feedback-access-message")) {
+      section.insertAdjacentHTML(
+        "beforeend",
+        '<div class="feedback-access-message"><i class="fa-solid fa-bag-shopping"></i><h2>شارك تجربتك بعد استلام طلبك الأول</h2><p>قم بطلب قطعة من Dart، وبعد تسليم الطلب ستتمكن من إرسال تقييمك.</p><a href="products.html" class="submit-btn-form">عرض المنتجات</a></div>',
+      );
+    }
   }
 
   // BEGIN Leaderboard net items — completed customer returns no longer count as purchases.
@@ -3240,7 +3254,20 @@
   setInterval(() => {
     if (!document.hidden) void hydratePublicLeaderboard();
   }, 10000);
-  window.addEventListener("focus", () => void hydratePublicLeaderboard());
+  setInterval(async () => {
+    if (!document.hidden && currentUser()) {
+      try {
+        await hydrateCustomerCommerce();
+      } catch (error) {
+        if (error.status !== 401)
+          console.warn("Dart customer snapshot refresh failed", error);
+      }
+    }
+  }, 5000);
+  window.addEventListener("focus", () => {
+    void hydratePublicLeaderboard();
+    if (currentUser()) void hydrateCustomerCommerce();
+  });
   window.addEventListener("storage", (event) => {
     if (event.key === KEYS.orders && document.querySelector(".tracking-card"))
       renderTracking();
@@ -3261,6 +3288,13 @@
       )
     )
       renderLeaderboard();
+    if (event.detail?.key === KEYS.orders) {
+      const feedbackSection =
+        document.getElementById("reviewForm")?.closest(".feedback-section");
+      if (feedbackSection) delete feedbackSection.dataset.eligibilityRendered;
+      renderFeedbackEligibility();
+      renderProfile();
+    }
   });
   window.DartPlatform = {
     read,
