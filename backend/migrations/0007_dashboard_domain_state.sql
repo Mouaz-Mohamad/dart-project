@@ -1,3 +1,5 @@
+CREATE SEQUENCE dart_return_request_seq START WITH 1;
+
 CREATE TABLE dashboard_domain_state (
   domain TEXT PRIMARY KEY CHECK (domain IN (
     'customers','returns','reviews','cards','representatives','damage',
