@@ -75,13 +75,20 @@
     logoutButton.hidden = true;
   }
 
-  function unlock() {
+  async function unlock() {
+    if (window.DartCatalog?.hydrate) {
+      try {
+        await window.DartCatalog.hydrate();
+      } catch (error) {
+        console.error("Unable to load server catalogue after dashboard sign-in", error);
+        lock();
+        status(loginForm, "Database connection failed. Dashboard remains locked.", true);
+        throw error;
+      }
+    }
     document.body.classList.remove("dart-admin-locked");
     authView.hidden = true;
     logoutButton.hidden = false;
-    window.DartCatalog?.hydrate?.().catch((error) => {
-      console.error("Unable to load server catalogue after dashboard sign-in", error);
-    });
   }
 
   async function beginMfaSetup() {
@@ -114,7 +121,7 @@
         await beginMfaSetup();
         return;
       }
-      unlock();
+      await unlock();
     } catch (error) {
       if (error.code === "MFA_REQUIRED" || error.code === "MFA_INVALID") {
         const field = loginForm.querySelector("[data-admin-totp-field]");
@@ -138,7 +145,7 @@
       mfaForm.reset();
       document.getElementById("dart-admin-mfa-secret").textContent = "";
       document.getElementById("dart-admin-mfa-uri").value = "";
-      unlock();
+      await unlock();
     } catch (error) {
       status(mfaForm, error.message, true);
     }
@@ -164,7 +171,7 @@
         await beginMfaSetup();
         return;
       }
-      unlock();
+      await unlock();
     })
     .catch(() => lock());
 })();
