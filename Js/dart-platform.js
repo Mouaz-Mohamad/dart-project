@@ -1577,101 +1577,87 @@
     return `${today.getFullYear()}-${today.getMonth()}-${hash >>> 0}`;
   }
 
+  let publicLeaderboardRows = null;
+  let publicLeaderboardPeriod = "";
+  let publicLeaderboardLoading = false;
+  let publicLeaderboardFailed = false;
+
+  async function hydratePublicLeaderboard() {
+    if (!API_BASE || publicLeaderboardLoading) return publicLeaderboardRows || [];
+    publicLeaderboardLoading = true;
+    try {
+      const payload = await apiRequest("/api/v1/leaderboard");
+      publicLeaderboardRows = Array.isArray(payload.rows) ? payload.rows : [];
+      publicLeaderboardPeriod = String(payload.period || "");
+      publicLeaderboardFailed = false;
+      renderLeaderboard();
+      return publicLeaderboardRows;
+    } catch (error) {
+      publicLeaderboardRows = [];
+      publicLeaderboardFailed = true;
+      renderLeaderboard();
+      console.warn("Dart leaderboard is temporarily unavailable.", error);
+      return [];
+    } finally {
+      publicLeaderboardLoading = false;
+    }
+  }
+
   function renderLeaderboard() {
     const list = document.querySelector(".leaderboard-list");
     if (!list) return;
-    const customers = read(KEYS.customers, []).filter(
-      (customer) => !customer.isArchived && !customer.isDeleted,
-    );
-    const orders = read(KEYS.orders, []),
-      returns = read(KEYS.returns, []),
-      cards = read("dart_cards", []),
-      today = new Date();
-    const signature = leaderboardDataSignature(
-      customers,
-      orders,
-      returns,
-      cards,
-      today,
-    );
+
+    const heading =
+      list.querySelector("h1")?.outerHTML ||
+      "<h1>Contenders for the DART card</h1>";
+
+    if (!API_BASE) {
+      list.innerHTML =
+        heading +
+        '<li class="leaderboard-empty">Leaderboard requires the Dart API.</li>';
+      return;
+    }
+
+    if (publicLeaderboardRows === null && !publicLeaderboardFailed) {
+      list.innerHTML =
+        heading +
+        '<li class="leaderboard-empty" role="status">Loading current contenders…</li>';
+      void hydratePublicLeaderboard();
+      return;
+    }
+
+    if (publicLeaderboardFailed) {
+      list.innerHTML =
+        heading +
+        '<li class="leaderboard-empty"><span>Leaderboard is temporarily unavailable.</span> <button type="button" class="dart-leaderboard-retry">Retry</button></li>';
+      list
+        .querySelector(".dart-leaderboard-retry")
+        ?.addEventListener("click", () => {
+          publicLeaderboardFailed = false;
+          publicLeaderboardRows = null;
+          renderLeaderboard();
+        });
+      return;
+    }
+
+    const rows = publicLeaderboardRows || [];
+    const signature = `${publicLeaderboardPeriod}:${JSON.stringify(rows)}`;
     if (list.dataset.dartLeaderboardSignature === signature) return;
-    const excluded = new Set(
-      cards
-        .filter((card) => card.status === "Active")
-        .map((card) => String(card.clientId)),
-    );
-    const candidates = customers
-      .filter((customer) => !excluded.has(String(customer.clientId)))
-      .map((customer) => {
-        const delivered = orders
-          .filter(
-            (order) =>
-              order.clientId === customer.clientId &&
-              order.status === "Delivered",
-          )
-          .filter((order) => {
-            const date = new Date(order.deliveredAt || order.createdAt || 0);
-            return (
-              date.getFullYear() === today.getFullYear() &&
-              date.getMonth() === today.getMonth()
-            );
-          });
-        const deliveredItemCodes = delivered.flatMap((order) =>
-          (order.items || []).map((code) => String(code)),
-        );
-        const deliveredOrderIds = new Set(
-          delivered.map((order) => String(order.orderId || order.id || "")),
-        );
-        const returnedItemCodes = new Set(
-          returns
-            .filter(isCompletedCustomerReturn)
-            .filter(
-              (record) =>
-                String(record.clientId || "") === String(customer.clientId) ||
-                deliveredOrderIds.has(String(record.orderId || "")),
-            )
-            .map((record) => String(record.itemCode || ""))
-            .filter(Boolean),
-        );
-        const grossItems = delivered.reduce(
-          (sum, order) =>
-            sum + Number(order.totalProducts || order.items?.length || 0),
-          0,
-        );
-        const returnedItems = new Set(
-          deliveredItemCodes.filter((code) => returnedItemCodes.has(code)),
-        ).size;
-        return {
-          customer,
-          orders: delivered.length,
-          items: Math.max(0, grossItems - returnedItems),
-          spent: delivered.reduce((sum, order) => sum + orderNet(order), 0),
-        };
-      })
-      .filter((row) => row.orders > 0)
-      .sort(
-        (a, b) => b.orders - a.orders || b.items - a.items || b.spent - a.spent,
-      );
-    const rows = candidates.slice(0, 3);
+
     if (!rows.length) {
-      const heading =
-        list.querySelector("h1")?.outerHTML ||
-        "<h1>Contenders for the DART card</h1>";
       list.innerHTML =
         heading +
         '<li class="leaderboard-empty">No eligible candidates this month yet.</li>';
       list.dataset.dartLeaderboardSignature = signature;
       return;
     }
-    const heading =
-      list.querySelector("h1")?.outerHTML ||
-      "<h1>Contenders for the DART card</h1>";
+
     list.innerHTML =
       heading +
       rows
         .map(
           (row, index) =>
-            `<li class="leaderboard-item rank-${index + 1} ${index === 0 ? "top-rank" : ""}"><div class="rank-badge"><h2 class="rank-num">${index + 1}</h2></div><div class="leaderboard-candidate"><small>${index === 0 ? "Leading contender" : "Dart Card contender"}</small><h3 class="user-name">${escapeHtml(customerNameParts(row.customer.clientName, 3))}</h3></div><h3 class="score" aria-label="${row.items} PIC"><strong>${row.items}</strong><span>PIC</span></h3></li>`,
+            `<li class="leaderboard-item rank-${index + 1} ${index === 0 ? "top-rank" : ""}"><div class="rank-badge"><h2 class="rank-num">${index + 1}</h2></div><div class="leaderboard-candidate"><small>${index === 0 ? "Leading contender" : "Dart Card contender"}</small><h3 class="user-name">${escapeHtml(row.name || "Dart Customer")}</h3></div><h3 class="score" aria-label="${Number(row.items) || 0} PIC"><strong>${Number(row.items) || 0}</strong><span>PIC</span></h3></li>`,
         )
         .join("");
     list.dataset.dartLeaderboardSignature = signature;
@@ -3251,6 +3237,10 @@
     void cleanupCartReservations();
     updateCartReservationTimer();
   }, 1000);
+  setInterval(() => {
+    if (!document.hidden) void hydratePublicLeaderboard();
+  }, 10000);
+  window.addEventListener("focus", () => void hydratePublicLeaderboard());
   window.addEventListener("storage", (event) => {
     if (event.key === KEYS.orders && document.querySelector(".tracking-card"))
       renderTracking();
@@ -3294,6 +3284,7 @@
     renderProfile,
     renderTracking,
     renderLeaderboard,
+    hydratePublicLeaderboard,
     reserveCart,
     releaseCartReservation,
     cleanupCartReservations,
