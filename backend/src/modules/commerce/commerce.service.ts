@@ -922,6 +922,190 @@ export class CommerceService {
     }
   }
 
+  private async applyOrderStatusTransition(
+    client: PoolClient,
+    orderId: string,
+    orderCode: string,
+    previousStatus: string | null,
+    nextStatus: string,
+    promotion: Record<string, unknown> | null,
+    actorId: string,
+  ): Promise<void> {
+    if (previousStatus === nextStatus) return;
+
+    const itemRows = await client.query<{ item_code: string }>(
+      "SELECT item_code FROM order_items WHERE order_id=$1 ORDER BY created_at, id",
+      [orderId],
+    );
+    const itemCodes = itemRows.rows.map((row) => row.item_code);
+    const itemCount = itemCodes.length;
+
+    let inventoryChanged = 0;
+    if (nextStatus === "Delivered") {
+      const updated = await client.query(
+        `UPDATE inventory_items i
+            SET status='Sold',
+                purchase_date=$2,
+                order_id=$1,
+                version=version+1,
+                updated_at=now()
+           FROM order_items oi
+          WHERE oi.order_id=$3
+            AND oi.inventory_item_id=i.id`,
+        [orderCode, new Date().toISOString().slice(0, 10), orderId],
+      );
+      inventoryChanged = updated.rowCount ?? 0;
+    } else if (["Cancelled", "Refused"].includes(nextStatus)) {
+      const updated = await client.query(
+        `UPDATE inventory_items i
+            SET status='In stock',
+                purchase_date=NULL,
+                order_id=NULL,
+                cart_reservation_id=NULL,
+                reservation_until=NULL,
+                version=version+1,
+                updated_at=now()
+           FROM order_items oi
+          WHERE oi.order_id=$1
+            AND oi.inventory_item_id=i.id`,
+        [orderId],
+      );
+      inventoryChanged = updated.rowCount ?? 0;
+    } else if (
+      ["New","Accepted","Preparing","Out With Representative","Representative On The Way","Needs Attention"].includes(nextStatus)
+    ) {
+      const updated = await client.query(
+        `UPDATE inventory_items i
+            SET status='Processing/Held',
+                purchase_date=NULL,
+                order_id=$2,
+                version=version+1,
+                updated_at=now()
+           FROM order_items oi
+          WHERE oi.order_id=$1
+            AND oi.inventory_item_id=i.id`,
+        [orderId, orderCode],
+      );
+      inventoryChanged = updated.rowCount ?? 0;
+    }
+
+    if (inventoryChanged > 0) {
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+      );
+    }
+
+    const promotionType = String(promotion?.type || "");
+    if (promotionType === "Birthday" && promotion?.rewardId) {
+      const stateResult = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='birthday_rewards' FOR UPDATE",
+      );
+      const state = stateResult.rows[0];
+      const data = Array.isArray(state?.data) ? state.data as Record<string, unknown>[] : [];
+      const reward = data.find((row) => String(row.id || "") === String(promotion.rewardId));
+      if (reward) {
+        if (nextStatus === "Delivered") {
+          reward.status = "Used";
+          reward.usedCount = 1;
+          reward.usedAt = new Date().toISOString();
+          reward.orderId = orderCode;
+        } else if (["Cancelled", "Refused"].includes(nextStatus)) {
+          reward.status = String(reward.expiresAt || "") > cairoDateKey() ? "Active" : "Expired";
+          reward.usedCount = 0;
+          reward.usedAt = null;
+          reward.orderId = "";
+          reward.reservedAt = null;
+        } else if (previousStatus === "Delivered" || ["Cancelled", "Refused"].includes(String(previousStatus || ""))) {
+          reward.status = "Reserved";
+          reward.usedCount = 0;
+          reward.usedAt = null;
+          reward.orderId = orderCode;
+          reward.reservedAt = new Date().toISOString();
+        }
+        await client.query(
+          `UPDATE dashboard_domain_state
+              SET data=$2::jsonb, version=$3, updated_at=now()
+            WHERE domain='birthday_rewards'`,
+          [JSON.stringify(data), Number(state?.version || 1) + 1],
+        );
+      }
+    }
+
+    if (promotionType === "Dart Card" && promotion?.cardId) {
+      const stateResult = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
+      );
+      const state = stateResult.rows[0];
+      const data = Array.isArray(state?.data) ? state.data as Record<string, unknown>[] : [];
+      const card = data.find(
+        (row) => String(row.cardId || row.id || "") === String(promotion.cardId),
+      );
+      if (card) {
+        const reservations = Array.isArray(card.reservedOrders)
+          ? card.reservedOrders as Record<string, unknown>[]
+          : [];
+        const reservation = reservations.find((row) => String(row.orderId || "") === orderCode);
+        const reservedCount = Number(reservation?.itemCount || itemCount || 0);
+        const removeReservation = () => {
+          card.reservedOrders = reservations.filter((row) => String(row.orderId || "") !== orderCode);
+          card.reservedItems = Math.max(0, Number(card.reservedItems || 0) - reservedCount);
+        };
+
+        if (nextStatus === "Delivered" && previousStatus !== "Delivered") {
+          removeReservation();
+          card.purchasedItems = String(Number(card.purchasedItems || 0) + reservedCount);
+          card.requestedProducts = [
+            ...new Set([...(Array.isArray(card.requestedProducts) ? card.requestedProducts : []), ...itemCodes]),
+          ];
+        } else if (["Cancelled", "Refused"].includes(nextStatus)) {
+          removeReservation();
+          if (previousStatus === "Delivered") {
+            card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - itemCount));
+          }
+        } else if (previousStatus === "Delivered" && nextStatus !== "Delivered") {
+          card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - itemCount));
+          if (!reservations.some((row) => String(row.orderId || "") === orderCode)) {
+            reservations.push({
+              orderId: orderCode,
+              itemCount,
+              itemCodes,
+              reservedAt: new Date().toISOString(),
+            });
+            card.reservedOrders = reservations;
+            card.reservedItems = Number(card.reservedItems || 0) + itemCount;
+          }
+        }
+
+        const limit = Number(card.itemLimit || card.purchasedLimit || 10);
+        const expiry = flexibleDateExpiry(card.expDate);
+        const unavailable =
+          Number(card.purchasedItems || 0) >= limit ||
+          Boolean(expiry && expiry < Date.now());
+        card.status = unavailable ? "Expired" : "Active";
+
+        await client.query(
+          `UPDATE dashboard_domain_state
+              SET data=$2::jsonb, version=$3, updated_at=now()
+            WHERE domain='cards'`,
+          [JSON.stringify(data), Number(state?.version || 1) + 1],
+        );
+      }
+    }
+
+    await client.query(
+      `INSERT INTO order_events (
+         order_id, event_type, from_status, to_status, actor_type, actor_id, metadata
+       ) VALUES ($1,'STATUS_CHANGED',$2,$3,'staff',$4,$5::jsonb)`,
+      [
+        orderId,
+        previousStatus,
+        nextStatus,
+        actorId,
+        JSON.stringify({ orderCode }),
+      ],
+    );
+  }
+
   public async customerSnapshot(customerUserId: string): Promise<{
     orders: Record<string, unknown>[];
     returns: unknown[];
