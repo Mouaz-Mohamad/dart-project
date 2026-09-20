@@ -309,6 +309,50 @@ export function createIdentityRouter(
     },
   );
 
+  router.post(
+    "/admin/customers/:id/state",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("customers.manage"),
+    async (request, response) => {
+      const body = z.object({
+        action: z.enum(["suspend", "activate", "delete"]),
+      }).parse(request.body);
+      await service.adminSetAccountState(
+        request.auth!,
+        uuid.parse(request.params.id),
+        "customer",
+        body.action,
+        metadata(request),
+      );
+      response.status(204).end();
+    },
+  );
+
+  router.post(
+    "/admin/representatives/:id/state",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("representatives.manage"),
+    async (request, response) => {
+      const body = z.object({
+        action: z.enum(["suspend", "activate", "delete"]),
+      }).parse(request.body);
+      await service.adminSetAccountState(
+        request.auth!,
+        uuid.parse(request.params.id),
+        "representative",
+        body.action,
+        metadata(request),
+      );
+      response.status(204).end();
+    },
+  );
+
   router.patch(
     "/admin/customers/:id",
     signedIn,
