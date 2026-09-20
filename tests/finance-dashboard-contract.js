@@ -72,6 +72,8 @@ assert(
 assert(finance.includes("DART_CARD_DRAW_ELIGIBILITY_CHANGED"), "Draw eligibility changes must be audited.");
 assert(dashboard.includes("c.dartCardDrawEligible !== false"), "Excluded customers must be removed from the winner candidate set.");
 assert(finance.includes("returnCourierCosts"), "Total Cost must include Dart-paid return/exchange representative fees.");
+assert(finance.includes("deliveryCosts"), "Total Cost must include snapshotted delivery costs.");
+assert(html.includes('id="settings-delivery-cost"'), "Settings must expose the per-piece delivery cost used for future order snapshots.");
 assert(finance.includes("inStockCost"), "Brand must calculate the filtered In Stock Cost Value.");
 assert(dashboard.includes("dartAssignReturnRepresentative"), "Dashboard return requests must support representative assignment.");
 
