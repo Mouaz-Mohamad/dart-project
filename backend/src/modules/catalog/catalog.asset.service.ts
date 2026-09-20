@@ -58,7 +58,12 @@ export class CatalogAssetService {
     if (!ALLOWED.has(input.contentType)) {
       throw new AppError(422, "ASSET_TYPE_INVALID", "Only JPG, PNG or WebP images are allowed");
     }
+    const normalizedBase64 = input.base64.replace(/=+$/, "");
     const content = Buffer.from(input.base64, "base64");
+    const canonicalBase64 = content.toString("base64").replace(/=+$/, "");
+    if (canonicalBase64 !== normalizedBase64) {
+      throw new AppError(422, "ASSET_ENCODING_INVALID", "Image payload is not valid base64");
+    }
     if (!content.length || content.length > MAX_BYTES) {
       throw new AppError(422, "ASSET_SIZE_INVALID", "Compressed image must be between 1 byte and 4 MB");
     }
