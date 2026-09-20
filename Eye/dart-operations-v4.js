@@ -1,5 +1,6 @@
 (function () {
   'use strict';
+  window.DartOperationsV4 = Object.freeze({ active: true });
 
   const RESET_MARKER = 'dart_demo_reset_2026_09_05';
   const PASSWORD_REQUESTS_KEY = 'dart_password_reset_requests';
