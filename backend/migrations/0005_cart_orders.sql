@@ -24,7 +24,7 @@ ALTER TABLE inventory_items
 CREATE TABLE orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_code TEXT NOT NULL UNIQUE DEFAULT ('K-' || nextval('dart_order_code_seq')::text),
-  customer_user_id UUID NOT NULL REFERENCES customers(user_id) ON DELETE RESTRICT,
+  customer_user_id UUID REFERENCES customers(user_id) ON DELETE RESTRICT,
   status TEXT NOT NULL DEFAULT 'New'
     CHECK (status IN (
       'New','Preparing','Out With Representative','On The Way','Delivered',
@@ -99,3 +99,8 @@ FROM roles
 JOIN permissions ON permissions.key IN ('orders.read', 'orders.manage')
 WHERE roles.name = 'Owner'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+
+INSERT INTO domain_state_versions (domain, version)
+VALUES ('orders', 1)
+ON CONFLICT (domain) DO NOTHING;
