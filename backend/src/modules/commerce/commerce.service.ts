@@ -2007,6 +2007,7 @@ export class CommerceService {
             orderCode,
             raw,
             existingOrder?.status || null,
+            status,
           );
           await this.applyOrderStatusTransition(
             client,
@@ -2051,6 +2052,7 @@ export class CommerceService {
     orderCode: string,
     raw: Record<string, unknown>,
     previousStatus: string | null,
+    nextStatus: string,
   ): Promise<void> {
     const directCodes = Array.isArray(raw.items)
       ? raw.items.map((value) => String(value || "").trim()).filter(Boolean)
@@ -2223,18 +2225,33 @@ export class CommerceService {
       );
     }
 
-    await client.query(
-      `UPDATE inventory_items
-          SET status='Processing/Held',
-              order_id=$2,
-              cart_reservation_id=NULL,
-              reservation_until=NULL,
-              version=version+1,
-              updated_at=now()
-        WHERE item_code = ANY($1::text[])
-          AND lower(status) <> 'sold'`,
-      [desiredCodes, orderCode],
-    );
+    if (["Cancelled", "Refused"].includes(nextStatus)) {
+      await client.query(
+        `UPDATE inventory_items
+            SET status='In stock',
+                order_id=NULL,
+                cart_reservation_id=NULL,
+                reservation_until=NULL,
+                version=version+1,
+                updated_at=now()
+          WHERE item_code = ANY($1::text[])
+            AND lower(status) <> 'sold'`,
+        [desiredCodes],
+      );
+    } else if (nextStatus !== "Delivered" && nextStatus !== "Returned") {
+      await client.query(
+        `UPDATE inventory_items
+            SET status='Processing/Held',
+                order_id=$2,
+                cart_reservation_id=NULL,
+                reservation_until=NULL,
+                version=version+1,
+                updated_at=now()
+          WHERE item_code = ANY($1::text[])
+            AND lower(status) <> 'sold'`,
+        [desiredCodes, orderCode],
+      );
+    }
 
     if (changed || desiredCodes.some((code) => !currentSet.has(code))) {
       await client.query(
