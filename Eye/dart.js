@@ -2293,6 +2293,35 @@ function setupHeaderBatchActions() {
 function dartSectionKeyFromContainer(container) {
   return container.closest(".dashboard-section")?.id;
 }
+async function dartAdminAccountState(sectionKey, record, action) {
+  if (!window.DartAdminApi?.request || !record?.serverAuthoritative) {
+    return { ok: false, message: "Secure account API is unavailable." };
+  }
+  const resource =
+    sectionKey === "customers"
+      ? "customers"
+      : sectionKey === "representative"
+        ? "representatives"
+        : "";
+  if (!resource) return { ok: false, message: "Unsupported account type." };
+
+  try {
+    await window.DartAdminApi.request(
+      `/api/v1/admin/${resource}/${encodeURIComponent(record.id)}/state`,
+      { method: "POST", body: { action } },
+    );
+    if (window.DartDomainState?.hydrateDomain) {
+      await window.DartDomainState.hydrateDomain(
+        sectionKey === "customers" ? "customers" : "representatives",
+        true,
+      );
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error.message || "Account action failed." };
+  }
+}
+
 function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
   const container = document.getElementById(containerId);
   if (!container || container.dataset.dartDelegated) return;
@@ -2314,10 +2343,45 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     if (!row) return;
     const id = row.dataset.id;
     if (e.target.closest(".btn-delete")) {
+      const record = sectionsMap[sectionKey]?.data.find(
+        (value) => String(value.id) === String(id),
+      );
+      if (
+        record?.serverAuthoritative &&
+        ["customers", "representative"].includes(sectionKey)
+      ) {
+        const suspended =
+          sectionKey === "customers"
+            ? record.accountStatus === "suspended"
+            : record.status === "Suspended" || record.accountStatus === "suspended";
+        const result = await dartAdminAccountState(
+          sectionKey,
+          record,
+          suspended ? "activate" : "suspend",
+        );
+        if (!result.ok) alert(result.message || "Account action failed.");
+        return;
+      }
       dartArchiveRecord(sectionKey, id);
       return;
     }
     if (e.target.closest(".btn-hard-delete")) {
+      const record = sectionsMap[sectionKey]?.data.find(
+        (value) => String(value.id) === String(id),
+      );
+      if (
+        record?.serverAuthoritative &&
+        ["customers", "representative"].includes(sectionKey)
+      ) {
+        if (
+          !confirm(
+            "Delete this account? Login access will be permanently disabled, while orders and audit history stay preserved.",
+          )
+        ) return;
+        const result = await dartAdminAccountState(sectionKey, record, "delete");
+        if (!result.ok) alert(result.message || "Account deletion failed.");
+        return;
+      }
       deletePermanently(id, sectionKey);
       return;
     }
