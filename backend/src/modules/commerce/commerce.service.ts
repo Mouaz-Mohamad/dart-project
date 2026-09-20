@@ -1000,6 +1000,371 @@ export class CommerceService {
     }
   }
 
+  public async representativeReturnAction(
+    representativeUserId: string,
+    returnRef: string,
+    action: "start" | "cancel" | "complete",
+  ): Promise<Record<string, unknown>> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const representative = await client.query<{ representative_code: string }>(
+        "SELECT representative_code FROM representatives WHERE user_id=$1 AND approval_status='approved'",
+        [representativeUserId],
+      );
+      const repCode = representative.rows[0]?.representative_code;
+      if (!repCode) {
+        throw new AppError(403, "REPRESENTATIVE_UNAVAILABLE", "Representative account is not active");
+      }
+
+      const stateResult = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      );
+      const state = stateResult.rows[0];
+      const rows = Array.isArray(state?.data) ? state!.data as Record<string, unknown>[] : [];
+      const record = rows.find((row) =>
+        (String(row.id || "") === returnRef || String(row.returnId || "") === returnRef) &&
+        [representativeUserId, repCode].includes(String(row.representativeId || "")) &&
+        !row.isDeleted &&
+        !row.isArchived,
+      );
+      if (!record) {
+        throw new AppError(404, "ASSIGNED_RETURN_NOT_FOUND", "This return is not assigned to your account");
+      }
+
+      const previousStatus = String(record.status || "");
+      const now = new Date().toISOString();
+
+      if (action === "start") {
+        if (!["Representative Assigned", "Pickup On The Way"].includes(previousStatus)) {
+          throw new AppError(409, "RETURN_STATE_INVALID", "This pickup cannot be started from its current status");
+        }
+        record.status = "Pickup On The Way";
+        record.pickupStartedAt = String(record.pickupStartedAt || now);
+        record.updatedAt = now;
+      } else if (action === "cancel") {
+        if (previousStatus !== "Pickup On The Way") {
+          throw new AppError(409, "RETURN_STATE_INVALID", "This pickup is not currently active");
+        }
+        record.status = "Representative Assigned";
+        record.pickupStartedAt = null;
+        record.courierLocation = null;
+        record.lastFailedPickupAt = now;
+        record.failedPickupAttempts = Number(record.failedPickupAttempts || 0) + 1;
+        record.updatedAt = now;
+      } else {
+        if (previousStatus !== "Pickup On The Way" || !record.pickupStartedAt) {
+          throw new AppError(409, "RETURN_STATE_INVALID", "Start pickup before confirming it");
+        }
+
+        const locationResult = await client.query<{
+          latitude: number;
+          longitude: number;
+          updated_at: Date;
+        }>(
+          `SELECT latitude, longitude, updated_at
+             FROM representative_locations
+            WHERE representative_user_id=$1
+            FOR UPDATE`,
+          [representativeUserId],
+        );
+        const location = locationResult.rows[0];
+        if (!location || Date.now() - location.updated_at.getTime() > 2 * 60_000) {
+          throw new AppError(409, "LOCATION_STALE", "Refresh your location before confirming pickup");
+        }
+        const destinationLat = Number(record.latitude);
+        const destinationLng = Number(record.longitude);
+        if (
+          !Number.isFinite(destinationLat) ||
+          !Number.isFinite(destinationLng) ||
+          !destinationLat ||
+          !destinationLng
+        ) {
+          throw new AppError(409, "PICKUP_COORDINATES_MISSING", "Customer pickup coordinates are missing");
+        }
+        const distance = distanceKm(
+          location.latitude,
+          location.longitude,
+          destinationLat,
+          destinationLng,
+        );
+        if (distance > 1) {
+          throw new AppError(
+            409,
+            "PICKUP_TOO_FAR",
+            `You must be within 1 km of the pickup address; current distance is ${distance.toFixed(2)} km`,
+          );
+        }
+
+        const itemCode = String(record.itemCode || "");
+        const originalItemResult = await client.query<{
+          id: string;
+          status: string;
+          model_id: string;
+          color: string;
+          size: string;
+        }>(
+          `SELECT id, status, model_id, color, size
+             FROM inventory_items
+            WHERE item_code=$1
+            FOR UPDATE`,
+          [itemCode],
+        );
+        const originalItem = originalItemResult.rows[0];
+        if (!originalItem) {
+          throw new AppError(409, "RETURN_ITEM_NOT_FOUND", "The original physical item could not be found");
+        }
+
+        const orderCode = String(record.orderId || "");
+        const orderResult = await client.query<{
+          id: string;
+          final_minor: string;
+          amount_refunded_minor: string;
+          promotion: Record<string, unknown> | null;
+          payment_status: string;
+        }>(
+          `SELECT id::text, final_minor::text, amount_refunded_minor::text,
+                  promotion, payment_status
+             FROM orders
+            WHERE order_code=$1
+            FOR UPDATE`,
+          [orderCode],
+        );
+        const order = orderResult.rows[0];
+        if (!order) {
+          throw new AppError(409, "RETURN_ORDER_NOT_FOUND", "The original delivered order could not be found");
+        }
+
+        const requestType = String(record.requestType || "");
+        await client.query(
+          `UPDATE inventory_items
+              SET status='Return Inspection',
+                  return_request_id=$2,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [originalItem.id, String(record.id || "")],
+        );
+
+        if (requestType === "Refund") {
+          const refundMinor = Math.max(
+            0,
+            Math.round(Number(record.originalNetAmount ?? record.refundAmount ?? 0) * 100),
+          );
+          const finalMinor = Number(order.final_minor || 0);
+          const refundedMinor = Math.min(
+            finalMinor,
+            Number(order.amount_refunded_minor || 0) + refundMinor,
+          );
+          await client.query(
+            `UPDATE orders
+                SET amount_refunded_minor=$2,
+                    payment_status=CASE
+                      WHEN $2 >= final_minor THEN 'Refunded'
+                      WHEN $2 > 0 THEN 'Partially Refunded'
+                      ELSE payment_status
+                    END,
+                    version=version+1,
+                    updated_at=now()
+              WHERE id=$1`,
+            [order.id, refundedMinor],
+          );
+          record.refundAmount = refundMinor / 100;
+          record.financialCompletionApplied = true;
+
+          if (order.promotion?.type === "Dart Card" && order.promotion?.cardId) {
+            const cardStateResult = await client.query<{ version: string; data: unknown[] }>(
+              "SELECT version::text, data FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
+            );
+            const cardState = cardStateResult.rows[0];
+            const cards = Array.isArray(cardState?.data)
+              ? cardState!.data as Record<string, unknown>[]
+              : [];
+            const card = cards.find(
+              (row) => String(row.cardId || row.id || "") === String(order.promotion?.cardId),
+            );
+            if (card && !record.dartCardUsageReversed) {
+              card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - 1));
+              card.requestedProducts = (Array.isArray(card.requestedProducts)
+                ? card.requestedProducts
+                : []
+              ).filter((code) => String(code) !== itemCode);
+              const limit = Number(card.itemLimit || card.purchasedLimit || 10);
+              const expiry = flexibleDateExpiry(card.expDate);
+              if (
+                Number(card.purchasedItems || 0) < limit &&
+                (!expiry || expiry >= Date.now())
+              ) {
+                card.status = "Active";
+              }
+              record.dartCardUsageReversed = true;
+              await client.query(
+                `UPDATE dashboard_domain_state
+                    SET data=$2::jsonb, version=$3, updated_at=now()
+                  WHERE domain='cards'`,
+                [
+                  JSON.stringify(cards),
+                  Number(cardState?.version || 1) + 1,
+                ],
+              );
+            }
+          }
+        } else if (requestType === "Exchange") {
+          const replacementCode = String(record.replacementItemCode || "");
+          if (!replacementCode) {
+            throw new AppError(409, "EXCHANGE_REPLACEMENT_MISSING", "A replacement item must be reserved before pickup completion");
+          }
+          const replacementResult = await client.query<{
+            id: string;
+            item_code: string;
+            model_id: string;
+            color: string;
+            size: string;
+            status: string;
+          }>(
+            `SELECT id, item_code, model_id, color, size, status
+               FROM inventory_items
+              WHERE item_code=$1
+              FOR UPDATE`,
+            [replacementCode],
+          );
+          const replacement = replacementResult.rows[0];
+          if (!replacement || String(replacement.status).toLowerCase() !== "processing/held") {
+            throw new AppError(409, "EXCHANGE_REPLACEMENT_UNAVAILABLE", "The held replacement item is no longer available");
+          }
+          if (
+            replacement.model_id !== originalItem.model_id ||
+            replacement.color !== originalItem.color ||
+            replacement.size !== originalItem.size
+          ) {
+            throw new AppError(409, "EXCHANGE_VARIANT_MISMATCH", "Replacement must match the original model, color and size");
+          }
+
+          await client.query(
+            `UPDATE inventory_items
+                SET status='Sold',
+                    order_id=$2,
+                    purchase_date=$3,
+                    cart_reservation_id=NULL,
+                    reservation_until=NULL,
+                    version=version+1,
+                    updated_at=now()
+              WHERE id=$1`,
+            [replacement.id, orderCode, new Date().toISOString().slice(0, 10)],
+          );
+          const updatedLine = await client.query(
+            `UPDATE order_items
+                SET inventory_item_id=$3,
+                    item_code=$4,
+                    model_id=$5,
+                    model_name=COALESCE((
+                      SELECT name FROM catalog_models WHERE model_id=$5
+                    ), model_name),
+                    color=$6,
+                    size=$7
+              WHERE order_id=$1 AND item_code=$2`,
+            [
+              order.id,
+              itemCode,
+              replacement.id,
+              replacement.item_code,
+              replacement.model_id,
+              replacement.color,
+              replacement.size,
+            ],
+          );
+          if (!updatedLine.rowCount) {
+            throw new AppError(409, "EXCHANGE_ORDER_LINE_NOT_FOUND", "Original order line could not be updated");
+          }
+          record.exchangeCompletionApplied = true;
+          record.exchangeHistoryEntry = {
+            fromItemCode: itemCode,
+            toItemCode: replacement.item_code,
+            completedAt: now,
+          };
+        } else {
+          throw new AppError(409, "RETURN_TYPE_INVALID", "Unsupported return request type");
+        }
+
+        record.status = "Completed";
+        record.completedAt = now;
+        record.updatedAt = now;
+        record.inspectionStatus = String(record.inspectionStatus || "Pending");
+        record.customerCourierFeeStatus =
+          Number(record.customerCourierFee || 0) > 0
+            ? "Collected by Representative"
+            : "Not Applicable";
+        record.brandCourierFeeStatus =
+          Number(record.brandCourierFee || 0) > 0
+            ? "Paid by Dart"
+            : "Not Applicable";
+
+        await client.query(
+          "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+        );
+      }
+
+      const activityLog = Array.isArray(record.activityLog)
+        ? record.activityLog as Record<string, unknown>[]
+        : [];
+      activityLog.push({
+        id: `EVT-${Date.now().toString(36)}`,
+        action:
+          action === "start"
+            ? "RETURN_PICKUP_STARTED"
+            : action === "cancel"
+              ? "RETURN_PICKUP_FAILED"
+              : "RETURN_PICKUP_COMPLETED",
+        previousStatus,
+        newStatus: record.status,
+        timestamp: now,
+        actorRole: "Representative",
+        representativeId: representativeUserId,
+      });
+      record.activityLog = activityLog;
+
+      await client.query(
+        `UPDATE dashboard_domain_state
+            SET data=$2::jsonb, version=$3, updated_at=now()
+          WHERE domain='returns'`,
+        [
+          JSON.stringify(rows),
+          Number(state?.version || 1) + 1,
+        ],
+      );
+
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, metadata
+         ) VALUES ('representative',$1,$2,'returns',$3,$4::jsonb)`,
+        [
+          representativeUserId,
+          action === "start"
+            ? "RETURN_PICKUP_STARTED"
+            : action === "cancel"
+              ? "RETURN_PICKUP_FAILED"
+              : "RETURN_PICKUP_COMPLETED",
+          String(record.id || returnRef),
+          JSON.stringify({
+            returnId: record.returnId || returnRef,
+            from: previousStatus,
+            to: record.status,
+            requestType: record.requestType || "",
+          }),
+        ],
+      );
+
+      await client.query("COMMIT");
+      return record;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async adminOrders(): Promise<{ version: number; orders: Record<string, unknown>[] }> {
     const versionResult = await this.pool.query<{ version: string }>(
       "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
