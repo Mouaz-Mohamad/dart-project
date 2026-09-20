@@ -27,8 +27,8 @@ CREATE TABLE orders (
   customer_user_id UUID REFERENCES customers(user_id) ON DELETE RESTRICT,
   status TEXT NOT NULL DEFAULT 'New'
     CHECK (status IN (
-      'New','Preparing','Out With Representative','On The Way','Delivered',
-      'Refused','Cancelled','Returned'
+      'New','Accepted','Preparing','Out With Representative','Representative On The Way',
+      'Delivered','Refused','Cancelled','Returned','Needs Attention'
     )),
   payment_method TEXT NOT NULL DEFAULT 'Cash on Delivery',
   payment_status TEXT NOT NULL DEFAULT 'Unpaid'
