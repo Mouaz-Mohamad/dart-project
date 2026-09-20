@@ -571,6 +571,44 @@ window.addEventListener("dart:orders-hydrated", (event) => {
   if (typeof dartRefreshAll === "function") dartRefreshAll();
 });
 
+window.addEventListener("dart:domain-hydrated", (event) => {
+  const domain = event.detail?.domain;
+  const data = event.detail?.data;
+  if (!Array.isArray(data)) return;
+  const handlers = {
+    customers(value) {
+      customersData = value;
+      if (typeof renderCustomers === "function") renderCustomers(customersData);
+    },
+    returns(value) {
+      returnsData = value;
+      if (typeof renderReturns === "function") renderReturns(returnsData);
+    },
+    reviews(value) {
+      reviewsData = value;
+      if (typeof renderReviews === "function") renderReviews(reviewsData);
+    },
+    cards(value) {
+      cardsData = value;
+      if (typeof renderCards === "function") renderCards(cardsData);
+    },
+    representatives(value) {
+      representativeData = value;
+      if (typeof renderRepresentative === "function") renderRepresentative(representativeData);
+    },
+    damage(value) {
+      damageData = value;
+      if (typeof renderDamage === "function") renderDamage(damageData);
+    },
+    notifications(value) {
+      notificationData = value;
+      if (typeof renderNotifications === "function") renderNotifications();
+    },
+  };
+  handlers[domain]?.(data);
+  if (typeof dartRefreshAll === "function") dartRefreshAll();
+});
+
 
 // ===========================================
 // 13. Chart in Brand Information
