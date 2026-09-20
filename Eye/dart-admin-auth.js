@@ -76,15 +76,14 @@
   }
 
   async function unlock() {
-    if (window.DartCatalog?.hydrate) {
-      try {
-        await window.DartCatalog.hydrate();
-      } catch (error) {
-        console.error("Unable to load server catalogue after dashboard sign-in", error);
-        lock();
-        status(loginForm, "Database connection failed. Dashboard remains locked.", true);
-        throw error;
-      }
+    try {
+      if (window.DartSiteSettings?.hydrate) await window.DartSiteSettings.hydrate();
+      if (window.DartCatalog?.hydrate) await window.DartCatalog.hydrate();
+    } catch (error) {
+      console.error("Unable to hydrate dashboard state after sign-in", error);
+      lock();
+      status(loginForm, "Database connection failed. Dashboard remains locked.", true);
+      throw error;
     }
     document.body.classList.remove("dart-admin-locked");
     authView.hidden = true;
