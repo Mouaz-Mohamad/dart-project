@@ -2121,6 +2121,235 @@ export class CommerceService {
     };
   }
 
+  public async createAdminOrder(
+    actorId: string,
+    input: {
+      clientId?: string | undefined;
+      clientName: string;
+      phone1: string;
+      phone2?: string | undefined;
+      email?: string | undefined;
+      paymentMethod?: string | undefined;
+      paymentStatus?: string | undefined;
+      amountPaid?: number | undefined;
+      amountRefunded?: number | undefined;
+      orderSource?: string | undefined;
+      deliveryNotes?: string | undefined;
+      itemCodes: string[];
+      discountPercent?: number | undefined;
+      country?: string | undefined;
+      governorate?: string | undefined;
+      area?: string | undefined;
+      street?: string | undefined;
+      building?: string | undefined;
+      floor?: string | undefined;
+      latitude?: string | undefined;
+      longitude?: string | undefined;
+      fullAddress?: string | undefined;
+    },
+    requestId: string,
+  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const versionResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM domain_state_versions WHERE domain='orders' FOR UPDATE",
+      );
+      const currentVersion = Number(versionResult.rows[0]?.version || 1);
+
+      const itemCodes = [...new Set(
+        input.itemCodes.map((code) => String(code || "").trim()).filter(Boolean),
+      )];
+      if (!itemCodes.length) {
+        throw new AppError(422, "ORDER_ITEMS_REQUIRED", "A manual order must contain at least one physical item");
+      }
+
+      const clientCode = String(input.clientId || "").trim();
+      const customerResult =
+        clientCode && clientCode !== "-"
+          ? await client.query<{ user_id: string }>(
+              "SELECT user_id::text FROM customers WHERE client_code=$1 LIMIT 1",
+              [clientCode],
+            )
+          : { rows: [] as { user_id: string }[] };
+      const customerUserId = customerResult.rows[0]?.user_id || null;
+
+      const contact = {
+        name: String(input.clientName || "").trim(),
+        phone1: String(input.phone1 || "").trim(),
+        phone2: String(input.phone2 || "").trim(),
+        email: String(input.email || "").trim(),
+      };
+      const address = {
+        country: String(input.country || "Egypt"),
+        governorate: String(input.governorate || ""),
+        area: String(input.area || ""),
+        street: String(input.street || ""),
+        building: String(input.building || ""),
+        floor: String(input.floor || ""),
+        latitude: String(input.latitude || ""),
+        longitude: String(input.longitude || ""),
+        fullAddress: String(input.fullAddress || ""),
+        addressSource: "Manual Admin",
+      };
+
+      const inserted = await client.query<{ id: string; order_code: string }>(
+        `INSERT INTO orders (
+           customer_user_id, status, payment_method, payment_status,
+           subtotal_minor, order_discount_minor, final_minor,
+           amount_paid_minor, amount_refunded_minor, contact_snapshot,
+           delivery_address, delivery_notes, order_source, legacy
+         ) VALUES (
+           $1,'New',$2,$3,0,0,0,0,0,$4::jsonb,$5::jsonb,$6,$7,$8::jsonb
+         )
+         RETURNING id::text, order_code`,
+        [
+          customerUserId,
+          String(input.paymentMethod || "Cash on Delivery"),
+          String(input.paymentStatus || "Unpaid"),
+          JSON.stringify(contact),
+          JSON.stringify(address),
+          String(input.deliveryNotes || ""),
+          String(input.orderSource || "Manual"),
+          JSON.stringify({
+            clientId: clientCode || "-",
+            source: "Manual Admin",
+          }),
+        ],
+      );
+      const order = inserted.rows[0]!;
+
+      await this.syncAdminOrderItems(
+        client,
+        order.id,
+        order.order_code,
+        { items: itemCodes },
+        null,
+        "New",
+      );
+
+      const totals = await client.query<{
+        subtotal_minor: string;
+      }>(
+        `SELECT COALESCE(sum(final_unit_minor),0)::text AS subtotal_minor
+           FROM order_items
+          WHERE order_id=$1`,
+        [order.id],
+      );
+      const subtotalMinor = Number(totals.rows[0]?.subtotal_minor || 0);
+      const discountPercent = Math.min(
+        100,
+        Math.max(0, Number(input.discountPercent) || 0),
+      );
+      const discountMinor = Math.min(
+        subtotalMinor,
+        Math.round((subtotalMinor * discountPercent) / 100),
+      );
+      const finalMinor = Math.max(0, subtotalMinor - discountMinor);
+      const amountPaidMinor = Math.min(
+        finalMinor,
+        Math.max(0, Math.round((Number(input.amountPaid) || 0) * 100)),
+      );
+      const amountRefundedMinor = Math.min(
+        amountPaidMinor,
+        Math.max(0, Math.round((Number(input.amountRefunded) || 0) * 100)),
+      );
+
+      await client.query(
+        `UPDATE orders
+            SET subtotal_minor=$2,
+                order_discount_minor=$3,
+                final_minor=$4,
+                amount_paid_minor=$5,
+                amount_refunded_minor=$6,
+                promotion=$7::jsonb,
+                legacy=legacy || $8::jsonb,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [
+          order.id,
+          subtotalMinor,
+          discountMinor,
+          finalMinor,
+          amountPaidMinor,
+          amountRefundedMinor,
+          discountPercent
+            ? JSON.stringify({
+                type: "Manual Order Discount",
+                percent: discountPercent,
+              })
+            : null,
+          JSON.stringify({
+            discount: discountPercent,
+            reasonDeduction: discountPercent ? "Order discount" : "-",
+          }),
+        ],
+      );
+
+      await client.query(
+        `INSERT INTO order_events (
+           order_id, event_type, from_status, to_status, actor_type, actor_id, metadata
+         ) VALUES ($1,'ORDER_CREATED',NULL,'New','staff',$2,$3::jsonb)`,
+        [
+          order.id,
+          actorId,
+          JSON.stringify({
+            requestId,
+            source: "Manual Admin",
+            itemCount: itemCodes.length,
+          }),
+        ],
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+         ) VALUES ('staff',$1,'MANUAL_ORDER_CREATED','orders',$2,$3,$4::jsonb)`,
+        [
+          actorId,
+          order.id,
+          requestId,
+          JSON.stringify({
+            orderCode: order.order_code,
+            itemCount: itemCodes.length,
+            discountPercent,
+          }),
+        ],
+      );
+      await client.query(
+        `INSERT INTO outbox_events (
+           aggregate_type, aggregate_id, event_type, payload, deduplication_key
+         ) VALUES ('order',$1,'order.created',$2::jsonb,$3)
+         ON CONFLICT (deduplication_key) DO NOTHING`,
+        [
+          order.id,
+          JSON.stringify({
+            orderId: order.id,
+            orderCode: order.order_code,
+            customerUserId,
+            totalMinor: finalMinor,
+            source: "Manual Admin",
+          }),
+          `order.created:${order.id}`,
+        ],
+      );
+
+      const nextVersion = currentVersion + 1;
+      await client.query(
+        "UPDATE domain_state_versions SET version=$2, updated_at=now() WHERE domain=$1",
+        ["orders", nextVersion],
+      );
+
+      await client.query("COMMIT");
+      return await this.adminOrders();
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async replaceAdminOrders(
     expectedVersion: number,
     orders: Record<string, unknown>[],
