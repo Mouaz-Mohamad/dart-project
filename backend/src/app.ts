@@ -1,8 +1,12 @@
+import express from "express";
 import { createApp } from "./application.js";
 import { loadConfig } from "./config/env.js";
 import { createLogger } from "./config/logger.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
+
+// Vercel discovers Express entrypoints from direct imports in this file.
+void express;
 
 export const config = loadConfig();
 export const logger = createLogger(config);
