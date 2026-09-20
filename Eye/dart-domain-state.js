@@ -233,7 +233,42 @@
   }
 
   async function checkAll() {
-    await Promise.all(Object.keys(STORAGE_BY_DOMAIN).map((domain) => checkDomain(domain)));
+    if (document.hidden) return;
+    const domains = Object.keys(STORAGE_BY_DOMAIN);
+
+    for (const domain of domains.filter((name) => dirty.has(name))) {
+      try {
+        await syncDomain(domain);
+      } catch (error) {
+        console.error(`Dart ${domain} sync failed`, error);
+        if (error.status === 409) await hydrateDomain(domain, true).catch(() => {});
+      }
+    }
+
+    try {
+      const payload = await api("/api/v1/admin/domain-state-versions");
+      const remoteVersions = payload.versions || {};
+      const changed = domains.filter((domain) => {
+        const remoteVersion = Number(remoteVersions[domain] || 0);
+        return (
+          remoteVersion &&
+          versions.get(domain) &&
+          remoteVersion !== versions.get(domain) &&
+          !dirty.has(domain)
+        );
+      });
+      await Promise.all(
+        changed.map((domain) =>
+          hydrateDomain(domain, true).catch((error) => {
+            if (error.status !== 401)
+              console.warn(`Dart ${domain} live refresh failed`, error);
+          }),
+        ),
+      );
+    } catch (error) {
+      if (error.status !== 401)
+        console.warn("Dart dashboard live version check failed", error);
+    }
   }
 
   window.addEventListener("online", checkAll);
