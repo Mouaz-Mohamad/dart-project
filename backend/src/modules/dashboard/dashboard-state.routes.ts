@@ -73,30 +73,6 @@ export function createDashboardStateRouter(
   );
 
   router.get(
-    "/admin/domain-state-versions",
-    signedIn,
-    requireAccountType("staff"),
-    requireMfa,
-    requirePermission("dashboard_state.read"),
-    async (_request, response) => {
-      response.setHeader("Cache-Control", "no-store");
-      response.status(200).json({ versions: await state.versions() });
-    },
-  );
-
-  router.get(
-    "/admin/domain-state-versions",
-    signedIn,
-    requireAccountType("staff"),
-    requireMfa,
-    requirePermission("dashboard_state.read"),
-    async (_request, response) => {
-      response.setHeader("Cache-Control", "no-store");
-      response.status(200).json({ versions: await state.versions() });
-    },
-  );
-
-  router.get(
     "/admin/domain-state/:domain",
     signedIn,
     requireAccountType("staff"),
