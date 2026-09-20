@@ -10,6 +10,7 @@ const sizeChart = read("Eye/dart-size-chart-v5.js");
 const fixes = read("Eye/dart-fixes.js");
 const operations = read("Eye/dart-operations-v4.js");
 const serviceWorker = read("sw.js");
+const vercel = read("vercel.json");
 
 assert.match(
   catalog,
@@ -74,3 +75,15 @@ assert.match(
 );
 
 console.log("PASS server-authority contract");
+
+
+const vercelConfig = JSON.parse(vercel);
+assert.ok(
+  Array.isArray(vercelConfig.rewrites) &&
+    vercelConfig.rewrites.some(
+      (rule) =>
+        rule.source === "/api/:path*" &&
+        /^https:\/\/[^/]+\.vercel\.app\/api\/:path\*$/.test(rule.destination),
+    ),
+  "storefront must proxy API calls through its own origin",
+);
