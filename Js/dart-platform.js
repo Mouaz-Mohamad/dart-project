@@ -1564,7 +1564,7 @@
     return customerNameParts(value, 2);
   }
 
-  function renderSerialResult(form) {
+  async function renderSerialResult(form) {
     const result = document.getElementById("serialSearchResult");
     if (!result) return;
     const content = result.querySelector(".serial-result-content");
@@ -1579,7 +1579,33 @@
     const code = String(form.elements.serial_number?.value || "")
       .trim()
       .toLowerCase();
-    const items = read(KEYS.items, []),
+    let item = null;
+    if (API_BASE) {
+      try {
+        const payload = await apiRequest(
+          `/api/v1/serial/${encodeURIComponent(code)}`,
+        );
+        if (payload.found && payload.item) {
+          item = {
+            ...payload.item,
+            clientName: payload.item.ownerName || "Dart Customer",
+          };
+        }
+      } catch (error) {
+        result.hidden = false;
+        result.classList.remove("is-idle");
+        content.classList.remove("serial-result-skeleton");
+        if (skeletonImage) skeletonImage.hidden = true;
+        if (skeletonCopy) skeletonCopy.hidden = true;
+        icon.hidden = false;
+        iconGlyph.className = "fa-solid fa-triangle-exclamation";
+        title.textContent = "Registry Unavailable";
+        message.textContent = "تعذر التحقق من قاعدة بيانات Dart الآن. حاول مرة أخرى.";
+        product.hidden = true;
+        return;
+      }
+    } else {
+      const items = read(KEYS.items, []);
       item = items.find(
         (row) =>
           String(row.itemCode || "")
@@ -1588,7 +1614,8 @@
           !row.isDeleted &&
           String(row.status || "").toLowerCase() === "sold" &&
           (row.clientId || row.clientName),
-      );
+      ) || null;
+    }
     result.hidden = false;
     result.classList.remove("is-idle");
     content.classList.remove("serial-result-skeleton");
@@ -1965,7 +1992,7 @@
             form.reportValidity();
             return;
           }
-          renderSerialResult(form);
+          await renderSerialResult(form);
           return;
         }
         if (
