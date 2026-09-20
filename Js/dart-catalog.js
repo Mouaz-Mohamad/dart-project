@@ -34,9 +34,14 @@
       try {
         const parsed = JSON.parse(rawKey);
         if (Array.isArray(parsed) && parsed.length >= 3) {
+          const normalizedKey = normalizeStockKey(
+            parsed[0],
+            parsed[1],
+            parsed[2],
+          );
           map.set(
-            normalizeStockKey(parsed[0], parsed[1], parsed[2]),
-            quantity,
+            normalizedKey,
+            Number(map.get(normalizedKey) || 0) + quantity,
           );
         }
       } catch {
@@ -492,8 +497,8 @@
   function available(m, size, color, owner = "") {
     if (
       !active(m) ||
-      !colors(m).some((c) => active(c) && c.name === color) ||
-      !sizes(m).some((s) => active(s) && s.name === String(size))
+      !colors(m).some((c) => active(c) && norm(c.name) === norm(color)) ||
+      !sizes(m).some((s) => active(s) && norm(s.name) === norm(size))
     )
       return 0;
     if (!IS_ADMIN && remoteStock) {
