@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import {
@@ -11,11 +12,17 @@ import {
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CatalogAssetService } from "./catalog.asset.service.js";
 
+const assetIdSchema = z.string().trim().regex(/^[A-Za-z0-9_-]{8,120}$/);
+
 const uploadSchema = z.object({
-  assetId: z.string().trim().min(1).max(120),
-  originalName: z.string().max(255).default(""),
+  assetId: assetIdSchema,
+  originalName: z.string().trim().max(255).default(""),
   contentType: z.enum(["image/jpeg","image/png","image/webp"]),
-  base64: z.string().min(1),
+  base64: z
+    .string()
+    .min(4)
+    .max(5_600_000)
+    .regex(/^[A-Za-z0-9+/]+={0,2}$/),
 });
 
 export function createCatalogAssetRouter(
@@ -26,9 +33,22 @@ export function createCatalogAssetRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
+  const uploadLimiter = rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 30,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: {
+      error: {
+        code: "ASSET_UPLOAD_RATE_LIMITED",
+        message: "Too many catalogue image uploads; try again later",
+      },
+    },
+  });
 
   router.get("/catalog/assets/:assetId", async (request, response) => {
-    const asset = await assets.get(String(request.params.assetId));
+    const assetId = assetIdSchema.parse(request.params.assetId);
+    const asset = await assets.get(assetId);
     if (!asset) {
       response.status(404).json({ error: { code: "ASSET_NOT_FOUND", message: "Image not found" } });
       return;
@@ -46,6 +66,7 @@ export function createCatalogAssetRouter(
 
   router.put(
     "/admin/catalog/assets",
+    uploadLimiter,
     signedIn,
     csrf,
     requireAccountType("staff"),
