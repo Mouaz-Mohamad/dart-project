@@ -255,9 +255,41 @@
   }
 
   function render() { renderOrders(); renderReturns(); }
-  window.DartTracking = { render, currentOrder, currentOrders, currentReturns, renderReturns, orderGroups };
-  document.addEventListener("DOMContentLoaded", render);
-  window.addEventListener("storage", (event) => { if (["dart_orders", "dart_returns"].includes(event.key)) render(); });
-  window.addEventListener("dart:data-changed", (event) => { if (["dart_orders", "dart_returns"].includes(event.detail?.key)) render(); });
-  setInterval(() => { if (!document.hidden) render(); }, 4000);
+
+  async function refreshServerTracking() {
+    if (document.hidden) return;
+    if (window.DartPlatform?.currentUser?.() && window.DartPlatform?.hydrateCustomerCommerce) {
+      try {
+        await window.DartPlatform.hydrateCustomerCommerce();
+      } catch (error) {
+        if (error.status !== 401) console.warn("Dart tracking refresh failed", error);
+      }
+    }
+    render();
+  }
+
+  window.DartTracking = {
+    render,
+    refreshServerTracking,
+    currentOrder,
+    currentOrders,
+    currentReturns,
+    renderReturns,
+    orderGroups,
+  };
+  document.addEventListener("DOMContentLoaded", () => {
+    render();
+    void refreshServerTracking();
+  });
+  window.addEventListener("storage", (event) => {
+    if (["dart_orders", "dart_returns"].includes(event.key)) render();
+  });
+  window.addEventListener("dart:data-changed", (event) => {
+    if (["dart_orders", "dart_returns"].includes(event.detail?.key)) render();
+  });
+  window.addEventListener("focus", () => void refreshServerTracking());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void refreshServerTracking();
+  });
+  setInterval(() => void refreshServerTracking(), 3000);
 })();
