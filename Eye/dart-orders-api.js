@@ -113,8 +113,12 @@
   }
 
   async function check() {
-    if (!serverVersion || document.hidden) return;
+    if (document.hidden) return;
     try {
+      if (!serverVersion) {
+        await hydrate();
+        return;
+      }
       if (dirty) await sync();
       const payload = await api("/api/v1/admin/orders-state");
       const remoteVersion = Number(payload.version || 0);
