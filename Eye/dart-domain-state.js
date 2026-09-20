@@ -185,9 +185,28 @@
     schedule(domain);
   }
 
+  async function hydrateAudit(limit = 500) {
+    const payload = await api(`/api/v1/admin/audit?limit=${encodeURIComponent(limit)}`);
+    const audit = Array.isArray(payload.audit) ? payload.audit : [];
+    localStorage.setItem("dart_audit", JSON.stringify(audit));
+    window.dispatchEvent(new CustomEvent("dart:audit-hydrated", { detail: { audit } }));
+    return audit;
+  }
+
+  async function auditFor(entityType, entityId) {
+    const params = new URLSearchParams({
+      limit: "1500",
+      entityType: String(entityType || ""),
+      entityId: String(entityId || ""),
+    });
+    const payload = await api(`/api/v1/admin/audit?${params.toString()}`);
+    return Array.isArray(payload.audit) ? payload.audit : [];
+  }
+
   async function hydrateAll() {
     const domains = Object.keys(STORAGE_BY_DOMAIN);
     const results = await Promise.all(domains.map((domain) => hydrateDomain(domain)));
+    await hydrateAudit().catch((error) => console.warn("Dart audit hydration failed", error));
     return Object.fromEntries(domains.map((domain, index) => [domain, results[index]]));
   }
 
@@ -229,6 +248,8 @@
     hydrateDomain,
     syncDomain,
     checkAll,
+    hydrateAudit,
+    auditFor,
     write,
     read(storageKey) {
       return readLocal(storageKey);
