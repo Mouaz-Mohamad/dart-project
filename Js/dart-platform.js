@@ -1702,7 +1702,7 @@
       productName = model?.name || item.modelName || "Dart item",
       image = DartCatalog.cover(model, item.color);
     iconGlyph.className = "fa-solid fa-check";
-    title.textContent = "Authentic Dart Item";
+    title.textContent = "Original piece";
     message.textContent = "This sold item is verified in the official Dart registry.";
     const imageElement = document.getElementById("serialProductImage");
     imageElement.src = image;
@@ -2942,6 +2942,9 @@
   }
 
   function bindRep() {
+    // Production representative workflow is server-authoritative in dart-rep.js.
+    // Keep this legacy demo path available only when no API is configured.
+    if (API_BASE) return;
     if (!document.querySelector(".rep-driver-card")) return;
     const id = new URLSearchParams(location.search).get("order"),
       orders = read(KEYS.orders, []),
