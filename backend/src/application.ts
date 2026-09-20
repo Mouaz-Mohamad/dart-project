@@ -33,6 +33,8 @@ import { createPlatformAdminRouter } from "./modules/platform/platform-admin.rou
 import type { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
 import { createFinanceRouter } from "./modules/finance/finance.routes.js";
 import type { FinanceService } from "./modules/finance/finance.service.js";
+import { createOutboxRouter } from "./modules/outbox/outbox.routes.js";
+import type { OutboxService } from "./modules/outbox/outbox.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -45,6 +47,7 @@ export interface AppDependencies extends HealthDependencies {
   customerInteractionService?: CustomerInteractionService;
   platformAdminService?: PlatformAdminService;
   financeService?: FinanceService;
+  outboxService?: OutboxService;
 }
 
 // Vercel's Express builder resolves Helmet's callable default export as a module namespace.
@@ -118,7 +121,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
     app.use("/api/v1", createIdentityRouter(dependencies.identityService, config));
-    app.use("/api/v1", createStaffOnboardingRouter(dependencies.identityService, config));
+    app.use("/api/v1", createStaffOnboardingRouter(dependencies.identityService, config, dependencies.outboxService));
     app.use("/api/v1", createStaffManagementRouter(dependencies.identityService, config));
 
     if (dependencies.catalogService) {
@@ -201,6 +204,10 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         ),
       );
     }
+  }
+
+  if (dependencies.outboxService) {
+    app.use("/api/v1", createOutboxRouter(dependencies.outboxService, config));
   }
 
   app.use(notFoundHandler);
