@@ -56,6 +56,23 @@ function minor(value: unknown): number {
   return Math.max(0, Math.round((Number(value) || 0) * 100));
 }
 
+function strictNumber(
+  value: unknown,
+  field: string,
+  options: { integer?: boolean; max?: number } = {},
+): number {
+  const number = value === undefined || value === null || value === "" ? 0 : Number(value);
+  if (
+    !Number.isFinite(number) ||
+    number < 0 ||
+    (options.integer && !Number.isInteger(number)) ||
+    (options.max !== undefined && number > options.max)
+  ) {
+    throw new AppError(422, "CATALOG_NUMBER_INVALID", `${field} has an invalid numeric value`);
+  }
+  return number;
+}
+
 function money(value: unknown): number {
   return Number(value || 0) / 100;
 }
@@ -76,6 +93,72 @@ function bool(value: unknown, fallback = false): boolean {
 function text(value: unknown, fallback = ""): string {
   const result = String(value ?? fallback).trim();
   return result || fallback;
+}
+
+function activeOptionNames(value: unknown): Set<string> {
+  return new Set(
+    (Array.isArray(value) ? value : [])
+      .filter((option) => option && typeof option === "object" && (option as { active?: unknown }).active !== false)
+      .map((option) => text((option as { name?: unknown }).name).toLocaleLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function validateCatalogReplacement(
+  models: Record<string, unknown>[],
+  items: Record<string, unknown>[],
+): void {
+  const modelIds = new Set<string>();
+  const variants = new Map<string, { colors: Set<string>; sizes: Set<string> }>();
+  for (const raw of models) {
+    const modelId = text(raw.modelId);
+    if (!modelId) throw new AppError(422, "MODEL_ID_REQUIRED", "Model code is required");
+    if (modelIds.has(modelId)) {
+      throw new AppError(422, "MODEL_ID_DUPLICATE", `Model code ${modelId} appears more than once`);
+    }
+    modelIds.add(modelId);
+    strictNumber(raw.cost, `Model ${modelId} cost`);
+    strictNumber(raw.selling, `Model ${modelId} selling price`);
+    strictNumber(raw.discount, `Model ${modelId} discount`, { max: 100 });
+    strictNumber(raw.lowStockLimit ?? 5, `Model ${modelId} low-stock limit`, { integer: true });
+    variants.set(modelId, {
+      colors: activeOptionNames(raw.colorOptions),
+      sizes: activeOptionNames(raw.sizeOptions),
+    });
+  }
+
+  const itemIds = new Set<string>();
+  const itemCodes = new Set<string>();
+  for (const raw of items) {
+    const id = text(raw.id);
+    const itemCode = text(raw.itemCode);
+    const modelId = text(raw.modelId);
+    if (!id || !itemCode || !modelId) {
+      throw new AppError(422, "ITEM_ID_REQUIRED", "Item id, code and model are required");
+    }
+    if (itemIds.has(id)) {
+      throw new AppError(422, "ITEM_ID_DUPLICATE", `Item id ${id} appears more than once`);
+    }
+    const normalizedCode = itemCode.toLocaleLowerCase();
+    if (itemCodes.has(normalizedCode)) {
+      throw new AppError(422, "ITEM_CODE_DUPLICATE", `Item code ${itemCode} appears more than once`);
+    }
+    itemIds.add(id);
+    itemCodes.add(normalizedCode);
+    const allowed = variants.get(modelId);
+    if (!allowed) {
+      throw new AppError(422, "ITEM_MODEL_INVALID", "Every item must reference an existing model");
+    }
+    if (
+      !allowed.colors.has(text(raw.color).toLocaleLowerCase()) ||
+      !allowed.sizes.has(text(raw.size).toLocaleLowerCase())
+    ) {
+      throw new AppError(422, "ITEM_VARIANT_INVALID", `Item ${itemCode} uses a color or size outside its model`);
+    }
+    if (raw.costSnapshot !== undefined) {
+      strictNumber(raw.costSnapshot, `Item ${itemCode} cost snapshot`);
+    }
+  }
 }
 
 export class CatalogService {
@@ -342,6 +425,7 @@ export class CatalogService {
   async adminState(): Promise<CatalogState> {
     const client = await this.pool.connect();
     try {
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
       await this.releaseExpiredReservations(client);
       const versionResult = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
@@ -358,7 +442,7 @@ export class CatalogService {
                 cost_snapshot_minor, legacy, version, created_at, updated_at
            FROM inventory_items ORDER BY created_at DESC`,
       );
-      return {
+      const state = {
         version: Number(versionResult.rows[0]?.version || 1),
         models: models.rows.map((row) => ({
           ...row.legacy,
@@ -401,6 +485,11 @@ export class CatalogService {
           updatedAt: row.updated_at,
         })),
       };
+      await client.query("COMMIT");
+      return state;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }
@@ -410,13 +499,22 @@ export class CatalogService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      validateCatalogReplacement(models, items);
       const versionSnapshot = await client.query<{ version: string }>(
-        "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
+        "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory' FOR UPDATE",
       );
       const currentVersion = Number(versionSnapshot.rows[0]?.version || 1);
       if (currentVersion !== expectedVersion) {
         throw new AppError(409, "CATALOG_VERSION_CONFLICT", "Catalogue changed on another device; reload and retry");
       }
+      const previousCounts = await client.query<{
+        model_count: string;
+        item_count: string;
+      }>(
+        `SELECT
+           (SELECT count(*)::text FROM catalog_models) AS model_count,
+           (SELECT count(*)::text FROM inventory_items) AS item_count`,
+      );
 
       const modelIds = new Set<string>();
       const modelCosts = new Map<string, number>();
@@ -442,8 +540,8 @@ export class CatalogService {
              version=catalog_models.version+1, updated_at=now()`,
           [
             modelId, text(raw.name, modelId), text(raw.category), text(raw.description),
-            minor(raw.cost), minor(raw.selling), Math.min(100, Math.max(0, Number(raw.discount) || 0)),
-            Math.max(0, Number(raw.lowStockLimit) || 5),
+            minor(raw.cost), minor(raw.selling), Number(raw.discount) || 0,
+            Number(raw.lowStockLimit ?? 5),
             JSON.stringify(Array.isArray(raw.sizeOptions) ? raw.sizeOptions : []),
             JSON.stringify(Array.isArray(raw.colorOptions) ? raw.colorOptions : []),
             JSON.stringify(raw.sizeChart ?? null),
@@ -463,12 +561,43 @@ export class CatalogService {
       }
 
       const itemIds = new Set<string>();
+      const protectedItems = await client.query<{
+        id: string;
+        item_code: string;
+        model_id: string;
+        color: string;
+        size: string;
+        status: string;
+      }>(
+        `SELECT id, item_code, model_id, color, size, status
+           FROM inventory_items
+          WHERE id = ANY($1::text[])
+            AND (order_id IS NOT NULL OR cart_reservation_id IS NOT NULL
+              OR lower(status) IN ('sold','processing/held','return inspection','cart reserved'))
+          FOR UPDATE`,
+        [items.map((raw) => text(raw.id))],
+      );
+      const protectedById = new Map(protectedItems.rows.map((row) => [row.id, row]));
       for (const raw of items) {
         const id = text(raw.id);
         const itemCode = text(raw.itemCode);
         const modelId = text(raw.modelId);
         if (!id || !itemCode || !modelId) throw new AppError(422, "ITEM_ID_REQUIRED", "Item id, code and model are required");
         if (!modelIds.has(modelId)) throw new AppError(422, "ITEM_MODEL_INVALID", "Every item must reference an existing model");
+        const protectedItem = protectedById.get(id);
+        if (
+          protectedItem &&
+          (protectedItem.item_code !== itemCode ||
+            protectedItem.model_id !== modelId ||
+            protectedItem.color !== text(raw.color) ||
+            protectedItem.size !== text(raw.size))
+        ) {
+          throw new AppError(
+            409,
+            "ITEM_IDENTITY_IMMUTABLE",
+            `Reserved or historical item ${protectedItem.item_code} cannot change code, model, color or size`,
+          );
+        }
         itemIds.add(id);
         const requestedStatus = text(raw.status, "In stock");
         const hasReservation =
@@ -560,14 +689,29 @@ export class CatalogService {
       }
       const next = Number(versionUpdate.rows[0].version);
       await client.query(
-        `INSERT INTO audit_logs (actor_type, actor_id, action, entity_type, entity_id, request_id, metadata)
-         VALUES ('staff',$1,'CATALOG_STATE_REPLACED','catalog_inventory','catalog_inventory',$2,$3::jsonb)`,
-        [actorId, requestId, JSON.stringify({ previousVersion: currentVersion, newVersion: next, modelCount: models.length, itemCount: items.length })],
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id,
+           old_values, new_values, metadata
+         ) VALUES (
+           'staff',$1,'CATALOG_STATE_REPLACED','catalog_inventory','catalog_inventory',$2,
+           $3::jsonb,$4::jsonb,$5::jsonb
+         )`,
+        [
+          actorId,
+          requestId,
+          JSON.stringify({
+            version: currentVersion,
+            modelCount: Number(previousCounts.rows[0]?.model_count || 0),
+            itemCount: Number(previousCounts.rows[0]?.item_count || 0),
+          }),
+          JSON.stringify({ version: next, modelCount: models.length, itemCount: items.length }),
+          JSON.stringify({ source: "dashboard_catalog_sync" }),
+        ],
       );
       await client.query("COMMIT");
       return this.adminState();
     } catch (error) {
-      await client.query("ROLLBACK");
+      await client.query("ROLLBACK").catch(() => undefined);
       throw error;
     } finally {
       client.release();
