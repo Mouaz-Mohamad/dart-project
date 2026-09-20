@@ -15,10 +15,13 @@ import {
 } from "./modules/health/health.routes.js";
 import { createIdentityRouter } from "./modules/identity/identity.routes.js";
 import type { IdentityService } from "./modules/identity/identity.service.js";
+import { createCatalogRouter } from "./modules/catalog/catalog.routes.js";
+import type { CatalogService } from "./modules/catalog/catalog.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
   identityService?: IdentityService;
+  catalogService?: CatalogService;
 }
 
 // Vercel's Express builder resolves Helmet's callable default export as a module namespace.
@@ -69,6 +72,9 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
     app.use("/api/v1", createIdentityRouter(dependencies.identityService, config));
+    if (dependencies.catalogService) {
+      app.use("/api/v1", createCatalogRouter(dependencies.catalogService, dependencies.identityService, config));
+    }
   }
 
   app.use(notFoundHandler);
