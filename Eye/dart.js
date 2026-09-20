@@ -1545,6 +1545,7 @@ function dartAssignRepresentative(order, repId) {
 }
 
 function dartUpdateBirthdayRewardForOrder(order, target) {
+  if (window.DartOrdersApi) return;
   if (!order?.birthdayRewardId) return;
   let rewards;
   try {
@@ -1576,7 +1577,6 @@ function dartPersistOrderWorkflow() {
   if (window.DartOrdersApi) {
     saveDataToStorage("dart_orders", ordersData);
     saveDataToStorage("dart_notifications", notificationData);
-    localStorage.setItem("dart_audit", JSON.stringify(auditData));
     return;
   }
   dartSaveAll();
