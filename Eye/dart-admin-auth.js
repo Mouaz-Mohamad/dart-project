@@ -124,11 +124,25 @@
   }
 
   async function unlock() {
+    const can = (permission) => window.DartAdminAccess?.can?.(permission) === true;
     try {
-      if (window.DartSiteSettings?.hydrate) await window.DartSiteSettings.hydrate();
-      if (window.DartCatalog?.hydrate) await window.DartCatalog.hydrate();
-      if (window.DartOrdersApi?.hydrate) await window.DartOrdersApi.hydrate();
-      if (window.DartDomainState?.hydrateAll) await window.DartDomainState.hydrateAll();
+      if (window.DartSiteSettings?.hydrate) {
+        await window.DartSiteSettings.hydrate(!can("settings.manage"));
+      }
+      if (can("catalog.manage") && window.DartCatalog?.hydrate) {
+        await window.DartCatalog.hydrate();
+      } else {
+        localStorage.removeItem("dart_models");
+        localStorage.removeItem("dart_items");
+      }
+      if (can("orders.read") && window.DartOrdersApi?.hydrate) {
+        await window.DartOrdersApi.hydrate();
+      } else {
+        localStorage.removeItem("dart_orders");
+      }
+      if (can("dashboard_state.read") && window.DartDomainState?.hydrateAll) {
+        await window.DartDomainState.hydrateAll();
+      }
     } catch (error) {
       console.error("Unable to hydrate dashboard state after sign-in", error);
       lock();
