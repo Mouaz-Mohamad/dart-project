@@ -39,6 +39,18 @@ const adminOrderStateSchema = z.object({
   orders: z.array(z.record(z.string(), z.unknown())).max(10000),
 });
 
+const savedAddressSchema = z.object({
+  address: z.string().trim().min(1).max(600),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  governorate: z.enum(["Cairo", "Giza"]),
+  country: z.string().trim().max(120).optional(),
+  area: z.string().trim().max(160).optional(),
+  street: z.string().trim().max(200).optional(),
+  building: z.string().trim().max(120).optional(),
+  floor: z.string().trim().max(80).optional(),
+});
+
 const checkoutSchema = z.object({
   reservationId,
   contact: z.object({
@@ -70,6 +82,38 @@ export function createCommerceRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
+
+  router.put(
+    "/me/preferences/address",
+    signedIn,
+    csrf,
+    requireAccountType("customer"),
+    async (request, response) => {
+      const address = savedAddressSchema.parse(request.body);
+      response.status(200).json({
+        savedAddress: await commerce.saveCustomerAddress(
+          request.auth!.userId,
+          address,
+          String(request.id),
+        ),
+      });
+    },
+  );
+
+  router.delete(
+    "/me/preferences/address",
+    signedIn,
+    csrf,
+    requireAccountType("customer"),
+    async (request, response) => {
+      await commerce.saveCustomerAddress(
+        request.auth!.userId,
+        null,
+        String(request.id),
+      );
+      response.status(204).end();
+    },
+  );
 
   router.get(
     "/me/cart",
