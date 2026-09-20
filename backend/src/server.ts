@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config/env.js";
 import { createLogger } from "./config/logger.js";
+import { shouldStartHttpListener } from "./config/runtime.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
 
@@ -23,10 +24,14 @@ const app = createApp(config, {
   identityService,
 });
 
-const server = createServer(app);
-server.listen(config.port, () => {
-  logger.info({ port: config.port }, "Dart backend listening");
-});
+let server: Server | undefined;
+
+if (shouldStartHttpListener()) {
+  server = createServer(app);
+  server.listen(config.port, () => {
+    logger.info({ port: config.port }, "Dart backend listening");
+  });
+}
 
 let shuttingDown = false;
 async function shutdown(signal: string, exitCode = 0): Promise<void> {
@@ -40,7 +45,7 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
   }, 10_000);
   forceTimer.unref();
 
-  await closeServer(server);
+  if (server) await closeServer(server);
   await database.end();
   clearTimeout(forceTimer);
   logger.info("Graceful shutdown completed");
@@ -53,13 +58,17 @@ function closeServer(target: Server): Promise<void> {
   });
 }
 
-process.on("SIGINT", () => void shutdown("SIGINT"));
-process.on("SIGTERM", () => void shutdown("SIGTERM"));
-process.on("uncaughtException", (error) => {
-  logger.fatal({ err: error }, "Uncaught exception");
-  void shutdown("uncaughtException", 1);
-});
-process.on("unhandledRejection", (error) => {
-  logger.fatal({ err: error }, "Unhandled promise rejection");
-  void shutdown("unhandledRejection", 1);
-});
+if (server) {
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("uncaughtException", (error) => {
+    logger.fatal({ err: error }, "Uncaught exception");
+    void shutdown("uncaughtException", 1);
+  });
+  process.on("unhandledRejection", (error) => {
+    logger.fatal({ err: error }, "Unhandled promise rejection");
+    void shutdown("unhandledRejection", 1);
+  });
+}
+
+export default app;
