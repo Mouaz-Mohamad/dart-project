@@ -1046,6 +1046,72 @@ export class IdentityService {
       client.release();
     }
   }
+  public async adminSetCustomerDrawEligibility(
+    account: AuthenticatedAccount,
+    customerUserId: string,
+    eligible: boolean,
+    reason: string,
+    metadata: RequestMetadata,
+  ): Promise<{ eligible: boolean }> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("customers.manage") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage customers");
+    }
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const current = await client.query<{
+        dart_card_draw_eligible: boolean;
+        client_code: string;
+      }>(
+        `SELECT dart_card_draw_eligible, client_code
+           FROM customers
+          WHERE user_id=$1
+          FOR UPDATE`,
+        [customerUserId],
+      );
+      const row = current.rows[0];
+      if (!row) {
+        throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
+      }
+
+      await client.query(
+        `UPDATE customers
+            SET dart_card_draw_eligible=$2,
+                updated_at=now()
+          WHERE user_id=$1`,
+        [customerUserId, eligible],
+      );
+
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "DART_CARD_DRAW_ELIGIBILITY_CHANGED",
+        "customers",
+        customerUserId,
+        metadata,
+        {
+          clientCode: row.client_code,
+          previousEligible: row.dart_card_draw_eligible,
+          eligible,
+          reason: reason.trim(),
+        },
+      );
+      await client.query("COMMIT");
+      return { eligible };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
 
   public async requestPasswordReset(
     accountType: AccountType,
