@@ -335,6 +335,31 @@ export function createIdentityRouter(
     },
   );
 
+  router.patch(
+    "/admin/representatives/:id",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("representatives.manage"),
+    async (request, response) => {
+      const body = z.object({
+        name: z.string().trim().min(3).max(120),
+        email,
+        phone1: egyptianPhone,
+        phone2: egyptianPhone.optional(),
+        address: z.string().trim().min(8).max(500),
+      }).parse(request.body);
+      await service.adminUpdateRepresentative(
+        request.auth!,
+        uuid.parse(request.params.id),
+        body,
+        metadata(request),
+      );
+      response.status(204).end();
+    },
+  );
+
   router.post(
     "/admin/representatives/:id/approve",
     signedIn,
