@@ -110,7 +110,11 @@ describe.skipIf(!databaseUrl)("identity service", () => {
         email: "mouaz@example.com",
         phone1: "01012345678",
         nationalId: "29901011234567",
+        address: "10 Test Street, Cairo, Egypt",
         password: "StrongPassword123",
+        idFrontImage: "data:image/webp;base64,AAAA",
+        idBackImage: "data:image/webp;base64,AAAA",
+        faceImage: "data:image/webp;base64,AAAA",
       },
       requestMetadata,
     );
