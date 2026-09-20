@@ -35,6 +35,10 @@ Add these in Vercel. Never paste their values into chat, source code, screenshot
 | `SESSION_COOKIE_SAME_SITE` | `none` while the storefront and API use separate `*.vercel.app` hostnames |
 | `SESSION_TTL_DAYS` | `30` |
 | `EMAIL_OTP_TTL_MINUTES` | `10` |
+| `AUTOMATION_WEBHOOK_URL` | HTTPS n8n/automation webhook that sends approved Email/Web Push/site notifications |
+| `AUTOMATION_WEBHOOK_SECRET` | New random secret of at least 32 characters used to sign every event |
+| `CRON_SECRET` | New random secret of at least 32 characters; Vercel supplies it as the Cron bearer token |
+| `OUTBOX_BATCH_SIZE` | `20` initially |
 
 Use `SESSION_COOKIE_SAME_SITE=strict` after the storefront and API are placed on same-site custom domains such as `www.example.com` and `api.example.com`. Cross-site cookies use `SameSite=None; Secure`; CSRF verification and the exact CORS allowlist remain mandatory.
 
@@ -50,11 +54,12 @@ Do not add `DART_OWNER_PASSWORD` as a permanent Vercel variable. Owner bootstrap
 6. Run `npm run db:migrate` once against the production `DATABASE_URL` from a controlled environment.
 7. Call `/api/v1/health/ready`; it must return HTTP 200 with the database check up.
 8. Run `npm run admin:bootstrap-owner` once, then remove the bootstrap password.
-9. Configure the storefront's API base URL and verify login, cookie, CSRF, logout, and MFA end to end.
+9. Verify the automation webhook signature and trigger one test Email OTP through the real provider.
+10. Configure the storefront's API base URL and verify login, cookie, CSRF, logout, and MFA end to end.
 
 ## Important boundaries
 
 - A successful deployment does not run or prove the database migrations.
-- Email OTP is queued in the transactional outbox, but customer delivery still requires the approved email provider/worker.
-- Representative registration remains closed until encrypted document storage, MIME inspection, and malware scanning are configured.
+- Email OTP and order events are queued transactionally and immediately dispatched when the signed automation webhook is configured; the database retry queue remains authoritative.
+- Representative documents are signature-checked, size-limited and encrypted in PostgreSQL. Production approval still requires a human identity review policy.
 - Never enable development seed data in Production.

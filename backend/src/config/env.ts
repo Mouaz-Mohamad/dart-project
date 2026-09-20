@@ -30,6 +30,7 @@ const environmentSchema = z.object({
   AUTOMATION_WEBHOOK_URL: z.union([z.url(), z.literal("")]).default(""),
   AUTOMATION_WEBHOOK_SECRET: z.string().default(""),
   OUTBOX_CRON_SECRET: z.string().default(""),
+  CRON_SECRET: z.string().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
 });
 
@@ -90,6 +91,17 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   ) {
     throw new Error("Invalid environment configuration: MFA_ENCRYPTION_KEY");
   }
+  const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
+  if (
+    parsed.data.NODE_ENV === "production" &&
+    (!parsed.data.AUTOMATION_WEBHOOK_URL ||
+      parsed.data.AUTOMATION_WEBHOOK_SECRET.length < 32 ||
+      outboxCronSecret.length < 32)
+  ) {
+    throw new Error(
+      "Invalid environment configuration: AUTOMATION_WEBHOOK_URL, AUTOMATION_WEBHOOK_SECRET, OUTBOX_CRON_SECRET/CRON_SECRET",
+    );
+  }
 
   return {
     nodeEnv: parsed.data.NODE_ENV,
@@ -111,7 +123,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     mfaEncryptionKey,
     automationWebhookUrl: parsed.data.AUTOMATION_WEBHOOK_URL || null,
     automationWebhookSecret: parsed.data.AUTOMATION_WEBHOOK_SECRET || null,
-    outboxCronSecret: parsed.data.OUTBOX_CRON_SECRET || null,
+    outboxCronSecret: outboxCronSecret || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
   };
 }

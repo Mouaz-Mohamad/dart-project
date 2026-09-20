@@ -11,6 +11,7 @@ import {
 } from "../../middleware/authentication.js";
 import type { AccountType, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
+import type { OutboxService } from "../outbox/outbox.service.js";
 
 const password = z.string().min(12).max(200);
 const email = z.email().max(254);
@@ -115,6 +116,7 @@ export function createIdentityRouter(
     AppConfig,
     "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite" | "authPepper"
   >,
+  outbox?: OutboxService,
 ): Router {
   const router = Router();
   const signedIn = authenticate(service, config);
@@ -122,6 +124,7 @@ export function createIdentityRouter(
 
   router.post("/auth/register", authLimiter(), async (request, response) => {
     const result = await service.registerCustomer(registerCustomerSchema.parse(request.body), metadata(request));
+    await outbox?.processBatch(5).catch(() => undefined);
     response.status(202).json({
       status: "verification_required",
       challengeId: result.challengeId,
@@ -139,6 +142,7 @@ export function createIdentityRouter(
   router.post("/auth/resend-verification", authLimiter(), async (request, response) => {
     const body = z.object({ challengeId: uuid }).parse(request.body);
     const result = await service.resendCustomerVerification(body.challengeId, metadata(request));
+    await outbox?.processBatch(5).catch(() => undefined);
     response.status(202).json({
       status: "verification_required",
       challengeId: result.challengeId,
@@ -168,6 +172,7 @@ export function createIdentityRouter(
   router.post("/representatives/register", authLimiter(), async (request, response) => {
     const body = registerRepresentativeSchema.parse(request.body);
     const result = await service.registerRepresentative(body, metadata(request));
+    await outbox?.processBatch(5).catch(() => undefined);
     response.status(202).json(result);
   });
 
@@ -492,6 +497,7 @@ export function createIdentityRouter(
         body.temporaryPassword,
         metadata(request),
       );
+      await outbox?.processBatch(5).catch(() => undefined);
       response.status(204).end();
     },
   );

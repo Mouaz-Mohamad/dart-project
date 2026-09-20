@@ -14,9 +14,9 @@ Use:
 
 with:
 
-`Authorization: Bearer <OUTBOX_CRON_SECRET>`
+`Authorization: Bearer <CRON_SECRET>`
 
-The secret must be at least 32 characters and must never be exposed in storefront or dashboard JavaScript.
+The secret must be at least 32 characters and must never be exposed in storefront or dashboard JavaScript. `OUTBOX_CRON_SECRET` remains accepted for non-Vercel schedulers, while `CRON_SECRET` matches Vercel's automatic Cron authorization header.
 
 ## Scheduling
 

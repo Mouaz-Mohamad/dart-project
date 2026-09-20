@@ -120,7 +120,14 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
 
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
-    app.use("/api/v1", createIdentityRouter(dependencies.identityService, config));
+    app.use(
+      "/api/v1",
+      createIdentityRouter(
+        dependencies.identityService,
+        config,
+        dependencies.outboxService,
+      ),
+    );
     app.use("/api/v1", createStaffOnboardingRouter(dependencies.identityService, config, dependencies.outboxService));
     app.use("/api/v1", createStaffManagementRouter(dependencies.identityService, config));
 
@@ -151,6 +158,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
           dependencies.commerceService,
           dependencies.identityService,
           config,
+          dependencies.outboxService,
         ),
       );
     }

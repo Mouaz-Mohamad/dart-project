@@ -57,4 +57,22 @@ describe("environment configuration", () => {
       }),
     ).toThrow("MFA_ENCRYPTION_KEY");
   });
+
+  it("fails closed when production event delivery is not configured", () => {
+    const production = {
+      ...baseEnvironment,
+      NODE_ENV: "production",
+      CORS_ORIGINS: "https://dart.example",
+      AUTH_PEPPER: "production-auth-pepper-with-at-least-32-characters",
+      MFA_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
+    };
+    expect(() => loadConfig(production)).toThrow("AUTOMATION_WEBHOOK_URL");
+    const config = loadConfig({
+      ...production,
+      AUTOMATION_WEBHOOK_URL: "https://automation.example/webhook",
+      AUTOMATION_WEBHOOK_SECRET: "a".repeat(32),
+      CRON_SECRET: "b".repeat(32),
+    });
+    expect(config.outboxCronSecret).toBe("b".repeat(32));
+  });
 });

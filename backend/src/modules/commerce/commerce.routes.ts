@@ -12,6 +12,7 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CommerceService } from "./commerce.service.js";
+import type { OutboxService } from "../outbox/outbox.service.js";
 
 const reservationId = z.string().trim().min(16).max(160).regex(/^[A-Za-z0-9_-]+$/);
 
@@ -110,6 +111,7 @@ export function createCommerceRouter(
   commerce: CommerceService,
   identity: IdentityService,
   config: Pick<AppConfig, "sessionCookieName" | "authPepper" | "nodeEnv">,
+  outbox?: OutboxService,
 ): Router {
   const router = Router();
   const signedIn = authenticate(identity, config);
@@ -505,13 +507,13 @@ export function createCommerceRouter(
       const body = z.object({
         action: z.enum(["start", "cancel", "delivered"]),
       }).parse(request.body);
-      response.status(200).json({
-        order: await commerce.representativeOrderAction(
+      const order = await commerce.representativeOrderAction(
           request.auth!.userId,
           orderCode,
           body.action,
-        ),
-      });
+        );
+      await outbox?.processBatch(10).catch(() => undefined);
+      response.status(200).json({ order });
     },
   );
 
@@ -526,13 +528,13 @@ export function createCommerceRouter(
       const body = z.object({
         action: z.enum(["start", "cancel", "complete"]),
       }).parse(request.body);
-      response.status(200).json({
-        return: await commerce.representativeReturnAction(
+      const result = await commerce.representativeReturnAction(
           request.auth!.userId,
           returnRef,
           body.action,
-        ),
-      });
+        );
+      await outbox?.processBatch(10).catch(() => undefined);
+      response.status(200).json({ return: result });
     },
   );
 
@@ -556,6 +558,7 @@ export function createCommerceRouter(
         guestCartOwnerHash(request, response, config, false) ?? undefined,
         idempotencyKey,
       );
+      await outbox?.processBatch(10).catch(() => undefined);
       response.status(201).json({ order: result });
     },
   );
