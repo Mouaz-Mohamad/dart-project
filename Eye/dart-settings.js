@@ -213,12 +213,21 @@
     localStorage.setItem("dart_audit", JSON.stringify(rows.slice(0, 2000)));
   }
 
-  function saveSettings(next, note) {
-    const before = root.DartSiteSettings.get();
-    const saved = root.DartSiteSettings.save(next);
-    audit(before, saved, note);
-    announce("تم حفظ الإعدادات. ستُطبّق على العمليات الجديدة والواجهة العامة.");
-    return saved;
+  async function saveSettings(next, note) {
+    const before = clone(root.DartSiteSettings.get());
+    root.DartSiteSettings.save(next);
+    try {
+      const saved = root.DartSiteSettings.sync
+        ? await root.DartSiteSettings.sync()
+        : root.DartSiteSettings.get();
+      audit(before, saved, note);
+      announce("تم حفظ الإعدادات في قاعدة البيانات وتطبيقها على الواجهة العامة.");
+      return saved;
+    } catch (error) {
+      await root.DartSiteSettings.hydrate?.(true).catch(() => {});
+      announce(error.message || "تعذر حفظ الإعدادات في قاعدة البيانات.", true);
+      return null;
+    }
   }
 
   function fillGeneral(settings) {
@@ -379,17 +388,18 @@
         const file = $(id).files?.[0];
         if (file) next[key] = await root.DartCatalog.saveImage(file);
       }
-      saveSettings(next, "Site media replaced");
+      const saved = await saveSettings(next, "Site media replaced");
+      if (!saved) return;
       event.target.reset();
-      renderMedia(next);
+      renderMedia(saved);
     } catch (error) { announce(error.message || "تعذر حفظ الصورة.", true); }
   });
 
-  $("clear-media-settings")?.addEventListener("click", () => {
+  $("clear-media-settings")?.addEventListener("click", async () => {
     const next = root.DartSiteSettings.get();
     next.heroDayImage = null; next.heroNightImage = null; next.founderImage = null;
-    saveSettings(next, "Site media restored to original files");
-    renderMedia(next);
+    const saved = await saveSettings(next, "Site media restored to original files");
+    if (saved) renderMedia(saved);
   });
 
   $("settings-announcement-form")?.addEventListener("submit", (event) => {
