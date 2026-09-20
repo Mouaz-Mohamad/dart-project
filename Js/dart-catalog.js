@@ -7,10 +7,7 @@
   "use strict";
   const RESET = "dart_v7_empty_start_completed";
   const API_BASE = String(
-    window.DART_API_BASE_URL ||
-      (location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)
-        ? "https://dart-api-dusky.vercel.app"
-        : ""),
+    window.DART_API_BASE_URL || location.origin,
   ).replace(/\/$/, "");
   const CSRF_STORAGE_KEY = "dart_csrf_token";
   const IS_ADMIN = /\/Eye\//i.test(location.pathname);
