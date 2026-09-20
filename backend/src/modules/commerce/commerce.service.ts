@@ -30,6 +30,7 @@ export interface CheckoutInput {
     addressSource?: string | undefined;
   };
   deliveryNotes?: string | undefined;
+  promotionCode?: string | undefined;
 }
 
 interface LockedItem {
@@ -171,6 +172,68 @@ function birthdayWindow(
   return null;
 }
 
+function promotionPercent(row: Record<string, unknown>): number {
+  return Math.min(
+    100,
+    Math.max(
+      0,
+      Number(row.percent ?? row.discountPercent ?? row.discount ?? 0) || 0,
+    ),
+  );
+}
+
+function promotionDateActive(row: Record<string, unknown>, today = cairoDateKey()): boolean {
+  const startsAt = String(row.startsAt || row.startDate || "").slice(0, 10);
+  const endsAt = String(row.endsAt || row.endDate || "").slice(0, 10);
+  return (!startsAt || today >= startsAt) && (!endsAt || today <= endsAt);
+}
+
+async function customerPurchaseStats(
+  client: PoolClient,
+  customerUserId: string,
+): Promise<{ deliveredOrders: number; deliveredItems: number }> {
+  const result = await client.query<{
+    delivered_orders: string;
+    delivered_items: string;
+  }>(
+    `SELECT
+       count(DISTINCT o.id)::text AS delivered_orders,
+       count(oi.id)::text AS delivered_items
+       FROM orders o
+       LEFT JOIN order_items oi ON oi.order_id=o.id
+      WHERE o.customer_user_id=$1
+        AND o.status='Delivered'
+        AND NOT o.is_deleted`,
+    [customerUserId],
+  );
+  return {
+    deliveredOrders: Number(result.rows[0]?.delivered_orders || 0),
+    deliveredItems: Number(result.rows[0]?.delivered_items || 0),
+  };
+}
+
+function promotionTargetsCustomer(
+  row: Record<string, unknown>,
+  stats: { deliveredOrders: number; deliveredItems: number },
+): boolean {
+  const type = String(
+    row.targetType || row.targetSegment || row.segment || "all",
+  ).trim().toLowerCase();
+  const value = Number(row.targetValue ?? row.minimumPurchasedItems ?? row.minPurchasedItems ?? 0);
+
+  if (["", "all", "everyone", "all_customers"].includes(type)) return true;
+  if (["zero_orders", "0_orders", "no_orders", "customers_with_0_orders"].includes(type)) {
+    return stats.deliveredOrders === 0;
+  }
+  if (["min_purchased_items", "purchased_items_at_least", "minimum_items"].includes(type)) {
+    return stats.deliveredItems >= Math.max(0, value);
+  }
+  if (["exact_purchased_items", "purchased_items_exact"].includes(type)) {
+    return stats.deliveredItems === Math.max(0, value);
+  }
+  return false;
+}
+
 function flexibleDateExpiry(value: unknown): number | null {
   const text = String(value || "").trim();
   if (!text) return null;
@@ -185,6 +248,56 @@ function flexibleDateExpiry(value: unknown): number | null {
 
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
+
+  public async validatePromotionCode(
+    customerUserId: string,
+    code: string,
+  ): Promise<{
+    valid: boolean;
+    promotion: Record<string, unknown> | null;
+    message?: string;
+  }> {
+    const client = await this.pool.connect();
+    try {
+      const stateResult = await client.query<{ data: unknown[] }>(
+        "SELECT data FROM dashboard_domain_state WHERE domain='promotions'",
+      );
+      const rows = Array.isArray(stateResult.rows[0]?.data)
+        ? stateResult.rows[0]!.data as Record<string, unknown>[]
+        : [];
+      const normalizedCode = String(code || "").trim().toUpperCase();
+      const row = rows.find((item) =>
+        String(item.code || "").trim().toUpperCase() === normalizedCode &&
+        String(item.status || "Active").toLowerCase() === "active" &&
+        !item.isArchived &&
+        !item.isDeleted,
+      );
+      if (!row || !promotionDateActive(row)) {
+        return { valid: false, promotion: null, message: "Promotion code is invalid or expired" };
+      }
+      const percent = promotionPercent(row);
+      if (!percent) {
+        return { valid: false, promotion: null, message: "Promotion has no active discount" };
+      }
+      const stats = await customerPurchaseStats(client, customerUserId);
+      if (!promotionTargetsCustomer(row, stats)) {
+        return { valid: false, promotion: null, message: "This promotion is not available for this account" };
+      }
+      return {
+        valid: true,
+        promotion: {
+          id: String(row.id || ""),
+          code: normalizedCode,
+          type: "Promotion",
+          percent,
+          startsAt: row.startsAt || row.startDate || "",
+          endsAt: row.endsAt || row.endDate || "",
+        },
+      };
+    } finally {
+      client.release();
+    }
+  }
 
   public async reserveCart(
     reservationId: string,
