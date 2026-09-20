@@ -10,12 +10,17 @@
 | `backend/src/database/pool.ts` | اتصال PostgreSQL وفحص الجاهزية |
 | `backend/src/database/migrate.ts` | Migrations مرتبة مع checksum وadvisory lock ومنع التنفيذ خارج الترتيب |
 | `backend/migrations/0001_platform_foundation.sql` | `audit_logs` و`outbox_events` و`idempotency_keys` |
+| `backend/migrations/0002_identity_auth.sql` | حسابات Customer/Staff/Representative والجلسات وEmail OTP وPassword Reset وRBAC وMFA |
 | `backend/src/database/seed.ts` | Seed تجريبي يتطلب تفعيلًا صريحًا وممنوع في Production |
+| `backend/src/database/bootstrap-owner.ts` | إنشاء أول Owner محمي مرة واحدة ثم فرض إعداد Authenticator |
 | `backend/src/modules/health/` | Liveness وReadiness بدون تسريب أخطاء قاعدة البيانات |
-| `backend/tests/` | اختبارات الإعدادات والصحة والترتيب والـseed واختبار PostgreSQL اختياري معزول |
-| `backend/openapi.yaml` | العقد المنفذ حاليًا فقط؛ بقية العقود ما زالت داخل `docs/API_CONTRACT.md` |
+| `backend/src/modules/identity/` | التسجيل والدخول والملف والجلسات وOTP وTOTP واعتماد المندوب وTemporary Password |
+| `backend/src/security/` | Argon2id والتشفير والتطبيع وSession/CSRF tokens |
+| `backend/src/middleware/authentication.ts` | التحقق المركزي من الجلسة ونوع الحساب والصلاحية وMFA وCSRF |
+| `backend/tests/` | اختبارات الإعدادات والصحة والأمان وHTTP Auth والترتيب والـseed واختبارات PostgreSQL المعزولة |
+| `backend/openapi.yaml` | عقد Foundation وIdentity/Auth المنفذ؛ بقية العقود داخل `docs/API_CONTRACT.md` |
 
-لم يتم توصيل أي تدفق واجهة بالـBackend في هذه الدفعة. `Js/dart-platform.js` يظل نقطة الربط الحالية، ويُنقل كل Domain لاحقًا بعد اعتماده دون fallback صامت إلى `localStorage` في Production.
+تم توصيل تسجيل/دخول/ملف العميل وEmail OTP ودخول المندوب وبوابة Staff/Owner بالـBackend عند ضبط `window.DART_API_BASE_URL`. بقية الـDomains تنتقل لاحقًا بعد اعتمادها، ومن دون fallback صامت للمصادقة المحلية في Production.
 
 الملفات الجديدة مقسمة بتعليقات BEGIN / END، وتعليقات BACKEND تحدد نقاط استبدال التخزين المحلي بالخادم. لم يتغير شكل وهوية المشروع الأساسية.
 

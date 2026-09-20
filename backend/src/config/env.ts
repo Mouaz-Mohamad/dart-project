@@ -19,6 +19,13 @@ const environmentSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
   ALLOW_DEVELOPMENT_SEED: booleanFromString,
+  AUTH_PEPPER: z.string().min(32).default("development-only-auth-pepper-change-me"),
+  SESSION_COOKIE_NAME: z.string().regex(/^[A-Za-z0-9_-]+$/).default("dart_session"),
+  SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+  EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().min(3).max(30).default(10),
+  MFA_ENCRYPTION_KEY: z
+    .string()
+    .default("ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="),
 });
 
 export interface AppConfig {
@@ -33,6 +40,11 @@ export interface AppConfig {
   rateLimitMax: number;
   logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
   allowDevelopmentSeed: boolean;
+  authPepper: string;
+  sessionCookieName: string;
+  sessionTtlDays: number;
+  emailOtpTtlMinutes: number;
+  mfaEncryptionKey: Buffer;
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -52,6 +64,22 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   if (parsed.data.NODE_ENV === "production" && parsed.data.ALLOW_DEVELOPMENT_SEED) {
     throw new Error("Invalid environment configuration: development seed cannot run in production");
   }
+  const mfaEncryptionKey = Buffer.from(parsed.data.MFA_ENCRYPTION_KEY, "base64");
+  if (mfaEncryptionKey.length !== 32) {
+    throw new Error("Invalid environment configuration: MFA_ENCRYPTION_KEY");
+  }
+  if (
+    parsed.data.NODE_ENV === "production" &&
+    parsed.data.AUTH_PEPPER === "development-only-auth-pepper-change-me"
+  ) {
+    throw new Error("Invalid environment configuration: AUTH_PEPPER");
+  }
+  if (
+    parsed.data.NODE_ENV === "production" &&
+    parsed.data.MFA_ENCRYPTION_KEY === "ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="
+  ) {
+    throw new Error("Invalid environment configuration: MFA_ENCRYPTION_KEY");
+  }
 
   return {
     nodeEnv: parsed.data.NODE_ENV,
@@ -65,5 +93,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     rateLimitMax: parsed.data.RATE_LIMIT_MAX,
     logLevel: parsed.data.LOG_LEVEL,
     allowDevelopmentSeed: parsed.data.ALLOW_DEVELOPMENT_SEED,
+    authPepper: parsed.data.AUTH_PEPPER,
+    sessionCookieName: parsed.data.SESSION_COOKIE_NAME,
+    sessionTtlDays: parsed.data.SESSION_TTL_DAYS,
+    emailOtpTtlMinutes: parsed.data.EMAIL_OTP_TTL_MINUTES,
+    mfaEncryptionKey,
   };
 }

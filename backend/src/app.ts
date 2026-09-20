@@ -1,4 +1,5 @@
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import express, { type Express } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -12,9 +13,12 @@ import {
   createHealthRouter,
   type HealthDependencies,
 } from "./modules/health/health.routes.js";
+import { createIdentityRouter } from "./modules/identity/identity.routes.js";
+import type { IdentityService } from "./modules/identity/identity.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
+  identityService?: IdentityService;
 }
 
 export function createApp(config: AppConfig, dependencies: AppDependencies): Express {
@@ -56,8 +60,12 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
     }),
   );
   app.use(express.json({ limit: "100kb", strict: true }));
+  app.use(cookieParser());
 
   app.use("/api/v1/health", createHealthRouter(dependencies));
+  if (dependencies.identityService) {
+    app.use("/api/v1", createIdentityRouter(dependencies.identityService, config));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

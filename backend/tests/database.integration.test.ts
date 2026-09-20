@@ -9,7 +9,7 @@ const schemaName = `dart_test_${randomUUID().replaceAll("-", "")}`;
 let adminPool: Pool | undefined;
 let testPool: Pool | undefined;
 
-describe.skipIf(!databaseUrl)("PostgreSQL foundation migration", () => {
+describe.skipIf(!databaseUrl)("PostgreSQL foundation and identity migrations", () => {
   beforeAll(async () => {
     adminPool = new Pool({ connectionString: databaseUrl, max: 1 });
     await adminPool.query(`CREATE SCHEMA "${schemaName}"`);
@@ -29,7 +29,7 @@ describe.skipIf(!databaseUrl)("PostgreSQL foundation migration", () => {
     }
   });
 
-  it("creates all foundation tables and records the migration", async () => {
+  it("creates all foundation and identity tables and records both migrations", async () => {
     const result = await testPool!.query<{ table_name: string }>(
       `
         SELECT table_name
@@ -40,10 +40,24 @@ describe.skipIf(!databaseUrl)("PostgreSQL foundation migration", () => {
       [schemaName],
     );
     expect(result.rows.map((row) => row.table_name)).toEqual([
+      "account_phones",
       "audit_logs",
+      "customers",
       "dart_schema_migrations",
+      "email_verification_challenges",
       "idempotency_keys",
+      "mfa_recovery_codes",
       "outbox_events",
+      "password_history",
+      "password_reset_requests",
+      "permissions",
+      "representatives",
+      "role_permissions",
+      "roles",
+      "sessions",
+      "staff_users",
+      "user_roles",
+      "users",
     ]);
   });
 

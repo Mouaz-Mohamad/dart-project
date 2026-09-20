@@ -17,6 +17,7 @@ Codex reads this file automatically before every task, so the rules below apply 
 - Run existing frontend checks: use the individual Node.js/Python commands listed under `docs/README.md` → **Checks**.
 - Lint: `cd backend && npm run lint`
 - Run a single migration: `cd backend && npm run db:migrate:one -- <migration-name>`
+- Bootstrap the first Owner once: `cd backend && npm run admin:bootstrap-owner`
 
 ## Non-negotiable architecture rules (every task, every phase)
 

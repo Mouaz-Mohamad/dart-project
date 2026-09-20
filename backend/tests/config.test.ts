@@ -29,4 +29,23 @@ describe("environment configuration", () => {
   it("requires a database URL", () => {
     expect(() => loadConfig({ NODE_ENV: "test" })).toThrow("DATABASE_URL");
   });
+
+  it("rejects development authentication secrets in production", () => {
+    expect(() =>
+      loadConfig({
+        ...baseEnvironment,
+        NODE_ENV: "production",
+        CORS_ORIGINS: "https://dart.example",
+      }),
+    ).toThrow("AUTH_PEPPER");
+
+    expect(() =>
+      loadConfig({
+        ...baseEnvironment,
+        NODE_ENV: "production",
+        CORS_ORIGINS: "https://dart.example",
+        AUTH_PEPPER: "production-auth-pepper-with-at-least-32-characters",
+      }),
+    ).toThrow("MFA_ENCRYPTION_KEY");
+  });
 });

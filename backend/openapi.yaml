@@ -1,61 +1,300 @@
 openapi: 3.1.0
 info:
   title: Dart Backend API
-  version: 0.1.0
-  description: Server-authoritative API for Dart | for you.
+  version: 0.2.0
+  description: Server-authoritative API for Dart | for you. Identity sessions use Secure HttpOnly cookies and CSRF tokens.
 servers:
   - url: /api/v1
+tags:
+  - name: Health
+  - name: Customer Auth
+  - name: Staff Auth
+  - name: Representative Auth
+  - name: Sessions
 paths:
   /health/live:
     get:
+      tags: [Health]
       summary: Process liveness
       operationId: getLiveness
       responses:
-        "200":
-          description: The API process is running.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Liveness"
+        "200": { description: API process is running }
   /health/ready:
     get:
-      summary: Dependency readiness
+      tags: [Health]
+      summary: PostgreSQL readiness
       operationId: getReadiness
       responses:
-        "200":
-          description: Required dependencies are ready.
+        "200": { description: Required dependencies are ready }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /auth/register:
+    post:
+      tags: [Customer Auth]
+      summary: Register a customer and queue a six-digit Email OTP
+      operationId: registerCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerRegistration" }
+      responses:
+        "202":
+          description: Email verification required
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Readiness"
-        "503":
-          description: At least one required dependency is unavailable.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Readiness"
+              schema: { $ref: "#/components/schemas/VerificationRequired" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/verify-email:
+    post:
+      tags: [Customer Auth]
+      summary: Consume an Email OTP and create the customer session
+      operationId: verifyCustomerEmail
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/resend-verification:
+    post:
+      tags: [Customer Auth]
+      summary: Replace a registration challenge and queue a new Email OTP
+      operationId: resendCustomerVerification
+      responses:
+        "202": { description: Replacement verification challenge }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/login:
+    post:
+      tags: [Customer Auth]
+      summary: Create a customer session
+      operationId: loginCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Login" }
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /admin/auth/login:
+    post:
+      tags: [Staff Auth]
+      summary: Create a staff session; TOTP is mandatory after setup
+      operationId: loginStaff
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/auth/mfa/setup:
+    post:
+      tags: [Staff Auth]
+      summary: Begin first-time TOTP setup
+      operationId: setupStaffMfa
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Manual Authenticator secret and otpauth URI }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/auth/mfa/confirm:
+    post:
+      tags: [Staff Auth]
+      summary: Verify the first TOTP and activate staff MFA
+      operationId: confirmStaffMfa
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "204": { description: MFA activated }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /representatives/register:
+    post:
+      tags: [Representative Auth]
+      summary: Representative registration boundary
+      description: Returns 503 until encrypted private document storage and malware scanning are configured; no incomplete application is saved.
+      operationId: registerRepresentative
+      responses:
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /representatives/login:
+    post:
+      tags: [Representative Auth]
+      summary: Create a session for an approved representative
+      operationId: loginRepresentative
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /auth/forgot-password:
+    post:
+      tags: [Customer Auth, Representative Auth]
+      summary: Record a reset request using a non-enumerating response
+      operationId: requestPasswordReset
+      responses:
+        "202": { description: Generic request accepted response }
+  /auth/change-temporary-password:
+    post:
+      tags: [Customer Auth, Representative Auth]
+      summary: Replace a temporary password and rotate all sessions
+      operationId: changeTemporaryPassword
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /auth/refresh:
+    post:
+      tags: [Sessions]
+      summary: Rotate the current server session
+      operationId: refreshSession
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Rotated CSRF token and expiry }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      tags: [Sessions]
+      summary: Revoke the current session
+      operationId: logout
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "204": { description: Session revoked }
+  /auth/logout-all:
+    post:
+      tags: [Sessions]
+      summary: Revoke every session for the account
+      operationId: logoutAll
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "204": { description: All sessions revoked }
+  /auth/sessions:
+    get:
+      tags: [Sessions]
+      summary: List active owned sessions
+      operationId: listOwnSessions
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Active session list }
+  /auth/sessions/{sessionId}:
+    delete:
+      tags: [Sessions]
+      summary: Revoke one owned session
+      operationId: revokeOwnSession
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Session revoked }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /me:
+    get:
+      tags: [Sessions]
+      summary: Return the minimum signed-in profile
+      operationId: getMe
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Signed-in profile }
+    patch:
+      tags: [Customer Auth]
+      summary: Update customer profile; changing email requires a new OTP
+      operationId: updateMe
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Updated profile and optional verification challenge }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/representatives/{id}/approve:
+    post:
+      tags: [Staff Auth]
+      summary: Approve a representative; Owner permission and MFA required
+      operationId: approveRepresentative
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Representative approved }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/representatives/{id}/reject:
+    post:
+      tags: [Staff Auth]
+      summary: Reject a representative; Owner permission and MFA required
+      operationId: rejectRepresentative
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Representative rejected }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/password-reset-requests/{id}/temporary-password:
+    post:
+      tags: [Staff Auth]
+      summary: Set a temporary password, revoke sessions and audit the action
+      operationId: setTemporaryPassword
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Temporary password assigned }
+        "403": { $ref: "#/components/responses/Forbidden" }
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: dart_session
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
   schemas:
-    Liveness:
+    CustomerRegistration:
       type: object
-      required: [status, service, version, startedAt, timestamp]
+      required: [name, email, phone1, password]
       properties:
-        status: { type: string, const: ok }
-        service: { type: string, const: dart-backend }
-        version: { type: string }
-        startedAt: { type: string, format: date-time }
-        timestamp: { type: string, format: date-time }
-    Readiness:
+        name: { type: string, minLength: 3, maxLength: 120 }
+        email: { type: string, format: email }
+        phone1: { type: string }
+        phone2: { type: string }
+        birthday: { type: string, format: date }
+        password: { type: string, minLength: 12, writeOnly: true }
+    Login:
       type: object
-      required: [status, checks, timestamp]
+      required: [identifier, password]
       properties:
-        status: { type: string, enum: [ready, not_ready] }
-        checks:
-          type: object
-          required: [database]
-          properties:
-            database: { type: string, enum: [up, down] }
-        timestamp: { type: string, format: date-time }
+        identifier: { type: string }
+        password: { type: string, writeOnly: true }
+        totp: { type: string, pattern: "^[0-9]{6}$", writeOnly: true }
+    VerificationRequired:
+      type: object
+      required: [status, challengeId, expiresAt]
+      properties:
+        status: { type: string, const: verification_required }
+        challengeId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+    Profile:
+      type: object
+      required: [id, accountType, code, name, email, phones, status]
+      properties:
+        id: { type: string, format: uuid }
+        accountType: { type: string, enum: [customer, staff, representative] }
+        code: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        phones: { type: array, items: { type: string } }
+        birthday: { type: [string, "null"], format: date }
+        status: { type: string }
+        emailVerified: { type: boolean }
+        mustChangePassword: { type: boolean }
+    Authenticated:
+      type: object
+      required: [user, csrfToken]
+      properties:
+        user: { $ref: "#/components/schemas/Profile" }
+        csrfToken: { type: string, writeOnly: true }
     ErrorResponse:
       type: object
       required: [error]
@@ -67,3 +306,45 @@ components:
             code: { type: string }
             message: { type: string }
             requestId: { type: string }
+            details: {}
+  responses:
+    Authenticated:
+      description: Authenticated session created or replaced
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Authenticated" }
+    Unauthorized:
+      description: Authentication failed or session expired
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: Authenticated but not authorized
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Conflict:
+      description: Duplicate or stale state conflict
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ValidationError:
+      description: Request or business validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ServiceUnavailable:
+      description: Required secure integration is unavailable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }

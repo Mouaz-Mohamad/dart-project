@@ -1,5 +1,15 @@
 # Dart Project changelog
 
+## Identity/Auth V0.2 — 2026-09-20
+
+- Added PostgreSQL identity tables for separate Customer, Staff and Representative realms, normalized phone uniqueness, customer/staff/representative profiles, rotating sessions, Email challenges, password-reset requests/history, MFA recovery-code storage and deny-by-default role/permission foundations.
+- Added Argon2id password hashing, a 12-character policy, hashed session and CSRF tokens, session-family reuse detection, device revocation, lockout/rate limits and append-only security audit events.
+- Added six-digit customer Email OTP registration and Email-change verification through encrypted transactional-outbox payloads; no OTP or temporary password is written to logs.
+- Added protected one-time Owner bootstrap, Staff dashboard login and Authenticator App TOTP setup. Owner-only representative decisions and temporary-password assignment require MFA and explicit permissions.
+- Connected the existing customer forms/profile and representative login to `/api/v1` when configured. HTTPS production auth fails closed if the secure API is missing; local prototype behavior remains available only for development.
+- Kept representative registration closed in API mode until encrypted private document storage, MIME inspection and malware scanning exist; incomplete applications are never saved.
+- Expanded OpenAPI, backend/frontend documentation and automated security/route tests.
+
 ## Backend Foundation V0.1 — 2026-09-19
 
 - Added the provider-neutral `backend/` modular-monolith foundation using Node.js, Express, TypeScript and PostgreSQL.

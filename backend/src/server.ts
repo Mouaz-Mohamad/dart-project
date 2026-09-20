@@ -3,11 +3,13 @@ import { createApp } from "./app.js";
 import { loadConfig } from "./config/env.js";
 import { createLogger } from "./config/logger.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
+import { IdentityService } from "./modules/identity/identity.service.js";
 
 const config = loadConfig();
 const logger = createLogger(config);
 const database = createDatabasePool(config);
 const startedAt = new Date();
+const identityService = new IdentityService(database, config);
 
 database.on("error", (error) => {
   logger.error({ err: error }, "Unexpected PostgreSQL pool error");
@@ -17,7 +19,8 @@ const app = createApp(config, {
   logger,
   databasePing: () => pingDatabase(database),
   startedAt,
-  version: "0.1.0",
+  version: "0.2.0",
+  identityService,
 });
 
 const server = createServer(app);

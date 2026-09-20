@@ -1,6 +1,6 @@
 {
   "name": "@dart/backend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Server-authoritative API foundation for Dart | for you",
   "type": "module",
@@ -20,19 +20,24 @@
     "check": "npm run lint && npm run typecheck && npm test",
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/database/migrate.ts",
     "db:migrate:one": "node --env-file-if-exists=.env --import tsx src/database/migrate.ts --one",
-    "db:seed:dev": "node --env-file-if-exists=.env --import tsx src/database/seed.ts"
+    "db:seed:dev": "node --env-file-if-exists=.env --import tsx src/database/seed.ts",
+    "admin:bootstrap-owner": "node --env-file-if-exists=.env --import tsx src/database/bootstrap-owner.ts"
   },
   "dependencies": {
+    "argon2": "0.44.0",
+    "cookie-parser": "1.4.7",
     "cors": "2.8.6",
     "express": "5.2.1",
     "express-rate-limit": "8.7.0",
     "helmet": "8.3.0",
+    "otplib": "13.3.0",
     "pg": "8.23.0",
     "pino": "10.3.1",
     "pino-http": "11.0.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
     "@types/node": "26.6.2",

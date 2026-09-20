@@ -16,6 +16,11 @@ const config: AppConfig = {
   rateLimitMax: 100,
   logLevel: "silent",
   allowDevelopmentSeed: false,
+  authPepper: "test-auth-pepper-with-at-least-32-characters",
+  sessionCookieName: "dart_session",
+  sessionTtlDays: 30,
+  emailOtpTtlMinutes: 10,
+  mfaEncryptionKey: Buffer.alloc(32, 7),
 };
 
 function appWith(databasePing: () => Promise<void>) {

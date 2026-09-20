@@ -181,7 +181,7 @@ function form(values) {
     email: "unit@example.com",
     phone1: "01012345678",
     phone2: "",
-    password: "password1",
+    password: "StrongPassword123",
     birthday: "2000-01-01",
   });
   const rememberedSession = JSON.parse(localStorage.getItem("dart_session"));
@@ -197,7 +197,7 @@ function form(values) {
       email: "UNIT@example.com",
       phone1: "01112345678",
       phone2: "",
-      password: "password2",
+      password: "AnotherPassword123",
       birthday: "2000-01-01",
     });
   } catch {

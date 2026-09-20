@@ -8,7 +8,10 @@ The frontend currently uses localStorage as an executable prototype. The backend
 - `GET /api/v1/health/live` reports process liveness without depending on PostgreSQL.
 - `GET /api/v1/health/ready` reports PostgreSQL readiness and returns `503` without leaking connection details when unavailable.
 - Migration `0001_platform_foundation.sql` adds append-only `audit_logs`, transactional `outbox_events`, and hashed `idempotency_keys` storage.
-- Customer, catalogue, inventory, order, authentication and messaging endpoints below remain contracts until their individual implementation slices are approved.
+- Migration `0002_identity_auth.sql` and the Identity/Auth module implement separate Customer, Staff and Representative realms, Argon2id passwords, customer Email OTP, rotating/revocable server sessions, CSRF enforcement, reset requests, protected Owner bootstrap and TOTP MFA.
+- The existing customer login/registration/profile and representative login adapters use these endpoints when `window.DART_API_BASE_URL` is configured. Dart Eye has a Staff/Owner login and first-login Authenticator gate.
+- Representative registration remains deliberately unavailable in API mode until encrypted private document storage, content inspection and malware scanning are configured. The endpoint returns `503` and saves nothing rather than dropping the existing identity-document requirement.
+- Catalogue, inventory, order and messaging delivery endpoints below remain contracts until their individual implementation slices are approved.
 - Production must never fall back silently to `localStorage` when the API is unavailable.
 
 ## Approved notification channels

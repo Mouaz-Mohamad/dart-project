@@ -1,5 +1,16 @@
 # V9 verification — 2026-09-11
 
+## Identity/Auth V0.2 verification — 2026-09-20
+
+- Backend production build, ESLint and strict TypeScript checks passed. The suite reports 24 passing tests across environment hardening, security primitives, HTTP cookie/CSRF boundaries, health/error behavior and migration ordering; five PostgreSQL-dependent scenarios remain automatically skipped without `TEST_DATABASE_URL`.
+- Verified Argon2id hashing, Egyptian phone normalization, AES-256-GCM secret encryption, session-token parsing, no-session-before-OTP behavior, HttpOnly session cookies, separate CSRF cookies, CSRF rejection, successful logout, MFA enforcement and fail-closed representative registration.
+- Existing platform, representative, tracking, Cairo/Giza address, dashboard, finance, settings, static accessibility/assets/integer-money and SEO checks all passed after the auth adapters and dashboard gate were added.
+- JavaScript syntax passed for customer auth, representative auth and the new Dart Eye admin gate. OpenAPI YAML parses and includes the implemented Identity/Auth paths.
+- Common private-key/API-token patterns were not found in project source. OTPs, temporary passwords, session secrets, National IDs and TOTP secrets are not logged.
+- The real PostgreSQL migration could not be applied in this environment because neither Docker nor PostgreSQL executables are installed. The isolated integration suite is included and must run in CI/staging with `TEST_DATABASE_URL` before deployment.
+- Playwright Chromium is not installed, so the browser visual suite stopped with its explicit dependency message. No visual pass is claimed for the new login overlays.
+- The existing user-owned `manifest.json` line-ending modification remains untouched and is the only source of `git diff --check` whitespace warnings.
+
 ## Backend Foundation V0.1 verification — 2026-09-19
 
 - Backend lint, TypeScript type checking and production build passed.

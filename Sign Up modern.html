@@ -337,7 +337,7 @@
                 </div>
 
                 <div class="input-box">
-                    <input type="password" name="password" placeholder="Password (8+ characters)" autocomplete="new-password" minlength="8" required>
+                    <input type="password" name="password" placeholder="Password (12+ characters)" autocomplete="new-password" minlength="12" required>
                     <i class='bx bxs-lock-alt'></i>
                 </div>
 
@@ -375,9 +375,21 @@
         <form id="customerChangePasswordForm" novalidate>
             <h2 id="customerPasswordChangeTitle">Replace temporary password</h2>
             <p>Create a private password before continuing to your profile.</p>
-            <label>New password<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
-            <label>Confirm new password<input type="password" name="confirmPassword" minlength="8" autocomplete="new-password" required></label>
+            <label>New password<input type="password" name="password" minlength="12" autocomplete="new-password" required></label>
+            <label>Confirm new password<input type="password" name="confirmPassword" minlength="12" autocomplete="new-password" required></label>
             <button type="submit" class="btn">Save new password</button>
+            <p class="form-status" role="status" aria-live="polite"></p>
+        </form>
+    </section>
+
+    <section id="customerEmailVerification" class="dart-password-change-dialog" hidden aria-modal="true" role="dialog" aria-labelledby="customerEmailVerificationTitle">
+        <form id="customerEmailVerificationForm" novalidate>
+            <h2 id="customerEmailVerificationTitle">Verify your email</h2>
+            <p>Enter the 6-digit code sent to your email. The code expires after 10 minutes.</p>
+            <input type="hidden" name="challengeId">
+            <label>Verification code<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+            <button type="submit" class="btn">Verify account</button>
+            <button type="button" class="btn" data-resend-email-verification>Resend code</button>
             <p class="form-status" role="status" aria-live="polite"></p>
         </form>
     </section>

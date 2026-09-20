@@ -24,6 +24,15 @@
     birthdayMessages: "dart_birthday_messages",
   });
   const API_BASE = String(window.DART_API_BASE_URL || "").replace(/\/$/, "");
+  const API_USER_CACHE_KEY = "dart_api_user_cache";
+  const API_REQUIRED =
+    location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
+  let apiUserCache = null;
+  try {
+    apiUserCache = JSON.parse(sessionStorage.getItem(API_USER_CACHE_KEY) || "null");
+  } catch {
+    sessionStorage.removeItem(API_USER_CACHE_KEY);
+  }
   const CART_RESERVATION_MS = 15 * 60 * 1000;
   const configuredBirthdayPercent = Number(
     window.DartSiteSettings?.get?.().birthdayDiscountPercent,
@@ -355,10 +364,20 @@
       throw Object.assign(new Error("API_NOT_CONFIGURED"), {
         code: "API_NOT_CONFIGURED",
       });
+    const method = String(options.method || "GET").toUpperCase();
+    const csrfToken = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("dart_csrf="))
+      ?.split("=")
+      .slice(1)
+      .join("=");
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken
+          ? { "X-CSRF-Token": decodeURIComponent(csrfToken) }
+          : {}),
         ...(options.headers || {}),
       },
       ...options,
@@ -369,11 +388,53 @@
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok)
-      throw Object.assign(new Error(payload.message || "Request failed"), {
+      throw Object.assign(
+        new Error(payload?.error?.message || payload.message || "Request failed"),
+        {
         status: response.status,
         payload,
-      });
+        code: payload?.error?.code,
+      },
+      );
     return payload;
+  }
+
+  function adaptApiUser(profile) {
+    if (!profile || profile.accountType !== "customer") return null;
+    return {
+      id: profile.id,
+      customerId: profile.code,
+      name: profile.name,
+      email: profile.email,
+      phone1: profile.phones?.[0] || "",
+      phone2: profile.phones?.[1] || "",
+      role: "Customer",
+      emailVerified: profile.emailVerified,
+      mustChangePassword: profile.mustChangePassword,
+      birthday: profile.birthday || "",
+      status: profile.status,
+      isArchived: false,
+      serverAuthoritative: true,
+    };
+  }
+
+  function cacheApiUser(profile) {
+    apiUserCache = adaptApiUser(profile);
+    if (apiUserCache)
+      sessionStorage.setItem(API_USER_CACHE_KEY, JSON.stringify(apiUserCache));
+    else sessionStorage.removeItem(API_USER_CACHE_KEY);
+    return apiUserCache;
+  }
+
+  async function hydrateApiSession() {
+    if (!API_BASE) return null;
+    try {
+      const payload = await apiRequest("/api/v1/me");
+      return cacheApiUser(payload.user);
+    } catch (error) {
+      if (error.status === 401) return cacheApiUser(null);
+      throw error;
+    }
   }
 
   function nextCode(prefix, collection, field) {
@@ -422,6 +483,7 @@
   }
 
   function currentSession() {
+    if (API_BASE) return apiUserCache ? { userId: apiUserCache.id, api: true } : null;
     const session = read(KEYS.session, null);
     if (!session || !session.userId) {
       localStorage.removeItem(KEYS.session);
@@ -431,6 +493,10 @@
   }
 
   function saveCustomerSession(user) {
+    if (API_BASE) {
+      cacheApiUser(user);
+      return;
+    }
     write(KEYS.session, {
       userId: user.id,
       createdAt: now(),
@@ -439,6 +505,7 @@
   }
 
   function currentUser() {
+    if (API_BASE) return apiUserCache;
     const session = currentSession();
     return session
       ? read(KEYS.users, []).find(
@@ -515,6 +582,11 @@
   }
 
   async function register(payload) {
+    if (API_BASE) {
+      return apiRequest("/api/v1/auth/register", { method: "POST", body: payload });
+    }
+    if (API_REQUIRED)
+      throw new Error("تعذر إنشاء الحساب لأن خدمة الحسابات غير مهيأة.");
     const users = read(KEYS.users, []);
     const email = normalizeEmail(payload.email),
       phone1 = normalizePhone(payload.phone1),
@@ -527,8 +599,8 @@
       throw new Error("رقم الهاتف المصري غير صحيح.");
     if (phone2 && !/^\+201[0125]\d{8}$/.test(phone2))
       throw new Error("رقم الهاتف الثاني غير صحيح.");
-    if (String(payload.password || "").length < 8)
-      throw new Error("كلمة المرور يجب ألا تقل عن 8 أحرف.");
+    if (String(payload.password || "").length < 12)
+      throw new Error("كلمة المرور يجب ألا تقل عن 12 حرفًا.");
     const conflict = identityConflict({ email, phone1, phone2 });
     if (conflict) throw new Error(conflict);
     const customerId = nextCode("DA", read(KEYS.customers, []), "clientId");
@@ -557,6 +629,15 @@
   }
 
   async function login(identifier, password) {
+    if (API_BASE) {
+      const payload = await apiRequest("/api/v1/auth/login", {
+        method: "POST",
+        body: { identifier, password },
+      });
+      return cacheApiUser(payload.user);
+    }
+    if (API_REQUIRED)
+      throw new Error("تعذر تسجيل الدخول لأن خدمة الحسابات غير مهيأة.");
     const keyEmail = normalizeEmail(identifier),
       keyPhone = normalizePhone(identifier),
       keyName = String(identifier || "")
@@ -624,10 +705,17 @@
   }
 
   async function replaceTemporaryPassword(password, confirmation) {
+    if (API_BASE) {
+      const payload = await apiRequest("/api/v1/auth/change-temporary-password", {
+        method: "POST",
+        body: { password, confirmation },
+      });
+      return cacheApiUser(payload.user);
+    }
     const user = currentUser();
     if (!user) throw new Error("Your login session has expired.");
-    if (String(password || "").length < 8)
-      throw new Error("Password must be at least 8 characters.");
+    if (String(password || "").length < 12)
+      throw new Error("Password must be at least 12 characters.");
     if (password !== confirmation) throw new Error("Passwords do not match.");
     const users = read(KEYS.users, []),
       stored = users.find((row) => row.id === user.id);
@@ -639,10 +727,27 @@
     return stored;
   }
 
-  function logout() {
+  async function logout() {
+    if (API_BASE) {
+      try {
+        await apiRequest("/api/v1/auth/logout", { method: "POST" });
+      } finally {
+        cacheApiUser(null);
+      }
+      return;
+    }
     const user = currentUser();
     if (user) audit("LOGOUT", "customers", user.customerId);
     localStorage.removeItem(KEYS.session);
+  }
+
+  async function verifyEmail(challengeId, code) {
+    if (!API_BASE) throw new Error("Email verification requires the backend API.");
+    const payload = await apiRequest("/api/v1/auth/verify-email", {
+      method: "POST",
+      body: { challengeId, code },
+    });
+    return cacheApiUser(payload.user);
   }
 
   function resetLocalDemoDataOnce() {
@@ -1497,7 +1602,13 @@
     } catch {
       pathname = String(location.pathname || "").toLowerCase();
     }
-    if (!pathname.endsWith("/sign up modern.html") || !currentUser()) return false;
+    const user = currentUser();
+    if (
+      !pathname.endsWith("/sign up modern.html") ||
+      !user ||
+      (API_BASE && user.status !== "active")
+    )
+      return false;
     location.replace(requestedAuthDestination());
     return true;
   }
@@ -1744,6 +1855,7 @@
         if (
           [
             "registerForm",
+            "customerEmailVerificationForm",
             "loginForm",
             "checkoutForm",
             "contactForm",
@@ -1761,8 +1873,30 @@
           event.preventDefault();
           event.stopImmediatePropagation();
           try {
-            await register(Object.fromEntries(new FormData(form)));
-            setStatus(form, "تم إنشاء الحساب بنجاح.");
+            const result = await register(Object.fromEntries(new FormData(form)));
+            if (result?.status === "verification_required") {
+              const dialog = document.getElementById("customerEmailVerification");
+              const verificationForm = document.getElementById(
+                "customerEmailVerificationForm",
+              );
+              verificationForm.elements.challengeId.value = result.challengeId;
+              dialog.hidden = false;
+              verificationForm.elements.code.focus();
+              setStatus(form, "تم إرسال كود التأكيد إلى بريدك الإلكتروني.");
+            } else {
+              setStatus(form, "تم إنشاء الحساب بنجاح.");
+              setTimeout(() => location.assign(requestedAuthDestination()), 450);
+            }
+          } catch (error) {
+            setStatus(form, error.message, true);
+          }
+        } else if (form.id === "customerEmailVerificationForm") {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          try {
+            await verifyEmail(form.elements.challengeId.value, form.elements.code.value);
+            sessionStorage.removeItem("dart_pending_email_verification");
+            setStatus(form, "تم تأكيد الحساب بنجاح.");
             setTimeout(() => location.assign(requestedAuthDestination()), 450);
           } catch (error) {
             setStatus(form, error.message, true);
@@ -2108,6 +2242,25 @@
         event.preventDefault();
         alert("تسجيل الدخول الاجتماعي غير مفعّل حاليًا.");
       }
+      const resend = event.target.closest("[data-resend-email-verification]");
+      if (resend) {
+        const form = document.getElementById("customerEmailVerificationForm");
+        const challengeId = form?.elements.challengeId.value;
+        if (!challengeId) return;
+        resend.disabled = true;
+        apiRequest("/api/v1/auth/resend-verification", {
+          method: "POST",
+          body: { challengeId },
+        })
+          .then((result) => {
+            form.elements.challengeId.value = result.challengeId;
+            setStatus(form, "تم إرسال كود جديد إلى بريدك الإلكتروني.");
+          })
+          .catch((error) => setStatus(form, error.message, true))
+          .finally(() => {
+            resend.disabled = false;
+          });
+      }
     });
   }
 
@@ -2266,14 +2419,14 @@
     if (logoutBtn) {
       logoutBtn.type = "button";
       logoutBtn.textContent = "Log Out";
-      logoutBtn.onclick = () => {
-        logout();
+      logoutBtn.onclick = async () => {
+        await logout();
         location.replace("index.html");
       };
     }
   }
 
-  function toggleProfileEdit(user, button) {
+  async function toggleProfileEdit(user, button) {
     const editing = button.dataset.mode === "edit";
     if (!editing) {
       button.dataset.mode = "edit";
@@ -2325,6 +2478,33 @@
     }
     if (!/^\S+@\S+\.\S+$/.test(email) || !/^\+201[0125]\d{8}$/.test(phone1)) {
       alert("راجع البريد ورقم الهاتف.");
+      return;
+    }
+    if (API_BASE) {
+      try {
+        const result = await apiRequest("/api/v1/me", {
+          method: "PATCH",
+          body: {
+            name: values.name,
+            email,
+            phone1,
+            ...(phone2 ? { phone2 } : {}),
+            ...(values.birthday ? { birthday: values.birthday } : {}),
+          },
+        });
+        cacheApiUser(result.user);
+        if (result.verification) {
+          sessionStorage.setItem(
+            "dart_pending_email_verification",
+            JSON.stringify(result.verification),
+          );
+          location.assign("Sign Up modern.html?verify=email&next=profile");
+          return;
+        }
+        renderProfile();
+      } catch (error) {
+        alert(error.message);
+      }
       return;
     }
     const users = read(KEYS.users, []),
@@ -2593,8 +2773,31 @@
   }
 
   bindAuth();
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
+    if (API_BASE) {
+      try {
+        await hydrateApiSession();
+      } catch (error) {
+        console.warn("Dart account service is temporarily unavailable.", error.code || "API_ERROR");
+      }
+    }
     if (redirectRememberedCustomer()) return;
+    if (document.getElementById("customerEmailVerificationForm")) {
+      try {
+        const pending = JSON.parse(
+          sessionStorage.getItem("dart_pending_email_verification") || "null",
+        );
+        if (pending?.challengeId) {
+          const dialog = document.getElementById("customerEmailVerification");
+          const form = document.getElementById("customerEmailVerificationForm");
+          form.elements.challengeId.value = pending.challengeId;
+          dialog.hidden = false;
+          form.elements.code.focus();
+        }
+      } catch {
+        sessionStorage.removeItem("dart_pending_email_verification");
+      }
+    }
     ensureCatalogInventory();
     cleanupCartReservations();
     updateCartReservationTimer();
@@ -2665,6 +2868,8 @@
     write,
     register,
     login,
+    verifyEmail,
+    hydrateApiSession,
     logout,
     currentUser,
     checkout,

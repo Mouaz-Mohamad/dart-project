@@ -1600,6 +1600,10 @@ section{
 .dart-password-request{display:grid;grid-template-columns:minmax(220px,1fr) minmax(180px,280px) auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #e5e7eb}.dart-password-request div{display:grid;gap:4px}.dart-password-request input{min-height:40px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px}.dart-sensitive-note{padding:10px 12px;border-radius:7px;background:#fff7ed;color:#9a3412}.dart-reset-requests-btn span{background:#fff;color:#8c1d2c;border-radius:999px;min-width:22px;padding:2px 6px}
 @media(max-width:760px){.dart-password-request{grid-template-columns:1fr}.dart-dashboard-order-map{height:240px}}
 
+/* BEGIN Server-backed admin authentication gate. */
+.dart-admin-auth{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:24px;background:#f7f2ea}.dart-admin-auth[hidden]{display:none}.dart-admin-auth-card{width:min(440px,100%);padding:28px;border:1px solid #e5d9ce;border-radius:18px;background:#fff;box-shadow:0 24px 70px rgba(54,20,26,.16)}.dart-admin-auth-card>img{display:block;width:110px;margin:0 auto 20px}.dart-admin-auth-card form{display:grid;gap:14px}.dart-admin-auth-card h1{margin:0;color:#6f1d2a}.dart-admin-auth-card p{margin:0;color:#626262}.dart-admin-auth-card label{display:grid;gap:6px;font-weight:700}.dart-admin-auth-card input,.dart-admin-auth-card output{min-height:44px;padding:10px 12px;border:1px solid #cfc6bf;border-radius:9px;background:#fff;font:inherit}.dart-admin-auth-card output{overflow-wrap:anywhere;background:#faf7f2}.dart-admin-auth-card button,.dart-admin-logout{min-height:42px;padding:10px 16px;border:0;border-radius:9px;background:#6f1d2a;color:#fff;font-weight:800;cursor:pointer}.dart-admin-auth-status{min-height:22px;color:#0f766e!important}.dart-admin-auth-status.is-error{color:#b42318!important}.dart-admin-logout{margin:18px auto;width:calc(100% - 28px)}body.dart-admin-locked>.cont-menu,body.dart-admin-locked>.nav-tow,body.dart-admin-locked>main{visibility:hidden;pointer-events:none}
+/* END Server-backed admin authentication gate. */
+
 /* BEGIN V9 requested dashboard controls */
 #birthdayWindowLabel {
   display: block;

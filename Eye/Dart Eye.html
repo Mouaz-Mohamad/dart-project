@@ -23,6 +23,30 @@
 </head>
 <body>
 
+    <section id="dart-admin-auth" class="dart-admin-auth" hidden aria-labelledby="dart-admin-auth-title">
+      <div class="dart-admin-auth-card">
+        <img src="dart_logo.png" alt="Dart Logo">
+        <form id="dart-admin-login-form" novalidate>
+          <h1 id="dart-admin-auth-title">Admin Login</h1>
+          <p>Use the protected Owner or Staff account.</p>
+          <label>Email or Staff ID<input name="identifier" type="text" autocomplete="username" required></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+          <label data-admin-totp-field hidden>Authenticator code<input name="totp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"></label>
+          <button type="submit">Login</button>
+          <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
+        </form>
+        <form id="dart-admin-mfa-form" hidden novalidate>
+          <h1>Secure the Owner account</h1>
+          <p>Add this secret to Google Authenticator or Microsoft Authenticator, then enter the current code.</p>
+          <output id="dart-admin-mfa-secret"></output>
+          <input id="dart-admin-mfa-uri" type="text" readonly aria-label="Authenticator setup URI">
+          <label>Authenticator code<input name="token" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+          <button type="submit">Activate 2FA</button>
+          <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
     <!-- القائمة الجانبية (الثابتة) -->
     <nav class="cont-menu">
         <img src="dart_logo.png" alt="Dart Logo">
@@ -40,6 +64,7 @@
             <li><a href="#" data-target="finance"> Finance</a></li>
             <li><a href="#" data-target="settings"> Settings</a></li>
         </ul>
+        <button id="dart-admin-logout" class="dart-admin-logout" type="button" hidden>Log Out</button>
     </nav>
 
     <!-- الشريط السفلي الخاص بالموبايل فقط -->
@@ -1963,6 +1988,7 @@
     <script src="../Js/dart-address.js"></script>
     <script src="../Js/dart-catalog.js"></script>
     <script src="../Js/dart-returns.js"></script>
+    <script src="dart-admin-auth.js"></script>
     <script src="dart.js"></script>
     <script src="dart-inventory.js"></script>
     <script src="dart-fixes.js"></script>

@@ -19,6 +19,16 @@
   const MAX_SAVED_BYTES = 650 * 1024;
   const DELIVERY_RADIUS_KM = 1;
   const LOCATION_MAX_AGE_MS = 2 * 60 * 1000;
+  const API_ENABLED = Boolean(window.DartApi?.isConfigured);
+  const API_REQUIRED =
+    location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
+  const API_REP_CACHE_KEY = "dart_api_representative_cache";
+  let apiRepresentative = null;
+  try {
+    apiRepresentative = JSON.parse(sessionStorage.getItem(API_REP_CACHE_KEY) || "null");
+  } catch {
+    sessionStorage.removeItem(API_REP_CACHE_KEY);
+  }
   const activeOrderIds = new Set(
     JSON.parse(sessionStorage.getItem("dart_rep_active_orders") || "[]"),
   );
@@ -207,6 +217,7 @@
   }
 
   function currentSession() {
+    if (API_ENABLED) return apiRepresentative ? { repId: apiRepresentative.id, api: true } : null;
     const session = read(KEYS.session, null);
     if (
       !session ||
@@ -220,6 +231,7 @@
   }
 
   function currentRep() {
+    if (API_ENABLED) return apiRepresentative;
     const session = currentSession();
     return session
       ? read(KEYS.reps, []).find(
@@ -230,6 +242,21 @@
   }
 
   function saveSession(rep) {
+    if (API_ENABLED) {
+      apiRepresentative = {
+        id: rep.id,
+        repId: rep.code,
+        name: rep.name,
+        email: rep.email,
+        phone1: rep.phones?.[0] || "",
+        phone2: rep.phones?.[1] || "",
+        status: rep.status === "active" ? "Active" : rep.status,
+        mustChangePassword: rep.mustChangePassword,
+        serverAuthoritative: true,
+      };
+      sessionStorage.setItem(API_REP_CACHE_KEY, JSON.stringify(apiRepresentative));
+      return;
+    }
     write(KEYS.session, {
       repId: rep.id,
       createdAt: now(),
@@ -324,6 +351,13 @@
   }
 
   async function register(form) {
+    if (API_ENABLED) {
+      throw new Error(
+        "Secure representative document upload is not configured yet. Registration was not saved.",
+      );
+    }
+    if (API_REQUIRED)
+      throw new Error("Representative registration requires the secure account API.");
     const data = Object.fromEntries(new FormData(form));
     data.name = String(data.name || "").trim();
     data.nationalId = String(data.nationalId || "").replace(/\D/g, "");
@@ -340,8 +374,8 @@
       throw new Error("Enter a valid Egyptian primary phone.");
     if (data.phone2 && !/^01[0125]\d{8}$/.test(data.phone2))
       throw new Error("Enter a valid secondary phone.");
-    if (data.password.length < 8)
-      throw new Error("Password must be at least 8 characters.");
+    if (data.password.length < 12)
+      throw new Error("Password must be at least 12 characters.");
     if (data.password !== data.confirmPassword)
       throw new Error("Passwords do not match.");
     if (!data.address) throw new Error("Full address is required.");
@@ -386,6 +420,16 @@
   }
 
   async function login(identifier, password) {
+    if (API_ENABLED) {
+      const payload = await window.DartApi.request("/api/v1/representatives/login", {
+        method: "POST",
+        body: { identifier, password },
+      });
+      saveSession(payload.user);
+      return apiRepresentative;
+    }
+    if (API_REQUIRED)
+      throw new Error("Representative login requires the secure account API.");
     const input = String(identifier || "").trim(),
       email = normalizeEmail(input),
       phone = phoneDigits(input),
@@ -433,6 +477,7 @@
   }
 
   function repOrders(rep) {
+    if (API_ENABLED) return [];
     return read(KEYS.orders, []).filter(
       (order) =>
         (String(order.representativeId) === String(rep.id) ||
@@ -444,6 +489,7 @@
   }
 
   function repReturns(rep) {
+    if (API_ENABLED) return [];
     return read(KEYS.returns, []).filter(
       (record) =>
         (String(record.representativeId) === String(rep.id) ||
@@ -1045,6 +1091,20 @@
         return setStatus(changeForm, "Passwords do not match.", true);
       const rep = currentRep();
       if (!rep) return showAuth("login");
+      if (API_ENABLED) {
+        try {
+          const payload = await window.DartApi.request(
+            "/api/v1/auth/change-temporary-password",
+            { method: "POST", body: { password, confirmation: password } },
+          );
+          saveSession(payload.user);
+          changeForm.reset();
+          renderOrders();
+        } catch (error) {
+          setStatus(changeForm, error.message, true);
+        }
+        return;
+      }
       const reps = read(KEYS.reps, []),
         stored = reps.find((row) => row.id === rep.id);
       stored.passwordHash = await hashPassword(password);
@@ -1055,11 +1115,21 @@
       changeForm.reset();
       renderOrders();
     });
-    document.getElementById("repForgotPassword").onclick = () => {
+    document.getElementById("repForgotPassword").onclick = async () => {
       const identifier = prompt(
         "Enter your phone, email, Rep ID or National ID:",
       );
       if (!identifier) return;
+      if (API_ENABLED) {
+        await window.DartApi.request("/api/v1/auth/forgot-password", {
+          method: "POST",
+          body: { identifier, accountType: "representative" },
+        });
+        alert(
+          "If the account exists, a reset request is now waiting for dashboard review.",
+        );
+        return;
+      }
       const reps = read(KEYS.reps, []),
         rep = reps.find(
           (row) =>
@@ -1098,10 +1168,19 @@
         "If the account exists, a reset request is now waiting for dashboard review.",
       );
     };
-    document.getElementById("repLogout").onclick = () => {
+    document.getElementById("repLogout").onclick = async () => {
       const rep = currentRep();
-      if (rep) audit("REP_LOGOUT", rep.id);
-      localStorage.removeItem(KEYS.session);
+      if (API_ENABLED) {
+        try {
+          await window.DartApi.request("/api/v1/auth/logout", { method: "POST" });
+        } finally {
+          apiRepresentative = null;
+          sessionStorage.removeItem(API_REP_CACHE_KEY);
+        }
+      } else {
+        if (rep) audit("REP_LOGOUT", rep.id);
+        localStorage.removeItem(KEYS.session);
+      }
       activeOrderIds.clear();
       activeReturnIds.clear();
       saveActiveIds();
@@ -1222,8 +1301,21 @@
     completeReturnPickup,
   };
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
+    if (API_ENABLED) {
+      try {
+        const payload = await window.DartApi.request("/api/v1/representatives/me");
+        saveSession(payload.user);
+      } catch (error) {
+        if (error.status === 401) {
+          apiRepresentative = null;
+          sessionStorage.removeItem(API_REP_CACHE_KEY);
+        } else {
+          setLocationStatus("Representative account service is temporarily unavailable.", "error");
+        }
+      }
+    }
     const rep = currentRep();
     if (rep?.status === "Active")
       rep.mustChangePassword ? showAuth("change") : renderOrders();
