@@ -21,7 +21,9 @@ export class DashboardStateService {
     const row = result.rows[0];
     if (!row) throw new AppError(404, "DOMAIN_NOT_FOUND", "Dashboard domain not found");
     const stored = Array.isArray(row.data) ? row.data : [];
-    const data = domain === "customers" ? await this.mergeRegisteredCustomers(stored) : stored;
+    let data = stored;
+    if (domain === "customers") data = await this.mergeRegisteredCustomers(stored);
+    if (domain === "representatives") data = await this.mergeRegisteredRepresentatives(stored);
     return { domain, version: Number(row.version || 1), data };
   }
 
@@ -209,6 +211,99 @@ export class DashboardStateService {
 
     for (const [clientId, row] of legacy) {
       if (!seen.has(clientId)) merged.push(row);
+    }
+    return merged;
+  }
+
+
+  private async mergeRegisteredRepresentatives(stored: unknown[]): Promise<unknown[]> {
+    const legacy = new Map<string, Record<string, unknown>>();
+    for (const raw of stored) {
+      const row = raw as Record<string, unknown>;
+      const key = String(row.repId || row.representative_code || "").trim();
+      if (key) legacy.set(key, row);
+    }
+
+    const result = await this.pool.query<{
+      user_id: string;
+      representative_code: string;
+      full_name: string;
+      national_id_last4: string;
+      address_text: string;
+      approval_status: string;
+      rejection_reason: string | null;
+      email: string;
+      user_status: string;
+      created_at: Date;
+      phones: Array<{ phone_display: string; is_primary: boolean }>;
+    }>(
+      `SELECT r.user_id::text, r.representative_code, r.full_name,
+              r.national_id_last4, r.address_text, r.approval_status,
+              r.rejection_reason, u.email, u.status AS user_status, r.created_at,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'phone_display', p.phone_display,
+                    'is_primary', p.is_primary
+                  ) ORDER BY p.is_primary DESC, p.created_at
+                ) FILTER (WHERE p.id IS NOT NULL),
+                '[]'::jsonb
+              ) AS phones
+         FROM representatives r
+         JOIN users u ON u.id=r.user_id
+         LEFT JOIN account_phones p
+           ON p.user_id=r.user_id AND p.account_type='representative'
+        WHERE u.deleted_at IS NULL
+        GROUP BY r.user_id, r.representative_code, r.full_name,
+                 r.national_id_last4, r.address_text, r.approval_status,
+                 r.rejection_reason, u.email, u.status, r.created_at
+        ORDER BY r.created_at DESC`,
+    );
+
+    const merged: Record<string, unknown>[] = [];
+    const seen = new Set<string>();
+    for (const row of result.rows) {
+      const previous = legacy.get(row.representative_code) || {};
+      const phones = Array.isArray(row.phones) ? row.phones : [];
+      const primary =
+        phones.find((phone) => phone.is_primary)?.phone_display ||
+        phones[0]?.phone_display ||
+        "";
+      const secondary =
+        phones.find((phone) => !phone.is_primary)?.phone_display || "-";
+      const status =
+        row.approval_status === "approved"
+          ? "Active"
+          : row.approval_status === "pending"
+            ? "Pending Approval"
+            : row.approval_status === "rejected"
+              ? "Rejected"
+              : "Suspended";
+      merged.push({
+        ...previous,
+        id: row.user_id,
+        repId: row.representative_code,
+        name: row.full_name,
+        email: row.email,
+        phone1: primary,
+        phone2: secondary,
+        address: row.address_text,
+        nationalIdLast4: row.national_id_last4,
+        approvalStatus: row.approval_status,
+        accountStatus: row.user_status,
+        rejectionReason: row.rejection_reason || "",
+        status,
+        createdAt: row.created_at.toISOString(),
+        serverAuthoritative: true,
+        isArchived: Boolean(previous.isArchived),
+        isDeleted: Boolean(previous.isDeleted),
+        isChecked: false,
+      });
+      seen.add(row.representative_code);
+    }
+
+    for (const [repId, row] of legacy) {
+      if (!seen.has(repId)) merged.push(row);
     }
     return merged;
   }
