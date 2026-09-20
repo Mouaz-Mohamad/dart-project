@@ -380,10 +380,10 @@ export class CatalogService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const locked = await client.query<{ version: string }>(
-        "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory' FOR UPDATE",
+      const versionSnapshot = await client.query<{ version: string }>(
+        "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
       );
-      const currentVersion = Number(locked.rows[0]?.version || 1);
+      const currentVersion = Number(versionSnapshot.rows[0]?.version || 1);
       if (currentVersion !== expectedVersion) {
         throw new AppError(409, "CATALOG_VERSION_CONFLICT", "Catalogue changed on another device; reload and retry");
       }
@@ -453,12 +453,27 @@ export class CatalogService {
            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz,$12,$13,$14::jsonb,1,
                      COALESCE($15::timestamptz, now()),now())
            ON CONFLICT (id) DO UPDATE SET
-             item_code=EXCLUDED.item_code, model_id=EXCLUDED.model_id, color=EXCLUDED.color,
-             size=EXCLUDED.size, status=EXCLUDED.status, active=EXCLUDED.active,
-             is_archived=EXCLUDED.is_archived, is_deleted=EXCLUDED.is_deleted,
-             cart_reservation_id=EXCLUDED.cart_reservation_id, reservation_until=EXCLUDED.reservation_until,
-             order_id=EXCLUDED.order_id, purchase_date=EXCLUDED.purchase_date, legacy=EXCLUDED.legacy,
-             version=inventory_items.version+1, updated_at=now()`,
+             item_code=EXCLUDED.item_code,
+             model_id=EXCLUDED.model_id,
+             color=EXCLUDED.color,
+             size=EXCLUDED.size,
+             status=CASE
+               WHEN lower(inventory_items.status) IN (
+                 'cart reserved','processing/held','sold','return inspection'
+               )
+                 THEN inventory_items.status
+               ELSE EXCLUDED.status
+             END,
+             active=EXCLUDED.active,
+             is_archived=EXCLUDED.is_archived,
+             is_deleted=EXCLUDED.is_deleted,
+             cart_reservation_id=inventory_items.cart_reservation_id,
+             reservation_until=inventory_items.reservation_until,
+             order_id=inventory_items.order_id,
+             purchase_date=inventory_items.purchase_date,
+             legacy=EXCLUDED.legacy,
+             version=inventory_items.version+1,
+             updated_at=now()`,
           [
             id,itemCode,modelId,text(raw.color),text(raw.size),status,
             bool(raw.active,true),bool(raw.isArchived),bool(raw.isDeleted),
@@ -473,18 +488,40 @@ export class CatalogService {
 
       if (itemIds.size) {
         await client.query(
-          "UPDATE inventory_items SET is_deleted=true, active=false, version=version+1, updated_at=now() WHERE NOT (id = ANY($1::text[]))",
+          `UPDATE inventory_items
+              SET is_deleted=true, active=false, version=version+1, updated_at=now()
+            WHERE NOT (id = ANY($1::text[]))
+              AND order_id IS NULL
+              AND cart_reservation_id IS NULL
+              AND lower(status) NOT IN ('sold','processing/held','return inspection','cart reserved')`,
           [[...itemIds]],
         );
       } else {
-        await client.query("UPDATE inventory_items SET is_deleted=true, active=false, version=version+1, updated_at=now()");
+        await client.query(
+          `UPDATE inventory_items
+              SET is_deleted=true, active=false, version=version+1, updated_at=now()
+            WHERE order_id IS NULL
+              AND cart_reservation_id IS NULL
+              AND lower(status) NOT IN ('sold','processing/held','return inspection','cart reserved')`,
+        );
       }
 
-      const next = currentVersion + 1;
-      await client.query(
-        "UPDATE domain_state_versions SET version=$2, updated_at=now() WHERE domain=$1",
-        ["catalog_inventory", next],
+      const versionUpdate = await client.query<{ version: string }>(
+        `UPDATE domain_state_versions
+            SET version=version+1, updated_at=now()
+          WHERE domain='catalog_inventory'
+            AND version=$1
+          RETURNING version::text`,
+        [expectedVersion],
       );
+      if (!versionUpdate.rows[0]) {
+        throw new AppError(
+          409,
+          "CATALOG_VERSION_CONFLICT",
+          "Catalogue changed while this update was being saved; reload and retry",
+        );
+      }
+      const next = Number(versionUpdate.rows[0].version);
       await client.query(
         `INSERT INTO audit_logs (actor_type, actor_id, action, entity_type, entity_id, request_id, metadata)
          VALUES ('staff',$1,'CATALOG_STATE_REPLACED','catalog_inventory','catalog_inventory',$2,$3::jsonb)`,
