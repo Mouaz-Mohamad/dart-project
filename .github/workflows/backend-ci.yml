@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - "backend/**"
+      - "Eye/**/*.js"
+      - "Js/**/*.js"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "Eye/**/*.js"
+      - "Js/**/*.js"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -36,3 +40,6 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
+      - name: Browser JavaScript syntax
+        run: |
+          find ../Eye ../Js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
