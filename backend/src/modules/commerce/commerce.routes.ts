@@ -214,7 +214,7 @@ export function createCommerceRouter(
     response.status(200).json(result);
   });
 
-  router.delete("/cart/reservation/:reservationId", async (request, response) => {
+  router.delete("/cart/reservation/:reservationId", rateLimit({ windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const id = reservationId.parse(request.params.reservationId);
     const ownerHash = guestCartOwnerHash(request, response, config, false);
     if (ownerHash) await commerce.releaseCart(id, ownerHash);
