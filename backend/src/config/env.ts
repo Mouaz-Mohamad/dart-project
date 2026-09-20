@@ -27,6 +27,10 @@ const environmentSchema = z.object({
   MFA_ENCRYPTION_KEY: z
     .string()
     .default("ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="),
+  AUTOMATION_WEBHOOK_URL: z.union([z.url(), z.literal("")]).default(""),
+  AUTOMATION_WEBHOOK_SECRET: z.string().default(""),
+  OUTBOX_CRON_SECRET: z.string().default(""),
+  OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 export interface AppConfig {
@@ -47,6 +51,10 @@ export interface AppConfig {
   sessionTtlDays: number;
   emailOtpTtlMinutes: number;
   mfaEncryptionKey: Buffer;
+  automationWebhookUrl: string | null;
+  automationWebhookSecret: string | null;
+  outboxCronSecret: string | null;
+  outboxBatchSize: number;
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -101,5 +109,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     sessionTtlDays: parsed.data.SESSION_TTL_DAYS,
     emailOtpTtlMinutes: parsed.data.EMAIL_OTP_TTL_MINUTES,
     mfaEncryptionKey,
+    automationWebhookUrl: parsed.data.AUTOMATION_WEBHOOK_URL || null,
+    automationWebhookSecret: parsed.data.AUTOMATION_WEBHOOK_SECRET || null,
+    outboxCronSecret: parsed.data.OUTBOX_CRON_SECRET || null,
+    outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
   };
 }
