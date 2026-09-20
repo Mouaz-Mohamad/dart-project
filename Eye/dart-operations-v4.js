@@ -862,30 +862,45 @@
         if (order.latitude && order.longitude) initDashboardAddress()?.selectLocation(Number(order.latitude), Number(order.longitude));
       }
       if (sectionKey === 'representative') {
-        const rep = representativeData.find(row => String(row.id) === String(id)); if (!rep) return;
+        const rep = representativeData.find(row => String(row.id) === String(id));
+        if (!rep) return;
         field('modal-rep-email').value = rep.email || '';
         field('modal-rep-status').value = rep.status || 'Pending Approval';
-        field('modal-rep-password').value = '';
-        previewImage(field('modal-rep-id-front-preview'), rep.idFrontImage);
-        previewImage(field('modal-rep-id-back-preview'), rep.idBackImage);
-        previewImage(field('modal-rep-face-preview'), rep.faceImage);
+        field('modal-representative-id').value = rep.repId || '';
+        configureRepresentativeFormForEdit(rep);
       }
     };
     wrapped.dartV4Wrapped = true; openEditModal = wrapped;
   }
 
+  async function refreshSecureIdentityUi() {
+    try {
+      await hydrateSecureRepresentatives();
+      if (typeof dartRefreshAll === 'function') dartRefreshAll();
+    } catch (error) {
+      if (error.status !== 401 && error.status !== 403) {
+        console.warn('Unable to hydrate secure representative accounts', error);
+      }
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     migrateOrderTotals();
-    initDashboardAddress(); bindOrderModalV4(); bindRepModalV4(); bindDashboardActions(); enhanceEditModal();
+    initDashboardAddress();
+    bindOrderModalV4();
+    bindRepModalV4();
+    bindDashboardActions();
+    enhanceEditModal();
     if (typeof renderRepresentative === 'function') {
       renderRepresentative = renderRepresentativesV4;
-      if (typeof sectionsMap !== 'undefined' && sectionsMap.representative) sectionsMap.representative.render = renderRepresentative;
+      if (typeof sectionsMap !== 'undefined' && sectionsMap.representative) {
+        sectionsMap.representative.render = renderRepresentative;
+      }
     }
     renderPasswordRequests();
     if (typeof dartRefreshAll === 'function') dartRefreshAll();
+    refreshSecureIdentityUi();
   });
 
-  window.addEventListener('storage', event => {
-    if (event.key === PASSWORD_REQUESTS_KEY) renderPasswordRequests();
-  });
+  window.addEventListener('dart:admin-authenticated', refreshSecureIdentityUi);
 })();
