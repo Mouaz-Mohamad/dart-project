@@ -113,26 +113,76 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
     app.use("/api/v1", createIdentityRouter(dependencies.identityService, config));
+
     if (dependencies.catalogService) {
-      app.use("/api/v1", createCatalogRouter(dependencies.catalogService, dependencies.identityService, config));
-      if (dependencies.catalogAssetService) {
-        app.use("/api/v1", createCatalogAssetRouter(dependencies.catalogAssetService, dependencies.identityService, config));
-      }
-      if (dependencies.commerceService) {
-        app.use("/api/v1", createCommerceRouter(dependencies.commerceService, dependencies.identityService, config));
-      }
-      if (dependencies.siteSettingsService) {
-        app.use("/api/v1", createSiteSettingsRouter(dependencies.siteSettingsService, dependencies.identityService, config));
-      }
-      if (dependencies.dashboardStateService) {
-        app.use("/api/v1", createDashboardStateRouter(dependencies.dashboardStateService, dependencies.identityService, config));
-      }
-      if (dependencies.customerInteractionService) {
-        app.use("/api/v1", createCustomerInteractionRouter(dependencies.customerInteractionService, dependencies.identityService, config));
-      }
-      if (dependencies.platformAdminService) {
-        app.use("/api/v1", createPlatformAdminRouter(dependencies.platformAdminService, dependencies.identityService, config));
-      }
+      app.use(
+        "/api/v1",
+        createCatalogRouter(
+          dependencies.catalogService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.catalogAssetService) {
+      app.use(
+        "/api/v1",
+        createCatalogAssetRouter(
+          dependencies.catalogAssetService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.commerceService) {
+      app.use(
+        "/api/v1",
+        createCommerceRouter(
+          dependencies.commerceService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.siteSettingsService) {
+      app.use(
+        "/api/v1",
+        createSiteSettingsRouter(
+          dependencies.siteSettingsService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.dashboardStateService) {
+      app.use(
+        "/api/v1",
+        createDashboardStateRouter(
+          dependencies.dashboardStateService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.customerInteractionService) {
+      app.use(
+        "/api/v1",
+        createCustomerInteractionRouter(
+          dependencies.customerInteractionService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.platformAdminService) {
+      app.use(
+        "/api/v1",
+        createPlatformAdminRouter(
+          dependencies.platformAdminService,
+          dependencies.identityService,
+          config,
+        ),
+      );
     }
   }
 
