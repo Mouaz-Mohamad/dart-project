@@ -1557,13 +1557,30 @@ export class CommerceService {
       created_at: Date;
       updated_at: Date;
       delivered_at: Date | null;
+      delivery_started_at: Date | null;
+      representative_user_id: string | null;
+      representative_code: string | null;
+      representative_name: string | null;
+      representative_phone: string | null;
+      courier_latitude: number | null;
+      courier_longitude: number | null;
+      courier_accuracy_meters: number | null;
+      courier_updated_at: Date | null;
       items: Array<Record<string, unknown>>;
     }>(
       `SELECT o.id, o.order_code, o.status, o.payment_method, o.payment_status,
               o.subtotal_minor::text, o.order_discount_minor::text, o.final_minor::text,
               o.amount_paid_minor::text, o.amount_refunded_minor::text, o.promotion,
               o.contact_snapshot, o.delivery_address, o.delivery_notes,
-              o.created_at, o.updated_at, o.delivered_at,
+              o.created_at, o.updated_at, o.delivered_at, o.delivery_started_at,
+              r.user_id::text AS representative_user_id,
+              r.representative_code,
+              r.full_name AS representative_name,
+              rp.phone_display AS representative_phone,
+              rl.latitude AS courier_latitude,
+              rl.longitude AS courier_longitude,
+              rl.accuracy_meters AS courier_accuracy_meters,
+              rl.updated_at AS courier_updated_at,
               COALESCE(
                 jsonb_agg(
                   jsonb_build_object(
@@ -1585,8 +1602,20 @@ export class CommerceService {
               ) AS items
          FROM orders o
          LEFT JOIN order_items oi ON oi.order_id=o.id
+         LEFT JOIN representatives r ON r.user_id=o.representative_user_id
+         LEFT JOIN representative_locations rl ON rl.representative_user_id=r.user_id
+         LEFT JOIN LATERAL (
+           SELECT p.phone_display
+             FROM account_phones p
+            WHERE p.user_id=r.user_id
+              AND p.account_type='representative'
+            ORDER BY p.is_primary DESC, p.created_at
+            LIMIT 1
+         ) rp ON true
         WHERE o.customer_user_id=$1 AND NOT o.is_deleted
-        GROUP BY o.id
+        GROUP BY o.id, r.user_id, r.representative_code, r.full_name,
+                 rp.phone_display, rl.latitude, rl.longitude,
+                 rl.accuracy_meters, rl.updated_at
         ORDER BY o.created_at DESC`,
       [customerUserId],
     );
@@ -1638,6 +1667,22 @@ export class CommerceService {
         longitude: address.longitude || "",
         fullAddress: address.fullAddress || "",
         deliveryNotes: row.delivery_notes,
+        representativeId: row.representative_user_id || "",
+        representativeBusinessId: row.representative_code || "",
+        representativeName: row.representative_name || "",
+        representativePhone: row.representative_phone || "",
+        deliveryStartedAt: row.delivery_started_at?.toISOString() || null,
+        courierLocation:
+          row.status === "Representative On The Way" &&
+          row.courier_latitude !== null &&
+          row.courier_longitude !== null
+            ? {
+                lat: row.courier_latitude,
+                lng: row.courier_longitude,
+                accuracy: row.courier_accuracy_meters,
+                updatedAt: row.courier_updated_at?.toISOString() || null,
+              }
+            : null,
         createdAt: row.created_at.toISOString(),
         updatedAt: row.updated_at.toISOString(),
         ...(row.delivered_at ? { deliveredAt: row.delivered_at.toISOString() } : {}),
