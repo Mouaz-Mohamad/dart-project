@@ -84,7 +84,25 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       },
     }),
   );
-  app.use(express.json({ limit: "8mb", strict: true }));
+  // Keep ordinary API bodies small. Only the few transitional bulk/image endpoints
+  // get larger parsers, which limits memory-amplification and JSON-body DoS exposure.
+  app.use(
+    "/api/v1/admin/catalog/assets",
+    express.json({ limit: "6mb", strict: true }),
+  );
+  app.use(
+    "/api/v1/representatives/register",
+    express.json({ limit: "5mb", strict: true }),
+  );
+  app.use(
+    [
+      "/api/v1/admin/catalog-state",
+      "/api/v1/admin/orders-state",
+      "/api/v1/admin/domain-state",
+    ],
+    express.json({ limit: "4mb", strict: true }),
+  );
+  app.use(express.json({ limit: "512kb", strict: true }));
   app.use(cookieParser());
 
   app.use("/api/v1/health", createHealthRouter(dependencies));
