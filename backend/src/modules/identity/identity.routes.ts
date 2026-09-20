@@ -454,6 +454,28 @@ export function createIdentityRouter(
     },
   );
   router.post(
+    "/admin/accounts/:id/password-reset-request",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("staff.sessions_revoke"),
+    async (request, response) => {
+      const body = z.object({
+        accountType: z.enum(["customer", "representative"]),
+      }).parse(request.body);
+      response.status(201).json(
+        await service.adminCreatePasswordResetRequest(
+          request.auth!,
+          uuid.parse(request.params.id),
+          body.accountType,
+          metadata(request),
+        ),
+      );
+    },
+  );
+
+  router.post(
     "/admin/password-reset-requests/:id/temporary-password",
     signedIn,
     csrf,
