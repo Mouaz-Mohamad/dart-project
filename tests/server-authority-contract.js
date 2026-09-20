@@ -63,7 +63,7 @@ assert.match(
 );
 assert.match(
   serviceWorker,
-  /\.(?:js|css)[\s\S]*fetch\(request\)/,
+  /if \(\/\\\.\(\?:js\|css\)\$\/i\.test\(url\.pathname\)\)[\s\S]*event\.respondWith\([\s\S]*fetch\(request\)/,
   "JavaScript and CSS must prefer the network so devices do not run stale business logic",
 );
 
