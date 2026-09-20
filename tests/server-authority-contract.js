@@ -5,6 +5,16 @@ function read(path) {
   return fs.readFileSync(path, "utf8");
 }
 
+function walkJsFiles(root) {
+  const output = [];
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const path = `${root}/${entry.name}`;
+    if (entry.isDirectory()) output.push(...walkJsFiles(path));
+    else if (entry.isFile() && entry.name.endsWith(".js")) output.push(path);
+  }
+  return output;
+}
+
 const catalog = read("Js/dart-catalog.js");
 const sizeChart = read("Eye/dart-size-chart-v5.js");
 const fixes = read("Eye/dart-fixes.js");
@@ -87,3 +97,36 @@ assert.ok(
     ),
   "storefront must proxy API calls through its own origin",
 );
+
+
+const coreBusinessKeys = [
+  "dart_models",
+  "dart_items",
+  "dart_orders",
+  "dart_customers",
+  "dart_returns",
+  "dart_reviews",
+  "dart_cards",
+  "dart_representatives",
+  "dart_damage",
+  "dart_site_settings",
+  "dart_finance_expenses",
+  "dart_finance_budgets",
+  "dart_finance_invoices",
+  "dart_finance_goals",
+  "dart_finance_marketing",
+  "dart_finance_cod_settlements",
+];
+
+for (const path of [...walkJsFiles("Eye"), ...walkJsFiles("Js")]) {
+  const source = read(path);
+  for (const key of coreBusinessKeys) {
+    assert.doesNotMatch(
+      source,
+      new RegExp(
+        `localStorage\\.setItem\\(\\s*["'\\`]\${key}["'\\`]`,
+      ),
+      `${path} must not write ${key} directly to localStorage`,
+    );
+  }
+}
