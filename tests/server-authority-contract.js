@@ -63,8 +63,14 @@ assert.match(
 );
 assert.match(
   serviceWorker,
-  /if \(\/\\\.\(\?:js\|css\)\$\/i\.test\(url\.pathname\)\)[\s\S]*event\.respondWith\([\s\S]*fetch\(request\)/,
-  "JavaScript and CSS must prefer the network so devices do not run stale business logic",
+  /\(\?:js\|css\)/,
+  "service worker must recognize JavaScript and CSS requests",
+);
+const codeBranch = serviceWorker.slice(serviceWorker.indexOf("js|css"));
+assert.match(
+  codeBranch,
+  /fetch\(request\)[\s\S]*caches\.match\(request\)/,
+  "JavaScript and CSS must try the network before cached fallback so devices do not run stale business logic",
 );
 
 console.log("PASS server-authority contract");
