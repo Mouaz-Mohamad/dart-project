@@ -72,10 +72,21 @@ export class CatalogService {
   constructor(private readonly pool: Pool) {}
 
   async version(): Promise<number> {
-    const result = await this.pool.query<{ version: string }>(
-      "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
-    );
-    return Number(result.rows[0]?.version || 1);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await this.releaseExpiredReservations(client);
+      const result = await client.query<{ version: string }>(
+        "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
+      );
+      await client.query("COMMIT");
+      return Number(result.rows[0]?.version || 1);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async publicCatalog(): Promise<{ version: number; models: Record<string, unknown>[]; stock: Record<string, number> }> {
