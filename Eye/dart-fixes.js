@@ -102,9 +102,11 @@
           window.DartDomainState.syncDomain?.('message_queue'),
           window.DartDomainState.syncDomain?.('birthday_messages'),
         ]);
-      } else {
+      } else if (['localhost', '127.0.0.1'].includes(location.hostname)) {
         localStorage.setItem('dart_message_queue', JSON.stringify(queue));
         localStorage.setItem('dart_birthday_messages', JSON.stringify(history));
+      } else {
+        throw new Error('Birthday messaging requires the secure server state.');
       }
       renderBirthdayWidget();
       alert('تم تسجيل رسائل خصم عيد الميلاد 30% وإخفاء العملاء من البوكس. سيقوم الـBackend بالإرسال الفعلي.');
