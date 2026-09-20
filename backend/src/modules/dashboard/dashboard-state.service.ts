@@ -200,6 +200,7 @@ export class DashboardStateService {
         accountStatus: row.status,
         dartCardDrawEligible: row.dart_card_draw_eligible,
         registeredAt: row.created_at.toISOString(),
+        serverAuthoritative: true,
         country: String(previous.country || "Egypt"),
         governorate: String(previous.governorate || ""),
         isArchived: Boolean(previous.isArchived),
