@@ -7,8 +7,14 @@
   const CSRF_STORAGE_KEY = "dart_csrf_token";
   const authView = document.getElementById("dart-admin-auth");
   const loginForm = document.getElementById("dart-admin-login-form");
+  const onboardingEmailForm = document.getElementById("dart-admin-onboarding-email-form");
+  const onboardingCodeForm = document.getElementById("dart-admin-onboarding-code-form");
+  const onboardingPasswordForm = document.getElementById("dart-admin-onboarding-password-form");
+  const firstTimeButton = document.getElementById("dart-admin-first-time");
   const mfaForm = document.getElementById("dart-admin-mfa-form");
   const logoutButton = document.getElementById("dart-admin-logout");
+  let onboardingChallengeId = "";
+  let onboardingSetupToken = "";
 
   if (!API_BASE) {
     if (
@@ -82,7 +88,23 @@
     baseUrl: API_BASE,
   });
 
-    function status(form, message, isError = false) {
+  function showAuthForm(form) {
+    [loginForm, onboardingEmailForm, onboardingCodeForm, onboardingPasswordForm, mfaForm]
+      .filter(Boolean)
+      .forEach((node) => {
+        node.hidden = node !== form;
+      });
+  }
+
+  function resetOnboarding() {
+    onboardingChallengeId = "";
+    onboardingSetupToken = "";
+    onboardingEmailForm?.reset();
+    onboardingCodeForm?.reset();
+    onboardingPasswordForm?.reset();
+  }
+
+  function status(form, message, isError = false) {
     const element = form.querySelector(".dart-admin-auth-status");
     element.textContent = message;
     element.classList.toggle("is-error", isError);
@@ -157,12 +179,120 @@
 
   async function beginMfaSetup() {
     const setup = await request("/api/v1/admin/auth/mfa/setup", { method: "POST" });
-    loginForm.hidden = true;
-    mfaForm.hidden = false;
+    showAuthForm(mfaForm);
     document.getElementById("dart-admin-mfa-secret").textContent = setup.secret;
     document.getElementById("dart-admin-mfa-uri").value = setup.otpauthUri;
     mfaForm.elements.token.focus();
   }
+
+  firstTimeButton?.addEventListener("click", () => {
+    resetOnboarding();
+    showAuthForm(onboardingEmailForm);
+    onboardingEmailForm.elements.email.focus();
+  });
+
+  document.querySelectorAll("[data-admin-back-login]").forEach((button) => {
+    button.addEventListener("click", () => {
+      resetOnboarding();
+      showAuthForm(loginForm);
+      loginForm.elements.identifier.focus();
+    });
+  });
+
+  onboardingEmailForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!onboardingEmailForm.checkValidity()) {
+      onboardingEmailForm.reportValidity();
+      return;
+    }
+    const submit = onboardingEmailForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      const payload = await request("/api/v1/admin/auth/onboarding/start", {
+        method: "POST",
+        body: { email: onboardingEmailForm.elements.email.value.trim() },
+      });
+      onboardingChallengeId = payload.challengeId || "";
+      showAuthForm(onboardingCodeForm);
+      status(
+        onboardingCodeForm,
+        "If this email is invited, a verification code has been sent.",
+      );
+      onboardingCodeForm.elements.code.focus();
+    } catch (error) {
+      status(onboardingEmailForm, error.message, true);
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  onboardingCodeForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!onboardingCodeForm.checkValidity()) {
+      onboardingCodeForm.reportValidity();
+      return;
+    }
+    const submit = onboardingCodeForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      const payload = await request("/api/v1/admin/auth/onboarding/verify", {
+        method: "POST",
+        body: {
+          challengeId: onboardingChallengeId,
+          code: onboardingCodeForm.elements.code.value.trim(),
+        },
+      });
+      onboardingSetupToken = payload.setupToken || "";
+      showAuthForm(onboardingPasswordForm);
+      onboardingPasswordForm.elements.credential.focus();
+    } catch (error) {
+      status(onboardingCodeForm, error.message, true);
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  onboardingPasswordForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!onboardingPasswordForm.checkValidity()) {
+      onboardingPasswordForm.reportValidity();
+      return;
+    }
+    if (
+      onboardingPasswordForm.elements.credential.value !==
+      onboardingPasswordForm.elements.confirmation.value
+    ) {
+      status(onboardingPasswordForm, "Passwords do not match.", true);
+      return;
+    }
+    const submit = onboardingPasswordForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      const payload = await request("/api/v1/admin/auth/onboarding/complete", {
+        method: "POST",
+        body: {
+          challengeId: onboardingChallengeId,
+          setupToken: onboardingSetupToken,
+          credential: onboardingPasswordForm.elements.credential.value,
+          confirmation: onboardingPasswordForm.elements.confirmation.value,
+        },
+      });
+      if (payload.user?.accountType !== "staff") {
+        throw new Error("Staff account required");
+      }
+      setAdminAccess(payload);
+      resetOnboarding();
+      if (payload.mfaSetupRequired) {
+        await beginMfaSetup();
+      } else {
+        await unlock();
+      }
+    } catch (error) {
+      status(onboardingPasswordForm, error.message, true);
+    } finally {
+      submit.disabled = false;
+    }
+  });
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -224,8 +354,8 @@
       clearAdminPrivateCache();
       lock();
       loginForm.reset();
-      loginForm.hidden = false;
-      mfaForm.hidden = true;
+      resetOnboarding();
+      showAuthForm(loginForm);
       location.reload();
     }
   });
