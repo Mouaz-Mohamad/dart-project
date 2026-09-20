@@ -19,7 +19,9 @@ export class DashboardStateService {
     );
     const row = result.rows[0];
     if (!row) throw new AppError(404, "DOMAIN_NOT_FOUND", "Dashboard domain not found");
-    return { domain, version: Number(row.version || 1), data: Array.isArray(row.data) ? row.data : [] };
+    const stored = Array.isArray(row.data) ? row.data : [];
+    const data = domain === "customers" ? await this.mergeRegisteredCustomers(stored) : stored;
+    return { domain, version: Number(row.version || 1), data };
   }
 
   async write(
@@ -82,4 +84,78 @@ export class DashboardStateService {
       };
     });
   }
+
+  private async mergeRegisteredCustomers(stored: unknown[]): Promise<unknown[]> {
+    const legacy = new Map<string, Record<string, unknown>>();
+    for (const raw of stored) {
+      const row = raw as Record<string, unknown>;
+      const key = String(row.clientId || row.client_code || "").trim();
+      if (key) legacy.set(key, row);
+    }
+
+    const result = await this.pool.query<{
+      user_id: string;
+      client_code: string;
+      full_name: string;
+      birthday: string | null;
+      dart_card_draw_eligible: boolean;
+      email: string;
+      status: string;
+      created_at: Date;
+      phones: Array<{ phone_display: string; is_primary: boolean }>;
+    }>(
+      `SELECT c.user_id::text, c.client_code, c.full_name, c.birthday::text,
+              c.dart_card_draw_eligible, u.email, u.status, c.created_at,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'phone_display', p.phone_display,
+                    'is_primary', p.is_primary
+                  ) ORDER BY p.is_primary DESC, p.created_at
+                ) FILTER (WHERE p.id IS NOT NULL),
+                '[]'::jsonb
+              ) AS phones
+         FROM customers c
+         JOIN users u ON u.id=c.user_id
+         LEFT JOIN account_phones p ON p.user_id=c.user_id AND p.account_type='customer'
+        WHERE u.deleted_at IS NULL
+        GROUP BY c.user_id, c.client_code, c.full_name, c.birthday,
+                 c.dart_card_draw_eligible, u.email, u.status, c.created_at
+        ORDER BY c.created_at DESC`,
+    );
+
+    const merged: Record<string, unknown>[] = [];
+    const seen = new Set<string>();
+    for (const row of result.rows) {
+      const previous = legacy.get(row.client_code) || {};
+      const phones = Array.isArray(row.phones) ? row.phones : [];
+      const primary = phones.find((phone) => phone.is_primary)?.phone_display || phones[0]?.phone_display || "";
+      const secondary = phones.find((phone) => !phone.is_primary)?.phone_display || "-";
+      merged.push({
+        ...previous,
+        id: row.user_id,
+        clientId: row.client_code,
+        clientName: row.full_name,
+        birthday: row.birthday || "-",
+        email: row.email,
+        phone1: primary,
+        phone2: secondary,
+        accountStatus: row.status,
+        dartCardDrawEligible: row.dart_card_draw_eligible,
+        registeredAt: row.created_at.toISOString(),
+        country: String(previous.country || "Egypt"),
+        governorate: String(previous.governorate || ""),
+        isArchived: Boolean(previous.isArchived),
+        isDeleted: Boolean(previous.isDeleted),
+        isChecked: false,
+      });
+      seen.add(row.client_code);
+    }
+
+    for (const [clientId, row] of legacy) {
+      if (!seen.has(clientId)) merged.push(row);
+    }
+    return merged;
+  }
+
 }
