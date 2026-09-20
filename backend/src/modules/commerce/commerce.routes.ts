@@ -5,6 +5,8 @@ import {
   authenticate,
   csrfProtection,
   requireAccountType,
+  requireMfa,
+  requirePermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CommerceService } from "./commerce.service.js";
@@ -30,6 +32,11 @@ const reserveSchema = z.object({
       message: "A cart can reserve at most 20 physical items",
     });
   }
+});
+
+const adminOrderStateSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+  orders: z.array(z.record(z.string(), z.unknown())).max(10000),
 });
 
 const checkoutSchema = z.object({
@@ -76,6 +83,38 @@ export function createCommerceRouter(
     await commerce.releaseCart(id);
     response.status(204).end();
   });
+
+  router.get(
+    "/admin/orders-state",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("orders.read"),
+    async (_request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.adminOrders());
+    },
+  );
+
+  router.put(
+    "/admin/orders-state",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("orders.manage"),
+    async (request, response) => {
+      const body = adminOrderStateSchema.parse(request.body);
+      response.status(200).json(
+        await commerce.replaceAdminOrders(
+          body.expectedVersion,
+          body.orders,
+          request.auth!.userId,
+          String(request.id),
+        ),
+      );
+    },
+  );
 
   router.post(
     "/orders",
