@@ -17,6 +17,7 @@
     heroNightImage: null,
     founderImage: null,
     defaultMarkupPercent: 50,
+    deliveryCostPerPiece: 100,
     birthdayDiscountPercent: 30,
     dartCardDiscountPercent: 40,
     refundCustomerFee: 100,
