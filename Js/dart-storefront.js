@@ -185,5 +185,6 @@
   window.addEventListener("dart:images-ready", refresh);
   window.addEventListener("dart:data-changed", refresh);
   window.addEventListener("dart:catalog-hydrated", refresh);
+  window.addEventListener("dart:site-settings-changed", refresh);
 })();
 /* END STOREFRONT */
