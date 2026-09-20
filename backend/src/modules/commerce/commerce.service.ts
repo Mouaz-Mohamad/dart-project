@@ -172,7 +172,7 @@ function birthdayWindow(
   return null;
 }
 
-function promotionPercent(row: Record<string, unknown>): number {
+function promotionPercentage(row: Record<string, unknown>): number {
   return Math.min(
     100,
     Math.max(
@@ -275,7 +275,7 @@ export class CommerceService {
       if (!row || !promotionDateActive(row)) {
         return { valid: false, promotion: null, message: "Promotion code is invalid or expired" };
       }
-      const percent = promotionPercent(row);
+      const percent = promotionPercentage(row);
       if (!percent) {
         return { valid: false, promotion: null, message: "Promotion has no active discount" };
       }
@@ -768,7 +768,7 @@ export class CommerceService {
         if (
           !codePromotion ||
           !promotionDateActive(codePromotion) ||
-          !promotionPercent(codePromotion)
+          !promotionPercentage(codePromotion)
         ) {
           throw new AppError(
             409,
@@ -784,7 +784,7 @@ export class CommerceService {
             "This promotion is not available for this account",
           );
         }
-        promotionPercent = promotionPercent(codePromotion);
+        promotionPercent = promotionPercentage(codePromotion);
         promotion = {
           id: String(codePromotion.id || ""),
           type: "Promotion",
