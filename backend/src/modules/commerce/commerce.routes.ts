@@ -114,6 +114,11 @@ export function createCommerceRouter(
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
 
+  router.get("/leaderboard", async (_request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.status(200).json(await commerce.publicLeaderboard());
+  });
+
   router.get(
     "/me/promotions/validate",
     signedIn,
