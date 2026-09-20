@@ -303,11 +303,68 @@ export class CommerceService {
     reservationId: string,
     lines: CartLineInput[],
     customerUserId?: string,
+    guestOwnerHash?: string,
   ): Promise<{ reservationId: string; expiresAt: Date; reservedItems: number }> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
       await this.releaseExpired(client);
+
+      const currentReservation = await client.query<{
+        customer_user_id: string | null;
+        guest_owner_hash: string | null;
+      }>(
+        `SELECT customer_user_id::text, guest_owner_hash
+           FROM cart_reservations
+          WHERE id=$1
+          FOR UPDATE`,
+        [reservationId],
+      );
+      const current = currentReservation.rows[0];
+      if (current) {
+        if (customerUserId) {
+          if (
+            current.customer_user_id &&
+            current.customer_user_id !== customerUserId
+          ) {
+            throw new AppError(
+              403,
+              "RESERVATION_OWNERSHIP_INVALID",
+              "This cart reservation belongs to another account",
+            );
+          }
+          if (
+            !current.customer_user_id &&
+            current.guest_owner_hash &&
+            current.guest_owner_hash !== guestOwnerHash
+          ) {
+            throw new AppError(
+              403,
+              "RESERVATION_OWNERSHIP_INVALID",
+              "This guest cart belongs to another browser",
+            );
+          }
+        } else {
+          if (!guestOwnerHash) {
+            throw new AppError(
+              403,
+              "GUEST_CART_OWNER_REQUIRED",
+              "Guest cart ownership could not be verified",
+            );
+          }
+          if (
+            current.customer_user_id ||
+            (current.guest_owner_hash &&
+              current.guest_owner_hash !== guestOwnerHash)
+          ) {
+            throw new AppError(
+              403,
+              "RESERVATION_OWNERSHIP_INVALID",
+              "This cart reservation belongs to another session",
+            );
+          }
+        }
+      }
 
       if (customerUserId) {
         const otherReservations = await client.query<{ id: string }>(
@@ -316,6 +373,34 @@ export class CommerceService {
             WHERE customer_user_id=$1 AND id<>$2
             FOR UPDATE`,
           [customerUserId, reservationId],
+        );
+        const otherIds = otherReservations.rows.map((row) => row.id);
+        if (otherIds.length) {
+          await client.query(
+            `UPDATE inventory_items
+                SET status='In stock',
+                    cart_reservation_id=NULL,
+                    reservation_until=NULL,
+                    version=version+1,
+                    updated_at=now()
+              WHERE cart_reservation_id = ANY($1::text[])
+                AND lower(status)='cart reserved'`,
+            [otherIds],
+          );
+          await client.query(
+            "DELETE FROM cart_reservations WHERE id = ANY($1::text[])",
+            [otherIds],
+          );
+        }
+      } else if (guestOwnerHash) {
+        const otherReservations = await client.query<{ id: string }>(
+          `SELECT id
+             FROM cart_reservations
+            WHERE customer_user_id IS NULL
+              AND guest_owner_hash=$1
+              AND id<>$2
+            FOR UPDATE`,
+          [guestOwnerHash, reservationId],
         );
         const otherIds = otherReservations.rows.map((row) => row.id);
         if (otherIds.length) {
@@ -352,9 +437,15 @@ export class CommerceService {
       const expiresAt = expiresResult.rows[0]!.expires_at;
 
       await client.query(
-        `INSERT INTO cart_reservations (id, customer_user_id, expires_at)
-         VALUES ($1,$2,$3)`,
-        [reservationId, customerUserId ?? null, expiresAt],
+        `INSERT INTO cart_reservations (
+           id, customer_user_id, guest_owner_hash, expires_at
+         ) VALUES ($1,$2,$3,$4)`,
+        [
+          reservationId,
+          customerUserId ?? null,
+          customerUserId ? null : guestOwnerHash ?? null,
+          expiresAt,
+        ],
       );
 
       let reservedItems = 0;
@@ -555,10 +646,40 @@ export class CommerceService {
     }
   }
 
-  public async releaseCart(reservationId: string): Promise<void> {
+  public async releaseCart(
+    reservationId: string,
+    guestOwnerHash: string,
+  ): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const reservationResult = await client.query<{
+        customer_user_id: string | null;
+        guest_owner_hash: string | null;
+      }>(
+        `SELECT customer_user_id::text, guest_owner_hash
+           FROM cart_reservations
+          WHERE id=$1
+          FOR UPDATE`,
+        [reservationId],
+      );
+      const reservation = reservationResult.rows[0];
+      if (!reservation) {
+        await client.query("COMMIT");
+        return;
+      }
+      if (
+        reservation.customer_user_id ||
+        (reservation.guest_owner_hash &&
+          reservation.guest_owner_hash !== guestOwnerHash)
+      ) {
+        throw new AppError(
+          403,
+          "RESERVATION_OWNERSHIP_INVALID",
+          "This guest cart belongs to another session",
+        );
+      }
+
       const result = await client.query(
         `UPDATE inventory_items
             SET status='In stock', cart_reservation_id=NULL, reservation_until=NULL,
@@ -585,6 +706,7 @@ export class CommerceService {
     customerUserId: string,
     input: CheckoutInput,
     requestId: string,
+    guestOwnerHash?: string,
   ): Promise<Record<string, unknown>> {
     const client = await this.pool.connect();
     try {
@@ -593,9 +715,10 @@ export class CommerceService {
 
       const reservationResult = await client.query<{
         customer_user_id: string | null;
+        guest_owner_hash: string | null;
         expires_at: Date;
       }>(
-        `SELECT customer_user_id, expires_at
+        `SELECT customer_user_id::text, guest_owner_hash, expires_at
            FROM cart_reservations
           WHERE id=$1
           FOR UPDATE`,
@@ -608,8 +731,23 @@ export class CommerceService {
       if (reservation.customer_user_id && reservation.customer_user_id !== customerUserId) {
         throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "This cart reservation belongs to another account");
       }
+      if (
+        !reservation.customer_user_id &&
+        reservation.guest_owner_hash &&
+        reservation.guest_owner_hash !== guestOwnerHash
+      ) {
+        throw new AppError(
+          403,
+          "RESERVATION_OWNERSHIP_INVALID",
+          "This guest cart belongs to another browser",
+        );
+      }
       await client.query(
-        "UPDATE cart_reservations SET customer_user_id=$2, updated_at=now() WHERE id=$1",
+        `UPDATE cart_reservations
+            SET customer_user_id=$2,
+                guest_owner_hash=NULL,
+                updated_at=now()
+          WHERE id=$1`,
         [input.reservationId, customerUserId],
       );
 
