@@ -890,6 +890,111 @@ export class IdentityService {
     await this.writeAudit(account, "SESSION_REVOKED", "sessions", sessionId, metadata);
   }
 
+  public async listRepresentativeApplications(
+    account: AuthenticatedAccount,
+  ): Promise<Array<Record<string, unknown>>> {
+    if (
+      !account.permissions.includes("representatives.read_applications") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to review representative applications");
+    }
+    const result = await this.pool.query<{
+      user_id: string;
+      representative_code: string;
+      full_name: string;
+      national_id_last4: string;
+      address_text: string;
+      approval_status: string;
+      rejection_reason: string | null;
+      created_at: Date;
+      email: string;
+      user_status: string;
+      phones: Array<{ phone_display: string; is_primary: boolean }>;
+    }>(
+      `SELECT r.user_id::text, r.representative_code, r.full_name,
+              r.national_id_last4, r.address_text, r.approval_status,
+              r.rejection_reason, r.created_at, u.email, u.status AS user_status,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'phone_display', p.phone_display,
+                    'is_primary', p.is_primary
+                  ) ORDER BY p.is_primary DESC, p.created_at
+                ) FILTER (WHERE p.id IS NOT NULL),
+                '[]'::jsonb
+              ) AS phones
+         FROM representatives r
+         JOIN users u ON u.id=r.user_id
+         LEFT JOIN account_phones p
+           ON p.user_id=r.user_id AND p.account_type='representative'
+        WHERE u.deleted_at IS NULL
+        GROUP BY r.user_id, r.representative_code, r.full_name,
+                 r.national_id_last4, r.address_text, r.approval_status,
+                 r.rejection_reason, r.created_at, u.email, u.status
+        ORDER BY
+          CASE r.approval_status WHEN 'pending' THEN 0 ELSE 1 END,
+          r.created_at DESC`,
+    );
+    return result.rows.map((row) => ({
+      id: row.user_id,
+      repId: row.representative_code,
+      name: row.full_name,
+      email: row.email,
+      phone1:
+        row.phones.find((phone) => phone.is_primary)?.phone_display ||
+        row.phones[0]?.phone_display ||
+        "",
+      phone2:
+        row.phones.find((phone) => !phone.is_primary)?.phone_display || "-",
+      address: row.address_text,
+      nationalIdLast4: row.national_id_last4,
+      status:
+        row.approval_status === "approved"
+          ? "Active"
+          : row.approval_status === "pending"
+            ? "Pending Approval"
+            : row.approval_status === "rejected"
+              ? "Rejected"
+              : "Suspended",
+      approvalStatus: row.approval_status,
+      accountStatus: row.user_status,
+      rejectionReason: row.rejection_reason || "",
+      createdAt: row.created_at.toISOString(),
+      documents: ["id_front", "id_back", "face"],
+    }));
+  }
+
+  public async representativeDocument(
+    account: AuthenticatedAccount,
+    representativeUserId: string,
+    documentType: "id_front" | "id_back" | "face",
+  ): Promise<{ contentType: string; dataUrl: string }> {
+    if (
+      !account.permissions.includes("representatives.read_applications") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to review representative documents");
+    }
+    const result = await this.pool.query<{
+      content_type: string;
+      encrypted_payload: Buffer;
+    }>(
+      `SELECT content_type, encrypted_payload
+         FROM representative_documents
+        WHERE representative_user_id=$1 AND document_type=$2`,
+      [representativeUserId, documentType],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new AppError(404, "REPRESENTATIVE_DOCUMENT_NOT_FOUND", "Verification document not found");
+    }
+    return {
+      contentType: row.content_type,
+      dataUrl: decryptSecret(row.encrypted_payload, this.config.mfaEncryptionKey),
+    };
+  }
+
   public async decideRepresentative(
     account: AuthenticatedAccount,
     representativeUserId: string,
