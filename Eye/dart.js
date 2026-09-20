@@ -571,6 +571,12 @@ window.addEventListener("dart:orders-hydrated", (event) => {
   if (typeof dartRefreshAll === "function") dartRefreshAll();
 });
 
+window.addEventListener("dart:audit-hydrated", (event) => {
+  const incoming = event.detail?.audit;
+  if (!Array.isArray(incoming)) return;
+  auditData = incoming;
+});
+
 window.addEventListener("dart:domain-hydrated", (event) => {
   const domain = event.detail?.domain;
   const data = event.detail?.data;
@@ -4805,13 +4811,20 @@ function dartPopulateItemSizeFilter(profile) {
 }
 
 // Enhance Audit History to show what changed, not only the action name.
-function dartShowAuditFor(type, id) {
+async function dartShowAuditFor(type, id) {
   const body = document.getElementById("history-modal-body");
   document.getElementById("history-modal-title").textContent =
     `Audit History — ${type}`;
-  const rows = auditData.filter(
+  let rows = auditData.filter(
     (a) => a.entityType === type && String(a.entityId) === String(id),
   );
+  if (window.DartDomainState?.auditFor) {
+    try {
+      rows = await window.DartDomainState.auditFor(type, id);
+    } catch (error) {
+      console.warn("Dart audit history request failed; using cached history.", error);
+    }
+  }
   body.innerHTML = `<div class="dart-timeline">${
     rows
       .map((a) => {
@@ -4831,7 +4844,7 @@ function dartShowAuditFor(type, id) {
               `<div><b>${dartEsc(k)}:</b> ${dartEsc(a.oldValues?.[k] ?? "-")} → ${dartEsc(a.newValues?.[k] ?? "-")}</div>`,
           )
           .join("");
-        return `<div class="dart-timeline-item"><b>${dartEsc(a.action)}</b>${changes || `<div>${dartEsc(a.note || "No field details")}</div>`}<small>${dartEsc(new Date(a.timestamp).toLocaleString())}</small></div>`;
+        return `<div class="dart-timeline-item"><b>${dartEsc(a.action)}</b>${changes || `<div>${dartEsc(a.note || a.metadata?.message || "No field details")}</div>`}<small>${dartEsc(new Date(a.timestamp).toLocaleString())}</small></div>`;
       })
       .join("") || '<div class="dart-empty-state">No audit entries yet</div>'
   }</div>`;
