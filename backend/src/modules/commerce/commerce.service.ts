@@ -1317,7 +1317,7 @@ export class CommerceService {
       await client.query("BEGIN");
 
       const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
       );
       const returnsState = returnsStateResult.rows[0];
       const returnsRows = Array.isArray(returnsState?.data)
@@ -1535,7 +1535,7 @@ export class CommerceService {
       }
 
       const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage'",
       );
       const damageState = damageStateResult.rows[0];
       const damageRows = Array.isArray(damageState?.data)
@@ -1744,7 +1744,7 @@ export class CommerceService {
     try {
       await client.query("BEGIN");
       const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
       );
       const returnsState = returnsStateResult.rows[0];
       const rows = Array.isArray(returnsState?.data)
@@ -1980,16 +1980,29 @@ export class CommerceService {
               isChecked: false,
             });
           }
-          await client.query(
+          const damageVersion = Number(damageState?.version || 1);
+          const damageUpdate = await client.query(
             `UPDATE dashboard_domain_state
-                SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
-              WHERE domain='damage'`,
+                SET data=$2::jsonb,
+                    version=version+1,
+                    updated_by=$3,
+                    updated_at=now()
+              WHERE domain=$1
+                AND version=$4`,
             [
+              "damage",
               JSON.stringify(damageRows),
-              Number(damageState?.version || 1) + 1,
               actorId,
+              damageVersion,
             ],
           );
+          if (!damageUpdate.rowCount) {
+            throw new AppError(
+              409,
+              "DAMAGE_VERSION_CONFLICT",
+              "Damage records changed while return inspection was being saved; reload and retry",
+            );
+          }
         }
 
         record.inspectionStatus = condition;
@@ -2014,16 +2027,29 @@ export class CommerceService {
       });
       record.activityLog = activityLog;
 
-      await client.query(
+      const returnsVersion = Number(returnsState?.version || 1);
+      const returnsUpdate = await client.query(
         `UPDATE dashboard_domain_state
-            SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
-          WHERE domain='returns'`,
+            SET data=$2::jsonb,
+                version=version+1,
+                updated_by=$3,
+                updated_at=now()
+          WHERE domain=$1
+            AND version=$4`,
         [
+          "returns",
           JSON.stringify(rows),
-          Number(returnsState?.version || 1) + 1,
           actorId,
+          returnsVersion,
         ],
       );
+      if (!returnsUpdate.rowCount) {
+        throw new AppError(
+          409,
+          "RETURN_VERSION_CONFLICT",
+          "Return records changed while this action was being saved; reload and retry",
+        );
+      }
 
       if (inventoryChanged) {
         await client.query(
@@ -2079,7 +2105,7 @@ export class CommerceService {
       }
 
       const stateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
       );
       const state = stateResult.rows[0];
       const rows = Array.isArray(state?.data) ? state!.data as Record<string, unknown>[] : [];
@@ -2384,15 +2410,27 @@ export class CommerceService {
       });
       record.activityLog = activityLog;
 
-      await client.query(
+      const returnStateVersion = Number(state?.version || 1);
+      const returnStateUpdate = await client.query(
         `UPDATE dashboard_domain_state
-            SET data=$2::jsonb, version=$3, updated_at=now()
-          WHERE domain='returns'`,
+            SET data=$2::jsonb,
+                version=version+1,
+                updated_at=now()
+          WHERE domain=$1
+            AND version=$3`,
         [
+          "returns",
           JSON.stringify(rows),
-          Number(state?.version || 1) + 1,
+          returnStateVersion,
         ],
       );
+      if (!returnStateUpdate.rowCount) {
+        throw new AppError(
+          409,
+          "RETURN_VERSION_CONFLICT",
+          "Return request changed while this pickup action was being saved; refresh and retry",
+        );
+      }
 
       await client.query(
         `INSERT INTO audit_logs (
@@ -3572,7 +3610,7 @@ export class CommerceService {
       const legacy = context?.legacy || {};
       const reason = String(legacy.refusalReason || "Refused delivery");
       const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'",
       );
       const returnsState = returnsStateResult.rows[0];
       const returnsRows = Array.isArray(returnsState?.data)
