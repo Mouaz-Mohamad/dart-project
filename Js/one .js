@@ -1742,14 +1742,43 @@ function showCartBanner(productTitle) {
         document.body.appendChild(banner);
     }
 
-    banner.innerHTML = `
-        <span style="font-size: 13px;">تم إضافة "${productTitle}" للسلة</span>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <a href="#cartView" id="bannerGoToCart" style="color: #fff; background: #000; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 12px;">السلة</a>
-            <span onclick="document.getElementById('cartBanner').classList.remove('show')" style="cursor: pointer; font-size: 16px; font-weight: bold;">&times;</span>
-        </div>
-    `;
+    const message = document.createElement('span');
+    message.style.fontSize = '13px';
+    message.textContent = `تم إضافة "${String(productTitle || '')}" للسلة`;
 
+    const actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.gap = '10px';
+    actions.style.alignItems = 'center';
+
+    const cartLink = document.createElement('a');
+    cartLink.href = '#cartView';
+    cartLink.id = 'bannerGoToCart';
+    cartLink.textContent = 'السلة';
+    Object.assign(cartLink.style, {
+        color: '#fff',
+        background: '#000',
+        padding: '5px 10px',
+        borderRadius: '4px',
+        textDecoration: 'none',
+        fontSize: '12px'
+    });
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'إغلاق إشعار السلة');
+    close.textContent = '×';
+    Object.assign(close.style, {
+        cursor: 'pointer',
+        fontSize: '16px',
+        fontWeight: 'bold',
+        border: '0',
+        background: 'transparent'
+    });
+    close.addEventListener('click', () => banner.classList.remove('show'));
+
+    actions.append(cartLink, close);
+    banner.replaceChildren(message, actions);
     banner.classList.add('show');
 
     clearTimeout(window.cartBannerTimeout);
