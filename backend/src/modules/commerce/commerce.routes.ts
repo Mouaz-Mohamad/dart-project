@@ -221,6 +221,29 @@ export function createCommerceRouter(
   });
 
   router.post(
+    "/admin/orders/:orderRef/state",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("orders.manage"),
+    async (request, response) => {
+      const orderRef = z.string().trim().min(1).max(160).parse(request.params.orderRef);
+      const body = z.object({
+        action: z.enum(["archive", "restore", "delete"]),
+      }).parse(request.body);
+      response.status(200).json(
+        await commerce.adminOrderStateAction(
+          request.auth!.userId,
+          orderRef,
+          body.action,
+          String(request.id),
+        ),
+      );
+    },
+  );
+
+  router.post(
     "/admin/returns/:returnRef/action",
     signedIn,
     csrf,
