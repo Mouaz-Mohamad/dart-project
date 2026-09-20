@@ -2288,7 +2288,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       dartUpdateMasterCheckbox(sectionKey);
     }
   });
-  container.addEventListener("click", (e) => {
+  container.addEventListener("click", async (e) => {
     const row = e.target.closest(".model-row");
     if (!row) return;
     const id = row.dataset.id;
@@ -2353,8 +2353,14 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
         if (summary) summary.textContent = `${r.returnId} · ${r.clientName || r.clientId || "Customer"}`;
         openModal(document.getElementById("return-rep-assignment-modal"));
       }
-      if (e.target.closest(".return-good-btn")) dartInspectReturn(r, "Good");
-      if (e.target.closest(".return-bad-btn")) dartInspectReturn(r, "Damaged");
+      if (e.target.closest(".return-good-btn")) {
+        const result = await dartInspectReturn(r, "Good");
+        if (result?.ok === false) alert(result.message || "Inspection failed");
+      }
+      if (e.target.closest(".return-bad-btn")) {
+        const result = await dartInspectReturn(r, "Damaged");
+        if (result?.ok === false) alert(result.message || "Inspection failed");
+      }
     }
     if (sectionKey === "damage") {
       const d = damageData.find((x) => String(x.id) === String(id));
@@ -2458,10 +2464,10 @@ function dartRequestOrderTransition(orders, target) {
 function dartSetupOperationalModals() {
   document
     .getElementById("confirm-return-approval")
-    ?.addEventListener("click", () => {
+    ?.addEventListener("click", async () => {
       const record = dartPendingReturnAction?.record;
       if (!record || dartPendingReturnAction?.decision !== "accept") return;
-      const result = dartApproveReturn(
+      const result = await dartApproveReturn(
         record,
         document.getElementById("return-replacement-select")?.value || "",
       );
@@ -2474,11 +2480,11 @@ function dartSetupOperationalModals() {
     });
   document
     .getElementById("confirm-return-rejection")
-    ?.addEventListener("click", () => {
+    ?.addEventListener("click", async () => {
       const record = dartPendingReturnAction?.record;
       if (!record || dartPendingReturnAction?.decision !== "reject") return;
       const reason = document.getElementById("return-rejection-reason")?.value;
-      const result = dartRejectReturn(record, reason);
+      const result = await dartRejectReturn(record, reason);
       if (!result.ok) {
         alert(result.message || "Operation failed");
         return;
@@ -2488,7 +2494,7 @@ function dartSetupOperationalModals() {
     });
   document
     .getElementById("confirm-return-rep-assignment")
-    ?.addEventListener("click", () => {
+    ?.addEventListener("click", async () => {
       const records = dartPendingReturnAction?.records || (dartPendingReturnAction?.record ? [dartPendingReturnAction.record] : []);
       if (!records.length || dartPendingReturnAction?.decision !== "assign") return;
       const representativeId = document.getElementById("return-rep-assignment-select")?.value;
@@ -2498,7 +2504,7 @@ function dartSetupOperationalModals() {
       }
       const pickupGroupId = window.DartGroups?.newId?.("RPG") || `RPG-${Date.now()}`;
       for (const record of records) {
-        const result = dartAssignReturnRepresentative(record, representativeId, pickupGroupId);
+        const result = await dartAssignReturnRepresentative(record, representativeId, pickupGroupId);
         if (!result.ok) { alert(result.message || "Operation failed"); return; }
       }
       dartPendingReturnAction = null;
