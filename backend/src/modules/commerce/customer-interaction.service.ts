@@ -17,7 +17,7 @@ export interface ContactInput {
   fullName: string;
   email: string;
   phone1: string;
-  phone2?: string;
+  phone2?: string | undefined;
   message: string;
 }
 
@@ -31,9 +31,9 @@ export interface ReturnInput {
   itemCode: string;
   requestType: "Refund" | "Exchange";
   reason: string;
-  notes?: string;
-  requestedColor?: string;
-  requestedSize?: string;
+  notes?: string | undefined;
+  requestedColor?: string | undefined;
+  requestedSize?: string | undefined;
   address: {
     country: string;
     governorate: "Cairo" | "Giza";
@@ -43,8 +43,8 @@ export interface ReturnInput {
     floor: string;
     latitude: number;
     longitude: number;
-    fullAddress?: string;
-    addressSource?: string;
+    fullAddress?: string | undefined;
+    addressSource?: string | undefined;
   };
 }
 
