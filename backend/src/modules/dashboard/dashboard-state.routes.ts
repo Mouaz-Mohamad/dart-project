@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
+import { AppError } from "../../http/app-error.js";
 import {
   authenticate,
   csrfProtection,
@@ -16,6 +17,33 @@ import {
 } from "./dashboard-state.service.js";
 
 const domainSchema = z.enum(DASHBOARD_DOMAINS);
+
+const SENSITIVE_DOMAIN_PERMISSIONS: Partial<
+  Record<DashboardDomain, { read: string; write: string }>
+> = {
+  customers: { read: "customers.read", write: "customers.manage" },
+  returns: { read: "returns.read", write: "returns.manage" },
+  representatives: {
+    read: "representatives.manage",
+    write: "representatives.manage",
+  },
+  damage: { read: "damage.manage", write: "damage.manage" },
+};
+
+function requireSensitiveDomainPermission(
+  domain: DashboardDomain,
+  mode: "read" | "write",
+  permissions: string[],
+): void {
+  const permission = SENSITIVE_DOMAIN_PERMISSIONS[domain]?.[mode];
+  if (permission && !permissions.includes(permission)) {
+    throw new AppError(
+      403,
+      "FORBIDDEN",
+      "You do not have permission to access this dashboard domain",
+    );
+  }
+}
 const writeSchema = z.object({
   expectedVersion: z.number().int().positive(),
   data: z.array(z.unknown()).max(20000),
@@ -80,6 +108,11 @@ export function createDashboardStateRouter(
     requirePermission("dashboard_state.read"),
     async (request, response) => {
       const domain = domainSchema.parse(request.params.domain) as DashboardDomain;
+      requireSensitiveDomainPermission(
+        domain,
+        "read",
+        request.auth!.permissions,
+      );
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json(await state.read(domain));
     },
@@ -94,6 +127,11 @@ export function createDashboardStateRouter(
     requirePermission("dashboard_state.manage"),
     async (request, response) => {
       const domain = domainSchema.parse(request.params.domain) as DashboardDomain;
+      requireSensitiveDomainPermission(
+        domain,
+        "write",
+        request.auth!.permissions,
+      );
       const body = writeSchema.parse(request.body);
       response.status(200).json(
         await state.write(domain, body.expectedVersion, body.data, request.auth!.userId, String(request.id)),
