@@ -42,8 +42,16 @@ export function createDashboardStateRouter(
         entityType: z.string().trim().min(1).max(120).optional(),
         entityId: z.string().trim().min(1).max(200).optional(),
       }).parse(request.query);
+      const auditInput: {
+        limit?: number;
+        entityType?: string;
+        entityId?: string;
+      } = {};
+      if (query.limit !== undefined) auditInput.limit = query.limit;
+      if (query.entityType !== undefined) auditInput.entityType = query.entityType;
+      if (query.entityId !== undefined) auditInput.entityId = query.entityId;
       response.setHeader("Cache-Control", "no-store");
-      response.status(200).json({ audit: await state.audit(query) });
+      response.status(200).json({ audit: await state.audit(auditInput) });
     },
   );
 
