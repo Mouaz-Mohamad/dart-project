@@ -11,6 +11,10 @@ function saveDataToStorage(key, data) {
     window.DartCatalog.write(key, data);
     return;
   }
+  if (key === "dart_orders" && window.DartOrdersApi) {
+    window.DartOrdersApi.write(data);
+    return;
+  }
   localStorage.setItem(key, JSON.stringify(data));
 }
 
@@ -554,6 +558,15 @@ window.addEventListener("dart:catalog-synced", () => {
   if (typeof renderModels === "function") renderModels(modelsData);
   if (typeof renderItems === "function") renderItems(itemsData);
 });
+
+window.addEventListener("dart:orders-hydrated", (event) => {
+  const incoming = event.detail?.orders;
+  if (!Array.isArray(incoming)) return;
+  ordersData = incoming;
+  if (typeof renderOrders === "function") renderOrders(ordersData);
+  if (typeof dartRefreshAll === "function") dartRefreshAll();
+});
+
 
 // ===========================================
 // 13. Chart in Brand Information
