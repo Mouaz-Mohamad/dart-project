@@ -39,6 +39,7 @@ CREATE TABLE orders (
   amount_paid_minor BIGINT NOT NULL DEFAULT 0 CHECK (amount_paid_minor >= 0),
   amount_refunded_minor BIGINT NOT NULL DEFAULT 0 CHECK (amount_refunded_minor >= 0),
   promotion JSONB,
+  contact_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
   delivery_address JSONB NOT NULL,
   delivery_notes TEXT NOT NULL DEFAULT '',
   order_source TEXT NOT NULL DEFAULT 'Website',
