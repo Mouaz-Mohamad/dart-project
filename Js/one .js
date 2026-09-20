@@ -1079,36 +1079,55 @@ function initCartAndCheckoutEvents() {
     }
 
     if (discountBtn && discountInput) {
-        discountBtn.addEventListener('click', () => {
+        discountBtn.addEventListener('click', async () => {
             if (syncBirthdayCheckoutDiscount(true)) {
                 updateCartTotals();
                 return;
             }
+
             const code = discountInput.value.trim().toUpperCase();
+            if (!code) {
+                window.dartAppliedPromotion = null;
+                appliedDiscountRate = 0;
+                showToast("اكتب كود الخصم أولاً.");
+                updateCartTotals();
+                return;
+            }
+
             let promotion = null;
-            try {
-                const today = new Date();
-                promotion = (JSON.parse(localStorage.getItem('dart_promotions')) || []).find(item =>
-                    String(item.code || '').toUpperCase() === code &&
-                    item.status === 'Active' &&
-                    (!item.startsAt || new Date(item.startsAt) <= today) &&
-                    (!item.endsAt || new Date(item.endsAt) >= today)
-                );
-                if (!promotion && window.DartPlatform) {
-                    const user = window.DartPlatform.currentUser();
-                    promotion = (JSON.parse(localStorage.getItem('dart_cards')) || []).find(card =>
-                        String(card.cardId || '').toUpperCase() === code &&
-                        card.clientId === user?.customerId && card.status === 'Active' &&
-                        Number(card.purchasedItems || 0) < Number(card.itemLimit || card.purchasedLimit || 10) &&
-                        cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0) <= Number(card.itemLimit || card.purchasedLimit || 10)-Number(card.purchasedItems||0) &&
-                        (!card.expDate || (() => { const parts=String(card.expDate).split(/[-/]/).map(Number);const expiry=parts[0]>999?new Date(parts[0],parts[1]-1,parts[2],23,59,59):new Date(parts[2],parts[1]-1,parts[0],23,59,59);return expiry>=today; })())
+            if (window.DartPlatform?.apiRequest && window.DartPlatform?.currentUser?.()) {
+                try {
+                    const payload = await window.DartPlatform.apiRequest(
+                        `/api/v1/me/promotions/validate?code=${encodeURIComponent(code)}`
                     );
-                if (promotion) promotion.percent = Number(promotion.discountPercent ?? window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40);
+                    if (payload.valid && payload.promotion) {
+                        promotion = payload.promotion;
+                    }
+                } catch (error) {
+                    console.warn('Promotion validation failed', error);
+                    showToast(error.message || "تعذر التحقق من كود الخصم.");
+                    return;
                 }
-            } catch {}
+            } else {
+                try {
+                    const today = new Date();
+                    promotion = (JSON.parse(localStorage.getItem('dart_promotions')) || []).find(item =>
+                        String(item.code || '').toUpperCase() === code &&
+                        item.status === 'Active' &&
+                        (!item.startsAt || new Date(item.startsAt) <= today) &&
+                        (!item.endsAt || new Date(item.endsAt) >= today)
+                    ) || null;
+                } catch {}
+            }
+
             if (promotion) {
+                promotion.type = 'Promotion';
+                promotion.code = code;
                 window.dartAppliedPromotion = promotion;
-                appliedDiscountRate = Math.min(1, Math.max(0, Number(promotion.percent || promotion.discount) / 100));
+                appliedDiscountRate = Math.min(
+                    1,
+                    Math.max(0, Number(promotion.percent || promotion.discountPercent || promotion.discount) / 100)
+                );
                 showToast(`تم تطبيق خصم ${Math.round(appliedDiscountRate * 100)}% بنجاح!`);
             } else {
                 window.dartAppliedPromotion = null;
