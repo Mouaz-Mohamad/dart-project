@@ -2601,6 +2601,13 @@ export class CommerceService {
     }
   }
 
+  public async adminOrdersVersion(): Promise<number> {
+    const result = await this.pool.query<{ version: string }>(
+      "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
+    );
+    return Number(result.rows[0]?.version || 1);
+  }
+
   public async adminOrders(): Promise<{ version: number; orders: Record<string, unknown>[] }> {
     const versionResult = await this.pool.query<{ version: string }>(
       "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
