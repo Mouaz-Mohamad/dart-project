@@ -526,7 +526,10 @@
 
   function startLiveRefresh() {
     clearInterval(versionPollTimer);
-    versionPollTimer = window.setInterval(checkForServerChanges, 3000);
+    const intervalMs = IS_ADMIN ? 8000 : 20000;
+    versionPollTimer = window.setInterval(() => {
+      if (!document.hidden) void checkForServerChanges();
+    }, intervalMs);
   }
 
   window.addEventListener("online", () => {

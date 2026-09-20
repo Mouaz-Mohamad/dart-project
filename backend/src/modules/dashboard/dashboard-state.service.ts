@@ -29,6 +29,12 @@ export class DashboardStateService {
     return versions;
   }
 
+  async readMany(
+    domains: DashboardDomain[],
+  ): Promise<Array<{ domain: DashboardDomain; version: number; data: unknown[] }>> {
+    return Promise.all(domains.map((domain) => this.read(domain)));
+  }
+
   async read(domain: DashboardDomain): Promise<{ domain: DashboardDomain; version: number; data: unknown[] }> {
     const result = await this.pool.query<{ version: string; data: unknown[] }>(
       "SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1",

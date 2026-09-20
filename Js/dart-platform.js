@@ -3202,13 +3202,14 @@
     renderBirthdayExperience();
     wireAccountLink();
     initializeReturnRequestForm();
-    new MutationObserver(() => {
+    document.addEventListener("dart:section-loaded", () => {
       renderFeedbackEligibility();
       renderLeaderboard();
       renderBirthdayTicker();
       wireSocialLinks();
       wireAccountLink();
-    }).observe(document.body, { childList: true, subtree: true });
+      initializeReturnRequestForm();
+    });
     document
       .querySelectorAll("img:not([alt])")
       .forEach((img) => (img.alt = "Decorative Dart visual"));
@@ -3236,7 +3237,7 @@
   }, 1000);
   setInterval(() => {
     if (!document.hidden) void hydratePublicLeaderboard();
-  }, 10000);
+  }, 30000);
   setInterval(async () => {
     if (!document.hidden && currentUser()) {
       try {
@@ -3246,7 +3247,7 @@
           console.warn("Dart customer snapshot refresh failed", error);
       }
     }
-  }, 5000);
+  }, 15000);
   window.addEventListener("focus", () => {
     void hydratePublicLeaderboard();
     if (currentUser()) void hydrateCustomerCommerce();

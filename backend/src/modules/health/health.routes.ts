@@ -14,6 +14,15 @@ export function createHealthRouter(dependencies: HealthDependencies): Router {
       status: "ok",
       service: "dart-backend",
       version: dependencies.version,
+      apiCompatibility: "dart-database-v1",
+      capabilities: [
+        "database-authoritative-v1",
+        "staff-onboarding-v1",
+        "guest-cart-v1",
+        "dashboard-domain-state-v1",
+        "bulk-domain-state-v1",
+        "catalog-assets-v1",
+      ],
       startedAt: dependencies.startedAt.toISOString(),
       timestamp: new Date().toISOString(),
     });

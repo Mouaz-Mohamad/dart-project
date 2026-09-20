@@ -120,6 +120,22 @@ export function createDashboardStateRouter(
   );
 
   router.get(
+    "/admin/domain-state",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("dashboard_state.read"),
+    async (request, response) => {
+      const readable = DASHBOARD_DOMAINS.filter((domain) => {
+        const permission = SENSITIVE_DOMAIN_PERMISSIONS[domain]?.read;
+        return !permission || request.auth!.permissions.includes(permission);
+      });
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json({ domains: await state.readMany(readable) });
+    },
+  );
+
+  router.get(
     "/admin/domain-state/:domain",
     signedIn,
     requireAccountType("staff"),

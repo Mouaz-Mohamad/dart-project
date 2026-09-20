@@ -178,7 +178,7 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) check();
   });
-  window.setInterval(check, 3000);
+  window.setInterval(check, 8000);
 
   window.DartOrdersApi = {
     hydrate,

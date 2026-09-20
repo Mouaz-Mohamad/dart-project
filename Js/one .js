@@ -227,26 +227,41 @@ function getProductTemplate() {
     return cachedProductTemplate;
 }
 
-async function loadSection(containerId, filePath) {
+async function loadSection(containerId, filePath, timeoutMs = 8000) {
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container) return false;
 
     setUiState(container, 'loading', 'Loading', 'Preparing this section…');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const response = await fetch(filePath);
+        const response = await fetch(filePath, {
+            signal: controller.signal,
+            cache: 'no-cache',
+            credentials: 'same-origin'
+        });
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
         const html = await response.text();
         container.innerHTML = html;
+        document.dispatchEvent(new CustomEvent('dart:section-loaded', {
+            detail: { containerId, filePath }
+        }));
+        return true;
     } catch (error) {
         console.error(`Failed to load (${filePath}):`, error);
         setUiState(
             container,
             'error',
             'This section could not be loaded',
-            navigator.onLine ? 'Please retry.' : 'Reconnect to the internet, then retry.',
+            error?.name === 'AbortError'
+                ? 'Loading timed out. Retry this section.'
+                : navigator.onLine ? 'Please retry.' : 'Reconnect to the internet, then retry.',
             'Retry',
-            () => loadSection(containerId, filePath)
+            () => loadSection(containerId, filePath, timeoutMs)
         );
+        return false;
+    } finally {
+        window.clearTimeout(timeout);
     }
 }
 
@@ -254,28 +269,43 @@ function initHeader() {
     const iconMenu = document.querySelector('.icon-menu');
     const sideMenu = document.querySelector('.side-menu');
     const menuFacke = document.querySelector('.menu-facke');
+    if (!iconMenu || iconMenu.dataset.dartMenuBound === '1') return;
 
-    if (iconMenu) {
-        iconMenu.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (sideMenu) sideMenu.classList.toggle('active');
-            if (menuFacke) menuFacke.classList.toggle('active');
-        });
+    iconMenu.dataset.dartMenuBound = '1';
+    const closeMenu = () => {
+        sideMenu?.classList.remove('active');
+        menuFacke?.classList.remove('active');
+        document.body.classList.remove('menu-open');
+    };
+    const openMenu = () => {
+        sideMenu?.classList.add('active');
+        menuFacke?.classList.add('active');
+        document.body.classList.add('menu-open');
+    };
 
-        document.addEventListener('click', (event) => {
-            if (sideMenu && !sideMenu.contains(event.target) && !iconMenu.contains(event.target)) {
-                sideMenu.classList.remove('active');
-            }
-            if (menuFacke && !menuFacke.contains(event.target) && !iconMenu.contains(event.target)) {
-                menuFacke.classList.remove('active');
-            }
-        });
+    iconMenu.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (sideMenu?.classList.contains('active')) closeMenu();
+        else openMenu();
+    });
 
-        window.addEventListener('scroll', () => {
-            if (sideMenu) sideMenu.classList.remove('active');
-            if (menuFacke) menuFacke.classList.remove('active');
-        });
-    }
+    menuFacke?.addEventListener('click', closeMenu);
+    sideMenu?.addEventListener('click', (event) => {
+        const link = event.target.closest('a[href]');
+        if (!link) return;
+        closeMenu();
+        // Allow the browser to perform a normal full-page navigation.
+        // This intentionally avoids SPA/history interception that could leave overlays stuck.
+    });
+
+    document.addEventListener('click', (event) => {
+        if (sideMenu?.classList.contains('active') &&
+            !sideMenu.contains(event.target) &&
+            !iconMenu.contains(event.target)) closeMenu();
+    });
+
+    window.addEventListener('pagehide', closeMenu, { once: true });
 }
 
 function renderProductsLogic() {
@@ -1957,32 +1987,45 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await Promise.all([
-        loadSection('header-container', 'sections/Nav-Bar.html'),
-        loadSection('leaderboard-card', 'sections/leaderboard-card.html'),
-        loadSection('birthday', 'sections/birthday.html'),
-        loadSection('feedback-form', 'sections/form-feedback.html'),
-        loadSection('contact-form', 'sections/form-contact.html'),
-        loadSection('story', 'sections/story.html'),
-        loadSection('dart-for-you', 'sections/dart-for-you.html'),
-        loadSection('birthday-details', 'sections/birthday-details.html'),
-        loadSection('card-details', 'sections/card.html'),
-        loadSection('why', 'sections/why-dart.html'),
-        loadSection('footer', 'sections/footer.html'),
-    ]);
-
+    // Header/navigation is critical: initialize it independently so a slow optional
+    // section can never freeze navigation or leave the overlay blocking the page.
+    await loadSection('header-container', 'sections/Nav-Bar.html', 5000);
     initHeader();
+
+    const optionalSections = [
+        ['leaderboard-card', 'sections/leaderboard-card.html'],
+        ['birthday', 'sections/birthday.html'],
+        ['feedback-form', 'sections/form-feedback.html'],
+        ['contact-form', 'sections/form-contact.html'],
+        ['story', 'sections/story.html'],
+        ['dart-for-you', 'sections/dart-for-you.html'],
+        ['birthday-details', 'sections/birthday-details.html'],
+        ['card-details', 'sections/card.html'],
+        ['why', 'sections/why-dart.html'],
+        ['footer', 'sections/footer.html'],
+    ];
+
     renderProductsLogic();
     renderFilterButtons();
     initProductFilterToggle();
     renderReviewsLogic();
-    hydratePublicReviews();
+    if (document.getElementById('reviewsContainer')) void hydratePublicReviews();
     initCartAndCheckoutEvents();
     initAddressMap();
     window.DartAddress?.initReturnRequest?.();
-    document.dispatchEvent(new CustomEvent('dart:sections-loaded'));
     updateCartCount();
     if (!navigator.onLine) updateConnectivityBanner();
+
+    const loadOptionalSections = () => {
+        void Promise.allSettled(
+            optionalSections.map(([containerId, filePath]) => loadSection(containerId, filePath))
+        ).then(() => document.dispatchEvent(new CustomEvent('dart:sections-loaded')));
+    };
+    if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(loadOptionalSections, { timeout: 1200 });
+    } else {
+        window.setTimeout(loadOptionalSections, 120);
+    }
 });
 
 // =========================================
@@ -2265,6 +2308,10 @@ restartHeroTyping();
 window.addEventListener("dart:site-settings-changed", restartHeroTyping);
 
 
-// Keep public reviews current without a page reload.
-window.setInterval(hydratePublicReviews, 10000);
-window.addEventListener('focus', hydratePublicReviews);
+// Keep public reviews current without a page reload, but only on pages that render them.
+if (document.getElementById('reviewsContainer')) {
+    window.setInterval(() => {
+        if (!document.hidden) void hydratePublicReviews();
+    }, 30000);
+    window.addEventListener('focus', () => void hydratePublicReviews());
+}

@@ -3,7 +3,8 @@ const fs = require("node:fs");
 const files = [
   "Js/dart-catalog.js","Js/dart-site-settings.js","Js/dart-platform.js","Js/one .js",
   "Js/dart-tracking.js","Js/dart-rep.js","Js/dart-api.js","Js/dart-returns.js",
-  "Eye/dart-domain-state.js","Eye/dart-orders-api.js","Eye/dart-admin-auth.js","Eye/dart-fixes.js"
+  "Eye/dart-domain-state.js","Eye/dart-orders-api.js","Eye/dart-admin-auth.js","Eye/dart-fixes.js",
+  "Eye/dart.js","Eye/dart-finance.js","Eye/dart-settings.js","Eye/dart-operations-v4.js"
 ];
 const keys = [
   "dart_models","dart_items","dart_customers","dart_orders","dart_returns","dart_reviews",

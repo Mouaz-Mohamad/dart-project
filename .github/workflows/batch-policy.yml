@@ -23,3 +23,17 @@ jobs:
         run: node backend/scripts/check-vercel-config.mjs
       - name: Database-authoritative browser storage check
         run: node tests/database-authoritative-storage.cjs
+      - name: Check browser JavaScript syntax
+        run: |
+          find Js Eye -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Run backend static checks and tests
+        working-directory: backend
+        run: npm run lint && npm run typecheck && npm test

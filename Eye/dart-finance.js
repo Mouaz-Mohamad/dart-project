@@ -2002,5 +2002,5 @@
   root.setInterval(() => {
     if (!document.hidden && !serverFinanceDenied)
       void hydrateAuthoritativeFinance(currentRange(), true);
-  }, 15000);
+  }, 30000);
 })(typeof window !== "undefined" ? window : globalThis);

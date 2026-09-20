@@ -196,29 +196,36 @@
   }
 
   async function hydrateAll() {
-    const domains = Object.keys(STORAGE_BY_DOMAIN);
-    const results = await Promise.all(
-      domains.map(async (domain) => {
-        try {
-          const data = await hydrateDomain(domain);
-          deniedDomains.delete(domain);
-          return data;
-        } catch (error) {
-          if (error.status !== 403) throw error;
-          deniedDomains.add(domain);
-          const storageKey = STORAGE_BY_DOMAIN[domain];
-          versions.delete(domain);
-          dirty.delete(domain);
-          window.DartState?.remove?.(storageKey, { source: "permission" });
-          window.dispatchEvent(
-            new CustomEvent("dart:domain-hydrated", {
-              detail: { domain, storageKey, version: 0, data: [] },
-            }),
-          );
-          return [];
-        }
-      }),
-    );
+    const allDomains = Object.keys(STORAGE_BY_DOMAIN);
+    const payload = await api("/api/v1/admin/domain-state");
+    const rows = Array.isArray(payload?.domains) ? payload.domains : [];
+    const received = new Set();
+
+    for (const row of rows) {
+      const domain = String(row?.domain || "");
+      const storageKey = STORAGE_BY_DOMAIN[domain];
+      if (!storageKey) continue;
+      received.add(domain);
+      deniedDomains.delete(domain);
+      versions.set(domain, Number(row.version || 1));
+      dirty.delete(domain);
+      cache(storageKey, row.data || [], domain);
+    }
+
+    for (const domain of allDomains) {
+      if (received.has(domain)) continue;
+      deniedDomains.add(domain);
+      const storageKey = STORAGE_BY_DOMAIN[domain];
+      versions.delete(domain);
+      dirty.delete(domain);
+      window.DartState?.remove?.(storageKey, { source: "permission" });
+      window.dispatchEvent(
+        new CustomEvent("dart:domain-hydrated", {
+          detail: { domain, storageKey, version: 0, data: [] },
+        }),
+      );
+    }
+
     try {
       await hydrateAudit();
     } catch (error) {
@@ -231,7 +238,9 @@
         console.warn("Dart audit hydration failed", error);
       }
     }
-    return Object.fromEntries(domains.map((domain, index) => [domain, results[index]]));
+    return Object.fromEntries(
+      rows.map((row) => [String(row.domain || ""), Array.isArray(row.data) ? row.data : []]),
+    );
   }
 
   async function checkDomain(domain, remoteVersion = 0) {
@@ -273,7 +282,7 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) checkAll();
   });
-  window.setInterval(checkAll, 5000);
+  window.setInterval(checkAll, 12000);
 
   window.DartDomainState = {
     hydrateAll,

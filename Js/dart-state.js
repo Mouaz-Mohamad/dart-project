@@ -43,12 +43,13 @@
     if (options.emit !== false) root.dispatchEvent?.(new CustomEvent("dart:business-state-cleared"));
   }
   function purgeLegacyBrowserBusinessData() {
+    const marker = "dart_database_only_migration_v1";
     try {
+      if (root.localStorage?.getItem(marker) === "1") return;
       for (const key of BUSINESS_KEYS) root.localStorage?.removeItem(key);
       root.localStorage?.removeItem("dart_csrf_token");
-    } catch {}
-    try {
       if (root.indexedDB) root.indexedDB.deleteDatabase("dart-catalog-media-v7");
+      root.localStorage?.setItem(marker, "1");
     } catch {}
   }
   purgeLegacyBrowserBusinessData();

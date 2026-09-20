@@ -16,6 +16,7 @@
   let onboardingChallengeId = "";
   let onboardingSetupToken = "";
   let csrfMemory = "";
+  let compatibilityPromise = null;
 
   if (!API_BASE) {
     if (
@@ -67,6 +68,40 @@
       throw error;
     }
     return payload;
+  }
+
+  function ensureApiCompatibility() {
+    if (compatibilityPromise) return compatibilityPromise;
+    compatibilityPromise = fetch(`${API_BASE}/api/v1/health/live`, {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        const capabilities = new Set(
+          Array.isArray(payload?.capabilities) ? payload.capabilities : [],
+        );
+        if (
+          !response.ok ||
+          payload?.apiCompatibility !== "dart-database-v1" ||
+          !capabilities.has("staff-onboarding-v1") ||
+          !capabilities.has("dashboard-domain-state-v1") ||
+          !capabilities.has("bulk-domain-state-v1")
+        ) {
+          const error = new Error(
+            "The dashboard and API deployments are not compatible yet. Publish the current Dart API before signing in.",
+          );
+          error.code = "API_VERSION_MISMATCH";
+          throw error;
+        }
+        return payload;
+      })
+      .catch((error) => {
+        compatibilityPromise = null;
+        throw error;
+      });
+    return compatibilityPromise;
   }
 
   let permissionSet = new Set();
@@ -184,6 +219,7 @@
     const submit = onboardingEmailForm.querySelector('button[type="submit"]');
     submit.disabled = true;
     try {
+      await ensureApiCompatibility();
       const payload = await request("/api/v1/admin/auth/onboarding/start", {
         method: "POST",
         body: { email: onboardingEmailForm.elements.email.value.trim() },
@@ -276,6 +312,7 @@
     const submit = loginForm.querySelector('button[type="submit"]');
     submit.disabled = true;
     try {
+      await ensureApiCompatibility();
       const payload = await request("/api/v1/admin/auth/login", {
         method: "POST",
         body: {
@@ -336,8 +373,10 @@
   });
 
   lock();
-  request("/api/v1/me")
-    .then(async (payload) => {
+  void (async () => {
+    try {
+      await ensureApiCompatibility();
+      const payload = await request("/api/v1/me");
       if (payload.user?.accountType !== "staff") throw new Error("Staff account required");
       setAdminAccess(payload);
       if (payload.session?.mfaRequired && !payload.session?.mfaSatisfied) {
@@ -345,6 +384,11 @@
         return;
       }
       await unlock();
-    })
-    .catch(() => lock());
+    } catch (error) {
+      lock();
+      if (error?.code === "API_VERSION_MISMATCH") {
+        status(loginForm, error.message, true);
+      }
+    }
+  })();
 })();
