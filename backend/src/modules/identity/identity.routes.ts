@@ -448,6 +448,37 @@ export function createIdentityRouter(
     },
   );
 
+  router.get(
+    "/admin/password-reset-requests",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("staff.sessions_revoke"),
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json({
+        requests: await service.listPasswordResetRequests(request.auth!),
+      });
+    },
+  );
+
+  router.post(
+    "/admin/password-reset-requests/:id/cancel",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("staff.sessions_revoke"),
+    async (request, response) => {
+      await service.cancelPasswordResetRequest(
+        request.auth!,
+        uuid.parse(request.params.id),
+        metadata(request),
+      );
+      response.status(204).end();
+    },
+  );
+
   return router;
 }
 
