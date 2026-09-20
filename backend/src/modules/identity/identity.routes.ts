@@ -27,13 +27,19 @@ const registerCustomerSchema = z.object({
   password,
 });
 
+const representativeImageDataUrl = z.string().min(100).max(1_500_000).regex(/^data:image\/(?:jpeg|png|webp);base64,/);
+
 const registerRepresentativeSchema = z.object({
   name: z.string().trim().min(3).max(120),
   email,
   phone1: egyptianPhone,
   phone2: egyptianPhone.optional(),
   nationalId: z.string().regex(/^\d{14}$/),
+  address: z.string().trim().min(8).max(500),
   password,
+  idFrontImage: representativeImageDataUrl,
+  idBackImage: representativeImageDataUrl,
+  faceImage: representativeImageDataUrl,
 });
 
 const loginSchema = z.object({
@@ -159,13 +165,10 @@ export function createIdentityRouter(
     });
   });
 
-  router.post("/representatives/register", authLimiter(), async (request, _response) => {
-    registerRepresentativeSchema.parse(request.body);
-    throw new AppError(
-      503,
-      "REPRESENTATIVE_DOCUMENT_STORAGE_NOT_CONFIGURED",
-      "Secure representative document upload is not configured; the application was not saved",
-    );
+  router.post("/representatives/register", authLimiter(), async (request, response) => {
+    const body = registerRepresentativeSchema.parse(request.body);
+    const result = await service.registerRepresentative(body, metadata(request));
+    response.status(202).json(result);
   });
 
   router.post("/representatives/login", authLimiter(), async (request, response) => {
@@ -274,6 +277,38 @@ export function createIdentityRouter(
     await service.confirmMfa(request.auth!, body.token, metadata(request));
     response.status(204).end();
   });
+
+  router.get(
+    "/admin/representatives",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("representatives.read_applications"),
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json({
+        representatives: await service.listRepresentativeApplications(request.auth!),
+      });
+    },
+  );
+  router.get(
+    "/admin/representatives/:id/documents/:type",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("representatives.read_applications"),
+    async (request, response) => {
+      const type = z.enum(["id_front", "id_back", "face"]).parse(request.params.type);
+      response.setHeader("Cache-Control", "private, no-store");
+      response.status(200).json({
+        document: await service.representativeDocument(
+          request.auth!,
+          uuid.parse(request.params.id),
+          type,
+        ),
+      });
+    },
+  );
 
   router.post(
     "/admin/representatives/:id/approve",
