@@ -61,6 +61,20 @@
     return payload;
   }
 
+  async function refreshRelatedServerState() {
+    const jobs = [];
+    if (window.DartCatalog?.hydrate) jobs.push(window.DartCatalog.hydrate(true));
+    if (window.DartDomainState?.hydrateDomain) {
+      ["cards", "birthday_rewards", "returns", "damage", "notifications"].forEach(
+        (domain) => jobs.push(window.DartDomainState.hydrateDomain(domain, true)),
+      );
+    }
+    if (window.DartDomainState?.hydrateAudit) {
+      jobs.push(window.DartDomainState.hydrateAudit());
+    }
+    if (jobs.length) await Promise.allSettled(jobs);
+  }
+
   async function sync() {
     if (!serverVersion) return readLocal();
     const payload = await api("/api/v1/admin/orders-state", {
@@ -73,6 +87,7 @@
     window.dispatchEvent(
       new CustomEvent("dart:orders-synced", { detail: { version: serverVersion } }),
     );
+    await refreshRelatedServerState();
     return payload.orders || [];
   }
 
@@ -103,6 +118,7 @@
     serverVersion = Number(payload.version || serverVersion || 1);
     dirty = false;
     cache(payload.orders || []);
+    await refreshRelatedServerState();
     return payload.orders || [];
   }
 
@@ -117,6 +133,7 @@
     serverVersion = Number(payload.version || serverVersion || 1);
     dirty = false;
     cache(payload.orders || []);
+    await refreshRelatedServerState();
     return payload.orders || [];
   }
 
