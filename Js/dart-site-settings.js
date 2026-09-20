@@ -280,7 +280,7 @@
       founder.src = await resolveImage(settings.founderImage, founder.getAttribute("src") || "/Photos/me.png");
   }
 
-  const api = {
+  const siteSettingsApi = {
     STORAGE_KEY,
     defaults,
     get,
@@ -298,8 +298,8 @@
     number,
     heroWordSize,
   };
-  root.DartSiteSettings = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.DartSiteSettings = siteSettingsApi;
+  if (typeof module !== "undefined" && module.exports) module.exports = siteSettingsApi;
 
   if (!root.document) return;
   root.document.addEventListener("DOMContentLoaded", () => {
