@@ -23,7 +23,9 @@
     birthdayRewards: "dart_birthday_rewards",
     birthdayMessages: "dart_birthday_messages",
   });
-  const API_BASE = String(\n    window.DART_API_BASE_URL ||\n      (location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)\n        ? "https://dart-api-dusky.vercel.app"\n        : ""),\n  ).replace(/\/$/, "");
+  const API_BASE = String(
+    window.DART_API_BASE_URL || location.origin,
+  ).replace(/\/$/, "");
   const API_USER_CACHE_KEY = "dart_api_user_cache";
   const CSRF_STORAGE_KEY = "dart_csrf_token";
   const API_REQUIRED =
