@@ -158,11 +158,12 @@ export class DashboardStateService {
       dart_card_draw_eligible: boolean;
       email: string;
       status: string;
+      deleted_at: Date | null;
       created_at: Date;
       phones: Array<{ phone_display: string; is_primary: boolean }>;
     }>(
       `SELECT c.user_id::text, c.client_code, c.full_name, c.birthday::text,
-              c.dart_card_draw_eligible, u.email, u.status, c.created_at,
+              c.dart_card_draw_eligible, u.email, u.status, u.deleted_at, c.created_at,
               COALESCE(
                 jsonb_agg(
                   jsonb_build_object(
@@ -175,15 +176,16 @@ export class DashboardStateService {
          FROM customers c
          JOIN users u ON u.id=c.user_id
          LEFT JOIN account_phones p ON p.user_id=c.user_id AND p.account_type='customer'
-        WHERE u.deleted_at IS NULL
         GROUP BY c.user_id, c.client_code, c.full_name, c.birthday,
-                 c.dart_card_draw_eligible, u.email, u.status, c.created_at
+                 c.dart_card_draw_eligible, u.email, u.status, u.deleted_at, c.created_at
         ORDER BY c.created_at DESC`,
     );
 
     const merged: Record<string, unknown>[] = [];
     const seen = new Set<string>();
     for (const row of result.rows) {
+      seen.add(row.client_code);
+      if (row.deleted_at) continue;
       const previous = legacy.get(row.client_code) || {};
       const phones = Array.isArray(row.phones) ? row.phones : [];
       const primary = phones.find((phone) => phone.is_primary)?.phone_display || phones[0]?.phone_display || "";
@@ -203,11 +205,10 @@ export class DashboardStateService {
         serverAuthoritative: true,
         country: String(previous.country || "Egypt"),
         governorate: String(previous.governorate || ""),
-        isArchived: Boolean(previous.isArchived),
-        isDeleted: Boolean(previous.isDeleted),
+        isArchived: row.status === "suspended" || Boolean(previous.isArchived),
+        isDeleted: false,
         isChecked: false,
       });
-      seen.add(row.client_code);
     }
 
     for (const [clientId, row] of legacy) {
@@ -235,12 +236,13 @@ export class DashboardStateService {
       rejection_reason: string | null;
       email: string;
       user_status: string;
+      deleted_at: Date | null;
       created_at: Date;
       phones: Array<{ phone_display: string; is_primary: boolean }>;
     }>(
       `SELECT r.user_id::text, r.representative_code, r.full_name,
               r.national_id_last4, r.address_text, r.approval_status,
-              r.rejection_reason, u.email, u.status AS user_status, r.created_at,
+              r.rejection_reason, u.email, u.status AS user_status, u.deleted_at, r.created_at,
               COALESCE(
                 jsonb_agg(
                   jsonb_build_object(
@@ -254,16 +256,17 @@ export class DashboardStateService {
          JOIN users u ON u.id=r.user_id
          LEFT JOIN account_phones p
            ON p.user_id=r.user_id AND p.account_type='representative'
-        WHERE u.deleted_at IS NULL
         GROUP BY r.user_id, r.representative_code, r.full_name,
                  r.national_id_last4, r.address_text, r.approval_status,
-                 r.rejection_reason, u.email, u.status, r.created_at
+                 r.rejection_reason, u.email, u.status, u.deleted_at, r.created_at
         ORDER BY r.created_at DESC`,
     );
 
     const merged: Record<string, unknown>[] = [];
     const seen = new Set<string>();
     for (const row of result.rows) {
+      seen.add(row.representative_code);
+      if (row.deleted_at) continue;
       const previous = legacy.get(row.representative_code) || {};
       const phones = Array.isArray(row.phones) ? row.phones : [];
       const primary =
@@ -296,11 +299,13 @@ export class DashboardStateService {
         status,
         createdAt: row.created_at.toISOString(),
         serverAuthoritative: true,
-        isArchived: Boolean(previous.isArchived),
-        isDeleted: Boolean(previous.isDeleted),
+        isArchived:
+          row.user_status === "suspended" ||
+          row.approval_status === "suspended" ||
+          Boolean(previous.isArchived),
+        isDeleted: false,
         isChecked: false,
       });
-      seen.add(row.representative_code);
     }
 
     for (const [repId, row] of legacy) {
