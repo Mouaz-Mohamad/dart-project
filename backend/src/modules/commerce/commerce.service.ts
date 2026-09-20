@@ -306,12 +306,19 @@ export class CommerceService {
       const excludedClients = new Set(
         (states.get("cards") || [])
           .map((raw) => raw as Record<string, unknown>)
-          .filter(
-            (card) =>
-              String(card.status || "").toLowerCase() === "active" &&
-              !card.isArchived &&
-              !card.isDeleted,
-          )
+          .filter((card) => {
+            if (
+              String(card.status || "").toLowerCase() !== "active" ||
+              card.isArchived ||
+              card.isDeleted
+            ) {
+              return false;
+            }
+            const limit = Number(card.itemLimit || card.purchasedLimit || 10);
+            const used = Number(card.purchasedItems || 0);
+            const expiry = flexibleDateExpiry(card.expDate);
+            return used < limit && (!expiry || expiry >= Date.now());
+          })
           .map((card) => String(card.clientId || "")),
       );
 
