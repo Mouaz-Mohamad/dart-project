@@ -1267,6 +1267,34 @@
                     <template id="settings-model-card-row-template"><div class="dart-settings-model-row" data-model-card-row><div><strong data-model-field="name"></strong><small data-model-field="code"></small></div><label>Cards<select data-model-field="mode"><option value="all">All colors</option><option value="one">One card</option><option value="two">Two cards</option><option value="count">Custom number</option><option value="custom">Choose colors</option></select></label><label data-model-count-wrap hidden>Number<input data-model-field="count" type="number" min="1" step="1" value="1"></label><div data-model-colors class="dart-settings-color-options"></div></div></template>
                 </article>
 
+                <article id="settings-staff-access-card" class="dart-settings-card dart-settings-form-card dart-settings-wide" hidden>
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-user-shield"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>STAFF ACCESS</span>
+                        <h2>Employees &amp; API permissions</h2>
+                        <p>أضف الموظف بالإيميل فقط، وحدد الصلاحيات المسموحة له. أول مرة يدخل سيؤكد الإيميل ثم ينشئ كلمة السر الخاصة به.</p>
+                    </div>
+                    <form id="settings-staff-invite-form" class="dart-settings-fields">
+                        <label for="settings-staff-name">Employee name<input id="settings-staff-name" type="text" maxlength="120" required></label>
+                        <label for="settings-staff-email">Employee email<input id="settings-staff-email" type="email" maxlength="254" required></label>
+                        <label class="dart-settings-check" for="settings-staff-mfa"><input id="settings-staff-mfa" type="checkbox" checked> Require 2FA</label>
+                        <div class="dart-settings-field-wide">
+                            <strong>Allowed APIs / actions</strong>
+                            <div id="settings-staff-invite-permissions" class="dart-staff-permissions"></div>
+                        </div>
+                        <button type="submit" class="dart-settings-save">Invite employee</button>
+                    </form>
+                    <p id="settings-staff-status" class="dart-settings-status" role="status" aria-live="polite"></p>
+                    <div class="dart-settings-field-wide">
+                        <h3>Active Staff</h3>
+                        <div id="settings-staff-list" class="dart-settings-list"></div>
+                    </div>
+                    <div class="dart-settings-field-wide">
+                        <h3>Invitations</h3>
+                        <div id="settings-staff-invitations" class="dart-settings-list"></div>
+                    </div>
+                </article>
+
                 <article id="settings-reset-card" class="dart-settings-card dart-settings-danger-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <div class="dart-settings-card-copy">
@@ -2029,6 +2057,7 @@
     <script src="dart-size-chart-v5.js"></script>
     <script src="dart-finance.js"></script>
     <script src="dart-settings.js"></script>
+    <script src="dart-staff.js"></script>
 
 <div class="modal" id="image-preview-modal">
   <div class="modal-content dart-image-preview-content">
