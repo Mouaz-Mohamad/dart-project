@@ -19,7 +19,10 @@ let reviewsLoadFailed = false;
 
 async function hydratePublicReviews() {
     try {
-        const response = await fetch('/api/v1/reviews', {
+        const apiBase = String(
+            window.DART_API_BASE_URL || window.DartApi?.baseUrl || location.origin
+        ).replace(/\/$/, '');
+        const response = await fetch(`${apiBase}/api/v1/reviews`, {
             credentials: 'include',
             cache: 'no-store'
         });
