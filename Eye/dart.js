@@ -5760,61 +5760,108 @@ function setupReturnModal() {
   form.dataset.dartV3Final = "1";
   form.dataset.dartV3 = "1";
   form.dataset.dartV2 = "1";
+
   document.getElementById("add-return-btn")?.addEventListener("click", () => {
     form.reset();
     document.getElementById("modal-return-edit-id").value = "";
     openModal(modal);
   });
-  form.addEventListener("submit", (e) => {
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const id = document.getElementById("modal-return-edit-id").value,
       code = document.getElementById("modal-return-item-code").value.trim(),
       it = dartFindItemByCode(code);
+
     if (!it) {
       alert("Item Code غير موجود.");
       return;
     }
+
     const order = ordersData.find(
-        (o) => (o.items || []).includes(code) && o.status === "Delivered",
-      ),
-      condition =
-        document.getElementById("modal-item-condition").value || "Good",
-      p = {
-        clientName:
-          document.getElementById("modal-return-name").value ||
-          order?.clientName ||
-          "",
-        clientId: order?.clientId || "",
-        itemCode: code,
-        modelId:
-          document.getElementById("modal-return-model-id").value || it.modelId,
-        phone1:
-          document.getElementById("modal-return-phone1").value ||
-          order?.phone1 ||
-          "",
-        phone2:
-          document.getElementById("modal-return-phone2").value ||
-          order?.phone2 ||
-          "-",
-        email:
-          document.getElementById("modal-return-email").value ||
-          order?.email ||
-          "",
-        reason: document.getElementById("modal-item-reason").value || "Other",
-        status: condition,
-        date: new Date().toLocaleDateString("en-GB"),
-        orderId: order?.orderId || "",
-        isPostDeliveryReturn: Boolean(order),
-        refundAmount:
-          Number(document.getElementById("modal-return-refund")?.value) || 0,
-        createdAt: dartNowISO(),
-      };
+      (o) => (o.items || []).includes(code) && o.status === "Delivered",
+    );
+    if (!order) {
+      alert("Manual return requires a delivered order containing this item.");
+      return;
+    }
+
+    const condition =
+      document.getElementById("modal-item-condition").value || "Good";
+    const payload = {
+      ...(id ? { existingReturnId: id } : {}),
+      itemCode: code,
+      reason: document.getElementById("modal-item-reason").value || "Other",
+      condition: condition === "Bad" ? "Bad" : "Good",
+      refundAmount:
+        Number(document.getElementById("modal-return-refund")?.value) || 0,
+      clientName:
+        document.getElementById("modal-return-name").value ||
+        order.clientName ||
+        "",
+      phone1:
+        document.getElementById("modal-return-phone1").value ||
+        order.phone1 ||
+        "",
+      phone2:
+        document.getElementById("modal-return-phone2").value ||
+        order.phone2 ||
+        "-",
+      email:
+        document.getElementById("modal-return-email").value ||
+        order.email ||
+        "",
+    };
+
+    if (window.DartAdminApi?.request) {
+      try {
+        await window.DartAdminApi.request("/api/v1/admin/returns/manual", {
+          method: "POST",
+          body: payload,
+        });
+
+        await Promise.allSettled([
+          window.DartDomainState?.hydrateDomain?.("returns", true),
+          window.DartDomainState?.hydrateDomain?.("damage", true),
+          window.DartCatalog?.hydrate?.(true),
+          window.DartOrdersApi?.hydrate?.(true),
+          window.DartDomainState?.hydrateAudit?.(),
+        ]);
+
+        dartRefreshAll();
+        closeModal(modal);
+        form.reset();
+      } catch (error) {
+        alert(error.message || "Manual return could not be saved.");
+      }
+      return;
+    }
+
+    const p = {
+      clientName: payload.clientName,
+      clientId: order.clientId || "",
+      itemCode: code,
+      modelId:
+        document.getElementById("modal-return-model-id").value || it.modelId,
+      phone1: payload.phone1,
+      phone2: payload.phone2,
+      email: payload.email,
+      reason: payload.reason,
+      status: payload.condition,
+      date: new Date().toLocaleDateString("en-GB"),
+      orderId: order.orderId || "",
+      isPostDeliveryReturn: true,
+      refundAmount: payload.refundAmount,
+      createdAt: dartNowISO(),
+    };
+
     let r;
     if (id) {
       r = returnsData.find((x) => String(x.id) === String(id));
-      const old = { ...r };
+      const previous = { ...r };
       Object.assign(r, p);
-      dartAudit("EDIT", "returns", r.id, old, p);
+      dartAudit("EDIT", "returns", r.id, previous, p);
     } else {
       r = {
         id: dartUid("RETDB"),
@@ -5826,61 +5873,28 @@ function setupReturnModal() {
       };
       returnsData.push(r);
       dartAudit("CREATE", "returns", r.id, {}, r);
-      dartNotify(
-        "return_created",
-        `Return ${r.returnId}`,
-        `${code} returned as ${condition}.`,
-        "returns",
-        r.id,
-      );
     }
-    if (condition === "Good") {
+
+    if (payload.condition === "Good") {
       it.status = "In stock";
       it.orderId = "";
       it.clientId = "";
       it.clientName = "";
       it.purchaseDate = "";
-    } else if (condition === "Bad") {
+    } else {
       it.status = "Damaged";
-      if (
-        !damageData.some(
-          (d) => d.itemCode === it.itemCode && d.status === "Damaged",
-        )
-      )
-        damageData.push({
-          id: dartUid("DMGDB"),
-          damageId: dartUid("DMG"),
-          itemCode: it.itemCode,
-          modelId: it.modelId,
-          img: it.img || "",
-          color: it.color,
-          size: it.size,
-          status: "Damaged",
-          reason: r.reason || "Returned Bad",
-          notes: "",
-          date: new Date().toLocaleDateString("en-GB"),
-          createdAt: dartNowISO(),
-          orderId: r.orderId || "",
-          clientId: r.clientId || "",
-          clientName: r.clientName || "",
-          returnId: r.returnId,
-          isArchived: false,
-          isDeleted: false,
-          isChecked: false,
-        });
     }
-    if (order && p.refundAmount > 0) {
+
+    if (payload.refundAmount > 0) {
       order.amountRefunded =
-        (Number(order.amountRefunded) || 0) + p.refundAmount;
+        (Number(order.amountRefunded) || 0) + payload.refundAmount;
       order.refundedAt = dartNowISO();
       order.paymentStatus =
         order.amountRefunded >= dartOrderNet(order)
           ? "Refunded"
           : "Partially Refunded";
-      dartLogOrder(order, "REFUND_RECORDED", order.status, order.status, {
-        notes: `Refund ${p.refundAmount} EGP for ${code}`,
-      });
     }
+
     dartSaveAll();
     dartRefreshAll();
     closeModal(modal);
