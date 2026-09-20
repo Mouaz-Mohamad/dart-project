@@ -37,6 +37,8 @@
   );
   let locationWatch = null;
   let locationPermissionBlocked = false;
+  let apiWork = { orders: [], returns: [] };
+  let latestApiLocation = null;
 
   const read = (key, fallback = []) => {
     try {
@@ -500,7 +502,7 @@
   }
 
   function repOrders(rep) {
-    if (API_ENABLED) return [];
+    if (API_ENABLED) return apiWork.orders || [];
     return read(KEYS.orders, []).filter(
       (order) =>
         (String(order.representativeId) === String(rep.id) ||
@@ -512,7 +514,7 @@
   }
 
   function repReturns(rep) {
-    if (API_ENABLED) return [];
+    if (API_ENABLED) return apiWork.returns || [];
     return read(KEYS.returns, []).filter(
       (record) =>
         (String(record.representativeId) === String(rep.id) ||
@@ -521,6 +523,23 @@
         !record.isDeleted &&
         ["Representative Assigned", "Pickup On The Way"].includes(record.status),
     );
+  }
+
+  async function refreshApiWork() {
+    if (!API_ENABLED || !currentRep()) return apiWork;
+    const payload = await window.DartApi.request("/api/v1/representatives/work");
+    apiWork = {
+      orders: Array.isArray(payload.orders) ? payload.orders : [],
+      returns: Array.isArray(payload.returns) ? payload.returns : [],
+    };
+    if (latestApiLocation) {
+      [...apiWork.orders, ...apiWork.returns].forEach((record) => {
+        if (record.deliveryStartedAt || record.pickupStartedAt || record.status === "Representative On The Way" || record.status === "Pickup On The Way") {
+          record.courierLocation = latestApiLocation;
+        }
+      });
+    }
+    return apiWork;
   }
 
   function fullAddress(order) {
@@ -691,7 +710,36 @@
     );
   }
 
-  function updateOrderStatus(orderId, status) {
+  async function updateOrderStatus(orderId, status) {
+    if (API_ENABLED) {
+      const order = (apiWork.orders || []).find(
+        (row) => String(row.id) === String(orderId),
+      );
+      if (!order) throw new Error("The assigned order could not be found.");
+      const action =
+        status === "Representative On The Way"
+          ? "start"
+          : status === "Delivered"
+            ? "delivered"
+            : status === "Out With Representative"
+              ? "cancel"
+              : "";
+      if (!action) throw new Error("Unsupported delivery action.");
+      await window.DartApi.request(
+        `/api/v1/representatives/orders/${encodeURIComponent(order.orderId)}/action`,
+        { method: "POST", body: { action } },
+      );
+      await refreshApiWork();
+      if (status === "Delivered") activeOrderIds.delete(order.id);
+      if (status === "Representative On The Way") activeOrderIds.add(order.id);
+      if (status === "Out With Representative") activeOrderIds.delete(order.id);
+      saveActiveIds();
+      return (apiWork.orders || []).find(
+        (row) => String(row.orderId) === String(order.orderId),
+      ) || { ...order, status };
+    }
+
+
     const rep = currentRep(),
       orders = read(KEYS.orders, []),
       order = orders.find((row) => String(row.id) === String(orderId));
@@ -1004,9 +1052,47 @@
     }
     setLocationStatus("Requesting precise location permission…", "loading");
     locationWatch = navigator.geolocation.watchPosition(
-      (position) => {
-        const rep = currentRep(),
-          orders = read(KEYS.orders, []),
+      async (position) => {
+        const rep = currentRep();
+        if (API_ENABLED) {
+          try {
+            const payload = await window.DartApi.request("/api/v1/representatives/location", {
+              method: "PUT",
+              body: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracyMeters: Number.isFinite(position.coords.accuracy)
+                  ? position.coords.accuracy
+                  : null,
+              },
+            });
+            latestApiLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              heading: position.coords.heading,
+              speed: position.coords.speed,
+              updatedAt: payload.updatedAt || now(),
+            };
+            [...apiWork.orders, ...apiWork.returns].forEach((record) => {
+              if (
+                activeOrderIds.has(record.id) ||
+                activeReturnIds.has(record.id) ||
+                record.status === "Representative On The Way" ||
+                record.status === "Pickup On The Way"
+              ) record.courierLocation = latestApiLocation;
+            });
+            setLocationStatus(
+              "Live location is being shared securely with Dart.",
+              "success",
+            );
+            renderOrders();
+          } catch (error) {
+            setLocationStatus(error.message || "Could not update live location.", "error");
+          }
+          return;
+        }
+        const orders = read(KEYS.orders, []),
           records = read(KEYS.returns, []);
         let ordersChanged = false,
           returnsChanged = false;
