@@ -15,6 +15,10 @@ function saveDataToStorage(key, data) {
     window.DartOrdersApi.write(data);
     return;
   }
+  if (window.DartDomainState?.domainForStorageKey?.(key)) {
+    window.DartDomainState.write(key, data);
+    return;
+  }
   localStorage.setItem(key, JSON.stringify(data));
 }
 
