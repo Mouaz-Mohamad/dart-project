@@ -457,7 +457,62 @@
         new CustomEvent("dart:data-changed", { detail: { key } }),
       );
     });
+    if (payload.savedAddress) {
+      localStorage.setItem("user_last_address", JSON.stringify(payload.savedAddress));
+    } else {
+      localStorage.removeItem("user_last_address");
+    }
+    window.dispatchEvent(
+      new CustomEvent("dart:saved-address-hydrated", {
+        detail: { address: payload.savedAddress || null },
+      }),
+    );
     return payload;
+  }
+
+  async function saveCustomerAddress(address) {
+    const normalized = address && typeof address === "object"
+      ? {
+          address: String(address.address || "").trim(),
+          lat: Number(address.lat),
+          lng: Number(address.lng),
+          governorate: deliveryGovernorate(address.governorate),
+          ...(address.country ? { country: String(address.country) } : {}),
+          ...(address.area ? { area: String(address.area) } : {}),
+          ...(address.street ? { street: String(address.street) } : {}),
+          ...(address.building ? { building: String(address.building) } : {}),
+          ...(address.floor ? { floor: String(address.floor) } : {}),
+        }
+      : null;
+    if (
+      !normalized ||
+      !normalized.address ||
+      !Number.isFinite(normalized.lat) ||
+      !Number.isFinite(normalized.lng) ||
+      !normalized.governorate
+    ) {
+      throw new Error("Saved address is incomplete.");
+    }
+    localStorage.setItem("user_last_address", JSON.stringify(normalized));
+    if (API_BASE && currentUser()) {
+      const payload = await apiRequest("/api/v1/me/preferences/address", {
+        method: "PUT",
+        body: normalized,
+      });
+      const saved = payload.savedAddress || normalized;
+      localStorage.setItem("user_last_address", JSON.stringify(saved));
+      return saved;
+    }
+    return normalized;
+  }
+
+  async function clearCustomerAddress() {
+    localStorage.removeItem("user_last_address");
+    if (API_BASE && currentUser()) {
+      await apiRequest("/api/v1/me/preferences/address", {
+        method: "DELETE",
+      });
+    }
   }
 
   async function hydrateApiSession() {
@@ -3173,6 +3228,8 @@
     hydrateApiSession,
     hydrateCustomerCommerce,
     hydrateCustomerCart,
+    saveCustomerAddress,
+    clearCustomerAddress,
     logout,
     currentUser,
     checkout,
