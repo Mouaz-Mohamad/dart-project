@@ -74,6 +74,35 @@
     element.classList.toggle("is-error", isError);
   }
 
+  function clearAdminPrivateCache() {
+    [
+      "dart_models",
+      "dart_items",
+      "dart_customers",
+      "dart_orders",
+      "dart_returns",
+      "dart_reviews",
+      "dart_cards",
+      "dart_representatives",
+      "dart_damage",
+      "dart_notifications",
+      "dart_contact_messages",
+      "dart_birthday_rewards",
+      "dart_birthday_messages",
+      "dart_message_queue",
+      "dart_promotions",
+      "dart_audit",
+      "dart_finance_expenses",
+      "dart_finance_budgets",
+      "dart_finance_invoices",
+      "dart_finance_goals",
+      "dart_finance_marketing",
+      "dart_finance_cod_settlements",
+      "dart_finance_audit",
+      "dart_draw_eligibility_audit",
+    ].forEach((key) => localStorage.removeItem(key));
+  }
+
   function lock() {
     document.body.classList.add("dart-admin-locked");
     authView.hidden = false;
