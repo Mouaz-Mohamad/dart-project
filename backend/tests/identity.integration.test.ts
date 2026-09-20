@@ -28,6 +28,8 @@ const requestMetadata = {
   ipAddress: "127.0.0.1",
   userAgent: "vitest",
 };
+const tinyPng =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
 describe.skipIf(!databaseUrl)("identity service", () => {
   beforeAll(async () => {
@@ -112,13 +114,36 @@ describe.skipIf(!databaseUrl)("identity service", () => {
         nationalId: "29901011234567",
         address: "10 Test Street, Cairo, Egypt",
         password: "StrongPassword123",
-        idFrontImage: "data:image/webp;base64,AAAA",
-        idBackImage: "data:image/webp;base64,AAAA",
-        faceImage: "data:image/webp;base64,AAAA",
+        idFrontImage: tinyPng,
+        idBackImage: tinyPng,
+        faceImage: tinyPng,
       },
       requestMetadata,
     );
     expect(representative.status).toBe("pending_approval");
+    const documents = await testPool!.query<{
+      document_type: string;
+      content_type: string;
+      byte_size: number;
+      encrypted_payload: Buffer;
+    }>(
+      `SELECT document_type, content_type, byte_size, encrypted_payload
+         FROM representative_documents
+        WHERE representative_user_id=$1
+        ORDER BY document_type`,
+      [representative.userId],
+    );
+    expect(documents.rows.map((row) => row.document_type)).toEqual([
+      "face",
+      "id_back",
+      "id_front",
+    ]);
+    for (const row of documents.rows) {
+      expect(row.content_type).toBe("image/png");
+      expect(row.byte_size).toBeGreaterThan(0);
+      expect(Buffer.isBuffer(row.encrypted_payload)).toBe(true);
+      expect(row.encrypted_payload.toString("utf8")).not.toContain("data:image");
+    }
     await expect(
       service!.login("representative", representative.representativeCode, "StrongPassword123", requestMetadata),
     ).rejects.toEqual(expect.objectContaining({ code: "REPRESENTATIVE_NOT_APPROVED" }));

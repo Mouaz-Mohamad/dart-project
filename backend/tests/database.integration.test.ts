@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -6,10 +7,14 @@ import { runMigrations } from "../src/database/migrate.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const schemaName = `dart_test_${randomUUID().replaceAll("-", "")}`;
+const migrationsPath = resolve(process.cwd(), "migrations");
+const expectedMigrations = readdirSync(migrationsPath)
+  .filter((name) => /^\d+.*\.sql$/.test(name))
+  .sort();
 let adminPool: Pool | undefined;
 let testPool: Pool | undefined;
 
-describe.skipIf(!databaseUrl)("PostgreSQL foundation and identity migrations", () => {
+describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
   beforeAll(async () => {
     adminPool = new Pool({ connectionString: databaseUrl, max: 1 });
     await adminPool.query(`CREATE SCHEMA "${schemaName}"`);
@@ -18,7 +23,7 @@ describe.skipIf(!databaseUrl)("PostgreSQL foundation and identity migrations", (
       max: 1,
       options: `-c search_path=${schemaName},public`,
     });
-    await runMigrations(testPool, resolve(process.cwd(), "migrations"));
+    await runMigrations(testPool, migrationsPath);
   });
 
   afterAll(async () => {
@@ -29,7 +34,7 @@ describe.skipIf(!databaseUrl)("PostgreSQL foundation and identity migrations", (
     }
   });
 
-  it("creates all foundation and identity tables and records both migrations", async () => {
+  it("applies every current migration and creates production-critical tables", async () => {
     const result = await testPool!.query<{ table_name: string }>(
       `
         SELECT table_name
@@ -39,26 +44,34 @@ describe.skipIf(!databaseUrl)("PostgreSQL foundation and identity migrations", (
       `,
       [schemaName],
     );
-    expect(result.rows.map((row) => row.table_name)).toEqual([
-      "account_phones",
-      "audit_logs",
-      "customers",
-      "dart_schema_migrations",
-      "email_verification_challenges",
-      "idempotency_keys",
-      "mfa_recovery_codes",
-      "outbox_events",
-      "password_history",
-      "password_reset_requests",
-      "permissions",
-      "representatives",
-      "role_permissions",
-      "roles",
-      "sessions",
-      "staff_users",
-      "user_roles",
-      "users",
-    ]);
+    const tableNames = result.rows.map((row) => row.table_name);
+    expect(tableNames).toEqual(
+      expect.arrayContaining([
+        "users",
+        "customers",
+        "staff_users",
+        "representatives",
+        "sessions",
+        "audit_logs",
+        "outbox_events",
+        "catalog_models",
+        "inventory_items",
+        "catalog_assets",
+        "cart_reservations",
+        "orders",
+        "order_items",
+        "order_events",
+        "site_settings",
+        "dashboard_domain_state",
+        "representative_documents",
+        "representative_locations",
+      ]),
+    );
+
+    const applied = await testPool!.query<{ name: string }>(
+      "SELECT name FROM dart_schema_migrations ORDER BY name",
+    );
+    expect(applied.rows.map((row) => row.name)).toEqual(expectedMigrations);
   });
 
   it("enforces append-only audit records", async () => {

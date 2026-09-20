@@ -15,11 +15,57 @@ const contentTypes = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jfif": "image/jpeg",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
 };
 
 const server = http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, "http://test").pathname);
+  if (pathname.startsWith("/api/")) {
+    response.setHeader("Content-Type", "application/json; charset=utf-8");
+    const payload =
+      pathname === "/api/v1/health/live"
+        ? {
+            status: "ok",
+            apiCompatibility: "dart-database-v1",
+            capabilities: [
+              "staff-onboarding-v1",
+              "dashboard-domain-state-v1",
+              "bulk-domain-state-v1",
+            ],
+          }
+        : pathname === "/api/v1/me"
+          ? {
+              user: { accountType: "staff", name: "CI Owner" },
+              session: { mfaRequired: false, mfaSatisfied: true },
+              permissions: [
+                "settings.manage",
+                "catalog.manage",
+                "orders.read",
+                "dashboard_state.read",
+                "finance.read",
+              ],
+            }
+          : pathname === "/api/v1/site-settings"
+            ? { version: 1, settings: {} }
+            : pathname === "/api/v1/admin/catalog-state"
+              ? { version: 1, models: [], items: [] }
+              : pathname === "/api/v1/admin/orders-state"
+                ? { version: 1, orders: [] }
+                : pathname === "/api/v1/admin/domain-state"
+                  ? { domains: [] }
+                  : pathname === "/api/v1/admin/audit"
+                    ? { audit: [] }
+                    : pathname === "/api/v1/admin/domain-state-versions"
+                      ? { versions: {} }
+                      : pathname === "/api/v1/catalog"
+                        ? { version: 1, models: [], stock: {} }
+                        : pathname === "/api/v1/reviews"
+                          ? { reviews: [] }
+                          : {};
+    response.end(JSON.stringify(payload));
+    return;
+  }
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
   const filename = path.resolve(root, relative);
   if (filename !== root && !filename.startsWith(root + path.sep)) {
@@ -135,6 +181,9 @@ const server = http.createServer((request, response) => {
   await tracking.close();
 
   const dashboard = await open("Eye/Dart%20Eye.html");
+  await dashboard.waitForFunction(
+    () => !document.body.classList.contains("dart-admin-locked"),
+  );
   assert.equal(await dashboard.locator(".dashboard-section.active-section").getAttribute("id"), "brand");
   assert.equal(await dashboard.locator("link[rel='manifest']").count(), 1);
   const dashboardTargets = await dashboard.locator("a[data-target]").evaluateAll((links) =>

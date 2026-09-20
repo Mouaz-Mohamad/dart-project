@@ -349,6 +349,8 @@ function createProductCard(item, template) {
         const images = getProductImages(item);
         img.src = images[0] || '';
         img.alt = item.title;
+        img.loading = 'lazy';
+        img.decoding = 'async';
         img.addEventListener('error', () => {
             img.hidden = true;
             if (!card.querySelector('.dart-product-image-error')) {
@@ -1015,21 +1017,21 @@ function renderCart() {
             }
 
             cartData[index].quantity += 1;
-            if (!await saveCartToLocalStorage()) return renderCart();
+            if (!await persistCartReservation()) return renderCart();
             renderCart();
         });
 
         card.querySelector('.decrease').addEventListener('click', async () => {
             if (cartData[index].quantity > 1) {
                 cartData[index].quantity -= 1;
-                if (!await saveCartToLocalStorage()) return renderCart();
+                if (!await persistCartReservation()) return renderCart();
                 renderCart();
             }
         });
 
         card.querySelector('.remove-item-btn').addEventListener('click', async () => {
             cartData.splice(index, 1);
-            if (!await saveCartToLocalStorage()) return renderCart();
+            if (!await persistCartReservation()) return renderCart();
             renderCart();
         });
 
@@ -1040,7 +1042,7 @@ function renderCart() {
     updateCartCount();
 }
 
-async function saveCartToLocalStorage() {
+async function persistCartReservation() {
     const previous = structuredClone(window.DartState?.read?.('dart_cart', []) || []);
     try {
         if (window.DartPlatform?.reserveCart) {
@@ -1119,7 +1121,7 @@ function initCartAndCheckoutEvents() {
                 });
             }
 
-            if (!await saveCartToLocalStorage()) { renderCart(); return; }
+            if (!await persistCartReservation()) { renderCart(); return; }
             showToast("تم إضافة المنتج إلى السلة بنجاح!");
             updateCartCount();
             showCartBanner(activeProduct.title);
@@ -1321,7 +1323,7 @@ function initCartAndCheckoutEvents() {
             }
 
             cartData = [];
-            await saveCartToLocalStorage();
+            await persistCartReservation();
             appliedDiscountRate = 0;
             updateCartCount();
             showToast("تم إتمام طلبك بنجاح! شكراً لك.");

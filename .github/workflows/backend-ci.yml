@@ -20,6 +20,23 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dart
+          POSTGRES_PASSWORD: dart
+          POSTGRES_DB: dart_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dart -d dart_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgresql://dart:dart@127.0.0.1:5432/dart_test
     defaults:
       run:
         working-directory: backend
@@ -38,7 +55,7 @@ jobs:
         run: npm run lint
       - name: Typecheck
         run: npm run typecheck
-      - name: Unit tests
+      - name: Unit and PostgreSQL integration tests
         run: npm test
       - name: Browser JavaScript syntax
         run: |
