@@ -6,6 +6,18 @@
 (function () {
   "use strict";
   const RESET = "dart_v7_empty_start_completed";
+  const API_BASE = String(
+    window.DART_API_BASE_URL ||
+      (location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)
+        ? "https://dart-api-dusky.vercel.app"
+        : ""),
+  ).replace(/\/$/, "");
+  const CSRF_STORAGE_KEY = "dart_csrf_token";
+  const IS_ADMIN = /\/Eye\//i.test(location.pathname);
+  let serverVersion = 0;
+  let remoteStock = null;
+  let syncTimer = 0;
+  let syncChain = Promise.resolve();
   // BEGIN One-time reset explicitly requested by the owner. New entries survive reloads.
   if (localStorage.getItem(RESET) !== "1") {
     Object.keys(localStorage)
@@ -34,12 +46,111 @@
       return fallback;
     }
   };
-  const write = (key, data) => {
-    localStorage.setItem(key, JSON.stringify(data));
+  const cacheWrite = (key, data) => {
+    const raw = JSON.stringify(data);
+    localStorage.setItem(key, raw);
+    readCache.set(key, { raw, value: data });
     window.dispatchEvent(
       new CustomEvent("dart:data-changed", { detail: { key } }),
     );
   };
+
+  async function api(path, options = {}) {
+    if (!API_BASE) throw new Error("Catalogue API is not configured.");
+    const method = String(options.method || "GET").toUpperCase();
+    const csrf = localStorage.getItem(CSRF_STORAGE_KEY);
+    const response = await fetch(`${API_BASE}${path}`, {
+      credentials: "include",
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrf
+          ? { "X-CSRF-Token": csrf }
+          : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (payload?.csrfToken) localStorage.setItem(CSRF_STORAGE_KEY, payload.csrfToken);
+    if (!response.ok) {
+      const error = new Error(payload?.error?.message || "Catalogue request failed");
+      error.status = response.status;
+      error.code = payload?.error?.code;
+      throw error;
+    }
+    return payload;
+  }
+
+  async function syncAdminState() {
+    if (!IS_ADMIN || !API_BASE || !serverVersion) return;
+    const payload = await api("/api/v1/admin/catalog-state", {
+      method: "PUT",
+      body: {
+        expectedVersion: serverVersion,
+        models: read("dart_models", []),
+        items: read("dart_items", []),
+      },
+    });
+    serverVersion = Number(payload.version || serverVersion);
+    cacheWrite("dart_models", payload.models || []);
+    cacheWrite("dart_items", payload.items || []);
+    window.dispatchEvent(new CustomEvent("dart:catalog-synced", { detail: { version: serverVersion } }));
+  }
+
+  function scheduleAdminSync() {
+    if (!IS_ADMIN || !API_BASE || !serverVersion) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      syncChain = syncChain
+        .then(syncAdminState)
+        .catch(async (error) => {
+          console.error("Dart catalogue sync failed", error);
+          window.dispatchEvent(new CustomEvent("dart:catalog-sync-error", { detail: { code: error.code || "SYNC_FAILED", message: error.message } }));
+          if (error.status === 409) await hydrateCatalog(true);
+        });
+    }, 120);
+  }
+
+  const write = (key, data) => {
+    cacheWrite(key, data);
+    if (["dart_models", "dart_items"].includes(key)) scheduleAdminSync();
+  };
+
+  async function hydrateCatalog(force = false) {
+    if (!API_BASE) return;
+    if (IS_ADMIN) {
+      const localModels = read("dart_models", []);
+      const localItems = read("dart_items", []);
+      let state = await api("/api/v1/admin/catalog-state");
+      serverVersion = Number(state.version || 1);
+      if (
+        !force &&
+        (state.models || []).length === 0 &&
+        (state.items || []).length === 0 &&
+        (localModels.length > 0 || localItems.length > 0)
+      ) {
+        state = await api("/api/v1/admin/catalog-state", {
+          method: "PUT",
+          body: {
+            expectedVersion: serverVersion,
+            models: localModels,
+            items: localItems,
+          },
+        });
+        serverVersion = Number(state.version || serverVersion);
+      }
+      cacheWrite("dart_models", state.models || []);
+      cacheWrite("dart_items", state.items || []);
+      remoteStock = null;
+    } else {
+      const state = await api("/api/v1/catalog");
+      serverVersion = Number(state.version || 1);
+      cacheWrite("dart_models", state.models || []);
+      remoteStock = new Map(Object.entries(state.stock || {}));
+    }
+    await preloadImages().catch(() => {});
+    window.dispatchEvent(new CustomEvent("dart:catalog-hydrated", { detail: { version: serverVersion, admin: IS_ADMIN } }));
+  }
   const active = (record) =>
     record &&
     !record.isArchived &&
@@ -172,6 +283,9 @@
       !sizes(m).some((s) => active(s) && s.name === String(size))
     )
       return 0;
+    if (!IS_ADMIN && remoteStock && !owner) {
+      return Number(remoteStock.get(JSON.stringify([m.modelId, color, String(size)])) || 0);
+    }
     return items().filter(
       (i) =>
         i.modelId === m.modelId &&
@@ -341,6 +455,10 @@
     groups,
     products,
     snapshot,
+    hydrate: hydrateCatalog,
+    syncAdminState,
+    serverVersion: () => serverVersion,
+    isServerAuthoritative: () => Boolean(API_BASE && serverVersion),
   };
   window.addEventListener("storage", (e) => {
     if (["dart_models", "dart_items", "dart_orders"].includes(e.key)) {
@@ -351,5 +469,9 @@
     }
   });
   preloadImages();
+  hydrateCatalog().catch((error) => {
+    console.error("Dart catalogue hydration failed", error);
+    window.dispatchEvent(new CustomEvent("dart:catalog-hydration-error", { detail: { code: error.code || "HYDRATION_FAILED", message: error.message } }));
+  });
 })();
 /* END DART CATALOG */
