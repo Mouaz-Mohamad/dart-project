@@ -2618,11 +2618,6 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const versionResult = await client.query<{ version: string }>(
-        "SELECT version::text FROM domain_state_versions WHERE domain='orders' FOR UPDATE",
-      );
-      const currentVersion = Number(versionResult.rows[0]?.version || 1);
-
       const itemCodes = [...new Set(
         input.itemCodes.map((code) => String(code || "").trim()).filter(Boolean),
       )];
@@ -2800,22 +2795,9 @@ export class CommerceService {
         ],
       );
 
-      const versionUpdate = await client.query<{ version: string }>(
-        `UPDATE domain_state_versions
-            SET version=version+1, updated_at=now()
-          WHERE domain='orders'
-            AND version=$1
-          RETURNING version::text`,
-        [expectedVersion],
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
       );
-      if (!versionUpdate.rows[0]) {
-        throw new AppError(
-          409,
-          "ORDERS_VERSION_CONFLICT",
-          "Orders changed while this update was being saved; reload and retry",
-        );
-      }
-      const nextVersion = Number(versionUpdate.rows[0].version);
 
       await client.query("COMMIT");
       return await this.adminOrders();
@@ -2859,11 +2841,6 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const versionResult = await client.query<{ version: string }>(
-        "SELECT version::text FROM domain_state_versions WHERE domain='orders' FOR UPDATE",
-      );
-      const currentVersion = Number(versionResult.rows[0]?.version || 1);
-
       const existingResult = await client.query<{
         id: string;
         order_code: string;
@@ -3035,10 +3012,8 @@ export class CommerceService {
         ],
       );
 
-      const nextVersion = currentVersion + 1;
       await client.query(
-        "UPDATE domain_state_versions SET version=$2, updated_at=now() WHERE domain=$1",
-        ["orders", nextVersion],
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
       );
       await client.query(
         `INSERT INTO audit_logs (
@@ -3269,11 +3244,22 @@ export class CommerceService {
         }
       }
 
-      const nextVersion = currentVersion + 1;
-      await client.query(
-        "UPDATE domain_state_versions SET version=$2, updated_at=now() WHERE domain=$1",
-        ["orders", nextVersion],
+      const versionUpdate = await client.query<{ version: string }>(
+        `UPDATE domain_state_versions
+            SET version=version+1, updated_at=now()
+          WHERE domain='orders'
+            AND version=$1
+          RETURNING version::text`,
+        [expectedVersion],
       );
+      if (!versionUpdate.rows[0]) {
+        throw new AppError(
+          409,
+          "ORDERS_VERSION_CONFLICT",
+          "Orders changed while this update was being saved; reload and retry",
+        );
+      }
+      const nextVersion = Number(versionUpdate.rows[0].version);
       await client.query(
         `INSERT INTO audit_logs (
            actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
