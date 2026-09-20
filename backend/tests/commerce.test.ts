@@ -36,6 +36,13 @@ describe("CommerceService public leaderboard", () => {
               final_minor: "30000",
               item_codes: ["C-1", "C-2", "C-3", "C-4"],
             },
+            {
+              client_code: "DR-4",
+              full_name: "Expired Card Customer",
+              order_code: "K-5",
+              final_minor: "40000",
+              item_codes: ["D-1"],
+            },
           ],
         };
       }
@@ -73,6 +80,13 @@ describe("CommerceService public leaderboard", () => {
                   isArchived: false,
                   isDeleted: false,
                 },
+                {
+                  clientId: "DR-4",
+                  status: "Active",
+                  expDate: "2020-01-01",
+                  isArchived: false,
+                  isDeleted: false,
+                },
               ],
             },
           ],
@@ -103,6 +117,12 @@ describe("CommerceService public leaderboard", () => {
         name: "Bob Example Customer",
         orders: 1,
         items: 3,
+      },
+      {
+        rank: 3,
+        name: "Expired Card Customer",
+        orders: 1,
+        items: 1,
       },
     ]);
     expect(result.rows.some((row) => row.name.includes("Card Holder"))).toBe(false);
