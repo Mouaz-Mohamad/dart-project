@@ -1,7 +1,7 @@
 import pino from "pino";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { createApp } from "../src/application.js";
 import type { AppConfig } from "../src/config/env.js";
 import type { IdentityService } from "../src/modules/identity/identity.service.js";
 import type { AuthenticatedAccount, IssuedSession } from "../src/modules/identity/identity.types.js";
