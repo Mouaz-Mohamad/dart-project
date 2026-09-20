@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const API_BASE = String(\n    window.DART_API_BASE_URL ||\n      (location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)\n        ? "https://dart-api-dusky.vercel.app"\n        : ""),\n  ).replace(/\/$/, "");
+  const API_BASE = String(
+    window.DART_API_BASE_URL || location.origin,
+  ).replace(/\/$/, "");
   const CSRF_STORAGE_KEY = "dart_csrf_token";
   const authView = document.getElementById("dart-admin-auth");
   const loginForm = document.getElementById("dart-admin-login-form");
