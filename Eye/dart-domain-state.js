@@ -63,6 +63,28 @@
       .join("=");
   }
 
+  async function sha256Text(value) {
+    const bytes = new TextEncoder().encode(String(value || ""));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  async function sanitizeDomainData(domain, data) {
+    const rows = Array.isArray(data) ? structuredClone(data) : [];
+    if (domain !== "representatives") return rows;
+    for (const row of rows) {
+      const raw = String(row.nationalId || "").trim();
+      if (raw) {
+        row.nationalIdHash = await sha256Text(raw);
+        row.nationalIdLast4 = raw.slice(-4);
+        delete row.nationalId;
+      }
+    }
+    return rows;
+  }
+
   async function api(path, options = {}) {
     const method = String(options.method || "GET").toUpperCase();
     const csrf = csrfToken();
@@ -99,7 +121,7 @@
         method: "PUT",
         body: {
           expectedVersion: versions.get(domain),
-          data: local,
+          data: await sanitizeDomainData(domain, local),
         },
       });
       versions.set(domain, Number(payload.version || versions.get(domain)));
@@ -118,7 +140,7 @@
       method: "PUT",
       body: {
         expectedVersion: version,
-        data: readLocal(storageKey),
+        data: await sanitizeDomainData(domain, readLocal(storageKey)),
       },
     });
     versions.set(domain, Number(payload.version || version));
