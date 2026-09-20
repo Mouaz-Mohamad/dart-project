@@ -151,7 +151,7 @@
       if (!body.children.length) body.insertAdjacentHTML('beforeend', rowMarkup());
     });
 
-    byId('dashboard-size-chart-form')?.addEventListener('submit', event => {
+    byId('dashboard-size-chart-form')?.addEventListener('submit', async event => {
       event.preventDefault();
       const model = findModel(activeModelId);
       if (!model) return setStatus('The model no longer exists.', 'error');
