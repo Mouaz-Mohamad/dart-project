@@ -1,11 +1,15 @@
-import argon2 from "argon2";
-
 const PASSWORD_OPTIONS = {
-  type: argon2.argon2id,
   memoryCost: 65_536,
   timeCost: 3,
   parallelism: 1,
 } as const;
+
+let argon2Module: Promise<typeof argon2> | undefined;
+
+function loadArgon2(): Promise<typeof argon2> {
+  argon2Module ??= import("argon2").then((module) => module.default);
+  return argon2Module;
+}
 
 export function validatePasswordPolicy(password: string): string[] {
   const problems: string[] = [];
@@ -16,14 +20,17 @@ export function validatePasswordPolicy(password: string): string[] {
   return problems;
 }
 
-export function hashPassword(password: string): Promise<string> {
-  return argon2.hash(password, PASSWORD_OPTIONS);
+export async function hashPassword(password: string): Promise<string> {
+  const argon2 = await loadArgon2();
+  return argon2.hash(password, { ...PASSWORD_OPTIONS, type: argon2.argon2id });
 }
 
 export async function verifyPassword(hash: string, password: string): Promise<boolean> {
   try {
+    const argon2 = await loadArgon2();
     return await argon2.verify(hash, password);
   } catch {
     return false;
   }
 }
+import type argon2 from "argon2";
