@@ -27,6 +27,40 @@ export interface ReviewInput {
   review: string;
 }
 
+export interface ReturnCourierPolicy {
+  customerFee: number;
+  brandFee: number;
+  payer: "Customer" | "Brand" | "None";
+}
+
+function safeMoneySetting(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(100_000, Math.max(0, Math.round(parsed * 100) / 100));
+}
+
+export function resolveReturnCourierPolicy(
+  settings: Record<string, unknown>,
+  requestType: "Refund" | "Exchange",
+  completedExchanges: number,
+): ReturnCourierPolicy {
+  if (requestType === "Refund") {
+    return {
+      customerFee: safeMoneySetting(settings.refundCustomerFee, 100),
+      brandFee: 0,
+      payer: "Customer",
+    };
+  }
+  if (Math.max(0, Number(completedExchanges) || 0) < 1) {
+    return { customerFee: 0, brandFee: 50, payer: "Brand" };
+  }
+  return {
+    customerFee: safeMoneySetting(settings.repeatExchangeCustomerFee, 50),
+    brandFee: 0,
+    payer: "Customer",
+  };
+}
+
 export interface ReturnInput {
   itemCode: string;
   requestType: "Refund" | "Exchange";
@@ -256,6 +290,38 @@ export class CustomerInteractionService {
         }
       }
 
+      const completedExchangeRows = existingReturns.filter((raw) => {
+        const row = raw as JsonRow;
+        return String(row.requestType || "") === "Exchange"
+          && !row.isDeleted
+          && ["Completed","Good","Damaged","Bad"].includes(String(row.status || ""));
+      });
+      const previousExchange = completedExchangeRows
+        .slice()
+        .reverse()
+        .find((row) => {
+          const history = row.exchangeHistoryEntry as JsonRow | undefined;
+          return String(row.replacementItemCode || history?.toItemCode || "") === line.item_code;
+        });
+      const exchangeChainId = String(
+        previousExchange?.exchangeChainId ||
+        previousExchange?.itemCode ||
+        line.item_code,
+      );
+      const completedExchangesBeforeRequest = completedExchangeRows.filter(
+        (row) =>
+          String(row.exchangeChainId || row.itemCode || "") === exchangeChainId,
+      ).length;
+      const settingsResult = await client.query<{ data: Record<string, unknown> }>(
+        "SELECT data FROM site_settings WHERE id='main'",
+      );
+      const settings = settingsResult.rows[0]?.data || {};
+      const courierPolicy = resolveReturnCourierPolicy(
+        settings,
+        input.requestType,
+        completedExchangesBeforeRequest,
+      );
+
       const sequence = await client.query<{ value: string }>(
         "SELECT nextval('dart_return_request_seq')::text AS value",
       );
@@ -292,21 +358,23 @@ export class CustomerInteractionService {
         originalNetAmount: amount,
         refundAmount: input.requestType === "Refund" ? amount : 0,
         exchangeValue: input.requestType === "Exchange" ? amount : 0,
-        exchangeChainId: line.item_code,
-        completedExchangesBeforeRequest: existingReturns.filter((raw) => {
-          const row = raw as JsonRow;
-          return String(row.exchangeChainId || row.itemCode || "") === line.item_code
-            && String(row.requestType || "") === "Exchange"
-            && ["Completed","Good","Damaged","Bad"].includes(String(row.status || ""));
-        }).length,
+        exchangeChainId,
+        completedExchangesBeforeRequest,
         requestedColor: input.requestType === "Exchange" ? line.color : "",
         requestedSize: input.requestType === "Exchange" ? line.size : "",
         replacementCandidateCount,
-        customerCourierFee: input.requestType === "Refund" ? 100 : 0,
-        brandCourierFee: input.requestType === "Exchange" ? 50 : 0,
-        courierFeePayer: input.requestType === "Refund" ? "Customer" : "Brand",
-        customerCourierFeeStatus: input.requestType === "Refund" ? "Due to Representative" : "Not Applicable",
-        brandCourierFeeStatus: input.requestType === "Exchange" ? "Due to Representative" : "Not Applicable",
+        customerCourierFee: courierPolicy.customerFee,
+        brandCourierFee: courierPolicy.brandFee,
+        courierFeePayer: courierPolicy.payer,
+        courierFeePolicySnapshot: {
+          refundCustomerFee: safeMoneySetting(settings.refundCustomerFee, 100),
+          repeatExchangeCustomerFee: safeMoneySetting(settings.repeatExchangeCustomerFee, 50),
+          firstExchangeBrandFee: 50,
+        },
+        customerCourierFeeStatus:
+          courierPolicy.customerFee > 0 ? "Due to Representative" : "Not Applicable",
+        brandCourierFeeStatus:
+          courierPolicy.brandFee > 0 ? "Due to Representative" : "Not Applicable",
         ...input.address,
         isPostDeliveryReturn: true,
         date: now,

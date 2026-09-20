@@ -10,6 +10,8 @@
 - Added magic-byte validation for representative PNG/JPEG/WebP verification uploads before encrypted persistence.
 - Added a cross-layer security regression contract covering private-cache boundaries, API cache exclusion, CSRF/cookie protection and accidental frontend secret embedding.
 - Updated the notification contract to the current policy: Email + Web Push + in-site for routine commerce; WhatsApp only for birthdays and post-delivery review requests.
+- Return fees now come from server-side site settings and are snapshotted on creation; completed exchange chains survive physical Item Code replacement so later exchanges are charged under the correct policy.
+- Added a dedicated authenticated interaction rate limit for customer review and return submissions.
 
 ## Identity/Auth V0.2.1 — 2026-09-20
 

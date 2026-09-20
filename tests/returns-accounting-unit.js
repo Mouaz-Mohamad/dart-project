@@ -25,6 +25,21 @@ assert.deepStrictEqual(
 assert.strictEqual(returns.courierPolicy("Exchange", 0).brandFee, 50, "The first completed exchange is paid by Dart.");
 assert.strictEqual(returns.courierPolicy("Exchange", 1).customerFee, 50, "Later exchanges are paid directly by the customer.");
 
+global.DartSiteSettings = {
+  get: () => ({ refundCustomerFee: 125, repeatExchangeCustomerFee: 75 }),
+};
+assert.strictEqual(
+  returns.courierPolicy("Refund", 0).customerFee,
+  125,
+  "Configured refund fee must flow into new return requests.",
+);
+assert.strictEqual(
+  returns.courierPolicy("Exchange", 2).customerFee,
+  75,
+  "Configured repeat-exchange fee must flow into later exchange requests.",
+);
+delete global.DartSiteSettings;
+
 const chain = [
   { id: "PENDING", requestType: "Exchange", exchangeChainId: "CHAIN-1", status: "Pending Request" },
   { id: "REJECTED", requestType: "Exchange", exchangeChainId: "CHAIN-1", status: "Rejected" },

@@ -17,6 +17,13 @@ const contactLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const customerInteractionLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+});
+
 const contactSchema = z.object({
   fullName: z.string().trim().min(2).max(160),
   email: z.string().trim().email().max(320),
@@ -68,6 +75,7 @@ export function createCustomerInteractionRouter(
 
   router.post(
     "/reviews",
+    customerInteractionLimiter,
     signedIn,
     csrf,
     requireAccountType("customer"),
@@ -81,6 +89,7 @@ export function createCustomerInteractionRouter(
 
   router.post(
     "/returns",
+    customerInteractionLimiter,
     signedIn,
     csrf,
     requireAccountType("customer"),
