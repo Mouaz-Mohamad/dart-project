@@ -389,6 +389,9 @@ export class CommerceService {
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
       );
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
+      );
       await client.query("COMMIT");
 
       return {
