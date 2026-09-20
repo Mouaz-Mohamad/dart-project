@@ -167,6 +167,7 @@
         },
       });
       if (payload.user?.accountType !== "staff") throw new Error("Staff account required");
+      setAdminAccess(payload);
       if (payload.mfaSetupRequired) {
         await beginMfaSetup();
         return;
@@ -219,6 +220,7 @@
   request("/api/v1/me")
     .then(async (payload) => {
       if (payload.user?.accountType !== "staff") throw new Error("Staff account required");
+      setAdminAccess(payload);
       if (payload.session?.mfaRequired && !payload.session?.mfaSatisfied) {
         await beginMfaSetup();
         return;
