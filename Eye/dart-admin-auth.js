@@ -63,6 +63,20 @@
     return payload;
   }
 
+  let permissionSet = new Set();
+
+  function setAdminAccess(payload) {
+    permissionSet = new Set(Array.isArray(payload?.permissions) ? payload.permissions : []);
+    window.DartAdminAccess = Object.freeze({
+      can(permission) {
+        return permissionSet.has(permission);
+      },
+      list() {
+        return [...permissionSet];
+      },
+    });
+  }
+
   window.DartAdminApi = Object.freeze({
     request,
     baseUrl: API_BASE,
