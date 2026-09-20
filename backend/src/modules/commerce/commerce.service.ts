@@ -2732,6 +2732,126 @@ export class CommerceService {
     };
   }
 
+  public async adminOrderStateAction(
+    actorId: string,
+    orderRef: string,
+    action: "archive" | "restore" | "delete",
+    requestId: string,
+  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{
+        id: string;
+        order_code: string;
+        status: string;
+        is_archived: boolean;
+        is_deleted: boolean;
+      }>(
+        `SELECT id::text, order_code, status, is_archived, is_deleted
+           FROM orders
+          WHERE id::text=$1 OR order_code=$1
+          LIMIT 1
+          FOR UPDATE`,
+        [orderRef],
+      );
+      const order = result.rows[0];
+      if (!order) {
+        throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+      }
+
+      const finalStatuses = new Set(["Delivered", "Refused", "Cancelled", "Returned"]);
+      if (action !== "restore" && !finalStatuses.has(order.status)) {
+        throw new AppError(
+          409,
+          "ACTIVE_ORDER_PROTECTED",
+          "Active orders cannot be archived or deleted; finish or cancel the workflow first",
+        );
+      }
+
+      if (action === "archive") {
+        await client.query(
+          `UPDATE orders
+              SET is_archived=true,
+                  is_deleted=false,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [order.id],
+        );
+      } else if (action === "delete") {
+        await client.query(
+          `UPDATE orders
+              SET is_archived=true,
+                  is_deleted=true,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [order.id],
+        );
+      } else {
+        await client.query(
+          `UPDATE orders
+              SET is_archived=false,
+                  is_deleted=false,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [order.id],
+        );
+      }
+
+      const versionUpdate = await client.query<{ version: string }>(
+        `UPDATE domain_state_versions
+            SET version=version+1, updated_at=now()
+          WHERE domain='orders'
+          RETURNING version::text`,
+      );
+
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id,
+           old_values, new_values, metadata
+         ) VALUES ('staff',$1,$2,'orders',$3,$4,$5::jsonb,$6::jsonb,$7::jsonb)`,
+        [
+          actorId,
+          action === "archive"
+            ? "ORDER_ARCHIVED"
+            : action === "delete"
+              ? "ORDER_SOFT_DELETED"
+              : "ORDER_RESTORED",
+          order.id,
+          requestId,
+          JSON.stringify({
+            isArchived: order.is_archived,
+            isDeleted: order.is_deleted,
+          }),
+          JSON.stringify({
+            isArchived: action !== "restore",
+            isDeleted: action === "delete",
+          }),
+          JSON.stringify({
+            orderCode: order.order_code,
+            status: order.status,
+            preservedFinancialHistory: true,
+          }),
+        ],
+      );
+
+      await client.query("COMMIT");
+      const state = await this.adminOrders();
+      return {
+        version: Number(versionUpdate.rows[0]?.version || state.version),
+        orders: state.orders,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async createAdminOrder(
     actorId: string,
     input: {
