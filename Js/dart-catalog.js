@@ -15,6 +15,7 @@
   let remoteStock = null;
   let syncTimer = 0;
   let syncChain = Promise.resolve();
+  let catalogDirty = false;
   // BEGIN One-time reset explicitly requested by the owner. New entries survive reloads.
   if (localStorage.getItem(RESET) !== "1") {
     Object.keys(localStorage)
@@ -89,6 +90,7 @@
       },
     });
     serverVersion = Number(payload.version || serverVersion);
+    catalogDirty = false;
     cacheWrite("dart_models", payload.models || []);
     cacheWrite("dart_items", payload.items || []);
     window.dispatchEvent(new CustomEvent("dart:catalog-synced", { detail: { version: serverVersion } }));
@@ -110,7 +112,10 @@
 
   const write = (key, data) => {
     cacheWrite(key, data);
-    if (["dart_models", "dart_items"].includes(key)) scheduleAdminSync();
+    if (["dart_models", "dart_items"].includes(key)) {
+      catalogDirty = true;
+      scheduleAdminSync();
+    }
   };
 
   async function hydrateCatalog(force = false) {
@@ -579,6 +584,17 @@
     if (!API_BASE || versionCheckBusy || document.hidden) return;
     versionCheckBusy = true;
     try {
+      if (IS_ADMIN && catalogDirty && serverVersion) {
+        try {
+          await syncAdminState();
+        } catch (error) {
+          if (error.status === 409) {
+            await hydrateCatalog(true);
+          } else {
+            throw error;
+          }
+        }
+      }
       const payload = await api("/api/v1/catalog/version");
       const remoteVersion = Number(payload.version || 0);
       if (remoteVersion && serverVersion && remoteVersion !== serverVersion) {
@@ -596,6 +612,10 @@
     versionPollTimer = window.setInterval(checkForServerChanges, 3000);
   }
 
+  window.addEventListener("online", () => {
+    if (IS_ADMIN && catalogDirty) scheduleAdminSync();
+    checkForServerChanges();
+  });
   window.addEventListener("focus", checkForServerChanges);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) checkForServerChanges();
