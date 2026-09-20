@@ -179,6 +179,26 @@ export function createCommerceRouter(
   );
 
   router.post(
+    "/representatives/returns/:returnRef/action",
+    signedIn,
+    csrf,
+    requireAccountType("representative"),
+    async (request, response) => {
+      const returnRef = z.string().trim().min(2).max(120).parse(request.params.returnRef);
+      const body = z.object({
+        action: z.enum(["start", "cancel", "complete"]),
+      }).parse(request.body);
+      response.status(200).json({
+        return: await commerce.representativeReturnAction(
+          request.auth!.userId,
+          returnRef,
+          body.action,
+        ),
+      });
+    },
+  );
+
+  router.post(
     "/orders",
     signedIn,
     csrf,
