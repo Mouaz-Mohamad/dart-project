@@ -13,22 +13,39 @@ productsData.forEach(product => {
     usedProductCodes.add(product.code);
 });
 
-// Only approved dashboard reviews are public. No fabricated launch reviews.
-const reviewsData = (() => {
+// Public reviews are server-authoritative; local data is only a temporary fallback.
+let reviewsData = [];
+
+async function hydratePublicReviews() {
     try {
-        return (JSON.parse(localStorage.getItem('dart_reviews')) || [])
-            .filter(review => review.status === 'Active' && !review.isArchived && !review.isDeleted)
-            .map(review => ({
-                name: review.clientName || 'Dart Customer',
-                date: review.date || '',
-                rating: Number(review.rating) || 0,
-                title: review.title || '',
-                comment: review.review || ''
-            }));
+        const response = await fetch('/api/v1/reviews', {
+            credentials: 'include',
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('Reviews request failed');
+        const payload = await response.json();
+        const incoming = Array.isArray(payload.reviews) ? payload.reviews : [];
+        const changed = JSON.stringify(incoming) !== JSON.stringify(reviewsData);
+        reviewsData = incoming;
+        if (changed && typeof renderReviewsLogic === 'function') renderReviewsLogic();
+        return reviewsData;
     } catch {
-        return [];
+        try {
+            reviewsData = (JSON.parse(localStorage.getItem('dart_reviews')) || [])
+                .filter(review => review.status === 'Active' && !review.isArchived && !review.isDeleted)
+                .map(review => ({
+                    name: review.clientName || 'Dart Customer',
+                    date: review.date || '',
+                    rating: Number(review.rating) || 0,
+                    title: review.title || '',
+                    comment: review.review || ''
+                }));
+        } catch {
+            reviewsData = [];
+        }
+        return reviewsData;
     }
-})();
+}
 
 let cartData = JSON.parse(localStorage.getItem('dart_cart')) || [];
 let appliedDiscountRate = 0;
@@ -1940,6 +1957,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderFilterButtons();
     initProductFilterToggle();
     renderReviewsLogic();
+    hydratePublicReviews();
     initCartAndCheckoutEvents();
     initAddressMap();
     window.DartAddress?.initReturnRequest?.();
@@ -2324,3 +2342,8 @@ function nextScene() {
 // ==========================================
 
 if (typingContainer && scenes.length) typeScene();
+
+
+// Keep public reviews current without a page reload.
+window.setInterval(hydratePublicReviews, 10000);
+window.addEventListener('focus', hydratePublicReviews);
