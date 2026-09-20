@@ -1,7 +1,7 @@
 /* ========================================================================== */
-/* DART SETTINGS — guarded reset for dashboard-owned browser data             */
-/* BACKEND: replace resetAllDartData with an authenticated admin endpoint.     */
-/* The server must require recent re-authentication and keep a protected log.  */
+/* DART SETTINGS — owner-only server-authoritative business-data reset         */
+/* PostgreSQL is reset first; browser caches are cleared only after commit.     */
+/* Protected Staff/Owner access and append-only audit history are preserved.    */
 /* ========================================================================== */
 (function (root) {
   "use strict";
@@ -148,13 +148,30 @@
     errorBox.hidden = true;
 
     try {
+      if (!root.DartAdminApi?.request) {
+        throw new Error("Secure admin API is unavailable.");
+      }
+      const result = await root.DartAdminApi.request(
+        "/api/v1/admin/platform/reset-business-data",
+        {
+          method: "POST",
+          body: {
+            confirmation: CONFIRMATION_PHRASE,
+            understandPermanentDeletion: true,
+          },
+        },
+      );
+
+      // PostgreSQL committed successfully; browser state can now be discarded safely.
       await clearCatalogMedia();
       clearDartStorage(root.localStorage);
       clearDartStorage(root.sessionStorage);
+
       modal.classList.remove("active");
       modal.style.display = "none";
       modal.setAttribute("aria-hidden", "true");
-      statusBox.textContent = "تم مسح جميع بيانات Dart بنجاح. سيتم الآن بدء النظام من الصفر.";
+      statusBox.textContent =
+        `تم مسح بيانات نشاط Dart من قاعدة البيانات بنجاح (${result.resetAt || "now"}). تم الاحتفاظ بحساب Owner/Staff وسجل Audit.`;
       statusBox.hidden = false;
       root.setTimeout(() => root.location.reload(), 900);
     } catch (error) {
@@ -164,7 +181,10 @@
       cancelButton.disabled = false;
       closeButton.disabled = false;
       syncConfirmationState();
-      showResetError("تعذر إكمال المسح بأمان. لم يتم حذف بيانات النظام المحلية. حاول مرة أخرى.");
+      showResetError(
+        error.message ||
+          "تعذر إكمال المسح على قاعدة البيانات. لم يتم تنظيف Cache المتصفح.",
+      );
     }
   }
 
