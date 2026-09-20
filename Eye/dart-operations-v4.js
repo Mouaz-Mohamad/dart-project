@@ -174,35 +174,122 @@
 
     window.loadOrderItemsForEdit = codes => { selected = [...(codes || [])]; populateLists(); renderSelected(); };
 
-    orderForm.addEventListener('submit', event => {
+    orderForm.addEventListener('submit', async event => {
       event.preventDefault();
       if (!selected.length) return alert('Add at least one physical item.');
+
       const address = initDashboardAddress()?.validate();
-      if (!address?.ok) return alert(address?.message || 'Complete and locate the delivery address.');
+      if (!address?.ok) {
+        return alert(address?.message || 'Complete and locate the delivery address.');
+      }
+
       const prices = calculate();
       const editId = value('modal-order-edit-id');
       const existing = ordersData.find(order => String(order.id) === String(editId));
       const customerId = value('clientId') || '-';
       const customer = dartFindCustomerByCode(customerId);
-      if (customer && dartIsArchived(customer)) return alert('An archived customer cannot be used.');
+      if (customer && dartIsArchived(customer)) {
+        return alert('An archived customer cannot be used.');
+      }
+
       let amountPaid = Math.max(0, Number(value('amountPaid')) || 0);
       let paymentStatus = value('paymentStatus') || 'Unpaid';
       if (paymentStatus === 'Paid') amountPaid = prices.finalAmount;
       if (paymentStatus === 'Unpaid') amountPaid = 0;
-      if (amountPaid > prices.finalAmount) return alert('Amount paid cannot exceed the final order total.');
-      const payload = {
-        clientId:customerId, clientName:value('clientName'), phone1:value('phone1'), phone2:value('phone2') || '-', email:value('email') || '-',
-        paymentMethod:value('paymentMethod') || 'Cash on Delivery', paymentStatus, amountPaid,
-        amountRefunded:Math.max(0, Number(value('amountRefunded')) || 0), orderSource:value('orderSource') || 'Manual',
-        deliveryNotes:value('deliveryNotes'), items:[...selected], totalProducts:selected.length,
-        priceSnapshot:prices.snapshot, totalPrice:prices.subtotal, discount:prices.discountPercent,
-        orderLevelDiscountAmount:prices.discountAmount, finalAmount:prices.finalAmount,
-        reasonDeduction:prices.discountPercent ? 'Order discount' : '-', country:value('orderCountry'), governorate:value('governorate'),
-        area:value('orderArea'), street:value('orderStreetName'), building:value('orderBuildingNumber'), floor:value('orderFloor'),
-        latitude:value('orderLatitude'), longitude:value('orderLongitude'), fullAddress:value('orderFullAddress') || value('orderAddress'),
-        addressSource:address.source || orderForm.dataset.dartAddressSource || 'map'
+      if (amountPaid > prices.finalAmount) {
+        return alert('Amount paid cannot exceed the final order total.');
+      }
+
+      const apiPayload = {
+        ...(customerId && customerId !== '-' ? { clientId: customerId } : {}),
+        clientName: value('clientName'),
+        phone1: value('phone1'),
+        ...(value('phone2') ? { phone2: value('phone2') } : {}),
+        ...(value('email') && value('email') !== '-' ? { email: value('email') } : {}),
+        paymentMethod: value('paymentMethod') || 'Cash on Delivery',
+        paymentStatus,
+        amountPaid,
+        amountRefunded: Math.max(0, Number(value('amountRefunded')) || 0),
+        orderSource: value('orderSource') || 'Manual',
+        deliveryNotes: value('deliveryNotes'),
+        itemCodes: [...selected],
+        discountPercent: Math.max(0, Math.min(100, Number(prices.discountPercent) || 0)),
+        country: value('orderCountry') || 'Egypt',
+        governorate: value('governorate'),
+        area: value('orderArea'),
+        street: value('orderStreetName'),
+        building: value('orderBuildingNumber'),
+        floor: value('orderFloor'),
+        latitude: value('orderLatitude'),
+        longitude: value('orderLongitude'),
+        fullAddress: value('orderFullAddress') || value('orderAddress'),
       };
-      if (payload.amountRefunded > prices.finalAmount) return alert('Refund cannot exceed the final order total.');
+
+      if (apiPayload.amountRefunded > prices.finalAmount) {
+        return alert('Refund cannot exceed the final order total.');
+      }
+
+      if (window.DartOrdersApi?.createManual && window.DartOrdersApi?.updateManual) {
+        try {
+          if (existing) {
+            await window.DartOrdersApi.updateManual(
+              existing.orderId || existing.id,
+              apiPayload,
+            );
+          } else {
+            await window.DartOrdersApi.createManual(apiPayload);
+          }
+
+          await Promise.allSettled([
+            window.DartOrdersApi.hydrate?.(true),
+            window.DartCatalog?.hydrate?.(true),
+            window.DartDomainState?.hydrateAudit?.(),
+          ]);
+
+          dartRefreshAll();
+          closeModal(field('orderModal'));
+          orderForm.reset();
+          selected = [];
+          resetOrderAddress();
+          renderSelected();
+        } catch (error) {
+          alert(error.message || 'Order could not be saved to the database.');
+        }
+        return;
+      }
+
+      const payload = {
+        clientId: customerId,
+        clientName: value('clientName'),
+        phone1: value('phone1'),
+        phone2: value('phone2') || '-',
+        email: value('email') || '-',
+        paymentMethod: apiPayload.paymentMethod,
+        paymentStatus,
+        amountPaid,
+        amountRefunded: apiPayload.amountRefunded,
+        orderSource: apiPayload.orderSource,
+        deliveryNotes: apiPayload.deliveryNotes,
+        items: [...selected],
+        totalProducts: selected.length,
+        priceSnapshot: prices.snapshot,
+        totalPrice: prices.subtotal,
+        discount: prices.discountPercent,
+        orderLevelDiscountAmount: prices.discountAmount,
+        finalAmount: prices.finalAmount,
+        reasonDeduction: prices.discountPercent ? 'Order discount' : '-',
+        country: apiPayload.country,
+        governorate: apiPayload.governorate,
+        area: apiPayload.area,
+        street: apiPayload.street,
+        building: apiPayload.building,
+        floor: apiPayload.floor,
+        latitude: apiPayload.latitude,
+        longitude: apiPayload.longitude,
+        fullAddress: apiPayload.fullAddress,
+        addressSource: address.source || orderForm.dataset.dartAddressSource || 'map',
+      };
+
       if (existing) {
         const oldCodes = [...(existing.items || [])];
         const newlySelected = selected.filter(code => !oldCodes.includes(code));
@@ -210,16 +297,28 @@
         if (!reservation.ok) return alert(reservation.message);
         oldCodes.filter(code => !selected.includes(code)).forEach(code => {
           const item = dartFindItemByCode(code);
-          if (item && item.status === 'Processing/Held') { item.status = 'In stock'; item.orderId = ''; }
+          if (item && item.status === 'Processing/Held') {
+            item.status = 'In stock';
+            item.orderId = '';
+          }
         });
-        const old = {...existing}; Object.assign(existing, payload, {updatedAt:now()});
+        const old = {...existing};
+        Object.assign(existing, payload, {updatedAt: now()});
         dartAudit('EDIT', 'orders', existing.id, old, payload, 'Order, price and delivery address updated');
         dartLogOrder(existing, 'ORDER_EDITED', existing.status, existing.status, {notes:'Order, final price or address edited'});
       } else {
         const order = {
-          id:uid('ODB'), orderId:dartNextBusinessCode('K', ordersData, 'orderId'),
-          date:new Date().toLocaleDateString('en-GB'), time:new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-          status:'New', createdAt:now(), orderCreatedAt:now(), activityLog:[], isArchived:false, isDeleted:false, isChecked:false,
+          id:uid('ODB'),
+          orderId:dartNextBusinessCode('K', ordersData, 'orderId'),
+          date:new Date().toLocaleDateString('en-GB'),
+          time:new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+          status:'New',
+          createdAt:now(),
+          orderCreatedAt:now(),
+          activityLog:[],
+          isArchived:false,
+          isDeleted:false,
+          isChecked:false,
           ...payload
         };
         const reservation = dartReserveItems(order, selected);
@@ -229,8 +328,15 @@
         dartAudit('CREATE', 'orders', order.id, {}, order);
         dartNotify('new_order', `New order ${order.orderId}`, `${order.clientName} — ${selected.length} item(s)`, 'orders', order.id);
       }
-      dartSaveAll(); dartRefreshAll(); closeModal(field('orderModal'));
-      orderForm.reset(); selected = []; resetOrderAddress(); renderSelected();
+
+      dartSaveAll();
+      dartRefreshAll();
+      closeModal(field('orderModal'));
+      orderForm.reset();
+      selected = [];
+      resetOrderAddress();
+      renderSelected();
+
     });
   }
 
