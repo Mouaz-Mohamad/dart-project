@@ -8,6 +8,7 @@
   const API_BASE = String(root.DART_API_BASE_URL || root.location?.origin || "").replace(/\/$/, "");
   const IS_ADMIN = /\/Eye\//i.test(root.location?.pathname || "");
   const CSRF_STORAGE_KEY = "dart_csrf_token";
+  const LEGACY_MIGRATION_KEY = "dart_site_settings_server_migration_v1";
   let serverVersion = 0;
   let cachedSettings = null;
   let syncTimer = 0;
@@ -183,10 +184,24 @@
       : {};
     const serverEmpty = Object.keys(serverSettings).length === 0;
     const localHasData = Object.keys(previousLocal).length > 0;
+    const migrationDone =
+      root.localStorage?.getItem(LEGACY_MIGRATION_KEY) === "1";
 
-    if (IS_ADMIN && !force && serverEmpty && localHasData) {
+    if (
+      IS_ADMIN &&
+      !force &&
+      !migrationDone &&
+      serverVersion === 1 &&
+      serverEmpty &&
+      localHasData
+    ) {
       cachedSettings = merge(previousLocal);
-      return await sync();
+      const migrated = await sync();
+      root.localStorage?.setItem(LEGACY_MIGRATION_KEY, "1");
+      return migrated;
+    }
+    if (IS_ADMIN && !force && !migrationDone) {
+      root.localStorage?.setItem(LEGACY_MIGRATION_KEY, "1");
     }
     return setCache(serverSettings);
   }
