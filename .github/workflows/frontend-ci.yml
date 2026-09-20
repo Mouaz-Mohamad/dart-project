@@ -65,7 +65,7 @@ jobs:
         with:
           node-version: "24"
       - name: Cache Playwright Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-1.55.0-chromium-v1
