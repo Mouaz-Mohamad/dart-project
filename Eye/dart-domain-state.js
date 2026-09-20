@@ -3,6 +3,7 @@
 
   const API_BASE = String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
   const CSRF_STORAGE_KEY = "dart_csrf_token";
+  const LEGACY_MIGRATION_PREFIX = "dart_domain_server_migration_v1:";
   const DOMAIN_BY_STORAGE = Object.freeze({
     dart_customers: "customers",
     dart_returns: "returns",
@@ -117,7 +118,14 @@
     let payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`);
     versions.set(domain, Number(payload.version || 1));
 
-    if (!force && (payload.data || []).length === 0 && local.length > 0) {
+    const migrationKey = `${LEGACY_MIGRATION_PREFIX}${domain}`;
+    const migrationDone = localStorage.getItem(migrationKey) === "1";
+    if (
+      !force &&
+      !migrationDone &&
+      (payload.data || []).length === 0 &&
+      local.length > 0
+    ) {
       payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`, {
         method: "PUT",
         body: {
@@ -126,6 +134,9 @@
         },
       });
       versions.set(domain, Number(payload.version || versions.get(domain)));
+    }
+    if (!force && !migrationDone) {
+      localStorage.setItem(migrationKey, "1");
     }
 
     dirty.delete(domain);
