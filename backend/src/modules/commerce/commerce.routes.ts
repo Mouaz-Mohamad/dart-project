@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
+import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import {
