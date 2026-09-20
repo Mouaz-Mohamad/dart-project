@@ -1882,6 +1882,397 @@ export class CommerceService {
     }
   }
 
+  public async adminManualReturn(
+    actorId: string,
+    input: {
+      existingReturnId?: string | undefined;
+      itemCode: string;
+      reason: string;
+      condition: "Good" | "Bad";
+      refundAmount: number;
+      clientName?: string | undefined;
+      phone1?: string | undefined;
+      phone2?: string | undefined;
+      email?: string | undefined;
+    },
+    requestId: string,
+  ): Promise<Record<string, unknown>> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const itemResult = await client.query<{
+        item_id: string;
+        item_code: string;
+        model_id: string;
+        color: string;
+        size: string;
+        item_status: string;
+        order_db_id: string;
+        order_code: string;
+        customer_user_id: string;
+        final_minor: string;
+        amount_refunded_minor: string;
+        payment_status: string;
+        promotion: Record<string, unknown> | null;
+        contact_snapshot: Record<string, unknown>;
+        client_code: string | null;
+        line_final_minor: string;
+      }>(
+        `SELECT i.id AS item_id, i.item_code, i.model_id, i.color, i.size,
+                i.status AS item_status,
+                o.id::text AS order_db_id, o.order_code, o.customer_user_id::text,
+                o.final_minor::text, o.amount_refunded_minor::text,
+                o.payment_status, o.promotion, o.contact_snapshot,
+                c.client_code, oi.final_unit_minor::text AS line_final_minor
+           FROM inventory_items i
+           JOIN order_items oi ON oi.inventory_item_id=i.id
+           JOIN orders o ON o.id=oi.order_id
+           LEFT JOIN customers c ON c.user_id=o.customer_user_id
+          WHERE lower(i.item_code)=lower($1)
+            AND o.status='Delivered'
+            AND NOT o.is_deleted
+          ORDER BY o.delivered_at DESC NULLS LAST, o.created_at DESC
+          LIMIT 1
+          FOR UPDATE OF i, o`,
+        [input.itemCode.trim()],
+      );
+      const item = itemResult.rows[0];
+      if (!item) {
+        throw new AppError(
+          409,
+          "MANUAL_RETURN_ITEM_INVALID",
+          "Manual returns require an item from a delivered order",
+        );
+      }
+
+      const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      );
+      const returnsState = returnsStateResult.rows[0];
+      const returnsRows = Array.isArray(returnsState?.data)
+        ? returnsState!.data as Record<string, unknown>[]
+        : [];
+
+      const existingId = String(input.existingReturnId || "").trim();
+      const existing = existingId
+        ? returnsRows.find(
+            (row) =>
+              String(row.id || "") === existingId ||
+              String(row.returnId || "") === existingId,
+          )
+        : null;
+
+      if (existing && !existing.manualAdmin) {
+        throw new AppError(
+          409,
+          "MANUAL_RETURN_EDIT_INVALID",
+          "Customer return requests must be managed through the return workflow",
+        );
+      }
+
+      const duplicate = returnsRows.find(
+        (row) =>
+          row !== existing &&
+          String(row.itemCode || "").toLowerCase() === item.item_code.toLowerCase() &&
+          !row.isDeleted &&
+          !["Rejected", "Closed"].includes(String(row.status || "")),
+      );
+      if (duplicate) {
+        throw new AppError(409, "RETURN_ALREADY_EXISTS", "An active return already exists for this item");
+      }
+
+      const previousRefundMinor = existing
+        ? Math.max(0, Math.round(Number(existing.refundAmount || 0) * 100))
+        : 0;
+      const requestedRefundMinor = Math.max(
+        0,
+        Math.round(Number(input.refundAmount || 0) * 100),
+      );
+      const currentRefundedMinor = Number(item.amount_refunded_minor || 0);
+      const baseWithoutThisReturn = Math.max(0, currentRefundedMinor - previousRefundMinor);
+      const maxRemainingMinor = Math.max(0, Number(item.final_minor || 0) - baseWithoutThisReturn);
+      if (requestedRefundMinor > maxRemainingMinor) {
+        throw new AppError(
+          422,
+          "REFUND_AMOUNT_TOO_HIGH",
+          `Maximum remaining refundable amount is ${(maxRemainingMinor / 100).toFixed(2)} EGP`,
+        );
+      }
+
+      if (
+        existing &&
+        String(existing.condition || existing.inspectionStatus || "") &&
+        String(existing.condition || existing.inspectionStatus) !==
+          (input.condition === "Bad" ? "Damaged" : "Good")
+      ) {
+        throw new AppError(
+          409,
+          "MANUAL_RETURN_CONDITION_IMMUTABLE",
+          "Use the inspection workflow instead of changing a saved manual return condition",
+        );
+      }
+
+      let returnId = String(existing?.returnId || "");
+      if (!returnId) {
+        const seq = await client.query<{ value: string }>(
+          "SELECT nextval('dart_return_request_seq')::text AS value",
+        );
+        returnId = `R-${seq.rows[0]!.value}`;
+      }
+      const recordId = String(existing?.id || randomUUID());
+      const now = new Date().toISOString();
+      const condition = input.condition === "Bad" ? "Damaged" : "Good";
+      const contact = item.contact_snapshot || {};
+
+      const record: Record<string, unknown> = existing || {};
+      Object.assign(record, {
+        id: recordId,
+        returnId,
+        manualAdmin: true,
+        requestType: "Refund",
+        clientName: String(input.clientName || contact.name || ""),
+        clientId: String(item.client_code || ""),
+        itemCode: item.item_code,
+        modelId: item.model_id,
+        color: item.color,
+        size: item.size,
+        phone1: String(input.phone1 || contact.phone1 || ""),
+        phone2: String(input.phone2 || contact.phone2 || "-"),
+        email: String(input.email || contact.email || ""),
+        reason: String(input.reason || "Other"),
+        condition,
+        inspectionStatus: condition,
+        status: condition,
+        orderId: item.order_code,
+        isPostDeliveryReturn: true,
+        refundAmount: requestedRefundMinor / 100,
+        originalNetAmount: Number(item.line_final_minor || 0) / 100,
+        financialCompletionApplied: requestedRefundMinor > 0,
+        inspectedAt: now,
+        completedAt: now,
+        updatedAt: now,
+        isArchived: Boolean(existing?.isArchived),
+        isDeleted: false,
+        isChecked: false,
+        createdAt: String(existing?.createdAt || now),
+      });
+
+      if (!existing) {
+        returnsRows.unshift(record);
+      }
+
+      if (condition === "Good") {
+        await client.query(
+          `UPDATE inventory_items
+              SET status='In stock',
+                  order_id=NULL,
+                  purchase_date=NULL,
+                  return_request_id=NULL,
+                  cart_reservation_id=NULL,
+                  reservation_until=NULL,
+                  active=true,
+                  is_archived=false,
+                  is_deleted=false,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [item.item_id],
+        );
+      } else {
+        await client.query(
+          `UPDATE inventory_items
+              SET status='Damaged',
+                  order_id=NULL,
+                  purchase_date=NULL,
+                  return_request_id=$2,
+                  cart_reservation_id=NULL,
+                  reservation_until=NULL,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [item.item_id, recordId],
+        );
+
+        const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
+          "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
+        );
+        const damageState = damageStateResult.rows[0];
+        const damageRows = Array.isArray(damageState?.data)
+          ? damageState!.data as Record<string, unknown>[]
+          : [];
+        const damage = damageRows.find(
+          (row) =>
+            String(row.returnId || "") === returnId ||
+            String(row.itemCode || "").toLowerCase() === item.item_code.toLowerCase(),
+        );
+        const damageRecord = damage || {};
+        Object.assign(damageRecord, {
+          id: String(damage?.id || randomUUID()),
+          damageId: String(damage?.damageId || `DMG-${Date.now()}`),
+          itemCode: item.item_code,
+          modelId: item.model_id,
+          color: item.color,
+          size: item.size,
+          status: "Damaged",
+          reason: String(input.reason || "Manual return - Damaged"),
+          date: now,
+          createdAt: String(damage?.createdAt || now),
+          updatedAt: now,
+          inspectedAt: now,
+          orderId: item.order_code,
+          clientId: String(item.client_code || ""),
+          clientName: String(input.clientName || contact.name || ""),
+          returnId,
+          requestType: "Refund",
+          isArchived: false,
+          isDeleted: false,
+          isChecked: false,
+        });
+        if (!damage) damageRows.unshift(damageRecord);
+
+        const damageVersion = Number(damageState?.version || 1);
+        const damageUpdate = await client.query(
+          `UPDATE dashboard_domain_state
+              SET data=$2::jsonb,
+                  version=version+1,
+                  updated_by=$3,
+                  updated_at=now()
+            WHERE domain='damage' AND version=$4`,
+          ["damage", JSON.stringify(damageRows), actorId, damageVersion],
+        );
+        if (!damageUpdate.rowCount) {
+          throw new AppError(
+            409,
+            "DAMAGE_VERSION_CONFLICT",
+            "Damage records changed while the manual return was being saved",
+          );
+        }
+      }
+
+      const newRefundedMinor = baseWithoutThisReturn + requestedRefundMinor;
+      await client.query(
+        `UPDATE orders
+            SET amount_refunded_minor=$2,
+                payment_status=CASE
+                  WHEN $2 >= final_minor AND $2 > 0 THEN 'Refunded'
+                  WHEN $2 > 0 THEN 'Partially Refunded'
+                  WHEN lower(payment_method) LIKE '%cash%' THEN 'Paid'
+                  ELSE payment_status
+                END,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [item.order_db_id, newRefundedMinor],
+      );
+
+      if (
+        item.promotion?.type === "Dart Card" &&
+        item.promotion?.cardId &&
+        !record.dartCardUsageReversed
+      ) {
+        const cardStateResult = await client.query<{ version: string; data: unknown[] }>(
+          "SELECT version::text, data FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
+        );
+        const cardState = cardStateResult.rows[0];
+        const cards = Array.isArray(cardState?.data)
+          ? cardState!.data as Record<string, unknown>[]
+          : [];
+        const card = cards.find(
+          (row) =>
+            String(row.cardId || row.id || "") === String(item.promotion?.cardId),
+        );
+        if (card) {
+          card.purchasedItems = String(
+            Math.max(0, Number(card.purchasedItems || 0) - 1),
+          );
+          card.requestedProducts = (
+            Array.isArray(card.requestedProducts) ? card.requestedProducts : []
+          ).filter((code) => String(code) !== item.item_code);
+          const limit = Number(card.itemLimit || card.purchasedLimit || 10);
+          const expiry = flexibleDateExpiry(card.expDate);
+          if (
+            Number(card.purchasedItems || 0) < limit &&
+            (!expiry || expiry >= Date.now())
+          ) {
+            card.status = "Active";
+          }
+          record.dartCardUsageReversed = true;
+          await client.query(
+            `UPDATE dashboard_domain_state
+                SET data=$2::jsonb,
+                    version=version+1,
+                    updated_at=now()
+              WHERE domain='cards' AND version=$3`,
+            ["cards", JSON.stringify(cards), Number(cardState?.version || 1)],
+          );
+        }
+      }
+
+      const returnsVersion = Number(returnsState?.version || 1);
+      const returnsUpdate = await client.query(
+        `UPDATE dashboard_domain_state
+            SET data=$2::jsonb,
+                version=version+1,
+                updated_by=$3,
+                updated_at=now()
+          WHERE domain='returns' AND version=$4`,
+        ["returns", JSON.stringify(returnsRows), actorId, returnsVersion],
+      );
+      if (!returnsUpdate.rowCount) {
+        throw new AppError(
+          409,
+          "RETURN_VERSION_CONFLICT",
+          "Return records changed while the manual return was being saved",
+        );
+      }
+
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+      );
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id,
+           old_values, new_values, metadata
+         ) VALUES ('staff',$1,$2,'returns',$3,$4,$5::jsonb,$6::jsonb,$7::jsonb)`,
+        [
+          actorId,
+          existing ? "MANUAL_RETURN_UPDATED" : "MANUAL_RETURN_CREATED",
+          recordId,
+          requestId,
+          JSON.stringify(
+            existing
+              ? {
+                  condition: existing.condition || existing.inspectionStatus || "",
+                  refundAmount: Number(existing.refundAmount || 0),
+                }
+              : {},
+          ),
+          JSON.stringify({
+            condition,
+            refundAmount: requestedRefundMinor / 100,
+          }),
+          JSON.stringify({
+            returnId,
+            orderId: item.order_code,
+            itemCode: item.item_code,
+          }),
+        ],
+      );
+
+      await client.query("COMMIT");
+      return record;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async adminReturnAction(
     actorId: string,
     returnRef: string,
