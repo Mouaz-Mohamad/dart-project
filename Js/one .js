@@ -494,19 +494,14 @@ function setProductOptionStatus(message, state = '') {
 }
 
 function getStoredProductSizeChart(product) {
-    try {
-        const models = JSON.parse(localStorage.getItem('dart_models') || '[]');
-        const model = models.find(row => String(row.modelId) === String(product.code));
-        const source = model?.sizeChart;
-        const rows = Array.isArray(source) ? source : Array.isArray(source?.rows) ? source.rows : [];
-        return {
-            model,
-            unit: Array.isArray(source) ? 'cm' : String(source?.unit || 'cm'),
-            rows: rows.filter(row => row && String(row.size || '').trim())
-        };
-    } catch {
-        return { model: null, unit: 'cm', rows: [] };
-    }
+    const model = DartCatalog.model(product.code);
+    const source = model?.sizeChart;
+    const rows = Array.isArray(source) ? source : Array.isArray(source?.rows) ? source.rows : [];
+    return {
+        model,
+        unit: Array.isArray(source) ? 'cm' : String(source?.unit || 'cm'),
+        rows: rows.filter(row => row && String(row.size || '').trim())
+    };
 }
 
 function renderProductSizeChart(product) {
