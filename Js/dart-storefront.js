@@ -184,5 +184,6 @@
   window.DartStorefront = { cards, open, onSlide, refresh };
   window.addEventListener("dart:images-ready", refresh);
   window.addEventListener("dart:data-changed", refresh);
+  window.addEventListener("dart:catalog-hydrated", refresh);
 })();
 /* END STOREFRONT */
