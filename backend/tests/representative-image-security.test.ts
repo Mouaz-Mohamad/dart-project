@@ -46,7 +46,7 @@ describe("representative verification image security", () => {
     const fakeWebp = `data:image/webp;base64,${Buffer.from("not-an-image").toString("base64")}`;
     await expect(application(fakeWebp)).rejects.toMatchObject({
       code: "REPRESENTATIVE_IMAGE_SIGNATURE_MISMATCH",
-      status: 422,
+      statusCode: 422,
     });
   });
 
@@ -58,7 +58,7 @@ describe("representative verification image security", () => {
     const disguised = `data:image/webp;base64,${pngBytes.toString("base64")}`;
     await expect(application(disguised)).rejects.toMatchObject({
       code: "REPRESENTATIVE_IMAGE_SIGNATURE_MISMATCH",
-      status: 422,
+      statusCode: 422,
     });
   });
 });

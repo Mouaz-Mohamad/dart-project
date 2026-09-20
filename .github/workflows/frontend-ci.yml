@@ -48,6 +48,7 @@ jobs:
         run: |
           node tests/database-authoritative-storage.cjs
           node tests/auth-contract.js
+          node tests/security-boundaries.cjs
           node tests/performance-budget.cjs
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js

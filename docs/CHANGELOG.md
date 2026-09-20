@@ -8,6 +8,8 @@
 - Removed multi-megabyte logo assets from runtime favicon, representative and dashboard surfaces where the existing 192px asset is appropriate.
 - Renamed the stale cart persistence helper so its name reflects server reservation persistence rather than LocalStorage.
 - Added magic-byte validation for representative PNG/JPEG/WebP verification uploads before encrypted persistence.
+- Added a cross-layer security regression contract covering private-cache boundaries, API cache exclusion, CSRF/cookie protection and accidental frontend secret embedding.
+- Updated the notification contract to the current policy: Email + Web Push + in-site for routine commerce; WhatsApp only for birthdays and post-delivery review requests.
 
 ## Identity/Auth V0.2.1 — 2026-09-20
 

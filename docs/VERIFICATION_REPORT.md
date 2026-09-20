@@ -5,7 +5,9 @@
 - Database integration coverage now verifies every migration filename is recorded, production-critical tables exist, audit rows are append-only, and outbox/idempotency deduplication is enforced by PostgreSQL.
 - Frontend CI now includes Chromium smoke coverage plus permanent database-authority and performance-budget checks.
 - Runtime favicons and dashboard/representative logos no longer download multi-megabyte logo sources where the existing 192px asset is sufficient; product cards lazy-load and decode images asynchronously.
-- Representative verification uploads now verify PNG/JPEG/WebP magic bytes against the declared MIME type before encryption or database persistence.
+- Representative verification uploads now verify PNG/JPEG/WebP magic bytes against the declared MIME type before encryption or database persistence. A dedicated regression test rejects arbitrary bytes and MIME-disguised image signatures.
+
+- Cross-layer security contract coverage now prevents Service Worker API caching, accidental caching of private account/dashboard pages, browser embedding of server secret configuration, and removal of dashboard CSRF/cookie boundaries.
 
 # V9 verification — 2026-09-11
 

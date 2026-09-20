@@ -1,6 +1,6 @@
 # Dart backend foundation and Identity/Auth
 
-This folder is the server-authoritative Node.js/Express/TypeScript backend. The platform foundation and Identity/Auth slice are implemented. The existing Vanilla storefront, representative portal and Dart Eye login gate use `/api/v1` when `window.DART_API_BASE_URL` is configured; unrelated business flows remain on their documented prototype adapters until their own phase is approved.
+This folder is the server-authoritative Node.js/Express/TypeScript backend. Identity/Auth, catalogue, inventory, cart reservations, orders, customer commerce, representative workflows, site settings, finance summaries, dashboard domain persistence and transactional outbox delivery are implemented behind `/api/v1`. The Vanilla storefront, representative portal and Dart Eye consume these server contracts while keeping only transient browser UI/session state locally.
 
 ## Local setup
 
@@ -34,7 +34,7 @@ The command refuses to create a second Owner. Remove `DART_OWNER_PASSWORD` from 
 - Passwords use Argon2id and a 12-character policy. Staff MFA secrets use AES-256-GCM with `MFA_ENCRYPTION_KEY`.
 - Server sessions are hashed, rotating, revocable per device, and transported in HttpOnly cookies. State-changing authenticated requests require the matching CSRF header.
 - Customer, Staff and Representative are separate account realms, so the same verified person can use the same contact detail in customer and representative accounts without weakening uniqueness inside either realm.
-- Representative registration intentionally returns `503` until encrypted private document storage, MIME inspection and malware scanning are configured. It never saves an incomplete application.
+- Representative registration validates JPG/PNG/WebP magic bytes and stores the accepted documents encrypted in PostgreSQL. Metadata stripping, malware scanning and the human approval policy remain required before unattended production approval.
 
 ## Development seed
 
@@ -49,7 +49,7 @@ Applied migration checksums are recorded in `dart_schema_migrations`. Editing an
 
 ## Current scope and boundaries
 
-Identity/Auth, sessions, basic deny-by-default roles, Owner TOTP, customer Email OTP, reset requests and representative approval boundaries are present. Granular employee permission editing, catalogue, inventory, orders, notifications delivery workers and representative private-document storage remain separate approved increments.
+Identity/Auth, sessions, deny-by-default permissions, Owner TOTP, customer Email OTP, representative encrypted documents, catalogue/inventory, orders, finance and database-backed dashboard state are present. The main remaining architecture hardening is to normalize high-value JSONB dashboard domains (especially returns/damage/finance operations), complete external notification providers, and keep expanding real-browser/load/restore verification.
 
 
 ## Transactional outbox retries on Vercel Hobby

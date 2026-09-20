@@ -10,15 +10,15 @@ The production frontend is database-authoritative through `/api/v1`; PostgreSQL 
 - Migration `0001_platform_foundation.sql` adds append-only `audit_logs`, transactional `outbox_events`, and hashed `idempotency_keys` storage.
 - Migration `0002_identity_auth.sql` and the Identity/Auth module implement separate Customer, Staff and Representative realms, Argon2id passwords, customer Email OTP, rotating/revocable server sessions, CSRF enforcement, reset requests, protected Owner bootstrap and TOTP MFA.
 - The existing customer login/registration/profile and representative login adapters use these endpoints when `window.DART_API_BASE_URL` is configured. Dart Eye has a Staff/Owner login and first-login Authenticator gate.
-- Representative registration remains deliberately unavailable in API mode until encrypted private document storage, content inspection and malware scanning are configured. The endpoint returns `503` and saves nothing rather than dropping the existing identity-document requirement.
-- Catalogue, inventory, order and messaging delivery endpoints below remain contracts until their individual implementation slices are approved.
+- Representative registration now stores verification documents encrypted in PostgreSQL and validates the declared JPG/PNG/WebP type against file magic bytes before persistence. Automated approval remains prohibited until metadata stripping, malware scanning and a human identity-review policy are configured.
+- Catalogue, inventory, cart reservation, orders, customer commerce, representative workflow, site settings, finance summaries and transactional outbox delivery are implemented under `/api/v1`. Remaining sections below distinguish implemented behavior from future hardening.
 - Production must never fall back silently to `localStorage` when the API is unavailable.
 
 ## Approved notification channels
 
 - Routine `ORDER_PLACED`, `ORDER_OUT_FOR_DELIVERY`, and `ORDER_DELIVERED` notifications use Email, Web Push, and in-site notifications.
-- WhatsApp is limited to interactive order confirmation, birthday messages, and post-delivery review requests.
-- WhatsApp order confirmation applies to every order, waits four hours, and sends one reminder after two hours. It remains a later Phase 1 implementation item; it is not part of the current foundation endpoints.
+- Routine commerce communication uses Email, Web Push and in-site notifications.
+- WhatsApp Business Platform is reserved for birthday messages and post-delivery review requests. Order placement, courier and delivery status messages must not silently expand the WhatsApp scope.
 
 ## Non-negotiable server rules
 
