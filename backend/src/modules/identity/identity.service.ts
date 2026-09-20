@@ -1992,6 +1992,7 @@ export class IdentityService {
     entityType: string,
     entityId: string,
     metadata: RequestMetadata,
+    details: Record<string, unknown> = {},
   ): Promise<void> {
     await client.query(
       `INSERT INTO audit_logs (
@@ -2004,7 +2005,10 @@ export class IdentityService {
         entityType,
         entityId,
         metadata.requestId,
-        JSON.stringify({ ipHash: ipHash(metadata.ipAddress, this.config.authPepper) }),
+        JSON.stringify({
+          ipHash: ipHash(metadata.ipAddress, this.config.authPepper),
+          ...details,
+        }),
       ],
     );
   }
