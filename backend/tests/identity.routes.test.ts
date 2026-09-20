@@ -31,6 +31,7 @@ const sessionId = "123e4567-e89b-12d3-a456-426614174000";
 const familyId = "123e4567-e89b-12d3-a456-426614174001";
 const secret = "a".repeat(43);
 const csrf = "csrf-route-test-token";
+const representativeImage = `data:image/webp;base64,${"A".repeat(120)}`;
 
 function account(overrides: Partial<AuthenticatedAccount> = {}): AuthenticatedAccount {
   return {
@@ -80,6 +81,11 @@ function fakeService(auth = account()) {
       userId: auth.userId,
       challengeId: "123e4567-e89b-12d3-a456-426614174003",
       expiresAt: new Date(Date.now() + 600_000),
+    }),
+    registerRepresentative: vi.fn().mockResolvedValue({
+      userId: "123e4567-e89b-12d3-a456-426614174008",
+      representativeCode: "REP-1",
+      status: "pending_approval",
     }),
     login: vi.fn().mockResolvedValue(issued(auth)),
     profile: vi.fn().mockResolvedValue(profile(auth)),
@@ -180,15 +186,23 @@ describe("identity HTTP boundaries", () => {
     expect(response.body.error.code).toBe("MFA_REQUIRED");
   });
 
-  it("fails representative registration closed while private document storage is absent", async () => {
-    const response = await request(app(fakeService())).post("/api/v1/representatives/register").send({
+  it("accepts representative applications with private verification documents", async () => {
+    const service = fakeService();
+    const response = await request(app(service)).post("/api/v1/representatives/register").send({
       name: "Test Representative",
       email: "rep@example.com",
       phone1: "01012345678",
       nationalId: "29901011234567",
+      address: "10 Test Street, Cairo, Egypt",
       password: "StrongPassword123",
+      idFrontImage: representativeImage,
+      idBackImage: representativeImage,
+      faceImage: representativeImage,
     });
-    expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe("REPRESENTATIVE_DOCUMENT_STORAGE_NOT_CONFIGURED");
+    expect(response.status).toBe(202);
+    expect(response.body).toMatchObject({
+      representativeCode: "REP-1",
+      status: "pending_approval",
+    });
   });
 });
