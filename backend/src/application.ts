@@ -69,7 +69,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       },
     }),
   );
-  app.use(express.json({ limit: "4mb", strict: true }));
+  app.use(express.json({ limit: "8mb", strict: true }));
   app.use(cookieParser());
 
   app.use("/api/v1/health", createHealthRouter(dependencies));
