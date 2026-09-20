@@ -159,6 +159,7 @@ export function createIdentityRouter(
     setSessionCookies(response, config, session);
     response.status(200).json({
       user: await service.profile(session.account),
+      permissions: session.account.permissions,
       csrfToken: session.csrfToken,
       mfaSetupRequired: session.account.mfaRequired && !session.account.mfaSatisfied,
     });
@@ -191,6 +192,7 @@ export function createIdentityRouter(
   router.get("/me", signedIn, async (request, response) => {
     response.status(200).json({
       user: await service.profile(request.auth!),
+      permissions: request.auth!.permissions,
       session: {
         mfaRequired: request.auth!.mfaRequired,
         mfaSatisfied: request.auth!.mfaSatisfied,
