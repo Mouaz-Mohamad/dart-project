@@ -1143,6 +1143,8 @@ export class CommerceService {
     orders: Record<string, unknown>[];
     returns: unknown[];
     cards: unknown[];
+    birthdayRewards: unknown[];
+    birthdayMessages: unknown[];
   }> {
     const customerResult = await this.pool.query<{ client_code: string }>(
       "SELECT client_code FROM customers WHERE user_id=$1",
@@ -1204,12 +1206,12 @@ export class CommerceService {
     );
 
     const states = await this.pool.query<{ domain: string; data: unknown[] }>(
-      "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards')",
+      "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards','birthday_rewards','birthday_messages')",
     );
     const stateByDomain = new Map(states.rows.map((row) => [row.domain, Array.isArray(row.data) ? row.data : []]));
     const onlyCustomer = (rows: unknown[]) => rows.filter((raw) => {
       const row = raw as Record<string, unknown>;
-      return String(row.clientId || "") === clientCode && !row.isDeleted;
+      return String(row.clientId || row.customerId || "") === clientCode && !row.isDeleted;
     });
 
     const orders = ordersResult.rows.map((row) => {
@@ -1260,6 +1262,8 @@ export class CommerceService {
       orders,
       returns: onlyCustomer(stateByDomain.get("returns") || []),
       cards: onlyCustomer(stateByDomain.get("cards") || []),
+      birthdayRewards: onlyCustomer(stateByDomain.get("birthday_rewards") || []),
+      birthdayMessages: onlyCustomer(stateByDomain.get("birthday_messages") || []),
     };
   }
 
