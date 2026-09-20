@@ -254,7 +254,7 @@
   }
 
   async function checkDomain(domain, remoteVersion = 0) {
-    if (document.hidden) return;
+    if (document.hidden || deniedDomains.has(domain)) return;
     try {
       if (!versions.get(domain)) {
         await hydrateDomain(domain);
