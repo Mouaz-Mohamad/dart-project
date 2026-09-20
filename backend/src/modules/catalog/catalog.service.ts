@@ -60,6 +60,15 @@ function money(value: unknown): number {
   return Number(value || 0) / 100;
 }
 
+export function physicalItemCostSnapshotMinor(
+  rawCostSnapshot: unknown,
+  modelCostMinor: number,
+): number {
+  return Number.isFinite(Number(rawCostSnapshot))
+    ? minor(rawCostSnapshot)
+    : Math.max(0, Math.round(Number(modelCostMinor) || 0));
+}
+
 function bool(value: unknown, fallback = false): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
@@ -505,9 +514,10 @@ export class CatalogService {
             hasReservation ? String(raw.reservationUntil) : null,
             raw.orderId ? String(raw.orderId) : null,
             raw.purchaseDate ? String(raw.purchaseDate) : null,
-            Number.isFinite(Number(raw.costSnapshot))
-              ? minor(raw.costSnapshot)
-              : modelCosts.get(modelId) ?? 0,
+            physicalItemCostSnapshotMinor(
+              raw.costSnapshot,
+              modelCosts.get(modelId) ?? 0,
+            ),
             JSON.stringify(raw), raw.createdAt ? String(raw.createdAt) : null,
           ],
         );
