@@ -3212,10 +3212,14 @@ function dartRollbackOrderOneStep(order) {
         reward.usedAt = null;
         reward.orderId = order.orderId;
         order.birthdayRewardUsageRecorded = false;
-        localStorage.setItem(
-          "dart_birthday_rewards",
-          JSON.stringify(rewards),
-        );
+        if (window.DartDomainState?.write) {
+          window.DartDomainState.write("dart_birthday_rewards", rewards);
+        } else {
+          localStorage.setItem(
+            "dart_birthday_rewards",
+            JSON.stringify(rewards),
+          );
+        }
       }
     }
   }
