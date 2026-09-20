@@ -452,6 +452,7 @@ export function createCommerceRouter(
 
   router.put(
     "/representatives/location",
+    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
