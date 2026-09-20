@@ -7,6 +7,7 @@ import { IdentityService } from "./modules/identity/identity.service.js";
 import { CatalogService } from "./modules/catalog/catalog.service.js";
 import { CatalogAssetService } from "./modules/catalog/catalog.asset.service.js";
 import { CommerceService } from "./modules/commerce/commerce.service.js";
+import { AdminOrdersService } from "./modules/commerce/admin-orders.service.js";
 import { SiteSettingsService } from "./modules/settings/site-settings.service.js";
 
 // Vercel discovers Express entrypoints from direct imports in this file.
@@ -19,6 +20,7 @@ export const identityService = new IdentityService(database, config);
 export const catalogService = new CatalogService(database);
 export const catalogAssetService = new CatalogAssetService(database);
 export const commerceService = new CommerceService(database);
+export const adminOrdersService = new AdminOrdersService(database);
 export const siteSettingsService = new SiteSettingsService(database);
 
 database.on("error", (error) => {
@@ -34,6 +36,7 @@ const app = createApp(config, {
   catalogService,
   catalogAssetService,
   commerceService,
+  adminOrdersService,
   siteSettingsService,
 });
 
