@@ -975,7 +975,13 @@ function dartNowISO() {
   return new Date().toISOString();
 }
 function dartUid(prefix = "ID") {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const randomPart =
+    typeof crypto?.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint32Array(4)))
+          .map((value) => value.toString(36))
+          .join("-");
+  return `${prefix}-${randomPart}`;
 }
 function dartMoney(v) {
   return `${Math.trunc(Number(v) || 0)} EGP`;
