@@ -167,31 +167,31 @@ function renderCards(dataArray) {
   getSortedData(dataArray).forEach((item) => {
     let boxesHTML = '<div class="card-items-grid">';
     (item.requestedProducts || []).forEach((code) => {
-      boxesHTML += `<div class="card-item-chip">${code}</div>`;
+      boxesHTML += `<div class="card-item-chip">${dartEsc(code)}</div>`;
     });
     boxesHTML += "</div>";
 
     container.insertAdjacentHTML(
       "beforeend",
       `
-            <div class="${getRowClass(item)}" data-id="${item.id}">
+            <div class="${getRowClass(item)}" data-id="${dartEsc(item.id)}">
                 <input type="checkbox" class="model-checkbox" ${item.isChecked ? "checked" : ""}>
                 <div class="w100 button row-action-btns">
                     <button type="button" class="action-btn btn-delete" title="شطب"><i class="bx bx-minus-circle"></i></button>
                     <button type="button" class="action-btn btn-hard-delete" title="حذف نهائي"><i class="bx bx-trash"></i></button>
                     <button type="button" class="action-btn btn-edit" title="تعديل"><i class="bx bx-edit"></i></button>
                 </div>
-                <span class="text-item overflow w150">${item.cardId}</span>
-                <span class="text-item overflow w150">${item.clientName}</span>
-                <span class="text-item overflow w150">${item.clientId}</span>
-                <span class="text-item overflow w150">${item.phone1}</span>
-                <span class="text-item overflow w150">${item.phone2}</span>
-                <span class="text-item overflow w200">${item.email}</span>
-                <span class="text-item overflow w150">${item.status}</span>
-                <span class="text-item overflow w200">${item.issueDate}</span>
-                <span class="text-item overflow w150">${item.expDate}</span>
-                <span class="text-item overflow w150">${item.purchasedItems}</span>
-                <span class="text-item overflow w150">${item.purchasedLimit}</span>
+                <span class="text-item overflow w150">${dartEsc(item.cardId)}</span>
+                <span class="text-item overflow w150">${dartEsc(item.clientName)}</span>
+                <span class="text-item overflow w150">${dartEsc(item.clientId)}</span>
+                <span class="text-item overflow w150">${dartEsc(item.phone1)}</span>
+                <span class="text-item overflow w150">${dartEsc(item.phone2 || "-")}</span>
+                <span class="text-item overflow w200">${dartEsc(item.email || "-")}</span>
+                <span class="text-item overflow w150">${dartEsc(item.status || "-")}</span>
+                <span class="text-item overflow w200">${dartEsc(item.issueDate || "-")}</span>
+                <span class="text-item overflow w150">${dartEsc(item.expDate || "-")}</span>
+                <span class="text-item overflow w150">${dartEsc(item.purchasedItems ?? 0)}</span>
+                <span class="text-item overflow w150">${dartEsc(item.purchasedLimit ?? item.itemLimit ?? 10)}</span>
                 <div class="text-item overflow w1200">${boxesHTML}</div>
             </div>
         `,
