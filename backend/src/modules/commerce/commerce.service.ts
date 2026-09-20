@@ -3150,9 +3150,11 @@ export class CommerceService {
         subtotal_minor: string;
         order_discount_minor: string;
         final_minor: string;
+        delivery_cost_minor: string;
       }>(
         `SELECT id::text, order_code, status, subtotal_minor::text,
-                order_discount_minor::text, final_minor::text
+                order_discount_minor::text, final_minor::text,
+                delivery_cost_minor::text
            FROM orders
           WHERE (id::text=$1 OR order_code=$1)
             AND NOT is_deleted
@@ -3239,6 +3241,23 @@ export class CommerceService {
       const finalMinor = financiallyLocked
         ? Number(existing.final_minor)
         : Math.max(0, subtotalMinor - discountMinor);
+
+      let updatedDeliveryCostMinor = Number(existing.delivery_cost_minor || 0);
+      let updatedDeliveryCostPerPieceMinor = 0;
+      if (!financiallyLocked) {
+        const settingsResult = await client.query<{ data: Record<string, unknown> }>(
+          "SELECT data FROM site_settings WHERE id='main'",
+        );
+        const configured = Number(
+          settingsResult.rows[0]?.data?.deliveryCostPerPiece,
+        );
+        updatedDeliveryCostPerPieceMinor = Math.round(
+          Math.max(0, Number.isFinite(configured) ? configured : 100) * 100,
+        );
+        updatedDeliveryCostMinor =
+          itemCodes.length * updatedDeliveryCostPerPieceMinor;
+      }
+
       const amountPaidMinor = Math.min(
         finalMinor,
         Math.max(0, Math.round((Number(input.amountPaid) || 0) * 100)),
@@ -3282,7 +3301,8 @@ export class CommerceService {
                 delivery_address=$12::jsonb,
                 delivery_notes=$13,
                 order_source=$14,
-                legacy=legacy || $15::jsonb,
+                delivery_cost_minor=$15,
+                legacy=legacy || $16::jsonb,
                 version=version+1,
                 updated_at=now()
           WHERE id=$1`,
@@ -3306,10 +3326,15 @@ export class CommerceService {
           JSON.stringify(address),
           String(input.deliveryNotes || ""),
           String(input.orderSource || "Manual"),
+          updatedDeliveryCostMinor,
           JSON.stringify({
             clientId: clientCode || "-",
             discount: requestedDiscount,
             reasonDeduction: requestedDiscount ? "Order discount" : "-",
+            deliveryCost: updatedDeliveryCostMinor / 100,
+            ...(updatedDeliveryCostPerPieceMinor
+              ? { deliveryCostPerPiece: updatedDeliveryCostPerPieceMinor / 100 }
+              : {}),
           }),
         ],
       );
@@ -3525,6 +3550,31 @@ export class CommerceService {
           ],
         );
         const orderDbId = upserted.rows[0]?.id;
+        if (
+          orderDbId &&
+          (!existingOrder || Number.isFinite(Number(raw.deliveryCost)))
+        ) {
+          const legacyItemCount = Array.isArray(raw.priceSnapshot)
+            ? raw.priceSnapshot.reduce(
+                (sum, line) =>
+                  sum +
+                  Math.max(
+                    1,
+                    Number((line as Record<string, unknown>)?.qty || 1),
+                  ),
+                0,
+              )
+            : Array.isArray(raw.items)
+              ? raw.items.length
+              : 0;
+          const rawDeliveryCostMinor = Number.isFinite(Number(raw.deliveryCost))
+            ? Math.max(0, Math.round(Number(raw.deliveryCost) * 100))
+            : Math.max(0, legacyItemCount * 10000);
+          await client.query(
+            "UPDATE orders SET delivery_cost_minor=$2 WHERE id=$1",
+            [orderDbId, rawDeliveryCostMinor],
+          );
+        }
         if (orderDbId) {
           await this.syncAdminOrderItems(
             client,
