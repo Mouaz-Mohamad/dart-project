@@ -27,6 +27,13 @@ function text(value: unknown, fallback = ""): string {
 export class CatalogService {
   constructor(private readonly pool: Pool) {}
 
+  async version(): Promise<number> {
+    const result = await this.pool.query<{ version: string }>(
+      "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
+    );
+    return Number(result.rows[0]?.version || 1);
+  }
+
   async publicCatalog(): Promise<{ version: number; models: Record<string, unknown>[]; stock: Record<string, number> }> {
     const client = await this.pool.connect();
     try {
@@ -265,11 +272,16 @@ export class CatalogService {
   }
 
   private async releaseExpiredReservations(client: PoolClient): Promise<void> {
-    await client.query(
+    const result = await client.query(
       `UPDATE inventory_items
           SET status='In stock', cart_reservation_id=NULL, reservation_until=NULL,
               version=version+1, updated_at=now()
         WHERE lower(status)='cart reserved' AND reservation_until <= now()`,
     );
+    if ((result.rowCount ?? 0) > 0) {
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+      );
+    }
   }
 }
