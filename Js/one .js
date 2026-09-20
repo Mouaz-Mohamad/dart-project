@@ -1278,6 +1278,7 @@ function initAddressMap() {
         let marker = null;
         let selectedAddressData = null;
         let timeout = null;
+        let userInteractedWithAddress = false;
 
         window.getCartAddressData = function() {
             return selectedAddressData || {
@@ -1333,6 +1334,7 @@ function initAddressMap() {
                 marker = L.marker([lat, lon], { draggable: true, icon: customIcon }).addTo(map);
 
                 marker.on('dragend', (e) => {
+                    userInteractedWithAddress = true;
                     const position = e.target.getLatLng();
                     if (!isWithinCairoGizaEnvelope(position.lat, position.lng)) {
                         if (typeof showToast === 'function') {
@@ -1348,31 +1350,53 @@ function initAddressMap() {
             if (input) input.value = addressName;
             if (fmtInp) fmtInp.value = addressName;
 
-            selectedAddressData = { address: addressName, lat: lat, lng: lon, governorate };
+            const components = result.address || {};
+            selectedAddressData = {
+                address: addressName,
+                lat: Number(lat),
+                lng: Number(lon),
+                governorate,
+                country: 'Egypt',
+                area: components.suburb || components.neighbourhood || components.city_district || components.town || components.city || '',
+                street: components.road || components.pedestrian || '',
+                building: components.house_number || '',
+                floor: ''
+            };
             marker.bindPopup(addressName).openPopup();
 
-            localStorage.setItem('user_last_address', JSON.stringify(selectedAddressData));
+            if (window.DartPlatform?.saveCustomerAddress) {
+                window.DartPlatform.saveCustomerAddress(selectedAddressData).catch(error => {
+                    console.warn('Saved address sync failed', error);
+                });
+            } else {
+                localStorage.setItem('user_last_address', JSON.stringify(selectedAddressData));
+            }
         }
 
         map.on('click', (e) => {
+            userInteractedWithAddress = true;
             setLocation(e.latlng.lat, e.latlng.lng);
         });
 
+        const applySavedLocation = (parsed) => {
+            if (!parsed || userInteractedWithAddress) return false;
+            if (!isWithinCairoGizaEnvelope(parsed.lat, parsed.lng)) return false;
+            void setLocation(parsed.lat, parsed.lng);
+            return true;
+        };
+
         const savedLoc = localStorage.getItem('user_last_address');
+        let restoredSavedLocation = false;
         if (savedLoc) {
             try {
-                const parsed = JSON.parse(savedLoc);
-                if (isWithinCairoGizaEnvelope(parsed.lat, parsed.lng)) {
-                    setLocation(parsed.lat, parsed.lng);
-                } else {
-                    fetchGPS();
-                }
-            } catch {
-                fetchGPS();
-            }
-        } else {
-            fetchGPS();
+                restoredSavedLocation = applySavedLocation(JSON.parse(savedLoc));
+            } catch {}
         }
+        if (!restoredSavedLocation) fetchGPS();
+
+        window.addEventListener('dart:saved-address-hydrated', event => {
+            applySavedLocation(event.detail?.address);
+        });
 
         function fetchGPS() {
             if (navigator.geolocation) {
@@ -1402,7 +1426,11 @@ function initAddressMap() {
                 boxShadow: '0 2px 6px rgba(0,0,0,0.3)', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: '#111827'
             });
-            locateBtn.onclick = (e) => { L.DomEvent.stopPropagation(e); fetchGPS(); };
+            locateBtn.onclick = (e) => {
+                L.DomEvent.stopPropagation(e);
+                userInteractedWithAddress = true;
+                fetchGPS();
+            };
 
             const resetBtn = document.createElement('button');
             resetBtn.type = 'button';
@@ -1414,9 +1442,18 @@ function initAddressMap() {
                 boxShadow: '0 2px 6px rgba(0,0,0,0.3)', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: '#ef4444'
             });
-            resetBtn.onclick = (e) => {
+            resetBtn.onclick = async (e) => {
                 L.DomEvent.stopPropagation(e);
-                localStorage.removeItem('user_last_address');
+                userInteractedWithAddress = true;
+                if (window.DartPlatform?.clearCustomerAddress) {
+                    try {
+                        await window.DartPlatform.clearCustomerAddress();
+                    } catch (error) {
+                        console.warn('Saved address clear failed', error);
+                    }
+                } else {
+                    localStorage.removeItem('user_last_address');
+                }
                 selectedAddressData = null;
                 if (input) input.value = '';
                 if (document.getElementById('lat-input')) document.getElementById('lat-input').value = '';
@@ -1456,6 +1493,7 @@ function initAddressMap() {
                                 const li = document.createElement('li');
                                 li.textContent = item.display_name;
                                 li.onclick = () => {
+                                    userInteractedWithAddress = true;
                                     setLocation(parseFloat(item.lat), parseFloat(item.lon), item);
                                     resultsList.style.display = 'none';
                                 };
