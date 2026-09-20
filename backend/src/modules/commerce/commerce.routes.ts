@@ -249,6 +249,50 @@ export function createCommerceRouter(
     },
   );
 
+  router.patch(
+    "/admin/orders/:orderRef",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("orders.manage"),
+    async (request, response) => {
+      const orderRef = z.string().trim().min(1).max(120).parse(request.params.orderRef);
+      const body = z.object({
+        clientId: z.string().trim().max(120).optional(),
+        clientName: z.string().trim().min(2).max(160),
+        phone1: z.string().trim().min(7).max(40),
+        phone2: z.string().trim().max(40).optional(),
+        email: z.string().trim().max(320).optional(),
+        paymentMethod: z.string().trim().min(1).max(80).optional(),
+        paymentStatus: z.enum(["Unpaid","Partially Paid","Paid","Refunded","Partially Refunded","Void"]).optional(),
+        amountPaid: z.number().min(0).optional(),
+        amountRefunded: z.number().min(0).optional(),
+        orderSource: z.string().trim().max(80).optional(),
+        deliveryNotes: z.string().trim().max(1000).optional(),
+        itemCodes: z.array(z.string().trim().min(1).max(120)).min(1).max(50),
+        discountPercent: z.number().min(0).max(100).optional(),
+        country: z.string().trim().max(120).optional(),
+        governorate: z.string().trim().max(120).optional(),
+        area: z.string().trim().max(160).optional(),
+        street: z.string().trim().max(200).optional(),
+        building: z.string().trim().max(120).optional(),
+        floor: z.string().trim().max(80).optional(),
+        latitude: z.string().trim().max(80).optional(),
+        longitude: z.string().trim().max(80).optional(),
+        fullAddress: z.string().trim().max(600).optional(),
+      }).parse(request.body);
+      response.status(200).json(
+        await commerce.updateAdminOrder(
+          request.auth!.userId,
+          orderRef,
+          body,
+          String(request.id),
+        ),
+      );
+    },
+  );
+
   router.get(
     "/admin/orders-state",
     signedIn,
