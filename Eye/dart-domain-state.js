@@ -123,6 +123,7 @@
     if (
       !force &&
       !migrationDone &&
+      Number(payload.version || 1) === 1 &&
       (payload.data || []).length === 0 &&
       local.length > 0
     ) {
