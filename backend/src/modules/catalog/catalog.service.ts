@@ -7,6 +7,50 @@ export interface CatalogState {
   items: Record<string, unknown>[];
 }
 
+interface PublicCatalogModelRow {
+  model_id: string;
+  name: string;
+  category: string;
+  description: string;
+  selling_minor: string | number;
+  discount_percent: string | number;
+  low_stock_limit: string | number;
+  size_options: unknown[];
+  color_options: unknown[];
+  size_chart: unknown;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+interface AdminCatalogModelRow extends PublicCatalogModelRow {
+  cost_minor: string | number;
+  active: boolean;
+  is_archived: boolean;
+  is_deleted: boolean;
+  legacy: Record<string, unknown>;
+  version: string | number;
+}
+
+interface AdminInventoryItemRow {
+  id: string;
+  item_code: string;
+  model_id: string;
+  color: string;
+  size: string;
+  status: string;
+  active: boolean;
+  is_archived: boolean;
+  is_deleted: boolean;
+  cart_reservation_id: string | null;
+  reservation_until: Date | string | null;
+  order_id: string | null;
+  purchase_date: Date | string | null;
+  legacy: Record<string, unknown>;
+  version: string | number;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
 function minor(value: unknown): number {
   return Math.max(0, Math.round((Number(value) || 0) * 100));
 }
@@ -41,7 +85,7 @@ export class CatalogService {
       const versionResult = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
       );
-      const modelResult = await client.query(
+      const modelResult = await client.query<PublicCatalogModelRow>(
         `SELECT model_id, name, category, description, selling_minor, discount_percent,
                 low_stock_limit, size_options, color_options, size_chart, created_at, updated_at
            FROM catalog_models
@@ -60,7 +104,7 @@ export class CatalogService {
       }
       return {
         version: Number(versionResult.rows[0]?.version || 1),
-        models: modelResult.rows.map((row: any) => ({
+        models: modelResult.rows.map((row) => ({
           modelId: row.model_id,
           name: row.name,
           category: row.category,
@@ -88,13 +132,13 @@ export class CatalogService {
       const versionResult = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
       );
-      const models = await client.query(
+      const models = await client.query<AdminCatalogModelRow>(
         `SELECT model_id, name, category, description, cost_minor, selling_minor, discount_percent,
                 low_stock_limit, size_options, color_options, size_chart, active, is_archived,
                 is_deleted, legacy, version, created_at, updated_at
            FROM catalog_models ORDER BY created_at DESC`,
       );
-      const items = await client.query(
+      const items = await client.query<AdminInventoryItemRow>(
         `SELECT id, item_code, model_id, color, size, status, active, is_archived, is_deleted,
                 cart_reservation_id, reservation_until, order_id, purchase_date, legacy, version,
                 created_at, updated_at
@@ -102,7 +146,7 @@ export class CatalogService {
       );
       return {
         version: Number(versionResult.rows[0]?.version || 1),
-        models: models.rows.map((row: any) => ({
+        models: models.rows.map((row) => ({
           ...row.legacy,
           modelId: row.model_id,
           name: row.name,
@@ -122,7 +166,7 @@ export class CatalogService {
           createdAt: row.created_at,
           updatedAt: row.updated_at,
         })),
-        items: items.rows.map((row: any) => ({
+        items: items.rows.map((row) => ({
           ...row.legacy,
           id: row.id,
           itemCode: row.item_code,
