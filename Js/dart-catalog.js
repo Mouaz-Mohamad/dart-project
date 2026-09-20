@@ -18,6 +18,34 @@
   let syncChain = Promise.resolve();
   let catalogDirty = false;
 
+  function normalizeStockKey(modelId, color, size) {
+    return JSON.stringify([
+      String(modelId ?? "").trim(),
+      String(color ?? "").trim().toLocaleLowerCase(),
+      String(size ?? "").trim().toLocaleLowerCase(),
+    ]);
+  }
+
+  function stockMapFromPayload(payload) {
+    const map = new Map();
+    for (const [rawKey, rawQuantity] of Object.entries(payload || {})) {
+      const quantity = Number(rawQuantity) || 0;
+      map.set(rawKey, quantity);
+      try {
+        const parsed = JSON.parse(rawKey);
+        if (Array.isArray(parsed) && parsed.length >= 3) {
+          map.set(
+            normalizeStockKey(parsed[0], parsed[1], parsed[2]),
+            quantity,
+          );
+        }
+      } catch {
+        // Ignore malformed legacy stock keys; exact key remains available.
+      }
+    }
+    return map;
+  }
+
   const readCache = new Map();
   const read = (key, fallback = []) => {
     try {
@@ -189,7 +217,7 @@
       const state = await api("/api/v1/catalog");
       serverVersion = Number(state.version || 1);
       cacheWrite("dart_models", state.models || []);
-      remoteStock = new Map(Object.entries(state.stock || {}));
+      remoteStock = stockMapFromPayload(state.stock || {});
     }
     await preloadImages().catch(() => {});
     window.dispatchEvent(
@@ -432,8 +460,12 @@
     )
       return 0;
     if (!IS_ADMIN && remoteStock) {
+      const exactKey = JSON.stringify([m.modelId, color, String(size)]);
+      const normalizedKey = normalizeStockKey(m.modelId, color, size);
       return Number(
-        remoteStock.get(JSON.stringify([m.modelId, color, String(size)])) || 0,
+        remoteStock.get(exactKey) ??
+          remoteStock.get(normalizedKey) ??
+          0,
       );
     }
     return items().filter(
