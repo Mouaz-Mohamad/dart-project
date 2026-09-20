@@ -1,8 +1,8 @@
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import express, { type Express } from "express";
+import express, { type Express, type RequestHandler } from "express";
 import { rateLimit } from "express-rate-limit";
-import * as helmetModule from "helmet";
+import helmet from "helmet";
 import type { Logger } from "pino";
 import type { AppConfig } from "./config/env.js";
 import { AppError } from "./http/app-error.js";
@@ -21,13 +21,17 @@ export interface AppDependencies extends HealthDependencies {
   identityService?: IdentityService;
 }
 
+// Vercel's Express builder resolves Helmet's callable default export as a module namespace.
+// Keep runtime behavior unchanged while presenting the middleware factory shape to TypeScript.
+const createHelmetMiddleware = helmet as unknown as () => RequestHandler;
+
 export function createApp(config: AppConfig, dependencies: AppDependencies): Express {
   const app = express();
   app.disable("x-powered-by");
   if (config.trustProxyHops > 0) app.set("trust proxy", config.trustProxyHops);
 
   app.use(requestContext(dependencies.logger));
-  app.use(helmetModule.default());
+  app.use(createHelmetMiddleware());
   app.use(
     cors({
       credentials: true,
