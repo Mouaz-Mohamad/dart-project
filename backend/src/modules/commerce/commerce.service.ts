@@ -1886,18 +1886,23 @@ export class CommerceService {
           status === "Representative On The Way"
             ? String(raw.deliveryStartedAt || raw.representativeOnWayAt || new Date().toISOString())
             : null;
-        const subtotalMinor = Math.max(0, Math.round((Number(raw.totalPrice) || 0) * 100));
-        const discountMinor = Math.max(
-          0,
-          Math.round((Number(raw.orderLevelDiscountAmount) || 0) * 100),
+        const subtotalAmount = Math.max(0, Number(raw.totalPrice) || 0);
+        const orderDiscountAmount = Number.isFinite(Number(raw.orderLevelDiscountAmount))
+          ? Math.max(0, Number(raw.orderLevelDiscountAmount))
+          : Math.max(
+              0,
+              subtotalAmount * Math.min(100, Math.max(0, Number(raw.discount) || 0)) / 100,
+            );
+        const subtotalMinor = Math.round(subtotalAmount * 100);
+        const discountMinor = Math.min(
+          subtotalMinor,
+          Math.round(orderDiscountAmount * 100),
         );
         const finalMinor = Math.max(
           0,
-          Math.round(
-            (Number.isFinite(Number(raw.finalAmount))
-              ? Number(raw.finalAmount)
-              : Number(raw.totalPrice || 0) - Number(raw.orderLevelDiscountAmount || 0)) * 100,
-          ),
+          Number.isFinite(Number(raw.finalAmount))
+            ? Math.round(Number(raw.finalAmount) * 100)
+            : subtotalMinor - discountMinor,
         );
         const contact = {
           name: String(raw.clientName || ""),
@@ -1996,6 +2001,13 @@ export class CommerceService {
         );
         const orderDbId = upserted.rows[0]?.id;
         if (orderDbId) {
+          await this.syncAdminOrderItems(
+            client,
+            orderDbId,
+            orderCode,
+            raw,
+            existingOrder?.status || null,
+          );
           await this.applyOrderStatusTransition(
             client,
             orderDbId,
@@ -2030,6 +2042,204 @@ export class CommerceService {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  private async syncAdminOrderItems(
+    client: PoolClient,
+    orderId: string,
+    orderCode: string,
+    raw: Record<string, unknown>,
+    previousStatus: string | null,
+  ): Promise<void> {
+    const directCodes = Array.isArray(raw.items)
+      ? raw.items.map((value) => String(value || "").trim()).filter(Boolean)
+      : [];
+    const snapshots = Array.isArray(raw.priceSnapshot)
+      ? raw.priceSnapshot as Record<string, unknown>[]
+      : [];
+    const snapshotCodes = snapshots
+      .map((row) => String(row.itemCode || "").trim())
+      .filter(Boolean);
+    const desiredCodes = [...new Set(directCodes.length ? directCodes : snapshotCodes)];
+
+    if (!desiredCodes.length) {
+      if (!previousStatus) {
+        throw new AppError(
+          422,
+          "ORDER_ITEMS_REQUIRED",
+          "A manual order must contain at least one physical item",
+        );
+      }
+      return;
+    }
+
+    const currentResult = await client.query<{
+      item_code: string;
+      inventory_item_id: string;
+    }>(
+      `SELECT item_code, inventory_item_id
+         FROM order_items
+        WHERE order_id=$1
+        ORDER BY created_at, id
+        FOR UPDATE`,
+      [orderId],
+    );
+    const currentCodes = currentResult.rows.map((row) => row.item_code);
+    const currentSet = new Set(currentCodes);
+    const desiredSet = new Set(desiredCodes);
+    const changed =
+      currentCodes.length !== desiredCodes.length ||
+      currentCodes.some((code) => !desiredSet.has(code));
+
+    if (
+      changed &&
+      previousStatus &&
+      ["Delivered", "Returned"].includes(previousStatus)
+    ) {
+      throw new AppError(
+        409,
+        "ORDER_ITEMS_LOCKED",
+        "Delivered or returned orders cannot have their physical items replaced",
+      );
+    }
+
+    const inventoryResult = await client.query<{
+      id: string;
+      item_code: string;
+      model_id: string;
+      color: string;
+      size: string;
+      status: string;
+      order_id: string | null;
+      model_name: string;
+      cost_minor: string;
+      selling_minor: string;
+      discount_percent: string;
+    }>(
+      `SELECT i.id, i.item_code, i.model_id, i.color, i.size, i.status, i.order_id,
+              m.name AS model_name, m.cost_minor::text, m.selling_minor::text,
+              m.discount_percent::text
+         FROM inventory_items i
+         JOIN catalog_models m ON m.model_id=i.model_id
+        WHERE i.item_code = ANY($1::text[])
+          AND i.active
+          AND NOT i.is_archived
+          AND NOT i.is_deleted
+        FOR UPDATE OF i`,
+      [desiredCodes],
+    );
+    if (inventoryResult.rows.length !== desiredCodes.length) {
+      const found = new Set(inventoryResult.rows.map((row) => row.item_code));
+      const missing = desiredCodes.filter((code) => !found.has(code));
+      throw new AppError(
+        409,
+        "ORDER_ITEM_NOT_FOUND",
+        `Physical item(s) not found: ${missing.join(", ")}`,
+      );
+    }
+
+    const inventoryByCode = new Map(
+      inventoryResult.rows.map((row) => [row.item_code, row]),
+    );
+    const snapshotByCode = new Map(
+      snapshots
+        .map((row) => [String(row.itemCode || "").trim(), row] as const)
+        .filter(([code]) => Boolean(code)),
+    );
+
+    const removedCodes = currentCodes.filter((code) => !desiredSet.has(code));
+    if (removedCodes.length) {
+      await client.query(
+        "DELETE FROM order_items WHERE order_id=$1 AND item_code = ANY($2::text[])",
+        [orderId, removedCodes],
+      );
+      await client.query(
+        `UPDATE inventory_items
+            SET status='In stock',
+                order_id=NULL,
+                cart_reservation_id=NULL,
+                reservation_until=NULL,
+                version=version+1,
+                updated_at=now()
+          WHERE item_code = ANY($1::text[])
+            AND order_id=$2
+            AND lower(status) <> 'sold'`,
+        [removedCodes, orderCode],
+      );
+    }
+
+    for (const code of desiredCodes) {
+      if (currentSet.has(code)) continue;
+      const item = inventoryByCode.get(code)!;
+      const itemStatus = String(item.status || "").toLowerCase();
+      const available =
+        itemStatus === "in stock" ||
+        (
+          itemStatus === "processing/held" &&
+          String(item.order_id || "") === orderCode
+        );
+      if (!available) {
+        throw new AppError(
+          409,
+          "ORDER_ITEM_UNAVAILABLE",
+          `${code} is already reserved, sold, damaged, or assigned elsewhere`,
+        );
+      }
+
+      const snapshot = snapshotByCode.get(code) || {};
+      const originalUnitMinor = Number.isFinite(Number(snapshot.originalUnitPrice))
+        ? Math.max(0, Math.round(Number(snapshot.originalUnitPrice) * 100))
+        : Number(item.selling_minor);
+      const modelDiscountPercent = Number.isFinite(Number(snapshot.discountPercent))
+        ? Math.min(100, Math.max(0, Number(snapshot.discountPercent)))
+        : Number(item.discount_percent || 0);
+      const finalUnitMinor = Number.isFinite(Number(snapshot.finalUnitPrice))
+        ? Math.max(0, Math.round(Number(snapshot.finalUnitPrice) * 100))
+        : finalModelPriceMinor(originalUnitMinor, modelDiscountPercent);
+      const costSnapshotMinor = Number.isFinite(Number(snapshot.costSnapshot))
+        ? Math.max(0, Math.round(Number(snapshot.costSnapshot) * 100))
+        : Number(item.cost_minor);
+
+      await client.query(
+        `INSERT INTO order_items (
+           order_id, inventory_item_id, item_code, model_id, model_name,
+           color, size, original_unit_minor, model_discount_percent,
+           final_unit_minor, cost_snapshot_minor
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          orderId,
+          item.id,
+          item.item_code,
+          item.model_id,
+          String(snapshot.name || item.model_name),
+          item.color,
+          item.size,
+          originalUnitMinor,
+          modelDiscountPercent,
+          finalUnitMinor,
+          costSnapshotMinor,
+        ],
+      );
+    }
+
+    await client.query(
+      `UPDATE inventory_items
+          SET status='Processing/Held',
+              order_id=$2,
+              cart_reservation_id=NULL,
+              reservation_until=NULL,
+              version=version+1,
+              updated_at=now()
+        WHERE item_code = ANY($1::text[])
+          AND lower(status) <> 'sold'`,
+      [desiredCodes, orderCode],
+    );
+
+    if (changed || desiredCodes.some((code) => !currentSet.has(code))) {
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+      );
     }
   }
 
