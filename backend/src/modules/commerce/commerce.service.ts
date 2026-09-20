@@ -1657,6 +1657,21 @@ export class CommerceService {
         }
       }
 
+      const activityLog = Array.isArray(record.activityLog)
+        ? record.activityLog as Record<string, unknown>[]
+        : [];
+      activityLog.push({
+        id: randomUUID(),
+        action: existing ? "MANUAL_RETURN_UPDATED" : "MANUAL_RETURN_RECORDED",
+        previousCondition,
+        condition: input.condition,
+        refundAmount: requestedRefundMinor / 100,
+        timestamp: now,
+        actorRole: "Admin",
+        actorId,
+      });
+      record.activityLog = activityLog;
+
       await client.query(
         `UPDATE dashboard_domain_state
             SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
@@ -1683,21 +1698,6 @@ export class CommerceService {
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
       );
-
-      const activityLog = Array.isArray(record.activityLog)
-        ? record.activityLog as Record<string, unknown>[]
-        : [];
-      activityLog.push({
-        id: randomUUID(),
-        action: existing ? "MANUAL_RETURN_UPDATED" : "MANUAL_RETURN_RECORDED",
-        previousCondition,
-        condition: input.condition,
-        refundAmount: requestedRefundMinor / 100,
-        timestamp: now,
-        actorRole: "Admin",
-        actorId,
-      });
-      record.activityLog = activityLog;
 
       await client.query(
         `INSERT INTO audit_logs (
