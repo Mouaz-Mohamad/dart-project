@@ -5,31 +5,7 @@
  */
 (function () {
   "use strict";
-  const RESET = "dart_v7_empty_start_completed";
-  const API_BASE = String(
-    window.DART_API_BASE_URL || location.origin,
-  ).replace(/\/$/, "");
-  const CSRF_STORAGE_KEY = "dart_csrf_token";
-  const IS_ADMIN = /\/Eye\//i.test(location.pathname);
-  let serverVersion = 0;
-  let remoteStock = null;
-  let syncTimer = 0;
-  let syncChain = Promise.resolve();
-  let catalogDirty = false;
-  // BEGIN One-time reset explicitly requested by the owner. New entries survive reloads.
-  if (localStorage.getItem(RESET) !== "1") {
-    Object.keys(localStorage)
-      .filter(
-        (key) =>
-          key.startsWith("dart_") ||
-          ["order_45_state", "user_last_address"].includes(key),
-      )
-      .forEach((key) => localStorage.removeItem(key));
-    Object.keys(sessionStorage)
-      .filter((key) => key.startsWith("dart_"))
-      .forEach((key) => sessionStorage.removeItem(key));
-    localStorage.setItem(RESET, "1");
-  }
+  // Production: never wipe browser state on load. Server hydration owns business data.
   const readCache = new Map();
   const read = (key, fallback = []) => {
     try {
