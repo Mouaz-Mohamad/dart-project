@@ -351,12 +351,7 @@
   }
 
   async function register(form) {
-    if (API_ENABLED) {
-      throw new Error(
-        "Secure representative document upload is not configured yet. Registration was not saved.",
-      );
-    }
-    if (API_REQUIRED)
+    if (!API_ENABLED && API_REQUIRED)
       throw new Error("Representative registration requires the secure account API.");
     const data = Object.fromEntries(new FormData(form));
     data.name = String(data.name || "").trim();
@@ -388,6 +383,34 @@
     };
     if (!images.idFrontImage || !images.idBackImage || !images.faceImage)
       throw new Error("Upload all three verification images.");
+
+    if (API_ENABLED) {
+      const result = await window.DartApi.request("/api/v1/representatives/register", {
+        method: "POST",
+        body: {
+          name: data.name,
+          nationalId: data.nationalId,
+          email: data.email,
+          phone1: data.phone1,
+          ...(data.phone2 ? { phone2: data.phone2 } : {}),
+          address: data.address,
+          password: data.password,
+          ...images,
+        },
+      });
+      return {
+        id: result.userId,
+        repId: result.representativeCode,
+        name: data.name,
+        email: data.email,
+        phone1: data.phone1,
+        phone2: data.phone2 || "-",
+        address: data.address,
+        status: "Pending Approval",
+        serverAuthoritative: true,
+      };
+    }
+
     const reps = read(KEYS.reps, []),
       rep = {
         id: uid("RDB"),
