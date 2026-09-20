@@ -1018,6 +1018,125 @@ export class IdentityService {
     await this.writeAudit(account, "SESSION_REVOKED", "sessions", sessionId, metadata);
   }
 
+  public async adminUpdateRepresentative(
+    account: AuthenticatedAccount,
+    representativeUserId: string,
+    input: {
+      name: string;
+      email: string;
+      phone1: string;
+      phone2?: string | undefined;
+      address: string;
+    },
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("representatives.manage") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage representatives");
+    }
+
+    const email = input.email.trim();
+    const emailNormalized = normalizeEmail(email);
+    const displayPhones = [input.phone1, input.phone2].filter(
+      (value): value is string => Boolean(value?.trim()),
+    );
+    const normalizedPhones = normalizePhonesOrThrow(displayPhones);
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<{
+        email_normalized: string;
+      }>(
+        `SELECT email_normalized
+           FROM users
+          WHERE id=$1
+            AND account_type='representative'
+            AND deleted_at IS NULL
+          FOR UPDATE`,
+        [representativeUserId],
+      );
+      const current = locked.rows[0];
+      if (!current) {
+        throw new AppError(404, "REPRESENTATIVE_NOT_FOUND", "Representative account not found");
+      }
+
+      const phonesResult = await client.query<{ values: string[] }>(
+        `SELECT COALESCE(
+           array_agg(phone_normalized ORDER BY is_primary DESC, created_at),
+           ARRAY[]::text[]
+         ) AS values
+           FROM account_phones
+          WHERE user_id=$1 AND account_type='representative'`,
+        [representativeUserId],
+      );
+      const contactsChanged =
+        current.email_normalized !== emailNormalized ||
+        phonesResult.rows[0]!.values.join("|") !== normalizedPhones.join("|");
+
+      await client.query(
+        `UPDATE representatives
+            SET full_name=$2,
+                address_text=$3,
+                updated_at=now()
+          WHERE user_id=$1`,
+        [representativeUserId, input.name.trim(), input.address.trim()],
+      );
+
+      await client.query(
+        `UPDATE users
+            SET email=$2,
+                email_normalized=$3,
+                session_version=session_version + CASE WHEN $4 THEN 1 ELSE 0 END,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [representativeUserId, email, emailNormalized, contactsChanged],
+      );
+
+      await client.query(
+        "DELETE FROM account_phones WHERE user_id=$1 AND account_type='representative'",
+        [representativeUserId],
+      );
+      await this.insertPhones(
+        client,
+        representativeUserId,
+        "representative",
+        displayPhones,
+        normalizedPhones,
+      );
+
+      if (contactsChanged) {
+        await client.query(
+          `UPDATE sessions
+              SET revoked_at=COALESCE(revoked_at, now()),
+                  revoke_reason=COALESCE(revoke_reason, 'admin_identity_update')
+            WHERE user_id=$1 AND revoked_at IS NULL`,
+          [representativeUserId],
+        );
+      }
+
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "REPRESENTATIVE_ADMIN_UPDATED",
+        "representatives",
+        representativeUserId,
+        metadata,
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
   public async listRepresentativeApplications(
     account: AuthenticatedAccount,
   ): Promise<Array<Record<string, unknown>>> {
