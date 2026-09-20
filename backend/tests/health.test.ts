@@ -18,6 +18,7 @@ const config: AppConfig = {
   allowDevelopmentSeed: false,
   authPepper: "test-auth-pepper-with-at-least-32-characters",
   sessionCookieName: "dart_session",
+  sessionCookieSameSite: "strict",
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
   mfaEncryptionKey: Buffer.alloc(32, 7),

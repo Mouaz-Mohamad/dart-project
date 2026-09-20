@@ -12,6 +12,12 @@ This folder is the server-authoritative Node.js/Express/TypeScript backend. The 
 
 The API listens on `http://localhost:4000` by default. Check `/api/v1/health/live` for process liveness and `/api/v1/health/ready` for PostgreSQL readiness.
 
+## Vercel deployment
+
+Vercel detects `src/server.ts` as the Express entrypoint and captures its HTTP listener as one Vercel Function. Keep the Vercel project Root Directory set to `backend`; do not set a custom Build Command or Output Directory. The complete production checklist and required environment variables are in [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md).
+
+Database migrations and the first Owner bootstrap are deliberate one-time operations. They are never run automatically during a Vercel build or Function startup.
+
 ## Create the protected Owner account
 
 After migrations, set `DART_OWNER_NAME`, `DART_OWNER_EMAIL`, `DART_OWNER_PHONE` and a strong `DART_OWNER_PASSWORD` in the local environment, then run:

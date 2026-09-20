@@ -21,6 +21,7 @@ const config: AppConfig = {
   allowDevelopmentSeed: false,
   authPepper: "route-test-auth-pepper-with-at-least-32-characters",
   sessionCookieName: "dart_session",
+  sessionCookieSameSite: "strict",
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
   mfaEncryptionKey: Buffer.alloc(32, 3),
@@ -121,6 +122,29 @@ describe("identity HTTP boundaries", () => {
     const cookies = response.headers["set-cookie"] as unknown as string[];
     expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
     expect(cookies.some((value) => value.startsWith("dart_csrf=") && !value.includes("HttpOnly"))).toBe(true);
+  });
+
+  it("supports secure cross-site cookies for separate Vercel frontend and API projects", async () => {
+    const productionConfig: AppConfig = {
+      ...config,
+      nodeEnv: "production",
+      sessionCookieSameSite: "none",
+    };
+    const application = createApp(productionConfig, {
+      databasePing: async () => undefined,
+      identityService: fakeService(),
+      logger: pino({ level: "silent" }),
+      startedAt: new Date("2026-09-20T00:00:00.000Z"),
+      version: "test",
+    });
+    const response = await request(application).post("/api/v1/auth/login").send({
+      identifier: "customer@example.com",
+      password: "StrongPassword123",
+    });
+    expect(response.status).toBe(200);
+    const cookies = response.headers["set-cookie"] as unknown as string[];
+    expect(cookies.every((value) => value.includes("SameSite=None"))).toBe(true);
+    expect(cookies.every((value) => value.includes("Secure"))).toBe(true);
   });
 
   it("rejects an authenticated mutation without the matching CSRF token", async () => {

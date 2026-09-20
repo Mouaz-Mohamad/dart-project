@@ -21,6 +21,7 @@ const environmentSchema = z.object({
   ALLOW_DEVELOPMENT_SEED: booleanFromString,
   AUTH_PEPPER: z.string().min(32).default("development-only-auth-pepper-change-me"),
   SESSION_COOKIE_NAME: z.string().regex(/^[A-Za-z0-9_-]+$/).default("dart_session"),
+  SESSION_COOKIE_SAME_SITE: z.enum(["strict", "lax", "none"]).default("strict"),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().min(3).max(30).default(10),
   MFA_ENCRYPTION_KEY: z
@@ -42,6 +43,7 @@ export interface AppConfig {
   allowDevelopmentSeed: boolean;
   authPepper: string;
   sessionCookieName: string;
+  sessionCookieSameSite: "strict" | "lax" | "none";
   sessionTtlDays: number;
   emailOtpTtlMinutes: number;
   mfaEncryptionKey: Buffer;
@@ -95,6 +97,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     allowDevelopmentSeed: parsed.data.ALLOW_DEVELOPMENT_SEED,
     authPepper: parsed.data.AUTH_PEPPER,
     sessionCookieName: parsed.data.SESSION_COOKIE_NAME,
+    sessionCookieSameSite: parsed.data.SESSION_COOKIE_SAME_SITE,
     sessionTtlDays: parsed.data.SESSION_TTL_DAYS,
     emailOtpTtlMinutes: parsed.data.EMAIL_OTP_TTL_MINUTES,
     mfaEncryptionKey,

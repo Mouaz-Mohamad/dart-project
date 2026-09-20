@@ -13,6 +13,15 @@ describe("environment configuration", () => {
     expect(config.port).toBe(4000);
     expect(config.allowDevelopmentSeed).toBe(false);
     expect(config.corsOrigins).toEqual(["http://localhost:4173"]);
+    expect(config.sessionCookieSameSite).toBe("strict");
+  });
+
+  it("accepts an explicit cross-site session-cookie policy", () => {
+    const config = loadConfig({
+      ...baseEnvironment,
+      SESSION_COOKIE_SAME_SITE: "none",
+    });
+    expect(config.sessionCookieSameSite).toBe("none");
   });
 
   it("blocks development seed in production", () => {

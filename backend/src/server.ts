@@ -19,7 +19,7 @@ const app = createApp(config, {
   logger,
   databasePing: () => pingDatabase(database),
   startedAt,
-  version: "0.2.0",
+  version: "0.2.1",
   identityService,
 });
 

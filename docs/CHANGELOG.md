@@ -1,5 +1,11 @@
 # Dart Project changelog
 
+## Identity/Auth V0.2.1 — 2026-09-20
+
+- Documented the zero-configuration Vercel Express deployment and the exact production environment contract without storing secret values.
+- Added an explicit `SESSION_COOKIE_SAME_SITE` policy so separate HTTPS frontend/API projects can use `SameSite=None; Secure`, while the safer `Strict` behavior remains the default.
+- Added regression tests for both the default cookie policy and the cross-site Vercel deployment policy.
+
 ## Identity/Auth V0.2 — 2026-09-20
 
 - Added PostgreSQL identity tables for separate Customer, Staff and Representative realms, normalized phone uniqueness, customer/staff/representative profiles, rotating sessions, Email challenges, password-reset requests/history, MFA recovery-code storage and deny-by-default role/permission foundations.

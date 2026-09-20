@@ -72,21 +72,21 @@ function authLimiter() {
 
 function setSessionCookies(
   response: Response,
-  config: Pick<AppConfig, "nodeEnv" | "sessionCookieName">,
+  config: Pick<AppConfig, "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite">,
   session: { sessionToken: string; csrfToken: string; expiresAt: Date },
 ): void {
-  const secure = config.nodeEnv === "production";
+  const secure = config.nodeEnv === "production" || config.sessionCookieSameSite === "none";
   response.cookie(config.sessionCookieName, session.sessionToken, {
     httpOnly: true,
     secure,
-    sameSite: "strict",
+    sameSite: config.sessionCookieSameSite,
     path: "/api/v1",
     expires: session.expiresAt,
   });
   response.cookie("dart_csrf", session.csrfToken, {
     httpOnly: false,
     secure,
-    sameSite: "strict",
+    sameSite: config.sessionCookieSameSite,
     path: "/",
     expires: session.expiresAt,
   });
@@ -94,11 +94,11 @@ function setSessionCookies(
 
 function clearSessionCookies(
   response: Response,
-  config: Pick<AppConfig, "nodeEnv" | "sessionCookieName">,
+  config: Pick<AppConfig, "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite">,
 ): void {
   const options = {
-    secure: config.nodeEnv === "production",
-    sameSite: "strict" as const,
+    secure: config.nodeEnv === "production" || config.sessionCookieSameSite === "none",
+    sameSite: config.sessionCookieSameSite,
   };
   response.clearCookie(config.sessionCookieName, { ...options, httpOnly: true, path: "/api/v1" });
   response.clearCookie("dart_csrf", { ...options, httpOnly: false, path: "/" });
@@ -106,7 +106,10 @@ function clearSessionCookies(
 
 export function createIdentityRouter(
   service: IdentityService,
-  config: Pick<AppConfig, "nodeEnv" | "sessionCookieName" | "authPepper">,
+  config: Pick<
+    AppConfig,
+    "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite" | "authPepper"
+  >,
 ): Router {
   const router = Router();
   const signedIn = authenticate(service, config);
