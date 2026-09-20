@@ -26,6 +26,12 @@ export function createCatalogRouter(
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
 
+  router.get("/serial/:itemCode", async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    const item = await catalog.serial(String(request.params.itemCode || ""));
+    response.status(200).json({ found: Boolean(item), item });
+  });
+
   router.get("/catalog/version", async (_request, response) => {
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json({ version: await catalog.version() });
