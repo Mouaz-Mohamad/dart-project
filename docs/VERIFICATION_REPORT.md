@@ -1,3 +1,12 @@
+# Production hardening verification — 2026-09-21
+
+- GitHub Backend CI now provisions PostgreSQL 17 and runs the full Vitest suite with `TEST_DATABASE_URL`; current migrations are applied into isolated schemas rather than being skipped.
+- The real database run exposed and fixed the partial-index outbox conflict target. Backend CI subsequently passed against PostgreSQL 17.
+- Database integration coverage now verifies every migration filename is recorded, production-critical tables exist, audit rows are append-only, and outbox/idempotency deduplication is enforced by PostgreSQL.
+- Frontend CI now includes Chromium smoke coverage plus permanent database-authority and performance-budget checks.
+- Runtime favicons and dashboard/representative logos no longer download multi-megabyte logo sources where the existing 192px asset is sufficient; product cards lazy-load and decode images asynchronously.
+- Representative verification uploads now verify PNG/JPEG/WebP magic bytes against the declared MIME type before encryption or database persistence.
+
 # V9 verification — 2026-09-11
 
 ## Identity/Auth V0.2 verification — 2026-09-20

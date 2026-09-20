@@ -1,5 +1,14 @@
 # Dart Project changelog
 
+## Production hardening V0.3 — 2026-09-21
+
+- Added real PostgreSQL 17 to Backend CI and made current migration/integration checks execute on every backend change.
+- Fixed a PostgreSQL partial-unique-index conflict bug discovered only after enabling real database CI.
+- Added Chromium storefront/dashboard smoke coverage and permanent browser-storage/performance regression budgets.
+- Removed multi-megabyte logo assets from runtime favicon, representative and dashboard surfaces where the existing 192px asset is appropriate.
+- Renamed the stale cart persistence helper so its name reflects server reservation persistence rather than LocalStorage.
+- Added magic-byte validation for representative PNG/JPEG/WebP verification uploads before encrypted persistence.
+
 ## Identity/Auth V0.2.1 — 2026-09-20
 
 - Documented the zero-configuration Vercel Express deployment and the exact production environment contract without storing secret values.

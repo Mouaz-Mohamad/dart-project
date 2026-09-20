@@ -117,6 +117,34 @@ function ipHash(ipAddress: string | undefined, pepper: string): string | null {
   return ipAddress ? digest(`ip:${ipAddress}`, pepper) : null;
 }
 
+function detectedImageContentType(
+  bytes: Buffer,
+): "image/jpeg" | "image/png" | "image/webp" | null {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) return "image/png";
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  ) return "image/jpeg";
+  if (
+    bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
+    bytes.subarray(8, 12).toString("ascii") === "WEBP"
+  ) return "image/webp";
+  return null;
+}
+
 function parsePrivateRepresentativeImage(value: string): {
   contentType: "image/jpeg" | "image/png" | "image/webp";
   bytes: Buffer;
@@ -133,6 +161,14 @@ function parsePrivateRepresentativeImage(value: string): {
   const bytes = Buffer.from(match[2]!, "base64");
   if (!bytes.length || bytes.length > 1024 * 1024) {
     throw new AppError(422, "REPRESENTATIVE_IMAGE_TOO_LARGE", "Each compressed verification image must be 1 MB or smaller");
+  }
+  const detectedType = detectedImageContentType(bytes);
+  if (!detectedType || detectedType !== contentType) {
+    throw new AppError(
+      422,
+      "REPRESENTATIVE_IMAGE_SIGNATURE_MISMATCH",
+      "Verification image bytes do not match the declared JPG, PNG or WebP type",
+    );
   }
   return {
     contentType,

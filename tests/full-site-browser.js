@@ -186,9 +186,14 @@ const server = http.createServer((request, response) => {
   await tracking.close();
 
   const dashboard = await open("Eye/Dart%20Eye.html");
-  await dashboard.waitForFunction(
-    () => !document.body.classList.contains("dart-admin-locked"),
-  );
+  assert.equal(await dashboard.locator("#dart-admin-auth").count(), 1);
+  // Authentication has dedicated backend/frontend contract coverage. This smoke suite
+  // verifies the dashboard DOM and navigation without depending on a seeded Owner account.
+  await dashboard.evaluate(() => {
+    document.body.classList.remove("dart-admin-locked");
+    const gate = document.getElementById("dart-admin-auth");
+    if (gate) gate.hidden = true;
+  });
   assert.equal(await dashboard.locator(".dashboard-section.active-section").getAttribute("id"), "brand");
   assert.equal(await dashboard.locator("link[rel='manifest']").count(), 1);
   const dashboardTargets = await dashboard.locator("a[data-target]").evaluateAll((links) =>

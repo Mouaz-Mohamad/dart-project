@@ -1,6 +1,6 @@
 # Dart Node.js / Express API contract
 
-The frontend currently uses localStorage as an executable prototype. The backend must become the only source of truth. Set `window.DART_API_BASE_URL` before `Js/dart-platform.js` when API integration begins.
+The production frontend is database-authoritative through `/api/v1`; PostgreSQL is the source of truth for business data. Browser storage is limited to transient UI/session hints and one-time legacy cleanup markers. `DartState` is an in-memory projection, not persistent business storage.
 
 ## Implemented foundation — 2026-09-19
 
@@ -165,7 +165,7 @@ Order creation requires an authenticated customer account. Do not create guest c
 - `POST /api/v1/admin/representatives/:id/reject`
 - `PATCH /api/v1/admin/representatives/:id`
 
-New registrations start as `Pending Approval`; rejected or unavailable accounts cannot log in or receive orders. Validate JPG/PNG/WebP and a maximum 5 MB source file per image, inspect actual MIME signatures, strip metadata and malware-scan uploads.
+New registrations start as `Pending Approval`; rejected or unavailable accounts cannot log in or receive orders. Validate JPG/PNG/WebP and a maximum 5 MB source file per image. The API must inspect actual MIME signatures before persistence (implemented); metadata stripping and malware scanning remain required before unattended production approval of representative documents.
 
 Customer and representative identities are separate roles and sessions. Reject duplicate email, phone or National ID within representative accounts, but do not reject a representative merely because the same email or phone belongs to that person's customer account.
 
