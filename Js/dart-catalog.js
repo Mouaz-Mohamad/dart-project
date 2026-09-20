@@ -120,22 +120,40 @@
       const localItems = read("dart_items", []);
       let state = await api("/api/v1/admin/catalog-state");
       serverVersion = Number(state.version || 1);
+
       if (
         !force &&
         (state.models || []).length === 0 &&
         (state.items || []).length === 0 &&
         (localModels.length > 0 || localItems.length > 0)
       ) {
+        const migratedLocalModels = structuredClone(localModels);
+        await migrateLegacyAssets(migratedLocalModels);
         state = await api("/api/v1/admin/catalog-state", {
           method: "PUT",
           body: {
             expectedVersion: serverVersion,
-            models: localModels,
+            models: migratedLocalModels,
             items: localItems,
           },
         });
         serverVersion = Number(state.version || serverVersion);
+      } else {
+        const migratedServerModels = structuredClone(state.models || []);
+        const assetsChanged = await migrateLegacyAssets(migratedServerModels);
+        if (assetsChanged) {
+          state = await api("/api/v1/admin/catalog-state", {
+            method: "PUT",
+            body: {
+              expectedVersion: serverVersion,
+              models: migratedServerModels,
+              items: state.items || [],
+            },
+          });
+          serverVersion = Number(state.version || serverVersion);
+        }
       }
+
       cacheWrite("dart_models", state.models || []);
       cacheWrite("dart_items", state.items || []);
       remoteStock = null;
@@ -146,8 +164,13 @@
       remoteStock = new Map(Object.entries(state.stock || {}));
     }
     await preloadImages().catch(() => {});
-    window.dispatchEvent(new CustomEvent("dart:catalog-hydrated", { detail: { version: serverVersion, admin: IS_ADMIN } }));
+    window.dispatchEvent(
+      new CustomEvent("dart:catalog-hydrated", {
+        detail: { version: serverVersion, admin: IS_ADMIN },
+      }),
+    );
   }
+
   const active = (record) =>
     record &&
     !record.isArchived &&
@@ -190,84 +213,174 @@
   const price = (m) => pricing(m).finalPrice;
   // END One-time reset and repositories.
 
-  // BEGIN Shared image storage. Blobs live once in IndexedDB; models hold IDs only.
-  // BACKEND: use uploaded asset IDs/URLs instead; never duplicate binaries per Item.
+  // BEGIN Shared image storage. Images are compressed client-side and persisted server-side.
   const imageURLs = new Map();
   let database;
+
   function db() {
     if (!database)
       database = new Promise((resolve, reject) => {
         const request = indexedDB.open("dart-catalog-media-v7", 1);
-        request.onupgradeneeded = () =>
-          request.result.createObjectStore("images");
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains("images"))
+            request.result.createObjectStore("images");
+        };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
     return database;
   }
+
   async function imageBlob(id) {
+    if (!id || typeof indexedDB === "undefined") return null;
     const store = (await db()).transaction("images").objectStore("images");
     return new Promise((resolve, reject) => {
-      const r = store.get(id);
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
+      const request = store.get(id);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
     });
   }
-  async function loadImage(asset) {
-    if (!asset?.id || imageURLs.has(asset.id)) return;
-    const blob = await imageBlob(asset.id);
-    if (blob) imageURLs.set(asset.id, URL.createObjectURL(blob));
-  }
-  async function preloadImages() {
-    const assets = models().flatMap((m) =>
-      colors(m).flatMap((c) => (c.images?.length ? [c.images[0]] : [])),
-    );
-    await Promise.all(assets.map((asset) => loadImage(asset).catch(() => {})));
-    window.dispatchEvent(new Event("dart:images-ready"));
-  }
-  async function loadModelImages(code) {
-    await Promise.all(
-      colors(model(code))
-        .flatMap((c) => c.images || [])
-        .map((asset) => loadImage(asset).catch(() => {})),
-    );
-  }
-  async function saveImage(file) {
-    if (
-      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-      file.size > 10 * 1024 * 1024
-    )
-      throw new Error("Choose JPG, PNG or WebP, up to 10 MB.");
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas
-      .getContext("2d")
-      .drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, "image/webp", 0.84),
-    );
-    if (!blob) throw new Error("Could not prepare this image.");
-    const id = uid(),
-      connection = await db();
+
+  async function rememberLocalBlob(id, blob) {
+    if (!id || !blob || typeof indexedDB === "undefined") return;
+    const connection = await db();
     await new Promise((resolve, reject) => {
       const tx = connection.transaction("images", "readwrite");
       tx.objectStore("images").put(blob, id);
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });
-    imageURLs.set(id, URL.createObjectURL(blob));
-    return { id, name: file.name };
   }
-  const imageSrc = (asset) =>
-    asset?.url || imageURLs.get(asset?.id) || placeholder;
+
+  function assetPath(id) {
+    return `/api/v1/catalog/assets/${encodeURIComponent(String(id || ""))}`;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || "").split(",").pop() || "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function uploadAssetBlob(id, name, blob) {
+    if (!IS_ADMIN || !API_BASE) throw new Error("Dashboard authentication is required to upload product images.");
+    if (!blob || blob.size > 4 * 1024 * 1024)
+      throw new Error("Compressed product image is too large.");
+    const result = await api("/api/v1/admin/catalog/assets", {
+      method: "PUT",
+      body: {
+        assetId: id,
+        originalName: name || "",
+        contentType: blob.type || "image/webp",
+        base64: await blobToBase64(blob),
+      },
+    });
+    return result.urlPath || assetPath(id);
+  }
+
+  async function loadImage(asset) {
+    if (!asset?.id || imageURLs.has(asset.id) || !IS_ADMIN) return;
+    const blob = await imageBlob(asset.id);
+    if (blob) imageURLs.set(asset.id, URL.createObjectURL(blob));
+  }
+
+  async function preloadImages() {
+    if (!IS_ADMIN) {
+      window.dispatchEvent(new Event("dart:images-ready"));
+      return;
+    }
+    const assets = models().flatMap((m) =>
+      colors(m).flatMap((color) => color.images || []),
+    );
+    await Promise.all(assets.map((asset) => loadImage(asset).catch(() => {})));
+    window.dispatchEvent(new Event("dart:images-ready"));
+  }
+
+  async function loadModelImages(code) {
+    if (!IS_ADMIN) return;
+    await Promise.all(
+      colors(model(code))
+        .flatMap((color) => color.images || [])
+        .map((asset) => loadImage(asset).catch(() => {})),
+    );
+  }
+
+  async function migrateLegacyAssets(targetModels) {
+    if (!IS_ADMIN || !API_BASE || !Array.isArray(targetModels)) return false;
+    let changed = false;
+    for (const modelRow of targetModels) {
+      for (const color of colors(modelRow)) {
+        for (const asset of color.images || []) {
+          if (!asset?.id || asset.url) continue;
+          const blob = await imageBlob(asset.id).catch(() => null);
+          if (!blob) continue;
+          const url = await uploadAssetBlob(asset.id, asset.name || "", blob);
+          asset.url = url;
+          imageURLs.set(asset.id, URL.createObjectURL(blob));
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  async function compressImage(file) {
+    if (
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+      file.size > 15 * 1024 * 1024
+    )
+      throw new Error("Choose JPG, PNG or WebP, up to 15 MB.");
+
+    const bitmap = await createImageBitmap(file);
+    const maxDimension = 1400;
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    let quality = 0.8;
+    let blob = null;
+    while (quality >= 0.56) {
+      blob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/webp", quality),
+      );
+      if (blob && blob.size <= 4 * 1024 * 1024) break;
+      quality -= 0.08;
+    }
+    if (!blob || blob.size > 4 * 1024 * 1024)
+      throw new Error("Could not compress this image below 4 MB.");
+    return blob;
+  }
+
+  async function saveImage(file) {
+    const blob = await compressImage(file);
+    const id = uid();
+    await rememberLocalBlob(id, blob);
+    imageURLs.set(id, URL.createObjectURL(blob));
+    const url = await uploadAssetBlob(id, file.name, blob);
+    return { id, name: file.name, url };
+  }
+
+  const imageSrc = (asset) => {
+    if (!asset) return placeholder;
+    const local = imageURLs.get(asset.id);
+    if (local) return local;
+    if (asset.url) return String(asset.url);
+    if (asset.id && API_BASE) return assetPath(asset.id);
+    return placeholder;
+  };
+
   function cover(m, colorName) {
-    const c = colors(m).find((c) => norm(c.name) === norm(colorName));
+    const color = colors(m).find((row) => norm(row.name) === norm(colorName));
     return imageSrc(
-      c?.images?.[0] || colors(m).find((c) => c.images?.length)?.images[0],
+      color?.images?.[0] ||
+        colors(m).find((row) => row.images?.length)?.images?.[0],
     );
   }
   // END Shared image storage.
@@ -456,7 +569,39 @@
     syncAdminState,
     serverVersion: () => serverVersion,
     isServerAuthoritative: () => Boolean(API_BASE && serverVersion),
+    checkForServerChanges,
+    migrateLegacyAssets,
   };
+  let versionPollTimer = 0;
+  let versionCheckBusy = false;
+
+  async function checkForServerChanges() {
+    if (!API_BASE || versionCheckBusy || document.hidden) return;
+    versionCheckBusy = true;
+    try {
+      const payload = await api("/api/v1/catalog/version");
+      const remoteVersion = Number(payload.version || 0);
+      if (remoteVersion && serverVersion && remoteVersion !== serverVersion) {
+        await hydrateCatalog(true);
+      }
+    } catch (error) {
+      console.warn("Dart catalogue live refresh failed", error);
+    } finally {
+      versionCheckBusy = false;
+    }
+  }
+
+  function startLiveRefresh() {
+    clearInterval(versionPollTimer);
+    versionPollTimer = window.setInterval(checkForServerChanges, 3000);
+  }
+
+  window.addEventListener("focus", checkForServerChanges);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) checkForServerChanges();
+  });
+  startLiveRefresh();
+
   window.addEventListener("storage", (e) => {
     if (["dart_models", "dart_items", "dart_orders"].includes(e.key)) {
       preloadImages();
