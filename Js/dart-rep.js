@@ -1169,7 +1169,12 @@
           loginForm.elements.password.value,
         );
         setStatus(loginForm, "Login successful.");
-        rep.mustChangePassword ? showAuth("change") : renderOrders();
+        if (rep.mustChangePassword) {
+          showAuth("change");
+        } else {
+          if (API_ENABLED) await refreshApiWork();
+          renderOrders();
+        }
       } catch (error) {
         setStatus(loginForm, error.message, true);
       }
@@ -1298,12 +1303,12 @@
     };
     document
       .getElementById("repOrdersList")
-      .addEventListener("click", (event) => {
+      .addEventListener("click", async (event) => {
         const button = event.target.closest("[data-action]");
         if (!button) return;
         const card = button.closest("[data-order-id]"),
           orderId = card?.dataset.orderId,
-          orders = read(KEYS.orders, []),
+          orders = API_ENABLED ? apiWork.orders : read(KEYS.orders, []),
           order = orders.find((row) => String(row.id) === String(orderId));
         try {
           if (!order) throw new Error("The assigned order could not be found.");
@@ -1320,12 +1325,12 @@
             window.open(googleMapsRoute(order), "_blank", "noopener");
             locationPermissionBlocked = false;
             activeOrderIds.add(order.id);
-            updateOrderStatus(order.id, "Representative On The Way");
+            await updateOrderStatus(order.id, "Representative On The Way");
             ensureLocationWatch();
             renderOrders();
           }
           if (button.dataset.action === "complete") {
-            const freshOrder = read(KEYS.orders, []).find(
+            const freshOrder = (API_ENABLED ? apiWork.orders : read(KEYS.orders, [])).find(
               (row) => String(row.id) === String(orderId),
             );
             const proximity = deliveryProximity(freshOrder);
@@ -1337,12 +1342,12 @@
             if (!proximity.ok) throw new Error(proximity.reason);
             if (!confirm(`Mark ${freshOrder.orderId} as delivered and paid?`))
               return;
-            updateOrderStatus(freshOrder.id, "Delivered");
+            await updateOrderStatus(freshOrder.id, "Delivered");
             renderOrders();
           }
           if (button.dataset.action === "cancel") {
             activeOrderIds.delete(order.id);
-            updateOrderStatus(order.id, "Out With Representative");
+            await updateOrderStatus(order.id, "Out With Representative");
             ensureLocationWatch();
             renderOrders();
           }
@@ -1426,11 +1431,27 @@
       }
     }
     const rep = currentRep();
-    if (rep?.status === "Active")
-      rep.mustChangePassword ? showAuth("change") : renderOrders();
-    else showAuth("login");
-    setInterval(() => {
-      if (currentRep() && !document.hidden) renderOrders();
+    if (rep?.status === "Active") {
+      if (rep.mustChangePassword) {
+        showAuth("change");
+      } else {
+        if (API_ENABLED) await refreshApiWork();
+        renderOrders();
+      }
+    } else {
+      showAuth("login");
+    }
+    setInterval(async () => {
+      if (currentRep() && !document.hidden) {
+        if (API_ENABLED) {
+          try {
+            await refreshApiWork();
+          } catch (error) {
+            setLocationStatus(error.message || "Could not refresh assigned work.", "error");
+          }
+        }
+        renderOrders();
+      }
     }, 5000);
   });
   window.addEventListener("storage", (event) => {
