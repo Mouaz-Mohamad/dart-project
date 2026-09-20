@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveReturnCourierPolicy } from "../src/modules/commerce/customer-interaction.service.js";
+import {
+  resolveExchangeChain,
+  resolveReturnCourierPolicy,
+} from "../src/modules/commerce/customer-interaction.service.js";
 
 describe("return courier policy snapshots", () => {
   it("reads the current refund fee from site settings", () => {
@@ -20,5 +23,56 @@ describe("return courier policy snapshots", () => {
   it("treats an explicitly configured zero as valid rather than falling back", () => {
     expect(resolveReturnCourierPolicy({ refundCustomerFee: 0 }, "Refund", 0).customerFee).toBe(0);
     expect(resolveReturnCourierPolicy({ repeatExchangeCustomerFee: 0 }, "Exchange", 2).customerFee).toBe(0);
+  });
+
+  it("keeps one exchange chain when the physical Item Code changes", () => {
+    const first = {
+      id: "RET-1",
+      requestType: "Exchange",
+      status: "Completed",
+      itemCode: "ITEM-OLD",
+      replacementItemCode: "ITEM-NEW",
+      exchangeChainId: "ITEM-OLD",
+    };
+    expect(resolveExchangeChain([first], "ITEM-NEW")).toEqual({
+      exchangeChainId: "ITEM-OLD",
+      completedExchangesBeforeRequest: 1,
+    });
+
+    const second = {
+      id: "RET-2",
+      requestType: "Exchange",
+      status: "Good",
+      itemCode: "ITEM-NEW",
+      replacementItemCode: "ITEM-NEW-2",
+      exchangeChainId: "ITEM-OLD",
+    };
+    expect(resolveExchangeChain([first, second], "ITEM-NEW-2")).toEqual({
+      exchangeChainId: "ITEM-OLD",
+      completedExchangesBeforeRequest: 2,
+    });
+  });
+
+  it("does not consume the free exchange for pending or rejected requests", () => {
+    const rows = [
+      {
+        requestType: "Exchange",
+        status: "Rejected",
+        itemCode: "ITEM-OLD",
+        replacementItemCode: "ITEM-NEW",
+        exchangeChainId: "ITEM-OLD",
+      },
+      {
+        requestType: "Exchange",
+        status: "Pending Request",
+        itemCode: "ITEM-OLD",
+        replacementItemCode: "ITEM-NEW",
+        exchangeChainId: "ITEM-OLD",
+      },
+    ];
+    expect(resolveExchangeChain(rows, "ITEM-NEW")).toEqual({
+      exchangeChainId: "ITEM-NEW",
+      completedExchangesBeforeRequest: 0,
+    });
   });
 });

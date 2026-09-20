@@ -49,6 +49,8 @@ Applied migration checksums are recorded in `dart_schema_migrations`. Editing an
 
 ## Current scope and boundaries
 
+Return creation locks the shared return domain inside the PostgreSQL transaction. Exchange-chain identity is resolved server-side across replacement Item Codes, and courier-fee policy is snapshotted when the request is created.
+
 Identity/Auth, sessions, deny-by-default permissions, Owner TOTP, customer Email OTP, representative encrypted documents, catalogue/inventory, orders, finance and database-backed dashboard state are present. The main remaining architecture hardening is to normalize high-value JSONB dashboard domains (especially returns/damage/finance operations), complete external notification providers, and keep expanding real-browser/load/restore verification.
 
 

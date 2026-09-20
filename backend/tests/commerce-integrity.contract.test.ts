@@ -13,6 +13,10 @@ const platform = readFileSync(
   new URL("../../Js/dart-platform.js", import.meta.url),
   "utf8",
 );
+const customerInteractions = readFileSync(
+  new URL("../src/modules/commerce/customer-interaction.service.ts", import.meta.url),
+  "utf8",
+);
 
 describe("commerce concurrency and representative safety contracts", () => {
   it("enforces checkout idempotency inside the order transaction", () => {
@@ -80,5 +84,13 @@ describe("commerce concurrency and representative safety contracts", () => {
       expect(start).toBeGreaterThan(-1);
       expect(routes.slice(start, start + 240)).toContain("rateLimit(");
     }
+  });
+
+  it("serializes customer return creation and preserves exchange-chain identity", () => {
+    expect(customerInteractions).toContain('this.lockDomain(client, "returns")');
+    expect(customerInteractions).toContain("resolveExchangeChain(existingReturns, line.item_code)");
+    expect(customerInteractions).toContain(
+      '"SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE"',
+    );
   });
 });

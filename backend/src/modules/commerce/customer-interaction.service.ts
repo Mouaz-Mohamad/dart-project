@@ -61,6 +61,46 @@ export function resolveReturnCourierPolicy(
   };
 }
 
+export interface ExchangeChainResolution {
+  exchangeChainId: string;
+  completedExchangesBeforeRequest: number;
+}
+
+export function resolveExchangeChain(
+  rows: readonly unknown[],
+  currentItemCode: string,
+): ExchangeChainResolution {
+  const completed = rows
+    .map((raw) => raw as JsonRow)
+    .filter(
+      (row) =>
+        String(row.requestType || "") === "Exchange" &&
+        !row.isDeleted &&
+        ["Completed", "Good", "Damaged", "Bad"].includes(String(row.status || "")),
+    );
+
+  const previousExchange = completed
+    .slice()
+    .reverse()
+    .find((row) => {
+      const history = row.exchangeHistoryEntry as JsonRow | undefined;
+      return String(row.replacementItemCode || history?.toItemCode || "") === currentItemCode;
+    });
+
+  const exchangeChainId = String(
+    previousExchange?.exchangeChainId ||
+      previousExchange?.itemCode ||
+      currentItemCode,
+  );
+
+  return {
+    exchangeChainId,
+    completedExchangesBeforeRequest: completed.filter(
+      (row) => String(row.exchangeChainId || row.itemCode || "") === exchangeChainId,
+    ).length,
+  };
+}
+
 export interface ReturnInput {
   itemCode: string;
   requestType: "Refund" | "Exchange";
@@ -290,28 +330,10 @@ export class CustomerInteractionService {
         }
       }
 
-      const completedExchangeRows = existingReturns.filter((raw) => {
-        const row = raw as JsonRow;
-        return String(row.requestType || "") === "Exchange"
-          && !row.isDeleted
-          && ["Completed","Good","Damaged","Bad"].includes(String(row.status || ""));
-      });
-      const previousExchange = completedExchangeRows
-        .slice()
-        .reverse()
-        .find((row) => {
-          const history = row.exchangeHistoryEntry as JsonRow | undefined;
-          return String(row.replacementItemCode || history?.toItemCode || "") === line.item_code;
-        });
-      const exchangeChainId = String(
-        previousExchange?.exchangeChainId ||
-        previousExchange?.itemCode ||
-        line.item_code,
-      );
-      const completedExchangesBeforeRequest = completedExchangeRows.filter(
-        (row) =>
-          String(row.exchangeChainId || row.itemCode || "") === exchangeChainId,
-      ).length;
+      const {
+        exchangeChainId,
+        completedExchangesBeforeRequest,
+      } = resolveExchangeChain(existingReturns, line.item_code);
       const settingsResult = await client.query<{ data: Record<string, unknown> }>(
         "SELECT data FROM site_settings WHERE id='main'",
       );

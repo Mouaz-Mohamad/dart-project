@@ -8,6 +8,7 @@
 - Representative verification uploads now verify PNG/JPEG/WebP magic bytes against the declared MIME type before encryption or database persistence. A dedicated regression test rejects arbitrary bytes and MIME-disguised image signatures.
 
 - Cross-layer security contract coverage now prevents Service Worker API caching, accidental caching of private account/dashboard pages, browser embedding of server secret configuration, and removal of dashboard CSRF/cookie boundaries.
+- Return policy tests now cover ITEM-OLD → ITEM-NEW → ITEM-NEW-2 chain continuity, completed-exchange counting, and exclusion of pending/rejected requests from the free-exchange quota.
 - Server/browser return courier-policy parity is regression-tested for configurable refund fees, configurable repeat-exchange fees, zero-valued settings, the fixed first Dart-paid exchange, and exchange-chain continuity after Item Code replacement.
 
 # V9 verification — 2026-09-11

@@ -12,6 +12,7 @@
 - Updated the notification contract to the current policy: Email + Web Push + in-site for routine commerce; WhatsApp only for birthdays and post-delivery review requests.
 - Return fees now come from server-side site settings and are snapshotted on creation; completed exchange chains survive physical Item Code replacement so later exchanges are charged under the correct policy.
 - Added a dedicated authenticated interaction rate limit for customer review and return submissions.
+- Extracted exchange-chain resolution into a typed server rule with replacement-code continuity tests; return creation keeps the domain row locked while the rule is evaluated.
 
 ## Identity/Auth V0.2.1 — 2026-09-20
 
