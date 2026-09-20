@@ -13,6 +13,22 @@ export type DashboardDomain = typeof DASHBOARD_DOMAINS[number];
 export class DashboardStateService {
   constructor(private readonly pool: Pool) {}
 
+  async versions(): Promise<Record<DashboardDomain, number>> {
+    const result = await this.pool.query<{ domain: DashboardDomain; version: string }>(
+      `SELECT domain, version::text
+         FROM dashboard_domain_state
+        WHERE domain = ANY($1::text[])`,
+      [DASHBOARD_DOMAINS],
+    );
+    const versions = Object.fromEntries(
+      DASHBOARD_DOMAINS.map((domain) => [domain, 0]),
+    ) as Record<DashboardDomain, number>;
+    for (const row of result.rows) {
+      versions[row.domain] = Number(row.version || 1);
+    }
+    return versions;
+  }
+
   async read(domain: DashboardDomain): Promise<{ domain: DashboardDomain; version: number; data: unknown[] }> {
     const result = await this.pool.query<{ version: string; data: unknown[] }>(
       "SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1",
