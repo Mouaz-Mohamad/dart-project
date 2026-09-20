@@ -850,6 +850,41 @@
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
+
+    if (API_BASE) {
+      const response = await apiRequest("/api/v1/orders", {
+        method: "POST",
+        body: {
+          reservationId: CART_RESERVATION_ID,
+          contact: {
+            name: details.name,
+            phone1: details.phone1,
+            ...(details.phone2 && details.phone2 !== "-" ? { phone2: details.phone2 } : {}),
+            email: details.email,
+          },
+          address: {
+            country: details.country,
+            governorate: details.governorate,
+            area: details.area,
+            street: details.street,
+            building: details.building,
+            floor: details.floor,
+            latitude: String(details.latitude),
+            longitude: String(details.longitude),
+            ...(details.fullAddress ? { fullAddress: details.fullAddress } : {}),
+            addressSource:
+              addressValidation?.source || form.dataset.dartAddressSource || "map",
+          },
+          deliveryNotes: details.deliveryNotes || "",
+        },
+      });
+      if (typeof cartData !== "undefined") cartData = [];
+      write("dart_cart", []);
+      window.dartAppliedPromotion = null;
+      await window.DartCatalog?.checkForServerChanges?.();
+      return response.order;
+    }
+
     const customer = syncCustomer(logged);
     const items = read(KEYS.items, []),
       allocations = [],
@@ -1096,7 +1131,23 @@
     status.classList.toggle("is-success", !error);
   }
 
-  function releaseCartReservation(clearCart = true) {
+  async function releaseCartReservation(clearCart = true) {
+    if (API_BASE) {
+      try {
+        await apiRequest(`/api/v1/cart/reservation/${encodeURIComponent(CART_RESERVATION_ID)}`, {
+          method: "DELETE",
+        });
+      } catch (error) {
+        if (![404, 409].includes(error.status)) throw error;
+      }
+      if (clearCart) {
+        write("dart_cart", []);
+        if (typeof cartData !== "undefined") cartData = [];
+      }
+      await window.DartCatalog?.checkForServerChanges?.();
+      return;
+    }
+
     const items = read(KEYS.items, []);
     let changed = false;
     items.forEach((item) => {
@@ -1117,30 +1168,36 @@
     }
   }
 
-  function cleanupCartReservations() {
-    const items = read(KEYS.items, []),
-      time = Date.now();
-    let changed = false;
-    items.forEach((item) => {
-      if (
-        String(item.status).toLowerCase() === "cart reserved" &&
-        new Date(item.reservationUntil || 0).getTime() <= time
-      ) {
-        item.status = "In stock";
-        delete item.cartReservationId;
-        delete item.reservationUntil;
-        changed = true;
+  async function cleanupCartReservations() {
+    const cart = read("dart_cart", []);
+    const expires = Math.max(
+      0,
+      ...cart.map((line) => new Date(line.reservationUntil || 0).getTime()),
+    );
+    if (cart.length && expires <= Date.now()) {
+      if (API_BASE) {
+        await releaseCartReservation(true).catch(() => {
+          write("dart_cart", []);
+          if (typeof cartData !== "undefined") cartData = [];
+        });
+      } else {
+        const items = read(KEYS.items, []);
+        let changed = false;
+        items.forEach((item) => {
+          if (
+            String(item.status).toLowerCase() === "cart reserved" &&
+            new Date(item.reservationUntil || 0).getTime() <= Date.now()
+          ) {
+            item.status = "In stock";
+            delete item.cartReservationId;
+            delete item.reservationUntil;
+            changed = true;
+          }
+        });
+        if (changed) write(KEYS.items, items);
+        write("dart_cart", []);
+        if (typeof cartData !== "undefined") cartData = [];
       }
-    });
-    if (changed) write(KEYS.items, items);
-    const cart = read("dart_cart", []),
-      expires = Math.max(
-        0,
-        ...cart.map((line) => new Date(line.reservationUntil || 0).getTime()),
-      );
-    if (cart.length && expires <= time) {
-      write("dart_cart", []);
-      if (typeof cartData !== "undefined") cartData = [];
       if (typeof renderCart === "function") renderCart();
       if (typeof updateCartCount === "function") updateCartCount();
       window.dispatchEvent(
@@ -1162,7 +1219,7 @@
     const remaining = expires - Date.now();
     if (!cart.length || remaining <= 0) {
       timer.hidden = true;
-      if (cart.length) cleanupCartReservations();
+      if (cart.length) void cleanupCartReservations();
       return;
     }
     const minutes = Math.floor(remaining / 60000),
@@ -1171,8 +1228,36 @@
     timer.textContent = `القطع محجوزة لمدة ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 
-  function reserveCart(cart) {
-    cleanupCartReservations();
+  async function reserveCart(cart) {
+    if (API_BASE) {
+      if (!cart.length) {
+        await releaseCartReservation(false);
+        write("dart_cart", []);
+        return { expiresAt: null };
+      }
+      const lines = cart.map((line) => ({
+        modelId: String(line.id),
+        color: String(line.color),
+        size: String(line.size),
+        quantity: Number(line.quantity),
+      }));
+      const payload = await apiRequest("/api/v1/cart/reservation", {
+        method: "PUT",
+        body: {
+          reservationId: CART_RESERVATION_ID,
+          lines,
+        },
+      });
+      cart.forEach((line) => {
+        line.reservationId = CART_RESERVATION_ID;
+        line.reservationUntil = payload.expiresAt;
+      });
+      write("dart_cart", cart);
+      await window.DartCatalog?.checkForServerChanges?.();
+      return payload;
+    }
+
+    await cleanupCartReservations();
     const items = read(KEYS.items, []),
       expiresAt = new Date(Date.now() + CART_RESERVATION_MS).toISOString(),
       selected = [];
@@ -1193,15 +1278,6 @@
         (row) => String(row.id) === String(line.id),
       );
       if (!product) throw new Error("أحد المنتجات لم يعد متاحًا.");
-      if (
-        !DartCatalog.colors(DartCatalog.model(product.code)).some(
-          (c) => DartCatalog.active(c) && c.name === line.color,
-        ) ||
-        !DartCatalog.sizes(DartCatalog.model(product.code)).some(
-          (s) => DartCatalog.active(s) && s.name === String(line.size),
-        )
-      )
-        throw new Error("اللون أو المقاس غير متاح.");
       const available = items.filter(
         (item) =>
           item.modelId === product.code &&
@@ -2846,7 +2922,7 @@
     } catch {}
   });
   setInterval(() => {
-    cleanupCartReservations();
+    void cleanupCartReservations();
     updateCartReservationTimer();
   }, 1000);
   window.addEventListener("storage", (event) => {
