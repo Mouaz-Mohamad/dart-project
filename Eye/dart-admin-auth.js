@@ -63,7 +63,12 @@
     return payload;
   }
 
-  function status(form, message, isError = false) {
+  window.DartAdminApi = Object.freeze({
+    request,
+    baseUrl: API_BASE,
+  });
+
+    function status(form, message, isError = false) {
     const element = form.querySelector(".dart-admin-auth-status");
     element.textContent = message;
     element.classList.toggle("is-error", isError);
