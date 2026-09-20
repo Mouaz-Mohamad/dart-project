@@ -25,6 +25,8 @@ import { createAdminOrdersRouter } from "./modules/commerce/admin-orders.routes.
 import type { AdminOrdersService } from "./modules/commerce/admin-orders.service.js";
 import { createSiteSettingsRouter } from "./modules/settings/site-settings.routes.js";
 import type { SiteSettingsService } from "./modules/settings/site-settings.service.js";
+import { createDashboardStateRouter } from "./modules/dashboard/dashboard-state.routes.js";
+import type { DashboardStateService } from "./modules/dashboard/dashboard-state.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -34,6 +36,7 @@ export interface AppDependencies extends HealthDependencies {
   commerceService?: CommerceService;
   adminOrdersService?: AdminOrdersService;
   siteSettingsService?: SiteSettingsService;
+  dashboardStateService?: DashboardStateService;
 }
 
 // Vercel's Express builder resolves Helmet's callable default export as a module namespace.
@@ -97,6 +100,9 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       }
       if (dependencies.siteSettingsService) {
         app.use("/api/v1", createSiteSettingsRouter(dependencies.siteSettingsService, dependencies.identityService, config));
+      }
+      if (dependencies.dashboardStateService) {
+        app.use("/api/v1", createDashboardStateRouter(dependencies.dashboardStateService, dependencies.identityService, config));
       }
     }
   }
