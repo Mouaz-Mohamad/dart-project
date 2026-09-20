@@ -5302,6 +5302,47 @@ function setupOrderModal() {
       }
     }
 
+    if (existing && window.DartOrdersApi?.updateManual) {
+      try {
+        await window.DartOrdersApi.updateManual(
+          existing.orderId || existing.id,
+          {
+            ...(selectedClientId && selectedClientId !== "-"
+              ? { clientId: selectedClientId }
+              : {}),
+            clientName: payload.clientName,
+            phone1: payload.phone1,
+            ...(payload.phone2 && payload.phone2 !== "-" ? { phone2: payload.phone2 } : {}),
+            ...(payload.email && payload.email !== "-" ? { email: payload.email } : {}),
+            paymentMethod: payload.paymentMethod,
+            paymentStatus: payload.paymentStatus,
+            amountPaid: payload.amountPaid,
+            amountRefunded: payload.amountRefunded,
+            orderSource: payload.orderSource,
+            deliveryNotes: payload.deliveryNotes,
+            itemCodes: [...selected],
+            discountPercent: prices.pct,
+            country: payload.country,
+            governorate: payload.governorate,
+            area: payload.area,
+            street: payload.street,
+            building: payload.building,
+            floor: payload.floor,
+          },
+        );
+        if (window.DartCatalog?.hydrate) await window.DartCatalog.hydrate(true);
+        dartRefreshAll();
+        closeModal(modal);
+        form.reset();
+        selected = [];
+        renderSel();
+        return;
+      } catch (error) {
+        alert(error.message || "Manual order could not be updated.");
+        return;
+      }
+    }
+
     if (existing) {
       const oldCodes = [...(existing.items || [])],
         newCodes = selected.filter((c) => !oldCodes.includes(c)),
