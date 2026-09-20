@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
+  "ignoreCommand": "bash scripts/vercel-ignore-backend.sh",
   "crons": [
     {
       "path": "/api/v1/internal/outbox/process",

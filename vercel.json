@@ -70,5 +70,5 @@
       "destination": "https://dart-api-dusky.vercel.app/api/:path*"
     }
   ],
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':(exclude)backend/**'"
+  "ignoreCommand": "bash scripts/vercel-ignore-frontend.sh"
 }

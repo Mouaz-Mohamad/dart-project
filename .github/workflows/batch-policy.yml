@@ -1,0 +1,20 @@
+name: Production batch policy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-batch-markers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require 7-change deploy batch markers
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          grep -Fq '[batch:7]' <<<"$COMMIT_MESSAGE" || { echo 'Missing [batch:7] marker'; exit 1; }
+          grep -Fq '[deploy]' <<<"$COMMIT_MESSAGE" || { echo 'Missing [deploy] marker'; exit 1; }
