@@ -842,7 +842,24 @@
     });
   }
 
-  function startReturnPickup(recordId) {
+  async function startReturnPickup(recordId) {
+    if (API_ENABLED) {
+      const record = (apiWork.returns || []).find(
+        (row) => String(row.id) === String(recordId),
+      );
+      if (!record) throw new Error("The assigned return could not be found.");
+      await window.DartApi.request(
+        `/api/v1/representatives/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
+        { method: "POST", body: { action: "start" } },
+      );
+      activeReturnIds.add(record.id);
+      saveActiveIds();
+      await refreshApiWork();
+      return (apiWork.returns || []).find((row) => String(row.id) === String(record.id)) || {
+        ...record,
+        status: "Pickup On The Way",
+      };
+    }
     const { rep, records, record } = assignedReturn(recordId);
     if (!["Representative Assigned", "Pickup On The Way"].includes(record.status))
       throw new Error("This pickup cannot be started in its current status.");
@@ -865,7 +882,24 @@
     return record;
   }
 
-  function cancelReturnPickup(recordId) {
+  async function cancelReturnPickup(recordId) {
+    if (API_ENABLED) {
+      const record = (apiWork.returns || []).find(
+        (row) => String(row.id) === String(recordId),
+      );
+      if (!record) throw new Error("The assigned return could not be found.");
+      await window.DartApi.request(
+        `/api/v1/representatives/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
+        { method: "POST", body: { action: "cancel" } },
+      );
+      activeReturnIds.delete(record.id);
+      saveActiveIds();
+      await refreshApiWork();
+      return (apiWork.returns || []).find((row) => String(row.id) === String(record.id)) || {
+        ...record,
+        status: "Representative Assigned",
+      };
+    }
     const { rep, records, record } = assignedReturn(recordId);
     if (record.status !== "Pickup On The Way")
       throw new Error("This pickup is not currently active.");
@@ -885,7 +919,21 @@
     return record;
   }
 
-  function completeReturnPickup(recordId) {
+  async function completeReturnPickup(recordId) {
+    if (API_ENABLED) {
+      const record = (apiWork.returns || []).find(
+        (row) => String(row.id) === String(recordId),
+      );
+      if (!record) throw new Error("The assigned return could not be found.");
+      await window.DartApi.request(
+        `/api/v1/representatives/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
+        { method: "POST", body: { action: "complete" } },
+      );
+      activeReturnIds.delete(record.id);
+      saveActiveIds();
+      await refreshApiWork();
+      return { ...record, status: "Completed", completedAt: now() };
+    }
     const { rep, records, record } = assignedReturn(recordId),
       proximity = deliveryProximity(record);
     if (record.status !== "Pickup On The Way" || !record.pickupStartedAt)
@@ -1357,24 +1405,24 @@
       });
     document
       .getElementById("repReturnsList")
-      .addEventListener("click", (event) => {
+      .addEventListener("click", async (event) => {
         const button = event.target.closest("[data-return-action]");
         if (!button) return;
         const card = button.closest("[data-return-id]"),
           recordId = card?.dataset.returnId,
-          records = read(KEYS.returns, []),
+          records = API_ENABLED ? apiWork.returns : read(KEYS.returns, []),
           record = records.find((row) => String(row.id) === String(recordId));
         try {
           if (!record) throw new Error("The assigned return could not be found.");
           if (button.dataset.returnAction === "start") {
             window.open(googleMapsRoute(record), "_blank", "noopener");
             locationPermissionBlocked = false;
-            startReturnPickup(record.id);
+            await startReturnPickup(record.id);
             ensureLocationWatch();
             renderOrders();
           }
           if (button.dataset.returnAction === "complete") {
-            const fresh = read(KEYS.returns, []).find(
+            const fresh = (API_ENABLED ? apiWork.returns : read(KEYS.returns, [])).find(
               (row) => String(row.id) === String(record.id),
             );
             const proximity = deliveryProximity(fresh);
@@ -1386,12 +1434,12 @@
               ? `Confirm pickup and that ${money(fee)} was collected directly from the customer?`
               : `Confirm pickup for ${fresh.returnId}?`;
             if (!confirm(promptText)) return;
-            completeReturnPickup(fresh.id);
+            await completeReturnPickup(fresh.id);
             renderOrders();
           }
           if (button.dataset.returnAction === "cancel") {
             if (!confirm("Record this pickup attempt as failed/cancelled?")) return;
-            cancelReturnPickup(record.id);
+            await cancelReturnPickup(record.id);
             ensureLocationWatch();
             renderOrders();
           }
