@@ -1193,6 +1193,61 @@ function initCartAndCheckoutEvents() {
                         window.location.href = 'index.html';
                     }, 700);
                 } catch (error) {
+                    if (error.code === "PRICE_CHANGED") {
+                        const changes = Array.isArray(error.details?.changes)
+                            ? error.details.changes
+                            : [];
+                        const summary = changes.length
+                            ? changes
+                                .map(change =>
+                                    `${change.modelId} — ${change.color} / ${change.size}: EGP ${Number(change.previousUnitPrice || 0).toFixed(2)} → EGP ${Number(change.currentUnitPrice || 0).toFixed(2)}`
+                                )
+                                .join("\n")
+                            : "One or more product prices changed.";
+                        const accepted = window.confirm(
+                            `Prices changed while the items were reserved:\n\n${summary}\n\nReview and accept the current prices to place the order.`
+                        );
+                        if (!accepted) {
+                            showToast("لم يتم إنشاء الطلب. راجع الأسعار الجديدة في السلة.");
+                            return;
+                        }
+
+                        changes.forEach(change => {
+                            cartData
+                                .filter(line =>
+                                    String(line.id) === String(change.modelId) &&
+                                    String(line.color) === String(change.color) &&
+                                    String(line.size) === String(change.size)
+                                )
+                                .forEach(line => {
+                                    line.price = Number(change.currentUnitPrice || line.price || 0);
+                                    line.priceReviewedAt = new Date().toISOString();
+                                });
+                        });
+                        localStorage.setItem('dart_cart', JSON.stringify(cartData));
+                        renderCart();
+
+                        try {
+                            const order = await window.DartPlatform.checkout(
+                                checkoutForm,
+                                { acceptPriceChanges: true }
+                            );
+                            sessionStorage.setItem('dart_last_order_id', order.orderId);
+                            sessionStorage.setItem('dart_internal_navigation', '1');
+                            cartData = [];
+                            localStorage.setItem('dart_cart', '[]');
+                            appliedDiscountRate = 0;
+                            updateCartCount();
+                            renderCart();
+                            showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
+                            setTimeout(() => {
+                                window.location.href = 'index.html';
+                            }, 700);
+                        } catch (retryError) {
+                            showToast(retryError.message || "تعذر إنشاء الطلب بعد مراجعة السعر.");
+                        }
+                        return;
+                    }
                     showToast(error.message || "تعذر إنشاء الطلب.");
                 }
                 return;
