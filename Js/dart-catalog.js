@@ -258,7 +258,16 @@
   }
 
   function assetPath(id) {
-    return `/api/v1/catalog/assets/${encodeURIComponent(String(id || ""))}`;
+    const path = `/api/v1/catalog/assets/${encodeURIComponent(String(id || ""))}`;
+    return API_BASE ? `${API_BASE}${path}` : path;
+  }
+
+  function resolveAssetUrl(value, assetId = "") {
+    const raw = String(value || "").trim();
+    if (!raw) return assetId ? assetPath(assetId) : "";
+    if (/^(?:https?:|data:|blob:)/i.test(raw)) return raw;
+    if (raw.startsWith("/")) return API_BASE ? `${API_BASE}${raw}` : raw;
+    return raw;
   }
 
   function blobToBase64(blob) {
@@ -283,7 +292,7 @@
         base64: await blobToBase64(blob),
       },
     });
-    return result.urlPath || assetPath(id);
+    return resolveAssetUrl(result.urlPath, id) || assetPath(id);
   }
 
   async function loadImage(asset) {
@@ -376,7 +385,7 @@
     if (!asset) return placeholder;
     const local = imageURLs.get(asset.id);
     if (local) return local;
-    if (asset.url) return String(asset.url);
+    if (asset.url) return resolveAssetUrl(asset.url, asset.id);
     if (asset.id && API_BASE) return assetPath(asset.id);
     return placeholder;
   };
