@@ -27,3 +27,5 @@ describe("migration ordering", () => {
     ).toThrow("Applied migration checksum changed");
   });
 });
+
+// Production compatibility note: 0018 is intentionally tolerant of duplicate legacy domain rows.

@@ -2,6 +2,8 @@
 
 ## Relational business domains V0.4 — 2026-09-21
 
+- Hardened migration 0018 for real legacy production data: duplicate record IDs are deterministically deduplicated during backfill, and legacy business-code indexes are non-unique during migration so stale duplicate codes cannot abort deployment.
+
 - Added first-class PostgreSQL row tables for Returns, Damage, Promotions, Dart Card loyalty, Birthday rewards, Notifications/Messaging and Finance records.
 - Backfilled existing domain data transactionally and added indexed generated business keys for return codes, Item Codes, customers, orders, representatives, promotion codes and card codes.
 - Dashboard, Finance, customer-return rules and Commerce now read critical operational state from relational rows rather than the monolithic dashboard JSONB arrays.

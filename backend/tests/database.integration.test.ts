@@ -189,6 +189,17 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
 
     await testPool!.query(
       `UPDATE dashboard_domain_state
+          SET data=$2::jsonb, version=version+1, updated_at=now()
+        WHERE domain=$1`,
+      ["returns", JSON.stringify([row, { ...row, status: "Duplicate Legacy" }])],
+    );
+    const deduped = await testPool!.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM return_requests WHERE record_id='rel-return-1'",
+    );
+    expect(deduped.rows[0]!.count).toBe("1");
+
+    await testPool!.query(
+      `UPDATE dashboard_domain_state
           SET data='[]'::jsonb, version=version+1, updated_at=now()
         WHERE domain='returns'`,
     );

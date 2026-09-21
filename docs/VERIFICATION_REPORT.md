@@ -1,5 +1,7 @@
 # Relational domain migration verification — 2026-09-21
 
+- Migration 0018 is production-safe for legacy duplicates: duplicate record IDs are collapsed deterministically and non-empty legacy business-code indexes remain searchable without imposing a migration-time uniqueness assumption.
+
 - Migration 0018 creates row-level PostgreSQL tables for Returns, Damage, Promotions, Loyalty/Birthday rewards, Notifications/Messaging and Finance.
 - Existing arrays are backfilled preserving record order and IDs. Migration 0019 then clears the duplicated critical arrays from `dashboard_domain_state`; future compatibility writes are relationalized by a BEFORE trigger and the envelope persists only `[]` plus its version metadata.
 - Dashboard, Finance, customer-return validation and Commerce read those critical domains from relational tables.

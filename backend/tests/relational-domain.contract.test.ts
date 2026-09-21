@@ -51,9 +51,12 @@ describe("relational business domain architecture", () => {
   });
 
   it("keeps indexed business keys outside the monolithic JSON array", () => {
+    expect(migration).toContain("DISTINCT ON (dart_domain_record_id(value))");
+    expect(migration).not.toContain("CREATE UNIQUE INDEX promotion_records_code_unique");
+    expect(migration).not.toContain("CREATE UNIQUE INDEX loyalty_cards_code_unique");
     expect(migration).toContain("return_requests_item_idx");
     expect(migration).toContain("return_requests_customer_idx");
-    expect(migration).toContain("promotion_records_code_unique");
+    expect(migration).toContain("promotion_records_code_idx");
     expect(migration).toContain("loyalty_cards_customer_idx");
     expect(migration).toContain("finance_records_order_idx");
   });
