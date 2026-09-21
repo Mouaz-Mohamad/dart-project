@@ -108,6 +108,14 @@ const server = http.createServer((request, response) => {
     page.on("pageerror", (error) =>
       failures.push(`${relativeUrl}: ${error.message}`),
     );
+    page.on("console", (message) => {
+      if (!["error", "warning"].includes(message.type())) return;
+      const source = String(message.location()?.url || "");
+      if (!source.startsWith(origin)) return;
+      failures.push(
+        `${relativeUrl}: console ${message.type()} ${message.text()} (${source})`,
+      );
+    });
     page.on("requestfailed", (request) => {
       if (request.url().startsWith(origin)) {
         failures.push(
