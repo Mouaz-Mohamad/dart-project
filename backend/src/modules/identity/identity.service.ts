@@ -608,7 +608,7 @@ export class IdentityService {
           JSON.stringify({
             channel: "whatsapp",
             to: recipient,
-            template: this.config.whatsappStaffOtpTemplate,
+            template: this.config.whatsappStaffOtpTemplate || "dart_staff_otp",
             encryptedParameters: {
               otp: encryptSecret(
                 otp,
@@ -1017,7 +1017,7 @@ export class IdentityService {
           JSON.stringify({
             channel: "whatsapp",
             to: phoneNormalized,
-            template: this.config.whatsappStaffInviteTemplate,
+            template: this.config.whatsappStaffInviteTemplate || "dart_staff_invite",
             parameters: ["/Eye/Dart%20Eye.html"],
             expiresInDays: 30,
           }),
