@@ -1,3 +1,10 @@
+# Strict CSP verification — 2026-09-21
+
+- All executable inline JavaScript and known inline event handlers were moved to external runtime listeners before tightening CSP.
+- `script-src` no longer contains `unsafe-inline`; the seven static JSON-LD blocks are allowed only by exact SHA-256 hashes and `script-src-attr` is `none`.
+- SEO CI recalculates those hashes from the HTML source, while auth/static checks reject reintroduced inline executable scripts and event attributes.
+- Existing browser smoke covers the migrated signup toggle and receipt rendering; dashboard smoke now exercises year navigation through external listeners.
+
 # CSS/browser compatibility verification — 2026-09-21
 
 - Dashboard CSS no longer relies on nested `&::-webkit-scrollbar` syntax and no longer contains an external `@import` dependency in the render path.

@@ -1,5 +1,12 @@
 # Dart Project changelog
 
+## Strict script CSP hardening — 2026-09-21
+
+- Removed executable inline scripts and inline event handlers from storefront, account, receipt and dashboard surfaces.
+- Replaced `script-src 'unsafe-inline'` with static SHA-256 allowlists for the seven JSON-LD data blocks and blocked script attributes with `script-src-attr 'none'`.
+- Added `frame-src 'none'` on top of the existing frame-ancestor protection.
+- Added CI checks that recalculate every JSON-LD CSP hash from source and reject future executable inline JavaScript or event attributes.
+
 ## CSS compatibility and render-path cleanup — 2026-09-21
 
 - Flattened dashboard scrollbar CSS nesting into standard selectors for wider browser compatibility.

@@ -223,6 +223,22 @@ console.log("PASS server-authority contract");
 
 
 const vercelConfig = JSON.parse(vercel);
+const globalSecurityHeaders = vercelConfig.headers
+  .find((entry) => entry.source === "/(.*)")?.headers || [];
+const csp = globalSecurityHeaders
+  .find((header) => header.key === "Content-Security-Policy")?.value || "";
+assert.ok(csp, "storefront must publish a Content-Security-Policy");
+assert.ok(
+  !/script-src[^;]*'unsafe-inline'/.test(csp),
+  "script-src must not allow unsafe-inline execution",
+);
+assert.match(
+  csp,
+  /script-src-attr 'none'/,
+  "inline JavaScript event attributes must be blocked by CSP",
+);
+assert.match(csp, /frame-src 'none'/, "frames must be blocked by default");
+
 assert.ok(
   Array.isArray(vercelConfig.rewrites) &&
     vercelConfig.rewrites.some(

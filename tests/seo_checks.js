@@ -1,6 +1,7 @@
 /* BEGIN SEO and structure checks — keep public metadata and canonical files unique. */
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const root = path.resolve(__dirname, "..");
 const publicPages = [
@@ -20,6 +21,19 @@ const privatePages = [
   "Eye/Dart Eye.html",
 ];
 const errors = [];
+const structuredDataPages = [
+  "index.html",
+  "products.html",
+  "form-return.html",
+  "search-serial.html",
+  "Contact us.html",
+  "about.html",
+  "policies.html",
+];
+const vercelConfig = JSON.parse(read("vercel.json"));
+const csp = vercelConfig.headers
+  .find((entry) => entry.source === "/(.*)")?.headers
+  ?.find((header) => header.key === "Content-Security-Policy")?.value || "";
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -63,14 +77,41 @@ for (const page of publicPages) {
   }
 }
 
+for (const page of structuredDataPages) {
+  const html = read(page);
+  for (const block of html.matchAll(
+    /<script\s+type="application\/ld\+json">([\s\S]*?)<\/script>/gi,
+  )) {
+    const hash = `sha256-${crypto
+      .createHash("sha256")
+      .update(block[1], "utf8")
+      .digest("base64")}`;
+    if (!csp.includes(`'${hash}'`))
+      errors.push(`${page}: JSON-LD hash missing from CSP`);
+  }
+}
+if (/script-src[^;]*'unsafe-inline'/.test(csp))
+  errors.push("CSP: script-src must not contain unsafe-inline");
+if (!/script-src-attr 'none'/.test(csp))
+  errors.push("CSP: inline script attributes must be disabled");
+
 for (const page of privatePages) {
   const html = read(page);
   if (!/<meta\s+name="robots"\s+content="[^"]*noindex/i.test(html))
     errors.push(`${page}: private page must be noindex`);
 }
 
-for (const page of [...publicPages, ...privatePages]) {
+for (const page of [...new Set([...publicPages, ...privatePages, ...structuredDataPages])]) {
   const html = withoutComments(read(page));
+  const executableInline = [
+    ...html.matchAll(
+      /<script(?![^>]*\bsrc=)(?![^>]*type=["']application\/ld\+json["'])[^>]*>([\s\S]*?)<\/script>/gi,
+    ),
+  ].filter((block) => block[1].trim());
+  if (executableInline.length)
+    errors.push(`${page}: executable inline script is forbidden`);
+  if (/\son(?:click|change|input|submit|load|error|focus|blur|keydown|keyup)=/i.test(html))
+    errors.push(`${page}: inline JavaScript event attribute is forbidden`);
   for (const button of html.matchAll(/<button\b[^>]*>/gi))
     if (!/\btype\s*=\s*["'][^"']+["']/i.test(button[0]))
       errors.push(`${page}: button without an explicit type`);

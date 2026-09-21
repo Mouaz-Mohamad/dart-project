@@ -34,5 +34,13 @@ assert(admin.includes("DartAdminHydration"), "Dashboard must expose authoritativ
 assert(admin.includes("Dashboard remains locked."), "Dashboard must remain locked when required server hydration fails");
 assert(dashboard.includes('id="dart-admin-auth"'), "Dashboard auth gate HTML is missing");
 assert(dashboard.includes('src="dart-admin-auth.js"'), "Dashboard auth gate script is not loaded");
+assert(
+  !/<script(?![^>]*\bsrc=)(?![^>]*type=["']application\/ld\+json["'])[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/i.test(signup),
+  "Signup must not execute inline JavaScript",
+);
+assert(
+  !/\son(?:click|change|input|submit|load|error)=/i.test(dashboard),
+  "Dashboard must not depend on inline JavaScript event handlers",
+);
 
 console.log("PASS server-backed customer, representative and admin auth contracts");
