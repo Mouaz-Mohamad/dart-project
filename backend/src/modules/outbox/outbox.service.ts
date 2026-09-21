@@ -39,10 +39,11 @@ export class OutboxService {
   ) {}
 
   public configured(): boolean {
+    const version = this.config.whatsappGraphApiVersion || "v26.0";
     return Boolean(
       this.config.whatsappAccessToken &&
         this.config.whatsappPhoneNumberId &&
-        /^v\d+\.\d+$/.test(this.config.whatsappGraphApiVersion),
+        /^v\d+\.\d+$/.test(version),
     );
   }
 
@@ -150,7 +151,7 @@ export class OutboxService {
     const to = String(payload.to || "").replace(/\D/g, "");
     const template = String(payload.template || "").trim();
     const languageCode = String(
-      payload.languageCode || this.config.whatsappTemplateLanguage,
+      payload.languageCode || this.config.whatsappTemplateLanguage || "ar",
     ).trim();
 
     if (!/^\d{8,15}$/.test(to)) throw new Error("WhatsApp recipient is missing or invalid");
@@ -163,7 +164,7 @@ export class OutboxService {
       : undefined;
 
     const response = await fetch(
-      `https://graph.facebook.com/${this.config.whatsappGraphApiVersion}/${this.config.whatsappPhoneNumberId}/messages`,
+      `https://graph.facebook.com/${this.config.whatsappGraphApiVersion || "v26.0"}/${this.config.whatsappPhoneNumberId}/messages`,
       {
         method: "POST",
         headers: {
