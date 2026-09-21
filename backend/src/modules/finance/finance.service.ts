@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 
 type JsonRow = Record<string, unknown>;
 
@@ -225,18 +226,23 @@ export class FinanceService {
         deliveredCodesResult.rows.map((row) => row.item_code),
       );
 
-      const stateResult = await client.query<{ domain: string; data: unknown[] }>(
-        `SELECT domain, data
-           FROM dashboard_domain_state
-          WHERE domain IN (
-            'returns','damage','finance_expenses',
-            'finance_settlements','finance_marketing'
-          )`,
+      const relationalDomains = [
+        "returns",
+        "damage",
+        "finance_expenses",
+        "finance_settlements",
+        "finance_marketing",
+      ] as const;
+      const relationalRows = await Promise.all(
+        relationalDomains.map(async (domain) => [
+          domain,
+          await readRelationalDashboardDomain(client, domain),
+        ] as const),
       );
       const states = new Map(
-        stateResult.rows.map((row) => [
-          row.domain,
-          Array.isArray(row.data) ? (row.data as JsonRow[]) : [],
+        relationalRows.map(([domain, rows]) => [
+          domain,
+          rows as JsonRow[],
         ]),
       );
 

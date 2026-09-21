@@ -66,6 +66,14 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
         "dashboard_domain_state",
         "representative_documents",
         "representative_locations",
+        "return_requests",
+        "damage_records",
+        "promotion_records",
+        "loyalty_cards",
+        "birthday_rewards",
+        "notification_records",
+        "message_records",
+        "finance_records",
       ]),
     );
 
@@ -138,6 +146,51 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
     );
     expect(item.rows[0]?.status).toBe("Cart Reserved");
     expect(item.rows[0]?.cart_reservation_id).toMatch(/^CART-[AB]-/);
+  });
+
+
+  it("backfills and transactionally mirrors critical dashboard domains into relational rows", async () => {
+    const row = {
+      id: "rel-return-1",
+      returnId: "R-REL-1",
+      itemCode: "ITEM-REL-1",
+      requestType: "Refund",
+      status: "Pending Request",
+      isDeleted: false,
+    };
+    await testPool!.query(
+      `UPDATE dashboard_domain_state
+          SET data=$2::jsonb, version=version+1, updated_at=now()
+        WHERE domain=$1`,
+      ["returns", JSON.stringify([row])],
+    );
+    const relational = await testPool!.query<{
+      record_id: string;
+      return_code: string;
+      item_code: string;
+      status: string;
+      payload: Record<string, unknown>;
+    }>(
+      "SELECT record_id, return_code, item_code, status, payload FROM return_requests",
+    );
+    expect(relational.rows).toHaveLength(1);
+    expect(relational.rows[0]).toMatchObject({
+      record_id: "rel-return-1",
+      return_code: "R-REL-1",
+      item_code: "ITEM-REL-1",
+      status: "Pending Request",
+    });
+    expect(relational.rows[0]!.payload.requestType).toBe("Refund");
+
+    await testPool!.query(
+      `UPDATE dashboard_domain_state
+          SET data='[]'::jsonb, version=version+1, updated_at=now()
+        WHERE domain='returns'`,
+    );
+    const cleared = await testPool!.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM return_requests",
+    );
+    expect(cleared.rows[0]!.count).toBe("0");
   });
 
   it("enforces append-only audit records", async () => {

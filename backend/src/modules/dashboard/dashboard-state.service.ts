@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "./relational-domain.store.js";
 
 export const DASHBOARD_DOMAINS = [
   "customers","returns","reviews","cards","representatives","damage",
@@ -43,7 +44,9 @@ export class DashboardStateService {
     const row = result.rows[0];
     if (!row) throw new AppError(404, "DOMAIN_NOT_FOUND", "Dashboard domain not found");
     const stored = Array.isArray(row.data) ? row.data : [];
-    let data = stored;
+    let data = isRelationalDashboardDomain(domain)
+      ? await readRelationalDashboardDomain(this.pool, domain)
+      : stored;
     if (domain === "customers") data = await this.mergeRegisteredCustomers(stored);
     if (domain === "representatives") data = await this.mergeRegisteredRepresentatives(stored);
     return { domain, version: Number(row.version || 1), data };

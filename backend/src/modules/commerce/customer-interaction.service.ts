@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 
 type JsonRow = Record<string, unknown>;
 
@@ -474,7 +475,10 @@ export class CustomerInteractionService {
     );
     const row = result.rows[0];
     if (!row) throw new AppError(500, "DOMAIN_STATE_MISSING", `Missing dashboard domain: ${domain}`);
-    return { version: Number(row.version), data: Array.isArray(row.data) ? row.data : [] };
+    const data = isRelationalDashboardDomain(domain)
+      ? await readRelationalDashboardDomain(client, domain)
+      : (Array.isArray(row.data) ? row.data : []);
+    return { version: Number(row.version), data };
   }
 
   private async writeLockedDomain(
