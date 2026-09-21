@@ -56,6 +56,13 @@ interface SessionRow {
   mfa_required: boolean | null;
 }
 
+interface StaffInvitationRow {
+  id: string;
+  email: string;
+  email_normalized: string;
+  is_owner: boolean;
+}
+
 export interface RegisterCustomerInput {
   name: string;
   email: string;
@@ -188,7 +195,15 @@ export class IdentityService {
       | "emailOtpTtlMinutes"
       | "mfaEncryptionKey"
     > &
-      Partial<Pick<AppConfig, "staffInviteOtpTtlHours" | "corsOrigins">>,
+      Partial<
+        Pick<
+          AppConfig,
+          | "staffInviteOtpTtlHours"
+          | "corsOrigins"
+          | "ownerBootstrapEmail"
+          | "ownerBootstrapName"
+        >
+      >,
   ) {}
 
   public async registerCustomer(
@@ -512,12 +527,8 @@ export class IdentityService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const invitationResult = await client.query<{
-        id: string;
-        email: string;
-        email_normalized: string;
-      }>(
-        `SELECT id::text, email, email_normalized
+      const invitationResult = await client.query<StaffInvitationRow>(
+        `SELECT id::text, email, email_normalized, is_owner
            FROM staff_invitations
           WHERE email_normalized=$1
             AND status='pending'
@@ -525,10 +536,72 @@ export class IdentityService {
           FOR UPDATE`,
         [emailNormalized],
       );
-      const invitation = invitationResult.rows[0];
+      let invitation = invitationResult.rows[0];
+
+      const isConfiguredOwner = Boolean(
+        this.config.ownerBootstrapEmail &&
+          normalizeEmail(this.config.ownerBootstrapEmail) === emailNormalized,
+      );
+      if (!invitation && isConfiguredOwner) {
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtext('dart-owner-browser-bootstrap'))",
+        );
+        const pendingAfterLock = await client.query<StaffInvitationRow>(
+          `SELECT id::text, email, email_normalized, is_owner
+             FROM staff_invitations
+            WHERE email_normalized=$1
+              AND status='pending'
+              AND (expires_at IS NULL OR expires_at > now())
+            FOR UPDATE`,
+          [emailNormalized],
+        );
+        invitation = pendingAfterLock.rows[0];
+
+        if (!invitation) {
+          const ownerExists = await client.query<{ exists: boolean }>(
+            "SELECT EXISTS (SELECT 1 FROM staff_users WHERE is_owner) AS exists",
+          );
+          if (!ownerExists.rows[0]?.exists) {
+            const created = await client.query<StaffInvitationRow>(
+              `INSERT INTO staff_invitations (
+                 email, email_normalized, display_name, is_owner,
+                 mfa_required, permission_keys, status, invited_by, expires_at
+               ) VALUES ($1,$2,$3,true,true,'[]'::jsonb,'pending',NULL,NULL)
+               RETURNING id::text, email, email_normalized, is_owner`,
+              [
+                this.config.ownerBootstrapEmail,
+                emailNormalized,
+                this.config.ownerBootstrapName || "Dart Owner",
+              ],
+            );
+            invitation = created.rows[0];
+            await this.audit(
+              client,
+              "system",
+              null,
+              "OWNER_BROWSER_BOOTSTRAP_OPENED",
+              "staff_invitations",
+              invitation!.id,
+              metadata,
+              { emailHash: digest(`staff-email:${emailNormalized}`, this.config.authPepper) },
+            );
+          }
+        }
+      }
+
       if (!invitation) {
         await client.query("COMMIT");
         return fallback;
+      }
+
+      if (invitation.is_owner) {
+        const ownerExists = await client.query<{ exists: boolean }>(
+          "SELECT EXISTS (SELECT 1 FROM staff_users WHERE is_owner) AS exists",
+        );
+        if (ownerExists.rows[0]?.exists) {
+          await client.query("COMMIT");
+          return fallback;
+        }
       }
 
       const existingUser = await client.query<{ id: string }>(

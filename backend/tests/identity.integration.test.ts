@@ -22,6 +22,8 @@ const authConfig: Pick<
   | "mfaEncryptionKey"
   | "staffInviteOtpTtlHours"
   | "corsOrigins"
+  | "ownerBootstrapEmail"
+  | "ownerBootstrapName"
 > = {
   authPepper: "integration-test-auth-pepper-32-characters-long",
   sessionTtlDays: 30,
@@ -29,6 +31,8 @@ const authConfig: Pick<
   mfaEncryptionKey: Buffer.alloc(32, 4),
   staffInviteOtpTtlHours: 48,
   corsOrigins: ["https://dart.example"],
+  ownerBootstrapEmail: "bootstrap-owner@example.com",
+  ownerBootstrapName: "Bootstrap Owner",
 };
 
 const requestMetadata = {
@@ -101,6 +105,34 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     expect(signedIn.account.permissions).toContain("profile.read_own");
   });
 
+  it("opens browser onboarding only for the configured first Owner email", async () => {
+    const stranger = await service!.startStaffOnboarding(
+      "not-invited@example.com",
+      requestMetadata,
+    );
+    expect(stranger.deliveryQueued).toBe(false);
+
+    const onboarding = await service!.startStaffOnboarding(
+      "BOOTSTRAP-OWNER@example.com",
+      requestMetadata,
+    );
+    expect(onboarding.deliveryQueued).toBe(true);
+    const invitation = await testPool!.query<{
+      display_name: string;
+      is_owner: boolean;
+      status: string;
+    }>(
+      `SELECT display_name, is_owner, status
+         FROM staff_invitations
+        WHERE email_normalized='bootstrap-owner@example.com'`,
+    );
+    expect(invitation.rows[0]).toMatchObject({
+      display_name: "Bootstrap Owner",
+      is_owner: true,
+      status: "pending",
+    });
+  });
+
   it("activates the Owner and invited Staff using email OTPs without WhatsApp", async () => {
     const onboarding = await service!.startStaffOnboarding(
       "midomoaaz3@gmail.com",
@@ -135,6 +167,12 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     );
     expect(session.account.accountType).toBe("staff");
     expect(session.account.mfaRequired).toBe(true);
+
+    const ownerBootstrapAfterActivation = await service!.startStaffOnboarding(
+      "bootstrap-owner@example.com",
+      requestMetadata,
+    );
+    expect(ownerBootstrapAfterActivation.deliveryQueued).toBe(false);
 
     expect(session.account.permissions).toContain("staff.manage");
     await expect(

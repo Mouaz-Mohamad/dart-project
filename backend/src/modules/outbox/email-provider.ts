@@ -16,12 +16,18 @@ export interface EmailProvider {
 export class SmtpEmailProvider implements EmailProvider {
   private readonly ready: boolean;
   private readonly transporter: ReturnType<typeof nodemailer.createTransport> | null;
-  private readonly from: string | null;
+  private readonly from: { name: string; address: string } | null;
 
   public constructor(
     config: Pick<
       AppConfig,
-      "smtpHost" | "smtpPort" | "smtpSecure" | "smtpUser" | "smtpPass" | "emailFrom"
+      | "smtpHost"
+      | "smtpPort"
+      | "smtpSecure"
+      | "smtpUser"
+      | "smtpPass"
+      | "emailFrom"
+      | "emailFromName"
     >,
   ) {
     this.ready = Boolean(
@@ -31,7 +37,12 @@ export class SmtpEmailProvider implements EmailProvider {
         config.smtpPass &&
         config.emailFrom,
     );
-    this.from = config.emailFrom || null;
+    this.from = config.emailFrom
+      ? {
+          name: config.emailFromName || "Dart | for you",
+          address: config.emailFrom,
+        }
+      : null;
     this.transporter = this.ready
       ? nodemailer.createTransport({
           host: config.smtpHost!,
@@ -73,6 +84,7 @@ export function createEmailProvider(
     | "smtpUser"
     | "smtpPass"
     | "emailFrom"
+    | "emailFromName"
   >,
 ): EmailProvider | null {
   if (config.emailProvider !== "smtp") return null;

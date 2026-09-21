@@ -40,6 +40,8 @@ const environmentSchema = z.object({
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().min(3).max(30).default(10),
   STAFF_INVITE_OTP_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(48),
+  DART_OWNER_EMAIL: z.email().or(z.literal("")).default(""),
+  DART_OWNER_NAME: z.string().trim().min(3).max(120).default("Dart Owner"),
   MFA_ENCRYPTION_KEY: z
     .string()
     .default("ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="),
@@ -50,6 +52,7 @@ const environmentSchema = z.object({
   SMTP_USER: z.string().default(""),
   SMTP_PASS: z.string().default(""),
   EMAIL_FROM: z.string().trim().default(""),
+  EMAIL_FROM_NAME: z.string().trim().min(1).max(120).default("Dart | for you"),
   WHATSAPP_CLOUD_API_TOKEN: z.string().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).or(z.literal("")).default(""),
   WHATSAPP_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
@@ -80,6 +83,8 @@ export interface AppConfig {
   sessionTtlDays: number;
   emailOtpTtlMinutes: number;
   staffInviteOtpTtlHours: number;
+  ownerBootstrapEmail?: string | null;
+  ownerBootstrapName?: string;
   mfaEncryptionKey: Buffer;
   emailProvider: "disabled" | "smtp";
   smtpHost: string | null;
@@ -88,6 +93,7 @@ export interface AppConfig {
   smtpUser: string | null;
   smtpPass: string | null;
   emailFrom: string | null;
+  emailFromName?: string;
   whatsappAccessToken?: string | null;
   whatsappPhoneNumberId?: string | null;
   whatsappGraphApiVersion?: string;
@@ -169,6 +175,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     sessionTtlDays: parsed.data.SESSION_TTL_DAYS,
     emailOtpTtlMinutes: parsed.data.EMAIL_OTP_TTL_MINUTES,
     staffInviteOtpTtlHours: parsed.data.STAFF_INVITE_OTP_TTL_HOURS,
+    ownerBootstrapEmail: parsed.data.DART_OWNER_EMAIL || null,
+    ownerBootstrapName: parsed.data.DART_OWNER_NAME,
     mfaEncryptionKey,
     emailProvider: parsed.data.EMAIL_PROVIDER,
     smtpHost: parsed.data.SMTP_HOST || null,
@@ -177,6 +185,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     smtpUser: parsed.data.SMTP_USER || null,
     smtpPass: parsed.data.SMTP_PASS || null,
     emailFrom: parsed.data.EMAIL_FROM || null,
+    emailFromName: parsed.data.EMAIL_FROM_NAME,
     whatsappAccessToken: parsed.data.WHATSAPP_CLOUD_API_TOKEN || null,
     whatsappPhoneNumberId: parsed.data.WHATSAPP_PHONE_NUMBER_ID || null,
     whatsappGraphApiVersion: parsed.data.WHATSAPP_GRAPH_API_VERSION,

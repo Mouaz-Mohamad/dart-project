@@ -68,13 +68,13 @@ describe.skipIf(!databaseUrl)("email outbox", () => {
     await pool!.query(
       `INSERT INTO outbox_events (
         aggregate_type, aggregate_id, event_type, payload, deduplication_key
-      ) VALUES ('user',$1,'EMAIL_VERIFICATION_REQUESTED',$2::jsonb,$3)`,
+      ) VALUES ('user',$1,'TEMPORARY_PASSWORD_ASSIGNED',$2::jsonb,$3)`,
       [
         id,
         JSON.stringify({
           channel: "email",
           to: "user@example.com",
-          encryptedParameters: { otp },
+          encryptedParameters: { temporaryPassword: otp },
           expiresAt: new Date(Date.now() + 600_000).toISOString(),
         }),
         `email-test:${id}`,
@@ -98,13 +98,13 @@ describe.skipIf(!databaseUrl)("email outbox", () => {
     await pool!.query(
       `INSERT INTO outbox_events (
         aggregate_type, aggregate_id, event_type, payload, deduplication_key
-      ) VALUES ('user',$1,'EMAIL_VERIFICATION_REQUESTED',$2::jsonb,$3)`,
+      ) VALUES ('user',$1,'TEMPORARY_PASSWORD_ASSIGNED',$2::jsonb,$3)`,
       [
         id,
         JSON.stringify({
           channel: "email",
           to: "user@example.com",
-          encryptedParameters: { otp },
+          encryptedParameters: { temporaryPassword: otp },
         }),
         `email-failure:${id}`,
       ],
@@ -126,5 +126,34 @@ describe.skipIf(!databaseUrl)("email outbox", () => {
     expect(row.rows[0]!.available_at.getTime()).toBeGreaterThan(Date.now());
     expect(row.rows[0]!.last_error).not.toContain("user@example.com");
     expect(row.rows[0]!.last_error).not.toContain("201001234567");
+  });
+
+  it("suppresses a superseded Staff OTP before calling SMTP", async () => {
+    const provider = new FakeEmailProvider();
+    const service = new OutboxService(pool!, config, provider);
+    const invitationId = randomUUID();
+    const missingChallengeId = randomUUID();
+    const otp = encryptSecret("777777", config.mfaEncryptionKey).toString("base64");
+    await pool!.query(
+      `INSERT INTO outbox_events (
+        aggregate_type, aggregate_id, event_type, payload, deduplication_key
+      ) VALUES ('staff_invitation',$1,'STAFF_ONBOARDING_CODE_REQUESTED',$2::jsonb,$3)`,
+      [
+        invitationId,
+        JSON.stringify({
+          channel: "email",
+          to: "owner@example.com",
+          encryptedParameters: { otp },
+        }),
+        `staff-onboarding-code:${missingChallengeId}`,
+      ],
+    );
+
+    const result = await service.processBatch(
+      1,
+      `staff-onboarding-code:${missingChallengeId}`,
+    );
+    expect(result.published).toBe(1);
+    expect(provider.messages).toHaveLength(0);
   });
 });

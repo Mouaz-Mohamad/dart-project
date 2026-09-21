@@ -1,6 +1,12 @@
 # Transactional outbox operations
 
-Dart uses PostgreSQL `outbox_events` as the durable source of truth for outbound notifications. Business writes create events transactionally, and the backend publishes WhatsApp events directly to Meta WhatsApp Business Platform (Cloud API). No n8n or third-party automation webhook is required.
+Dart uses PostgreSQL `outbox_events` as the durable source of truth for outbound notifications. Business writes create events transactionally, and the backend publishes email through SMTP and approved WhatsApp events directly through Meta WhatsApp Business Platform (Cloud API). No n8n or third-party automation webhook is required.
+
+## Email delivery
+
+Owner/Staff onboarding and customer verification emails are sent directly by the API through SMTP. Configure `EMAIL_PROVIDER=smtp`, the `SMTP_*` variables, `EMAIL_FROM`, and `EMAIL_FROM_NAME`. The public sender identity should be `Dart | for you`, while the authenticated mailbox address stays server-side.
+
+The onboarding API returns `EMAIL_DELIVERY_UNAVAILABLE` instead of claiming success when SMTP is disabled or the immediate send fails. The failed outbox row remains durable and eligible for a protected retry.
 
 ## WhatsApp delivery
 
@@ -25,7 +31,7 @@ Use `POST /api/v1/internal/outbox/process` with:
 
 `Authorization: Bearer <OUTBOX_CRON_SECRET>`
 
-The processor claims only WhatsApp events. Failed sends remain in PostgreSQL and retry with exponential backoff; stuck `processing` rows are reclaimable after the lock timeout.
+The processor claims email and WhatsApp events. Failed sends remain in PostgreSQL and retry with exponential backoff; stuck `processing` rows are reclaimable after the lock timeout.
 
 ## Security
 

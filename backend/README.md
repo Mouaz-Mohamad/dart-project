@@ -16,7 +16,7 @@ The API listens on `http://localhost:4000` by default. Check `/api/v1/health/liv
 
 Vercel detects `src/server.ts` as the Express entrypoint and captures its HTTP listener as one Vercel Function. Keep the Vercel project Root Directory set to `backend`; do not set a custom Build Command or Output Directory. The complete production checklist and required environment variables are in [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md).
 
-Database migrations and the first Owner bootstrap are deliberate one-time operations. They are never run automatically during a Vercel build or Function startup.
+Database migrations are deliberate deployment operations. The first Owner can be created either by the protected command below or by the one-time browser onboarding flow configured with `DART_OWNER_EMAIL`; neither path can create a second Owner.
 
 ## Create the protected Owner account
 
@@ -27,6 +27,8 @@ npm run admin:bootstrap-owner
 ```
 
 The command refuses to create a second Owner. Remove `DART_OWNER_PASSWORD` from `.env` after it succeeds. The first dashboard login requires Google Authenticator or Microsoft Authenticator setup before protected staff actions are available.
+
+For browser onboarding, set only `DART_OWNER_EMAIL` and `DART_OWNER_NAME`. While no Owner exists, that exact normalized email may create the protected Owner invitation and receive its OTP. Every other Staff account still requires an invitation from the authenticated Owner. The browser bootstrap closes automatically as soon as the Owner account exists.
 
 ## Identity/Auth behavior
 

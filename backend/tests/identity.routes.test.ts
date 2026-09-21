@@ -5,6 +5,7 @@ import { createApp } from "../src/application.js";
 import type { AppConfig } from "../src/config/env.js";
 import type { IdentityService } from "../src/modules/identity/identity.service.js";
 import type { AuthenticatedAccount, IssuedSession } from "../src/modules/identity/identity.types.js";
+import type { OutboxService } from "../src/modules/outbox/outbox.service.js";
 import { hashCsrfToken } from "../src/security/session-token.js";
 
 const config: AppConfig = {
@@ -98,6 +99,11 @@ function fakeService(auth = account()) {
       status: "pending_approval",
     }),
     login: vi.fn().mockResolvedValue(issued(auth)),
+    startStaffOnboarding: vi.fn().mockResolvedValue({
+      challengeId: "123e4567-e89b-12d3-a456-426614174004",
+      expiresAt: new Date(Date.now() + 600_000),
+      deliveryQueued: true,
+    }),
     profile: vi.fn().mockResolvedValue(profile(auth)),
     authenticate: vi.fn().mockResolvedValue(auth),
     logout: vi.fn().mockResolvedValue(undefined),
@@ -105,10 +111,11 @@ function fakeService(auth = account()) {
   } as unknown as IdentityService;
 }
 
-function app(service: IdentityService) {
+function app(service: IdentityService, outboxService?: OutboxService) {
   return createApp(config, {
     databasePing: async () => undefined,
     identityService: service,
+    ...(outboxService ? { outboxService } : {}),
     logger: pino({ level: "silent" }),
     startedAt: new Date("2026-09-20T00:00:00.000Z"),
     version: "test",
@@ -116,6 +123,41 @@ function app(service: IdentityService) {
 }
 
 describe("identity HTTP boundaries", () => {
+  it("does not claim an onboarding OTP was sent when email is disabled", async () => {
+    const service = fakeService();
+    const outbox = {
+      configured: vi.fn().mockReturnValue(false),
+    } as unknown as OutboxService;
+    const response = await request(app(service, outbox))
+      .post("/api/v1/admin/auth/onboarding/start")
+      .send({ email: "owner@example.com" });
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("EMAIL_DELIVERY_UNAVAILABLE");
+    expect(service.startStaffOnboarding).not.toHaveBeenCalled();
+  });
+
+  it("reports an immediate SMTP failure while keeping the OTP queued for retry", async () => {
+    const service = fakeService();
+    const outbox = {
+      configured: vi.fn().mockReturnValue(true),
+      processBatch: vi.fn().mockResolvedValue({
+        configured: true,
+        claimed: 1,
+        published: 0,
+        failed: 1,
+      }),
+    } as unknown as OutboxService;
+    const response = await request(app(service, outbox))
+      .post("/api/v1/admin/auth/onboarding/start")
+      .send({ email: "owner@example.com" });
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("EMAIL_DELIVERY_UNAVAILABLE");
+    expect(outbox.processBatch).toHaveBeenCalledWith(
+      1,
+      "staff-onboarding-code:123e4567-e89b-12d3-a456-426614174004",
+    );
+  });
+
   it("queues registration verification without creating a browser credential", async () => {
     const service = fakeService();
     const response = await request(app(service)).post("/api/v1/auth/register").send({

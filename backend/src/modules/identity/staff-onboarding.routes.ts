@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
+import { AppError } from "../../http/app-error.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
@@ -51,6 +52,13 @@ export function createStaffOnboardingRouter(
 
   async function startOrResend(request: Request, response: Response) {
     const body = z.object({ email: z.email().max(254) }).parse(request.body);
+    if (!outbox?.configured("email")) {
+      throw new AppError(
+        503,
+        "EMAIL_DELIVERY_UNAVAILABLE",
+        "Dart email delivery is temporarily unavailable. Please try again shortly.",
+      );
+    }
     const result = await service.startStaffOnboarding(body.email, {
       requestId: String(request.id),
       ...(request.ip ? { ipAddress: request.ip } : {}),
@@ -58,20 +66,31 @@ export function createStaffOnboardingRouter(
         ? { userAgent: request.get("user-agent")! }
         : {}),
     });
-    if (result.deliveryQueued && outbox) {
+    if (result.deliveryQueued) {
       const eventKey = `staff-onboarding-code:${result.challengeId}`;
       try {
         const delivery = await outbox.processBatch(1, eventKey);
         if (delivery.published !== 1) {
           logger?.warn({ eventKey }, "Staff onboarding email is queued for retry");
+          throw new AppError(
+            503,
+            "EMAIL_DELIVERY_UNAVAILABLE",
+            "Dart could not send the verification email. Please try again shortly.",
+          );
         }
       } catch (error) {
+        if (error instanceof AppError) throw error;
         logger?.warn(
           {
             eventKey,
             errorName: error instanceof Error ? error.name : "Error",
           },
           "Staff onboarding email dispatch failed and remains queued",
+        );
+        throw new AppError(
+          503,
+          "EMAIL_DELIVERY_UNAVAILABLE",
+          "Dart could not send the verification email. Please try again shortly.",
         );
       }
     }

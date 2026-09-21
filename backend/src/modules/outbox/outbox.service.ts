@@ -9,6 +9,7 @@ interface OutboxRow {
   aggregate_type: string;
   aggregate_id: string;
   event_type: string;
+  deduplication_key: string | null;
   payload: Record<string, unknown>;
   attempts: number;
 }
@@ -121,7 +122,8 @@ export class OutboxService {
     try {
       await client.query("BEGIN");
       const result = await client.query<OutboxRow>(
-        `SELECT id::text, aggregate_type, aggregate_id, event_type, payload, attempts
+        `SELECT id::text, aggregate_type, aggregate_id, event_type,
+                deduplication_key, payload, attempts
            FROM outbox_events
           WHERE attempts < 12
             AND available_at <= now()
@@ -226,6 +228,7 @@ export class OutboxService {
     if (!this.emailProvider?.configured()) {
       throw new Error("SMTP email delivery is not configured");
     }
+    if (!(await this.emailChallengeIsActive(row))) return;
     const payload = this.externalPayload(row.payload || {});
     const to = String(payload.to || "").trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
@@ -233,6 +236,43 @@ export class OutboxService {
     }
     const rendered = renderOutboxEmail(row.event_type, payload);
     await this.emailProvider.send({ to, ...rendered });
+  }
+
+  private async emailChallengeIsActive(row: OutboxRow): Promise<boolean> {
+    const challengeSources: Record<string, { prefix: string; table: string }> = {
+      STAFF_INVITED: {
+        prefix: "staff-onboarding-code:",
+        table: "staff_onboarding_challenges",
+      },
+      STAFF_ONBOARDING_CODE_REQUESTED: {
+        prefix: "staff-onboarding-code:",
+        table: "staff_onboarding_challenges",
+      },
+      EMAIL_VERIFICATION_REQUESTED: {
+        prefix: "email-verification:",
+        table: "email_verification_challenges",
+      },
+      EMAIL_CHANGE_VERIFICATION_REQUESTED: {
+        prefix: "email-change-verification:",
+        table: "email_verification_challenges",
+      },
+    };
+    const source = challengeSources[row.event_type];
+    if (!source) return true;
+    const challengeId = row.deduplication_key?.startsWith(source.prefix)
+      ? row.deduplication_key.slice(source.prefix.length)
+      : "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(challengeId)) {
+      throw new Error("Email OTP event is missing a valid challenge identity");
+    }
+    const result = await this.pool.query<{ active: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM ${source.table}
+          WHERE id=$1 AND consumed_at IS NULL AND expires_at > now()
+       ) AS active`,
+      [challengeId],
+    );
+    return result.rows[0]?.active === true;
   }
 
   private async publishWhatsApp(row: OutboxRow): Promise<void> {

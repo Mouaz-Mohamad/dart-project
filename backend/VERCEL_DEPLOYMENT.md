@@ -32,6 +32,8 @@ Core:
 - `SESSION_TTL_DAYS`
 - `EMAIL_OTP_TTL_MINUTES`
 - `STAFF_INVITE_OTP_TTL_HOURS`
+- `DART_OWNER_EMAIL` (the only email allowed to open the one-time browser Owner bootstrap)
+- `DART_OWNER_NAME`
 - `OUTBOX_CRON_SECRET` or `CRON_SECRET`
 - `OUTBOX_BATCH_SIZE`
 
@@ -43,6 +45,7 @@ Email:
 - `SMTP_USER`
 - `SMTP_PASS`
 - `EMAIL_FROM`
+- `EMAIL_FROM_NAME` (default: `Dart | for you`)
 
 WhatsApp remains optional for approved notification flows:
 - `WHATSAPP_CLOUD_API_TOKEN`
