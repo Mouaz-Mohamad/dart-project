@@ -47,7 +47,27 @@ const server = http.createServer((request, response) => {
               ],
             }
           : pathname.startsWith("/api/v1/admin/finance/summary")
-            ? { summary: {} }
+            ? {
+                summary: {
+                  grossRevenue: 0, refunds: 0, netRevenue: 0,
+                  grossCogs: 0, cogsReversal: 0, netCogs: 0,
+                  operatingExpenses: 0, codFees: 0, damageLoss: 0,
+                  damageValue: 0, returnCourierCosts: 0, deliveryCosts: 0,
+                  totalOperatingExpenses: 0, totalCost: 0,
+                  grossProfit: 0, netProfit: 0, physicalItemCost: 0,
+                  incrementalDamage: 0, brandTotalCost: 0, brandNetProfit: 0,
+                  margin: 0, grossMargin: 0, deliveredOrders: 0,
+                  grossSoldUnits: 0, returnedUnits: 0, soldUnits: 0,
+                  averageOrderValue: 0, uniqueCustomers: 0,
+                  returningCustomers: 0, oneTimeCustomers: 0, repeatRate: 0,
+                  cashIn: 0, cashOut: 0, netCashFlow: 0,
+                  paidExpenseCashOut: 0, refundCashOut: 0,
+                  marketing: {
+                    spend: 0, revenue: 0, roas: 0, cac: 0, ctr: 0,
+                    cpc: 0, conversion: 0, impressions: 0, clicks: 0, orders: 0,
+                  },
+                },
+              }
           : pathname === "/api/v1/site-settings"
             ? { version: 1, settings: {} }
             : pathname === "/api/v1/admin/catalog-state"
