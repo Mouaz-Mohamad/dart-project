@@ -27,7 +27,6 @@
     window.DART_API_BASE_URL || location.origin,
   ).replace(/\/$/, "");
   const API_USER_CACHE_KEY = "dart_api_user_cache";
-  const CSRF_STORAGE_KEY = "dart_csrf_token";
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;

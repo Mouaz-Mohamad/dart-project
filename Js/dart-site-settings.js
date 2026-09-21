@@ -7,8 +7,6 @@
   const STORAGE_KEY = "dart_site_settings";
   const API_BASE = String(root.DART_API_BASE_URL || root.location?.origin || "").replace(/\/$/, "");
   const IS_ADMIN = /\/Eye\//i.test(root.location?.pathname || "");
-  const CSRF_STORAGE_KEY = "dart_csrf_token";
-  const LEGACY_MIGRATION_KEY = "dart_site_settings_server_migration_v1";
   let serverVersion = 0;
   let cachedSettings = null;
   let syncTimer = 0;

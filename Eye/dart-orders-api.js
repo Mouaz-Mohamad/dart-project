@@ -3,8 +3,6 @@
 
   const API_BASE = String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
   const STORAGE_KEY = "dart_orders";
-  const CSRF_STORAGE_KEY = "dart_csrf_token";
-  const LEGACY_MIGRATION_KEY = "dart_orders_server_migration_v1";
   let serverVersion = 0;
   let dirty = false;
   let syncTimer = 0;

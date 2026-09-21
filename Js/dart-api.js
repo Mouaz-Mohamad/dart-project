@@ -2,7 +2,6 @@
   "use strict";
 
   const BASE = String(root.DART_API_BASE_URL || root.location?.origin || "").replace(/\/$/, "");
-  const CSRF_KEY = "dart_csrf_token";
   let csrfMemory = "";
 
   function csrfToken() {

@@ -2,8 +2,6 @@
   "use strict";
 
   const API_BASE = String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
-  const CSRF_STORAGE_KEY = "dart_csrf_token";
-  const LEGACY_MIGRATION_PREFIX = "dart_domain_server_migration_v1:";
   const DOMAIN_BY_STORAGE = Object.freeze({
     dart_customers: "customers",
     dart_returns: "returns",

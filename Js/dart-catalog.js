@@ -9,8 +9,6 @@
   const API_BASE = String(
     window.DART_API_BASE_URL || location.origin,
   ).replace(/\/$/, "");
-  const CSRF_STORAGE_KEY = "dart_csrf_token";
-  const LEGACY_MIGRATION_KEY = "dart_catalog_server_migration_v1";
   const IS_ADMIN = /\/Eye\//i.test(location.pathname);
   let serverVersion = 0;
   let remoteStock = null;
