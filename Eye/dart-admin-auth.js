@@ -275,7 +275,7 @@
       showAuthForm(onboardingCodeForm);
       status(
         onboardingCodeForm,
-        "If this email is invited, a verification code has been sent to the registered WhatsApp number.",
+        "If this email is invited, a verification code has been sent to the registered WhatsApp number via WhatsApp Business Platform.",
       );
       onboardingCodeForm.elements.code.focus();
     } catch (error) {

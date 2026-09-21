@@ -51,7 +51,7 @@ const app = createApp(config, {
   logger,
   databasePing: () => pingDatabase(database),
   startedAt: new Date(),
-  version: "0.3.0",
+  version: "0.3.1",
   identityService,
   catalogService,
   catalogAssetService,

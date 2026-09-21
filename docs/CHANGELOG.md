@@ -1,11 +1,3 @@
-## 2026-09-21 — Dashboard auth and direct WhatsApp delivery
-
-- Prevent Vercel serverless cold starts from running filesystem-backed database migrations.
-- Route Staff onboarding OTP delivery directly through Meta WhatsApp Business Platform (Cloud API); no n8n webhook is required.
-- Keep WhatsApp credentials server-side and fail explicitly when the provider is not configured.
-- Add WhatsApp phone input for future Staff invitations while reusing the transactional outbox for durable retries.
-- Preserve the seven-change production deployment marker policy.
-
 # Dart Project changelog
 
 ## Fine-grained permission CI cleanup — 2026-09-21
