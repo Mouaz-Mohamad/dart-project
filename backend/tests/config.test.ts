@@ -58,7 +58,7 @@ describe("environment configuration", () => {
     ).toThrow("MFA_ENCRYPTION_KEY");
   });
 
-  it("keeps production automation disabled when unconfigured and rejects partial secrets", () => {
+  it("keeps legacy automation optional and validates direct WhatsApp settings", () => {
     const production = {
       ...baseEnvironment,
       NODE_ENV: "production",
@@ -69,21 +69,35 @@ describe("environment configuration", () => {
     const disabled = loadConfig(production);
     expect(disabled.automationWebhookUrl).toBeNull();
     expect(disabled.automationWebhookSecret).toBeNull();
+    expect(disabled.whatsappAccessToken).toBeNull();
+    expect(disabled.whatsappPhoneNumberId).toBeNull();
     expect(disabled.outboxCronSecret).toBeNull();
+
+    const legacyPartial = loadConfig({
+      ...production,
+      AUTOMATION_WEBHOOK_URL: "https://automation.example/webhook",
+    });
+    expect(legacyPartial.automationWebhookUrl).toBe(
+      "https://automation.example/webhook",
+    );
 
     expect(() =>
       loadConfig({
         ...production,
-        AUTOMATION_WEBHOOK_URL: "https://automation.example/webhook",
+        WHATSAPP_OWNER_PHONE: "12345",
       }),
-    ).toThrow("partial automation configuration");
+    ).toThrow("WHATSAPP_OWNER_PHONE");
 
     const config = loadConfig({
       ...production,
-      AUTOMATION_WEBHOOK_URL: "https://automation.example/webhook",
-      AUTOMATION_WEBHOOK_SECRET: "a".repeat(32),
+      WHATSAPP_CLOUD_API_TOKEN: "meta-system-user-token",
+      WHATSAPP_PHONE_NUMBER_ID: "123456789012345",
+      WHATSAPP_OWNER_PHONE: "201001234567",
       CRON_SECRET: "b".repeat(32),
     });
+    expect(config.whatsappPhoneNumberId).toBe("123456789012345");
+    expect(config.whatsappOwnerPhone).toBe("201001234567");
+    expect(config.whatsappGraphApiVersion).toBe("v26.0");
     expect(config.outboxCronSecret).toBe("b".repeat(32));
   });
 });
