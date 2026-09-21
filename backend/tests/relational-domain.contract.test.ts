@@ -38,6 +38,10 @@ describe("relational business domain architecture", () => {
       "BEFORE INSERT OR UPDATE OF data ON dashboard_domain_state",
     );
     expect(authoritativeMigration).toContain("NEW.data := '[]'::jsonb");
+    expect(authoritativeMigration).toContain(
+      "DISTINCT ON (dart_domain_record_id(value))",
+    );
+    expect(authoritativeMigration).toContain("ordinality DESC");
   });
 
   it("does not persist duplicated critical arrays in the compatibility envelope", () => {

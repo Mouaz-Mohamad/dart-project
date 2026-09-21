@@ -1,3 +1,9 @@
+# Relational duplicate regression fix — 2026-09-21
+
+- Root cause of the latest PostgreSQL CI failure was confirmed in migration 0019: it redefined the authoritative trigger without the duplicate-safe SELECT introduced in 0018.
+- 0019 now deduplicates every critical domain before UPSERT and deterministically keeps the last legacy occurrence.
+- Integration coverage verifies one relational row remains and that its payload is the last duplicate state.
+
 # Vercel production environment hardening — 2026-09-21
 
 - Verified from Vercel runtime logs that the previous cold start failed only because automation secrets were absent.

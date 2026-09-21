@@ -21,50 +21,93 @@ BEGIN
   IF NEW.domain = 'returns' THEN
     DELETE FROM return_requests;
     INSERT INTO return_requests(record_id,position,payload)
-    SELECT dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT record_id, position, payload FROM (
+      SELECT DISTINCT ON (dart_domain_record_id(value))
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   ELSIF NEW.domain = 'damage' THEN
     DELETE FROM damage_records;
     INSERT INTO damage_records(record_id,position,payload)
-    SELECT dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT record_id, position, payload FROM (
+      SELECT DISTINCT ON (dart_domain_record_id(value))
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   ELSIF NEW.domain = 'promotions' THEN
     DELETE FROM promotion_records;
     INSERT INTO promotion_records(record_id,position,payload)
-    SELECT dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT record_id, position, payload FROM (
+      SELECT DISTINCT ON (dart_domain_record_id(value))
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   ELSIF NEW.domain = 'cards' THEN
     DELETE FROM loyalty_cards;
     INSERT INTO loyalty_cards(record_id,position,payload)
-    SELECT dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT record_id, position, payload FROM (
+      SELECT DISTINCT ON (dart_domain_record_id(value))
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   ELSIF NEW.domain = 'birthday_rewards' THEN
     DELETE FROM birthday_rewards;
     INSERT INTO birthday_rewards(record_id,position,payload)
-    SELECT dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT record_id, position, payload FROM (
+      SELECT DISTINCT ON (dart_domain_record_id(value))
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   ELSIF NEW.domain = 'notifications' THEN
     DELETE FROM notification_records;
     INSERT INTO notification_records(record_id,position,payload)
-    SELECT dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT record_id, position, payload FROM (
+      SELECT DISTINCT ON (dart_domain_record_id(value))
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   ELSIF NEW.domain IN ('birthday_messages','message_queue') THEN
     DELETE FROM message_records WHERE domain=NEW.domain;
     INSERT INTO message_records(domain,record_id,position,payload)
-    SELECT NEW.domain, dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT domain, record_id, position, payload FROM (
+      SELECT DISTINCT ON (NEW.domain, dart_domain_record_id(value))
+             NEW.domain AS domain,
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY NEW.domain, dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(domain,record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   ELSIF NEW.domain IN (
@@ -73,8 +116,15 @@ BEGIN
   ) THEN
     DELETE FROM finance_records WHERE domain=NEW.domain;
     INSERT INTO finance_records(domain,record_id,position,payload)
-    SELECT NEW.domain, dart_domain_record_id(value), ordinality, value
-      FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+    SELECT domain, record_id, position, payload FROM (
+      SELECT DISTINCT ON (NEW.domain, dart_domain_record_id(value))
+             NEW.domain AS domain,
+             dart_domain_record_id(value) AS record_id,
+             ordinality AS position,
+             value AS payload
+        FROM jsonb_array_elements(NEW.data) WITH ORDINALITY AS rows(value,ordinality)
+       ORDER BY NEW.domain, dart_domain_record_id(value), ordinality DESC
+    ) deduped
     ON CONFLICT(domain,record_id) DO UPDATE
       SET position=EXCLUDED.position,payload=EXCLUDED.payload,updated_at=now();
   END IF;

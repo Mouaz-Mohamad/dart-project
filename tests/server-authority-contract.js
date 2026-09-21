@@ -111,6 +111,16 @@ assert.match(
 );
 assert.match(
   relationalAuthorityMigration,
+  /DISTINCT ON \(dart_domain_record_id\(value\)\)/,
+  "authoritative compatibility trigger must deduplicate legacy record IDs before UPSERT",
+);
+assert.match(
+  relationalAuthorityMigration,
+  /ordinality DESC/,
+  "duplicate legacy IDs must resolve deterministically to the latest array record",
+);
+assert.match(
+  relationalAuthorityMigration,
   /NEW\.data := '\[\]'::jsonb/,
   "critical dashboard JSON arrays must be cleared from the version envelope",
 );

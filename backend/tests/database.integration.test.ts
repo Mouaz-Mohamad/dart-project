@@ -197,6 +197,10 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       "SELECT count(*)::text AS count FROM return_requests WHERE record_id='rel-return-1'",
     );
     expect(deduped.rows[0]!.count).toBe("1");
+    const dedupedPayload = await testPool!.query<{ status: string }>(
+      "SELECT status FROM return_requests WHERE record_id='rel-return-1'",
+    );
+    expect(dedupedPayload.rows[0]!.status).toBe("Duplicate Legacy");
 
     await testPool!.query(
       `UPDATE dashboard_domain_state

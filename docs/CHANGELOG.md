@@ -1,5 +1,10 @@
 # Dart Project changelog
 
+## Relational duplicate safety follow-up — 2026-09-21
+
+- Fixed the authoritative 0019 BEFORE trigger so duplicate legacy record IDs cannot make PostgreSQL reject a compatibility write with `ON CONFLICT DO UPDATE command cannot affect row a second time`.
+- Duplicate IDs are collapsed deterministically and the final legacy array occurrence wins, preserving the most recent state during migration.
+
 ## Vercel production bootstrap hardening — 2026-09-21
 
 - Core API startup no longer requires n8n/automation secrets. A fully absent automation configuration disables event delivery safely; a partial configuration still fails closed.
