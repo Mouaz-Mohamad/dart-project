@@ -6,7 +6,6 @@ import {
   csrfProtection,
   requireAccountType,
   requireMfa,
-  requirePermission,
   requireAnyPermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";

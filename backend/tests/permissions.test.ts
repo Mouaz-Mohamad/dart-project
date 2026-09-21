@@ -10,16 +10,16 @@ function invoke(
   permissions: string[],
   body: Record<string, unknown> = {},
 ) {
-  const next = vi.fn() as unknown as NextFunction;
+  const next = vi.fn();
   middleware(
     {
       auth: { permissions } as Request["auth"],
       body,
     } as Request,
     {} as Response,
-    next,
+    next as unknown as NextFunction,
   );
-  return next as unknown as ReturnType<typeof vi.fn>;
+  return next;
 }
 
 describe("fine-grained permission middleware", () => {

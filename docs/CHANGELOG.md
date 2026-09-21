@@ -1,5 +1,11 @@
 # Dart Project changelog
 
+## Fine-grained permission CI cleanup — 2026-09-21
+
+- Removed the obsolete catalog `requirePermission` import after migrating the routes to `requireAnyPermission`.
+- Simplified the permission unit-test mock typing so lint/typecheck validate the actual middleware rather than test-cast noise.
+- Moved dashboard chart listener verification to the static contract; Chromium now verifies the controls exist without executing CDN-dependent chart work in the isolated smoke environment.
+
 ## Draw-authority and smoke-test correction — 2026-09-21
 
 - Removed a stale static contract that expected browser-side Dart Card winner selection; eligibility remains server-backed and audited, while winner awarding is explicitly reserved for a future server transaction.

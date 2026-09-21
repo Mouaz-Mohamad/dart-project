@@ -395,3 +395,5 @@ Marketing records contain channel, campaign, date, spend, impressions, clicks, a
 - `PATCH /api/v1/admin/customers/:customerId/dart-card-draw-eligibility` accepts `{ "eligible": boolean, "reason": string, "expectedVersion": number }`.
 - The eligibility change and its append-only audit event are committed atomically. Return previous/new values, actor and timestamp.
 - Monthly winner selection reads the same committed customer snapshot and excludes `eligible=false` before ranking. Existing customers default to eligible only through an explicit database migration; new-customer defaults must be documented and enforced server-side.
+
+> CI note: fine-grained permission middleware is lint/typechecked and unit-tested independently from browser chart smoke; chart CDN behavior is not part of authorization acceptance.

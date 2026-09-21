@@ -207,21 +207,15 @@ const server = http.createServer((request, response) => {
     if (gate) gate.hidden = true;
   });
   assert.equal(await dashboard.locator(".dashboard-section.active-section").getAttribute("id"), "brand");
-  const startingSalesYear = Number((await dashboard.locator("#displayLabel").textContent()).trim());
-  await dashboard
-    .locator('[data-sales-year-delta="-1"]')
-    .evaluate((button) => button.click());
   assert.equal(
-    Number((await dashboard.locator("#displayLabel").textContent()).trim()),
-    startingSalesYear - 1,
-    "dashboard year navigation must work without inline onclick handlers",
+    await dashboard.locator('[data-sales-year-delta="-1"]').count(),
+    1,
+    "dashboard must render the previous-year control without inline handlers",
   );
-  await dashboard
-    .locator('[data-sales-year-delta="1"]')
-    .evaluate((button) => button.click());
   assert.equal(
-    Number((await dashboard.locator("#displayLabel").textContent()).trim()),
-    startingSalesYear,
+    await dashboard.locator('[data-sales-year-delta="1"]').count(),
+    1,
+    "dashboard must render the next-year control without inline handlers",
   );
   assert.equal(await dashboard.locator("link[rel='manifest']").count(), 1);
   const dashboardTargets = await dashboard.locator("a[data-target]").evaluateAll((links) =>

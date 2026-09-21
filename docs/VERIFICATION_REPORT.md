@@ -1,3 +1,9 @@
+# Fine-grained permission CI verification — 2026-09-21
+
+- The first action-permission batch correctly exposed one unused import through ESLint; it is removed rather than suppressed.
+- Permission middleware unit coverage checks specific permission success, parent fallback success, 403 denial and action-to-permission mapping.
+- Dashboard chart controls remain Chromium-visible while static contracts verify their external event-listener wiring, avoiding CDN-dependent false timeouts.
+
 # CI regression correction — 2026-09-21
 
 - Frontend CI exposed two test assumptions after cleanup: a stale source assertion for removed browser-side Dart Card awarding, and a Playwright visibility timeout on an off-viewport Brand year button.

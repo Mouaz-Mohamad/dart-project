@@ -227,6 +227,16 @@ assert.ok(
   !dashboardRuntime.includes(".replaceAll("),
   "dashboard runtime should avoid replaceAll when simple global replacement is enough",
 );
+assert.match(
+  dashboardRuntime,
+  /querySelectorAll\("\[data-sales-year-delta\]"\)[\s\S]*addEventListener\("click"/,
+  "dashboard sales-year controls must be wired through external event listeners",
+);
+assert.match(
+  dashboardRuntime,
+  /querySelectorAll\("\[data-chart-period-tow\]"\)[\s\S]*addEventListener\("click"/,
+  "dashboard chart-period controls must be wired through external event listeners",
+);
 assert.ok(
   !dashboardRuntime.includes("dartEnsureMonthlyDartCardWinners"),
   "monthly Dart Card winner selection must not run authoritatively in the browser",
