@@ -131,41 +131,9 @@
     </div>
 
     <div class="actions">
-        <button type="button" onclick="window.print()">Print Receipt</button>
+        <button id="printReceiptBtn" type="button">Print Receipt</button>
     </div>
-
-    <script>
-        const orderProducts = [
-            { name: "Jeans 9 oz", qty: 2, price: 450 },
-            { name: "Dart Brand T-Shirt", qty: 3, price: 250 },
-            { name: "Black Winter Hoodie", qty: 1, price: 600 }
-        ];
-
-        function loadReceipt() {
-            document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-GB');
-            
-            const tbody = document.getElementById('receipt-items');
-            tbody.innerHTML = '';
-            let grandTotal = 0;
-
-            orderProducts.forEach(item => {
-                let total = item.qty * item.price;
-                grandTotal += total;
-
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${item.name}</td>
-                        <td>${item.qty}</td>
-                        <td>${total} EGP</td>
-                    </tr>
-                `;
-            });
-
-            document.getElementById('grand-total').innerText = grandTotal;
-        }
-
-        window.onload = loadReceipt;
-    </script>
+    <script src="Js/dart-receipt.js" defer></script>
 
 </body>
 </html>

@@ -13,11 +13,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#000000">
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
-        }
-    </script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -225,9 +220,9 @@
                     <div class="dart-controls">
                         <div class="dart-chart-title"><strong>Total Sales</strong><small>Delivered net sales by month</small></div>
                         <div class="dart-nav-controls">
-                            <button type="button" class="dart-nav-btn" onclick="navigate(-1)">❮</button>
+                            <button type="button" class="dart-nav-btn" data-sales-year-delta="-1" aria-label="Previous sales year">❮</button>
                             <span id="displayLabel">2026</span>
-                            <button type="button" class="dart-nav-btn" onclick="navigate(1)">❯</button>
+                            <button type="button" class="dart-nav-btn" data-sales-year-delta="1" aria-label="Next sales year">❯</button>
                         </div>
                     </div>
                     <div id="myChart"></div>
@@ -396,13 +391,13 @@
                         <h3><i class="fa-solid fa-chart-line" style="color: #ab012b;"></i> تحليلات الزوار والمبيعات</h3>
                     </div>
                     <div class="header-actions-tow">
-                        <button type="button" class="export-btn-tow" onclick="exportChartPNGTow()">
+                        <button id="exportChartTowBtn" type="button" class="export-btn-tow">
                             <i class="fa-solid fa-download"></i> تصدير PNG
                         </button>
                         <div class="filter-btns-tow">
-                            <button type="button" class="filter-btn-tow active-tow" onclick="updateChartTow('daily', this)">يومي</button>
-                            <button type="button" class="filter-btn-tow" onclick="updateChartTow('weekly', this)">أسبوعي</button>
-                            <button type="button" class="filter-btn-tow" onclick="updateChartTow('monthly', this)">شهري</button>
+                            <button type="button" class="filter-btn-tow active-tow" data-chart-period-tow="daily">يومي</button>
+                            <button type="button" class="filter-btn-tow" data-chart-period-tow="weekly">أسبوعي</button>
+                            <button type="button" class="filter-btn-tow" data-chart-period-tow="monthly">شهري</button>
                         </div>
                     </div>
                 </div>

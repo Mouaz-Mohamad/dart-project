@@ -659,6 +659,12 @@ function navigate(dir) {
   updateChart();
 }
 
+document.querySelectorAll("[data-sales-year-delta]").forEach((button) => {
+  button.addEventListener("click", () => {
+    navigate(Number(button.dataset.salesYearDelta) || 0);
+  });
+});
+
 function updateChart() {
   const label = document.getElementById("displayLabel");
   if (label) label.innerText = currentYear;
@@ -911,6 +917,15 @@ function exportChartPNGTow() {
   link.click();
   document.body.removeChild(link);
 }
+
+document.querySelectorAll("[data-chart-period-tow]").forEach((button) => {
+  button.addEventListener("click", () => {
+    updateChartTow(String(button.dataset.chartPeriodTow || "daily"), button);
+  });
+});
+document
+  .getElementById("exportChartTowBtn")
+  ?.addEventListener("click", exportChartPNGTow);
 
 // ============================================================================
 // DART OPERATIONS V2 — integrated business layer (additive refactor)

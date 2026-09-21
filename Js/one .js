@@ -1925,6 +1925,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 // =========================================
 // --. الازرار الي بتحولني الي اقسام وصفحات مختلفه
 // =========================================
+
+function initAccountModeToggle() {
+    const container = document.querySelector('.container');
+    const registerButton = document.querySelector('.register-btn');
+    const loginButton = document.querySelector('.login-btn');
+    if (!container || !registerButton || !loginButton) return;
+    registerButton.addEventListener('click', () => container.classList.add('active'));
+    loginButton.addEventListener('click', () => container.classList.remove('active'));
+}
+
+function registerDartServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    const allowedProtocol =
+        location.protocol === 'https:' ||
+        ['localhost', '127.0.0.1'].includes(location.hostname);
+    if (!allowedProtocol) return;
+    navigator.serviceWorker.register('/sw.js').catch((error) => {
+        console.warn('Dart service worker registration failed.', error);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initAccountModeToggle();
+    registerDartServiceWorker();
+});
+
 document.querySelectorAll("[data-go-products]").forEach((button) =>
     button.addEventListener("click", function () { window.location.href = "products.html"; }),
 );
