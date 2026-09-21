@@ -1,3 +1,9 @@
+# Vercel runtime migration hardening — 2026-09-21
+
+- Removed database migration execution from the Vercel build command so production builds do not depend on database reachability during the build sandbox phase.
+- Vercel cold starts now run the checksum-protected migration runner under its PostgreSQL advisory lock before serving the API.
+- The backend Vercel function bundle explicitly includes `migrations/**`; local/non-Vercel runtime behavior remains unchanged.
+
 # Relational domain migration verification — 2026-09-21
 
 - Migration 0018 is production-safe for legacy duplicates: duplicate record IDs are collapsed deterministically and non-empty legacy business-code indexes remain searchable without imposing a migration-time uniqueness assumption.

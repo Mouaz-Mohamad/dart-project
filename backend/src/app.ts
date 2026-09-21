@@ -1,8 +1,11 @@
 import express from "express";
+import { resolve } from "node:path";
 import { createApp } from "./application.js";
 import { loadConfig } from "./config/env.js";
 import { createLogger } from "./config/logger.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
+import { runMigrations } from "./database/migrate.js";
+import { shouldRunRuntimeMigrations } from "./config/runtime.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
 import { CatalogService } from "./modules/catalog/catalog.service.js";
 import { CatalogAssetService } from "./modules/catalog/catalog.asset.service.js";
@@ -34,6 +37,15 @@ export const outboxService = new OutboxService(database, config);
 database.on("error", (error) => {
   logger.error({ err: error }, "Unexpected PostgreSQL pool error");
 });
+
+if (shouldRunRuntimeMigrations()) {
+  const migrationDirectory = resolve(process.cwd(), "migrations");
+  const applied = await runMigrations(database, migrationDirectory);
+  logger.info(
+    { applied },
+    applied.length ? "Runtime migrations applied" : "Runtime database schema is current",
+  );
+}
 
 const app = createApp(config, {
   logger,

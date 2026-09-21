@@ -6,5 +6,10 @@
       "path": "/api/v1/internal/outbox/process",
       "schedule": "17 3 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/server.ts": {
+      "includeFiles": "migrations/**"
+    }
+  }
 }

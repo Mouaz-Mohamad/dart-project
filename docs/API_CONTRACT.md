@@ -4,7 +4,7 @@ The production frontend is database-authoritative through `/api/v1`; PostgreSQL 
 
 ## Implemented foundation — 2026-09-19
 
-- The provider-neutral TypeScript/Express service lives under `backend/`.
+- The provider-neutral TypeScript/Express service lives under `backend/`. Vercel production builds compile without opening a database connection; schema migrations run at serverless cold start under the existing PostgreSQL advisory lock before the Express app is exported, with SQL migration files explicitly included in the function bundle.
 - `GET /api/v1/health/live` reports process liveness without depending on PostgreSQL.
 - `GET /api/v1/health/ready` reports PostgreSQL readiness and returns `503` without leaking connection details when unavailable.
 - Migration `0001_platform_foundation.sql` adds append-only `audit_logs`, transactional `outbox_events`, and hashed `idempotency_keys` storage.
