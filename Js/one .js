@@ -629,25 +629,6 @@ function renderProductSizeChart(product) {
 
 function openProductModal(product) { return DartStorefront.open(product); }
 
-function updateColorsAvailability(product, size) {
-    const modal = document.getElementById('SectionModel');
-    const colorBtns = modal.querySelectorAll('.color-btn');
-    
-    colorBtns.forEach(btn => {
-        const color = btn.getAttribute('data-color');
-        const qty = getAvailableStock(product, size, color);
-        
-        if (qty <= 0) {
-            btn.classList.add('disabled');
-            if (selectedColor === color) {
-                btn.classList.remove('active');
-                selectedColor = null;
-            }
-        } else {
-            btn.classList.remove('disabled');
-        }
-    });
-}
 
 // ==========================================
 // كاروسيل صور المنتج داخل المودال
@@ -1655,96 +1636,6 @@ function initAddressMap() {
 // ==========================================
 // 6. خريطة تتبع الطلب (وجهة ثابتة + موقع متغير)
 // ==========================================
-function initTrackingMap(destLat = 30.0444, destLng = 31.2357) {
-    const mapElement = document.getElementById('tracking-map');
-    if (!mapElement || typeof L === 'undefined') return;
-
-    const map = L.map('tracking-map', {
-        attributionControl: false,
-        zoomControl: false
-    }).setView([destLat, destLng], 13);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
-    }).addTo(map);
-
-    setTimeout(() => map.invalidateSize(), 200);
-
-    // 1. الوجهة الثابتة
-    const destIcon = L.divIcon({
-        className: 'custom-dest-pin',
-        html: `<div style="color: #ef4444; font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-                <i class="fa-solid fa-location-dot"></i>
-               </div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 30]
-    });
-
-    const fixedMarker = L.marker([destLat, destLng], { icon: destIcon }).addTo(map);
-    fixedMarker.bindPopup("<b>عنوان التوصيل (ثابت)</b>").openPopup();
-
-    // 2. إعداد المتغيرات (لن تظهر النقطة أو الخط إلا بعد توفر الموقع)
-    const userIcon = L.divIcon({
-        className: 'custom-user-pin',
-        html: `<div style="color: #2563eb; font-size: 22px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-                <i class="fa-solid fa-circle-dot"></i>
-               </div>`,
-        iconSize: [25, 25],
-        iconAnchor: [12, 12]
-    });
-
-    let userMarker = null;
-    let routePolyline = null;
-
-    if ("geolocation" in navigator) {
-        navigator.geolocation.watchPosition(
-            (pos) => {
-                const currentLat = pos.coords.latitude;
-                const currentLng = pos.coords.longitude;
-
-                // 1. إظهار النقطة الزرقاء لأول مرة أو تحديث مكانها
-                if (!userMarker) {
-                    userMarker = L.marker([currentLat, currentLng], { icon: userIcon }).addTo(map);
-                    userMarker.bindPopup("الموقع الحالي");
-                } else {
-                    userMarker.setLatLng([currentLat, currentLng]);
-                }
-
-                // 2. جلب المسار الشارعي نحو النقطة الثابتة ورسم الاتجاهات
-                const routeUrl = `https://router.project-osrm.org/route/v1/driving/${currentLng},${currentLat};${destLng},${destLat}?overview=full&geometries=geojson`;
-
-                fetch(routeUrl)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.routes && data.routes[0]) {
-                            const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-
-                            if (routePolyline) {
-                                routePolyline.setLatLngs(coords);
-                            } else {
-                                routePolyline = L.polyline(coords, {
-                                    color: '#2563eb',
-                                    weight: 5,
-                                    opacity: 0.8,
-                                    lineJoin: 'round'
-                                }).addTo(map);
-                            }
-                        }
-                    })
-                    .catch(err => console.error('خطأ في جلب الاتجاهات:', err));
-
-                // 3. احتواء الموقعين داخل الشاشة
-                const bounds = L.latLngBounds([
-                    [destLat, destLng],
-                    [currentLat, currentLng]
-                ]);
-                map.fitBounds(bounds, { padding: [50, 50] });
-            },
-            (err) => console.warn('تعذر تحديث الموقع المباشر:', err.message),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    }
-}
 // ==========================================
 // 6. الفلترة والبانر
 // ==========================================

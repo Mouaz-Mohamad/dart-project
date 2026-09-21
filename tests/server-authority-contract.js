@@ -28,6 +28,10 @@ const relationalAuthorityMigration = read("backend/migrations/0019_relational_do
 const customerInteractionService = read("backend/src/modules/commerce/customer-interaction.service.ts");
 const typedReturnDamageMigration = read("backend/migrations/0020_return_damage_typed_core.sql");
 const dashboardHtml = read("Eye/Dart Eye.html");
+const dashboardRuntime = read("Eye/dart.js");
+const storefrontRuntime = read("Js/one .js");
+const operationsRuntime = read("Eye/dart-operations-v4.js");
+const platformRuntime = read("Js/dart-platform.js");
 
 assert.match(
   catalog,
@@ -163,6 +167,19 @@ for (const path of [...walkJsFiles("Eye"), ...walkJsFiles("Js")]) {
     "DART_V3_ID_MIGRATION_KEY",
   ]) {
     assert.ok(!source.includes(deadName), `${path} must not retain dead legacy declaration ${deadName}`);
+  }
+}
+for (const [runtimeName, source] of [
+  ["dashboard", dashboardRuntime],
+  ["storefront", storefrontRuntime],
+  ["operations", operationsRuntime],
+  ["platform", platformRuntime],
+]) {
+  for (const deadName of ["setMode","dartCanHardDelete","saveSectionState","dartVisibleRows","dartSectionKeyFromContainer","dartTomorrowBirthdays","dartEnsureMonthlyDartCardWinners","dartEnsureBrandExtraCards","dartMigrateSequentialIds","updateColorsAvailability","initTrackingMap","hashPassword","safeDemoReset","resetLocalDemoDataOnce","isCompletedCustomerReturn","leaderboardDataSignature","publicCustomerName"]) {
+    assert.ok(
+      !new RegExp(`\\b${deadName}\\b`).test(source),
+      `${runtimeName} runtime must not retain dead legacy helper ${deadName}`,
+    );
   }
 }
 assert.ok(!dashboardHtml.includes('class=""'), "dashboard HTML must not retain empty class attributes");

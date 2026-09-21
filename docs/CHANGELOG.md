@@ -1,5 +1,11 @@
 # Dart Project changelog
 
+## Runtime dead-code cleanup — 2026-09-21
+
+- Removed 17 unused legacy helpers/no-op stubs from the storefront, dashboard operations and platform runtimes after whole-project reference verification.
+- Removed the obsolete sequential-ID browser migration stub and empty demo reset shim now that durable business state is server-authoritative.
+- Added a regression contract preventing those legacy helper names from silently returning.
+
 ## Typed Returns / Damage core phase 1 — 2026-09-21
 
 - Added typed PostgreSQL columns and foreign keys for return customer/order/item links, pickup address, exchange-chain data, monetary values and courier fees.

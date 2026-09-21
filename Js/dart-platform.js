@@ -881,9 +881,6 @@
     return cacheApiUser(payload.user);
   }
 
-  function resetLocalDemoDataOnce() {
-    /* No demo seeding: owner requested an empty dashboard. */
-  }
 
   function ensureCatalogInventory() {
     /* Inventory is created only through Add Item. */
@@ -1528,54 +1525,7 @@
   }
 
   // BEGIN Leaderboard net items — completed customer returns no longer count as purchases.
-  function isCompletedCustomerReturn(record) {
-    const status = String(record?.status || "")
-      .trim()
-      .toLowerCase();
-    return (
-      record?.isPostDeliveryReturn === true &&
-      !record?.isDeleted &&
-      !returnRules()?.isExchange(record) &&
-      Boolean(record?.completedAt || ["completed", "good", "damaged", "bad"].includes(status))
-    );
-  }
 
-  function leaderboardDataSignature(customers, orders, returns, cards, today) {
-    const source = JSON.stringify({
-      month: `${today.getFullYear()}-${today.getMonth()}`,
-      customers: customers.map((row) => [
-        row.clientId,
-        row.clientName,
-        Boolean(row.isArchived),
-        Boolean(row.isDeleted),
-      ]),
-      orders: orders.map((row) => [
-        row.orderId,
-        row.clientId,
-        row.status,
-        row.deliveredAt || row.createdAt,
-        row.totalProducts,
-        row.items,
-        row.finalAmount,
-      ]),
-      returns: returns.map((row) => [
-        row.returnId,
-        row.orderId,
-        row.clientId,
-        row.itemCode,
-        row.status,
-        Boolean(row.isPostDeliveryReturn),
-        Boolean(row.isDeleted),
-      ]),
-      cards: cards.map((row) => [row.cardId, row.clientId, row.status]),
-    });
-    let hash = 2166136261;
-    for (let index = 0; index < source.length; index += 1) {
-      hash ^= source.charCodeAt(index);
-      hash = Math.imul(hash, 16777619);
-    }
-    return `${today.getFullYear()}-${today.getMonth()}-${hash >>> 0}`;
-  }
 
   let publicLeaderboardRows = null;
   let publicLeaderboardPeriod = "";
@@ -1707,9 +1657,6 @@
     return parts.slice(0, Math.max(1, count)).join(" ");
   }
 
-  function publicCustomerName(value) {
-    return customerNameParts(value, 2);
-  }
 
   async function renderSerialResult(form) {
     const result = document.getElementById("serialSearchResult");

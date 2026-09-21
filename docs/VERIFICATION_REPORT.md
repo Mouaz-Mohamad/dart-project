@@ -1,3 +1,9 @@
+# Runtime cleanup verification — 2026-09-21
+
+- Whole-project reference checks confirmed the removed helpers were not referenced by HTML inline handlers, sibling runtime files or public adapters.
+- Deleted helpers covered obsolete browser migrations, local-demo reset shims, unused leaderboard/customer formatters and abandoned UI helpers.
+- A server-authority regression contract now fails if any of the removed legacy helper names return to the four affected runtimes.
+
 # Relational duplicate regression fix — 2026-09-21
 
 - Root cause of the latest PostgreSQL CI failure was confirmed in migration 0019: it redefined the authoritative trigger without the duplicate-safe SELECT introduced in 0018.

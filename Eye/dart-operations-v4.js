@@ -23,17 +23,7 @@
   const value = id => String(field(id)?.value || '').trim();
   const now = () => new Date().toISOString();
   const uid = prefix => `${prefix}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
-
-  async function hashPassword(password) {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(password)));
-    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  function safeDemoReset() { /* Empty installation; never overwrite owner records. */ }
-
-  safeDemoReset();
-
-  if (typeof dartMoney === 'function') {
+if (typeof dartMoney === 'function') {
     dartMoney = amount => `${Math.trunc(Number(amount) || 0)} EGP`;
   }
   if (typeof dartOrderNet === 'function') {

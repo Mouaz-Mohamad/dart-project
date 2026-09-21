@@ -653,16 +653,6 @@ var chart =
     : { render() {}, updateOptions() {} };
 chart.render();
 
-function setMode(mode) {
-  currentMode = mode;
-  document
-    .querySelectorAll(".mode-btns button")
-    .forEach((b) => b.classList.remove("active"));
-  document
-    .getElementById("btn" + mode.charAt(0).toUpperCase() + mode.slice(1))
-    .classList.add("active");
-  updateChart();
-}
 
 function navigate(dir) {
   currentYear += dir;
@@ -1294,13 +1284,6 @@ function dartDeleteImpact(sectionKey, id) {
   return { sectionKey, id: sid, target, impact, counts };
 }
 
-function dartCanHardDelete(sectionKey, id) {
-  const preview = dartDeleteImpact(sectionKey, id),
-    relations = (preview?.counts || [])
-      .filter((row) => row.key !== sectionKey || row.count > 1)
-      .map((row) => `${row.label} (${row.count})`);
-  return { allowed: relations.length === 0, relations };
-}
 
 let dartPendingHardDelete = null;
 function dartHardDeleteRelations(preview) {
@@ -2268,12 +2251,6 @@ sectionsMap.damage = {
   storageKey: "dart_damage",
 };
 
-function saveSectionState(sectionKey) {
-  const sec = sectionsMap[sectionKey];
-  if (!sec) return;
-  saveDataToStorage(sec.storageKey, sec.data);
-  dartSaveAll();
-}
 function dartArchiveRecord(key, id) {
   const sec = sectionsMap[key],
     x = sec?.data.find((v) => String(v.id) === String(id));
@@ -2293,12 +2270,6 @@ function dartArchiveRecord(key, id) {
   );
   dartSaveAll();
   dartRefreshAll();
-}
-function dartVisibleRows(key) {
-  const sec = document.getElementById(key);
-  return [...(sec?.querySelectorAll(".model-row") || [])].filter(
-    (r) => r.offsetParent !== null && !r.classList.contains("row-deleted"),
-  );
 }
 function dartUpdateMasterCheckbox(key, viewData) {
   if (key === "items") return DartInventory.updateMaster();
@@ -2556,9 +2527,6 @@ function setupHeaderBatchActions() {
 }
 
 
-function dartSectionKeyFromContainer(container) {
-  return container.closest(".dashboard-section")?.id;
-}
 let dartPasswordResetRequests = [];
 
 async function dartLoadPasswordResetRequests(openAfterLoad = false) {
@@ -3379,9 +3347,6 @@ const DART_TOP_SIZES = [
   "6XL",
 ];
 
-function dartMigrateSequentialIds() {
-  return false;
-}
 
 function loadAllDataFromStorage(_persistMigrations = true) {
   const load = (key, fallback) => window.DartState?.read?.(key, fallback) ?? fallback;
@@ -4194,9 +4159,6 @@ function dartBirthdayMessageBatch(reference = new Date()) {
     );
   return { open: true, key, target, all, rows };
 }
-function dartTomorrowBirthdays(reference = new Date()) {
-  return dartBirthdayMessageBatch(reference).rows;
-}
 function renderBirthdayWidget() {
   const feed = document.getElementById("birthday-feed");
   if (!feed) return;
@@ -4374,105 +4336,6 @@ function renderTopClients() {
     '<div class="dart-empty-state">No delivered orders in this period</div>';
 }
 
-function dartEnsureMonthlyDartCardWinners() {
-  const now = new Date(),
-    prev = new Date(now.getFullYear(), now.getMonth() - 1, 1),
-    key = dartMonthKey(prev),
-    marker = `dart_card_awarded_${key}`;
-  if (cardsData.some((card) => card.awardMonth === key && !card.isDeleted)) return;
-  cardsData.forEach((card) => {
-    if (card.status === "Active") {
-      const expiredByItems =
-          Number(card.purchasedItems || 0) >=
-          Number(card.itemLimit || card.purchasedLimit || 10),
-        expiry = dartDateValue(card.expDate),
-        expiredByDate = expiry && expiry < now;
-      if (expiredByItems || expiredByDate) card.status = "Expired";
-    }
-  });
-  const activeCardClients = new Set(
-    cardsData
-      .filter((card) => card.status === "Active")
-      .map((card) => String(card.clientId)),
-  );
-  customersData.forEach((customer) => {
-    customer.dartCard = activeCardClients.has(String(customer.clientId))
-      ? "yes"
-      : "no";
-  });
-  const candidates = customersData
-    .filter(dartIsActive)
-    // Draw eligibility is opt-out for existing customers and explicitly auditable in Finance.
-    .filter((c) => c.dartCardDrawEligible !== false)
-    .filter((c) => !activeCardClients.has(String(c.clientId)))
-    .map((c) => {
-      const os = dartDeliveredInMonth(
-        c.clientId,
-        prev.getFullYear(),
-        prev.getMonth(),
-      );
-      return {
-        c,
-        count: os.length,
-        spent: os.reduce(
-          (a, o) =>
-            a + Math.max(0, dartOrderNet(o) - (Number(o.amountRefunded) || 0)),
-          0,
-        ),
-      };
-    })
-    .filter((x) => x.count > 0)
-    .sort((a, b) => b.count - a.count || b.spent - a.spent);
-  if (!candidates.length) {
-    dartSyncUserCardFlags();
-    return;
-  }
-  const maxCount = candidates[0].count,
-    winners = candidates
-      .filter((x) => x.count === maxCount)
-      .sort((a, b) => b.spent - a.spent)
-      .slice(0, 3);
-  winners.forEach((w, idx) => {
-    if (
-      !cardsData.some(
-        (c) => c.awardMonth === key && c.clientId === w.c.clientId,
-      )
-    ) {
-      cardsData.push({
-        id: dartUid("CARDDB"),
-        cardId: `DART-${key}-${idx + 1}`,
-        clientName: w.c.clientName,
-        clientId: w.c.clientId,
-        phone1: w.c.phone1,
-        phone2: w.c.phone2 || "-",
-        email: w.c.email || "",
-        status: "Active",
-        issueDate: new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          1,
-        ).toLocaleDateString("en-GB"),
-        expDate: new Date(
-          now.getFullYear() + 1,
-          now.getMonth(),
-          1,
-        ).toLocaleDateString("en-GB"),
-        purchasedItems: "0",
-        purchasedLimit: "10",
-        itemLimit: 10,
-        discountPercent: Number(window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40),
-        requestedProducts: [],
-        awardMonth: key,
-        isArchived: false,
-        isDeleted: false,
-        isChecked: false,
-      });
-      w.c.dartCard = "yes";
-    }
-  });
-  dartSyncUserCardFlags();
-  // Award rows are the durable monthly marker.
-}
 
 function dartInStockSellingValue() {
   return itemsData
@@ -4491,10 +4354,6 @@ function dartDamageLoss() {
       const m = dartFindModelByCode(i.modelId);
       return a + (Number(m?.cost) || 0);
     }, 0);
-}
-function dartEnsureBrandExtraCards() {
-  const grid = dartEnsureAnalyticsGrid();
-  if (!grid) return;
 }
 function dartInfoButton(title, text) {
   return `<button type="button" class="dart-info-btn" data-info-title="${dartEsc(title)}" data-info-text="${dartEsc(text)}" title="Info"><i class="fa-solid fa-info"></i></button>`;
@@ -6075,6 +5934,3 @@ function dartTotalInventoryCost() {
       return a + (Number(i.costSnapshot ?? m?.cost) || 0);
     }, 0);
 }
-// Ensure migrated sequences reserve their highest number and migrate review references too.
-// Legacy browser sequence migration removed: PostgreSQL/API own durable business state.
-dartMigrateSequentialIds = function () { return false; };
