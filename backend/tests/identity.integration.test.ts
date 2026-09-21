@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
+import { generate as generateTotp } from "otplib";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AppConfig } from "../src/config/env.js";
@@ -135,8 +136,36 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     expect(session.account.accountType).toBe("staff");
     expect(session.account.mfaRequired).toBe(true);
 
+    expect(session.account.permissions).toContain("staff.manage");
+    await expect(
+      service!.createStaffInvitation(
+        session.account,
+        {
+          email: "blocked-before-mfa@example.com",
+          phone: "",
+          displayName: "Blocked Before MFA",
+          permissionKeys: ["orders.read"],
+          mfaRequired: false,
+        },
+        requestMetadata,
+      ),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    const mfaSetup = await service!.setupMfa(session.account);
+    const mfaToken = await generateTotp({ secret: mfaSetup.secret });
+    await service!.confirmMfa(session.account, mfaToken, requestMetadata);
+
+    const separator = session.sessionToken.indexOf(".");
+    expect(separator).toBeGreaterThan(0);
+    const ownerAccount = await service!.authenticate(
+      session.sessionToken.slice(0, separator),
+      session.sessionToken.slice(separator + 1),
+    );
+    expect(ownerAccount?.mfaSatisfied).toBe(true);
+    expect(ownerAccount?.permissions).toContain("staff.manage");
+
     const invitation = await service!.createStaffInvitation(
-      session.account,
+      ownerAccount!,
       {
         email: "staff@example.com",
         phone: "",
