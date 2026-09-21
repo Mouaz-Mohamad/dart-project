@@ -186,10 +186,9 @@ export class IdentityService {
       | "authPepper"
       | "sessionTtlDays"
       | "emailOtpTtlMinutes"
-      | "staffInviteOtpTtlHours"
       | "mfaEncryptionKey"
-      | "corsOrigins"
-    >,
+    > &
+      Partial<Pick<AppConfig, "staffInviteOtpTtlHours" | "corsOrigins">>,
   ) {}
 
   public async registerCustomer(
@@ -507,7 +506,7 @@ export class IdentityService {
     const emailNormalized = normalizeEmail(emailInput);
     const fallback = {
       challengeId: randomUUID(),
-      expiresAt: new Date(Date.now() + this.config.staffInviteOtpTtlHours * 3_600_000),
+      expiresAt: new Date(Date.now() + (this.config.staffInviteOtpTtlHours ?? 48) * 3_600_000),
       deliveryQueued: false,
     };
     const client = await this.pool.connect();
@@ -568,7 +567,7 @@ export class IdentityService {
       const challengeId = randomUUID();
       const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
       const expiresAt = new Date(
-        Date.now() + this.config.staffInviteOtpTtlHours * 3_600_000,
+        Date.now() + (this.config.staffInviteOtpTtlHours ?? 48) * 3_600_000,
       );
       await client.query(
         `INSERT INTO staff_onboarding_challenges (
@@ -595,7 +594,7 @@ export class IdentityService {
             encryptedParameters: {
               otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
             },
-            dashboardUrl: `${this.config.corsOrigins[0] || ""}/Eye/Dart%20Eye.html`,
+            dashboardUrl: `${this.config.corsOrigins?.[0] || ""}/Eye/Dart%20Eye.html`,
             expiresAt: expiresAt.toISOString(),
           }),
           `staff-onboarding-code:${challengeId}`,
@@ -1008,7 +1007,7 @@ export class IdentityService {
       const challengeId = randomUUID();
       const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
       const challengeExpiresAt = new Date(
-        Date.now() + this.config.staffInviteOtpTtlHours * 3_600_000,
+        Date.now() + (this.config.staffInviteOtpTtlHours ?? 48) * 3_600_000,
       );
       await client.query(
         `INSERT INTO staff_onboarding_challenges (
@@ -1035,7 +1034,7 @@ export class IdentityService {
             encryptedParameters: {
               otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
             },
-            dashboardUrl: `${this.config.corsOrigins[0] || ""}/Eye/Dart%20Eye.html`,
+            dashboardUrl: `${this.config.corsOrigins?.[0] || ""}/Eye/Dart%20Eye.html`,
             expiresAt: challengeExpiresAt.toISOString(),
           }),
           `staff-onboarding-code:${challengeId}`,
