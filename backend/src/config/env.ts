@@ -61,13 +61,13 @@ export interface AppConfig {
   mfaEncryptionKey: Buffer;
   automationWebhookUrl: string | null;
   automationWebhookSecret: string | null;
-  whatsappAccessToken: string | null;
-  whatsappPhoneNumberId: string | null;
-  whatsappGraphApiVersion: string;
-  whatsappTemplateLanguage: string;
-  whatsappOwnerPhone: string | null;
-  whatsappStaffOtpTemplate: string;
-  whatsappStaffInviteTemplate: string;
+  whatsappAccessToken?: string | null;
+  whatsappPhoneNumberId?: string | null;
+  whatsappGraphApiVersion?: string;
+  whatsappTemplateLanguage?: string;
+  whatsappOwnerPhone?: string | null;
+  whatsappStaffOtpTemplate?: string;
+  whatsappStaffInviteTemplate?: string;
   outboxCronSecret: string | null;
   outboxBatchSize: number;
 }
