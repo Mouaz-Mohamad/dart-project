@@ -1,9 +1,6 @@
 (function () {
   'use strict';
   window.DartOperationsV4 = Object.freeze({ active: true });
-
-  const RESET_MARKER = 'dart_demo_reset_2026_09_05';
-  const PASSWORD_REQUESTS_KEY = 'dart_password_reset_requests';
   const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
   const MAX_SOURCE_IMAGE_BYTES = 5 * 1024 * 1024;
   const MAX_SAVED_IMAGE_BYTES = 650 * 1024;

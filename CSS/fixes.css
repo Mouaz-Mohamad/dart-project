@@ -289,10 +289,7 @@
   .dart-card-account-head {
     grid-template-columns: minmax(230px, 42%) 1fr;
   }
-  .dart-card-account-tagline {
-
-  }
-  .dart-card-account-main {
+.dart-card-account-main {
     align-items: center;
   }
 }

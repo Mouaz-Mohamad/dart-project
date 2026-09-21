@@ -27,6 +27,7 @@ const relationalStore = read("backend/src/modules/dashboard/relational-domain.st
 const relationalAuthorityMigration = read("backend/migrations/0019_relational_domains_authoritative.sql");
 const customerInteractionService = read("backend/src/modules/commerce/customer-interaction.service.ts");
 const typedReturnDamageMigration = read("backend/migrations/0020_return_damage_typed_core.sql");
+const dashboardHtml = read("Eye/Dart Eye.html");
 
 assert.match(
   catalog,
@@ -146,6 +147,28 @@ assert.match(
   relationalAuthorityMigration,
   /NEW\.data := '\[\]'::jsonb/,
   "critical dashboard JSON arrays must be cleared from the version envelope",
+);
+
+for (const path of [...walkJsFiles("Eye"), ...walkJsFiles("Js")]) {
+  const source = read(path);
+  for (const deadName of [
+    "CSRF_STORAGE_KEY",
+    "LEGACY_MIGRATION_PREFIX",
+    "LEGACY_MIGRATION_KEY",
+    "CSRF_KEY",
+    "EXPENSE_CATEGORIES",
+    "RESET_MARKER",
+    "PASSWORD_REQUESTS_KEY",
+    "DART_SCHEMA_VERSION",
+    "DART_V3_ID_MIGRATION_KEY",
+  ]) {
+    assert.ok(!source.includes(deadName), `${path} must not retain dead legacy declaration ${deadName}`);
+  }
+}
+assert.ok(!dashboardHtml.includes('class=""'), "dashboard HTML must not retain empty class attributes");
+assert.ok(
+  !/<[^>]*\btype=["'][^"']+["'][^>]*\btype=["'][^"']+["'][^>]*>/i.test(dashboardHtml),
+  "dashboard HTML must not contain duplicate type attributes",
 );
 
 assert.match(

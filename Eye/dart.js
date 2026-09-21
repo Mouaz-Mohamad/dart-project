@@ -78,37 +78,6 @@ let customersData = [];
 // 5. قسم الطلبات (Orders Module)
 // ==========================================
 
-// إعدادات حالات الطلب
-const orderStatuses = [
-  {
-    key: "Pending",
-    label: "Pending",
-    bg: "#fff3cd",
-    color: "#856404",
-    border: "#ffeeba",
-  },
-  {
-    key: "Accepted",
-    label: "Accepted",
-    bg: "#cce5ff",
-    color: "#004085",
-    border: "#b8daff",
-  },
-  {
-    key: "Out for Delivery",
-    label: "Out for Delivery",
-    bg: "#e2e3e5",
-    color: "#383d41",
-    border: "#d6d8db",
-  },
-  {
-    key: "Delivered",
-    label: "Delivered",
-    bg: "#d4edda",
-    color: "#155724",
-    border: "#c3e6cb",
-  },
-];
 
 // البيانات الأولية للطلبات
 let ordersData = [];
@@ -959,7 +928,6 @@ function exportChartPNGTow() {
 let damageData = [];
 let notificationData = [];
 let auditData = [];
-const DART_SCHEMA_VERSION = 2;
 const DART_LOW_STOCK_THRESHOLD = 5;
 const DART_DEAD_STOCK_DAYS = 60;
 const DART_ORDER_FLOW = [
@@ -3380,7 +3348,6 @@ function dartCheckStockAlerts() {
 // ============================================================================
 // DART OPERATIONS V3 — requested refinements (IDs, analytics, UX, filters)
 // ============================================================================
-const DART_V3_ID_MIGRATION_KEY = "dart_v3_sequential_ids_migrated";
 const DART_PANTS_SIZES = [
   "26",
   "28",

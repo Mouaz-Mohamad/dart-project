@@ -79,5 +79,12 @@ assert.strictEqual(
   "Responsive CSS may only contain @media blocks",
 );
 assert(!/#(?:brand|finance|models|orders|returns|representative)\b/.test(main), "Dashboard section selectors must not leak into storefront CSS");
+for (const [name, source] of [["main", main], ["responsive", responsive]]) {
+  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert(
+    !/[^{}]+\{\s*\}/.test(withoutComments),
+    `${name} storefront CSS must not contain empty rules`,
+  );
+}
 
 console.log(`PASS storefront CSS architecture (${responsiveParts.media.length} responsive blocks)`);

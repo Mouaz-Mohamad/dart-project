@@ -19,21 +19,6 @@
     period: "dart_finance_period",
   });
 
-
-
-  const EXPENSE_CATEGORIES = [
-    "Marketing",
-    "Delivery",
-    "Packaging",
-    "Salaries",
-    "Rent",
-    "Utilities",
-    "Software",
-    "Professional Services",
-    "Taxes & Fees",
-    "Other",
-  ];
-
   const GOAL_METRICS = Object.freeze({
     revenue: { label: "Net Revenue", unit: "money", direction: "min" },
     units: { label: "Net Units Sold", unit: "number", direction: "min" },
