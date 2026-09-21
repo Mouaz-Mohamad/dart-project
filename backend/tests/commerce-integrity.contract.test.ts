@@ -47,7 +47,14 @@ describe("commerce concurrency and representative safety contracts", () => {
 
   it("reads critical return data from relational rows while keeping the version envelope locked", () => {
     expect(service).toContain('readRelationalDashboardDomain');
-    expect(service).not.toContain("SELECT data FROM dashboard_domain_state WHERE domain='returns'");
+    for (const domain of ["returns", "cards", "damage", "promotions", "birthday_rewards"]) {
+      expect(service).not.toContain(
+        `SELECT data FROM dashboard_domain_state WHERE domain='${domain}'`,
+      );
+      expect(service).not.toContain(
+        `SELECT version::text, data FROM dashboard_domain_state WHERE domain='${domain}'`,
+      );
+    }
     const lockedVersions = service.match(
       /SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE/g,
     ) ?? [];

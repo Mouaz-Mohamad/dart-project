@@ -2881,13 +2881,14 @@ export class CommerceService {
             [item.id, String(record.id || returnRef)],
           );
 
-          const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
-            "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
+          const damageStateResult = await client.query<{ version: string }>(
+            "SELECT version::text FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
           );
           const damageState = damageStateResult.rows[0];
-          const damageRows = Array.isArray(damageState?.data)
-            ? damageState!.data as Record<string, unknown>[]
-            : [];
+          const damageRows = await readRelationalDashboardDomain(
+            client,
+            "damage",
+          ) as Record<string, unknown>[];
           if (!damageRows.some((row) => String(row.itemCode || "") === itemCode && !row.isDeleted)) {
             damageRows.unshift({
               id: randomUUID(),
@@ -3201,13 +3202,14 @@ export class CommerceService {
           record.financialCompletionApplied = true;
 
           if (order.promotion?.type === "Dart Card" && order.promotion?.cardId) {
-            const cardStateResult = await client.query<{ version: string; data: unknown[] }>(
-              "SELECT version::text, data FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
+            const cardStateResult = await client.query<{ version: string }>(
+              "SELECT version::text FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
             );
             const cardState = cardStateResult.rows[0];
-            const cards = Array.isArray(cardState?.data)
-              ? cardState!.data as Record<string, unknown>[]
-              : [];
+            const cards = await readRelationalDashboardDomain(
+              client,
+              "cards",
+            ) as Record<string, unknown>[];
             const card = cards.find(
               (row) => String(row.cardId || row.id || "") === String(order.promotion?.cardId),
             );
@@ -4824,11 +4826,14 @@ export class CommerceService {
 
     const promotionType = String(promotion?.type || "");
     if (promotionType === "Birthday" && promotion?.rewardId) {
-      const stateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='birthday_rewards' FOR UPDATE",
+      const stateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='birthday_rewards' FOR UPDATE",
       );
       const state = stateResult.rows[0];
-      const data = Array.isArray(state?.data) ? state.data as Record<string, unknown>[] : [];
+      const data = await readRelationalDashboardDomain(
+        client,
+        "birthday_rewards",
+      ) as Record<string, unknown>[];
       const reward = data.find((row) => String(row.id || "") === String(promotion.rewardId));
       if (reward) {
         if (nextStatus === "Delivered") {
@@ -4859,11 +4864,14 @@ export class CommerceService {
     }
 
     if (promotionType === "Dart Card" && promotion?.cardId) {
-      const stateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
+      const stateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
       );
       const state = stateResult.rows[0];
-      const data = Array.isArray(state?.data) ? state.data as Record<string, unknown>[] : [];
+      const data = await readRelationalDashboardDomain(
+        client,
+        "cards",
+      ) as Record<string, unknown>[];
       const card = data.find(
         (row) => String(row.cardId || row.id || "") === String(promotion.cardId),
       );

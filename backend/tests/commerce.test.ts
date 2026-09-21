@@ -50,47 +50,52 @@ describe("CommerceService public leaderboard", () => {
         };
       }
 
-      if (sql.includes("FROM dashboard_domain_state")) {
+      if (sql.includes("FROM return_requests")) {
         return {
           rows: [
             {
-              domain: "returns",
-              data: [
-                {
-                  itemCode: "A-2",
-                  requestType: "Refund",
-                  status: "Completed",
-                  completedAt: "2026-09-20T12:00:00.000Z",
-                  isPostDeliveryReturn: true,
-                  isDeleted: false,
-                },
-                {
-                  itemCode: "A-3",
-                  requestType: "Exchange",
-                  status: "Completed",
-                  completedAt: "2026-09-20T13:00:00.000Z",
-                  isPostDeliveryReturn: true,
-                  isDeleted: false,
-                },
-              ],
+              payload: {
+                itemCode: "A-2",
+                requestType: "Refund",
+                status: "Completed",
+                completedAt: "2026-09-20T12:00:00.000Z",
+                isPostDeliveryReturn: true,
+                isDeleted: false,
+              },
             },
             {
-              domain: "cards",
-              data: [
-                {
-                  clientId: "DR-3",
-                  status: "Active",
-                  isArchived: false,
-                  isDeleted: false,
-                },
-                {
-                  clientId: "DR-4",
-                  status: "Active",
-                  expDate: "2020-01-01",
-                  isArchived: false,
-                  isDeleted: false,
-                },
-              ],
+              payload: {
+                itemCode: "A-3",
+                requestType: "Exchange",
+                status: "Completed",
+                completedAt: "2026-09-20T13:00:00.000Z",
+                isPostDeliveryReturn: true,
+                isDeleted: false,
+              },
+            },
+          ],
+        };
+      }
+
+      if (sql.includes("FROM loyalty_cards")) {
+        return {
+          rows: [
+            {
+              payload: {
+                clientId: "DR-3",
+                status: "Active",
+                isArchived: false,
+                isDeleted: false,
+              },
+            },
+            {
+              payload: {
+                clientId: "DR-4",
+                status: "Active",
+                expDate: "2020-01-01",
+                isArchived: false,
+                isDeleted: false,
+              },
             },
           ],
         };

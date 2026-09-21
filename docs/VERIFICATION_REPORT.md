@@ -4,7 +4,8 @@
 - Existing arrays are backfilled through the same database trigger used for compatibility writes, preserving record order and IDs.
 - Dashboard, Finance, customer-return validation and Commerce read those critical domains from relational tables.
 - Integration coverage checks the tables exist and verifies a compatibility-envelope update is mirrored transactionally into `return_requests`.
-- Static contracts reject a regression where Commerce reads Returns directly from `dashboard_domain_state.data`.
+- Static contracts reject regressions where Commerce reads Returns, Cards, Damage, Promotions or Birthday rewards directly from `dashboard_domain_state.data`.
+- Real PostgreSQL migration tests passed for migration 0018 and its row-level mirror trigger before the final mock-fixture cleanup.
 
 # Recovery and readiness hardening — 2026-09-21
 

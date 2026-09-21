@@ -85,10 +85,13 @@ assert.match(
   /readRelationalDashboardDomain/,
   "commerce must read critical operational state from relational tables",
 );
-assert.ok(
-  !commerceService.includes("SELECT data FROM dashboard_domain_state WHERE domain='returns'"),
-  "commerce must not use the JSONB compatibility envelope as the returns read source",
-);
+for (const domain of ["returns", "cards", "damage", "promotions", "birthday_rewards"]) {
+  assert.ok(
+    !commerceService.includes(`SELECT data FROM dashboard_domain_state WHERE domain='${domain}'`) &&
+      !commerceService.includes(`SELECT version::text, data FROM dashboard_domain_state WHERE domain='${domain}'`),
+    `commerce must not use the JSONB compatibility envelope as the ${domain} read source`,
+  );
+}
 assert.match(
   financeService,
   /readRelationalDashboardDomain/,

@@ -7,6 +7,7 @@
 - Dashboard, Finance, customer-return rules and Commerce now read critical operational state from relational rows rather than the monolithic dashboard JSONB arrays.
 - The legacy `dashboard_domain_state` payload remains temporarily as a versioned compatibility write envelope; database triggers mirror those writes transactionally into the relational tables until the frontend protocol is migrated to row-level mutations.
 - Added PostgreSQL integration and static contracts to prevent critical reads from drifting back to the compatibility JSONB envelope.
+- Removed the last remaining Commerce reads of card, damage and birthday-reward payloads from the compatibility envelope; all critical operational reads now use relational rows.
 
 
 ## Production hardening V0.3 — 2026-09-21
