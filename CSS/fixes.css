@@ -174,10 +174,12 @@
   }
   .product-size-chart-dialog {
     width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
     max-height: calc(100dvh - 16px);
     padding: 18px 10px 12px;
   }
   .product-size-chart-table-wrap {
+    max-height: 68vh;
     max-height: 68dvh;
   }
   .product-size-chart-table th,

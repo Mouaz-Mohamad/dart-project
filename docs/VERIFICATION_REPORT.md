@@ -1,3 +1,9 @@
+# CSS/browser compatibility verification — 2026-09-21
+
+- Dashboard CSS no longer relies on nested `&::-webkit-scrollbar` syntax and no longer contains an external `@import` dependency in the render path.
+- Mobile size-chart `dvh` declarations are preceded by equivalent `vh` fallbacks.
+- CSS architecture tests enforce both compatibility rules; Chromium smoke verifies dashboard navigation remains scrollable after the selector rewrite.
+
 # Runtime cleanup verification — 2026-09-21
 
 - Whole-project reference checks confirmed the removed helpers were not referenced by HTML inline handlers, sibling runtime files or public adapters.

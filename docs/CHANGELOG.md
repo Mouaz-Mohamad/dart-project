@@ -1,5 +1,12 @@
 # Dart Project changelog
 
+## CSS compatibility and render-path cleanup — 2026-09-21
+
+- Flattened dashboard scrollbar CSS nesting into standard selectors for wider browser compatibility.
+- Removed the render-delaying Boxicons `@import` from dashboard CSS; the dashboard already loads Boxicons from its document head.
+- Added `vh` fallbacks before `dvh` mobile size-chart rules so older mobile browsers retain usable modal heights.
+- Bumped the storefront static cache and added static/Chromium regressions for the cleaned CSS behavior.
+
 ## Browser compatibility pass — 2026-09-21
 
 - Added a shared clone helper that uses native `structuredClone` when available and a JSON-safe fallback for legacy browsers; cart rollback and dashboard price snapshots now use it.

@@ -1,5 +1,5 @@
 // Dart storefront cache: network-first for code, cache-first fallback for media.
-const CACHE = 'dart-static-v16-performance';
+const CACHE = 'dart-static-v17-compatibility';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));

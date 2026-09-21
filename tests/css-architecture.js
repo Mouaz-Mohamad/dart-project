@@ -7,6 +7,7 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const main = fs.readFileSync(path.join(root, "CSS/Stayle 1.css"), "utf8");
 const responsive = fs.readFileSync(path.join(root, "CSS/fixes.css"), "utf8");
+const dashboard = fs.readFileSync(path.join(root, "Eye/dart.css"), "utf8");
 
 function skipQuoted(text, index, quote) {
   index += 1;
@@ -87,4 +88,21 @@ for (const [name, source] of [["main", main], ["responsive", responsive]]) {
   );
 }
 
-console.log(`PASS storefront CSS architecture (${responsiveParts.media.length} responsive blocks)`);
+assert(
+  !dashboard.includes("&::-webkit-scrollbar"),
+  "Dashboard CSS must use standard selectors instead of nested scrollbar syntax",
+);
+assert(
+  !dashboard.includes("@import url("),
+  "Dashboard CSS must not delay rendering with external @import stylesheets",
+);
+assert(
+  /max-height:\s*calc\(100vh - 16px\);\s*max-height:\s*calc\(100dvh - 16px\);/.test(responsive),
+  "Dynamic viewport sizing must retain a vh fallback",
+);
+assert(
+  /max-height:\s*68vh;\s*max-height:\s*68dvh;/.test(responsive),
+  "Size-chart scroll height must retain a vh fallback",
+);
+
+console.log(`PASS storefront/dashboard CSS architecture (${responsiveParts.media.length} responsive blocks)`);
