@@ -1,3 +1,10 @@
+# Recovery and readiness hardening — 2026-09-21
+
+- Added an automated PostgreSQL restore-drill command for verified custom-format backups.
+- Restore verification is fail-safe: it refuses the production database, requires an explicitly named recovery/test target, never issues DROP/CLEAN/CREATE, and restores inside a single transaction with exit-on-error.
+- Health liveness now reports process uptime; readiness reports PostgreSQL latency without exposing database errors or credentials.
+- Tests permanently enforce the non-destructive recovery boundary and readiness response contract.
+
 # Production hardening verification — 2026-09-21
 
 - GitHub Backend CI now provisions PostgreSQL 17 and runs the full Vitest suite with `TEST_DATABASE_URL`; current migrations are applied into isolated schemas rather than being skipped.

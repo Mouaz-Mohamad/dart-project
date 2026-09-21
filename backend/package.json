@@ -28,7 +28,8 @@
     "admin:bootstrap-owner": "node --env-file-if-exists=.env --import tsx src/database/bootstrap-owner.ts",
     "check:vercel": "node scripts/check-vercel-config.mjs",
     "db:backup": "node --env-file-if-exists=.env scripts/database-backup.mjs create",
-    "db:backup:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs verify"
+    "db:backup:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs verify",
+    "db:restore:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs restore-verify"
   },
   "dependencies": {
     "argon2": "0.44.0",

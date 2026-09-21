@@ -26,6 +26,20 @@ npm run db:backup:verify -- backups/manual-before-change.dump
 
 The script passes database credentials through PostgreSQL environment variables rather than command-line arguments and never prints `DATABASE_URL` or the password.
 
+
+### Automated isolated restore verification
+
+For a real restore drill, create an **empty, isolated** recovery database and set:
+
+```bash
+export DART_RECOVERY_DATABASE_URL="postgresql://.../dart_recovery"
+npm run db:restore:verify -- backups/<backup>.dump
+```
+
+The command refuses to run when the recovery target resolves to the same database identity as `DATABASE_URL`. It also requires the target database name to contain `recovery`, `restore`, `drill`, or `test`. It never creates, drops, cleans, or overwrites a database automatically; the recovery target must already exist and be disposable.
+
+The restore uses `--single-transaction` and `--exit-on-error`, so a failed archive does not leave a partially restored verification database.
+
 ## Storage policy
 
 Do not keep the only backup on the application server and never commit a dump to Git. Copy verified archives to encrypted, access-controlled backup storage. A practical starting retention policy is daily backups for 14 days, weekly backups for 8 weeks, and monthly backups for 12 months. Adjust retention when legal, accounting, or business requirements are defined.

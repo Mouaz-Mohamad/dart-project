@@ -44,6 +44,7 @@ describe("health API", () => {
     );
     expect(response.status).toBe(200);
     expect(response.body.status).toBe("ok");
+    expect(response.body.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(response.headers["x-request-id"]).toBeTruthy();
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
@@ -59,8 +60,12 @@ describe("health API", () => {
 
     expect(ready.status).toBe(200);
     expect(ready.body.checks.database).toBe("up");
+    expect(ready.body.checks.databaseLatency).toBe("ok");
+    expect(ready.body.checks.databaseLatencyMs).toEqual(expect.any(Number));
     expect(unavailable.status).toBe(503);
     expect(unavailable.body.checks.database).toBe("down");
+    expect(unavailable.body.checks.databaseLatency).toBe("unavailable");
+    expect(unavailable.body.checks.databaseLatencyMs).toBeNull();
     expect(JSON.stringify(unavailable.body)).not.toContain("database unavailable");
   });
 

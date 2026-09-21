@@ -24,22 +24,36 @@ export function createHealthRouter(dependencies: HealthDependencies): Router {
         "catalog-assets-v1",
       ],
       startedAt: dependencies.startedAt.toISOString(),
+      uptimeSeconds: Math.max(
+        0,
+        Math.floor((Date.now() - dependencies.startedAt.getTime()) / 1000),
+      ),
       timestamp: new Date().toISOString(),
     });
   });
 
   router.get("/ready", async (_request, response) => {
+    const started = performance.now();
     try {
       await dependencies.databasePing();
+      const latencyMs = Math.max(0, Math.round((performance.now() - started) * 100) / 100);
       response.status(200).json({
         status: "ready",
-        checks: { database: "up" },
+        checks: {
+          database: "up",
+          databaseLatencyMs: latencyMs,
+          databaseLatency: latencyMs >= 1000 ? "slow" : "ok",
+        },
         timestamp: new Date().toISOString(),
       });
     } catch {
       response.status(503).json({
         status: "not_ready",
-        checks: { database: "down" },
+        checks: {
+          database: "down",
+          databaseLatencyMs: null,
+          databaseLatency: "unavailable",
+        },
         timestamp: new Date().toISOString(),
       });
     }

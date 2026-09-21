@@ -24,9 +24,18 @@ describe("database backup operations", () => {
     expect(script).toContain("return verifyBackup(target)");
   });
 
+  it("supports a non-destructive isolated restore drill", () => {
+    expect(script).toContain("restoreBackupForVerification");
+    expect(script).toContain("DART_RECOVERY_DATABASE_URL");
+    expect(script).toContain('"--single-transaction"');
+    expect(script).toContain('"--exit-on-error"');
+    expect(script).toContain("Refusing to restore into the production database");
+  });
+
   it("does not implement an unattended destructive restore command", () => {
     expect(script).not.toContain('"--clean"');
     expect(script).not.toContain('"--create"');
     expect(script).not.toContain("DROP DATABASE");
+    expect(script).not.toContain("DROP SCHEMA");
   });
 });

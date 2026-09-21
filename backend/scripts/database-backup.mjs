@@ -68,6 +68,59 @@ export async function verifyBackup(filePath) {
   return { path: target, bytes: info.size };
 }
 
+function sameDatabase(left, right) {
+  const normalize = (value) => {
+    const url = new URL(value);
+    return [
+      url.hostname.toLowerCase(),
+      url.port || "5432",
+      decodeURIComponent(url.pathname.replace(/^\\//, "")),
+      decodeURIComponent(url.username),
+    ].join("|");
+  };
+  return normalize(left) === normalize(right);
+}
+
+function assertRecoveryDatabaseSafety(productionUrl, recoveryUrl) {
+  if (!recoveryUrl) {
+    throw new Error("DART_RECOVERY_DATABASE_URL is required for a restore drill");
+  }
+  if (sameDatabase(productionUrl, recoveryUrl)) {
+    throw new Error("Refusing to restore into the production database");
+  }
+  const recovery = new URL(recoveryUrl);
+  const name = decodeURIComponent(recovery.pathname.replace(/^\\//, ""));
+  if (!/(?:recovery|restore|drill|test)/i.test(name)) {
+    throw new Error(
+      "Recovery database name must include recovery, restore, drill or test",
+    );
+  }
+}
+
+export async function restoreBackupForVerification(filePath) {
+  const productionUrl = process.env.DATABASE_URL;
+  const recoveryUrl = process.env.DART_RECOVERY_DATABASE_URL;
+  if (!productionUrl) throw new Error("DATABASE_URL is required for restore safety checks");
+  assertRecoveryDatabaseSafety(productionUrl, recoveryUrl);
+
+  const verified = await verifyBackup(filePath);
+  const env = postgresEnvironment(recoveryUrl);
+  await run(
+    "pg_restore",
+    [
+      "--exit-on-error",
+      "--single-transaction",
+      "--no-owner",
+      "--no-privileges",
+      "--dbname",
+      env.PGDATABASE,
+      verified.path,
+    ],
+    env,
+  );
+  return verified;
+}
+
 export async function createBackup(filePath = defaultBackupPath()) {
   const target = resolve(filePath);
   await mkdir(dirname(target), { recursive: true });
@@ -100,7 +153,17 @@ async function main() {
     process.stdout.write(`Backup archive is readable: ${result.path} (${result.bytes} bytes)\n`);
     return;
   }
-  throw new Error("Usage: database-backup.mjs create [output.dump] | verify <backup.dump>");
+  if (command === "restore-verify") {
+    if (!filePath) throw new Error("restore-verify requires a backup file path");
+    const result = await restoreBackupForVerification(filePath);
+    process.stdout.write(
+      `Backup restored successfully into the isolated recovery database: ${result.path}\n`,
+    );
+    return;
+  }
+  throw new Error(
+    "Usage: database-backup.mjs create [output.dump] | verify <backup.dump> | restore-verify <backup.dump>",
+  );
 }
 
 const entryPoint = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : "";
