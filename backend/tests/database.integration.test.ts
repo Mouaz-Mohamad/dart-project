@@ -156,6 +156,11 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       itemCode: "ITEM-REL-1",
       requestType: "Refund",
       status: "Pending Request",
+      reason: "Size issue",
+      governorate: "Cairo",
+      originalNetAmount: 420,
+      customerCourierFee: 100,
+      courierFeePayer: "Customer",
       isDeleted: false,
     };
     await testPool!.query(
@@ -181,6 +186,25 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       status: "Pending Request",
     });
     expect(relational.rows[0]!.payload.requestType).toBe("Refund");
+
+    const typedReturn = await testPool!.query<{
+      reason: string;
+      pickup_governorate: string;
+      original_net_minor: string;
+      customer_courier_fee_minor: string;
+      courier_fee_payer: string;
+    }>(
+      `SELECT reason, pickup_governorate, original_net_minor::text,
+              customer_courier_fee_minor::text, courier_fee_payer
+         FROM return_requests WHERE record_id='rel-return-1'`,
+    );
+    expect(typedReturn.rows[0]).toMatchObject({
+      reason: "Size issue",
+      pickup_governorate: "Cairo",
+      original_net_minor: "42000",
+      customer_courier_fee_minor: "10000",
+      courier_fee_payer: "Customer",
+    });
 
     const envelope = await testPool!.query<{ data: unknown[] }>(
       "SELECT data FROM dashboard_domain_state WHERE domain='returns'",

@@ -25,6 +25,8 @@ const commerceService = read("backend/src/modules/commerce/commerce.service.ts")
 const financeService = read("backend/src/modules/finance/finance.service.ts");
 const relationalStore = read("backend/src/modules/dashboard/relational-domain.store.ts");
 const relationalAuthorityMigration = read("backend/migrations/0019_relational_domains_authoritative.sql");
+const customerInteractionService = read("backend/src/modules/commerce/customer-interaction.service.ts");
+const typedReturnDamageMigration = read("backend/migrations/0020_return_damage_typed_core.sql");
 
 assert.match(
   catalog,
@@ -99,6 +101,27 @@ for (const domain of ["returns", "cards", "damage", "promotions", "birthday_rewa
     `commerce must not use the JSONB compatibility envelope as the ${domain} read source`,
   );
 }
+assert.match(
+  customerInteractionService,
+  /INSERT INTO return_requests\(record_id,position,payload\)/,
+  "new customer returns must use a row-level authoritative insert",
+);
+assert.ok(
+  !customerInteractionService.includes(
+    'writeLockedDomain(client, "returns", returnsState.version, [...existingReturns, record])',
+  ),
+  "new customer returns must not rewrite the full legacy returns array",
+);
+assert.match(
+  typedReturnDamageMigration,
+  /customer_user_id UUID REFERENCES customers/,
+  "typed returns must have a customer foreign key",
+);
+assert.match(
+  typedReturnDamageMigration,
+  /inventory_item_id TEXT REFERENCES inventory_items/,
+  "typed return and damage rows must link to physical inventory",
+);
 assert.match(
   financeService,
   /readRelationalDashboardDomain/,

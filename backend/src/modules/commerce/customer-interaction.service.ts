@@ -407,7 +407,7 @@ export class CustomerInteractionService {
         isChecked: false,
       };
 
-      await this.writeLockedDomain(client, "returns", returnsState.version, [...existingReturns, record]);
+      await this.insertReturnRecord(client, returnsState.version, record);
       await this.appendNotification(client, {
         type: "return_created",
         title: `Return ${returnId}`,
@@ -429,6 +429,46 @@ export class CustomerInteractionService {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  private async insertReturnRecord(
+    client: PoolClient,
+    expectedVersion: number,
+    record: JsonRow,
+  ): Promise<void> {
+    const recordId = String(record.id || record.returnId || "").trim();
+    if (!recordId) {
+      throw new AppError(500, "RETURN_ID_MISSING", "Return record ID is required");
+    }
+    const position = await client.query<{ next_position: string }>(
+      "SELECT (COALESCE(max(position),0)+1)::text AS next_position FROM return_requests",
+    );
+    await client.query(
+      `INSERT INTO return_requests(record_id,position,payload)
+       VALUES ($1,$2,$3::jsonb)
+       ON CONFLICT(record_id) DO UPDATE SET
+         position=EXCLUDED.position,
+         payload=EXCLUDED.payload,
+         updated_at=now()`,
+      [
+        recordId,
+        Number(position.rows[0]?.next_position || 1),
+        JSON.stringify(record),
+      ],
+    );
+    const versionUpdate = await client.query(
+      `UPDATE dashboard_domain_state
+          SET version=version+1, updated_at=now()
+        WHERE domain='returns' AND version=$1`,
+      [expectedVersion],
+    );
+    if (!versionUpdate.rowCount) {
+      throw new AppError(
+        409,
+        "RETURN_VERSION_CONFLICT",
+        "Return records changed while the request was being saved",
+      );
     }
   }
 

@@ -9,6 +9,10 @@ const authoritativeMigration = readFileSync(
   new URL("../migrations/0019_relational_domains_authoritative.sql", import.meta.url),
   "utf8",
 );
+const typedMigration = readFileSync(
+  new URL("../migrations/0020_return_damage_typed_core.sql", import.meta.url),
+  "utf8",
+);
 const store = readFileSync(
   new URL("../src/modules/dashboard/relational-domain.store.ts", import.meta.url),
   "utf8",
@@ -52,6 +56,15 @@ describe("relational business domain architecture", () => {
     expect(authoritativeMigration).toContain(
       "CREATE TRIGGER dashboard_domain_relational_sync",
     );
+  });
+
+  it("adds typed relational return and damage cores with real foreign keys", () => {
+    expect(typedMigration).toContain("customer_user_id UUID REFERENCES customers");
+    expect(typedMigration).toContain("order_id UUID REFERENCES orders");
+    expect(typedMigration).toContain("inventory_item_id TEXT REFERENCES inventory_items");
+    expect(typedMigration).toContain("original_net_minor BIGINT");
+    expect(typedMigration).toContain("return_requests_typed_sync");
+    expect(typedMigration).toContain("damage_records_typed_sync");
   });
 
   it("keeps indexed business keys outside the monolithic JSON array", () => {

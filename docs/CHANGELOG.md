@@ -1,5 +1,12 @@
 # Dart Project changelog
 
+## Typed Returns / Damage core phase 1 — 2026-09-21
+
+- Added typed PostgreSQL columns and foreign keys for return customer/order/item links, pickup address, exchange-chain data, monetary values and courier fees.
+- Added typed Damage links/fields for inventory, damage code, reason, customer and lifecycle state.
+- Added compatibility triggers so legacy payload writes keep the typed core synchronized during migration.
+- Customer-created returns now insert one authoritative return row directly instead of rewriting the entire Returns domain array.
+
 ## Relational duplicate safety follow-up — 2026-09-21
 
 - Fixed the authoritative 0019 BEFORE trigger so duplicate legacy record IDs cannot make PostgreSQL reject a compatibility write with `ON CONFLICT DO UPDATE command cannot affect row a second time`.
