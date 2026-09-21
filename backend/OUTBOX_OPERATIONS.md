@@ -17,7 +17,7 @@ Required production variables:
 - `WHATSAPP_GRAPH_API_VERSION` (default: `v26.0`)
 - `WHATSAPP_TEMPLATE_LANGUAGE`
 - `WHATSAPP_OWNER_PHONE` for protected Owner onboarding
-- approved template names such as `dart_staff_otp`
+- approved template names such as `dart_staff_otp` (Meta AUTHENTICATION template with an OTP COPY_CODE button)
 
 ## Retry endpoint
 
@@ -30,3 +30,10 @@ The processor claims only WhatsApp events. Failed sends remain in PostgreSQL and
 ## Security
 
 OTP values stay encrypted at rest inside the outbox payload and are decrypted only immediately before server-side delivery to Meta. Meta access tokens never leave the backend.
+
+
+## Staff OTP template
+
+Create `dart_staff_otp` in Meta as an `AUTHENTICATION` template with an OTP
+`COPY_CODE` button. Dart sends the same one-time code as the body parameter and
+the button parameter.

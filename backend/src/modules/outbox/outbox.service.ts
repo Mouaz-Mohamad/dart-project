@@ -163,9 +163,27 @@ export class OutboxService {
     if (!languageCode) throw new Error("WhatsApp template language is missing");
 
     const parameters = textParameters(payload);
-    const components = parameters.length
-      ? [{ type: "body", parameters: parameters.map((text) => ({ type: "text", text })) }]
+    const bodyComponent = parameters.length
+      ? {
+          type: "body",
+          parameters: parameters.map((text) => ({ type: "text", text })),
+        }
       : undefined;
+    const authenticationOtp = payload.authenticationOtp === true;
+    const otp = parameters[0] || "";
+    const components = authenticationOtp && otp
+      ? [
+          bodyComponent!,
+          {
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [{ type: "text", text: otp }],
+          },
+        ]
+      : bodyComponent
+        ? [bodyComponent]
+        : undefined;
 
     const response = await fetch(
       `https://graph.facebook.com/${this.config.whatsappGraphApiVersion || "v26.0"}/${this.config.whatsappPhoneNumberId}/messages`,

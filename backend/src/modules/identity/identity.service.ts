@@ -600,6 +600,7 @@ export class IdentityService {
             channel: "whatsapp",
             to: recipient,
             template: this.config.whatsappStaffOtpTemplate || "dart_staff_otp",
+            authenticationOtp: true,
             encryptedParameters: {
               otp: encryptSecret(
                 otp,
