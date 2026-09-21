@@ -24,6 +24,7 @@ const vercel = read("vercel.json");
 const commerceService = read("backend/src/modules/commerce/commerce.service.ts");
 const financeService = read("backend/src/modules/finance/finance.service.ts");
 const relationalStore = read("backend/src/modules/dashboard/relational-domain.store.ts");
+const relationalAuthorityMigration = read("backend/migrations/0019_relational_domains_authoritative.sql");
 
 assert.match(
   catalog,
@@ -96,6 +97,16 @@ assert.match(
   financeService,
   /readRelationalDashboardDomain/,
   "finance must calculate from relational domain rows",
+);
+assert.match(
+  relationalAuthorityMigration,
+  /BEFORE INSERT OR UPDATE OF data ON dashboard_domain_state/,
+  "critical compatibility writes must be intercepted before JSON arrays persist",
+);
+assert.match(
+  relationalAuthorityMigration,
+  /NEW\.data := '\[\]'::jsonb/,
+  "critical dashboard JSON arrays must be cleared from the version envelope",
 );
 
 assert.match(

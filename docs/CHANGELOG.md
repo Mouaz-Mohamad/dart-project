@@ -5,7 +5,7 @@
 - Added first-class PostgreSQL row tables for Returns, Damage, Promotions, Dart Card loyalty, Birthday rewards, Notifications/Messaging and Finance records.
 - Backfilled existing domain data transactionally and added indexed generated business keys for return codes, Item Codes, customers, orders, representatives, promotion codes and card codes.
 - Dashboard, Finance, customer-return rules and Commerce now read critical operational state from relational rows rather than the monolithic dashboard JSONB arrays.
-- The legacy `dashboard_domain_state` payload remains temporarily as a versioned compatibility write envelope; database triggers mirror those writes transactionally into the relational tables until the frontend protocol is migrated to row-level mutations.
+- `dashboard_domain_state` now remains only as a versioned compatibility envelope: migration 0019 clears existing critical arrays and a BEFORE trigger relationalizes incoming bulk writes before forcing the persisted envelope payload back to `[]`.
 - Added PostgreSQL integration and static contracts to prevent critical reads from drifting back to the compatibility JSONB envelope.
 - Removed the last remaining Commerce reads of card, damage and birthday-reward payloads from the compatibility envelope; all critical operational reads now use relational rows.
 

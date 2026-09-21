@@ -1,6 +1,6 @@
 # Dart Node.js / Express API contract
 
-The production frontend is database-authoritative through `/api/v1`; PostgreSQL is the source of truth for business data. Browser storage is limited to transient UI/session hints and one-time legacy cleanup markers. `DartState` is an in-memory projection, not persistent business storage. Critical operational domains (returns, damage, promotions, loyalty, notifications/messages and finance) are additionally materialized as row-level relational tables; `dashboard_domain_state.data` is retained temporarily as a migration compatibility envelope while legacy writers are removed.
+The production frontend is database-authoritative through `/api/v1`; PostgreSQL is the source of truth for business data. Browser storage is limited to transient UI/session hints and one-time legacy cleanup markers. `DartState` is an in-memory projection, not persistent business storage. Critical operational domains (returns, damage, promotions, loyalty, notifications/messages and finance) live in row-level relational tables. `dashboard_domain_state` is retained only as an optimistic-concurrency/version envelope for the legacy bulk PUT protocol: a BEFORE trigger writes incoming records to the relational tables and clears `data` before the envelope row is persisted, so critical arrays are no longer duplicated there.
 
 ## Implemented foundation — 2026-09-19
 

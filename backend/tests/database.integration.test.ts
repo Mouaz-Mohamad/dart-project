@@ -182,6 +182,11 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
     });
     expect(relational.rows[0]!.payload.requestType).toBe("Refund");
 
+    const envelope = await testPool!.query<{ data: unknown[] }>(
+      "SELECT data FROM dashboard_domain_state WHERE domain='returns'",
+    );
+    expect(envelope.rows[0]!.data).toEqual([]);
+
     await testPool!.query(
       `UPDATE dashboard_domain_state
           SET data='[]'::jsonb, version=version+1, updated_at=now()

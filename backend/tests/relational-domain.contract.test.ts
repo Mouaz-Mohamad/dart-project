@@ -5,6 +5,10 @@ const migration = readFileSync(
   new URL("../migrations/0018_relational_business_domains.sql", import.meta.url),
   "utf8",
 );
+const authoritativeMigration = readFileSync(
+  new URL("../migrations/0019_relational_domains_authoritative.sql", import.meta.url),
+  "utf8",
+);
 const store = readFileSync(
   new URL("../src/modules/dashboard/relational-domain.store.ts", import.meta.url),
   "utf8",
@@ -28,9 +32,22 @@ describe("relational business domain architecture", () => {
   });
 
   it("backfills existing state and keeps compatibility writes transactionally mirrored", () => {
-    expect(migration).toContain("CREATE TRIGGER dashboard_domain_relational_sync");
     expect(migration).toContain("UPDATE dashboard_domain_state");
     expect(migration).toContain("jsonb_array_elements(NEW.data)");
+    expect(authoritativeMigration).toContain(
+      "BEFORE INSERT OR UPDATE OF data ON dashboard_domain_state",
+    );
+    expect(authoritativeMigration).toContain("NEW.data := '[]'::jsonb");
+  });
+
+  it("does not persist duplicated critical arrays in the compatibility envelope", () => {
+    expect(authoritativeMigration).toContain(
+      "DROP TRIGGER IF EXISTS dashboard_domain_relational_sync",
+    );
+    expect(authoritativeMigration).toContain("SET data='[]'::jsonb");
+    expect(authoritativeMigration).toContain(
+      "CREATE TRIGGER dashboard_domain_relational_sync",
+    );
   });
 
   it("keeps indexed business keys outside the monolithic JSON array", () => {

@@ -1,7 +1,7 @@
 # Relational domain migration verification — 2026-09-21
 
 - Migration 0018 creates row-level PostgreSQL tables for Returns, Damage, Promotions, Loyalty/Birthday rewards, Notifications/Messaging and Finance.
-- Existing arrays are backfilled through the same database trigger used for compatibility writes, preserving record order and IDs.
+- Existing arrays are backfilled preserving record order and IDs. Migration 0019 then clears the duplicated critical arrays from `dashboard_domain_state`; future compatibility writes are relationalized by a BEFORE trigger and the envelope persists only `[]` plus its version metadata.
 - Dashboard, Finance, customer-return validation and Commerce read those critical domains from relational tables.
 - Integration coverage checks the tables exist and verifies a compatibility-envelope update is mirrored transactionally into `return_requests`.
 - Static contracts reject regressions where Commerce reads Returns, Cards, Damage, Promotions or Birthday rewards directly from `dashboard_domain_state.data`.
