@@ -506,11 +506,12 @@ export class IdentityService {
   public async startStaffOnboarding(
     emailInput: string,
     metadata: RequestMetadata,
-  ): Promise<{ challengeId: string; expiresAt: Date }> {
+  ): Promise<{ challengeId: string; expiresAt: Date; deliveryQueued: boolean }> {
     const emailNormalized = normalizeEmail(emailInput);
     const fallback = {
       challengeId: randomUUID(),
       expiresAt: new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000),
+      deliveryQueued: false,
     };
     const client = await this.pool.connect();
     try {
@@ -621,7 +622,7 @@ export class IdentityService {
         { emailHash: digest(`staff-email:${emailNormalized}`, this.config.authPepper) },
       );
       await client.query("COMMIT");
-      return { challengeId, expiresAt };
+      return { challengeId, expiresAt, deliveryQueued: true };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

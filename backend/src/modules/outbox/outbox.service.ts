@@ -47,7 +47,10 @@ export class OutboxService {
     );
   }
 
-  public async processBatch(limit = this.config.outboxBatchSize): Promise<{
+  public async processBatch(
+    limit = this.config.outboxBatchSize,
+    deduplicationKey?: string,
+  ): Promise<{
     configured: boolean;
     claimed: number;
     published: number;
@@ -67,6 +70,7 @@ export class OutboxService {
           WHERE attempts < 12
             AND available_at <= now()
             AND payload->>'channel' = 'whatsapp'
+            AND ($2::text IS NULL OR deduplication_key=$2)
             AND (
               status IN ('pending','failed')
               OR (status='processing' AND locked_at < now() - interval '5 minutes')
@@ -74,7 +78,7 @@ export class OutboxService {
           ORDER BY available_at, created_at
           FOR UPDATE SKIP LOCKED
           LIMIT $1`,
-        [Math.min(100, Math.max(1, limit))],
+        [Math.min(100, Math.max(1, limit)), deduplicationKey || null],
       );
       rows = result.rows;
       if (rows.length) {

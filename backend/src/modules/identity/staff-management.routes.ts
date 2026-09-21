@@ -58,7 +58,9 @@ export function createStaffManagementRouter(
             : {}),
         },
       );
-      const delivery = await outbox?.processBatch(5).catch(() => undefined);
+      const delivery = await outbox
+        ?.processBatch(1, `staff-invited:${invitation.invitationId}`)
+        .catch(() => undefined);
       response.status(201).json({
         ...invitation,
         whatsappDelivery: delivery

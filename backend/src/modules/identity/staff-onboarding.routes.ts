@@ -2,6 +2,7 @@ import { Router, type Response } from "express";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
+import { AppError } from "../../http/app-error.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
@@ -56,7 +57,33 @@ export function createStaffOnboardingRouter(
         ? { userAgent: request.get("user-agent")! }
         : {}),
     });
-    await outbox?.processBatch(5).catch(() => undefined);
+    if (result.deliveryQueued) {
+      if (!outbox) {
+        throw new AppError(
+          503,
+          "WHATSAPP_NOT_CONFIGURED",
+          "WhatsApp Business Platform delivery is unavailable",
+        );
+      }
+      const delivery = await outbox.processBatch(
+        1,
+        `staff-onboarding-code:${result.challengeId}`,
+      );
+      if (!delivery.configured) {
+        throw new AppError(
+          503,
+          "WHATSAPP_NOT_CONFIGURED",
+          "WhatsApp Business Platform delivery is unavailable",
+        );
+      }
+      if (delivery.published !== 1) {
+        throw new AppError(
+          502,
+          "WHATSAPP_DELIVERY_FAILED",
+          "WhatsApp could not deliver the verification code",
+        );
+      }
+    }
     response.status(202).json({
       challengeId: result.challengeId,
       expiresAt: result.expiresAt.toISOString(),
