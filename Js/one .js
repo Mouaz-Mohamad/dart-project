@@ -227,6 +227,11 @@ function getProductTemplate() {
     return cachedProductTemplate;
 }
 
+let dartPageUnloading = false;
+window.addEventListener('pagehide', () => {
+    dartPageUnloading = true;
+}, { once: true });
+
 async function loadSection(containerId, filePath, timeoutMs = 8000) {
     const container = document.getElementById(containerId);
     if (!container) return false;
@@ -248,6 +253,9 @@ async function loadSection(containerId, filePath, timeoutMs = 8000) {
         }));
         return true;
     } catch (error) {
+        // A full-page navigation can abort optional fragment fetches. That is not a
+        // section failure and should not create console noise or a transient error UI.
+        if (dartPageUnloading) return false;
         console.error(`Failed to load (${filePath}):`, error);
         setUiState(
             container,
