@@ -3,8 +3,8 @@ set -euo pipefail
 
 commit_message="$(git log -1 --pretty=%B)"
 
-if [[ "$commit_message" != *"[deploy]"* || "$commit_message" != *"[batch:7]"* ]]; then
-  echo "Skipping API build: commit is not an approved 7-change deploy batch."
+if [[ "$commit_message" != *"[deploy]"* || ! "$commit_message" =~ \[batch:[0-9]+\] ]]; then
+  echo "Skipping API build: commit is not an approved numbered deploy batch."
   exit 0
 fi
 
