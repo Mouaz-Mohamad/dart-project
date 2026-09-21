@@ -86,6 +86,12 @@ assert.match(
   /readRelationalDashboardDomain/,
   "commerce must read critical operational state from relational tables",
 );
+assert.ok(
+  !commerceService.includes(
+    "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards','birthday_rewards','birthday_messages')",
+  ),
+  "customer snapshots must read relational return/loyalty/birthday rows",
+);
 for (const domain of ["returns", "cards", "damage", "promotions", "birthday_rewards"]) {
   assert.ok(
     !commerceService.includes(`SELECT data FROM dashboard_domain_state WHERE domain='${domain}'`) &&

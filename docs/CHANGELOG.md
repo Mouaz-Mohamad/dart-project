@@ -7,7 +7,7 @@
 - Dashboard, Finance, customer-return rules and Commerce now read critical operational state from relational rows rather than the monolithic dashboard JSONB arrays.
 - `dashboard_domain_state` now remains only as a versioned compatibility envelope: migration 0019 clears existing critical arrays and a BEFORE trigger relationalizes incoming bulk writes before forcing the persisted envelope payload back to `[]`.
 - Added PostgreSQL integration and static contracts to prevent critical reads from drifting back to the compatibility JSONB envelope.
-- Removed the last remaining Commerce reads of card, damage and birthday-reward payloads from the compatibility envelope; all critical operational reads now use relational rows.
+- Removed the last remaining Commerce reads of card, damage and birthday-reward payloads from the compatibility envelope; all critical operational reads now use relational rows.\n- Moved customer profile snapshots for Returns, Dart Card, Birthday rewards and Birthday messages to the relational read path so clearing the compatibility envelope cannot hide customer history.
 
 
 ## Production hardening V0.3 — 2026-09-21

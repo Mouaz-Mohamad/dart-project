@@ -139,6 +139,52 @@ describe("CommerceService public leaderboard", () => {
 });
 
 
+describe("CommerceService relational customer snapshot", () => {
+  it("reads return, loyalty and birthday records from relational tables", async () => {
+    const query = vi.fn(async (sql: string, values: unknown[] = []) => {
+      if (sql.includes("SELECT client_code FROM customers")) {
+        return { rows: [{ client_code: "DR-1" }] };
+      }
+      if (sql.includes("FROM orders o") && sql.includes("WHERE o.customer_user_id")) {
+        return { rows: [] };
+      }
+      if (sql.includes("FROM return_requests")) {
+        return { rows: [{ payload: { id: "r1", clientId: "DR-1", itemCode: "I-1" } }] };
+      }
+      if (sql.includes("FROM loyalty_cards")) {
+        return { rows: [{ payload: { id: "c1", clientId: "DR-1", status: "Active" } }] };
+      }
+      if (sql.includes("FROM birthday_rewards")) {
+        return { rows: [{ payload: { id: "b1", clientId: "DR-1", status: "Active" } }] };
+      }
+      if (sql.includes("FROM message_records")) {
+        expect(values[0]).toBe("birthday_messages");
+        return { rows: [{ payload: { id: "m1", clientId: "DR-1", status: "Sent" } }] };
+      }
+      if (sql.includes("FROM customer_preferences")) {
+        return { rows: [{ last_address: null }] };
+      }
+      throw new Error(`Unexpected query in customer snapshot test: ${sql}`);
+    });
+    const pool = { query } as unknown as Pool;
+    const snapshot = await new CommerceService(pool).customerSnapshot(
+      "123e4567-e89b-12d3-a456-426614174001",
+    );
+
+    expect(snapshot.orders).toEqual([]);
+    expect(snapshot.returns).toHaveLength(1);
+    expect(snapshot.cards).toHaveLength(1);
+    expect(snapshot.birthdayRewards).toHaveLength(1);
+    expect(snapshot.birthdayMessages).toHaveLength(1);
+    expect(
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes("SELECT domain, data FROM dashboard_domain_state"),
+      ),
+    ).toBe(false);
+  });
+});
+
+
 describe("cart price review", () => {
   it("detects a changed unit price after reservation", () => {
     const changes = detectCartPriceChanges(

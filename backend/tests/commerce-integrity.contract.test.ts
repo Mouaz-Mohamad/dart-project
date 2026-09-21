@@ -59,6 +59,9 @@ describe("commerce concurrency and representative safety contracts", () => {
       /SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE/g,
     ) ?? [];
     expect(lockedVersions.length).toBeGreaterThanOrEqual(4);
+    expect(service).not.toContain(
+      "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards','birthday_rewards','birthday_messages')",
+    );
   });
 
   it("does not expose archived deliveries as active representative work", () => {

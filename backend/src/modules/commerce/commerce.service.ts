@@ -5040,16 +5040,28 @@ export class CommerceService {
       [customerUserId],
     );
 
-    const [states, preferencesResult] = await Promise.all([
-      this.pool.query<{ domain: string; data: unknown[] }>(
-        "SELECT domain, data FROM dashboard_domain_state WHERE domain IN ('returns','cards','birthday_rewards','birthday_messages')",
-      ),
+    const [
+      returnRows,
+      cardRows,
+      birthdayRewardRows,
+      birthdayMessageRows,
+      preferencesResult,
+    ] = await Promise.all([
+      readRelationalDashboardDomain(this.pool, "returns"),
+      readRelationalDashboardDomain(this.pool, "cards"),
+      readRelationalDashboardDomain(this.pool, "birthday_rewards"),
+      readRelationalDashboardDomain(this.pool, "birthday_messages"),
       this.pool.query<{ last_address: Record<string, unknown> | null }>(
         "SELECT last_address FROM customer_preferences WHERE customer_user_id=$1",
         [customerUserId],
       ),
     ]);
-    const stateByDomain = new Map(states.rows.map((row) => [row.domain, Array.isArray(row.data) ? row.data : []]));
+    const stateByDomain = new Map<string, unknown[]>([
+      ["returns", returnRows],
+      ["cards", cardRows],
+      ["birthday_rewards", birthdayRewardRows],
+      ["birthday_messages", birthdayMessageRows],
+    ]);
     const onlyCustomer = (rows: unknown[]) => rows.filter((raw) => {
       const row = raw as Record<string, unknown>;
       return String(row.clientId || row.customerId || "") === clientCode && !row.isDeleted;
