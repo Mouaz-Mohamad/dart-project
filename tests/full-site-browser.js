@@ -46,6 +46,8 @@ const server = http.createServer((request, response) => {
                 "finance.read",
               ],
             }
+          : pathname.startsWith("/api/v1/admin/finance/summary")
+            ? { summary: {} }
           : pathname === "/api/v1/site-settings"
             ? { version: 1, settings: {} }
             : pathname === "/api/v1/admin/catalog-state"
@@ -117,9 +119,12 @@ const server = http.createServer((request, response) => {
       );
     });
     page.on("requestfailed", (request) => {
+      const errorText = request.failure()?.errorText || "unknown";
+      // A real navigation/redirect is allowed to abort in-flight fragment requests.
+      if (errorText.includes("ERR_ABORTED")) return;
       if (request.url().startsWith(origin)) {
         failures.push(
-          `${relativeUrl}: request failed ${request.url()} (${request.failure()?.errorText || "unknown"})`,
+          `${relativeUrl}: request failed ${request.url()} (${errorText})`,
         );
       }
     });
