@@ -89,7 +89,7 @@ if (typeof dartMoney === 'function') {
       // BEGIN Immutable prices: existing lines and same-model additions retain the order's original transaction price/cost.
       const snapshot = selected.map(code=>{
         const saved=existing?.priceSnapshot?.find(line=>line.itemCode===code);
-        if (saved) return structuredClone(saved);
+        if (saved) return window.DartState?.clone?.(saved) ?? JSON.parse(JSON.stringify(saved));
         const current=dartPriceSnapshotForCodes([code])[0];
         if (!current) return current;
         const historical=existing?.priceSnapshot?.find(line=>String(line.modelCode)===String(current.modelCode));

@@ -1,5 +1,12 @@
 # Dart Project changelog
 
+## Browser compatibility pass — 2026-09-21
+
+- Added a shared clone helper that uses native `structuredClone` when available and a JSON-safe fallback for legacy browsers; cart rollback and dashboard price snapshots now use it.
+- Added a `crypto.getRandomValues` fallback for catalogue IDs when `crypto.randomUUID` is unavailable.
+- Replaced unnecessary `String.prototype.replaceAll` usage in the dashboard with broadly supported global regular-expression replacements.
+- Added regression guards so these compatibility fallbacks cannot silently regress.
+
 ## Runtime dead-code cleanup — 2026-09-21
 
 - Removed 17 unused legacy helpers/no-op stubs from the storefront, dashboard operations and platform runtimes after whole-project reference verification.

@@ -163,7 +163,12 @@
     String(value ?? "")
       .trim()
       .toLocaleLowerCase();
-  const uid = () => crypto.randomUUID();
+  const uid = () => {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    return Array.from(crypto.getRandomValues(new Uint32Array(4)))
+      .map((value) => value.toString(36))
+      .join("-");
+  };
   const placeholder =
     "data:image/svg+xml," +
     encodeURIComponent(

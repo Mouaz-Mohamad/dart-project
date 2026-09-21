@@ -32,6 +32,7 @@ const dashboardRuntime = read("Eye/dart.js");
 const storefrontRuntime = read("Js/one .js");
 const operationsRuntime = read("Eye/dart-operations-v4.js");
 const platformRuntime = read("Js/dart-platform.js");
+const stateRuntime = read("Js/dart-state.js");
 
 assert.match(
   catalog,
@@ -182,6 +183,24 @@ for (const [runtimeName, source] of [
     );
   }
 }
+assert.match(
+  stateRuntime,
+  /typeof root\.structuredClone === "function"[\s\S]*JSON\.parse\(JSON\.stringify\(value\)\)/,
+  "shared runtime cloning must fall back when structuredClone is unavailable",
+);
+assert.ok(
+  !storefrontRuntime.includes("structuredClone(") &&
+    !operationsRuntime.includes("structuredClone("),
+  "feature runtimes must use the shared clone compatibility helper",
+);
+assert.ok(
+  !catalog.includes("const uid = () => crypto.randomUUID();"),
+  "catalog IDs must retain a getRandomValues fallback for browsers without randomUUID",
+);
+assert.ok(
+  !dashboardRuntime.includes(".replaceAll("),
+  "dashboard runtime should avoid replaceAll when simple global replacement is enough",
+);
 assert.ok(!dashboardHtml.includes('class=""'), "dashboard HTML must not retain empty class attributes");
 assert.ok(
   !/<[^>]*\btype=["'][^"']+["'][^>]*\btype=["'][^"']+["'][^>]*>/i.test(dashboardHtml),

@@ -1737,7 +1737,7 @@ function dartApplyTransition(order, target, meta = {}) {
     meta.reason || "",
   );
   dartNotify(
-    `order_${target.toLowerCase().replaceAll(" ", "_")}`,
+    `order_${target.toLowerCase().replace(/ /g, "_")}`,
     `${order.orderId}: ${target}`,
     meta.reason || `Order moved from ${prev} to ${target}.`,
     "orders",
@@ -3974,7 +3974,7 @@ function dartApplyFilters(key, data) {
       out = out.filter((r) =>
         String(r.reason || "")
           .toLowerCase()
-          .includes(String(state.reason).replaceAll("_", " ").toLowerCase()),
+          .includes(String(state.reason).replace(/_/g, " ").toLowerCase()),
       );
     out.sort(
       (a, b) =>
@@ -5898,7 +5898,7 @@ dartApplyFilters = function (key, data) {
           missing_parts: ["نقص", "missing"],
           other: ["آخر", "other"],
         },
-        terms = map[v] || [String(v).replaceAll("_", " ")];
+        terms = map[v] || [String(v).replace(/_/g, " ")];
       out = [...(data || [])].filter((r) =>
         terms.some((t) =>
           String(r.reason || "")

@@ -1024,7 +1024,8 @@ function renderCart() {
 }
 
 async function persistCartReservation() {
-    const previous = structuredClone(window.DartState?.read?.('dart_cart', []) || []);
+    const previous = window.DartState?.clone?.(window.DartState?.read?.('dart_cart', []) || [])
+        ?? JSON.parse(JSON.stringify(window.DartState?.read?.('dart_cart', []) || []));
     try {
         if (window.DartPlatform?.reserveCart) {
             await window.DartPlatform.reserveCart(cartData);

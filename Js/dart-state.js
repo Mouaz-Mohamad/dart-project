@@ -25,6 +25,11 @@
       detail: { key, value, source, revision: sequence }
     }));
   }
+  function clone(value) {
+    if (typeof root.structuredClone === "function") return root.structuredClone(value);
+    if (value === undefined || value === null) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
   function read(key, fallback = null) {
     return values.has(key) ? values.get(key) : fallback;
   }
@@ -54,7 +59,7 @@
   }
   purgeLegacyBrowserBusinessData();
   root.DartState = Object.freeze({
-    read, write, remove, clearBusiness, purgeLegacyBrowserBusinessData,
+    read, write, remove, clone, clearBusiness, purgeLegacyBrowserBusinessData,
     has: (key) => values.has(key),
     revision: (key) => revisions.get(key) || 0,
     isBusinessKey: (key) => BUSINESS_KEYS.has(key),
