@@ -13,12 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Require numbered deploy batch markers
+      - name: Require numbered batch marker
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           grep -Eq '\[batch:[0-9]+\]' <<<"$COMMIT_MESSAGE" || { echo 'Missing numbered [batch:N] marker'; exit 1; }
-          grep -Fq '[deploy]' <<<"$COMMIT_MESSAGE" || { echo 'Missing [deploy] marker'; exit 1; }
+          if grep -Fq '[deploy]' <<<"$COMMIT_MESSAGE"; then
+            echo 'Production deployment requested for this batch.'
+          else
+            echo 'CI-only batch: Vercel ignore rules will skip production deployment.'
+          fi
       - name: Validate Vercel deployment config
         run: node backend/scripts/check-vercel-config.mjs
       - name: Database-authoritative browser storage check
