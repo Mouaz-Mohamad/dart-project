@@ -884,7 +884,6 @@ if (typeof dartMoney === 'function') {
     }
     renderPasswordRequests();
     if (typeof dartRefreshAll === 'function') dartRefreshAll();
-    refreshSecureIdentityUi();
   });
 
   window.addEventListener('dart:admin-authenticated', refreshSecureIdentityUi);

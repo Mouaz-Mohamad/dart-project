@@ -1,8 +1,8 @@
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
+import type { Logger } from "pino";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
-import { AppError } from "../../http/app-error.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
@@ -45,10 +45,11 @@ export function createStaffOnboardingRouter(
     "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite"
   >,
   outbox?: OutboxService,
+  logger?: Logger,
 ): Router {
   const router = Router();
 
-  router.post("/admin/auth/onboarding/start", limiter(), async (request, response) => {
+  async function startOrResend(request: Request, response: Response) {
     const body = z.object({ email: z.email().max(254) }).parse(request.body);
     const result = await service.startStaffOnboarding(body.email, {
       requestId: String(request.id),
@@ -57,30 +58,20 @@ export function createStaffOnboardingRouter(
         ? { userAgent: request.get("user-agent")! }
         : {}),
     });
-    if (result.deliveryQueued) {
-      if (!outbox) {
-        throw new AppError(
-          503,
-          "WHATSAPP_NOT_CONFIGURED",
-          "WhatsApp Business Platform delivery is unavailable",
-        );
-      }
-      const delivery = await outbox.processBatch(
-        1,
-        `staff-onboarding-code:${result.challengeId}`,
-      );
-      if (!delivery.configured) {
-        throw new AppError(
-          503,
-          "WHATSAPP_NOT_CONFIGURED",
-          "WhatsApp Business Platform delivery is unavailable",
-        );
-      }
-      if (delivery.published !== 1) {
-        throw new AppError(
-          502,
-          "WHATSAPP_DELIVERY_FAILED",
-          "WhatsApp could not deliver the verification code",
+    if (result.deliveryQueued && outbox) {
+      const eventKey = `staff-onboarding-code:${result.challengeId}`;
+      try {
+        const delivery = await outbox.processBatch(1, eventKey);
+        if (delivery.published !== 1) {
+          logger?.warn({ eventKey }, "Staff onboarding email is queued for retry");
+        }
+      } catch (error) {
+        logger?.warn(
+          {
+            eventKey,
+            errorName: error instanceof Error ? error.name : "Error",
+          },
+          "Staff onboarding email dispatch failed and remains queued",
         );
       }
     }
@@ -89,7 +80,10 @@ export function createStaffOnboardingRouter(
       expiresAt: result.expiresAt.toISOString(),
       message: "If this email is invited, a verification code has been sent.",
     });
-  });
+  }
+
+  router.post("/admin/auth/onboarding/start", limiter(), startOrResend);
+  router.post("/admin/auth/onboarding/resend", limiter(), startOrResend);
 
   router.post("/admin/auth/onboarding/verify", limiter(), async (request, response) => {
     const body = z.object({

@@ -128,7 +128,15 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         dependencies.outboxService,
       ),
     );
-    app.use("/api/v1", createStaffOnboardingRouter(dependencies.identityService, config, dependencies.outboxService));
+    app.use(
+      "/api/v1",
+      createStaffOnboardingRouter(
+        dependencies.identityService,
+        config,
+        dependencies.outboxService,
+        dependencies.logger,
+      ),
+    );
     app.use(
       "/api/v1",
       createStaffManagementRouter(

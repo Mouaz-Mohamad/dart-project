@@ -1,3 +1,8 @@
+globalThis.location = globalThis.location || {
+  origin: "http://localhost",
+  pathname: "/products.html",
+};
+
 "use strict";
 
 const assert = require("assert");

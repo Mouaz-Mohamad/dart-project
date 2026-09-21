@@ -5082,11 +5082,8 @@ function setupPasswordResetRequests() {
     });
   }
 
-  void dartLoadPasswordResetRequests(false).catch((error) => {
-    if (error?.status !== 401 && error?.status !== 403) {
-      console.warn("Password reset request refresh failed", error);
-    }
-  });
+  // Password-reset requests are fetched on demand after authentication.
+  // Do not call protected endpoints while the login/activation gate is visible.
 }
 
 function setupAllDelegatedEvents() {

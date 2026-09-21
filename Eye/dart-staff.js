@@ -6,15 +6,17 @@
   const invitePermissions = document.getElementById("settings-staff-invite-permissions");
   const staffList = document.getElementById("settings-staff-list");
   const invitationsList = document.getElementById("settings-staff-invitations");
+  const deliveryList = document.getElementById("settings-delivery-events");
   const statusNode = document.getElementById("settings-staff-status");
 
-  if (!card || !form || !invitePermissions || !staffList || !invitationsList) return;
+  if (!card || !form || !invitePermissions || !staffList || !invitationsList || !deliveryList) return;
 
   let directory = {
     permissions: [],
     invitations: [],
     staff: [],
   };
+  let deliveryEvents = [];
 
   const protectedBasics = new Set([
     "profile.read_own",
@@ -165,6 +167,23 @@
       .join("");
   }
 
+  function renderDeliveryEvents() {
+    if (!deliveryEvents.length) {
+      deliveryList.innerHTML = '<div class="dart-empty-state">No delivery events yet.</div>';
+      return;
+    }
+    deliveryList.innerHTML = deliveryEvents.map((event) => `
+      <div class="dart-settings-list-row">
+        <div>
+          <strong>${esc(event.eventType || "Notification")}</strong>
+          <small>${esc(event.channel)} · ${esc(event.recipient)} · attempts ${esc(event.attempts)}</small>
+          ${event.lastError ? `<small>${esc(event.lastError)}</small>` : ""}
+        </div>
+        <span>${esc(event.status)}</span>
+      </div>
+    `).join("");
+  }
+
   async function load() {
     if (!can("staff.read") || !window.DartAdminApi?.request) {
       card.hidden = true;
@@ -172,10 +191,18 @@
     }
     card.hidden = false;
     try {
-      directory = await window.DartAdminApi.request("/api/v1/admin/staff");
+      const [nextDirectory, delivery] = await Promise.all([
+        window.DartAdminApi.request("/api/v1/admin/staff"),
+        can("staff.manage")
+          ? window.DartAdminApi.request("/api/v1/admin/delivery-events")
+          : Promise.resolve({ events: [] }),
+      ]);
+      directory = nextDirectory;
+      deliveryEvents = Array.isArray(delivery.events) ? delivery.events : [];
       renderInvitePermissions();
       renderStaff();
       renderInvitations();
+      renderDeliveryEvents();
       setStatus("");
     } catch (error) {
       setStatus(error.message || "Unable to load Staff access.", true);
@@ -209,8 +236,8 @@
         },
       });
       form.reset();
-      document.getElementById("settings-staff-mfa").checked = true;
-      setStatus("Staff invitation created. Activation will be sent directly to the employee's WhatsApp number.");
+      document.getElementById("settings-staff-mfa").checked = false;
+      setStatus("Staff invitation created. The activation code was queued for email delivery.");
       await load();
     } catch (error) {
       setStatus(error.message || "Unable to invite Staff.", true);

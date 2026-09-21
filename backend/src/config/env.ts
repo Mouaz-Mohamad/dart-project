@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+export class EnvironmentConfigError extends Error {
+  public readonly fields: string[];
+
+  public constructor(fields: string[]) {
+    const unique = [...new Set(fields.filter(Boolean))];
+    super(`Invalid environment configuration: ${unique.join(", ")}`);
+    this.name = "EnvironmentConfigError";
+    this.fields = unique;
+  }
+}
+
+function invalidEnvironment(...fields: string[]): never {
+  throw new EnvironmentConfigError(fields);
+}
+
 const booleanFromString = z
   .enum(["true", "false"])
   .default("false")
@@ -24,11 +39,17 @@ const environmentSchema = z.object({
   SESSION_COOKIE_SAME_SITE: z.enum(["strict", "lax", "none"]).default("strict"),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().min(3).max(30).default(10),
+  STAFF_INVITE_OTP_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(48),
   MFA_ENCRYPTION_KEY: z
     .string()
     .default("ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="),
-  AUTOMATION_WEBHOOK_URL: z.union([z.url(), z.literal("")]).default(""),
-  AUTOMATION_WEBHOOK_SECRET: z.string().default(""),
+  EMAIL_PROVIDER: z.enum(["disabled", "smtp"]).default("disabled"),
+  SMTP_HOST: z.string().trim().default(""),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(587),
+  SMTP_SECURE: booleanFromString,
+  SMTP_USER: z.string().default(""),
+  SMTP_PASS: z.string().default(""),
+  EMAIL_FROM: z.string().trim().default(""),
   WHATSAPP_CLOUD_API_TOKEN: z.string().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).or(z.literal("")).default(""),
   WHATSAPP_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
@@ -58,9 +79,15 @@ export interface AppConfig {
   sessionCookieSameSite: "strict" | "lax" | "none";
   sessionTtlDays: number;
   emailOtpTtlMinutes: number;
+  staffInviteOtpTtlHours: number;
   mfaEncryptionKey: Buffer;
-  automationWebhookUrl: string | null;
-  automationWebhookSecret: string | null;
+  emailProvider: "disabled" | "smtp";
+  smtpHost: string | null;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string | null;
+  smtpPass: string | null;
+  emailFrom: string | null;
   whatsappAccessToken?: string | null;
   whatsappPhoneNumberId?: string | null;
   whatsappGraphApiVersion?: string;
@@ -76,7 +103,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = environmentSchema.safeParse(source);
   if (!parsed.success) {
     const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join(".")))];
-    throw new Error(`Invalid environment configuration: ${fields.join(", ")}`);
+    throw new EnvironmentConfigError(fields);
   }
 
   const corsOrigins = parsed.data.CORS_ORIGINS.split(",")
@@ -84,31 +111,44 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     .filter(Boolean);
 
   if (parsed.data.NODE_ENV === "production" && corsOrigins.length === 0) {
-    throw new Error("Invalid environment configuration: CORS_ORIGINS");
+    invalidEnvironment("CORS_ORIGINS");
   }
   if (parsed.data.NODE_ENV === "production" && parsed.data.ALLOW_DEVELOPMENT_SEED) {
-    throw new Error("Invalid environment configuration: development seed cannot run in production");
+    invalidEnvironment("ALLOW_DEVELOPMENT_SEED");
   }
   const mfaEncryptionKey = Buffer.from(parsed.data.MFA_ENCRYPTION_KEY, "base64");
   if (mfaEncryptionKey.length !== 32) {
-    throw new Error("Invalid environment configuration: MFA_ENCRYPTION_KEY");
+    invalidEnvironment("MFA_ENCRYPTION_KEY");
   }
   if (
     parsed.data.NODE_ENV === "production" &&
     parsed.data.AUTH_PEPPER === "development-only-auth-pepper-change-me"
   ) {
-    throw new Error("Invalid environment configuration: AUTH_PEPPER");
+    invalidEnvironment("AUTH_PEPPER");
   }
   if (
     parsed.data.NODE_ENV === "production" &&
     parsed.data.MFA_ENCRYPTION_KEY === "ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="
   ) {
-    throw new Error("Invalid environment configuration: MFA_ENCRYPTION_KEY");
+    invalidEnvironment("MFA_ENCRYPTION_KEY");
   }
+  if (parsed.data.NODE_ENV === "production" && parsed.data.EMAIL_PROVIDER === "smtp") {
+    const missingEmailFields = [
+      !parsed.data.SMTP_HOST && "SMTP_HOST",
+      !parsed.data.SMTP_USER && "SMTP_USER",
+      !parsed.data.SMTP_PASS && "SMTP_PASS",
+      !parsed.data.EMAIL_FROM && "EMAIL_FROM",
+    ].filter((field): field is string => Boolean(field));
+    if (missingEmailFields.length) throw new EnvironmentConfigError(missingEmailFields);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.data.EMAIL_FROM)) {
+      invalidEnvironment("EMAIL_FROM");
+    }
+  }
+
   const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
   const whatsappOwnerPhone = parsed.data.WHATSAPP_OWNER_PHONE.replace(/\D/g, "");
   if (whatsappOwnerPhone && !/^201(?:0|1|2|5)\d{8}$/.test(whatsappOwnerPhone)) {
-    throw new Error("Invalid environment configuration: WHATSAPP_OWNER_PHONE");
+    invalidEnvironment("WHATSAPP_OWNER_PHONE");
   }
 
   return {
@@ -128,9 +168,15 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     sessionCookieSameSite: parsed.data.SESSION_COOKIE_SAME_SITE,
     sessionTtlDays: parsed.data.SESSION_TTL_DAYS,
     emailOtpTtlMinutes: parsed.data.EMAIL_OTP_TTL_MINUTES,
+    staffInviteOtpTtlHours: parsed.data.STAFF_INVITE_OTP_TTL_HOURS,
     mfaEncryptionKey,
-    automationWebhookUrl: parsed.data.AUTOMATION_WEBHOOK_URL || null,
-    automationWebhookSecret: parsed.data.AUTOMATION_WEBHOOK_SECRET || null,
+    emailProvider: parsed.data.EMAIL_PROVIDER,
+    smtpHost: parsed.data.SMTP_HOST || null,
+    smtpPort: parsed.data.SMTP_PORT,
+    smtpSecure: parsed.data.SMTP_SECURE,
+    smtpUser: parsed.data.SMTP_USER || null,
+    smtpPass: parsed.data.SMTP_PASS || null,
+    emailFrom: parsed.data.EMAIL_FROM || null,
     whatsappAccessToken: parsed.data.WHATSAPP_CLOUD_API_TOKEN || null,
     whatsappPhoneNumberId: parsed.data.WHATSAPP_PHONE_NUMBER_ID || null,
     whatsappGraphApiVersion: parsed.data.WHATSAPP_GRAPH_API_VERSION,

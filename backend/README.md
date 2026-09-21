@@ -59,3 +59,10 @@ Identity/Auth, sessions, deny-by-default permissions, Owner TOTP, customer Email
 The API keeps immediate event dispatch for normal transactional flows. The Vercel Cron entry is only a daily safety retry because the Hobby plan accepts schedules that run at most once per day. Faster retry cadence must come from an external scheduler such as the existing n8n automation layer calling the protected outbox processor endpoint.
 
 The protected processor is `POST /api/v1/internal/outbox/process` with `Authorization: Bearer <OUTBOX_CRON_SECRET>`. Keep that secret server-side only. Failed outbox rows keep their own retry timing and are safe to claim concurrently through PostgreSQL locking.
+
+
+## Email and Staff activation
+
+Staff activation and customer email verification use the transactional outbox and SMTP email delivery. WhatsApp is optional and is not required for Owner or Staff sign-in. Configure the SMTP environment variables documented in `VERCEL_DEPLOYMENT.md`.
+
+Dashboard server polling starts only after authentication. Public site-settings checks are conditional with ETag and are throttled to at least 60 seconds while the tab is visible.

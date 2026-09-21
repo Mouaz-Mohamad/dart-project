@@ -42,10 +42,10 @@ export function createStaffManagementRouter(
     async (request, response) => {
       const body = z.object({
         email: z.email().max(254),
-        phone: z.string().min(10).max(25),
+        phone: z.string().trim().max(25).optional().default(""),
         displayName: z.string().trim().min(3).max(120),
         permissionKeys: z.array(z.string().trim().min(3).max(120)).max(300).default([]),
-        mfaRequired: z.boolean().default(true),
+        mfaRequired: z.boolean().default(false),
       }).parse(request.body);
       const invitation = await service.createStaffInvitation(
         request.auth!,
@@ -59,17 +59,31 @@ export function createStaffManagementRouter(
         },
       );
       const delivery = await outbox
-        ?.processBatch(1, `staff-invited:${invitation.invitationId}`)
+        ?.processBatch(1, `staff-onboarding-code:${invitation.challengeId}`)
         .catch(() => undefined);
       response.status(201).json({
         ...invitation,
-        whatsappDelivery: delivery
+        emailDelivery: delivery
           ? {
-              configured: delivery.configured,
+              configured: outbox?.configured("email") === true,
               published: delivery.published,
               failed: delivery.failed,
             }
           : { configured: false, published: 0, failed: 0 },
+      });
+    },
+  );
+
+  router.get(
+    "/admin/delivery-events",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("staff.manage"),
+    async (_request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json({
+        events: outbox ? await outbox.recentEvents(50) : [],
       });
     },
   );

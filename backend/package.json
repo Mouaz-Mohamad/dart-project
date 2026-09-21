@@ -29,7 +29,8 @@
     "check:vercel": "node scripts/check-vercel-config.mjs",
     "db:backup": "node --env-file-if-exists=.env scripts/database-backup.mjs create",
     "db:backup:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs verify",
-    "db:restore:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs restore-verify"
+    "db:restore:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs restore-verify",
+    "check:env": "node --env-file-if-exists=.env --import tsx scripts/check-env.ts"
   },
   "dependencies": {
     "argon2": "0.44.0",
@@ -42,7 +43,8 @@
     "pg": "8.23.0",
     "pino": "10.3.1",
     "pino-http": "11.0.0",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "nodemailer": "8.0.2"
   },
   "devDependencies": {
     "@types/cookie-parser": "1.4.10",
@@ -57,6 +59,7 @@
     "tsx": "4.23.13",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.0",
-    "vitest": "5.0.1"
+    "vitest": "5.0.1",
+    "@types/nodemailer": "8.0.1"
   }
 }

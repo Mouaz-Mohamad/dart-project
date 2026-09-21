@@ -186,12 +186,9 @@ export class IdentityService {
       | "authPepper"
       | "sessionTtlDays"
       | "emailOtpTtlMinutes"
+      | "staffInviteOtpTtlHours"
       | "mfaEncryptionKey"
-      | "whatsappAccessToken"
-      | "whatsappPhoneNumberId"
-      | "whatsappOwnerPhone"
-      | "whatsappStaffOtpTemplate"
-      | "whatsappStaffInviteTemplate"
+      | "corsOrigins"
     >,
   ) {}
 
@@ -510,7 +507,7 @@ export class IdentityService {
     const emailNormalized = normalizeEmail(emailInput);
     const fallback = {
       challengeId: randomUUID(),
-      expiresAt: new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000),
+      expiresAt: new Date(Date.now() + this.config.staffInviteOtpTtlHours * 3_600_000),
       deliveryQueued: false,
     };
     const client = await this.pool.connect();
@@ -520,11 +517,8 @@ export class IdentityService {
         id: string;
         email: string;
         email_normalized: string;
-        is_owner: boolean;
-        phone: string | null;
-        phone_normalized: string | null;
       }>(
-        `SELECT id::text, email, email_normalized, is_owner, phone, phone_normalized
+        `SELECT id::text, email, email_normalized
            FROM staff_invitations
           WHERE email_normalized=$1
             AND status='pending'
@@ -552,6 +546,18 @@ export class IdentityService {
         return fallback;
       }
 
+      const recent = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+           FROM staff_onboarding_challenges
+          WHERE invitation_id=$1
+            AND created_at >= now() - interval '1 hour'`,
+        [invitation.id],
+      );
+      if (Number(recent.rows[0]?.count || 0) >= 4) {
+        await client.query("COMMIT");
+        return fallback;
+      }
+
       await client.query(
         `UPDATE staff_onboarding_challenges
             SET consumed_at=COALESCE(consumed_at, now())
@@ -559,21 +565,10 @@ export class IdentityService {
         [invitation.id],
       );
 
-      const recipient =
-        invitation.phone_normalized ||
-        (invitation.is_owner ? this.config.whatsappOwnerPhone : null);
-      if (!recipient || !this.config.whatsappAccessToken || !this.config.whatsappPhoneNumberId) {
-        throw new AppError(
-          503,
-          "WHATSAPP_NOT_CONFIGURED",
-          "WhatsApp Business Platform is not configured for secure Staff OTP delivery",
-        );
-      }
-
       const challengeId = randomUUID();
       const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
       const expiresAt = new Date(
-        Date.now() + this.config.emailOtpTtlMinutes * 60_000,
+        Date.now() + this.config.staffInviteOtpTtlHours * 3_600_000,
       );
       await client.query(
         `INSERT INTO staff_onboarding_challenges (
@@ -582,10 +577,7 @@ export class IdentityService {
         [
           challengeId,
           invitation.id,
-          digest(
-            `staff-onboarding:${challengeId}:${otp}`,
-            this.config.authPepper,
-          ),
+          digest(`staff-onboarding:${challengeId}:${otp}`, this.config.authPepper),
           expiresAt,
         ],
       );
@@ -597,16 +589,13 @@ export class IdentityService {
         [
           invitation.id,
           JSON.stringify({
-            channel: "whatsapp",
-            to: recipient,
-            template: this.config.whatsappStaffOtpTemplate || "dart_staff_otp",
-            authenticationOtp: true,
+            channel: "email",
+            to: invitation.email,
+            template: "staff_invite",
             encryptedParameters: {
-              otp: encryptSecret(
-                otp,
-                this.config.mfaEncryptionKey,
-              ).toString("base64"),
+              otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
             },
+            dashboardUrl: `${this.config.corsOrigins[0] || ""}/Eye/Dart%20Eye.html`,
             expiresAt: expiresAt.toISOString(),
           }),
           `staff-onboarding-code:${challengeId}`,
@@ -706,7 +695,7 @@ export class IdentityService {
         client,
         "system",
         null,
-        "STAFF_ONBOARDING_WHATSAPP_VERIFIED",
+        "STAFF_ONBOARDING_EMAIL_VERIFIED",
         "staff_invitations",
         row.invitation_id,
         metadata,
@@ -827,9 +816,7 @@ export class IdentityService {
          ) VALUES ($1,$2,$3,$4)`,
         [userId, row.display_name, row.is_owner, row.mfa_required],
       );
-      const staffPhone =
-        row.phone_normalized ||
-        (row.is_owner ? this.config.whatsappOwnerPhone : null);
+      const staffPhone = row.phone_normalized;
       if (staffPhone) {
         await client.query(
           `INSERT INTO account_phones (
@@ -924,13 +911,13 @@ export class IdentityService {
     account: AuthenticatedAccount,
     input: {
       email: string;
-      phone: string;
+      phone?: string | undefined;
       displayName: string;
       permissionKeys: string[];
       mfaRequired: boolean;
     },
     metadata: RequestMetadata,
-  ): Promise<{ invitationId: string; email: string }> {
+  ): Promise<{ invitationId: string; email: string; challengeId: string }> {
     if (
       account.accountType !== "staff" ||
       !account.permissions.includes("staff.manage") ||
@@ -955,7 +942,8 @@ export class IdentityService {
     }
 
     const emailNormalized = normalizeEmail(input.email);
-    const phoneNormalized = normalizeEgyptianPhone(input.phone);
+    const phoneDisplay = input.phone?.trim() || null;
+    const phoneNormalized = phoneDisplay ? normalizeEgyptianPhone(phoneDisplay) : null;
     const permissionKeys = [
       ...new Set(input.permissionKeys.map((key) => key.trim()).filter(Boolean)),
     ];
@@ -1009,12 +997,28 @@ export class IdentityService {
         [
           input.email.trim(),
           emailNormalized,
-          input.phone.trim(),
+          phoneDisplay,
           phoneNormalized,
           input.displayName.trim(),
           input.mfaRequired,
           JSON.stringify(permissionKeys),
           account.userId,
+        ],
+      );
+      const challengeId = randomUUID();
+      const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      const challengeExpiresAt = new Date(
+        Date.now() + this.config.staffInviteOtpTtlHours * 3_600_000,
+      );
+      await client.query(
+        `INSERT INTO staff_onboarding_challenges (
+           id, invitation_id, code_hash, expires_at
+         ) VALUES ($1,$2,$3,$4)`,
+        [
+          challengeId,
+          invitation.rows[0]!.id,
+          digest(`staff-onboarding:${challengeId}:${otp}`, this.config.authPepper),
+          challengeExpiresAt,
         ],
       );
       await client.query(
@@ -1025,13 +1029,16 @@ export class IdentityService {
         [
           invitation.rows[0]!.id,
           JSON.stringify({
-            channel: "whatsapp",
-            to: phoneNormalized,
-            template: this.config.whatsappStaffInviteTemplate || "dart_staff_invite",
-            parameters: ["/Eye/Dart%20Eye.html"],
-            expiresInDays: 30,
+            channel: "email",
+            to: input.email.trim(),
+            template: "staff_invite",
+            encryptedParameters: {
+              otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
+            },
+            dashboardUrl: `${this.config.corsOrigins[0] || ""}/Eye/Dart%20Eye.html`,
+            expiresAt: challengeExpiresAt.toISOString(),
           }),
-          `staff-invited:${invitation.rows[0]!.id}`,
+          `staff-onboarding-code:${challengeId}`,
         ],
       );
       await this.audit(
@@ -1048,6 +1055,7 @@ export class IdentityService {
       return {
         invitationId: invitation.rows[0]!.id,
         email: input.email.trim(),
+        challengeId,
       };
     } catch (error) {
       await client.query("ROLLBACK");

@@ -17,6 +17,10 @@ const staffOnboardingRoutes = readFileSync(
   new URL("../src/modules/identity/staff-onboarding.routes.ts", import.meta.url),
   "utf8",
 );
+const outboxService = readFileSync(
+  new URL("../src/modules/outbox/outbox.service.ts", import.meta.url),
+  "utf8",
+);
 
 describe("production event delivery contracts", () => {
   it("attempts immediate delivery for customer and representative identity events", () => {
@@ -27,25 +31,22 @@ describe("production event delivery contracts", () => {
     expect(commerceRoutes.match(/outbox\?\.processBatch\(10\)/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("targets immediate direct delivery for the exact Staff invitation", () => {
+  it("targets the exact Staff invitation email event", () => {
     expect(staffManagementRoutes).toContain(
-      "processBatch(1, `staff-invited:${invitation.invitationId}`)",
+      "processBatch(1, `staff-onboarding-code:${invitation.challengeId}`)",
     );
+    expect(staffManagementRoutes).toContain("emailDelivery");
   });
 
-  it("requires confirmed delivery of the exact Staff onboarding OTP event", () => {
-    expect(staffOnboardingRoutes).toContain(
-      "`staff-onboarding-code:${result.challengeId}`",
-    );
-    expect(staffOnboardingRoutes).toContain("WHATSAPP_DELIVERY_FAILED");
-    expect(staffOnboardingRoutes).toContain("delivery.published !== 1");
+  it("keeps Staff onboarding anti-enumeration generic when delivery fails", () => {
+    expect(staffOnboardingRoutes).toContain("/admin/auth/onboarding/resend");
+    expect(staffOnboardingRoutes).toContain("remains queued");
+    expect(staffOnboardingRoutes).not.toContain("WHATSAPP_DELIVERY_FAILED");
   });
-});
 
-
-describe("optional production delivery boundary", () => {
-  it("keeps non-critical delivery calls optional without an external workflow engine", () => {
-    expect(identityRoutes).toContain("outbox?.processBatch");
-    expect(commerceRoutes).toContain("outbox?.processBatch");
+  it("dispatches both email and WhatsApp channels from the transactional outbox", () => {
+    expect(outboxService).toContain("payload->>'channel' IN ('email','whatsapp')");
+    expect(outboxService).toContain("publishEmail");
+    expect(outboxService).toContain("publishWhatsApp");
   });
 });

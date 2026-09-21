@@ -1,6 +1,8 @@
 import type { Pool } from "pg";
 import type { AppConfig } from "../../config/env.js";
 import { decryptSecret } from "../../security/crypto.js";
+import type { EmailProvider } from "./email-provider.js";
+import { renderOutboxEmail } from "./email-templates.js";
 
 interface OutboxRow {
   id: string;
@@ -24,6 +26,23 @@ function textParameters(payload: Record<string, unknown>): string[] {
   return [];
 }
 
+function safeDeliveryError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "Unknown delivery error";
+  return raw
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/\b\d{8,15}\b/g, "[phone]")
+    .slice(0, 1000);
+}
+
+function maskRecipient(channel: string, recipient: string): string {
+  if (channel === "email") {
+    const [local = "", domain = ""] = recipient.split("@");
+    return domain ? `${local.slice(0, 1) || "*"}***@${domain}` : "***";
+  }
+  const digits = recipient.replace(/\D/g, "");
+  return digits ? `***${digits.slice(-4)}` : "***";
+}
+
 export class OutboxService {
   public constructor(
     private readonly pool: Pool,
@@ -36,15 +55,56 @@ export class OutboxService {
       | "outboxBatchSize"
       | "mfaEncryptionKey"
     >,
+    private readonly emailProvider: EmailProvider | null = null,
   ) {}
 
-  public configured(): boolean {
-    const version = this.config.whatsappGraphApiVersion || "v26.0";
-    return Boolean(
+  public configured(channel?: "email" | "whatsapp"): boolean {
+    const whatsapp = Boolean(
       this.config.whatsappAccessToken &&
         this.config.whatsappPhoneNumberId &&
-        /^v\d+\.\d+$/.test(version),
+        /^v\d+\.\d+$/.test(this.config.whatsappGraphApiVersion || "v26.0"),
     );
+    const email = this.emailProvider?.configured() === true;
+    if (channel === "email") return email;
+    if (channel === "whatsapp") return whatsapp;
+    return email || whatsapp;
+  }
+
+  public async recentEvents(limit = 50): Promise<Array<Record<string, unknown>>> {
+    const result = await this.pool.query<{
+      id: string;
+      event_type: string;
+      status: string;
+      attempts: number;
+      last_error: string | null;
+      created_at: Date;
+      updated_at: Date;
+      published_at: Date | null;
+      channel: string;
+      recipient: string;
+    }>(
+      `SELECT id::text, event_type, status, attempts, last_error,
+              created_at, updated_at, published_at,
+              COALESCE(payload->>'channel','') AS channel,
+              COALESCE(payload->>'to','') AS recipient
+         FROM outbox_events
+        WHERE payload->>'channel' IN ('email','whatsapp')
+        ORDER BY created_at DESC
+        LIMIT $1`,
+      [Math.min(100, Math.max(1, limit))],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      eventType: row.event_type,
+      channel: row.channel,
+      recipient: maskRecipient(row.channel, row.recipient),
+      status: row.status,
+      attempts: row.attempts,
+      lastError: row.last_error,
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+      publishedAt: row.published_at?.toISOString() || null,
+    }));
   }
 
   public async processBatch(
@@ -56,10 +116,6 @@ export class OutboxService {
     published: number;
     failed: number;
   }> {
-    if (!this.configured()) {
-      return { configured: false, claimed: 0, published: 0, failed: 0 };
-    }
-
     const client = await this.pool.connect();
     let rows: OutboxRow[] = [];
     try {
@@ -69,7 +125,7 @@ export class OutboxService {
            FROM outbox_events
           WHERE attempts < 12
             AND available_at <= now()
-            AND payload->>'channel' = 'whatsapp'
+            AND payload->>'channel' IN ('email','whatsapp')
             AND ($2::text IS NULL OR deduplication_key=$2)
             AND (
               status IN ('pending','failed')
@@ -101,7 +157,7 @@ export class OutboxService {
     let failed = 0;
     for (const row of rows) {
       try {
-        await this.publishWhatsApp(row);
+        await this.publish(row);
         published += 1;
         await this.pool.query(
           `UPDATE outbox_events
@@ -112,8 +168,6 @@ export class OutboxService {
         );
       } catch (error) {
         failed += 1;
-        const message =
-          error instanceof Error ? error.message.slice(0, 1000) : "Unknown WhatsApp delivery error";
         const nextAttemptSeconds = Math.min(
           3600,
           Math.max(15, 2 ** Math.min(10, row.attempts + 1) * 15),
@@ -124,12 +178,17 @@ export class OutboxService {
                   available_at=now() + ($2::text || ' seconds')::interval,
                   locked_at=NULL, last_error=$3, updated_at=now()
             WHERE id=$1`,
-          [row.id, String(nextAttemptSeconds), message],
+          [row.id, String(nextAttemptSeconds), safeDeliveryError(error)],
         );
       }
     }
 
-    return { configured: true, claimed: rows.length, published, failed };
+    return {
+      configured: this.configured(),
+      claimed: rows.length,
+      published,
+      failed,
+    };
   }
 
   private externalPayload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -150,7 +209,36 @@ export class OutboxService {
     return copy;
   }
 
+  private async publish(row: OutboxRow): Promise<void> {
+    const channel = String(row.payload?.channel || "");
+    if (channel === "email") {
+      await this.publishEmail(row);
+      return;
+    }
+    if (channel === "whatsapp") {
+      await this.publishWhatsApp(row);
+      return;
+    }
+    throw new Error("Unsupported outbox delivery channel");
+  }
+
+  private async publishEmail(row: OutboxRow): Promise<void> {
+    if (!this.emailProvider?.configured()) {
+      throw new Error("SMTP email delivery is not configured");
+    }
+    const payload = this.externalPayload(row.payload || {});
+    const to = String(payload.to || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      throw new Error("Email recipient is missing or invalid");
+    }
+    const rendered = renderOutboxEmail(row.event_type, payload);
+    await this.emailProvider.send({ to, ...rendered });
+  }
+
   private async publishWhatsApp(row: OutboxRow): Promise<void> {
+    if (!this.configured("whatsapp")) {
+      throw new Error("WhatsApp Business Platform delivery is not configured");
+    }
     const payload = this.externalPayload(row.payload || {});
     const to = String(payload.to || "").replace(/\D/g, "");
     const template = String(payload.template || "").trim();
@@ -209,10 +297,7 @@ export class OutboxService {
     );
 
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(
-        `WhatsApp Cloud API returned ${response.status}${body ? `: ${body.slice(0, 500)}` : ""}`,
-      );
+      throw new Error(`WhatsApp Cloud API returned ${response.status}`);
     }
   }
 }

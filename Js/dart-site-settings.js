@@ -10,6 +10,9 @@
   let serverVersion = 0;
   let cachedSettings = null;
   let syncTimer = 0;
+  let publicSettingsEtag = "";
+  let lastSettingsCheckAt = 0;
+  const SETTINGS_POLL_MS = 60_000;
   const defaults = Object.freeze({
     version: 1,
     heroDayImage: null,
@@ -120,12 +123,17 @@
       method,
       headers: {
         "Content-Type": "application/json",
+        ...(options.headers || {}),
         ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrf
           ? { "X-CSRF-Token": decodeURIComponent(csrf) }
           : {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
+    if (response.status === 304) {
+      lastSettingsCheckAt = Date.now();
+      return { notModified: true, etag: response.headers.get("etag") || publicSettingsEtag };
+    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(payload?.error?.message || "Site settings request failed");
@@ -133,6 +141,9 @@
       error.code = payload?.error?.code;
       throw error;
     }
+    lastSettingsCheckAt = Date.now();
+    const etag = response.headers.get("etag");
+    if (etag) publicSettingsEtag = etag;
     return payload;
   }
 
@@ -171,15 +182,22 @@
 
   async function hydrate(_force = false) {
     if (!API_BASE) throw new Error("Site settings API is not configured.");
-    const payload = await api("/api/v1/site-settings");
+    const payload = await api("/api/v1/site-settings", {
+      headers: publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
+    });
+    if (payload?.notModified) return get();
     serverVersion = Number(payload.version || 1);
     return setCache(payload.settings || {});
   }
 
   async function checkForChanges() {
     if (!API_BASE || root.document?.hidden) return;
+    if (Date.now() - lastSettingsCheckAt < SETTINGS_POLL_MS) return;
     try {
-      const payload = await api("/api/v1/site-settings");
+      const payload = await api("/api/v1/site-settings", {
+        headers: publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
+      });
+      if (payload?.notModified) return;
       const remoteVersion = Number(payload.version || 0);
       if (remoteVersion && remoteVersion !== serverVersion) {
         serverVersion = remoteVersion;
@@ -290,5 +308,5 @@
   root.document.addEventListener("visibilitychange", () => {
     if (!root.document.hidden) checkForChanges();
   });
-  root.setInterval?.(checkForChanges, 5000);
+  root.setInterval?.(checkForChanges, SETTINGS_POLL_MS);
 })(typeof window !== "undefined" ? window : globalThis);

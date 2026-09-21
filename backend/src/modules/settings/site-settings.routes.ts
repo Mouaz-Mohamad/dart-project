@@ -25,9 +25,16 @@ export function createSiteSettingsRouter(
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
 
-  router.get("/site-settings", async (_request, response) => {
-    response.setHeader("Cache-Control", "no-store");
-    response.status(200).json(await settings.get());
+  router.get("/site-settings", async (request, response) => {
+    const payload = await settings.get();
+    const etag = `"dart-site-settings-v${payload.version}"`;
+    response.setHeader("ETag", etag);
+    response.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
+    if (request.get("if-none-match") === etag) {
+      response.status(304).end();
+      return;
+    }
+    response.status(200).json(payload);
   });
 
   router.put(

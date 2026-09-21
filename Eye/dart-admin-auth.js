@@ -10,10 +10,12 @@
   const onboardingCodeForm = document.getElementById("dart-admin-onboarding-code-form");
   const onboardingPasswordForm = document.getElementById("dart-admin-onboarding-password-form");
   const firstTimeButton = document.getElementById("dart-admin-first-time");
+  const onboardingResendButton = document.getElementById("dart-admin-onboarding-resend");
   const mfaForm = document.getElementById("dart-admin-mfa-form");
   const logoutButton = document.getElementById("dart-admin-logout");
   let onboardingChallengeId = "";
   let onboardingSetupToken = "";
+  let onboardingEmail = "";
   let csrfMemory = "";
   let compatibilityPromise = null;
   const HYDRATION_TIMEOUT_MS = 12000;
@@ -134,6 +136,7 @@
   function resetOnboarding() {
     onboardingChallengeId = "";
     onboardingSetupToken = "";
+    onboardingEmail = "";
     onboardingEmailForm?.reset();
     onboardingCodeForm?.reset();
     onboardingPasswordForm?.reset();
@@ -272,16 +275,39 @@
         body: { email: onboardingEmailForm.elements.email.value.trim() },
       });
       onboardingChallengeId = payload.challengeId || "";
+      onboardingEmail = onboardingEmailForm.elements.email.value.trim();
       showAuthForm(onboardingCodeForm);
       status(
         onboardingCodeForm,
-        "If this email is invited, a verification code has been sent to the registered WhatsApp number via WhatsApp Business Platform.",
+        "If this email is invited, a 6-digit verification code has been sent to that email.",
       );
       onboardingCodeForm.elements.code.focus();
     } catch (error) {
       status(onboardingEmailForm, error.message, true);
     } finally {
       submit.disabled = false;
+    }
+  });
+
+  onboardingResendButton?.addEventListener("click", async () => {
+    if (!onboardingEmail) return;
+    onboardingResendButton.disabled = true;
+    try {
+      const payload = await request("/api/v1/admin/auth/onboarding/resend", {
+        method: "POST",
+        body: { email: onboardingEmail },
+      });
+      onboardingChallengeId = payload.challengeId || "";
+      status(
+        onboardingCodeForm,
+        "If this email is invited, a fresh verification code has been sent.",
+      );
+      onboardingCodeForm.elements.code.value = "";
+      onboardingCodeForm.elements.code.focus();
+    } catch (error) {
+      status(onboardingCodeForm, error.message, true);
+    } finally {
+      onboardingResendButton.disabled = false;
     }
   });
 

@@ -46,6 +46,7 @@
           <p>Enter the 6-digit code sent to your invited email.</p>
           <label>Verification code<input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
           <button type="submit">Verify code</button>
+          <button id="dart-admin-onboarding-resend" type="button" class="dart-admin-auth-secondary">Resend code</button>
           <button type="button" data-admin-back-login class="dart-admin-auth-secondary">Cancel</button>
           <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
         </form>
@@ -1267,13 +1268,13 @@
                     <div class="dart-settings-card-copy">
                         <span>STAFF ACCESS</span>
                         <h2>Employees &amp; API permissions</h2>
-                        <p>أضف الموظف بالإيميل ورقم واتساب، وحدد الصلاحيات المسموحة له. أول مرة يدخل سيصل له كود التفعيل مباشرة عبر WhatsApp Business Platform ثم ينشئ كلمة السر الخاصة به.</p>
+                        <p>أضف الموظف بالإيميل وحدد الصلاحيات المسموحة له. رقم الهاتف اختياري، وكود التفعيل يُرسل إلى البريد الإلكتروني ثم ينشئ الموظف كلمة السر الخاصة به.</p>
                     </div>
                     <form id="settings-staff-invite-form" class="dart-settings-fields">
                         <label for="settings-staff-name">Employee name<input id="settings-staff-name" type="text" maxlength="120" required></label>
                         <label for="settings-staff-email">Employee email<input id="settings-staff-email" type="email" maxlength="254" required></label>
-                        <label for="settings-staff-phone">WhatsApp phone<input id="settings-staff-phone" type="tel" inputmode="tel" maxlength="25" placeholder="01xxxxxxxxx" required></label>
-                        <label class="dart-settings-check" for="settings-staff-mfa"><input id="settings-staff-mfa" type="checkbox" checked> Require 2FA</label>
+                        <label for="settings-staff-phone">Phone (optional)<input id="settings-staff-phone" type="tel" inputmode="tel" maxlength="25" placeholder="01xxxxxxxxx"></label>
+                        <label class="dart-settings-check" for="settings-staff-mfa"><input id="settings-staff-mfa" type="checkbox"> Require 2FA</label>
                         <div class="dart-settings-field-wide">
                             <strong>Allowed APIs / actions</strong>
                             <div id="settings-staff-invite-permissions" class="dart-staff-permissions"></div>
@@ -1288,6 +1289,11 @@
                     <div class="dart-settings-field-wide">
                         <h3>Invitations</h3>
                         <div id="settings-staff-invitations" class="dart-settings-list"></div>
+                    </div>
+                    <div class="dart-settings-field-wide">
+                        <h3>Email delivery</h3>
+                        <p>آخر محاولات إرسال أكواد التفعيل والتأكيد. العناوين معروضة بصورة مخفية ولا يظهر أي OTP.</p>
+                        <div id="settings-delivery-events" class="dart-settings-list"></div>
                     </div>
                 </article>
 

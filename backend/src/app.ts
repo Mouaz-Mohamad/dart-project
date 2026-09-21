@@ -1,11 +1,13 @@
-import express from "express";
-import { resolve } from "node:path";
+import express, { type Express } from "express";
+import pino from "pino";
 import { createApp } from "./application.js";
-import { loadConfig } from "./config/env.js";
+import {
+  EnvironmentConfigError,
+  loadConfig,
+  type AppConfig,
+} from "./config/env.js";
 import { createLogger } from "./config/logger.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
-import { runMigrations } from "./database/migrate.js";
-import { shouldRunRuntimeMigrations } from "./config/runtime.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
 import { CatalogService } from "./modules/catalog/catalog.service.js";
 import { CatalogAssetService } from "./modules/catalog/catalog.asset.service.js";
@@ -16,52 +18,86 @@ import { CustomerInteractionService } from "./modules/commerce/customer-interact
 import { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
 import { FinanceService } from "./modules/finance/finance.service.js";
 import { OutboxService } from "./modules/outbox/outbox.service.js";
+import { createEmailProvider } from "./modules/outbox/email-provider.js";
 
-// Vercel discovers Express entrypoints from direct imports in this file.
-void express;
+export interface DartRuntime {
+  app: Express;
+  config: AppConfig;
+  database: ReturnType<typeof createDatabasePool>;
+  logger: ReturnType<typeof createLogger>;
+}
 
-export const config = loadConfig();
-export const logger = createLogger(config);
-export const database = createDatabasePool(config);
-export const identityService = new IdentityService(database, config);
-export const catalogService = new CatalogService(database);
-export const catalogAssetService = new CatalogAssetService(database);
-export const commerceService = new CommerceService(database);
-export const siteSettingsService = new SiteSettingsService(database);
-export const dashboardStateService = new DashboardStateService(database);
-export const customerInteractionService = new CustomerInteractionService(database);
-export const platformAdminService = new PlatformAdminService(database);
-export const financeService = new FinanceService(database);
-export const outboxService = new OutboxService(database, config);
+export function createMisconfiguredApplication(): Express {
+  const fallback = express();
+  fallback.disable("x-powered-by");
+  fallback.get("/api/v1/health/live", (_request, response) => {
+    response.status(503).json({ status: "misconfigured" });
+  });
+  fallback.use("/api/v1", (_request, response) => {
+    response.status(503).json({
+      error: {
+        code: "SERVICE_MISCONFIGURED",
+        message: "Dart API is temporarily unavailable",
+      },
+    });
+  });
+  return fallback;
+}
 
-database.on("error", (error) => {
-  logger.error({ err: error }, "Unexpected PostgreSQL pool error");
-});
+export function createRuntimeApplication(
+  source: NodeJS.ProcessEnv = process.env,
+): DartRuntime {
+  const config = loadConfig(source);
+  const logger = createLogger(config);
+  const database = createDatabasePool(config);
+  const identityService = new IdentityService(database, config);
+  const catalogService = new CatalogService(database);
+  const catalogAssetService = new CatalogAssetService(database);
+  const commerceService = new CommerceService(database);
+  const siteSettingsService = new SiteSettingsService(database);
+  const dashboardStateService = new DashboardStateService(database);
+  const customerInteractionService = new CustomerInteractionService(database);
+  const platformAdminService = new PlatformAdminService(database);
+  const financeService = new FinanceService(database);
+  const outboxService = new OutboxService(
+    database,
+    config,
+    createEmailProvider(config),
+  );
 
-if (shouldRunRuntimeMigrations()) {
-  const migrationDirectory = resolve(process.cwd(), "migrations");
-  const applied = await runMigrations(database, migrationDirectory);
-  logger.info(
-    { applied },
-    applied.length ? "Runtime migrations applied" : "Runtime database schema is current",
+  database.on("error", (error) => {
+    logger.error({ err: error }, "Unexpected PostgreSQL pool error");
+  });
+
+  const app = createApp(config, {
+    logger,
+    databasePing: () => pingDatabase(database),
+    startedAt: new Date(),
+    version: "0.4.0",
+    identityService,
+    catalogService,
+    catalogAssetService,
+    commerceService,
+    siteSettingsService,
+    dashboardStateService,
+    customerInteractionService,
+    platformAdminService,
+    financeService,
+    outboxService,
+  });
+  return { app, config, database, logger };
+}
+
+export let runtime: DartRuntime | null = null;
+try {
+  runtime = createRuntimeApplication();
+} catch (error) {
+  if (!(error instanceof EnvironmentConfigError)) throw error;
+  pino({ level: "error" }).error(
+    { invalidFields: error.fields },
+    "Dart backend environment is invalid",
   );
 }
 
-const app = createApp(config, {
-  logger,
-  databasePing: () => pingDatabase(database),
-  startedAt: new Date(),
-  version: "0.3.1",
-  identityService,
-  catalogService,
-  catalogAssetService,
-  commerceService,
-  siteSettingsService,
-  dashboardStateService,
-  customerInteractionService,
-  platformAdminService,
-  financeService,
-  outboxService,
-});
-
+const app = runtime?.app ?? createMisconfiguredApplication();
 export default app;

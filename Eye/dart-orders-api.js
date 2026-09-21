@@ -7,6 +7,7 @@
   let dirty = false;
   let syncTimer = 0;
   let syncChain = Promise.resolve();
+  let adminPollingEnabled = false;
 
   function readLocal() {
     return window.DartState?.read?.(STORAGE_KEY, []) || [];
@@ -154,7 +155,7 @@
   }
 
   async function check() {
-    if (document.hidden) return;
+    if (!adminPollingEnabled || document.hidden) return;
     try {
       if (!serverVersion) {
         await hydrate();
@@ -171,6 +172,9 @@
     }
   }
 
+  window.addEventListener("dart:admin-authenticated", () => {
+    adminPollingEnabled = true;
+  });
   window.addEventListener("online", check);
   window.addEventListener("focus", check);
   document.addEventListener("visibilitychange", () => {

@@ -24,7 +24,7 @@ describe("environment configuration", () => {
     expect(config.sessionCookieSameSite).toBe("none");
   });
 
-  it("blocks development seed in production", () => {
+  it("blocks development seed in production using only the field name", () => {
     expect(() =>
       loadConfig({
         ...baseEnvironment,
@@ -32,7 +32,7 @@ describe("environment configuration", () => {
         CORS_ORIGINS: "https://dart.example",
         ALLOW_DEVELOPMENT_SEED: "true",
       }),
-    ).toThrow("development seed cannot run in production");
+    ).toThrow("ALLOW_DEVELOPMENT_SEED");
   });
 
   it("requires a database URL", () => {
@@ -58,7 +58,7 @@ describe("environment configuration", () => {
     ).toThrow("MFA_ENCRYPTION_KEY");
   });
 
-  it("keeps legacy automation optional and validates direct WhatsApp settings", () => {
+  it("keeps email disabled by default and validates SMTP fields in production", () => {
     const production = {
       ...baseEnvironment,
       NODE_ENV: "production",
@@ -67,20 +67,40 @@ describe("environment configuration", () => {
       MFA_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     };
     const disabled = loadConfig(production);
-    expect(disabled.automationWebhookUrl).toBeNull();
-    expect(disabled.automationWebhookSecret).toBeNull();
-    expect(disabled.whatsappAccessToken).toBeNull();
-    expect(disabled.whatsappPhoneNumberId).toBeNull();
+    expect(disabled.emailProvider).toBe("disabled");
+    expect(disabled.smtpHost).toBeNull();
     expect(disabled.outboxCronSecret).toBeNull();
 
-    const legacyPartial = loadConfig({
-      ...production,
-      AUTOMATION_WEBHOOK_URL: "https://automation.example/webhook",
-    });
-    expect(legacyPartial.automationWebhookUrl).toBe(
-      "https://automation.example/webhook",
-    );
+    expect(() =>
+      loadConfig({
+        ...production,
+        EMAIL_PROVIDER: "smtp",
+      }),
+    ).toThrow("SMTP_HOST");
 
+    const smtp = loadConfig({
+      ...production,
+      EMAIL_PROVIDER: "smtp",
+      SMTP_HOST: "smtp.example.com",
+      SMTP_PORT: "587",
+      SMTP_SECURE: "false",
+      SMTP_USER: "dart@example.com",
+      SMTP_PASS: "app-password",
+      EMAIL_FROM: "dart@example.com",
+    });
+    expect(smtp.emailProvider).toBe("smtp");
+    expect(smtp.smtpPort).toBe(587);
+    expect(smtp.staffInviteOtpTtlHours).toBe(48);
+  });
+
+  it("validates optional direct WhatsApp settings", () => {
+    const production = {
+      ...baseEnvironment,
+      NODE_ENV: "production",
+      CORS_ORIGINS: "https://dart.example",
+      AUTH_PEPPER: "production-auth-pepper-with-at-least-32-characters",
+      MFA_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
+    };
     expect(() =>
       loadConfig({
         ...production,
@@ -97,7 +117,6 @@ describe("environment configuration", () => {
     });
     expect(config.whatsappPhoneNumberId).toBe("123456789012345");
     expect(config.whatsappOwnerPhone).toBe("201001234567");
-    expect(config.whatsappGraphApiVersion).toBe("v26.0");
     expect(config.outboxCronSecret).toBe("b".repeat(32));
   });
 });

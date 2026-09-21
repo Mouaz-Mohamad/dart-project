@@ -1,65 +1,74 @@
-# Deploy the Dart API on Vercel
+# Dart API — Vercel deployment
 
-This backend is an Express/TypeScript application. Vercel recognizes `src/server.ts` and deploys it as one Node.js Function. No adapter, custom build command, output directory, or `vercel.json` is required.
+The backend project root is `backend/` and production runs on Node 24.
 
-## Project settings
+## Production build
 
-- Project name: `dart-api`
-- Git branch: `main`
-- Root Directory: `backend`
-- Framework Preset: Express (automatic detection)
-- Build Command: leave empty/default
-- Output Directory: leave empty/default
-- Install Command: leave empty/default (`npm install` uses `package-lock.json`)
-- Node.js: 24.x, matching `package.json`
+`backend/vercel.json` runs database migrations during the production build and then builds TypeScript. Runtime cold starts do **not** run migrations. This prevents a missing `/var/task/migrations` directory from crashing every API route.
 
-## Required Production environment variables
+Required deployment checks:
 
-Add these in Vercel. Never paste their values into chat, source code, screenshots, or Git history.
+1. `npm ci`
+2. `npm run lint`
+3. `npm run typecheck`
+4. `npm test`
+5. `npm run check:env` with the production environment loaded
+6. `npm run db:migrate` against the target Neon database when not using the Vercel production build hook
 
-| Key | Production value or rule |
-|---|---|
-| `NODE_ENV` | `production` |
-| `DATABASE_URL` | Injected by the Neon integration connected to the `dart-api` project |
-| `DATABASE_SSL` | `true` |
-| `DATABASE_POOL_MAX` | `3` initially to limit connections per Function instance |
-| `CORS_ORIGINS` | `https://dart-project-psi.vercel.app` initially; comma-separate future approved origins |
-| `TRUST_PROXY_HOPS` | `1` |
-| `RATE_LIMIT_WINDOW_MS` | `60000` |
-| `RATE_LIMIT_MAX` | `120` |
-| `LOG_LEVEL` | `info` |
-| `ALLOW_DEVELOPMENT_SEED` | `false` |
-| `AUTH_PEPPER` | A new cryptographically random secret of at least 32 characters |
-| `MFA_ENCRYPTION_KEY` | Exactly 32 random bytes encoded as Base64 |
-| `SESSION_COOKIE_NAME` | `dart_session` |
-| `SESSION_COOKIE_SAME_SITE` | `none` while the storefront and API use separate `*.vercel.app` hostnames |
-| `SESSION_TTL_DAYS` | `30` |
-| `EMAIL_OTP_TTL_MINUTES` | `10` |
-| `AUTOMATION_WEBHOOK_URL` | HTTPS n8n/automation webhook that sends approved Email/Web Push/site notifications |
-| `AUTOMATION_WEBHOOK_SECRET` | New random secret of at least 32 characters used to sign every event |
-| `CRON_SECRET` | New random secret of at least 32 characters; Vercel supplies it as the Cron bearer token |
-| `OUTBOX_BATCH_SIZE` | `20` initially |
+Never edit an already-applied migration. New migrations start at `0023_*` or above and use a new prefix.
 
-Use `SESSION_COOKIE_SAME_SITE=strict` after the storefront and API are placed on same-site custom domains such as `www.example.com` and `api.example.com`. Cross-site cookies use `SameSite=None; Secure`; CSRF verification and the exact CORS allowlist remain mandatory.
+## Environment variable names
 
-Do not add `DART_OWNER_PASSWORD` as a permanent Vercel variable. Owner bootstrap is a controlled one-time command, and the password must be removed immediately after it succeeds.
+Core:
+- `NODE_ENV`
+- `DATABASE_URL`
+- `DATABASE_SSL`
+- `DATABASE_POOL_MAX`
+- `CORS_ORIGINS`
+- `AUTH_PEPPER`
+- `MFA_ENCRYPTION_KEY`
+- `SESSION_COOKIE_NAME`
+- `SESSION_COOKIE_SAME_SITE`
+- `SESSION_TTL_DAYS`
+- `EMAIL_OTP_TTL_MINUTES`
+- `STAFF_INVITE_OTP_TTL_HOURS`
+- `OUTBOX_CRON_SECRET` or `CRON_SECRET`
+- `OUTBOX_BATCH_SIZE`
 
-## Deployment order
+Email:
+- `EMAIL_PROVIDER=smtp`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `EMAIL_FROM`
 
-1. Push the reviewed source to GitHub.
-2. Create `dart-api` from the same repository with Root Directory `backend`.
-3. Connect the existing Neon database to `dart-api`, producing `DATABASE_URL` there.
-4. Add the remaining Production variables above.
-5. Deploy and call `/api/v1/health/live`; it must return HTTP 200.
-6. Run `npm run db:migrate` once against the production `DATABASE_URL` from a controlled environment.
-7. Call `/api/v1/health/ready`; it must return HTTP 200 with the database check up.
-8. Run `npm run admin:bootstrap-owner` once, then remove the bootstrap password.
-9. Verify the automation webhook signature and trigger one test Email OTP through the real provider.
-10. Configure the storefront's API base URL and verify login, cookie, CSRF, logout, and MFA end to end.
+WhatsApp remains optional for approved notification flows:
+- `WHATSAPP_CLOUD_API_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `WHATSAPP_OWNER_PHONE`
+- `WHATSAPP_GRAPH_API_VERSION`
+- `WHATSAPP_TEMPLATE_LANGUAGE`
 
-## Important boundaries
+Do not store or document environment values in Git.
 
-- A successful deployment does not run or prove the database migrations.
-- Email OTP and order events are queued transactionally and immediately dispatched when the signed automation webhook is configured; the database retry queue remains authoritative.
-- Representative documents are signature-checked, size-limited and encrypted in PostgreSQL. Production approval still requires a human identity review policy.
-- Never enable development seed data in Production.
+## Health
+
+- `GET /api/v1/health/live` returns 200 for a correctly configured process.
+- Invalid production configuration returns 503 with only `{"status":"misconfigured"}`; invalid field names are written only to server logs.
+- `GET /api/v1/health/ready` returns 200 only when PostgreSQL responds.
+
+## Outbox retry processor
+
+Immediate delivery is attempted after the database transaction commits. Failed email/WhatsApp events remain in `outbox_events` with exponential backoff.
+
+Safety-net endpoint:
+
+`GET|POST /api/v1/internal/outbox/process`
+
+Authorization:
+
+`Authorization: Bearer <OUTBOX_CRON_SECRET>`
+
+If the Vercel plan cannot schedule the needed retry frequency, call this endpoint every five minutes from a trusted external scheduler. Never expose the cron secret to browser JavaScript.

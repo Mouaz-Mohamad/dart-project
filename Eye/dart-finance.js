@@ -51,6 +51,12 @@
   const serverFinanceErrors = new Map();
   let serverFinanceDenied = false;
   let serverFinanceRefreshTimer = 0;
+  let adminAuthenticated = false;
+  let financeBackoffMs = 5_000;
+  let financeLastAttemptAt = 0;
+  let financeWarnedBackoffMs = 0;
+  const FINANCE_REFRESH_MS = 30_000;
+  const FINANCE_MAX_BACKOFF_MS = 300_000;
 
   function getStorage() {
     try {
@@ -1021,7 +1027,7 @@
       })
       .catch((error) => {
         serverFinanceErrors.set(key, error);
-        if (error?.status === 403) serverFinanceDenied = true;
+        if (error?.status === 401 || error?.status === 403) serverFinanceDenied = true;
         throw error;
       })
       .finally(() => serverFinancePending.delete(key));
@@ -1031,25 +1037,64 @@
   }
 
   async function hydrateAuthoritativeFinance(range = currentRange(), force = false) {
-    if (serverFinanceDenied) return;
+    if (serverFinanceDenied || !adminAuthenticated || document.hidden) return false;
     try {
       await Promise.all([
         hydrateServerFinanceSummary(range, force),
         hydrateServerFinanceSummary(range.previous, force),
       ]);
+      return true;
     } catch (error) {
-      if (error?.status !== 403)
-        console.warn("Dart server finance summary refresh failed", error);
+      if (
+        error?.status !== 401 &&
+        error?.status !== 403 &&
+        financeWarnedBackoffMs !== financeBackoffMs
+      ) {
+        financeWarnedBackoffMs = financeBackoffMs;
+        console.warn("Dart server finance summary refresh failed; retry is backed off.");
+      }
+      return false;
+    } finally {
+      renderAllFinance();
     }
-    renderAllFinance();
+  }
+
+  function scheduleFinanceRefresh(delayMs = FINANCE_REFRESH_MS) {
+    clearTimeout(serverFinanceRefreshTimer);
+    if (!adminAuthenticated || serverFinanceDenied || document.hidden) return;
+    const jitter = delayMs >= FINANCE_REFRESH_MS
+      ? Math.floor(Math.random() * Math.min(5_000, delayMs * 0.1))
+      : 0;
+    serverFinanceRefreshTimer = root.setTimeout(
+      () => void refreshFinanceFromServer(true),
+      delayMs + jitter,
+    );
+  }
+
+  async function refreshFinanceFromServer(force = true) {
+    if (!adminAuthenticated || serverFinanceDenied || document.hidden) return;
+    financeLastAttemptAt = Date.now();
+    const ok = await hydrateAuthoritativeFinance(currentRange(), force);
+    if (ok) {
+      financeBackoffMs = 5_000;
+      financeWarnedBackoffMs = 0;
+      scheduleFinanceRefresh(FINANCE_REFRESH_MS);
+      return;
+    }
+    if (!serverFinanceDenied) {
+      const nextDelay = financeBackoffMs;
+      financeBackoffMs = Math.min(FINANCE_MAX_BACKOFF_MS, financeBackoffMs * 2);
+      scheduleFinanceRefresh(nextDelay);
+    }
   }
 
   function invalidateAuthoritativeFinance() {
     serverFinanceSummaries.clear();
     serverFinanceErrors.clear();
     clearTimeout(serverFinanceRefreshTimer);
+    if (!adminAuthenticated) return;
     serverFinanceRefreshTimer = root.setTimeout(
-      () => void hydrateAuthoritativeFinance(currentRange(), true),
+      () => void refreshFinanceFromServer(true),
       120,
     );
   }
@@ -1977,15 +2022,30 @@
   document.addEventListener("DOMContentLoaded", () => {
     renderPeriodControls();
     renderAllFinance();
-    void hydrateAuthoritativeFinance(currentRange());
     const saved = getStorage()?.getItem("dart_active_section");
     if (requestedInitialSection === "finance" || saved === "finance") activateFinance();
   });
-  root.addEventListener("focus", () => {
-    if (!serverFinanceDenied) void hydrateAuthoritativeFinance(currentRange(), true);
+  root.addEventListener("dart:admin-authenticated", () => {
+    adminAuthenticated = true;
+    serverFinanceDenied = false;
+    financeBackoffMs = 5_000;
+    financeWarnedBackoffMs = 0;
+    void refreshFinanceFromServer(true);
   });
-  root.setInterval(() => {
-    if (!document.hidden && !serverFinanceDenied)
-      void hydrateAuthoritativeFinance(currentRange(), true);
-  }, 30000);
+  root.addEventListener("focus", () => {
+    if (
+      adminAuthenticated &&
+      !serverFinanceDenied &&
+      Date.now() - financeLastAttemptAt >= FINANCE_REFRESH_MS
+    ) {
+      void refreshFinanceFromServer(true);
+    }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      clearTimeout(serverFinanceRefreshTimer);
+      return;
+    }
+    if (adminAuthenticated && !serverFinanceDenied) scheduleFinanceRefresh(1_000);
+  });
 })(typeof window !== "undefined" ? window : globalThis);

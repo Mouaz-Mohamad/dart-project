@@ -19,21 +19,15 @@ const authConfig: Pick<
   | "sessionTtlDays"
   | "emailOtpTtlMinutes"
   | "mfaEncryptionKey"
-  | "whatsappAccessToken"
-  | "whatsappPhoneNumberId"
-  | "whatsappOwnerPhone"
-  | "whatsappStaffOtpTemplate"
-  | "whatsappStaffInviteTemplate"
+  | "staffInviteOtpTtlHours"
+  | "corsOrigins"
 > = {
   authPepper: "integration-test-auth-pepper-32-characters-long",
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
   mfaEncryptionKey: Buffer.alloc(32, 4),
-  whatsappAccessToken: "integration-test-meta-token",
-  whatsappPhoneNumberId: "123456789012345",
-  whatsappOwnerPhone: "201001234567",
-  whatsappStaffOtpTemplate: "dart_staff_otp",
-  whatsappStaffInviteTemplate: "dart_staff_invite",
+  staffInviteOtpTtlHours: 48,
+  corsOrigins: ["https://dart.example"],
 };
 
 const requestMetadata = {
@@ -106,7 +100,7 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     expect(signedIn.account.permissions).toContain("profile.read_own");
   });
 
-  it("activates the Owner with a WhatsApp OTP and persists the Staff phone", async () => {
+  it("activates the Owner and invited Staff using email OTPs without WhatsApp", async () => {
     const onboarding = await service!.startStaffOnboarding(
       "midomoaaz3@gmail.com",
       requestMetadata,
@@ -118,19 +112,13 @@ describe.skipIf(!databaseUrl)("identity service", () => {
         encryptedParameters: { otp: string };
       };
     }>(
-      `SELECT payload
-         FROM outbox_events
-        WHERE event_type='STAFF_ONBOARDING_CODE_REQUESTED'
-        ORDER BY created_at DESC
-        LIMIT 1`,
+      `SELECT payload FROM outbox_events WHERE deduplication_key=$1 LIMIT 1`,
+      [`staff-onboarding-code:${onboarding.challengeId}`],
     );
-    expect(event.rows[0]!.payload.channel).toBe("whatsapp");
-    expect(event.rows[0]!.payload.to).toBe(authConfig.whatsappOwnerPhone);
+    expect(event.rows[0]!.payload.channel).toBe("email");
+    expect(event.rows[0]!.payload.to).toBe("midomoaaz3@gmail.com");
     const otp = decryptSecret(
-      Buffer.from(
-        event.rows[0]!.payload.encryptedParameters.otp,
-        "base64",
-      ),
+      Buffer.from(event.rows[0]!.payload.encryptedParameters.otp, "base64"),
       authConfig.mfaEncryptionKey,
     );
     const verified = await service!.verifyStaffOnboarding(
@@ -146,21 +134,46 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     );
     expect(session.account.accountType).toBe("staff");
     expect(session.account.mfaRequired).toBe(true);
-    const phone = await testPool!.query<{
-      phone_normalized: string;
-      is_primary: boolean;
-      verified_at: Date | null;
-    }>(
-      `SELECT phone_normalized, is_primary, verified_at
-         FROM account_phones
-        WHERE user_id=$1 AND account_type='staff'`,
-      [session.account.userId],
+
+    const invitation = await service!.createStaffInvitation(
+      session.account,
+      {
+        email: "staff@example.com",
+        phone: "",
+        displayName: "Test Staff",
+        permissionKeys: ["orders.read"],
+        mfaRequired: false,
+      },
+      requestMetadata,
     );
-    expect(phone.rows[0]).toMatchObject({
-      phone_normalized: authConfig.whatsappOwnerPhone,
-      is_primary: true,
+    const staffEvent = await testPool!.query<{
+      payload: { channel: string; to: string; encryptedParameters: { otp: string } };
+    }>(
+      `SELECT payload FROM outbox_events WHERE deduplication_key=$1`,
+      [`staff-onboarding-code:${invitation.challengeId}`],
+    );
+    expect(staffEvent.rows[0]!.payload).toMatchObject({
+      channel: "email",
+      to: "staff@example.com",
     });
-    expect(phone.rows[0]!.verified_at).toBeInstanceOf(Date);
+    const staffOtp = decryptSecret(
+      Buffer.from(staffEvent.rows[0]!.payload.encryptedParameters.otp, "base64"),
+      authConfig.mfaEncryptionKey,
+    );
+    const staffVerified = await service!.verifyStaffOnboarding(
+      invitation.challengeId,
+      staffOtp,
+      requestMetadata,
+    );
+    const staffSession = await service!.completeStaffOnboarding(
+      invitation.challengeId,
+      staffVerified.setupToken,
+      "StaffStrongPassword123",
+      requestMetadata,
+    );
+    expect(staffSession.account.mfaRequired).toBe(false);
+    expect(staffSession.account.permissions).toContain("orders.read");
+    expect(staffSession.account.permissions).not.toContain("staff.manage");
   });
 
   it("rejects duplicate customer identities but permits the same contact in another realm", async () => {

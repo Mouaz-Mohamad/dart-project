@@ -32,6 +32,7 @@
   const timers = new Map();
   const queues = new Map();
   const deniedDomains = new Set();
+  let adminPollingEnabled = false;
 
   function readLocal(storageKey) {
     return window.DartState?.read?.(storageKey, []) || [];
@@ -261,7 +262,7 @@
   }
 
   async function checkAll() {
-    if (document.hidden) return;
+    if (!adminPollingEnabled || document.hidden) return;
     try {
       const payload = await api("/api/v1/admin/domain-state-versions");
       const remoteVersions = payload?.versions || {};
@@ -275,6 +276,9 @@
     }
   }
 
+  window.addEventListener("dart:admin-authenticated", () => {
+    adminPollingEnabled = true;
+  });
   window.addEventListener("online", checkAll);
   window.addEventListener("focus", checkAll);
   document.addEventListener("visibilitychange", () => {
