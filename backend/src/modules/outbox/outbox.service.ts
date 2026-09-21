@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import type { Pool } from "pg";
 import type { AppConfig } from "../../config/env.js";
 import { decryptSecret } from "../../security/crypto.js";
@@ -12,13 +11,28 @@ interface OutboxRow {
   attempts: number;
 }
 
+function textParameters(payload: Record<string, unknown>): string[] {
+  const parameters = payload.parameters;
+  if (Array.isArray(parameters)) {
+    return parameters.map((value) => String(value ?? "").trim()).filter(Boolean);
+  }
+  if (parameters && typeof parameters === "object") {
+    return Object.values(parameters as Record<string, unknown>)
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export class OutboxService {
   public constructor(
     private readonly pool: Pool,
     private readonly config: Pick<
       AppConfig,
-      | "automationWebhookUrl"
-      | "automationWebhookSecret"
+      | "whatsappAccessToken"
+      | "whatsappPhoneNumberId"
+      | "whatsappGraphApiVersion"
+      | "whatsappTemplateLanguage"
       | "outboxBatchSize"
       | "mfaEncryptionKey"
     >,
@@ -26,9 +40,9 @@ export class OutboxService {
 
   public configured(): boolean {
     return Boolean(
-      this.config.automationWebhookUrl &&
-        this.config.automationWebhookSecret &&
-        this.config.automationWebhookSecret.length >= 32,
+      this.config.whatsappAccessToken &&
+        this.config.whatsappPhoneNumberId &&
+        /^v\d+\.\d+$/.test(this.config.whatsappGraphApiVersion),
     );
   }
 
@@ -51,6 +65,7 @@ export class OutboxService {
            FROM outbox_events
           WHERE attempts < 12
             AND available_at <= now()
+            AND payload->>'channel' = 'whatsapp'
             AND (
               status IN ('pending','failed')
               OR (status='processing' AND locked_at < now() - interval '5 minutes')
@@ -64,10 +79,7 @@ export class OutboxService {
       if (rows.length) {
         await client.query(
           `UPDATE outbox_events
-              SET status='processing',
-                  locked_at=now(),
-                  attempts=attempts+1,
-                  updated_at=now()
+              SET status='processing', locked_at=now(), attempts=attempts+1, updated_at=now()
             WHERE id = ANY($1::uuid[])`,
           [rows.map((row) => row.id)],
         );
@@ -84,22 +96,19 @@ export class OutboxService {
     let failed = 0;
     for (const row of rows) {
       try {
-        await this.publish(row);
+        await this.publishWhatsApp(row);
         published += 1;
         await this.pool.query(
           `UPDATE outbox_events
-              SET status='published',
-                  published_at=now(),
-                  locked_at=NULL,
-                  last_error=NULL,
-                  updated_at=now()
+              SET status='published', published_at=now(), locked_at=NULL,
+                  last_error=NULL, updated_at=now()
             WHERE id=$1`,
           [row.id],
         );
       } catch (error) {
         failed += 1;
         const message =
-          error instanceof Error ? error.message.slice(0, 1000) : "Unknown delivery error";
+          error instanceof Error ? error.message.slice(0, 1000) : "Unknown WhatsApp delivery error";
         const nextAttemptSeconds = Math.min(
           3600,
           Math.max(15, 2 ** Math.min(10, row.attempts + 1) * 15),
@@ -108,21 +117,14 @@ export class OutboxService {
           `UPDATE outbox_events
               SET status='failed',
                   available_at=now() + ($2::text || ' seconds')::interval,
-                  locked_at=NULL,
-                  last_error=$3,
-                  updated_at=now()
+                  locked_at=NULL, last_error=$3, updated_at=now()
             WHERE id=$1`,
           [row.id, String(nextAttemptSeconds), message],
         );
       }
     }
 
-    return {
-      configured: true,
-      claimed: rows.length,
-      published,
-      failed,
-    };
+    return { configured: true, claimed: rows.length, published, failed };
   }
 
   private externalPayload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -130,9 +132,7 @@ export class OutboxService {
     const encrypted = payload.encryptedParameters;
     if (encrypted && typeof encrypted === "object" && !Array.isArray(encrypted)) {
       const parameters: Record<string, string> = {};
-      for (const [key, value] of Object.entries(
-        encrypted as Record<string, unknown>,
-      )) {
+      for (const [key, value] of Object.entries(encrypted as Record<string, unknown>)) {
         if (typeof value !== "string" || !value) continue;
         parameters[key] = decryptSecret(
           Buffer.from(value, "base64"),
@@ -145,32 +145,50 @@ export class OutboxService {
     return copy;
   }
 
-  private async publish(row: OutboxRow): Promise<void> {
-    const url = this.config.automationWebhookUrl!;
-    const secret = this.config.automationWebhookSecret!;
-    const body = JSON.stringify({
-      id: row.id,
-      aggregateType: row.aggregate_type,
-      aggregateId: row.aggregate_id,
-      eventType: row.event_type,
-      payload: this.externalPayload(row.payload || {}),
-    });
-    const signature = createHmac("sha256", secret).update(body).digest("hex");
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Dart-Event-Id": row.id,
-        "X-Dart-Event-Type": row.event_type,
-        "X-Dart-Signature": `sha256=${signature}`,
+  private async publishWhatsApp(row: OutboxRow): Promise<void> {
+    const payload = this.externalPayload(row.payload || {});
+    const to = String(payload.to || "").replace(/\D/g, "");
+    const template = String(payload.template || "").trim();
+    const languageCode = String(
+      payload.languageCode || this.config.whatsappTemplateLanguage,
+    ).trim();
+
+    if (!/^\d{8,15}$/.test(to)) throw new Error("WhatsApp recipient is missing or invalid");
+    if (!/^[a-z0-9_]+$/.test(template)) throw new Error("WhatsApp template is missing or invalid");
+    if (!languageCode) throw new Error("WhatsApp template language is missing");
+
+    const parameters = textParameters(payload);
+    const components = parameters.length
+      ? [{ type: "body", parameters: parameters.map((text) => ({ type: "text", text })) }]
+      : undefined;
+
+    const response = await fetch(
+      `https://graph.facebook.com/${this.config.whatsappGraphApiVersion}/${this.config.whatsappPhoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.whatsappAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to,
+          type: "template",
+          template: {
+            name: template,
+            language: { code: languageCode },
+            ...(components ? { components } : {}),
+          },
+        }),
+        signal: AbortSignal.timeout(12_000),
       },
-      body,
-      signal: AbortSignal.timeout(12_000),
-    });
+    );
+
     if (!response.ok) {
-      const text = await response.text().catch(() => "");
+      const body = await response.text().catch(() => "");
       throw new Error(
-        `Automation webhook returned ${response.status}${text ? `: ${text.slice(0, 300)}` : ""}`,
+        `WhatsApp Cloud API returned ${response.status}${body ? `: ${body.slice(0, 500)}` : ""}`,
       );
     }
   }

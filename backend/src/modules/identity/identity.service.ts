@@ -183,7 +183,15 @@ export class IdentityService {
     private readonly pool: Pool,
     private readonly config: Pick<
       AppConfig,
-      "authPepper" | "sessionTtlDays" | "emailOtpTtlMinutes" | "mfaEncryptionKey"
+      | "authPepper"
+      | "sessionTtlDays"
+      | "emailOtpTtlMinutes"
+      | "mfaEncryptionKey"
+      | "whatsappAccessToken"
+      | "whatsappPhoneNumberId"
+      | "whatsappOwnerPhone"
+      | "whatsappStaffOtpTemplate"
+      | "whatsappStaffInviteTemplate"
     >,
   ) {}
 
@@ -511,8 +519,9 @@ export class IdentityService {
         id: string;
         email: string;
         email_normalized: string;
+        is_owner: boolean;
       }>(
-        `SELECT id::text, email, email_normalized
+        `SELECT id::text, email, email_normalized, is_owner
            FROM staff_invitations
           WHERE email_normalized=$1
             AND status='pending'
@@ -547,6 +556,29 @@ export class IdentityService {
         [invitation.id],
       );
 
+      let recipient = invitation.is_owner ? this.config.whatsappOwnerPhone : null;
+      if (!recipient) {
+        const inviteDelivery = await client.query<{ phone: string | null }>(
+          `SELECT payload->>'to' AS phone
+             FROM outbox_events
+            WHERE aggregate_type='staff_invitation'
+              AND aggregate_id=$1
+              AND event_type='STAFF_INVITED'
+              AND payload->>'channel'='whatsapp'
+            ORDER BY created_at DESC
+            LIMIT 1`,
+          [invitation.id],
+        );
+        recipient = inviteDelivery.rows[0]?.phone || null;
+      }
+      if (!recipient || !this.config.whatsappAccessToken || !this.config.whatsappPhoneNumberId) {
+        throw new AppError(
+          503,
+          "WHATSAPP_NOT_CONFIGURED",
+          "WhatsApp Business Platform is not configured for secure Staff OTP delivery",
+        );
+      }
+
       const challengeId = randomUUID();
       const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
       const expiresAt = new Date(
@@ -574,9 +606,9 @@ export class IdentityService {
         [
           invitation.id,
           JSON.stringify({
-            channel: "email",
-            to: invitation.email,
-            template: "staff_onboarding_code",
+            channel: "whatsapp",
+            to: recipient,
+            template: this.config.whatsappStaffOtpTemplate,
             encryptedParameters: {
               otp: encryptSecret(
                 otp,
@@ -682,7 +714,7 @@ export class IdentityService {
         client,
         "system",
         null,
-        "STAFF_ONBOARDING_EMAIL_VERIFIED",
+        "STAFF_ONBOARDING_WHATSAPP_VERIFIED",
         "staff_invitations",
         row.invitation_id,
         metadata,
@@ -885,6 +917,7 @@ export class IdentityService {
     account: AuthenticatedAccount,
     input: {
       email: string;
+      phone: string;
       displayName: string;
       permissionKeys: string[];
       mfaRequired: boolean;
@@ -915,6 +948,7 @@ export class IdentityService {
     }
 
     const emailNormalized = normalizeEmail(input.email);
+    const phoneNormalized = normalizeEgyptianPhone(input.phone);
     const permissionKeys = [
       ...new Set(input.permissionKeys.map((key) => key.trim()).filter(Boolean)),
     ];
@@ -981,10 +1015,10 @@ export class IdentityService {
         [
           invitation.rows[0]!.id,
           JSON.stringify({
-            channel: "email",
-            to: input.email.trim(),
-            template: "staff_invited",
-            setupUrl: "/Eye/Dart%20Eye.html",
+            channel: "whatsapp",
+            to: phoneNormalized,
+            template: this.config.whatsappStaffInviteTemplate,
+            parameters: ["/Eye/Dart%20Eye.html"],
             expiresInDays: 30,
           }),
           `staff-invited:${invitation.rows[0]!.id}`,

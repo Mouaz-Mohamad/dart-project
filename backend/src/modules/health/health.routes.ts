@@ -22,6 +22,7 @@ export function createHealthRouter(dependencies: HealthDependencies): Router {
         "dashboard-domain-state-v1",
         "bulk-domain-state-v1",
         "catalog-assets-v1",
+        "whatsapp-cloud-api-direct-v1",
       ],
       startedAt: dependencies.startedAt.toISOString(),
       uptimeSeconds: Math.max(

@@ -29,6 +29,13 @@ const environmentSchema = z.object({
     .default("ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="),
   AUTOMATION_WEBHOOK_URL: z.union([z.url(), z.literal("")]).default(""),
   AUTOMATION_WEBHOOK_SECRET: z.string().default(""),
+  WHATSAPP_CLOUD_API_TOKEN: z.string().default(""),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).or(z.literal("")).default(""),
+  WHATSAPP_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().trim().min(2).max(20).default("ar"),
+  WHATSAPP_OWNER_PHONE: z.string().default(""),
+  WHATSAPP_STAFF_OTP_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_otp"),
+  WHATSAPP_STAFF_INVITE_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_invite"),
   OUTBOX_CRON_SECRET: z.string().default(""),
   CRON_SECRET: z.string().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
@@ -54,6 +61,13 @@ export interface AppConfig {
   mfaEncryptionKey: Buffer;
   automationWebhookUrl: string | null;
   automationWebhookSecret: string | null;
+  whatsappAccessToken: string | null;
+  whatsappPhoneNumberId: string | null;
+  whatsappGraphApiVersion: string;
+  whatsappTemplateLanguage: string;
+  whatsappOwnerPhone: string | null;
+  whatsappStaffOtpTemplate: string;
+  whatsappStaffInviteTemplate: string;
   outboxCronSecret: string | null;
   outboxBatchSize: number;
 }
@@ -92,21 +106,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("Invalid environment configuration: MFA_ENCRYPTION_KEY");
   }
   const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
-  const automationPartiallyConfigured = Boolean(
-    parsed.data.AUTOMATION_WEBHOOK_URL ||
-    parsed.data.AUTOMATION_WEBHOOK_SECRET ||
-    outboxCronSecret,
-  );
-  if (
-    parsed.data.NODE_ENV === "production" &&
-    automationPartiallyConfigured &&
-    (!parsed.data.AUTOMATION_WEBHOOK_URL ||
-      parsed.data.AUTOMATION_WEBHOOK_SECRET.length < 32 ||
-      outboxCronSecret.length < 32)
-  ) {
-    throw new Error(
-      "Invalid environment configuration: partial automation configuration requires AUTOMATION_WEBHOOK_URL, AUTOMATION_WEBHOOK_SECRET, and OUTBOX_CRON_SECRET/CRON_SECRET",
-    );
+  const whatsappOwnerPhone = parsed.data.WHATSAPP_OWNER_PHONE.replace(/\D/g, "");
+  if (whatsappOwnerPhone && !/^201(?:0|1|2|5)\d{8}$/.test(whatsappOwnerPhone)) {
+    throw new Error("Invalid environment configuration: WHATSAPP_OWNER_PHONE");
   }
 
   return {
@@ -129,6 +131,13 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     mfaEncryptionKey,
     automationWebhookUrl: parsed.data.AUTOMATION_WEBHOOK_URL || null,
     automationWebhookSecret: parsed.data.AUTOMATION_WEBHOOK_SECRET || null,
+    whatsappAccessToken: parsed.data.WHATSAPP_CLOUD_API_TOKEN || null,
+    whatsappPhoneNumberId: parsed.data.WHATSAPP_PHONE_NUMBER_ID || null,
+    whatsappGraphApiVersion: parsed.data.WHATSAPP_GRAPH_API_VERSION,
+    whatsappTemplateLanguage: parsed.data.WHATSAPP_TEMPLATE_LANGUAGE,
+    whatsappOwnerPhone: whatsappOwnerPhone || null,
+    whatsappStaffOtpTemplate: parsed.data.WHATSAPP_STAFF_OTP_TEMPLATE,
+    whatsappStaffInviteTemplate: parsed.data.WHATSAPP_STAFF_INVITE_TEMPLATE,
     outboxCronSecret: outboxCronSecret || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
   };

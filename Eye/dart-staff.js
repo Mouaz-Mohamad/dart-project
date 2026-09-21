@@ -203,13 +203,14 @@
         body: {
           displayName: document.getElementById("settings-staff-name").value.trim(),
           email: document.getElementById("settings-staff-email").value.trim(),
+          phone: document.getElementById("settings-staff-phone").value.trim(),
           permissionKeys: selected,
           mfaRequired: document.getElementById("settings-staff-mfa").checked,
         },
       });
       form.reset();
       document.getElementById("settings-staff-mfa").checked = true;
-      setStatus("Staff invitation created. The employee can now activate the account with the invited email.");
+      setStatus("Staff invitation created. Activation will be sent directly to the employee's WhatsApp number.");
       await load();
     } catch (error) {
       setStatus(error.message || "Unable to invite Staff.", true);

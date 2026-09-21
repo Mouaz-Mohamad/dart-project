@@ -1,30 +1,32 @@
 # Transactional outbox operations
 
-Dart uses PostgreSQL `outbox_events` as the durable source of truth for automation delivery. API writes create events transactionally; delivery to the automation webhook is signed and retried without moving business state into n8n.
+Dart uses PostgreSQL `outbox_events` as the durable source of truth for outbound notifications. Business writes create events transactionally, and the backend publishes WhatsApp events directly to Meta WhatsApp Business Platform (Cloud API). No n8n or third-party automation webhook is required.
 
-## Normal delivery
+## WhatsApp delivery
 
-Business flows should attempt immediate dispatch after the transaction commits. A failed webhook call leaves the event in the outbox with a future `available_at` and exponential backoff.
+The backend sends approved WhatsApp templates directly to:
+
+`https://graph.facebook.com/<GRAPH_VERSION>/<PHONE_NUMBER_ID>/messages`
+
+Credentials are server-only environment variables. Never expose `WHATSAPP_CLOUD_API_TOKEN` or `WHATSAPP_PHONE_NUMBER_ID` in storefront or dashboard JavaScript.
+
+Required production variables:
+
+- `WHATSAPP_CLOUD_API_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `WHATSAPP_GRAPH_API_VERSION` (default: `v26.0`)
+- `WHATSAPP_TEMPLATE_LANGUAGE`
+- `WHATSAPP_OWNER_PHONE` for protected Owner onboarding
+- approved template names such as `dart_staff_otp`
 
 ## Retry endpoint
 
-Use:
+Use `POST /api/v1/internal/outbox/process` with:
 
-`POST /api/v1/internal/outbox/process`
+`Authorization: Bearer <OUTBOX_CRON_SECRET>`
 
-with:
+The processor claims only WhatsApp events. Failed sends remain in PostgreSQL and retry with exponential backoff; stuck `processing` rows are reclaimable after the lock timeout.
 
-`Authorization: Bearer <CRON_SECRET>`
+## Security
 
-The secret must be at least 32 characters and must never be exposed in storefront or dashboard JavaScript. `OUTBOX_CRON_SECRET` remains accepted for non-Vercel schedulers, while `CRON_SECRET` matches Vercel's automatic Cron authorization header.
-
-## Scheduling
-
-Vercel Hobby allows Cron Jobs at most once per day, so `backend/vercel.json` keeps a daily safety run at 03:17 UTC. For near-real-time retry behavior, configure n8n to call the protected endpoint every 5 minutes. The database claim uses row locking and event status, so overlapping workers do not publish the same claimed row concurrently.
-
-## Failure handling
-
-- A failed webhook is kept for retry.
-- Attempts are capped by the outbox service.
-- Stuck `processing` rows become reclaimable after the lock timeout.
-- The webhook receives `X-Dart-Event-Id`, `X-Dart-Event-Type`, and an HMAC signature.
+OTP values stay encrypted at rest inside the outbox payload and are decrypted only immediately before server-side delivery to Meta. Meta access tokens never leave the backend.
