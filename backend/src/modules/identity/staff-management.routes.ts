@@ -9,10 +9,12 @@ import {
   requirePermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "./identity.service.js";
+import type { OutboxService } from "../outbox/outbox.service.js";
 
 export function createStaffManagementRouter(
   service: IdentityService,
   config: Pick<AppConfig, "sessionCookieName" | "authPepper">,
+  outbox?: OutboxService,
 ): Router {
   const router = Router();
   const signedIn = authenticate(service, config);
@@ -45,19 +47,28 @@ export function createStaffManagementRouter(
         permissionKeys: z.array(z.string().trim().min(3).max(120)).max(300).default([]),
         mfaRequired: z.boolean().default(true),
       }).parse(request.body);
-      response.status(201).json(
-        await service.createStaffInvitation(
-          request.auth!,
-          body,
-          {
-            requestId: String(request.id),
-            ...(request.ip ? { ipAddress: request.ip } : {}),
-            ...(request.get("user-agent")
-              ? { userAgent: request.get("user-agent")! }
-              : {}),
-          },
-        ),
+      const invitation = await service.createStaffInvitation(
+        request.auth!,
+        body,
+        {
+          requestId: String(request.id),
+          ...(request.ip ? { ipAddress: request.ip } : {}),
+          ...(request.get("user-agent")
+            ? { userAgent: request.get("user-agent")! }
+            : {}),
+        },
       );
+      const delivery = await outbox?.processBatch(5).catch(() => undefined);
+      response.status(201).json({
+        ...invitation,
+        whatsappDelivery: delivery
+          ? {
+              configured: delivery.configured,
+              published: delivery.published,
+              failed: delivery.failed,
+            }
+          : { configured: false, published: 0, failed: 0 },
+      });
     },
   );
 

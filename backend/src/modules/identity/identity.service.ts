@@ -520,8 +520,10 @@ export class IdentityService {
         email: string;
         email_normalized: string;
         is_owner: boolean;
+        phone: string | null;
+        phone_normalized: string | null;
       }>(
-        `SELECT id::text, email, email_normalized, is_owner
+        `SELECT id::text, email, email_normalized, is_owner, phone, phone_normalized
            FROM staff_invitations
           WHERE email_normalized=$1
             AND status='pending'
@@ -556,21 +558,9 @@ export class IdentityService {
         [invitation.id],
       );
 
-      let recipient = invitation.is_owner ? this.config.whatsappOwnerPhone : null;
-      if (!recipient) {
-        const inviteDelivery = await client.query<{ phone: string | null }>(
-          `SELECT payload->>'to' AS phone
-             FROM outbox_events
-            WHERE aggregate_type='staff_invitation'
-              AND aggregate_id=$1
-              AND event_type='STAFF_INVITED'
-              AND payload->>'channel'='whatsapp'
-            ORDER BY created_at DESC
-            LIMIT 1`,
-          [invitation.id],
-        );
-        recipient = inviteDelivery.rows[0]?.phone || null;
-      }
+      const recipient =
+        invitation.phone_normalized ||
+        (invitation.is_owner ? this.config.whatsappOwnerPhone : null);
       if (!recipient || !this.config.whatsappAccessToken || !this.config.whatsappPhoneNumberId) {
         throw new AppError(
           503,
@@ -746,6 +736,8 @@ export class IdentityService {
         invitation_id: string;
         email: string;
         email_normalized: string;
+        phone: string | null;
+        phone_normalized: string | null;
         display_name: string;
         is_owner: boolean;
         mfa_required: boolean;
@@ -757,6 +749,7 @@ export class IdentityService {
         consumed_at: Date | null;
       }>(
         `SELECT i.id::text AS invitation_id, i.email, i.email_normalized,
+                i.phone, i.phone_normalized,
                 i.display_name, i.is_owner, i.mfa_required,
                 i.permission_keys,
                 i.status AS invitation_status,
@@ -832,6 +825,18 @@ export class IdentityService {
          ) VALUES ($1,$2,$3,$4)`,
         [userId, row.display_name, row.is_owner, row.mfa_required],
       );
+      const staffPhone =
+        row.phone_normalized ||
+        (row.is_owner ? this.config.whatsappOwnerPhone : null);
+      if (staffPhone) {
+        await client.query(
+          `INSERT INTO account_phones (
+             user_id, account_type, phone_normalized, phone_display,
+             is_primary, verified_at
+           ) VALUES ($1,'staff',$2,$3,true,now())`,
+          [userId, staffPhone, row.phone || staffPhone],
+        );
+      }
       await this.assignRole(
         client,
         userId,
@@ -994,13 +999,16 @@ export class IdentityService {
       );
       const invitation = await client.query<{ id: string }>(
         `INSERT INTO staff_invitations (
-           email, email_normalized, display_name, is_owner, mfa_required,
+           email, email_normalized, phone, phone_normalized,
+           display_name, is_owner, mfa_required,
            permission_keys, status, invited_by, expires_at
-         ) VALUES ($1,$2,$3,false,$4,$5::jsonb,'pending',$6,now()+interval '30 days')
+         ) VALUES ($1,$2,$3,$4,$5,false,$6,$7::jsonb,'pending',$8,now()+interval '30 days')
          RETURNING id::text`,
         [
           input.email.trim(),
           emailNormalized,
+          input.phone.trim(),
+          phoneNormalized,
           input.displayName.trim(),
           input.mfaRequired,
           JSON.stringify(permissionKeys),
@@ -1069,13 +1077,14 @@ export class IdentityService {
       this.pool.query<{
         id: string;
         email: string;
+        phone: string | null;
         display_name: string;
         permission_keys: unknown[];
         status: string;
         expires_at: Date | null;
         created_at: Date;
       }>(
-        `SELECT id::text, email, display_name, permission_keys, status,
+        `SELECT id::text, email, phone, display_name, permission_keys, status,
                 expires_at, created_at
            FROM staff_invitations
           WHERE is_owner=false
@@ -1089,13 +1098,19 @@ export class IdentityService {
         is_owner: boolean;
         mfa_required: boolean;
         email: string;
+        phone: string | null;
         status: string;
         created_at: Date;
       }>(
         `SELECT s.user_id::text, s.staff_code, s.display_name, s.is_owner,
-                s.mfa_required, u.email, u.status, s.created_at
+                s.mfa_required, u.email, p.phone_display AS phone,
+                u.status, s.created_at
            FROM staff_users s
            JOIN users u ON u.id=s.user_id
+           LEFT JOIN account_phones p
+             ON p.user_id=s.user_id
+            AND p.account_type='staff'
+            AND p.is_primary=true
           WHERE u.deleted_at IS NULL
           ORDER BY s.is_owner DESC, s.created_at`,
       ),
@@ -1109,6 +1124,7 @@ export class IdentityService {
         staffCode: row.staff_code,
         name: row.display_name,
         email: row.email,
+        phone: row.phone,
         status: row.status,
         isOwner: row.is_owner,
         mfaRequired: row.mfa_required,
@@ -1121,6 +1137,7 @@ export class IdentityService {
       invitations: invitationsResult.rows.map((row) => ({
         id: row.id,
         email: row.email,
+        phone: row.phone,
         name: row.display_name,
         permissions: Array.isArray(row.permission_keys)
           ? row.permission_keys

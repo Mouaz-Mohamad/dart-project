@@ -129,7 +129,14 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       ),
     );
     app.use("/api/v1", createStaffOnboardingRouter(dependencies.identityService, config, dependencies.outboxService));
-    app.use("/api/v1", createStaffManagementRouter(dependencies.identityService, config));
+    app.use(
+      "/api/v1",
+      createStaffManagementRouter(
+        dependencies.identityService,
+        config,
+        dependencies.outboxService,
+      ),
+    );
 
     if (dependencies.catalogService) {
       app.use(
