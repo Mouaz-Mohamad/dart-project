@@ -10,8 +10,19 @@ describe("HTTP runtime selection", () => {
     expect(shouldStartHttpListener({})).toBe(true);
   });
 
-  it("runs schema migrations at Vercel cold start only", () => {
-    expect(shouldRunRuntimeMigrations({ VERCEL: "1" })).toBe(true);
+  it("never runs schema migrations during Vercel cold starts", () => {
+    expect(
+      shouldRunRuntimeMigrations({
+        VERCEL: "1",
+        DART_RUN_RUNTIME_MIGRATIONS: "1",
+      }),
+    ).toBe(false);
+  });
+
+  it("runs runtime migrations only when explicitly enabled outside Vercel", () => {
     expect(shouldRunRuntimeMigrations({})).toBe(false);
+    expect(
+      shouldRunRuntimeMigrations({ DART_RUN_RUNTIME_MIGRATIONS: "1" }),
+    ).toBe(true);
   });
 });

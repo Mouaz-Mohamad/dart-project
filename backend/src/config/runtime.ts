@@ -4,9 +4,16 @@ export function shouldStartHttpListener(
   return environment.VERCEL !== "1";
 }
 
-
 export function shouldRunRuntimeMigrations(
-  environment: { VERCEL?: string | undefined } = process.env,
+  environment: {
+    VERCEL?: string | undefined;
+    DART_RUN_RUNTIME_MIGRATIONS?: string | undefined;
+  } = process.env,
 ): boolean {
-  return environment.VERCEL === "1";
+  // Serverless cold starts must never depend on migration files being present.
+  // Production schema changes are applied explicitly with `npm run db:migrate`.
+  return (
+    environment.VERCEL !== "1" &&
+    environment.DART_RUN_RUNTIME_MIGRATIONS === "1"
+  );
 }
