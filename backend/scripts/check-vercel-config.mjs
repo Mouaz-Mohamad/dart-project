@@ -10,6 +10,14 @@ if (config.ignoreCommand !== "bash scripts/vercel-ignore-backend.sh") {
   throw new Error("backend/vercel.json must keep the guarded batch ignoreCommand");
 }
 
+const expectedBuildCommand =
+  'if [ "$VERCEL_ENV" = "production" ]; then npm run db:migrate; fi && npm run build';
+if (config.buildCommand !== expectedBuildCommand) {
+  throw new Error(
+    "backend/vercel.json must migrate the production database before building",
+  );
+}
+
 for (const cron of config.crons ?? []) {
   if (!cron || typeof cron.path !== "string" || typeof cron.schedule !== "string") {
     throw new Error("Every Vercel cron entry must contain path and schedule strings");
