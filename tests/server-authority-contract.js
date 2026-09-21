@@ -21,6 +21,9 @@ const fixes = read("Eye/dart-fixes.js");
 const operations = read("Eye/dart-operations-v4.js");
 const serviceWorker = read("sw.js");
 const vercel = read("vercel.json");
+const commerceService = read("backend/src/modules/commerce/commerce.service.ts");
+const financeService = read("backend/src/modules/finance/finance.service.ts");
+const relationalStore = read("backend/src/modules/dashboard/relational-domain.store.ts");
 
 assert.match(
   catalog,
@@ -72,6 +75,26 @@ assert.match(
   /DartDomainState\.write/,
   "non-order operational writes must route through dashboard domain state",
 );
+assert.match(
+  relationalStore,
+  /return_requests[\s\S]*damage_records[\s\S]*promotion_records[\s\S]*loyalty_cards/,
+  "critical dashboard domains must have first-class relational storage",
+);
+assert.match(
+  commerceService,
+  /readRelationalDashboardDomain/,
+  "commerce must read critical operational state from relational tables",
+);
+assert.ok(
+  !commerceService.includes("SELECT data FROM dashboard_domain_state WHERE domain='returns'"),
+  "commerce must not use the JSONB compatibility envelope as the returns read source",
+);
+assert.match(
+  financeService,
+  /readRelationalDashboardDomain/,
+  "finance must calculate from relational domain rows",
+);
+
 assert.match(
   serviceWorker,
   /\(\?:js\|css\)/,

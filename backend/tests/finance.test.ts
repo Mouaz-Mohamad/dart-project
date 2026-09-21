@@ -4,7 +4,7 @@ import { FinanceService } from "../src/modules/finance/finance.service.js";
 function financePool(options: { failDelivered?: boolean } = {}) {
   const queries: string[] = [];
   const client = {
-    query: vi.fn(async (sql: string) => {
+    query: vi.fn(async (sql: string, values: unknown[] = []) => {
       queries.push(sql);
       if (sql.startsWith("BEGIN") || sql === "COMMIT" || sql === "ROLLBACK") {
         return { rows: [], rowCount: 0 };
@@ -33,30 +33,34 @@ function financePool(options: { failDelivered?: boolean } = {}) {
       if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: [] };
       if (sql.includes("FROM inventory_items")) return { rows: [] };
       if (sql.includes("SELECT DISTINCT oi.item_code")) return { rows: [] };
-      if (sql.includes("FROM dashboard_domain_state")) {
+      if (sql.includes("FROM return_requests")) {
         return {
-          rows: [
-            {
-              domain: "returns",
-              data: [{
-                id: "return-1", orderId: "K-2", itemCode: "I-2",
-                requestType: "Refund", status: "Completed",
-                isPostDeliveryReturn: true, completedAt: "2026-09-12T10:00:00Z",
-                refundAmount: 20, inspectionStatus: "Damaged",
-              }],
+          rows: [{
+            payload: {
+              id: "return-1", orderId: "K-2", itemCode: "I-2",
+              requestType: "Refund", status: "Completed",
+              isPostDeliveryReturn: true, completedAt: "2026-09-12T10:00:00Z",
+              refundAmount: 20, inspectionStatus: "Damaged",
             },
-            {
-              domain: "finance_settlements",
-              data: [{
+          }],
+        };
+      }
+      if (sql.includes("FROM damage_records")) return { rows: [] };
+      if (sql.includes("FROM finance_records")) {
+        const domain = String(values[0] || "");
+        if (domain === "finance_settlements") {
+          return {
+            rows: [{
+              payload: {
                 id: "settlement-1", orderId: "K-1", amountReceived: 100.01,
                 fee: 0, settlementDate: "2026-10-01",
-              }],
-            },
-            { domain: "damage", data: [] },
-            { domain: "finance_expenses", data: [] },
-            { domain: "finance_marketing", data: [] },
-          ],
-        };
+              },
+            }],
+          };
+        }
+        if (["finance_expenses", "finance_marketing"].includes(domain)) {
+          return { rows: [] };
+        }
       }
       throw new Error(`Unexpected finance query: ${sql}`);
     }),

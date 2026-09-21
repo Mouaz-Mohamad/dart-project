@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 
 export interface CartLineInput {
   modelId: string;
@@ -339,17 +340,14 @@ export class CommerceService {
           ORDER BY COALESCE(o.delivered_at, o.updated_at), o.order_code`,
       );
 
-      const stateResult = await client.query<{ domain: string; data: unknown[] }>(
-        `SELECT domain, data
-           FROM dashboard_domain_state
-          WHERE domain IN ('returns','cards')`,
-      );
-      const states = new Map(
-        stateResult.rows.map((row) => [
-          row.domain,
-          Array.isArray(row.data) ? row.data : [],
-        ]),
-      );
+      const [returnRows, cardRows] = await Promise.all([
+        readRelationalDashboardDomain(client, "returns"),
+        readRelationalDashboardDomain(client, "cards"),
+      ]);
+      const states = new Map<string, unknown[]>([
+        ["returns", returnRows],
+        ["cards", cardRows],
+      ]);
 
       const excludedClients = new Set(
         (states.get("cards") || [])
@@ -461,12 +459,10 @@ export class CommerceService {
   }> {
     const client = await this.pool.connect();
     try {
-      const stateResult = await client.query<{ data: unknown[] }>(
-        "SELECT data FROM dashboard_domain_state WHERE domain='promotions'",
-      );
-      const rows = Array.isArray(stateResult.rows[0]?.data)
-        ? stateResult.rows[0]!.data as Record<string, unknown>[]
-        : [];
+      const rows = await readRelationalDashboardDomain(
+        client,
+        "promotions",
+      ) as Record<string, unknown>[];
       const normalizedCode = String(code || "").trim().toUpperCase();
       const row = rows.find((item) =>
         String(item.code || "").trim().toUpperCase() === normalizedCode &&
@@ -1167,22 +1163,22 @@ export class CommerceService {
       const promotionStatesResult = await client.query<{
         domain: string;
         version: string;
-        data: unknown[];
       }>(
-        `SELECT domain, version::text, data
+        `SELECT domain, version::text
            FROM dashboard_domain_state
           WHERE domain IN ('birthday_rewards','cards','promotions')
           FOR UPDATE`,
       );
-      const promotionStates = new Map(
-        promotionStatesResult.rows.map((row) => [
-          row.domain,
-          {
-            version: Number(row.version || 1),
-            data: Array.isArray(row.data) ? row.data : [],
-          },
-        ]),
-      );
+      const promotionStates = new Map<string, { version: number; data: unknown[] }>();
+      for (const row of promotionStatesResult.rows) {
+        promotionStates.set(row.domain, {
+          version: Number(row.version || 1),
+          data: await readRelationalDashboardDomain(
+            client,
+            row.domain as "birthday_rewards" | "cards" | "promotions",
+          ),
+        });
+      }
       const birthdayState = promotionStates.get("birthday_rewards");
       const cardState = promotionStates.get("cards");
       const promotionsState = promotionStates.get("promotions");
@@ -1579,13 +1575,11 @@ export class CommerceService {
       [representativeUserId],
     );
     const repCode = representative.rows[0]?.representative_code || "";
-    const returnsState = await this.pool.query<{ data: unknown[] }>(
-      "SELECT data FROM dashboard_domain_state WHERE domain='returns'",
+    const returnRows = await readRelationalDashboardDomain(
+      this.pool,
+      "returns",
     );
-    const returns = (Array.isArray(returnsState.rows[0]?.data)
-      ? returnsState.rows[0]!.data
-      : []
-    ).filter((raw) => {
+    const returns = returnRows.filter((raw) => {
       const row = raw as Record<string, unknown>;
       return (
         [representativeUserId, repCode].includes(String(row.representativeId || "")) &&
@@ -1646,18 +1640,16 @@ export class CommerceService {
         LIMIT 1`,
       [representativeUserId],
     );
-    const activeReturns = await this.pool.query<{ data: unknown[] }>(
-      "SELECT data FROM dashboard_domain_state WHERE domain='returns'",
+    const activeReturnRows = await readRelationalDashboardDomain(
+      this.pool,
+      "returns",
     );
     const repCodeResult = await this.pool.query<{ representative_code: string }>(
       "SELECT representative_code FROM representatives WHERE user_id=$1 AND approval_status='approved'",
       [representativeUserId],
     );
     const repCode = repCodeResult.rows[0]?.representative_code || "";
-    const hasActiveReturn = (Array.isArray(activeReturns.rows[0]?.data)
-      ? activeReturns.rows[0]!.data
-      : []
-    ).some((raw) => {
+    const hasActiveReturn = activeReturnRows.some((raw) => {
       const row = raw as Record<string, unknown>;
       return (
         [representativeUserId, repCode].includes(String(row.representativeId || "")) &&
@@ -1856,13 +1848,14 @@ export class CommerceService {
     try {
       await client.query("BEGIN");
 
-      const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      const returnsStateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const returnsState = returnsStateResult.rows[0];
-      const returnsRows = Array.isArray(returnsState?.data)
-        ? returnsState!.data as Record<string, unknown>[]
-        : [];
+      const returnsRows = await readRelationalDashboardDomain(
+        client,
+        "returns",
+      ) as Record<string, unknown>[];
 
       const existing = returnRef
         ? returnsRows.find(
@@ -2074,13 +2067,14 @@ export class CommerceService {
         );
       }
 
-      const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage'",
+      const damageStateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='damage'",
       );
       const damageState = damageStateResult.rows[0];
-      const damageRows = Array.isArray(damageState?.data)
-        ? damageState!.data as Record<string, unknown>[]
-        : [];
+      const damageRows = await readRelationalDashboardDomain(
+        client,
+        "damage",
+      ) as Record<string, unknown>[];
       const existingDamageIndex = damageRows.findIndex(
         (row) =>
           String(row.itemCode || "") === requestedItemCode &&
@@ -2155,13 +2149,14 @@ export class CommerceService {
         !existing &&
         requestedRefundMinor > 0
       ) {
-        const cardStateResult = await client.query<{ version: string; data: unknown[] }>(
-          "SELECT version::text, data FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
+        const cardStateResult = await client.query<{ version: string }>(
+          "SELECT version::text FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
         );
         const cardState = cardStateResult.rows[0];
-        const cards = Array.isArray(cardState?.data)
-          ? cardState!.data as Record<string, unknown>[]
-          : [];
+        const cards = await readRelationalDashboardDomain(
+          client,
+          "cards",
+        ) as Record<string, unknown>[];
         const card = cards.find(
           (row) =>
             String(row.cardId || row.id || "") ===
@@ -2332,13 +2327,14 @@ export class CommerceService {
         );
       }
 
-      const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      const returnsStateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const returnsState = returnsStateResult.rows[0];
-      const returnsRows = Array.isArray(returnsState?.data)
-        ? returnsState!.data as Record<string, unknown>[]
-        : [];
+      const returnsRows = await readRelationalDashboardDomain(
+        client,
+        "returns",
+      ) as Record<string, unknown>[];
 
       const existingId = String(input.existingReturnId || "").trim();
       const existing = existingId
@@ -2480,13 +2476,14 @@ export class CommerceService {
           [item.item_id, recordId],
         );
 
-        const damageStateResult = await client.query<{ version: string; data: unknown[] }>(
-          "SELECT version::text, data FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
+        const damageStateResult = await client.query<{ version: string }>(
+          "SELECT version::text FROM dashboard_domain_state WHERE domain='damage' FOR UPDATE",
         );
         const damageState = damageStateResult.rows[0];
-        const damageRows = Array.isArray(damageState?.data)
-          ? damageState!.data as Record<string, unknown>[]
-          : [];
+        const damageRows = await readRelationalDashboardDomain(
+          client,
+          "damage",
+        ) as Record<string, unknown>[];
         const damage = damageRows.find(
           (row) =>
             String(row.returnId || "") === returnId ||
@@ -2557,13 +2554,14 @@ export class CommerceService {
         item.promotion?.cardId &&
         !record.dartCardUsageReversed
       ) {
-        const cardStateResult = await client.query<{ version: string; data: unknown[] }>(
-          "SELECT version::text, data FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
+        const cardStateResult = await client.query<{ version: string }>(
+          "SELECT version::text FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
         );
         const cardState = cardStateResult.rows[0];
-        const cards = Array.isArray(cardState?.data)
-          ? cardState!.data as Record<string, unknown>[]
-          : [];
+        const cards = await readRelationalDashboardDomain(
+          client,
+          "cards",
+        ) as Record<string, unknown>[];
         const card = cards.find(
           (row) =>
             String(row.cardId || row.id || "") === String(item.promotion?.cardId),
@@ -2674,13 +2672,14 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      const returnsStateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const returnsState = returnsStateResult.rows[0];
-      const rows = Array.isArray(returnsState?.data)
-        ? returnsState!.data as Record<string, unknown>[]
-        : [];
+      const rows = await readRelationalDashboardDomain(
+        client,
+        "returns",
+      ) as Record<string, unknown>[];
       const record = rows.find(
         (row) =>
           String(row.id || "") === returnRef ||
@@ -3035,11 +3034,14 @@ export class CommerceService {
         throw new AppError(403, "REPRESENTATIVE_UNAVAILABLE", "Representative account is not active");
       }
 
-      const stateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      const stateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const state = stateResult.rows[0];
-      const rows = Array.isArray(state?.data) ? state!.data as Record<string, unknown>[] : [];
+      const rows = await readRelationalDashboardDomain(
+        client,
+        "returns",
+      ) as Record<string, unknown>[];
       const record = rows.find((row) =>
         (String(row.id || "") === returnRef || String(row.returnId || "") === returnRef) &&
         [representativeUserId, repCode].includes(String(row.representativeId || "")) &&
@@ -4732,13 +4734,14 @@ export class CommerceService {
       const contact = context?.contact_snapshot || {};
       const legacy = context?.legacy || {};
       const reason = String(legacy.refusalReason || "Refused delivery");
-      const returnsStateResult = await client.query<{ version: string; data: unknown[] }>(
-        "SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      const returnsStateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
       );
       const returnsState = returnsStateResult.rows[0];
-      const returnsRows = Array.isArray(returnsState?.data)
-        ? returnsState!.data as Record<string, unknown>[]
-        : [];
+      const returnsRows = await readRelationalDashboardDomain(
+        client,
+        "returns",
+      ) as Record<string, unknown>[];
       let returnsChanged = false;
 
       for (const item of itemRows.rows) {

@@ -469,15 +469,15 @@ export class CustomerInteractionService {
   }
 
   private async lockDomain(client: PoolClient, domain: string): Promise<{ version: number; data: unknown[] }> {
-    const result = await client.query<{ version: string; data: unknown[] }>(
-      "SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE",
+    const result = await client.query<{ version: string }>(
+      "SELECT version::text FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE",
       [domain],
     );
     const row = result.rows[0];
     if (!row) throw new AppError(500, "DOMAIN_STATE_MISSING", `Missing dashboard domain: ${domain}`);
     const data = isRelationalDashboardDomain(domain)
       ? await readRelationalDashboardDomain(client, domain)
-      : (Array.isArray(row.data) ? row.data : []);
+      : [];
     return { version: Number(row.version), data };
   }
 

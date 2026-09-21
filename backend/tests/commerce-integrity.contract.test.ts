@@ -45,12 +45,13 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(routes).toContain('z.enum(["map", "manual"])');
   });
 
-  it("serializes every mutable return-state read", () => {
-    const mutableReturnReads = service.match(
-      /SELECT version::text, data FROM dashboard_domain_state WHERE domain='returns'(?: FOR UPDATE)?/g,
+  it("reads critical return data from relational rows while keeping the version envelope locked", () => {
+    expect(service).toContain('readRelationalDashboardDomain');
+    expect(service).not.toContain("SELECT data FROM dashboard_domain_state WHERE domain='returns'");
+    const lockedVersions = service.match(
+      /SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE/g,
     ) ?? [];
-    expect(mutableReturnReads.length).toBeGreaterThanOrEqual(4);
-    expect(mutableReturnReads.every((query) => query.endsWith("FOR UPDATE"))).toBe(true);
+    expect(lockedVersions.length).toBeGreaterThanOrEqual(4);
   });
 
   it("does not expose archived deliveries as active representative work", () => {
@@ -90,7 +91,8 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(customerInteractions).toContain('this.lockDomain(client, "returns")');
     expect(customerInteractions).toContain("resolveExchangeChain(existingReturns, line.item_code)");
     expect(customerInteractions).toContain(
-      '"SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE"',
+      '"SELECT version::text FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE"',
     );
+    expect(customerInteractions).toContain("readRelationalDashboardDomain(client, domain)");
   });
 });
