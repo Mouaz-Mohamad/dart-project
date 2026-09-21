@@ -92,14 +92,20 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("Invalid environment configuration: MFA_ENCRYPTION_KEY");
   }
   const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
+  const automationPartiallyConfigured = Boolean(
+    parsed.data.AUTOMATION_WEBHOOK_URL ||
+    parsed.data.AUTOMATION_WEBHOOK_SECRET ||
+    outboxCronSecret,
+  );
   if (
     parsed.data.NODE_ENV === "production" &&
+    automationPartiallyConfigured &&
     (!parsed.data.AUTOMATION_WEBHOOK_URL ||
       parsed.data.AUTOMATION_WEBHOOK_SECRET.length < 32 ||
       outboxCronSecret.length < 32)
   ) {
     throw new Error(
-      "Invalid environment configuration: AUTOMATION_WEBHOOK_URL, AUTOMATION_WEBHOOK_SECRET, OUTBOX_CRON_SECRET/CRON_SECRET",
+      "Invalid environment configuration: partial automation configuration requires AUTOMATION_WEBHOOK_URL, AUTOMATION_WEBHOOK_SECRET, and OUTBOX_CRON_SECRET/CRON_SECRET",
     );
   }
 

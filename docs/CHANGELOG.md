@@ -1,5 +1,11 @@
 # Dart Project changelog
 
+## Vercel production bootstrap hardening — 2026-09-21
+
+- Core API startup no longer requires n8n/automation secrets. A fully absent automation configuration disables event delivery safely; a partial configuration still fails closed.
+- Removed the Vercel Outbox cron schedule until its production secret is configured, preventing noisy unauthorized cron invocations.
+- Kept immediate event-delivery calls optional through the existing Outbox service so commerce/auth continue to operate without silently sending events.
+
 ## Relational business domains V0.4 — 2026-09-21
 
 - Hardened migration 0018 for real legacy production data: duplicate record IDs are deterministically deduplicated during backfill, and legacy business-code indexes are non-unique during migration so stale duplicate codes cannot abort deployment.

@@ -19,3 +19,11 @@ describe("production event delivery contracts", () => {
     expect(commerceRoutes.match(/outbox\?\.processBatch\(10\)/g)?.length).toBeGreaterThanOrEqual(3);
   });
 });
+
+
+describe("optional production automation boundary", () => {
+  it("keeps delivery calls optional instead of making core API startup depend on n8n", () => {
+    expect(identityRoutes).toContain("outbox?.processBatch");
+    expect(commerceRoutes).toContain("outbox?.processBatch");
+  });
+});

@@ -1,3 +1,9 @@
+# Vercel production environment hardening — 2026-09-21
+
+- Verified from Vercel runtime logs that the previous cold start failed only because automation secrets were absent.
+- Core API startup now permits automation to be fully disabled; partial automation credentials remain invalid.
+- The Outbox service already returns `configured:false` without claiming or publishing events when disabled, and the cron route remains unauthorized without a strong secret.
+
 # Vercel runtime migration hardening — 2026-09-21
 
 - Removed database migration execution from the Vercel build command so production builds do not depend on database reachability during the build sandbox phase.

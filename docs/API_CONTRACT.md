@@ -16,6 +16,8 @@ The production frontend is database-authoritative through `/api/v1`; PostgreSQL 
 
 ## Approved notification channels
 
+Production automation is optional at core API startup. When `AUTOMATION_WEBHOOK_URL`, `AUTOMATION_WEBHOOK_SECRET`, and `OUTBOX_CRON_SECRET`/`CRON_SECRET` are all absent, the API starts normally with the Outbox disabled. A partial configuration is rejected. The Vercel cron is intentionally not scheduled until a valid cron secret and automation endpoint are configured.
+
 - Routine `ORDER_PLACED`, `ORDER_OUT_FOR_DELIVERY`, and `ORDER_DELIVERED` notifications use Email, Web Push, and in-site notifications.
 - Routine commerce communication uses Email, Web Push and in-site notifications.
 - WhatsApp Business Platform is reserved for birthday messages and post-delivery review requests. Order placement, courier and delivery status messages must not silently expand the WhatsApp scope.

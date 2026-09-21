@@ -58,7 +58,7 @@ describe("environment configuration", () => {
     ).toThrow("MFA_ENCRYPTION_KEY");
   });
 
-  it("fails closed when production event delivery is not configured", () => {
+  it("keeps production automation disabled when unconfigured and rejects partial secrets", () => {
     const production = {
       ...baseEnvironment,
       NODE_ENV: "production",
@@ -66,7 +66,18 @@ describe("environment configuration", () => {
       AUTH_PEPPER: "production-auth-pepper-with-at-least-32-characters",
       MFA_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     };
-    expect(() => loadConfig(production)).toThrow("AUTOMATION_WEBHOOK_URL");
+    const disabled = loadConfig(production);
+    expect(disabled.automationWebhookUrl).toBeNull();
+    expect(disabled.automationWebhookSecret).toBeNull();
+    expect(disabled.outboxCronSecret).toBeNull();
+
+    expect(() =>
+      loadConfig({
+        ...production,
+        AUTOMATION_WEBHOOK_URL: "https://automation.example/webhook",
+      }),
+    ).toThrow("partial automation configuration");
+
     const config = loadConfig({
       ...production,
       AUTOMATION_WEBHOOK_URL: "https://automation.example/webhook",
