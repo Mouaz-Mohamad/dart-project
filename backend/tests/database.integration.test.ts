@@ -97,8 +97,9 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       ],
     );
     await testPool!.query(
-      `INSERT INTO inventory_items (id, item_code, model_id, color, size, status)
-       VALUES ($1,$2,$3,'Black','M','In stock')`,
+      `INSERT INTO inventory_items (
+         id, item_code, model_id, color, size, status, cost_snapshot_minor
+       ) VALUES ($1,$2,$3,'Black','M','In stock',40000)`,
       [itemId, itemCode, modelId],
     );
 
