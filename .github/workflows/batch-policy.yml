@@ -13,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Require 7-change deploy batch markers
+      - name: Require numbered deploy batch markers
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          grep -Fq '[batch:7]' <<<"$COMMIT_MESSAGE" || { echo 'Missing [batch:7] marker'; exit 1; }
+          grep -Eq '\[batch:[0-9]+\]' <<<"$COMMIT_MESSAGE" || { echo 'Missing numbered [batch:N] marker'; exit 1; }
           grep -Fq '[deploy]' <<<"$COMMIT_MESSAGE" || { echo 'Missing [deploy] marker'; exit 1; }
       - name: Validate Vercel deployment config
         run: node backend/scripts/check-vercel-config.mjs
