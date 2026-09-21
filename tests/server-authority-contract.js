@@ -201,6 +201,10 @@ assert.ok(
   !dashboardRuntime.includes(".replaceAll("),
   "dashboard runtime should avoid replaceAll when simple global replacement is enough",
 );
+assert.ok(
+  !dashboardRuntime.includes("dartEnsureMonthlyDartCardWinners"),
+  "monthly Dart Card winner selection must not run authoritatively in the browser",
+);
 assert.ok(!dashboardHtml.includes('class=""'), "dashboard HTML must not retain empty class attributes");
 assert.ok(
   !/<[^>]*\btype=["'][^"']+["'][^>]*\btype=["'][^"']+["'][^>]*>/i.test(dashboardHtml),

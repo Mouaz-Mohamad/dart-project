@@ -1,5 +1,11 @@
 # Dart Project changelog
 
+## Draw-authority and smoke-test correction — 2026-09-21
+
+- Removed a stale static contract that expected browser-side Dart Card winner selection; eligibility remains server-backed and audited, while winner awarding is explicitly reserved for a future server transaction.
+- Changed dashboard Chromium year-navigation smoke to trigger the real external event listener programmatically, avoiding false timeouts when the Brand control is outside the mobile viewport.
+- Added a regression guard preventing browser-authoritative monthly Dart Card awarding from returning.
+
 ## Strict script CSP hardening — 2026-09-21
 
 - Removed executable inline scripts and inline event handlers from storefront, account, receipt and dashboard surfaces.

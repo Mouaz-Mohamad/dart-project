@@ -1,6 +1,6 @@
 /* ========================================================================== */
-/* DART FINANCE V1 — dashboard-only finance, goals and draw eligibility       */
-/* BACKEND: replace FinanceRepository local methods with the documented API.   */
+/* DART FINANCE V1 — dashboard finance, goals and server-backed draw eligibility */
+/* Draw eligibility changes use the secure API; winner selection stays server-owned. */
 /* Money is kept as decimal EGP in the prototype; production stores minor      */
 /* units as integers and performs every authoritative calculation server-side. */
 /* ========================================================================== */

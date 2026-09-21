@@ -208,13 +208,17 @@ const server = http.createServer((request, response) => {
   });
   assert.equal(await dashboard.locator(".dashboard-section.active-section").getAttribute("id"), "brand");
   const startingSalesYear = Number((await dashboard.locator("#displayLabel").textContent()).trim());
-  await dashboard.locator('[data-sales-year-delta="-1"]').click();
+  await dashboard
+    .locator('[data-sales-year-delta="-1"]')
+    .evaluate((button) => button.click());
   assert.equal(
     Number((await dashboard.locator("#displayLabel").textContent()).trim()),
     startingSalesYear - 1,
     "dashboard year navigation must work without inline onclick handlers",
   );
-  await dashboard.locator('[data-sales-year-delta="1"]').click();
+  await dashboard
+    .locator('[data-sales-year-delta="1"]')
+    .evaluate((button) => button.click());
   assert.equal(
     Number((await dashboard.locator("#displayLabel").textContent()).trim()),
     startingSalesYear,

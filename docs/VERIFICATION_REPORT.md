@@ -1,3 +1,9 @@
+# CI regression correction — 2026-09-21
+
+- Frontend CI exposed two test assumptions after cleanup: a stale source assertion for removed browser-side Dart Card awarding, and a Playwright visibility timeout on an off-viewport Brand year button.
+- The finance contract now verifies server-backed eligibility updates and explicitly rejects browser-authoritative winner awards.
+- Browser smoke invokes the same external click listener through DOM `click()`, testing behavior without requiring the control to be in the current mobile viewport.
+
 # Strict CSP verification — 2026-09-21
 
 - All executable inline JavaScript and known inline event handlers were moved to external runtime listeners before tightening CSP.

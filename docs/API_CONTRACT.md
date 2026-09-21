@@ -1,3 +1,9 @@
+## Dart Card draw authority
+
+- Customer draw eligibility is editable from Dart Eye through the authenticated admin API and is audited.
+- Monthly winner selection and card awarding must remain server-authoritative; the dashboard must not create winner cards as a browser-only side effect.
+- Existing browser-era automatic award code has been removed. A future scheduled/API draw workflow must enforce eligibility, active-card exclusion, idempotency and audit in one server transaction.
+
 # Dart Node.js / Express API contract
 
 The production frontend is database-authoritative through `/api/v1`; PostgreSQL is the source of truth for business data. Browser storage is limited to transient UI/session hints and one-time legacy cleanup markers. `DartState` is an in-memory projection, not persistent business storage. Critical operational domains (returns, damage, promotions, loyalty, notifications/messages and finance) live in row-level relational tables. The initial relational backfill is duplicate-tolerant so historical browser-era records cannot block a production migration. Customer profile snapshots read Returns, Dart Card, Birthday rewards and Birthday messages from those same relational tables. Returns/Damage now also expose a typed PostgreSQL core for customer/order/item relations, money, pickup address, exchange-chain and lifecycle fields while the compatibility payload remains temporarily for fields not yet migrated. Legacy compatibility writes are deduplicated by record ID in the authoritative BEFORE trigger, with the last legacy array occurrence winning deterministically. `dashboard_domain_state` is retained only as an optimistic-concurrency/version envelope for the legacy bulk PUT protocol: a BEFORE trigger writes incoming records to the relational tables and clears `data` before the envelope row is persisted, so critical arrays are no longer duplicated there.

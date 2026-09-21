@@ -70,7 +70,18 @@ assert(
   "Brand analytics blocks must have stable non-overlapping HTML order.",
 );
 assert(finance.includes("DART_CARD_DRAW_ELIGIBILITY_CHANGED"), "Draw eligibility changes must be audited.");
-assert(dashboard.includes("c.dartCardDrawEligible !== false"), "Excluded customers must be removed from the winner candidate set.");
+assert(
+  finance.includes("customer.dartCardDrawEligible !== false"),
+  "Draw eligibility UI must reflect the server-authoritative customer flag.",
+);
+assert(
+  finance.includes("/dart-card-draw-eligibility"),
+  "Draw eligibility changes must be persisted through the secure admin API.",
+);
+assert(
+  !dashboard.includes("dartEnsureMonthlyDartCardWinners"),
+  "The browser must not award monthly Dart Cards authoritatively.",
+);
 assert(finance.includes("returnCourierCosts"), "Total Cost must include Dart-paid return/exchange representative fees.");
 assert(finance.includes("deliveryCosts"), "Total Cost must include snapshotted delivery costs.");
 assert(html.includes('id="settings-delivery-cost"'), "Settings must expose the per-piece delivery cost used for future order snapshots.");
