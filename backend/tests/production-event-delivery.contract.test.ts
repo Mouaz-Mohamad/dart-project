@@ -13,6 +13,10 @@ const staffManagementRoutes = readFileSync(
   new URL("../src/modules/identity/staff-management.routes.ts", import.meta.url),
   "utf8",
 );
+const staffOnboardingRoutes = readFileSync(
+  new URL("../src/modules/identity/staff-onboarding.routes.ts", import.meta.url),
+  "utf8",
+);
 
 describe("production event delivery contracts", () => {
   it("attempts immediate delivery for customer and representative identity events", () => {
@@ -23,14 +27,24 @@ describe("production event delivery contracts", () => {
     expect(commerceRoutes.match(/outbox\?\.processBatch\(10\)/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("attempts immediate direct delivery for Staff invitations", () => {
-    expect(staffManagementRoutes).toContain("outbox?.processBatch(5)");
+  it("targets immediate direct delivery for the exact Staff invitation", () => {
+    expect(staffManagementRoutes).toContain(
+      "processBatch(1, `staff-invited:${invitation.invitationId}`)",
+    );
+  });
+
+  it("requires confirmed delivery of the exact Staff onboarding OTP event", () => {
+    expect(staffOnboardingRoutes).toContain(
+      "`staff-onboarding-code:${result.challengeId}`",
+    );
+    expect(staffOnboardingRoutes).toContain("WHATSAPP_DELIVERY_FAILED");
+    expect(staffOnboardingRoutes).toContain("delivery.published !== 1");
   });
 });
 
 
 describe("optional production delivery boundary", () => {
-  it("keeps delivery calls optional instead of making core API startup depend on n8n", () => {
+  it("keeps non-critical delivery calls optional without an external workflow engine", () => {
     expect(identityRoutes).toContain("outbox?.processBatch");
     expect(commerceRoutes).toContain("outbox?.processBatch");
   });
