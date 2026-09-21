@@ -9,6 +9,8 @@ import {
   requireAccountType,
   requireMfa,
   requirePermission,
+  requireAnyPermission,
+  requireActionPermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CommerceService } from "./commerce.service.js";
@@ -250,7 +252,11 @@ export function createCommerceRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("orders.manage"),
+    requireActionPermission("action", {
+      archive: ["orders.manage", "orders.archive"],
+      restore: ["orders.manage", "orders.archive"],
+      delete: ["orders.manage", "orders.delete"],
+    }),
     async (request, response) => {
       const orderRef = z.string().trim().min(1).max(160).parse(request.params.orderRef);
       const body = z.object({
@@ -273,7 +279,7 @@ export function createCommerceRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("returns.manage"),
+    requireAnyPermission("returns.manage", "returns.create_manual"),
     async (request, response) => {
       const body = z.object({
         existingReturnId: z.string().trim().min(1).max(120).optional(),
@@ -302,7 +308,12 @@ export function createCommerceRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("returns.manage"),
+    requireActionPermission("action", {
+      approve: ["returns.manage", "returns.review"],
+      reject: ["returns.manage", "returns.review"],
+      assign: ["returns.manage", "returns.assign"],
+      inspect: ["returns.manage", "returns.inspect"],
+    }),
     async (request, response) => {
       const returnRef = z.string().trim().min(2).max(120).parse(request.params.returnRef);
       const body = z.object({
@@ -329,7 +340,7 @@ export function createCommerceRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("orders.manage"),
+    requireAnyPermission("orders.manage", "orders.create"),
     async (request, response) => {
       const body = z.object({
         clientId: z.string().trim().max(120).optional(),
@@ -371,7 +382,7 @@ export function createCommerceRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("orders.manage"),
+    requireAnyPermission("orders.manage", "orders.edit"),
     async (request, response) => {
       const orderRef = z.string().trim().min(1).max(120).parse(request.params.orderRef);
       const body = z.object({
@@ -439,7 +450,7 @@ export function createCommerceRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("orders.manage"),
+    requireAnyPermission("orders.manage", "orders.bulk_manage"),
     async (request, response) => {
       const body = adminOrderStateSchema.parse(request.body);
       response.status(200).json(

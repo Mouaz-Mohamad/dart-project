@@ -7,6 +7,7 @@ import {
   requireAccountType,
   requireMfa,
   requirePermission,
+  requireAnyPermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CatalogService } from "./catalog.service.js";
@@ -48,7 +49,7 @@ export function createCatalogRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("damage.manage"),
+    requireAnyPermission("damage.manage", "damage.resolve"),
     async (request, response) => {
       const damageRef = z.string().trim().min(1).max(160).parse(request.params.damageRef);
       const body = z.object({
@@ -70,7 +71,7 @@ export function createCatalogRouter(
     signedIn,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("catalog.manage"),
+    requireAnyPermission("catalog.manage", "catalog.read"),
     async (_request, response) => {
       response.status(200).json(await catalog.adminState());
     },
@@ -82,7 +83,7 @@ export function createCatalogRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("catalog.manage"),
+    requireAnyPermission("catalog.manage", "catalog.edit"),
     async (request, response) => {
       const body = stateSchema.parse(request.body);
       const result = await catalog.replaceState(

@@ -42,9 +42,42 @@ export function requireMfa(request: Request, _response: Response, next: NextFunc
   next(new AppError(403, "MFA_REQUIRED", "Complete two-factor authentication to continue"));
 }
 
+function hasAnyPermission(
+  granted: readonly string[] | undefined,
+  required: readonly string[],
+): boolean {
+  if (!granted?.length || !required.length) return false;
+  const available = new Set(granted);
+  return required.some((permission) => available.has(permission));
+}
+
 export function requirePermission(permission: string): RequestHandler {
+  return requireAnyPermission(permission);
+}
+
+export function requireAnyPermission(...permissions: string[]): RequestHandler {
   return (request, _response, next) => {
-    if (!request.auth?.permissions.includes(permission)) {
+    if (!hasAnyPermission(request.auth?.permissions, permissions)) {
+      next(new AppError(403, "FORBIDDEN", "You do not have permission for this action"));
+      return;
+    }
+    next();
+  };
+}
+
+export function requireActionPermission(
+  bodyField: string,
+  permissionMap: Readonly<Record<string, readonly string[]>>,
+): RequestHandler {
+  return (request, _response, next) => {
+    const body = request.body as Record<string, unknown> | undefined;
+    const action = String(body?.[bodyField] ?? "");
+    const required = permissionMap[action];
+    if (!required) {
+      next();
+      return;
+    }
+    if (!hasAnyPermission(request.auth?.permissions, required)) {
       next(new AppError(403, "FORBIDDEN", "You do not have permission for this action"));
       return;
     }

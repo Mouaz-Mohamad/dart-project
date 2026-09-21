@@ -27,6 +27,9 @@ const relationalStore = read("backend/src/modules/dashboard/relational-domain.st
 const relationalAuthorityMigration = read("backend/migrations/0019_relational_domains_authoritative.sql");
 const customerInteractionService = read("backend/src/modules/commerce/customer-interaction.service.ts");
 const typedReturnDamageMigration = read("backend/migrations/0020_return_damage_typed_core.sql");
+const commerceRoutes = read("backend/src/modules/commerce/commerce.routes.ts");
+const catalogRoutes = read("backend/src/modules/catalog/catalog.routes.ts");
+const actionPermissionMigration = read("backend/migrations/0021_action_permissions.sql");
 const dashboardHtml = read("Eye/Dart Eye.html");
 const dashboardRuntime = read("Eye/dart.js");
 const storefrontRuntime = read("Js/one .js");
@@ -107,6 +110,29 @@ for (const domain of ["returns", "cards", "damage", "promotions", "birthday_rewa
     `commerce must not use the JSONB compatibility envelope as the ${domain} read source`,
   );
 }
+for (const key of [
+  "orders.create","orders.edit","orders.archive","orders.delete","orders.bulk_manage",
+  "returns.create_manual","returns.review","returns.assign","returns.inspect",
+  "damage.resolve","catalog.read","catalog.edit",
+]) {
+  assert.ok(actionPermissionMigration.includes(`'${key}'`), `missing fine-grained permission ${key}`);
+}
+assert.match(
+  commerceRoutes,
+  /requireActionPermission\("action",[\s\S]*returns\.review[\s\S]*returns\.assign[\s\S]*returns\.inspect/,
+  "return actions must be permissioned independently",
+);
+assert.match(
+  commerceRoutes,
+  /requireAnyPermission\("orders\.manage", "orders\.create"\)/,
+  "manual order creation must accept the dedicated create permission",
+);
+assert.match(
+  catalogRoutes,
+  /requireAnyPermission\("damage\.manage", "damage\.resolve"\)/,
+  "damage resolution must accept its dedicated permission",
+);
+
 assert.match(
   customerInteractionService,
   /INSERT INTO return_requests\(record_id,position,payload\)/,

@@ -1,3 +1,14 @@
+## Fine-grained staff action permissions
+
+Dart Eye permissions are database-driven. The following dedicated permissions are now enforced while the older broad parent permissions remain compatibility fallbacks during the staged dashboard migration:
+
+- Orders: `orders.create`, `orders.edit`, `orders.archive`, `orders.delete`, `orders.bulk_manage`.
+- Returns: `returns.create_manual`, `returns.review`, `returns.assign`, `returns.inspect`.
+- Damage: `damage.resolve`.
+- Catalogue: `catalog.read`, `catalog.edit`.
+
+The Owner role receives all new capabilities. Staff receive none automatically; the Owner selects their explicit permission keys. Existing `orders.manage`, `returns.manage`, `damage.manage` and `catalog.manage` permissions continue to authorize their child actions until the transitional bulk endpoints are retired.
+
 ## Dart Card draw authority
 
 - Customer draw eligibility is editable from Dart Eye through the authenticated admin API and is audited.
