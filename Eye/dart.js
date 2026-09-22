@@ -1665,7 +1665,7 @@ function dartPersistOrderWorkflow() {
   dartSaveAll();
 }
 
-function dartApplyTransition(order, target, meta = {}) {
+async function dartApplyTransition(order, target, meta = {}) {
   if (!dartCanTransition(order, target))
     return {
       ok: false,
@@ -1676,6 +1676,31 @@ function dartApplyTransition(order, target, meta = {}) {
     serverAuthoritative = Boolean(window.DartOrdersApi);
   if (target === "Out With Representative" && !meta.representativeId)
     return { ok: false, needsRep: true };
+  if (window.DartOrdersApi?.workflow) {
+    try {
+      await window.DartOrdersApi.workflow(order.orderId || order.id, {
+        expectedStatus: order.status,
+        target,
+        ...(meta.representativeId
+          ? { representativeId: String(meta.representativeId) }
+          : {}),
+        ...(meta.deliveryGroupId
+          ? { deliveryGroupId: String(meta.deliveryGroupId) }
+          : {}),
+        ...(meta.reason ? { reason: String(meta.reason) } : {}),
+        ...(meta.notes ? { notes: String(meta.notes) } : {}),
+      });
+      return { ok: true };
+    } catch (error) {
+      if (error?.code === "ORDER_STATE_STALE") {
+        await window.DartOrdersApi.hydrate(true).catch(() => {});
+      }
+      return {
+        ok: false,
+        message: error?.message || "Order status was not committed to the server.",
+      };
+    }
+  }
   if (
     target === "Out With Representative" &&
     !dartAssignRepresentative(order, meta.representativeId)
@@ -1785,7 +1810,7 @@ function dartApplyTransition(order, target, meta = {}) {
   }
   return { ok: true };
 }
-function dartBatchTransition(orders, target, meta = {}) {
+async function dartBatchTransition(orders, target, meta = {}) {
   const invalid = orders.filter((o) => !dartCanTransition(o, target));
   if (invalid.length)
     return {
@@ -1807,12 +1832,24 @@ function dartBatchTransition(orders, target, meta = {}) {
     )
       return { ok: false, message: "Representative unavailable." };
   }
-  orders.forEach((o) => {
-    if (deliveryGroupId) o.deliveryGroupId = deliveryGroupId;
-    dartApplyTransition(o, target, { ...meta, suppressRefresh: true });
-  });
-  dartPersistOrderWorkflow();
-  dartRefreshAll();
+  for (const original of orders) {
+    const current =
+      ordersData.find(
+        (row) =>
+          String(row.id) === String(original.id) ||
+          String(row.orderId) === String(original.orderId),
+      ) || original;
+    const result = await dartApplyTransition(current, target, {
+      ...meta,
+      ...(deliveryGroupId ? { deliveryGroupId } : {}),
+      suppressRefresh: true,
+    });
+    if (!result.ok) return result;
+  }
+  if (!window.DartOrdersApi?.workflow) {
+    dartPersistOrderWorkflow();
+    dartRefreshAll();
+  }
   return { ok: true };
 }
 
@@ -2802,15 +2839,16 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       const target = e.target.closest("[data-order-target]")?.dataset
         .orderTarget;
       if (target) {
-        dartRequestOrderTransition([o], target);
+        await dartRequestOrderTransition([o], target);
         return;
       }
       if (e.target.closest(".dart-pickup-cancel-btn")) {
-        dartApplyTransition(o, "Preparing", {
+        const result = await dartApplyTransition(o, "Preparing", {
           type: "REPRESENTATIVE_CANCELLED_PICKUP",
           actorRole: "Representative",
           reason: "Representative cancelled pickup",
         });
+        if (!result.ok) alert(result.message || "Order status update failed.");
         return;
       }
       if (e.target.closest("[data-order-history]")) {
@@ -2890,7 +2928,7 @@ function dartActiveReps() {
     (r) => dartIsActive(r) && r.status === "Active",
   );
 }
-function dartRequestOrderTransition(orders, target) {
+async function dartRequestOrderTransition(orders, target) {
   if (!orders.length) return;
   const invalid = orders.filter((o) => !dartCanTransition(o, target));
   if (invalid.length) {
@@ -2949,8 +2987,11 @@ function dartRequestOrderTransition(orders, target) {
     openModal(document.getElementById("order-reason-modal"));
     return;
   }
-  if (orders.length === 1) dartApplyTransition(orders[0], target);
-  else dartBatchTransition(orders, target);
+  const result =
+    orders.length === 1
+      ? await dartApplyTransition(orders[0], target)
+      : await dartBatchTransition(orders, target);
+  if (!result.ok) alert(result.message || "Order status update failed.");
 }
 function dartSetupOperationalModals() {
   document
@@ -3026,33 +3067,51 @@ function dartSetupOperationalModals() {
   });
   document
     .getElementById("confirm-rep-assignment")
-    ?.addEventListener("click", () => {
+    ?.addEventListener("click", async (event) => {
       if (!dartPendingOrderAction) return;
+      const button = event.currentTarget;
+      button.disabled = true;
       const rep = document.getElementById("rep-assignment-select").value;
       const { orders, target } = dartPendingOrderAction;
-      const res =
-        orders.length === 1
-          ? dartApplyTransition(orders[0], target, { representativeId: rep })
-          : dartBatchTransition(orders, target, { representativeId: rep });
-      if (!res.ok) alert(res.message || "Operation failed");
-      dartPendingOrderAction = null;
-      closeModal(document.getElementById("rep-assignment-modal"));
+      try {
+        const res =
+          orders.length === 1
+            ? await dartApplyTransition(orders[0], target, { representativeId: rep })
+            : await dartBatchTransition(orders, target, { representativeId: rep });
+        if (!res.ok) {
+          alert(res.message || "Operation failed");
+          return;
+        }
+        dartPendingOrderAction = null;
+        closeModal(document.getElementById("rep-assignment-modal"));
+      } finally {
+        button.disabled = false;
+      }
     });
   document
     .getElementById("confirm-order-reason")
-    ?.addEventListener("click", () => {
+    ?.addEventListener("click", async (event) => {
       if (!dartPendingOrderAction) return;
+      const button = event.currentTarget;
+      button.disabled = true;
       const reason = document.getElementById("order-reason-select").value,
         notes = document.getElementById("order-reason-notes").value;
       const { orders, target } = dartPendingOrderAction,
         meta = { reason, notes, actorRole: "Admin" };
-      const res =
-        orders.length === 1
-          ? dartApplyTransition(orders[0], target, meta)
-          : dartBatchTransition(orders, target, meta);
-      if (!res.ok) alert(res.message || "Operation failed");
-      dartPendingOrderAction = null;
-      closeModal(document.getElementById("order-reason-modal"));
+      try {
+        const res =
+          orders.length === 1
+            ? await dartApplyTransition(orders[0], target, meta)
+            : await dartBatchTransition(orders, target, meta);
+        if (!res.ok) {
+          alert(res.message || "Operation failed");
+          return;
+        }
+        dartPendingOrderAction = null;
+        closeModal(document.getElementById("order-reason-modal"));
+      } finally {
+        button.disabled = false;
+      }
     });
   document
     .getElementById("order-bulk-actions")
@@ -3516,7 +3575,7 @@ function dartPreviousStatus(status) {
   const i = DART_ORDER_FLOW.indexOf(status);
   return i > 0 ? DART_ORDER_FLOW[i - 1] : null;
 }
-function dartRollbackOrderOneStep(order) {
+async function dartRollbackOrderOneStep(order) {
   if (
     !order ||
     dartIsArchived(order) ||
@@ -3533,6 +3592,24 @@ function dartRollbackOrderOneStep(order) {
     )
   )
     return { ok: false, message: "cancelled" };
+  if (window.DartOrdersApi?.workflow) {
+    try {
+      await window.DartOrdersApi.workflow(order.orderId || order.id, {
+        expectedStatus: prevStatus,
+        target,
+        reason: "Manual one-step rollback",
+      });
+      return { ok: true };
+    } catch (error) {
+      if (error?.code === "ORDER_STATE_STALE") {
+        await window.DartOrdersApi.hydrate(true).catch(() => {});
+      }
+      return {
+        ok: false,
+        message: error?.message || "Order rollback was not committed to the server.",
+      };
+    }
+  }
   if (prevStatus === "Delivered") {
     if (!serverAuthoritative) {
       (order.items || []).forEach((code) => {
@@ -5240,12 +5317,21 @@ function setupAllDelegatedEvents() {
   const orders = document.getElementById("orders-container");
   if (orders && !orders.dataset.dartV3Back) {
     orders.dataset.dartV3Back = "1";
-    orders.addEventListener("click", (e) => {
+    orders.addEventListener("click", async (e) => {
       const b = e.target.closest(".dart-back-btn");
       if (!b) return;
       const id = b.closest(".model-row")?.dataset.id,
         o = ordersData.find((x) => String(x.id) === String(id));
-      if (o) dartRollbackOrderOneStep(o);
+      if (!o) return;
+      b.disabled = true;
+      try {
+        const result = await dartRollbackOrderOneStep(o);
+        if (!result.ok && result.message !== "cancelled") {
+          alert(result.message || "Order rollback failed.");
+        }
+      } finally {
+        b.disabled = false;
+      }
     });
   }
   const items = document.getElementById("items-container");
