@@ -1,3 +1,7 @@
+// DART | MODULE: dart-api.js
+// Small shared HTTP client and API-base helpers.
+// BEGIN MODULE
+
 (function (root) {
   "use strict";
 
@@ -59,3 +63,6 @@
     request,
   });
 })(typeof window !== "undefined" ? window : globalThis);
+
+
+// END MODULE
