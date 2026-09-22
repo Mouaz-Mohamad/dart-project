@@ -4358,6 +4358,267 @@ export class CommerceService {
     }
   }
 
+  public async adminOrderWorkflowAction(
+    actorId: string,
+    orderRef: string,
+    input: {
+      expectedStatus?: string | undefined;
+      target:
+        | "New"
+        | "Accepted"
+        | "Preparing"
+        | "Out With Representative"
+        | "Representative On The Way"
+        | "Delivered"
+        | "Refused"
+        | "Cancelled";
+      representativeId?: string | undefined;
+      deliveryGroupId?: string | undefined;
+      reason?: string | undefined;
+      notes?: string | undefined;
+    },
+    requestId: string,
+  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    const client = await this.pool.connect();
+    const flow = [
+      "New",
+      "Accepted",
+      "Preparing",
+      "Out With Representative",
+      "Representative On The Way",
+      "Delivered",
+    ];
+    try {
+      await client.query("BEGIN");
+      const orderResult = await client.query<{
+        id: string;
+        order_code: string;
+        status: string;
+        promotion: Record<string, unknown> | null;
+        is_archived: boolean;
+        is_deleted: boolean;
+        payment_method: string;
+        representative_user_id: string | null;
+        legacy: Record<string, unknown> | null;
+      }>(
+        `SELECT id::text, order_code, status, promotion, is_archived, is_deleted,
+                payment_method, representative_user_id::text, legacy
+           FROM orders
+          WHERE id::text=$1 OR order_code=$1
+          LIMIT 1
+          FOR UPDATE`,
+        [orderRef],
+      );
+      const order = orderResult.rows[0];
+      if (!order || order.is_deleted) {
+        throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+      }
+      if (order.is_archived) {
+        throw new AppError(409, "ORDER_ARCHIVED", "Archived orders cannot change workflow state");
+      }
+
+      const previousStatus = String(order.status || "");
+      const target = input.target;
+      if (input.expectedStatus && previousStatus !== input.expectedStatus) {
+        throw new AppError(
+          409,
+          "ORDER_STATE_STALE",
+          `Order state changed from ${input.expectedStatus} to ${previousStatus}; refresh and retry`,
+        );
+      }
+      if (previousStatus === target) {
+        await client.query("COMMIT");
+        return await this.adminOrders();
+      }
+
+      const previousIndex = flow.indexOf(previousStatus);
+      const targetIndex = flow.indexOf(target);
+      const isForward = previousIndex >= 0 && targetIndex === previousIndex + 1;
+      const isBack = previousIndex > 0 && targetIndex === previousIndex - 1;
+      const isCancelled =
+        target === "Cancelled" &&
+        !["Delivered", "Refused", "Cancelled"].includes(previousStatus);
+      const isRefused =
+        target === "Refused" &&
+        ["Out With Representative", "Representative On The Way"].includes(previousStatus);
+      if (!isForward && !isBack && !isCancelled && !isRefused) {
+        throw new AppError(
+          409,
+          "ORDER_STATE_INVALID",
+          `Invalid order transition: ${previousStatus} -> ${target}`,
+        );
+      }
+
+      let representativeUserId = order.representative_user_id;
+      if (target === "Out With Representative" && previousStatus === "Preparing") {
+        const representativeRef = String(input.representativeId || "").trim();
+        if (!representativeRef) {
+          throw new AppError(
+            422,
+            "REPRESENTATIVE_REQUIRED",
+            "Choose a representative before sending the order out",
+          );
+        }
+        const representativeResult = await client.query<{ user_id: string }>(
+          `SELECT r.user_id::text
+             FROM representatives r
+             JOIN users u ON u.id=r.user_id
+            WHERE (r.user_id::text=$1 OR r.representative_code=$1)
+              AND r.approval_status='approved'
+              AND u.status='active'
+            LIMIT 1`,
+          [representativeRef],
+        );
+        representativeUserId = representativeResult.rows[0]?.user_id || null;
+        if (!representativeUserId) {
+          throw new AppError(
+            409,
+            "REPRESENTATIVE_UNAVAILABLE",
+            "Choose an active representative",
+          );
+        }
+      }
+      if (
+        target === "Preparing" &&
+        previousStatus === "Out With Representative"
+      ) {
+        representativeUserId = null;
+      }
+
+      const now = new Date().toISOString();
+      const legacy = {
+        ...(order.legacy && typeof order.legacy === "object" ? order.legacy : {}),
+        ...(target === "Accepted" ? { acceptedAt: now } : {}),
+        ...(target === "Preparing" ? { preparingAt: now } : {}),
+        ...(target === "Out With Representative"
+          ? {
+              outWithRepresentativeAt: now,
+              deliveryGroupId: String(input.deliveryGroupId || ""),
+            }
+          : {}),
+        ...(target === "Representative On The Way"
+          ? { representativeOnWayAt: now }
+          : {}),
+        ...(target === "Refused"
+          ? {
+              refusalReason: String(input.reason || "Other"),
+              refusalNotes: String(input.notes || ""),
+              refusedAt: now,
+            }
+          : {}),
+        ...(target === "Cancelled"
+          ? {
+              cancellationReason: String(input.reason || "Cancelled"),
+              cancellationNotes: String(input.notes || ""),
+              cancelledAt: now,
+            }
+          : {}),
+      } as Record<string, unknown>;
+
+      if (isBack) {
+        if (previousStatus === "Accepted") legacy.acceptedAt = null;
+        if (previousStatus === "Preparing") legacy.preparingAt = null;
+        if (previousStatus === "Out With Representative") {
+          legacy.outWithRepresentativeAt = null;
+          legacy.deliveryGroupId = "";
+        }
+        if (previousStatus === "Representative On The Way") {
+          legacy.representativeOnWayAt = null;
+        }
+        if (previousStatus === "Delivered") {
+          legacy.deliveredAt = null;
+        }
+      }
+
+      await client.query(
+        `UPDATE orders
+            SET status=$2,
+                representative_user_id=$3,
+                delivery_started_at=CASE
+                  WHEN $2='Representative On The Way'
+                    THEN COALESCE(delivery_started_at, now())
+                  ELSE NULL
+                END,
+                delivered_at=CASE
+                  WHEN $2='Delivered' THEN now()
+                  ELSE NULL
+                END,
+                payment_status=CASE
+                  WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Paid'
+                  WHEN $1='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Unpaid'
+                  ELSE payment_status
+                END,
+                amount_paid_minor=CASE
+                  WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN final_minor
+                  WHEN $1='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 0
+                  ELSE amount_paid_minor
+                END,
+                legacy=$4::jsonb,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$5`,
+        [
+          previousStatus,
+          target,
+          representativeUserId,
+          JSON.stringify(legacy),
+          order.id,
+        ],
+      );
+
+      await this.applyOrderStatusTransition(
+        client,
+        order.id,
+        order.order_code,
+        previousStatus,
+        target,
+        order.promotion,
+        actorId,
+      );
+
+      const versionUpdate = await client.query<{ version: string }>(
+        `UPDATE domain_state_versions
+            SET version=version+1, updated_at=now()
+          WHERE domain='orders'
+          RETURNING version::text`,
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id,
+           old_values, new_values, metadata
+         ) VALUES ('staff',$1,'ORDER_WORKFLOW_CHANGED','orders',$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)`,
+        [
+          actorId,
+          order.id,
+          requestId,
+          JSON.stringify({ status: previousStatus }),
+          JSON.stringify({
+            status: target,
+            representativeId: representativeUserId,
+          }),
+          JSON.stringify({
+            orderCode: order.order_code,
+            reason: String(input.reason || ""),
+            notes: String(input.notes || ""),
+            direction: isBack ? "back" : "forward",
+          }),
+        ],
+      );
+
+      await client.query("COMMIT");
+      const state = await this.adminOrders();
+      return {
+        version: Number(versionUpdate.rows[0]?.version || state.version),
+        orders: state.orders,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async replaceAdminOrders(
     expectedVersion: number,
     orders: Record<string, unknown>[],
