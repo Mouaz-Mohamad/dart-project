@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-operations.js
+// Orders, representatives, address handling, operational forms, and transactional UI.
+// BEGIN MODULE
+
 // ============================================================================
  // DART EYE | OPERATIONS
  // Order and representative operational forms, address handling, image intake,
@@ -896,3 +900,5 @@ if (typeof dartMoney === 'function') {
 })();
 
 // END DART EYE | OPERATIONS
+
+// END MODULE
