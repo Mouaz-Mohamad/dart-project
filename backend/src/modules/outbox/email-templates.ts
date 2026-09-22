@@ -41,10 +41,14 @@ export function renderOutboxEmail(
   let english = "";
   let arabic = "";
 
-  if (eventType === "STAFF_INVITED" || eventType === "STAFF_ONBOARDING_CODE_REQUESTED") {
-    subject = "Dart Staff verification code";
-    english = `Your Dart Staff verification code is ${otp}. It expires ${expiry || "soon"}. Open the dashboard: ${dashboardUrl}`;
-    arabic = `كود تفعيل حساب الموظف في Dart هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. افتح الداشبورد: ${dashboardUrl}`;
+  if (
+    eventType === "STAFF_INVITED" ||
+    eventType === "STAFF_ONBOARDING_CODE_REQUESTED" ||
+    eventType === "STAFF_EMAIL_ACCESS_CODE_REQUESTED"
+  ) {
+    subject = "Dart Eye verification code";
+    english = `Your Dart Eye verification code is ${otp}. It expires ${expiry || "soon"}. Open the dashboard: ${dashboardUrl}`;
+    arabic = `كود تأكيد الدخول إلى Dart Eye هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. افتح الداشبورد: ${dashboardUrl}`;
   } else if (
     eventType === "EMAIL_VERIFICATION_REQUESTED" ||
     eventType === "EMAIL_CHANGE_VERIFICATION_REQUESTED"
