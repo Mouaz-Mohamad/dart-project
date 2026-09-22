@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-size-chart.js
+// Admin model size-chart editing and persistence.
+// BEGIN MODULE
+
 // ============================================================================
  // DART EYE | SIZE CHART
  // Admin size-chart editing for catalog models.
@@ -194,3 +198,5 @@
 })();
 
 // END DART EYE | SIZE CHART
+
+// END MODULE
