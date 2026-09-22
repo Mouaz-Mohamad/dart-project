@@ -1,0 +1,45 @@
+name: Add Arabic code guides
+
+on:
+  push:
+    branches:
+      - full-code-cleanup
+    paths:
+      - "scripts/add-arabic-code-comments.mjs"
+      - ".github/workflows/code-comments.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  annotate:
+    if: "!contains(github.event.head_commit.message, '[code-guides-generated]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout cleanup branch
+        uses: actions/checkout@v4
+        with:
+          ref: full-code-cleanup
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Add concise Arabic file guides
+        run: node scripts/add-arabic-code-comments.mjs
+
+      - name: Commit generated comments
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No code-guide changes needed."
+            exit 0
+          fi
+          git config user.name "Dart Code Guide Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .
+          git commit -m "docs: add Arabic code guides across source files [code-guides-generated]"
+          git push origin HEAD:full-code-cleanup
