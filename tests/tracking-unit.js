@@ -43,6 +43,7 @@ localStorage.setItem('dart_returns', JSON.stringify([
 ]));
 
 const trackingSource = fs.readFileSync('Js/dart-tracking.js','utf8');
+const representativeSource = fs.readFileSync('Js/dart-rep.js','utf8');
 vm.runInContext(trackingSource, context, {filename:'Js/dart-tracking.js'});
 assert(window.DartTracking.currentOrder().orderId === 'K-2', 'Tracking should use the signed-in customer latest order when no query is present');
 sessionStorage.setItem('dart_last_order_id','K-1');
@@ -62,4 +63,6 @@ assert(trackingSource.includes('setLatLng'), 'Courier movement must update exist
 assert(trackingSource.includes('Reset view'), 'Manual map movement must expose a Reset view control');
 assert(trackingSource.includes('manualView'), 'Tracking must preserve customer-controlled zoom until Reset view is used');
 assert(!trackingSource.includes('setInterval(() => void refreshServerTracking(), 3000)'), 'The old single three-second full-render tracking loop must stay removed');
+assert(representativeSource.includes('lastLocationSyncAt < 1000'), 'Active representative GPS sync must support one-second freshness');
+assert(representativeSource.includes('updateDeliveryMapsLocation(latestApiLocation)'), 'Representative GPS updates must move existing map layers instead of rerendering the whole work UI');
 console.log('PASS tracking order-resolution unit tests');
