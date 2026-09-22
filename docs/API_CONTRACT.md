@@ -1,3 +1,17 @@
+## Live Operations Map
+
+The Owner live map is server-authoritative and never reads representative/order state from browser storage.
+
+- `GET /api/v1/admin/live-operations` returns active representatives, the latest accepted GPS point, current/upcoming/delivered/waiting/problem stops, suggested stop sequence, and the four live counters.
+- `POST /api/v1/admin/live-operations/orders/:orderRef/state` sets `current|upcoming|waiting|problem`. Only one order may be `current` per representative; selecting a new current order atomically returns the previous current order to Upcoming.
+- `POST /api/v1/admin/live-operations/representatives/:representativeId/reorder` persists the operator-preferred route order without forcing the representative to follow it.
+- Representative GPS is accepted for an active assigned round and throttled client-side to one update every 3 seconds. The API rate limit is 30 updates/minute to leave safe retry headroom.
+- Delivered = green, Delivering = Dart Burgundy `#AB012B`, Upcoming = blue, Waiting = yellow, and Problem/Cancelled/Refused = orange-red. State text/icons accompany color.
+- The dashboard refreshes the live snapshot every 3 seconds without page reload. The selected representative may use a road-routing adapter for the current segment; failure falls back to the operational polyline and never changes order state.
+- Customer `Track Order` remains isolated: customers only receive their own assigned representative location under the existing tracking policy.
+- Read permissions: `live_map.read` (with existing `orders.read` as compatibility parent). Manage permissions: `live_map.manage` (with `orders.manage` compatibility parent).
+- Manual state/route changes are written to the audit log.
+
 ## Fine-grained staff action permissions
 
 Dart Eye permissions are database-driven. The following dedicated permissions are now enforced while the older broad parent permissions remain compatibility fallbacks during the staged dashboard migration:
