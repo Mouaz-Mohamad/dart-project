@@ -17,7 +17,6 @@ const privatePages = [
   "Sign Up modern.html",
   "track.html",
   "rep.html",
-  "pdf.html",
   "Eye/Dart Eye.html",
 ];
 const errors = [];
