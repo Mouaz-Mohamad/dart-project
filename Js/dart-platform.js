@@ -36,6 +36,7 @@
   const CART_UI_CACHE_KEY = "dart_cart_ui_cache_v1";
   let checkoutSubmissionBusy = false;
   let serverReviewEligible = null;
+  let serverPurchaseStats = null;
   let customerCommercePromise = null;
   let customerCommerceGeneration = 0;
   const API_REQUIRED =
@@ -470,6 +471,7 @@
       customerCommerceGeneration += 1;
       customerCommercePromise = null;
       serverReviewEligible = null;
+      serverPurchaseStats = null;
     }
     if (apiUserCache)
       sessionStorage.setItem(API_USER_CACHE_KEY, JSON.stringify(apiUserCache));
@@ -492,6 +494,15 @@
         return payload;
       }
       serverReviewEligible = payload.reviewEligible === true;
+      serverPurchaseStats =
+        payload.purchaseStats &&
+        Number.isFinite(Number(payload.purchaseStats.totalPieces)) &&
+        Number.isFinite(Number(payload.purchaseStats.monthlyPieces))
+          ? {
+              totalPieces: Math.max(0, Number(payload.purchaseStats.totalPieces) || 0),
+              monthlyPieces: Math.max(0, Number(payload.purchaseStats.monthlyPieces) || 0),
+            }
+          : null;
       const snapshots = [
         [KEYS.orders, payload.orders || []],
         [KEYS.returns, payload.returns || []],
@@ -755,6 +766,7 @@
       });
       if (result.user) {
         cacheApiUser(result.user);
+        await claimGuestCartAfterAuth();
         refreshCustomerCommerceInBackground();
       }
       return result;
@@ -810,6 +822,7 @@
         body: { identifier, password },
       });
       const user = cacheApiUser(payload.user);
+      await claimGuestCartAfterAuth();
       refreshCustomerCommerceInBackground();
       return user;
     }
@@ -1505,10 +1518,35 @@
     status.classList.toggle("is-success", !error);
   }
 
+  async function claimGuestCartAfterAuth() {
+    if (!API_BASE || !currentUser()) return null;
+    const localCart = read("dart_cart", []);
+    if (!Array.isArray(localCart) || !localCart.length) return null;
+    try {
+      const result = await apiRequest("/api/v1/me/cart/claim", {
+        method: "POST",
+        body: { reservationId: CART_RESERVATION_ID },
+      });
+      if (result?.reservationId) setCartReservationId(result.reservationId);
+      return result;
+    } catch (error) {
+      if (error?.code === "CART_RESERVATION_EXPIRED") {
+        write("dart_cart", []);
+        if (typeof cartData !== "undefined") cartData = [];
+        return null;
+      }
+      throw error;
+    }
+  }
+
   async function hydrateCustomerCart() {
     if (!API_BASE) return read("dart_cart", []);
     let payload;
     if (currentUser()) {
+      const localCart = read("dart_cart", []);
+      if (Array.isArray(localCart) && localCart.length) {
+        await claimGuestCartAfterAuth();
+      }
       payload = await apiRequest("/api/v1/me/cart");
     } else {
       payload = await apiRequest(`/api/v1/cart/reservation/${encodeURIComponent(CART_RESERVATION_ID)}`).catch((error) => {
@@ -2889,18 +2927,48 @@
     };
     set(".hello .user-name", user.name.split(/\s+/)[0]);
     set(".hello .e-mail", user.email);
-    set(".number-total-order", orders.length);
-    const today = new Date();
-    set(
-      ".number-monthly-order",
-      orders.filter((o) => {
-        const d = new Date(o.createdAt);
-        return (
-          d.getMonth() === today.getMonth() &&
-          d.getFullYear() === today.getFullYear()
-        );
-      }).length,
+    const refundedItemCodes = new Set(
+      returns
+        .filter((record) => {
+          const status = String(record.status || "");
+          const completed =
+            Boolean(record.completedAt) ||
+            ["Completed", "Good", "Damaged", "Bad"].includes(status);
+          return (
+            (returnRules()?.isRefund?.(record) || record.requestType === "Refund") &&
+            completed
+          );
+        })
+        .map((record) => String(record.itemCode || ""))
+        .filter(Boolean),
     );
+    const deliveredOrders = orders.filter((order) => order.status === "Delivered");
+    const netPiecesForOrders = (rows) =>
+      rows.reduce(
+        (sum, order) =>
+          sum +
+          (Array.isArray(order.items) ? order.items : []).filter(
+            (itemCode) => !refundedItemCodes.has(String(itemCode)),
+          ).length,
+        0,
+      );
+    const today = cairoParts(new Date());
+    const localStats = {
+      totalPieces: netPiecesForOrders(deliveredOrders),
+      monthlyPieces: netPiecesForOrders(
+        deliveredOrders.filter((order) => {
+          const date = new Date(
+            order.deliveredAt || order.updatedAt || order.createdAt || 0,
+          );
+          if (Number.isNaN(date.getTime())) return false;
+          const parts = cairoParts(date);
+          return parts.month === today.month && parts.year === today.year;
+        }),
+      ),
+    };
+    const purchaseStats = serverPurchaseStats || localStats;
+    set(".number-total-order", purchaseStats.totalPieces);
+    set(".number-monthly-order", purchaseStats.monthlyPieces);
     const fields = {
       "#user-name": user.name,
       "#user-id": user.customerId,
@@ -3485,11 +3553,13 @@
       )
     )
       renderLeaderboard();
-    if (event.detail?.key === KEYS.orders) {
-      const feedbackSection =
+    if ([KEYS.orders, KEYS.returns].includes(event.detail?.key)) {
+      if (event.detail?.key === KEYS.orders) {
+        const feedbackSection =
         document.getElementById("reviewForm")?.closest(".feedback-section");
-      if (feedbackSection) delete feedbackSection.dataset.eligibilityRendered;
-      renderFeedbackEligibility();
+        if (feedbackSection) delete feedbackSection.dataset.eligibilityRendered;
+        renderFeedbackEligibility();
+      }
       renderProfile();
     }
   });
@@ -3502,6 +3572,7 @@
     hydrateApiSession,
     hydrateCustomerCommerce,
     hydrateCustomerCart,
+    claimGuestCartAfterAuth,
     saveCustomerAddress,
     clearCustomerAddress,
     logout,

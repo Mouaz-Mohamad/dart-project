@@ -909,6 +909,135 @@ export class CommerceService {
     }
   }
 
+  public async claimGuestCart(
+    reservationId: string,
+    customerUserId: string,
+    guestOwnerHash?: string,
+  ): Promise<{ reservationId: string; expiresAt: Date; reservedItems: number }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await this.releaseExpired(client);
+
+      const reservationResult = await client.query<{
+        id: string;
+        customer_user_id: string | null;
+        guest_owner_hash: string | null;
+        expires_at: Date;
+      }>(
+        `SELECT id, customer_user_id::text, guest_owner_hash, expires_at
+           FROM cart_reservations
+          WHERE id=$1 AND expires_at > now()
+          FOR UPDATE`,
+        [reservationId],
+      );
+      const reservation = reservationResult.rows[0];
+      if (!reservation) {
+        throw new AppError(
+          409,
+          "CART_RESERVATION_EXPIRED",
+          "This cart reservation has expired",
+        );
+      }
+      if (
+        reservation.customer_user_id &&
+        reservation.customer_user_id !== customerUserId
+      ) {
+        throw new AppError(
+          403,
+          "RESERVATION_OWNERSHIP_INVALID",
+          "This cart reservation belongs to another account",
+        );
+      }
+      if (
+        !reservation.customer_user_id &&
+        (!guestOwnerHash ||
+          !reservation.guest_owner_hash ||
+          reservation.guest_owner_hash !== guestOwnerHash)
+      ) {
+        throw new AppError(
+          403,
+          "RESERVATION_OWNERSHIP_INVALID",
+          "This guest cart belongs to another browser",
+        );
+      }
+
+      const otherReservations = await client.query<{ id: string }>(
+        `SELECT id
+           FROM cart_reservations
+          WHERE customer_user_id=$1 AND id<>$2
+          FOR UPDATE`,
+        [customerUserId, reservationId],
+      );
+      const otherIds = otherReservations.rows.map((row) => row.id);
+      if (otherIds.length) {
+        await client.query(
+          `UPDATE inventory_items
+              SET status='In stock',
+                  cart_reservation_id=NULL,
+                  reservation_until=NULL,
+                  version=version+1,
+                  updated_at=now()
+            WHERE cart_reservation_id = ANY($1::text[])
+              AND lower(status)='cart reserved'`,
+          [otherIds],
+        );
+        await client.query(
+          "DELETE FROM cart_reservations WHERE id = ANY($1::text[])",
+          [otherIds],
+        );
+      }
+
+      if (!reservation.customer_user_id) {
+        await client.query(
+          `UPDATE cart_reservations
+              SET customer_user_id=$2,
+                  guest_owner_hash=NULL,
+                  updated_at=now()
+            WHERE id=$1`,
+          [reservationId, customerUserId],
+        );
+      }
+
+      const countResult = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+           FROM inventory_items
+          WHERE cart_reservation_id=$1
+            AND lower(status)='cart reserved'
+            AND reservation_until > now()
+            AND active
+            AND NOT is_archived
+            AND NOT is_deleted`,
+        [reservationId],
+      );
+      const reservedItems = Number(countResult.rows[0]?.count || 0);
+      if (!reservedItems) {
+        throw new AppError(
+          409,
+          "CART_RESERVATION_EXPIRED",
+          "This cart reservation no longer contains reserved items",
+        );
+      }
+
+      if (otherIds.length) {
+        await client.query(
+          "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+        );
+      }
+      await client.query("COMMIT");
+      return {
+        reservationId,
+        expiresAt: reservation.expires_at,
+        reservedItems,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async releaseCustomerCart(customerUserId: string): Promise<void> {
     const client = await this.pool.connect();
     try {
@@ -5011,6 +5140,7 @@ export class CommerceService {
     birthdayRewards: unknown[];
     birthdayMessages: unknown[];
     reviewEligible: boolean;
+    purchaseStats: { totalPieces: number; monthlyPieces: number };
     savedAddress: Record<string, unknown> | null;
   }> {
     const customerResult = await this.pool.query<{ client_code: string }>(
@@ -5191,13 +5321,60 @@ export class CommerceService {
       };
     });
 
+    const customerReturns = onlyCustomer(stateByDomain.get("returns") || []);
+    const refundedItemCodes = new Set(
+      customerReturns
+        .filter((raw) => {
+          const row = raw as Record<string, unknown>;
+          const status = String(row.status || "");
+          const completed =
+            Boolean(row.completedAt) ||
+            ["Completed", "Good", "Damaged", "Bad"].includes(status);
+          return String(row.requestType || "") === "Refund" && completed;
+        })
+        .map((raw) => String((raw as Record<string, unknown>).itemCode || ""))
+        .filter(Boolean),
+    );
+    const cairoMonthKey = (value: unknown): string => {
+      const date = new Date(String(value || ""));
+      if (Number.isNaN(date.getTime())) return "";
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+      }).formatToParts(date);
+      const year = parts.find((part) => part.type === "year")?.value || "";
+      const month = parts.find((part) => part.type === "month")?.value || "";
+      return year && month ? `${year}-${month}` : "";
+    };
+    const currentMonth = cairoMonthKey(new Date());
+    const deliveredOrders = orders.filter((order) => order.status === "Delivered");
+    const countNetPieces = (rows: typeof deliveredOrders) =>
+      rows.reduce(
+        (total, order) =>
+          total +
+          (Array.isArray(order.items) ? order.items : []).filter(
+            (itemCode) => !refundedItemCodes.has(String(itemCode)),
+          ).length,
+        0,
+      );
+    const totalPieces = countNetPieces(deliveredOrders);
+    const monthlyPieces = countNetPieces(
+      deliveredOrders.filter(
+        (order) =>
+          cairoMonthKey(order.deliveredAt || order.updatedAt || order.createdAt) ===
+          currentMonth,
+      ),
+    );
+
     return {
       orders,
-      returns: onlyCustomer(stateByDomain.get("returns") || []),
+      returns: customerReturns,
       cards: onlyCustomer(stateByDomain.get("cards") || []),
       birthdayRewards: onlyCustomer(stateByDomain.get("birthday_rewards") || []),
       birthdayMessages: onlyCustomer(stateByDomain.get("birthday_messages") || []),
       reviewEligible: ordersResult.rows.some((row) => row.status === "Delivered"),
+      purchaseStats: { totalPieces, monthlyPieces },
       savedAddress: preferencesResult.rows[0]?.last_address || null,
     };
   }

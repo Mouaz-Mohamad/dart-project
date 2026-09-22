@@ -181,6 +181,23 @@ export function createCommerceRouter(
     },
   );
 
+  router.post(
+    "/me/cart/claim",
+    signedIn,
+    csrf,
+    requireAccountType("customer"),
+    async (request, response) => {
+      const body = z.object({ reservationId }).parse(request.body);
+      const result = await commerce.claimGuestCart(
+        body.reservationId,
+        request.auth!.userId,
+        guestCartOwnerHash(request, response, config, false) ?? undefined,
+      );
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(result);
+    },
+  );
+
   router.put(
     "/me/cart/reservation",
     signedIn,

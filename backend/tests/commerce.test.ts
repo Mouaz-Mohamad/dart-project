@@ -179,6 +179,7 @@ describe("CommerceService relational customer snapshot", () => {
     expect(snapshot.birthdayRewards).toHaveLength(1);
     expect(snapshot.birthdayMessages).toHaveLength(1);
     expect(snapshot.reviewEligible).toBe(false);
+    expect(snapshot.purchaseStats).toEqual({ totalPieces: 0, monthlyPieces: 0 });
     expect(
       query.mock.calls.some(([sql]) =>
         String(sql).includes("SELECT domain, data FROM dashboard_domain_state"),
@@ -187,7 +188,7 @@ describe("CommerceService relational customer snapshot", () => {
   });
 
   it("marks a customer review-eligible when any authoritative order is Delivered", async () => {
-    const now = new Date("2026-09-22T12:00:00.000Z");
+    const now = new Date();
     const query = vi.fn(async (sql: string, values: unknown[] = []) => {
       if (sql.includes("SELECT client_code FROM customers")) {
         return { rows: [{ client_code: "DR-1" }] };
@@ -222,11 +223,28 @@ describe("CommerceService relational customer snapshot", () => {
             courier_longitude: null,
             courier_accuracy_meters: null,
             courier_updated_at: null,
-            items: [],
+            items: [
+              { itemCode: "I-1" },
+              { itemCode: "I-2" },
+              { itemCode: "I-3" },
+            ],
           }],
         };
       }
-      if (sql.includes("FROM return_requests")) return { rows: [] };
+      if (sql.includes("FROM return_requests")) {
+        return {
+          rows: [{
+            payload: {
+              id: "r1",
+              clientId: "DR-1",
+              requestType: "Refund",
+              status: "Completed",
+              itemCode: "I-2",
+              completedAt: now.toISOString(),
+            },
+          }],
+        };
+      }
       if (sql.includes("FROM loyalty_cards")) return { rows: [] };
       if (sql.includes("FROM birthday_rewards")) return { rows: [] };
       if (sql.includes("FROM message_records")) {
@@ -241,6 +259,7 @@ describe("CommerceService relational customer snapshot", () => {
       "123e4567-e89b-12d3-a456-426614174001",
     );
     expect(snapshot.reviewEligible).toBe(true);
+    expect(snapshot.purchaseStats).toEqual({ totalPieces: 2, monthlyPieces: 2 });
   });
 });
 

@@ -109,6 +109,14 @@ describe("commerce concurrency and representative safety contracts", () => {
     );
   });
 
+  it("claims the same guest reservation after authentication without releasing its items", () => {
+    expect(routes).toContain('"/me/cart/claim"');
+    expect(service).toContain("public async claimGuestCart(");
+    expect(service).toContain("SET customer_user_id=$2");
+    expect(service).toContain("guest_owner_hash=NULL");
+    expect(service).toContain("CART_RESERVATION_EXPIRED");
+  });
+
   it("rate-limits representative delivery and return mutations", () => {
     for (const route of [
       "/representatives/orders/:orderCode/action",
