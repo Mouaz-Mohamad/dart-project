@@ -1,7 +1,7 @@
 // DART CODE GUIDE | Eye/dart-orders-api.js
 // الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-orders-api.js
-// Server-backed order hydration, writes, and synchronization.
+// Server-backed order hydration, writes, workflow mutations, and synchronization.
 // BEGIN MODULE
 
 (function () {
@@ -14,16 +14,23 @@
   let syncTimer = 0;
   let syncChain = Promise.resolve();
   let adminPollingEnabled = false;
+  let localRevision = 0;
+  let syncInFlight = false;
+  let authoritativeMutations = 0;
+  let authoritativeEpoch = 0;
+  let hydrateSerial = 0;
+  let lastAppliedHydrateSerial = 0;
 
   function readLocal() {
     return window.DartState?.read?.(STORAGE_KEY, []) || [];
   }
 
-  function cache(orders) {
-    window.DartState?.write?.(STORAGE_KEY, Array.isArray(orders) ? orders : [], { source: "orders" });
+  function cache(orders, source = "orders") {
+    const rows = Array.isArray(orders) ? orders : [];
+    window.DartState?.write?.(STORAGE_KEY, rows, { source });
     window.dispatchEvent(
       new CustomEvent("dart:orders-hydrated", {
-        detail: { version: serverVersion, orders: Array.isArray(orders) ? orders : [] },
+        detail: { version: serverVersion, orders: rows },
       }),
     );
   }
@@ -75,100 +82,212 @@
     if (jobs.length) await Promise.allSettled(jobs);
   }
 
+  function hasMutationBarrier() {
+    return dirty || syncInFlight || authoritativeMutations > 0;
+  }
+
   async function sync() {
-    if (!serverVersion) return readLocal();
-    const payload = await api("/api/v1/admin/orders-state", {
-      method: "PUT",
-      body: { expectedVersion: serverVersion, orders: readLocal() },
-    });
-    serverVersion = Number(payload.version || serverVersion);
-    dirty = false;
-    cache(payload.orders || []);
-    window.dispatchEvent(
-      new CustomEvent("dart:orders-synced", { detail: { version: serverVersion } }),
-    );
-    await refreshRelatedServerState();
-    return payload.orders || [];
+    if (!serverVersion || !dirty || authoritativeMutations > 0) return readLocal();
+
+    const revision = localRevision;
+    const expectedVersion = serverVersion;
+    const snapshot = readLocal().map((row) => ({ ...row }));
+    syncInFlight = true;
+    try {
+      const payload = await api("/api/v1/admin/orders-state", {
+        method: "PUT",
+        body: { expectedVersion, orders: snapshot },
+      });
+      serverVersion = Number(payload.version || serverVersion);
+      if (revision === localRevision) {
+        dirty = false;
+        cache(payload.orders || [], "orders:sync-confirmed");
+        window.dispatchEvent(
+          new CustomEvent("dart:orders-synced", {
+            detail: { version: serverVersion },
+          }),
+        );
+      } else {
+        dirty = true;
+        scheduleSync();
+      }
+      await refreshRelatedServerState();
+      return revision === localRevision ? payload.orders || [] : readLocal();
+    } finally {
+      syncInFlight = false;
+    }
+  }
+
+  async function rebaseVersionPreservingLocal() {
+    const payload = await api("/api/v1/admin/orders-state");
+    serverVersion = Number(payload.version || serverVersion || 1);
+    return readLocal();
   }
 
   function scheduleSync() {
-    if (!serverVersion) return;
+    if (!serverVersion || authoritativeMutations > 0) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => {
       syncChain = syncChain
         .then(sync)
         .catch(async (error) => {
           console.error("Dart order sync failed", error);
-          if (error.status === 409) await hydrate(true);
+          if (error.status === 409) {
+            await rebaseVersionPreservingLocal();
+            dirty = true;
+            scheduleSync();
+          }
         });
     }, 120);
   }
 
   function write(orders) {
-    window.DartState?.write?.(STORAGE_KEY, Array.isArray(orders) ? orders : [], { source: "orders:edit" });
+    window.DartState?.write?.(
+      STORAGE_KEY,
+      Array.isArray(orders) ? orders : [],
+      { source: "orders:edit" },
+    );
+    localRevision += 1;
     dirty = true;
     scheduleSync();
   }
 
-  async function stateAction(orderRef, action) {
-    const payload = await api(
-      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/state`,
-      {
-        method: "POST",
-        body: { action },
-      },
+  async function flush() {
+    clearTimeout(syncTimer);
+    if (!dirty) {
+      await syncChain;
+      return readLocal();
+    }
+    syncChain = syncChain.then(sync);
+    return await syncChain;
+  }
+
+  async function runAuthoritativeMutation(path, body) {
+    if (dirty) await flush();
+
+    authoritativeMutations += 1;
+    authoritativeEpoch += 1;
+    const epoch = authoritativeEpoch;
+    clearTimeout(syncTimer);
+    try {
+      const payload = await api(path, { method: "POST", body });
+      if (epoch === authoritativeEpoch) {
+        serverVersion = Number(payload.version || serverVersion || 1);
+        dirty = false;
+        cache(payload.orders || [], "orders:authoritative");
+      }
+      await refreshRelatedServerState();
+      return payload.orders || [];
+    } finally {
+      authoritativeMutations = Math.max(0, authoritativeMutations - 1);
+    }
+  }
+
+  async function workflow(orderRef, input) {
+    return await runAuthoritativeMutation(
+      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/workflow`,
+      input,
     );
-    serverVersion = Number(payload.version || serverVersion || 1);
-    dirty = false;
-    cache(payload.orders || []);
-    await refreshRelatedServerState();
-    return payload.orders || [];
+  }
+
+  async function stateAction(orderRef, action) {
+    return await runAuthoritativeMutation(
+      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/state`,
+      { action },
+    );
   }
 
   async function createManual(order) {
-    const payload = await api("/api/v1/admin/orders", {
-      method: "POST",
-      body: order,
-    });
-    serverVersion = Number(payload.version || serverVersion || 1);
-    dirty = false;
-    cache(payload.orders || []);
-    await refreshRelatedServerState();
-    return payload.orders || [];
+    if (dirty) await flush();
+    authoritativeMutations += 1;
+    authoritativeEpoch += 1;
+    const epoch = authoritativeEpoch;
+    try {
+      const payload = await api("/api/v1/admin/orders", {
+        method: "POST",
+        body: order,
+      });
+      if (epoch === authoritativeEpoch) {
+        serverVersion = Number(payload.version || serverVersion || 1);
+        dirty = false;
+        cache(payload.orders || [], "orders:create-confirmed");
+      }
+      await refreshRelatedServerState();
+      return payload.orders || [];
+    } finally {
+      authoritativeMutations = Math.max(0, authoritativeMutations - 1);
+    }
   }
 
   async function updateManual(orderRef, order) {
-    const payload = await api(
-      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}`,
-      {
-        method: "PATCH",
-        body: order,
-      },
-    );
-    serverVersion = Number(payload.version || serverVersion || 1);
-    dirty = false;
-    cache(payload.orders || []);
-    await refreshRelatedServerState();
-    return payload.orders || [];
+    if (dirty) await flush();
+    authoritativeMutations += 1;
+    authoritativeEpoch += 1;
+    const epoch = authoritativeEpoch;
+    try {
+      const payload = await api(
+        `/api/v1/admin/orders/${encodeURIComponent(orderRef)}`,
+        {
+          method: "PATCH",
+          body: order,
+        },
+      );
+      if (epoch === authoritativeEpoch) {
+        serverVersion = Number(payload.version || serverVersion || 1);
+        dirty = false;
+        cache(payload.orders || [], "orders:update-confirmed");
+      }
+      await refreshRelatedServerState();
+      return payload.orders || [];
+    } finally {
+      authoritativeMutations = Math.max(0, authoritativeMutations - 1);
+    }
   }
 
   async function hydrate(_force = false) {
+    if (hasMutationBarrier()) return readLocal();
+
+    const serial = ++hydrateSerial;
+    const epoch = authoritativeEpoch;
+    const revision = localRevision;
     const payload = await api("/api/v1/admin/orders-state");
+
+    if (
+      hasMutationBarrier() ||
+      epoch !== authoritativeEpoch ||
+      revision !== localRevision ||
+      serial < lastAppliedHydrateSerial
+    ) {
+      return readLocal();
+    }
+
+    lastAppliedHydrateSerial = serial;
     serverVersion = Number(payload.version || 1);
     dirty = false;
-    cache(payload.orders || []);
+    cache(payload.orders || [], "orders:hydrate");
     return payload.orders || [];
   }
 
   async function check() {
-    if (!adminPollingEnabled || document.hidden) return;
+    if (!adminPollingEnabled || document.hidden || authoritativeMutations > 0) return;
     try {
       if (!serverVersion) {
         await hydrate();
         return;
       }
-      if (dirty) await sync();
+      if (dirty || syncInFlight) {
+        await flush();
+        if (dirty || syncInFlight) return;
+      }
+      const epoch = authoritativeEpoch;
+      const revision = localRevision;
       const payload = await api("/api/v1/admin/orders-version");
+      if (
+        epoch !== authoritativeEpoch ||
+        revision !== localRevision ||
+        hasMutationBarrier()
+      ) return;
+
       const remoteVersion = Number(payload.version || 0);
       if (remoteVersion && remoteVersion !== serverVersion) {
         await hydrate(true);
@@ -186,18 +305,21 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) check();
   });
-  // Lightweight version check only; no full-page reload.
+  // Lightweight version check only; stale reads can never overwrite an active mutation.
   window.setInterval(check, 3000);
 
   window.DartOrdersApi = {
     hydrate,
     createManual,
     updateManual,
+    workflow,
     stateAction,
     sync,
+    flush,
     write,
     read: readLocal,
     check,
+    isBusy: () => hasMutationBarrier(),
     serverVersion: () => serverVersion,
   };
 })();
