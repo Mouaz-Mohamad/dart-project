@@ -330,3 +330,98 @@ describe("cart price review", () => {
     expect(changes).toEqual([]);
   });
 });
+
+
+describe("CommerceService customer live tracking", () => {
+  it("returns only the signed-in customer's active delivery and pickup courier locations", async () => {
+    const now = new Date("2026-09-22T18:00:00.000Z");
+    const query = vi.fn(async (sql: string, values: unknown[] = []) => {
+      if (sql.includes("SELECT client_code FROM customers")) {
+        expect(values[0]).toBe("123e4567-e89b-12d3-a456-426614174001");
+        return { rows: [{ client_code: "DR-1" }] };
+      }
+      if (
+        sql.includes("FROM orders o") &&
+        sql.includes("status='Representative On The Way'")
+      ) {
+        expect(values[0]).toBe("123e4567-e89b-12d3-a456-426614174001");
+        return {
+          rows: [{
+            id: "order-db-1",
+            order_code: "K-1",
+            status: "Representative On The Way",
+            delivery_started_at: now,
+            representative_user_id: "rep-user-1",
+            latitude: 30.04,
+            longitude: 31.23,
+            accuracy_meters: 8,
+            location_updated_at: now,
+          }],
+        };
+      }
+      if (sql.includes("FROM return_requests")) {
+        expect(sql).toContain("payload->>'clientId'=$1");
+        expect(values[0]).toBe("DR-1");
+        return {
+          rows: [{
+            payload: {
+              id: "return-db-1",
+              returnId: "R-1",
+              clientId: "DR-1",
+              status: "Pickup On The Way",
+              pickupStartedAt: now.toISOString(),
+              representativeId: "rep-user-2",
+              representativeBusinessId: "REP-2",
+              isDeleted: false,
+              isArchived: false,
+            },
+          }],
+        };
+      }
+      if (sql.includes("FROM representatives r")) {
+        expect(values[0]).toEqual(["rep-user-2", "REP-2"]);
+        return {
+          rows: [{
+            user_id: "rep-user-2",
+            representative_code: "REP-2",
+            latitude: 30.05,
+            longitude: 31.24,
+            accuracy_meters: 6,
+            location_updated_at: now,
+          }],
+        };
+      }
+      throw new Error(`Unexpected query in customer live tracking test: ${sql}`);
+    });
+
+    const pool = { query } as unknown as Pool;
+    const result = await new CommerceService(pool).customerLiveTracking(
+      "123e4567-e89b-12d3-a456-426614174001",
+    );
+
+    expect(result.orders).toEqual([{
+      id: "order-db-1",
+      orderId: "K-1",
+      status: "Representative On The Way",
+      deliveryStartedAt: now.toISOString(),
+      courierLocation: {
+        lat: 30.04,
+        lng: 31.23,
+        accuracy: 8,
+        updatedAt: now.toISOString(),
+      },
+    }]);
+    expect(result.returns).toEqual([{
+      id: "return-db-1",
+      returnId: "R-1",
+      status: "Pickup On The Way",
+      pickupStartedAt: now.toISOString(),
+      courierLocation: {
+        lat: 30.05,
+        lng: 31.24,
+        accuracy: 6,
+        updatedAt: now.toISOString(),
+      },
+    }]);
+  });
+});
