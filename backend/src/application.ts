@@ -8,7 +8,7 @@ import helmet from "helmet";
 import type { Logger } from "pino";
 import type { AppConfig } from "./config/env.js";
 import { AppError } from "./http/app-error.js";
-import { errorHandler } from "./middleware/error-handler.js";
+import { createErrorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { requestContext } from "./middleware/request-context.js";
 import {
@@ -35,6 +35,7 @@ import { createPlatformAdminRouter } from "./modules/platform/platform-admin.rou
 import type { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
 import { createFinanceRouter } from "./modules/finance/finance.routes.js";
 import type { FinanceService } from "./modules/finance/finance.service.js";
+import type { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { createOutboxRouter } from "./modules/outbox/outbox.routes.js";
 import type { OutboxService } from "./modules/outbox/outbox.service.js";
 
@@ -50,6 +51,7 @@ export interface AppDependencies extends HealthDependencies {
   platformAdminService?: PlatformAdminService;
   financeService?: FinanceService;
   outboxService?: OutboxService;
+  operationalAlerts?: Pick<OperationalAlertService, "report">;
 }
 
 // Vercel's Express builder resolves Helmet's callable default export as a module namespace.
@@ -236,6 +238,6 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   }
 
   app.use(notFoundHandler);
-  app.use(errorHandler);
+  app.use(createErrorHandler(dependencies.operationalAlerts));
   return app;
 }
