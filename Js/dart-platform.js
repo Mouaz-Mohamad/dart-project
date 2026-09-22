@@ -2031,21 +2031,33 @@
       if (!line?.modelCode) return [];
       const model = window.DartCatalog?.model?.(line.modelCode);
       if (!model) return [];
-      const available = Number(
-        window.DartCatalog?.available?.(
-          model,
-          String(line.size || ""),
-          String(line.color || ""),
-        ) || 0,
-      );
-      if (available <= 0) return [];
-      return Array.from({ length: available }, (_, index) => ({
-        id: `server-stock-${index}`,
-        modelId: line.modelCode,
-        color: line.color,
-        size: line.size,
-        status: "In stock",
-      }));
+
+      const sizes = (Array.isArray(model.sizeOptions) ? model.sizeOptions : [])
+        .map((entry) => typeof entry === "string" ? entry : entry?.name ?? entry?.size)
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+      const colors = (Array.isArray(model.colorOptions) ? model.colorOptions : [])
+        .map((entry) => typeof entry === "string" ? entry : entry?.name ?? entry?.color)
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+      const available = [];
+      for (const sizeValue of sizes) {
+        for (const colorValue of colors) {
+          const quantity = Number(
+            window.DartCatalog?.available?.(model, sizeValue, colorValue) || 0,
+          );
+          for (let index = 0; index < quantity; index += 1) {
+            available.push({
+              id: `server-stock-${line.modelCode}-${sizeValue}-${colorValue}-${index}`,
+              modelId: line.modelCode,
+              color: colorValue,
+              size: sizeValue,
+              status: "In stock",
+            });
+          }
+        }
+      }
+      return available;
     };
 
     const refreshSizes = () => {

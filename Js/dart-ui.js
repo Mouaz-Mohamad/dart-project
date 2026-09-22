@@ -336,6 +336,27 @@ async function loadSection(containerId, filePath, timeoutMs = 8000) {
     }
 }
 
+
+function ensureAboutImages() {
+    const founder = document.getElementById('dart-founder-image');
+    if (founder && !founder.dataset.dartImageFallbackBound) {
+        founder.dataset.dartImageFallbackBound = '1';
+        if (!founder.getAttribute('src')) founder.src = '/Photos/me.png';
+        founder.addEventListener('error', () => {
+            if (!founder.src.endsWith('/Photos/me.png')) founder.src = '/Photos/me.png';
+        });
+    }
+    const card = document.querySelector('.card-dart img');
+    if (card && !card.dataset.dartImageFallbackBound) {
+        card.dataset.dartImageFallbackBound = '1';
+        card.addEventListener('error', () => {
+            if (!card.src.includes('Dart%20Card1%20dart.png') && !card.src.includes('Dart Card1 dart.png')) {
+                card.src = '/Photos/Dart%20Card1%20dart.png';
+            }
+        });
+    }
+}
+
 function initHeader() {
     const iconMenu = document.querySelector('.icon-menu');
     const sideMenu = document.querySelector('.side-menu');
@@ -1796,6 +1817,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProductsLogic();
     renderFilterButtons();
     initProductFilterToggle();
+    document.addEventListener('dart:section-loaded', (event) => {
+        if (['story', 'card-details'].includes(event.detail?.containerId)) ensureAboutImages();
+    });
+    ensureAboutImages();
     window.addEventListener('dart:catalog-hydrated', () => {
         productsData = DartCatalog.products();
         renderProductsLogic();

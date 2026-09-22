@@ -1710,3 +1710,26 @@ section{
   }
 }
 /* END V9 requested dashboard controls */
+
+
+/* DART FIX | keep every table-like row aligned with its column header */
+.title-name,
+.model-row {
+  gap: 10px;
+  padding-inline: 16px;
+  box-sizing: border-box;
+}
+.title-name input,
+.model-checkbox {
+  margin-right: 0 !important;
+  flex: 0 0 25px;
+}
+.title-name .w100, .model-row .w100,
+.title-name .w150, .model-row .w150,
+.title-name .w200, .model-row .w200,
+.title-name .w300, .model-row .w300,
+.title-name .w500, .model-row .w500,
+.title-name .w1000, .model-row .w1000,
+.title-name .w1200, .model-row .w1200 {
+  box-sizing: border-box;
+}

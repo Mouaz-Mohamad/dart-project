@@ -46,6 +46,7 @@
   let apiWork = { orders: [], returns: [] };
   let latestApiLocation = null;
   let lastLocationSyncAt = 0;
+  const deliveryMaps = new Map();
 
   const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
@@ -647,6 +648,66 @@
     wrapOperationalGroups(list, records, "return");
   }
 
+
+  function clearDeliveryMaps() {
+    for (const entry of deliveryMaps.values()) {
+      try { entry.map.remove(); } catch {}
+    }
+    deliveryMaps.clear();
+  }
+
+  function renderDeliveryMaps(orders) {
+    if (typeof window.L === "undefined") return;
+    document.querySelectorAll("[data-rep-live-map]").forEach((element) => {
+      const order = orders.find(
+        (row) => String(row.id) === String(element.dataset.orderId),
+      );
+      if (!order) return;
+      const destinationLat = Number(order.latitude);
+      const destinationLng = Number(order.longitude);
+      if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) {
+        element.replaceChildren();
+        element.textContent = "Customer map location is unavailable.";
+        return;
+      }
+      const courier = order.courierLocation || latestApiLocation;
+      const courierLat = Number(courier?.lat);
+      const courierLng = Number(courier?.lng);
+      const map = window.L.map(element, {
+        attributionControl: false,
+        zoomControl: false,
+      }).setView([destinationLat, destinationLng], 15);
+      window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        subdomains: "abcd",
+      }).addTo(map);
+      const destinationMarker = window.L.marker([destinationLat, destinationLng])
+        .addTo(map)
+        .bindPopup("Customer");
+      let courierMarker = null;
+      let route = null;
+      if (Number.isFinite(courierLat) && Number.isFinite(courierLng)) {
+        courierMarker = window.L.marker([courierLat, courierLng])
+          .addTo(map)
+          .bindPopup("You");
+        route = window.L.polyline(
+          [[courierLat, courierLng], [destinationLat, destinationLng]],
+          { weight: 4, opacity: 0.7 },
+        ).addTo(map);
+        map.fitBounds(route.getBounds(), { padding: [28, 28], maxZoom: 16 });
+      } else {
+        destinationMarker.openPopup();
+      }
+      deliveryMaps.set(String(order.id), {
+        map,
+        destinationMarker,
+        courierMarker,
+        route,
+      });
+      window.setTimeout(() => map.invalidateSize(), 80);
+    });
+  }
+
   function renderOrders() {
     const rep = currentRep();
     if (!rep) {
@@ -663,6 +724,7 @@
       `${rep.name} · ${rep.repId} · ${rep.phone1}`;
     const orders = repOrders(rep),
       list = document.getElementById("repOrdersList");
+    clearDeliveryMaps();
     activeOrderIds.clear();
     orders
       .filter(
@@ -696,9 +758,11 @@
         <div class="rep-info-box"><div class="rep-info-title">Customer &amp; address</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "Address missing")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
         <div class="rep-info-box"><div class="rep-info-title">Items &amp; cash collection</div>${items}<div class="dart-rep-total"><span>Collect cash</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>
         <p class="dart-rep-proximity ${proximity.ok ? "is-ready" : ""}" role="status">${esc(proximity.reason)}</p>
+        ${started ? `<div class="dart-rep-live-map" data-rep-live-map data-order-id="${esc(order.id)}" aria-label="Live delivery route"></div>` : ""}
         <div class="dart-rep-order-actions">
           <a href="tel:${esc(order.phone1)}" class="rep-btn rep-btn-call"><i class="fa-solid fa-phone"></i> Call customer</a>
           ${!started ? '<button type="button" class="rep-btn rep-btn-go" data-action="start"><i class="fa-solid fa-diamond-turn-right"></i> Start delivery</button>' : ""}
+          ${started ? `<a class="rep-btn rep-btn-go" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Open navigation</a>` : ""}
           ${started ? '<button type="button" class="rep-btn rep-btn-cancel" data-action="cancel"><i class="fa-solid fa-xmark"></i> Cancel delivery</button>' : ""}
           ${started && proximity.ok ? '<button type="button" class="rep-btn rep-btn-complete" data-action="complete"><i class="fa-solid fa-circle-check"></i> Delivered</button>' : ""}
         </div>
@@ -707,6 +771,7 @@
         .join("") ||
       '<div class="empty-state">No active orders are assigned to you.</div>';
     wrapOperationalGroups(list, orders, "order");
+    renderDeliveryMaps(orders);
     renderReturns(rep);
     ensureLocationWatch();
   }
@@ -1385,7 +1450,6 @@
               throw new Error(
                 "Dashboard must move the order to Out With Representative first.",
               );
-            window.open(googleMapsRoute(order), "_blank", "noopener");
             locationPermissionBlocked = false;
             activeOrderIds.add(order.id);
             await updateOrderStatus(order.id, "Representative On The Way");

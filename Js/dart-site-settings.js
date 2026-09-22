@@ -293,8 +293,13 @@
       const selected = isDay
         ? settings.heroDayImage || settings.heroNightImage
         : settings.heroNightImage || settings.heroDayImage;
-      hero.src = await resolveImage(selected, hero.getAttribute("src") || "/Photos/hero 2.png");
+      hero.dataset.dartMediaReady = "false";
+      hero.src = await resolveImage(
+        selected,
+        hero.getAttribute("src") || "/Photos/hero 2.png",
+      );
       hero.dataset.timeMode = isDay ? "day" : "night";
+      hero.dataset.dartMediaReady = "true";
     }
     const founder = root.document?.getElementById("dart-founder-image");
     if (founder && settings.founderImage)
