@@ -3167,9 +3167,12 @@
         if (currentUser()) await hydrateCustomerCommerce();
         await hydrateCustomerCart();
       } catch (error) {
-        console.warn(
-          "Dart account/catalog service is temporarily unavailable.",
-          error.code || "API_ERROR",
+        // Expected connectivity/API bootstrap failures are surfaced as UI state,
+        // not console noise. Server-side observability remains authoritative.
+        window.dispatchEvent(
+          new CustomEvent("dart:platform-unavailable", {
+            detail: { code: error?.code || "API_ERROR" },
+          }),
         );
       }
     }

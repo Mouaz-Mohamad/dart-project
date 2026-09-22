@@ -342,18 +342,22 @@ function ensureAboutImages() {
     if (founder && !founder.dataset.dartImageFallbackBound) {
         founder.dataset.dartImageFallbackBound = '1';
         if (!founder.getAttribute('src')) founder.src = '/Photos/me.png';
-        founder.addEventListener('error', () => {
+        const useFounderFallback = () => {
             if (!founder.src.endsWith('/Photos/me.png')) founder.src = '/Photos/me.png';
-        });
+        };
+        founder.addEventListener('error', useFounderFallback);
+        if (founder.complete && founder.naturalWidth === 0) useFounderFallback();
     }
     const card = document.querySelector('.card-dart img');
     if (card && !card.dataset.dartImageFallbackBound) {
         card.dataset.dartImageFallbackBound = '1';
-        card.addEventListener('error', () => {
+        const useCardFallback = () => {
             if (!card.src.includes('Dart%20Card1%20dart.png') && !card.src.includes('Dart Card1 dart.png')) {
                 card.src = '/Photos/Dart%20Card1%20dart.png';
             }
-        });
+        };
+        card.addEventListener('error', useCardFallback);
+        if (card.complete && card.naturalWidth === 0) useCardFallback();
     }
 }
 
