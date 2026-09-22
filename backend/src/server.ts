@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/server.ts
+// الغرض: تشغيل HTTP server وإدارة الإغلاق الآمن واتصال PostgreSQL.
 import type { Server } from "node:http";
 import app, { runtime } from "./app.js";
 import { shouldStartHttpListener } from "./config/runtime.js";

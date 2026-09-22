@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/security/password.ts
+// الغرض: وظائف أمنية مشتركة للمصادقة أو التطبيع أو حماية الجلسات والبيانات الحساسة.
 const PASSWORD_OPTIONS = {
   memoryCost: 65_536,
   timeCost: 3,

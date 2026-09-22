@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0013_customer_preferences.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE TABLE customer_preferences (
   customer_user_id UUID PRIMARY KEY REFERENCES customers(user_id) ON DELETE CASCADE,
   last_address JSONB,

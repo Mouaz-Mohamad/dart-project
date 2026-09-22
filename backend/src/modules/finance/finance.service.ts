@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/finance/finance.service.ts
+// الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 

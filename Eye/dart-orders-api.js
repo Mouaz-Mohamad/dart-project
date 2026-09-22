@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-orders-api.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-orders-api.js
 // Server-backed order hydration, writes, and synchronization.
 // BEGIN MODULE

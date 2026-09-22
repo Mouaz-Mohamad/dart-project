@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0020_return_damage_typed_core.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 -- Typed relational core for Returns / Exchanges / Damage.
 -- Payload remains temporarily for backwards-compatible UI fields while authoritative
 -- identifiers, money, address and lifecycle fields become queryable typed columns.

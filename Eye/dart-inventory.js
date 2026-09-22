@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-inventory.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-inventory.js
 // Inventory/model/item grouping, forms, stock rendering, and alerts.
 // BEGIN MODULE

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/email-provider.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SmtpEmailProvider } from "../src/modules/outbox/email-provider.js";
 

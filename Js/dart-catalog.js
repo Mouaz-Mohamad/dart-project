@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-catalog.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-catalog.js
 // Catalog/models/items authority adapter and inventory-derived helpers.
 // BEGIN MODULE

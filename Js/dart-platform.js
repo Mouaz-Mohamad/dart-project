@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-platform.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-platform.js
 // Customer auth/session, cart reservation, checkout, rewards, and site-wide platform behavior.
 // BEGIN MODULE

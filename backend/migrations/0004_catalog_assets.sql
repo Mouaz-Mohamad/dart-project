@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0004_catalog_assets.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE TABLE catalog_assets (
   asset_id TEXT PRIMARY KEY,
   original_name TEXT NOT NULL DEFAULT '',

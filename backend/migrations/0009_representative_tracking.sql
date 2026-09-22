@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0009_representative_tracking.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 ALTER TABLE representatives
   ADD COLUMN IF NOT EXISTS address_text TEXT NOT NULL DEFAULT '';
 

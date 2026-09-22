@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/database/seed.ts
+// الغرض: طبقة PostgreSQL: اتصال أو migration أو seed؛ الخادم هو مصدر الحقيقة للبيانات.
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadConfig } from "../config/env.js";

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-domain-state.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-domain-state.js
 // Dashboard domain hydration/synchronization adapters backed by the admin API.
 // BEGIN MODULE

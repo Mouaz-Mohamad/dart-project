@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-state.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-state.js
 // Small browser-state compatibility adapter; never the production business authority.
 // BEGIN MODULE

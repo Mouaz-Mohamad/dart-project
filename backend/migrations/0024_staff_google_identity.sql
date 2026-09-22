@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0024_staff_google_identity.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 -- Phase 1: Google + Supabase identity for Dart Eye Staff.
 -- Existing Staff password/OTP/TOTP primitives stay intact temporarily for rollback.
 

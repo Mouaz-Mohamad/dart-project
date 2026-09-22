@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0011_customer_admin_permissions.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 INSERT INTO permissions (key, description) VALUES
   ('customers.read', 'Read registered customer accounts'),
   ('customers.manage', 'Manage registered customer identity and profile data')

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-staff.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-staff.js
 // Owner-managed Staff allowlist, permissions, status, and session revocation UI.
 // BEGIN MODULE

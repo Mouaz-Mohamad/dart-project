@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0025_staff_simple_email_access.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 -- Simplified Dart Eye Staff access:
 -- Owner manages an email allowlist and role; Staff prove email ownership with a one-time code.
 -- No Google OAuth, Supabase Auth, password or TOTP is required for this path.

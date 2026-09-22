@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0022_staff_whatsapp_delivery.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 ALTER TABLE staff_invitations
   ADD COLUMN IF NOT EXISTS phone TEXT;
 

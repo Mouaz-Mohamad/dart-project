@@ -1,3 +1,5 @@
+# DART CODE GUIDE | backend/openapi.yaml
+# الغرض: ملف إعداد تشغيلي/CI؛ تغيير القيم هنا يؤثر على الأتمتة وليس منطق المتجر مباشرة.
 openapi: 3.1.0
 info:
   title: Dart Backend API

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-size-chart.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-size-chart.js
 // Admin model size-chart editing and persistence.
 // BEGIN MODULE

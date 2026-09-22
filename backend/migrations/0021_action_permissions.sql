@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0021_action_permissions.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 -- Fine-grained staff action permissions.
 -- Broad *.manage permissions remain accepted temporarily as compatibility parents.
 

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/health.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import pino from "pino";
 import request from "supertest";
 import { describe, expect, it } from "vitest";

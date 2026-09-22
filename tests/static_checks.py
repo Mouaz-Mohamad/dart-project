@@ -1,3 +1,5 @@
+# DART CODE GUIDE | tests/static_checks.py
+# الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 from html.parser import HTMLParser
 from pathlib import Path
 import re

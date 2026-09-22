@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/config/runtime.ts
+// الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 export function shouldStartHttpListener(
   environment: { VERCEL?: string | undefined } = process.env,
 ): boolean {

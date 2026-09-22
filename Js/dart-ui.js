@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-ui.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-ui.js
 // Storefront rendering, filters, cart UI, checkout UI, and reusable page sections.
 // BEGIN MODULE

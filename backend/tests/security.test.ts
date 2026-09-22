@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/security.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret } from "../src/security/crypto.js";
 import { normalizeEgyptianPhone } from "../src/security/normalization.js";

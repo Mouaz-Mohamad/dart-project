@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/seo_checks.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 /* BEGIN SEO and structure checks — keep public metadata and canonical files unique. */
 const fs = require("fs");
 const path = require("path");

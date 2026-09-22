@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0019_relational_domains_authoritative.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 -- Make row-level tables authoritative for critical business domains.
 -- The dashboard_domain_state row remains only as an optimistic-concurrency/version envelope.
 

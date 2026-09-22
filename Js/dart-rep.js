@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-rep.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-rep.js
 // Representative portal auth, assignments, delivery, return pickup, and live-location UI.
 // BEGIN MODULE

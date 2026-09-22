@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/catalog-browser.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 /* BEGIN V7 acceptance tests — real UI flows, isolated browser-only test data. */
 const fs=require('fs'),path=require('path'),http=require('http');
 const {chromium}=require('playwright');

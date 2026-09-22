@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/application.ts
+// الغرض: تجميع تطبيق Express: الأمان وCORS والـrate limits والـrouters ومعالجة الأخطاء.
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import express, { type Express, type RequestHandler } from "express";

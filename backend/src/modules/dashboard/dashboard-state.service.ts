@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/dashboard/dashboard-state.service.ts
+// الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "./relational-domain.store.js";

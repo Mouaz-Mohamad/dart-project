@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/migration-naming.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";

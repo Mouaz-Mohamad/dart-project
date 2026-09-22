@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/production-event-delivery.contract.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 

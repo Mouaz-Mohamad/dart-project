@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-settings.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-settings.js
 // Dashboard Settings forms, templates, general settings, and internal Settings navigation.
 // BEGIN MODULE

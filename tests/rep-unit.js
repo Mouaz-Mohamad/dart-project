@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/rep-unit.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const fs=require('fs'),vm=require('vm'),{webcrypto}=require('crypto');
 class Storage{constructor(){this.data=new Map()}getItem(k){return this.data.has(k)?this.data.get(k):null}setItem(k,v){this.data.set(k,String(v))}removeItem(k){this.data.delete(k)}}
 const localStorage=new Storage(),sessionStorage=new Storage(),callbacks={};

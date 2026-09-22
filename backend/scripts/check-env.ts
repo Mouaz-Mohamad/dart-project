@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/scripts/check-env.ts
+// الغرض: أداة تشغيل/صيانة للـBackend؛ تُستخدم من npm scripts أو CI ولا تعمل داخل المتصفح.
 import {
   EnvironmentConfigError,
   loadConfig,

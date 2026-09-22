@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/dashboard-v9-unit.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const fs = require("fs");
 const vm = require("vm");
 const assert = require("node:assert/strict");

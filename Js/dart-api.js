@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-api.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-api.js
 // Small shared HTTP client and API-base helpers.
 // BEGIN MODULE

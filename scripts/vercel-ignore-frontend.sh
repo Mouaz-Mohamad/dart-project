@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# DART CODE GUIDE | scripts/vercel-ignore-frontend.sh
+# الغرض: سكريبت Shell مساعد للتشغيل أو النشر.
 set -euo pipefail
 
 commit_message="$(git log -1 --pretty=%B)"

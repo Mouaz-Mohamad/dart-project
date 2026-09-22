@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/app.ts
+// الغرض: إنشاء Runtime وربط الخدمات وقاعدة البيانات بالتطبيق، مع fallback آمن عند سوء الإعداد.
 import express, { type Express } from "express";
 import pino from "pino";
 import { createApp } from "./application.js";

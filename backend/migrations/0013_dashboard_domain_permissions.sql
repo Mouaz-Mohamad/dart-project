@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0013_dashboard_domain_permissions.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 INSERT INTO permissions (key, description) VALUES
   ('reviews.read', 'Read customer reviews'),
   ('reviews.manage', 'Moderate and manage customer reviews'),

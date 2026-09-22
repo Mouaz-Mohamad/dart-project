@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-returns.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-returns.js
 // Customer return/exchange rules, pricing, states, and helpers.
 // BEGIN MODULE

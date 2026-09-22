@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-admin-auth.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-admin-auth.js
 // Dart Eye Staff email verification, secure session bootstrap, and auth gate UI.
 // BEGIN MODULE

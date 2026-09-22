@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# DART CODE GUIDE | backend/scripts/vercel-ignore-backend.sh
+# الغرض: أداة تشغيل/صيانة للـBackend؛ تُستخدم من npm scripts أو CI ولا تعمل داخل المتصفح.
 set -euo pipefail
 
 commit_message="$(git log -1 --pretty=%B)"

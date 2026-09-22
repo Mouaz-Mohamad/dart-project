@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/catalog/catalog.asset.routes.ts
+// الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";

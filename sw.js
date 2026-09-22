@@ -1,3 +1,5 @@
+// DART CODE GUIDE | sw.js
+// الغرض: Service Worker للموقع؛ يدير التخزين المؤقت وسلوك الشبكة دون أن يصبح مصدر بيانات تجاري.
 // Dart storefront cache: network-first for code, cache-first fallback for media.
 const CACHE = 'dart-static-v17-compatibility';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];

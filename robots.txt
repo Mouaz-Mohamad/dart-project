@@ -1,3 +1,5 @@
+# DART CODE GUIDE | robots.txt
+# الغرض: تعليمات لمحركات البحث حول مسارات الموقع التي يمكن زحفها.
 User-agent: *
 Allow: /
 Disallow: /Eye/

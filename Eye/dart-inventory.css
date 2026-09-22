@@ -1,3 +1,5 @@
+/* DART CODE GUIDE | Eye/dart-inventory.css
+   الغرض: تنسيقات قسم من Dart Eye Dashboard مع دعم الكمبيوتر والموبايل. */
 /* BEGIN Inventory layout — keeps the original dashboard identity and row widths. */
 [hidden] {
   display: none !important;

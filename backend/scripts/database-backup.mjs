@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/scripts/database-backup.mjs
+// الغرض: أداة تشغيل/صيانة للـBackend؛ تُستخدم من npm scripts أو CI ولا تعمل داخل المتصفح.
 import { spawn } from "node:child_process";
 import { mkdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";

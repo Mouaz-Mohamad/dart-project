@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/v9-requested-features.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const fs = require("fs");
 const path = require("path");
 

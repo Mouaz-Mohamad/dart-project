@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/scripts/check-vercel-config.mjs
+// الغرض: أداة تشغيل/صيانة للـBackend؛ تُستخدم من npm scripts أو CI ولا تعمل داخل المتصفح.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

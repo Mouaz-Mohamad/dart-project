@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/css-architecture.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 "use strict";
 
 const assert = require("assert");

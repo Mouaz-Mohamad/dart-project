@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0016_guest_cart_ownership.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 ALTER TABLE cart_reservations
   ADD COLUMN IF NOT EXISTS guest_owner_hash CHAR(64);
 

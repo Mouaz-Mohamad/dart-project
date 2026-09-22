@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/security/normalization.ts
+// الغرض: وظائف أمنية مشتركة للمصادقة أو التطبيع أو حماية الجلسات والبيانات الحساسة.
 export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }

@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0001_platform_foundation.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE audit_logs (

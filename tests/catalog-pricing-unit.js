@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/catalog-pricing-unit.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 globalThis.location = globalThis.location || {
   origin: "http://localhost",
   pathname: "/products.html",

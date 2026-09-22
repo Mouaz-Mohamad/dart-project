@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0007_dashboard_domain_state.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE SEQUENCE dart_return_request_seq START WITH 1;
 
 CREATE TABLE dashboard_domain_state (

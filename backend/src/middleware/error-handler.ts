@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/middleware/error-handler.ts
+// الغرض: Middleware مركزي يطبّق قاعدة مشتركة على طلبات HTTP قبل وصولها للـroutes.
 import type { ErrorRequestHandler } from "express";
 import { ZodError } from "zod";
 import { AppError } from "../http/app-error.js";

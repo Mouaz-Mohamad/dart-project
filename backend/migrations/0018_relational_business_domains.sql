@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0018_relational_business_domains.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 -- First-class relational storage for critical dashboard business domains.
 -- dashboard_domain_state remains only as a compatibility/version envelope during migration.
 

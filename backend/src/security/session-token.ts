@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/security/session-token.ts
+// الغرض: وظائف أمنية مشتركة للمصادقة أو التطبيع أو حماية الجلسات والبيانات الحساسة.
 import { digest, randomToken } from "./crypto.js";
 
 export interface SessionToken {

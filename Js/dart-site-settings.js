@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-site-settings.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-site-settings.js
 // Public site settings cache, live refresh, and template propagation.
 // BEGIN MODULE

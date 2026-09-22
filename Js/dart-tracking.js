@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-tracking.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-tracking.js
 // Order/return tracking cards, maps, timelines, and live state.
 // BEGIN MODULE

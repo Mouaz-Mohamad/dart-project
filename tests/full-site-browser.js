@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/full-site-browser.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 /* BEGIN Full-site smoke test — navigation, shared sections, controls and local requests. */
 const fs = require("fs");
 const path = require("path");

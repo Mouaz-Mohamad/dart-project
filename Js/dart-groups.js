@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-groups.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-groups.js
 // Address/order grouping helpers shared by tracking and operations.
 // BEGIN MODULE

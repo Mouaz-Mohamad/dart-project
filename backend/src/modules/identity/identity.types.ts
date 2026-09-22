@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/identity/identity.types.ts
+// الغرض: تعريف أنواع TypeScript والعقود المشتركة بين أجزاء الـBackend.
 export type AccountType = "customer" | "staff" | "representative";
 
 export interface AuthenticatedAccount {

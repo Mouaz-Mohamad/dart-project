@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0026_remove_retired_staff_google_identity.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 -- Remove the retired Google/Supabase Staff identity storage after the
 -- simplified email-verification flow became the only Dart Eye Staff auth path.
 

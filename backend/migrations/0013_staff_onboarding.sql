@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0013_staff_onboarding.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE TABLE staff_invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL,

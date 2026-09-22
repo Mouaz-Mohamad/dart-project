@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/catalog-integrity.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { describe, expect, it } from "vitest";
 import { AppError } from "../src/http/app-error.js";
 import { validateCatalogReplacement } from "../src/modules/catalog/catalog.service.js";

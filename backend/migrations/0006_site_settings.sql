@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0006_site_settings.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE TABLE site_settings (
   id TEXT PRIMARY KEY DEFAULT 'main' CHECK (id = 'main'),
   data JSONB NOT NULL DEFAULT '{}'::jsonb,

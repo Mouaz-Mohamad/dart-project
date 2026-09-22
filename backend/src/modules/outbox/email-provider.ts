@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/outbox/email-provider.ts
+// الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 import nodemailer from "nodemailer";
 import type { AppConfig } from "../../config/env.js";
 

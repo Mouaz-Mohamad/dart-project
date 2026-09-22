@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/health/health.routes.ts
+// الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
 
 export interface HealthDependencies {

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/settings-and-groups-unit.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const assert = require("assert");
 const groups = require("../Js/dart-groups.js");
 

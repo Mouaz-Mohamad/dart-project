@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/database.integration.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { randomUUID } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";

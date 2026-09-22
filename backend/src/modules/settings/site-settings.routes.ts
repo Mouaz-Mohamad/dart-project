@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/settings/site-settings.routes.ts
+// الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";

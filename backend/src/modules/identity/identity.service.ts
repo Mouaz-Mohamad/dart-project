@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/identity/identity.service.ts
+// الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { createHash, randomInt, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import type { AppConfig } from "../../config/env.js";

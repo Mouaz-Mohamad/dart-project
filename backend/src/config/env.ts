@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/config/env.ts
+// الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 import { z } from "zod";
 
 export class EnvironmentConfigError extends Error {

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-finance.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-finance.js
 // Finance calculations, filters, charts, goals, marketing, and management UI.
 // BEGIN MODULE

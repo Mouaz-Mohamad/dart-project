@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/middleware/not-found.ts
+// الغرض: Middleware مركزي يطبّق قاعدة مشتركة على طلبات HTTP قبل وصولها للـroutes.
 import type { RequestHandler } from "express";
 import { AppError } from "../http/app-error.js";
 

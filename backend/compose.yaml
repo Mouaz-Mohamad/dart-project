@@ -1,3 +1,5 @@
+# DART CODE GUIDE | backend/compose.yaml
+# الغرض: ملف إعداد تشغيلي/CI؛ تغيير القيم هنا يؤثر على الأتمتة وليس منطق المتجر مباشرة.
 services:
   postgres:
     image: postgres:17-alpine

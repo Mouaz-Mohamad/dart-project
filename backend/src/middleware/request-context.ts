@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/middleware/request-context.ts
+// الغرض: Middleware مركزي يطبّق قاعدة مشتركة على طلبات HTTP قبل وصولها للـroutes.
 import { randomUUID } from "node:crypto";
 import { pinoHttp } from "pino-http";
 import type { Logger } from "pino";

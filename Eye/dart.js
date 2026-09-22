@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // ============================================================================
  // DART EYE | DASHBOARD CORE
  // Core dashboard rendering, forms, navigation, brand analytics, and shared UI.

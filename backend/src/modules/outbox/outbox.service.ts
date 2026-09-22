@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/outbox/outbox.service.ts
+// الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
 import type { AppConfig } from "../../config/env.js";
 import { decryptSecret } from "../../security/crypto.js";

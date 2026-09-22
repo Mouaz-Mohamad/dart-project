@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0003_catalog_inventory.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE TABLE catalog_models (
   model_id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

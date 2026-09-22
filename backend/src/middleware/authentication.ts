@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/middleware/authentication.ts
+// الغرض: Middleware مركزي يطبّق قاعدة مشتركة على طلبات HTTP قبل وصولها للـroutes.
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { AppConfig } from "../config/env.js";
 import { AppError } from "../http/app-error.js";

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/catalog/catalog.service.ts
+// الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Eye/dart-operations.js
+// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // DART EYE | MODULE: dart-operations.js
 // Orders, representatives, address handling, operational forms, and transactional UI.
 // BEGIN MODULE

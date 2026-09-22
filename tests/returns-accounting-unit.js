@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/returns-accounting-unit.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 "use strict";
 
 const assert = require("assert");

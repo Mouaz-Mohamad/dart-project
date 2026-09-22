@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0014_damage_manage_permission.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 INSERT INTO permissions (key, description) VALUES
   ('damage.manage', 'Repair or destroy damaged physical inventory items')
 ON CONFLICT (key) DO NOTHING;

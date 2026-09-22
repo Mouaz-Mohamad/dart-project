@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/representative-image-security.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../src/config/env.js";

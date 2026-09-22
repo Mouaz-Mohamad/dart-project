@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/runtime-bootstrap.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createMisconfiguredApplication } from "../src/app.js";

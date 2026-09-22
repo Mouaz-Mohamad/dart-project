@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-address.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-address.js
 // Storefront address validation, geocoding, and delivery-zone helpers.
 // BEGIN MODULE

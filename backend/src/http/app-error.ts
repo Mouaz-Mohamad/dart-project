@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/http/app-error.ts
+// الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly code: string;

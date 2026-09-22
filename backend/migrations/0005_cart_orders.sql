@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0005_cart_orders.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE SEQUENCE dart_order_code_seq START WITH 1;
 
 CREATE TABLE cart_reservations (

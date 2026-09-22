@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0002_identity_auth.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 CREATE SEQUENCE dart_customer_code_seq START WITH 1;
 CREATE SEQUENCE dart_staff_code_seq START WITH 1;
 CREATE SEQUENCE dart_representative_code_seq START WITH 1;

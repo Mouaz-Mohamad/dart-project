@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/auth-contract.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 

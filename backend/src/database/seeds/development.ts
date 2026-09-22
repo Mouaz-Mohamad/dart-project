@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/database/seeds/development.ts
+// الغرض: طبقة PostgreSQL: اتصال أو migration أو seed؛ الخادم هو مصدر الحقيقة للبيانات.
 import type { PoolClient } from "pg";
 
 export interface DevelopmentSeeder {

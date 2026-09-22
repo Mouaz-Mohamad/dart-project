@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/dashboard/relational-domain.store.ts
+// الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 import type { Pool, PoolClient } from "pg";
 
 export const RELATIONAL_DASHBOARD_DOMAINS = [

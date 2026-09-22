@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/tests/migrations.test.ts
+// الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { describe, expect, it } from "vitest";
 import {
   selectMigrationsToApply,

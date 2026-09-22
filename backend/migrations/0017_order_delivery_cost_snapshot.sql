@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0017_order_delivery_cost_snapshot.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS delivery_cost_minor BIGINT NOT NULL DEFAULT 0
   CHECK (delivery_cost_minor >= 0);

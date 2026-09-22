@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/security/crypto.ts
+// الغرض: وظائف أمنية مشتركة للمصادقة أو التطبيع أو حماية الجلسات والبيانات الحساسة.
 import {
   createCipheriv,
   createDecipheriv,

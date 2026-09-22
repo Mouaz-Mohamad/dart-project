@@ -1,3 +1,5 @@
+/* DART CODE GUIDE | CSS/responsive.css
+   الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */
 /* ==========================================================================
    DART | STOREFRONT RESPONSIVE
    Media-query-only overrides. Keep normal component rules in Stayle 1.css.

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/v8-features-browser.js
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 /* BEGIN V8 acceptance — contact inbox, return workflow, tracking activation and client analytics. */
 const fs = require("fs");
 const path = require("path");

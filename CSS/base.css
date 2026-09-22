@@ -1,3 +1,5 @@
+/* DART CODE GUIDE | CSS/base.css
+   الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */
 /* ==========================================================================
    DART | STOREFRONT BASE
    Reset, design tokens, global element defaults, and tiny shared utilities.

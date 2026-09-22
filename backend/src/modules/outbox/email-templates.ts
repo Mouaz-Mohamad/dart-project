@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/outbox/email-templates.ts
+// الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
     .replaceAll("&", "&amp;")

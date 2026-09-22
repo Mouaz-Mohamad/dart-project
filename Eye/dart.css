@@ -1,3 +1,5 @@
+/* DART CODE GUIDE | Eye/dart.css
+   الغرض: تنسيقات قسم من Dart Eye Dashboard مع دعم الكمبيوتر والموبايل. */
 /* ربط الخط وأيقونات Boxicons إذا لم تكن مضافة مسبقاً */
 @import url('https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css');
 *, *::before, *::after {

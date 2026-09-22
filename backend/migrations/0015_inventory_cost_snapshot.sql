@@ -1,3 +1,5 @@
+-- DART CODE GUIDE | backend/migrations/0015_inventory_cost_snapshot.sql
+-- الغرض: Migration لقاعدة PostgreSQL؛ يغيّر الـschema بترتيب ثابت ولا يُعدّل بعد تطبيقه في بيئة حقيقية.
 ALTER TABLE inventory_items
   ADD COLUMN IF NOT EXISTS cost_snapshot_minor BIGINT;
 

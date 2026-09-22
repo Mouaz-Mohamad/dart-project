@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/modules/identity/identity.routes.ts
+// الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router, type Request, type Response } from "express";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";

@@ -1,3 +1,5 @@
+// DART CODE GUIDE | Js/dart-storefront.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
 // DART | MODULE: dart-storefront.js
 // Storefront product cards, product modal, option availability, and carousel behavior.
 // BEGIN MODULE

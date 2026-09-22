@@ -1,3 +1,5 @@
+// DART CODE GUIDE | tests/performance-budget.cjs
+// الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const fs = require("node:fs");
 const path = require("node:path");
 

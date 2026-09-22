@@ -1,3 +1,5 @@
+// DART CODE GUIDE | backend/src/config/logger.ts
+// الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 import pino, { type Logger } from "pino";
 import type { AppConfig } from "./env.js";
 
