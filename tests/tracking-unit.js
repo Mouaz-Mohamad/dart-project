@@ -42,7 +42,8 @@ localStorage.setItem('dart_returns', JSON.stringify([
   {id:'RDB3',returnId:'R-3',clientId:'DA-2',isPostDeliveryReturn:true,status:'Pending Request',createdAt:'2026-09-09T10:00:00Z'},
 ]));
 
-vm.runInContext(fs.readFileSync('Js/dart-tracking.js','utf8'), context, {filename:'Js/dart-tracking.js'});
+const trackingSource = fs.readFileSync('Js/dart-tracking.js','utf8');
+vm.runInContext(trackingSource, context, {filename:'Js/dart-tracking.js'});
 assert(window.DartTracking.currentOrder().orderId === 'K-2', 'Tracking should use the signed-in customer latest order when no query is present');
 sessionStorage.setItem('dart_last_order_id','K-1');
 assert(window.DartTracking.currentOrders().length === 2, 'A signed-in customer must see every active order, even when checkout saved one last order ID');
@@ -55,4 +56,10 @@ sessionStorage.setItem('dart_last_return_id','R-1');
 assert(window.DartTracking.currentReturns()[0].returnId === 'R-1', 'Tracking must remember the newly created return request');
 context.location.search='?return=R-3';
 assert(window.DartTracking.currentReturns()[0].returnId === 'R-3', 'Explicit return tracking links must select their exact request');
+assert(trackingSource.includes('LIVE_LOCATION_POLL_MS = 1000'), 'Customer live tracking must poll at one-second cadence while visible');
+assert(trackingSource.includes('/api/v1/me/tracking/live'), 'Tracking must use the lightweight live-location endpoint');
+assert(trackingSource.includes('setLatLng'), 'Courier movement must update existing Leaflet markers instead of recreating the map');
+assert(trackingSource.includes('Reset view'), 'Manual map movement must expose a Reset view control');
+assert(trackingSource.includes('manualView'), 'Tracking must preserve customer-controlled zoom until Reset view is used');
+assert(!trackingSource.includes('setInterval(() => void refreshServerTracking(), 3000)'), 'The old single three-second full-render tracking loop must stay removed');
 console.log('PASS tracking order-resolution unit tests');
