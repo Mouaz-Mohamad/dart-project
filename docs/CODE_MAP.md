@@ -12,9 +12,9 @@
 | `backend/migrations/0001_platform_foundation.sql` | `audit_logs` و`outbox_events` و`idempotency_keys` |
 | `backend/migrations/0002_identity_auth.sql` | حسابات Customer/Staff/Representative والجلسات وEmail OTP وPassword Reset وRBAC وMFA |
 | `backend/src/database/seed.ts` | Seed تجريبي يتطلب تفعيلًا صريحًا وممنوع في Production |
-| `backend/src/database/bootstrap-owner.ts` | إنشاء أول Owner محمي مرة واحدة ثم فرض إعداد Authenticator |
+| `backend/src/database/bootstrap-owner.ts` | تجهيز هوية الـOwner المحمية ومسار الاستعادة الإداري |
 | `backend/src/modules/health/` | Liveness وReadiness بدون تسريب أخطاء قاعدة البيانات |
-| `backend/src/modules/identity/` | التسجيل والدخول والملف والجلسات وOTP وTOTP واعتماد المندوب وTemporary Password |
+| `backend/src/modules/identity/` | تسجيل العملاء والمندوبين، جلسات Dart، Email OTP، وإدارة دخول وصلاحيات Staff بالبريد |
 | `backend/src/security/` | Argon2id والتشفير والتطبيع وSession/CSRF tokens |
 | `backend/src/middleware/authentication.ts` | التحقق المركزي من الجلسة ونوع الحساب والصلاحية وMFA وCSRF |
 | `backend/tests/` | اختبارات الإعدادات والصحة والأمان وHTTP Auth والترتيب والـseed واختبارات PostgreSQL المعزولة |
