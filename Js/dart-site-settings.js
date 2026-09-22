@@ -26,7 +26,7 @@
     heroNightImage: null,
     founderImage: null,
     defaultMarkupPercent: 50,
-    deliveryCostPerPiece: 100,
+    courierFeePerOrder: 100,
     birthdayDiscountPercent: 30,
     dartCardDiscountPercent: 40,
     refundCustomerFee: 100,
@@ -86,6 +86,12 @@
     return {
       ...clone(defaults),
       ...value,
+      courierFeePerOrder: number(
+        value.courierFeePerOrder ?? value.deliveryCostPerPiece,
+        defaults.courierFeePerOrder,
+        0,
+        1000000,
+      ),
       siteDiscount: { ...defaults.siteDiscount, ...(value.siteDiscount || {}) },
       typing: {
         ...clone(defaults.typing),

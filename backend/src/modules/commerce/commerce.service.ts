@@ -1124,12 +1124,14 @@ export class CommerceService {
         "SELECT data FROM site_settings WHERE id='main'",
       );
       const settings = settingsResult.rows[0]?.data || {};
-      const configuredDeliveryCost = Number(settings.deliveryCostPerPiece);
-      const deliveryCostPerPieceMinor = Math.round(
+      const configuredCourierFee = Number(
+        settings.courierFeePerOrder ?? settings.deliveryCostPerPiece,
+      );
+      const courierFeePerOrderMinor = Math.round(
         Math.max(
           0,
-          Number.isFinite(configuredDeliveryCost)
-            ? configuredDeliveryCost
+          Number.isFinite(configuredCourierFee)
+            ? configuredCourierFee
             : 100,
         ) * 100,
       );
@@ -1326,8 +1328,9 @@ export class CommerceService {
         };
       });
       const orderDiscountMinor = Math.max(0, subtotalMinor - finalMinor);
-      const deliveryCostMinor =
-        itemSnapshots.length * deliveryCostPerPieceMinor;
+      // The representative is paid once per order, not once per item.
+      // Item cost already includes this allocation, so Finance must not add it again.
+      const deliveryCostMinor = courierFeePerOrderMinor;
 
       const orderResult = await client.query<{ id: string; order_code: string; created_at: Date }>(
         `INSERT INTO orders (
@@ -1486,7 +1489,8 @@ export class CommerceService {
         orderLevelDiscountAmount: orderDiscountMinor / 100,
         finalAmount: finalMinor / 100,
         deliveryCost: deliveryCostMinor / 100,
-        deliveryCostPerPiece: deliveryCostPerPieceMinor / 100,
+        courierFee: deliveryCostMinor / 100,
+        courierFeePerOrder: courierFeePerOrderMinor / 100,
         promotionType: promotion?.type || "",
         promotionCode: promotion?.type === "Promotion" ? String(promotion.code || "") : "",
         birthdayRewardId: promotion?.type === "Birthday" ? String(promotion.rewardId || "") : "",
@@ -3703,19 +3707,19 @@ export class CommerceService {
       const manualSettingsResult = await client.query<{ data: Record<string, unknown> }>(
         "SELECT data FROM site_settings WHERE id='main'",
       );
-      const configuredManualDeliveryCost = Number(
-        manualSettingsResult.rows[0]?.data?.deliveryCostPerPiece,
+      const configuredManualCourierFee = Number(
+        manualSettingsResult.rows[0]?.data?.courierFeePerOrder ??
+          manualSettingsResult.rows[0]?.data?.deliveryCostPerPiece,
       );
-      const manualDeliveryCostPerPieceMinor = Math.round(
+      const manualCourierFeePerOrderMinor = Math.round(
         Math.max(
           0,
-          Number.isFinite(configuredManualDeliveryCost)
-            ? configuredManualDeliveryCost
+          Number.isFinite(configuredManualCourierFee)
+            ? configuredManualCourierFee
             : 100,
         ) * 100,
       );
-      const manualDeliveryCostMinor =
-        itemCodes.length * manualDeliveryCostPerPieceMinor;
+      const manualDeliveryCostMinor = manualCourierFeePerOrderMinor;
 
       const clientCode = String(input.clientId || "").trim();
       const customerResult =
@@ -3769,7 +3773,7 @@ export class CommerceService {
             clientId: clientCode || "-",
             source: "Manual Admin",
             deliveryCost: manualDeliveryCostMinor / 100,
-            deliveryCostPerPiece: manualDeliveryCostPerPieceMinor / 100,
+            deliveryCostPerPiece: manualCourierFeePerOrderMinor / 100,
           }),
         ],
       );
@@ -4036,19 +4040,19 @@ export class CommerceService {
         : Math.max(0, subtotalMinor - discountMinor);
 
       let updatedDeliveryCostMinor = Number(existing.delivery_cost_minor || 0);
-      let updatedDeliveryCostPerPieceMinor = 0;
+      let updatedCourierFeePerOrderMinor = 0;
       if (!financiallyLocked) {
         const settingsResult = await client.query<{ data: Record<string, unknown> }>(
           "SELECT data FROM site_settings WHERE id='main'",
         );
         const configured = Number(
-          settingsResult.rows[0]?.data?.deliveryCostPerPiece,
+          settingsResult.rows[0]?.data?.courierFeePerOrder ??
+            settingsResult.rows[0]?.data?.deliveryCostPerPiece,
         );
-        updatedDeliveryCostPerPieceMinor = Math.round(
+        updatedCourierFeePerOrderMinor = Math.round(
           Math.max(0, Number.isFinite(configured) ? configured : 100) * 100,
         );
-        updatedDeliveryCostMinor =
-          itemCodes.length * updatedDeliveryCostPerPieceMinor;
+        updatedDeliveryCostMinor = updatedCourierFeePerOrderMinor;
       }
 
       const amountPaidMinor = Math.min(
@@ -4125,8 +4129,8 @@ export class CommerceService {
             discount: requestedDiscount,
             reasonDeduction: requestedDiscount ? "Order discount" : "-",
             deliveryCost: updatedDeliveryCostMinor / 100,
-            ...(updatedDeliveryCostPerPieceMinor
-              ? { deliveryCostPerPiece: updatedDeliveryCostPerPieceMinor / 100 }
+            ...(updatedCourierFeePerOrderMinor
+              ? { deliveryCostPerPiece: updatedCourierFeePerOrderMinor / 100 }
               : {}),
           }),
         ],

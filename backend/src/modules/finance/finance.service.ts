@@ -368,12 +368,12 @@ export class FinanceService {
 
       const netRevenueMinor = grossRevenueMinor - refundsMinor;
       const netCogsMinor = Math.max(0, grossCogsMinor - cogsReversalMinor);
+      // Representative delivery allocation is already embedded in item cost.
       const totalOperatingMinor =
         operatingExpenseMinor +
         codFeesMinor +
         damageLossMinor +
-        returnCourierMinor +
-        deliveryCostMinor;
+        returnCourierMinor;
       const totalCostMinor = netCogsMinor + totalOperatingMinor;
 
       const physicalItemCostMinor = acquiredResult.rows.reduce(
@@ -385,7 +385,6 @@ export class FinanceService {
         operatingExpenseMinor +
         codFeesMinor +
         returnCourierMinor +
-        deliveryCostMinor +
         incrementalDamageMinor;
 
       const grossProfitMinor = netRevenueMinor - netCogsMinor;
@@ -421,7 +420,12 @@ export class FinanceService {
           Number(order.amount_paid_minor || 0) > 0
             ? Number(order.amount_paid_minor)
             : Number(order.final_minor || 0);
-        fallbackCodCashInMinor += Math.max(0, paidMinor);
+        const collectedMinor = Math.max(0, paidMinor);
+        fallbackCodCashInMinor += Math.max(
+          0,
+          collectedMinor -
+            Math.min(collectedMinor, Number(order.delivery_cost_minor || 0)),
+        );
       }
 
       const cashInMinor =
@@ -430,7 +434,6 @@ export class FinanceService {
         paidExpenseMinor +
         codFeesMinor +
         returnCourierMinor +
-        deliveryCostMinor +
         refundsMinor;
 
       const marketingRows = (states.get("finance_marketing") || [])

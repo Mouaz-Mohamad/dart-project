@@ -220,7 +220,7 @@
 
   function fillGeneral(settings) {
     $("settings-default-markup").value = settings.defaultMarkupPercent;
-    $("settings-delivery-cost").value = settings.deliveryCostPerPiece;
+    $("settings-delivery-cost").value = settings.courierFeePerOrder ?? settings.deliveryCostPerPiece ?? 100;
     $("settings-birthday-discount").value = settings.birthdayDiscountPercent;
     $("settings-card-discount").value = settings.dartCardDiscountPercent;
     $("settings-refund-fee").value = settings.refundCustomerFee;
@@ -346,7 +346,8 @@
     event.preventDefault();
     const next = root.DartSiteSettings.get();
     next.defaultMarkupPercent = Math.max(0, number("settings-default-markup", 50));
-    next.deliveryCostPerPiece = Math.max(0, number("settings-delivery-cost", 100));
+    next.courierFeePerOrder = Math.max(0, number("settings-delivery-cost", 100));
+    delete next.deliveryCostPerPiece;
     next.birthdayDiscountPercent = Math.min(100, Math.max(0, number("settings-birthday-discount", 30)));
     next.dartCardDiscountPercent = Math.min(100, Math.max(0, number("settings-card-discount", 40)));
     next.refundCustomerFee = Math.max(0, number("settings-refund-fee", 100));
