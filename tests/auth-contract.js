@@ -20,8 +20,8 @@ for (const path of [
 }
 assert(customer.includes("profile.accountType !== \"customer\""), "Customer cache must reject Staff/Representative sessions");
 assert(customer.includes("X-CSRF-Token"), "Customer mutations must forward the CSRF token");
-assert(signup.includes('id="customerEmailVerificationForm"'), "Email OTP form is missing");
-assert(signup.includes('minlength="4"'), "Customer password UI must enforce the 4-character minimum");
+assert(!signup.includes('id="customerEmailVerificationForm"'), "Customer signup must not present an email OTP form");
+assert(signup.includes('minlength="8"'), "Customer password UI must enforce the 8-character minimum");
 assert(!signup.includes("boxicons"), "Customer auth icons must not depend on the Boxicons font");
 assert(signup.includes("dart-auth-icon"), "Customer auth inputs must use local SVG icons");
 
@@ -35,7 +35,14 @@ assert(admin.includes("/api/v1/admin/auth/email/verify"), "Admin email verificat
 assert(admin.includes("staff-email-access-v1"), "Admin must require the simplified Staff email capability");
 assert(!admin.includes("signInWithIdToken"), "Admin login must not depend on Supabase ID-token exchange");
 assert(!admin.includes("accounts.google.com"), "Admin login must not depend on Google Identity Services");
-assert(!admin.includes("localStorage.setItem"), "Admin auth must not persist tokens in localStorage");
+assert(
+  admin.includes('localStorage.setItem(STAFF_EMAIL_CACHE_KEY, emailAddress)'),
+  "Admin may remember only the Staff email address for faster reload UX",
+);
+assert(
+  !/localStorage\.setItem\([^\n]*(?:token|otp|session|secret|csrf)/i.test(admin),
+  "Admin auth must never persist tokens, OTPs, sessions, CSRF values or secrets in localStorage",
+);
 assert(
   admin.includes("document.body.classList.add(\"dart-admin-locked\")") &&
     admin.includes("/api/v1/health/live") &&
