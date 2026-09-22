@@ -28,14 +28,14 @@ CREATE INDEX IF NOT EXISTS delivery_route_stops_rep_sequence_idx
 INSERT INTO permissions (key, description) VALUES
   ('live_map.read', 'View the live operations map and active delivery routes'),
   ('live_map.manage', 'Change live route states and route ordering'),
-  ('representatives.location.read', 'View active representative live locations')
+  ('representative_location.read', 'View active representative live locations')
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT roles.id, permissions.id
 FROM roles
 JOIN permissions ON permissions.key IN (
-  'live_map.read','live_map.manage','representatives.location.read'
+  'live_map.read','live_map.manage','representative_location.read'
 )
 WHERE roles.name='Owner'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
