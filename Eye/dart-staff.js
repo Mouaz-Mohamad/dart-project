@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-staff.js
+// Owner-managed Staff allowlist, permissions, status, and session revocation UI.
+// BEGIN MODULE
+
 (function () {
   "use strict";
 
@@ -375,3 +379,5 @@
     if (can("staff.read")) void load();
   });
 })();
+
+// END MODULE
