@@ -1231,13 +1231,18 @@
   }
 
   function ensureLocationWatch() {
-    if (!activeOrderIds.size && !activeReturnIds.size) {
+    const hasAssignedDeliveryWork =
+      API_ENABLED &&
+      (apiWork.orders || []).some((order) =>
+        ["Out With Representative", "Representative On The Way"].includes(String(order.status || "")),
+      );
+    if (!hasAssignedDeliveryWork && !activeOrderIds.size && !activeReturnIds.size) {
       if (locationWatch != null && navigator.geolocation) {
         navigator.geolocation.clearWatch(locationWatch);
         locationWatch = null;
       }
       setLocationStatus(
-        "Location sharing starts only after you start a delivery.",
+        "Location sharing starts when Dart assigns active delivery work to you.",
       );
       return;
     }
