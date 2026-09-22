@@ -105,6 +105,16 @@ assert.match(
   "Back must use the same server-authoritative workflow path",
 );
 assert.match(
+  dashboardRuntime,
+  /await dartRequestOrderTransition\(\[o\], target\)/,
+  "single-order workflow clicks must await server confirmation",
+);
+assert.match(
+  dashboardRuntime,
+  /await dartRequestOrderTransition\(selected, target\)/,
+  "bulk order workflow clicks must await server confirmation",
+);
+assert.match(
   operations,
   /DartDomainState\.write/,
   "non-order operational writes must route through dashboard domain state",
