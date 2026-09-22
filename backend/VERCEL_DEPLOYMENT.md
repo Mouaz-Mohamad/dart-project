@@ -4,7 +4,7 @@ The backend project root is `backend/` and production runs on Node 24.
 
 ## Production build
 
-`backend/vercel.json` runs database migrations during the production build and then builds TypeScript. Runtime cold starts do **not** run migrations. This prevents a missing `/var/task/migrations` directory from crashing every API route.
+`backend/vercel.json` runs database migrations during the production build and then builds TypeScript. Runtime cold starts do **not** run migrations.
 
 Required deployment checks:
 
@@ -15,7 +15,7 @@ Required deployment checks:
 5. `npm run check:env` with the production environment loaded
 6. `npm run db:migrate` against the target Neon database when not using the Vercel production build hook
 
-Never edit an already-applied migration. New migrations start at `0023_*` or above and use a new prefix.
+Never edit an already-applied migration. Add a new migration with the next numeric prefix.
 
 ## Environment variable names
 
@@ -31,28 +31,19 @@ Core:
 - `SESSION_COOKIE_SAME_SITE`
 - `SESSION_TTL_DAYS`
 - `EMAIL_OTP_TTL_MINUTES`
-- `STAFF_INVITE_OTP_TTL_HOURS`
-- `STAFF_GOOGLE_AUTH_ENABLED`
-- `STAFF_LEGACY_AUTH_ENABLED` (keep `true` only during Phase 1 rollback testing)
-- `STAFF_LEGACY_AUTH_UI_ENABLED` (normally `false`)
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_PROJECT_REF`
-- `SUPABASE_AUTH_TIMEOUT_MS`
-- `GOOGLE_CLIENT_ID`
 - `OUTBOX_CRON_SECRET` or `CRON_SECRET`
 - `OUTBOX_BATCH_SIZE`
 
-Dart Eye Google/Supabase identity:
+## Dart Eye Staff access
 
-- Configure the Google OAuth Web Client ID/Secret in Google + Supabase. The Google Client Secret stays there and is never a frontend or Git variable.
-- Add the production storefront origin and localhost development origin to Google Authorized JavaScript origins.
-- Enable Google in Supabase Auth. Dart Eye uses Supabase Auth only to prove identity.
-- The frontend receives only public values from `GET /api/v1/admin/auth/google/config`; no Vercel frontend secret is required.
-- Do **not** add `SUPABASE_SERVICE_ROLE_KEY` for this login flow. The backend verifies the presented session through Supabase Auth and then creates the normal Dart session.
-- Keep the protected Owner allowlist at `midomoaaz3@gmail.com` for first production sign-in. `dart.official.eg@gmail.com` remains the notification sender and is not a dashboard Owner unless explicitly added later.
+Dart Eye does **not** require Google OAuth or Supabase Auth.
 
-Email:
+The Owner manually allows a dashboard email and chooses `Owner` or `Staff`. Staff permissions are stored in Dart PostgreSQL. On first access, and whenever a valid session is not present, the allowed email receives a six-digit verification code. A successful verification creates the normal secure Dart HttpOnly session.
+
+The protected first Owner email is seeded by the database migrations. Customer and representative authentication are separate and unchanged.
+
+Email delivery is therefore required for Dart Eye Staff verification in production:
+
 - `EMAIL_PROVIDER=smtp`
 - `SMTP_HOST`
 - `SMTP_PORT`
@@ -62,14 +53,14 @@ Email:
 - `EMAIL_FROM`
 - `EMAIL_FROM_NAME` (default: `Dart | for you`)
 
+For Gmail SMTP, use `smtp.gmail.com`, port `587`, `SMTP_SECURE=false`, and a Google App Password. Keep the App Password only in Vercel/server environment variables. Never put it in Git, frontend JavaScript, logs or support/chat messages.
+
 WhatsApp remains optional for approved notification flows:
 - `WHATSAPP_CLOUD_API_TOKEN`
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `WHATSAPP_OWNER_PHONE`
 - `WHATSAPP_GRAPH_API_VERSION`
 - `WHATSAPP_TEMPLATE_LANGUAGE`
-
-Do not store or document environment values in Git. Never put a Google Client Secret, Supabase service-role key, access token, refresh token or Dart session token in frontend code, logs, commits or support/chat messages.
 
 ## Health
 
@@ -89,4 +80,4 @@ Authorization:
 
 `Authorization: Bearer <OUTBOX_CRON_SECRET>`
 
-If the Vercel plan cannot schedule the needed retry frequency, call this endpoint every five minutes from a trusted external scheduler. Never expose the cron secret to browser JavaScript.
+If the Vercel plan cannot schedule the needed retry frequency, call this endpoint from a trusted external scheduler. Never expose the cron secret to browser JavaScript.
