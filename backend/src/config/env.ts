@@ -45,6 +45,22 @@ const environmentSchema = z.object({
   MFA_ENCRYPTION_KEY: z
     .string()
     .default("ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="),
+  STAFF_GOOGLE_AUTH_ENABLED: booleanFromString,
+  STAFF_LEGACY_AUTH_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  STAFF_LEGACY_AUTH_UI_ENABLED: booleanFromString,
+  SUPABASE_URL: z.string().trim().default(""),
+  SUPABASE_PUBLISHABLE_KEY: z.string().trim().default(""),
+  SUPABASE_PROJECT_REF: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9-]+$/)
+    .or(z.literal(""))
+    .default(""),
+  SUPABASE_AUTH_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(15_000).default(6_000),
+  GOOGLE_CLIENT_ID: z.string().trim().default(""),
   EMAIL_PROVIDER: z.enum(["disabled", "smtp"]).default("disabled"),
   SMTP_HOST: z.string().trim().default(""),
   SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(587),
@@ -86,6 +102,14 @@ export interface AppConfig {
   ownerBootstrapEmail?: string | null;
   ownerBootstrapName?: string;
   mfaEncryptionKey: Buffer;
+  staffGoogleAuthEnabled?: boolean;
+  staffLegacyAuthEnabled?: boolean;
+  staffLegacyAuthUiEnabled?: boolean;
+  supabaseUrl?: string | null;
+  supabasePublishableKey?: string | null;
+  supabaseProjectRef?: string | null;
+  supabaseAuthTimeoutMs?: number;
+  googleClientId?: string | null;
   emailProvider: "disabled" | "smtp";
   smtpHost: string | null;
   smtpPort: number;
@@ -138,6 +162,41 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   ) {
     invalidEnvironment("MFA_ENCRYPTION_KEY");
   }
+  if (
+    parsed.data.STAFF_LEGACY_AUTH_UI_ENABLED &&
+    !parsed.data.STAFF_LEGACY_AUTH_ENABLED
+  ) {
+    invalidEnvironment("STAFF_LEGACY_AUTH_UI_ENABLED", "STAFF_LEGACY_AUTH_ENABLED");
+  }
+  if (parsed.data.STAFF_GOOGLE_AUTH_ENABLED) {
+    const missingGoogleAuthFields = [
+      !parsed.data.SUPABASE_URL && "SUPABASE_URL",
+      !parsed.data.SUPABASE_PUBLISHABLE_KEY && "SUPABASE_PUBLISHABLE_KEY",
+      !parsed.data.SUPABASE_PROJECT_REF && "SUPABASE_PROJECT_REF",
+      !parsed.data.GOOGLE_CLIENT_ID && "GOOGLE_CLIENT_ID",
+    ].filter((field): field is string => Boolean(field));
+    if (missingGoogleAuthFields.length) {
+      throw new EnvironmentConfigError(missingGoogleAuthFields);
+    }
+
+    let parsedSupabaseUrl: URL | null = null;
+    try {
+      parsedSupabaseUrl = new URL(parsed.data.SUPABASE_URL);
+    } catch {
+      invalidEnvironment("SUPABASE_URL");
+    }
+    if (
+      !parsedSupabaseUrl ||
+      parsedSupabaseUrl.protocol !== "https:" ||
+      parsedSupabaseUrl.hostname !== `${parsed.data.SUPABASE_PROJECT_REF}.supabase.co` ||
+      (parsedSupabaseUrl.pathname !== "/" && parsedSupabaseUrl.pathname !== "")
+    ) {
+      invalidEnvironment("SUPABASE_URL", "SUPABASE_PROJECT_REF");
+    }
+    if (!parsed.data.GOOGLE_CLIENT_ID.endsWith(".apps.googleusercontent.com")) {
+      invalidEnvironment("GOOGLE_CLIENT_ID");
+    }
+  }
   if (parsed.data.NODE_ENV === "production" && parsed.data.EMAIL_PROVIDER === "smtp") {
     const missingEmailFields = [
       !parsed.data.SMTP_HOST && "SMTP_HOST",
@@ -178,6 +237,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     ownerBootstrapEmail: parsed.data.DART_OWNER_EMAIL || null,
     ownerBootstrapName: parsed.data.DART_OWNER_NAME,
     mfaEncryptionKey,
+    staffGoogleAuthEnabled: parsed.data.STAFF_GOOGLE_AUTH_ENABLED,
+    staffLegacyAuthEnabled: parsed.data.STAFF_LEGACY_AUTH_ENABLED,
+    staffLegacyAuthUiEnabled: parsed.data.STAFF_LEGACY_AUTH_UI_ENABLED,
+    supabaseUrl: parsed.data.SUPABASE_URL || null,
+    supabasePublishableKey: parsed.data.SUPABASE_PUBLISHABLE_KEY || null,
+    supabaseProjectRef: parsed.data.SUPABASE_PROJECT_REF || null,
+    supabaseAuthTimeoutMs: parsed.data.SUPABASE_AUTH_TIMEOUT_MS,
+    googleClientId: parsed.data.GOOGLE_CLIENT_ID || null,
     emailProvider: parsed.data.EMAIL_PROVIDER,
     smtpHost: parsed.data.SMTP_HOST || null,
     smtpPort: parsed.data.SMTP_PORT,

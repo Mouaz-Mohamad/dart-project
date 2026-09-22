@@ -1,5 +1,19 @@
 # Dart Project changelog
 
+## Dart Eye Google/Supabase Staff Auth Phase 1 — 2026-09-21
+
+- Replaced the primary Owner/Admin/Staff dashboard sign-in UX with Google Identity Services + Supabase Auth while retaining Dart PostgreSQL, RBAC and HttpOnly sessions as the authorization/session authority.
+- Added migration 0024 for Google provider binding, Supabase user IDs, provider subjects, linked/last-login timestamps, Staff disable metadata, protected Owner constraints and the permanent first Owner allowlist entry for `midomoaaz3@gmail.com`.
+- Added `POST /api/v1/admin/auth/google/exchange` with Dart-project issuer/audience/expiry/subject/email checks plus Supabase Auth verification and Google-only provider enforcement.
+- Added transactional first-login subject binding, concurrency locks, conflict auditing, disabled-account rejection and no-password Staff rows for the new path.
+- Added Owner-managed Gmail allowlist, Active/Disabled controls, permission updates, session revocation and explicit non-Owner Google relink actions.
+- Added a server-only audited Owner break-glass recovery command. It cannot create a second Owner and does not use a fixed recovery password.
+- Kept Staff legacy password/OTP/TOTP routes behind Phase-1 feature flags for rollback; customers, representatives and SMTP customer/order notifications are unchanged.
+- Kept Supabase sessions ephemeral in Dart Eye with `persistSession:false`; the access token is exchanged once and never persisted as the dashboard session.
+- Expanded CSP only for the pinned Supabase JS CDN path already allowed by jsDelivr, Google Identity Services and Supabase API connections.
+- Added unit, PostgreSQL integration, optional live-Supabase, browser auth-contract and security-boundary regression coverage.
+
+
 ## Fine-grained permission CI cleanup — 2026-09-21
 
 - Removed the obsolete catalog `requirePermission` import after migrating the routes to `requireAnyPermission`.

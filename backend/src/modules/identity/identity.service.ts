@@ -18,13 +18,14 @@ import type {
   IssuedSession,
   RequestMetadata,
 } from "./identity.types.js";
+import type { VerifiedGoogleIdentity } from "./supabase-google.js";
 
 interface LoginRow {
   id: string;
   account_type: AccountType;
   email: string;
   email_normalized: string;
-  password_hash: string;
+  password_hash: string | null;
   status: string;
   email_verified_at: Date | null;
   must_change_password: boolean;
@@ -559,7 +560,15 @@ export class IdentityService {
 
         if (!invitation) {
           const ownerExists = await client.query<{ exists: boolean }>(
-            "SELECT EXISTS (SELECT 1 FROM staff_users WHERE is_owner) AS exists",
+            `SELECT (
+               EXISTS (SELECT 1 FROM staff_users WHERE is_owner)
+               OR EXISTS (
+                 SELECT 1
+                   FROM staff_invitations
+                  WHERE is_owner=true
+                    AND status='pending'
+               )
+             ) AS exists`,
           );
           if (!ownerExists.rows[0]?.exists) {
             const created = await client.query<StaffInvitationRow>(
@@ -979,6 +988,970 @@ export class IdentityService {
     }
   }
 
+
+  public async exchangeStaffGoogleIdentity(
+    identity: VerifiedGoogleIdentity,
+    metadata: RequestMetadata,
+  ): Promise<IssuedSession> {
+    const emailNormalized = normalizeEmail(identity.email);
+    const emailHash = digest(
+      `staff-google-email:${emailNormalized}`,
+      this.config.authPepper,
+    );
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-google-email:${emailNormalized}`],
+      );
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-google-subject:${identity.providerSubject}`],
+      );
+
+      const subjectOwner = await client.query<{ user_id: string }>(
+        `SELECT user_id::text
+           FROM staff_users
+          WHERE supabase_user_id=$1::uuid
+             OR (auth_provider='google' AND provider_subject=$2)
+          LIMIT 1
+          FOR UPDATE`,
+        [identity.supabaseUserId, identity.providerSubject],
+      );
+
+      const existing = await client.query<{
+        user_id: string;
+        email: string;
+        status: string;
+        is_owner: boolean;
+        auth_provider: string | null;
+        supabase_user_id: string | null;
+        provider_subject: string | null;
+      }>(
+        `SELECT u.id::text AS user_id, u.email, u.status, s.is_owner,
+                s.auth_provider, s.supabase_user_id::text, s.provider_subject
+           FROM users u
+           JOIN staff_users s ON s.user_id=u.id
+          WHERE u.account_type='staff'
+            AND u.email_normalized=$1
+            AND u.deleted_at IS NULL
+          LIMIT 1
+          FOR UPDATE OF u, s`,
+        [emailNormalized],
+      );
+
+      let staff = existing.rows[0] ?? null;
+      if (
+        subjectOwner.rows[0] &&
+        subjectOwner.rows[0].user_id !== staff?.user_id
+      ) {
+        await this.audit(
+          client,
+          "system",
+          null,
+          "STAFF_GOOGLE_IDENTITY_LINK_REJECTED",
+          "staff_users",
+          subjectOwner.rows[0].user_id,
+          metadata,
+          { reason: "subject_already_linked", emailHash },
+        );
+        await client.query("COMMIT");
+        throw new AppError(
+          403,
+          "DASHBOARD_ACCESS_DENIED",
+          "This Google account is not authorized to access the Dart dashboard.",
+        );
+      }
+
+      if (!staff) {
+        const invitation = await client.query<{
+          id: string;
+          email: string;
+          email_normalized: string;
+          phone: string | null;
+          phone_normalized: string | null;
+          display_name: string;
+          is_owner: boolean;
+          permission_keys: unknown[];
+          invited_by: string | null;
+        }>(
+          `SELECT id::text, email, email_normalized, phone, phone_normalized,
+                  display_name, is_owner, permission_keys, invited_by::text
+             FROM staff_invitations
+            WHERE email_normalized=$1
+              AND access_mode='google'
+              AND status='pending'
+              AND (expires_at IS NULL OR expires_at > now())
+            ORDER BY is_owner DESC, created_at DESC
+            LIMIT 1
+            FOR UPDATE`,
+          [emailNormalized],
+        );
+        const grant = invitation.rows[0];
+        if (!grant) {
+          await this.audit(
+            client,
+            "system",
+            null,
+            "UNAUTHORIZED_GOOGLE_DASHBOARD_ATTEMPT",
+            "staff_access",
+            emailHash,
+            metadata,
+            { emailHash },
+          );
+          await client.query("COMMIT");
+          throw new AppError(
+            403,
+            "DASHBOARD_ACCESS_DENIED",
+            "This Google account is not authorized to access the Dart dashboard.",
+          );
+        }
+
+        if (grant.is_owner) {
+          const owner = await client.query<{ user_id: string }>(
+            "SELECT user_id::text FROM staff_users WHERE is_owner LIMIT 1 FOR UPDATE",
+          );
+          if (owner.rows[0]) {
+            await this.audit(
+              client,
+              "system",
+              null,
+              "STAFF_GOOGLE_IDENTITY_LINK_REJECTED",
+              "staff_users",
+              owner.rows[0].user_id,
+              metadata,
+              { reason: "owner_already_exists", emailHash },
+            );
+            await client.query("COMMIT");
+            throw new AppError(
+              409,
+              "OWNER_ALREADY_EXISTS",
+              "The protected Owner account already exists",
+            );
+          }
+        }
+
+        const userId = randomUUID();
+        await client.query(
+          `INSERT INTO users (
+             id, account_type, email, email_normalized, password_hash,
+             status, email_verified_at, must_change_password, last_login_at
+           ) VALUES ($1,'staff',$2,$3,NULL,'active',now(),false,now())`,
+          [userId, grant.email, grant.email_normalized],
+        );
+        await client.query(
+          `INSERT INTO staff_users (
+             user_id, display_name, is_owner, mfa_required,
+             auth_provider, supabase_user_id, provider_subject,
+             identity_linked_at, identity_last_login_at, created_by
+           ) VALUES ($1,$2,$3,false,'google',$4::uuid,$5,now(),now(),$6::uuid)`,
+          [
+            userId,
+            grant.display_name,
+            grant.is_owner,
+            identity.supabaseUserId,
+            identity.providerSubject,
+            grant.invited_by,
+          ],
+        );
+        if (grant.phone_normalized) {
+          await client.query(
+            `INSERT INTO account_phones (
+               user_id, account_type, phone_normalized, phone_display,
+               is_primary, verified_at
+             ) VALUES ($1,'staff',$2,$3,true,NULL)`,
+            [
+              userId,
+              grant.phone_normalized,
+              grant.phone || grant.phone_normalized,
+            ],
+          );
+        }
+        await this.assignRole(
+          client,
+          userId,
+          grant.is_owner ? "Owner" : "Staff",
+        );
+
+        if (!grant.is_owner) {
+          const permissionKeys = Array.isArray(grant.permission_keys)
+            ? [
+                ...new Set(
+                  grant.permission_keys
+                    .map((value) => String(value || "").trim())
+                    .filter(Boolean),
+                ),
+              ]
+            : [];
+          if (permissionKeys.length) {
+            const validPermissions = await client.query<{
+              id: string;
+              key: string;
+            }>(
+              "SELECT id::text, key FROM permissions WHERE key = ANY($1::text[])",
+              [permissionKeys],
+            );
+            if (validPermissions.rows.length !== permissionKeys.length) {
+              throw new AppError(
+                409,
+                "STAFF_ALLOWLIST_PERMISSION_INVALID",
+                "One or more Staff permissions no longer exist",
+              );
+            }
+            for (const permission of validPermissions.rows) {
+              await client.query(
+                `INSERT INTO user_permission_overrides (
+                   user_id, permission_id, allowed, granted_by
+                 ) VALUES ($1,$2,true,$3::uuid)
+                 ON CONFLICT (user_id, permission_id) DO UPDATE SET
+                   allowed=true,
+                   granted_by=EXCLUDED.granted_by,
+                   updated_at=now()`,
+                [userId, permission.id, grant.invited_by],
+              );
+            }
+          }
+        }
+
+        await client.query(
+          `UPDATE staff_invitations
+              SET status='claimed', claimed_by=$2, claimed_at=now(), updated_at=now()
+            WHERE id=$1`,
+          [grant.id, userId],
+        );
+        staff = {
+          user_id: userId,
+          email: grant.email,
+          status: "active",
+          is_owner: grant.is_owner,
+          auth_provider: "google",
+          supabase_user_id: identity.supabaseUserId,
+          provider_subject: identity.providerSubject,
+        };
+        await this.audit(
+          client,
+          "staff",
+          userId,
+          grant.is_owner
+            ? "OWNER_ACCOUNT_ACTIVATED"
+            : "STAFF_ACCOUNT_ACTIVATED",
+          "staff_users",
+          userId,
+          metadata,
+          { authentication: "google" },
+        );
+        await this.audit(
+          client,
+          "staff",
+          userId,
+          grant.is_owner
+            ? "OWNER_GOOGLE_IDENTITY_LINKED"
+            : "STAFF_GOOGLE_IDENTITY_LINKED",
+          "staff_users",
+          userId,
+          metadata,
+          { emailHash, provider: "google" },
+        );
+      } else {
+        if (staff.status !== "active") {
+          await this.audit(
+            client,
+            "system",
+            null,
+            "UNAUTHORIZED_GOOGLE_DASHBOARD_ATTEMPT",
+            "staff_access",
+            emailHash,
+            metadata,
+            { reason: "staff_disabled", emailHash },
+          );
+          await client.query("COMMIT");
+          throw new AppError(
+            403,
+            "DASHBOARD_ACCESS_DENIED",
+            "This Google account is not authorized to access the Dart dashboard.",
+          );
+        }
+
+        const alreadyLinked = Boolean(
+          staff.supabase_user_id ||
+            staff.provider_subject ||
+            staff.auth_provider,
+        );
+        if (
+          alreadyLinked &&
+          (
+            staff.auth_provider !== "google" ||
+            staff.supabase_user_id !== identity.supabaseUserId ||
+            staff.provider_subject !== identity.providerSubject
+          )
+        ) {
+          await this.audit(
+            client,
+            "system",
+            null,
+            "STAFF_GOOGLE_IDENTITY_LINK_REJECTED",
+            "staff_users",
+            staff.user_id,
+            metadata,
+            { reason: "email_linked_to_different_subject", emailHash },
+          );
+          await client.query("COMMIT");
+          throw new AppError(
+            403,
+            "DASHBOARD_ACCESS_DENIED",
+            "This Google account is not authorized to access the Dart dashboard.",
+          );
+        }
+
+        if (!alreadyLinked) {
+          await client.query(
+            `UPDATE staff_users
+                SET auth_provider='google',
+                    supabase_user_id=$2::uuid,
+                    provider_subject=$3,
+                    identity_linked_at=now(),
+                    identity_last_login_at=now(),
+                    updated_at=now()
+              WHERE user_id=$1`,
+            [
+              staff.user_id,
+              identity.supabaseUserId,
+              identity.providerSubject,
+            ],
+          );
+          await this.audit(
+            client,
+            "staff",
+            staff.user_id,
+            staff.is_owner
+              ? "OWNER_GOOGLE_IDENTITY_LINKED"
+              : "STAFF_GOOGLE_IDENTITY_LINKED",
+            "staff_users",
+            staff.user_id,
+            metadata,
+            { emailHash, provider: "google" },
+          );
+        } else {
+          await client.query(
+            "UPDATE staff_users SET identity_last_login_at=now(), updated_at=now() WHERE user_id=$1",
+            [staff.user_id],
+          );
+        }
+        await client.query(
+          `UPDATE users
+              SET last_login_at=now(),
+                  failed_login_count=0,
+                  locked_until=NULL,
+                  updated_at=now()
+            WHERE id=$1`,
+          [staff.user_id],
+        );
+      }
+
+      const session = await this.issueSession(
+        client,
+        staff.user_id,
+        true,
+        metadata,
+      );
+      await this.audit(
+        client,
+        "staff",
+        staff.user_id,
+        "GOOGLE_LOGIN_SUCCEEDED",
+        "sessions",
+        session.account.sessionId,
+        metadata,
+        { provider: "google" },
+      );
+      await client.query("COMMIT");
+      return session;
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      if (error instanceof AppError) throw error;
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
+
+  private async requireOwnerForStaffManagement(
+    account: AuthenticatedAccount,
+  ): Promise<void> {
+    if (
+      account.accountType !== "staff" ||
+      !account.permissions.includes("staff.manage") ||
+      !account.mfaSatisfied
+    ) {
+      throw new AppError(
+        403,
+        "FORBIDDEN",
+        "You do not have permission to manage Staff",
+      );
+    }
+    const owner = await this.pool.query<{ is_owner: boolean }>(
+      "SELECT is_owner FROM staff_users WHERE user_id=$1",
+      [account.userId],
+    );
+    if (!owner.rows[0]?.is_owner) {
+      throw new AppError(
+        403,
+        "OWNER_REQUIRED",
+        "Only the Owner can manage Staff access",
+      );
+    }
+  }
+
+  public async createStaffGoogleAllowance(
+    account: AuthenticatedAccount,
+    input: {
+      email: string;
+      phone?: string | undefined;
+      displayName: string;
+      permissionKeys: string[];
+    },
+    metadata: RequestMetadata,
+  ): Promise<{ allowanceId: string; email: string }> {
+    await this.requireOwnerForStaffManagement(account);
+    const email = input.email.trim();
+    const emailNormalized = normalizeEmail(email);
+    const displayName = input.displayName.trim();
+    const phoneDisplay = input.phone?.trim() || null;
+    const phoneNormalized = phoneDisplay
+      ? normalizePhonesOrThrow([phoneDisplay])[0]!
+      : null;
+    const permissionKeys = [
+      ...new Set(
+        input.permissionKeys.map((key) => key.trim()).filter(Boolean),
+      ),
+    ].sort();
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-google-email:${emailNormalized}`],
+      );
+
+      const protectedOwnerGrant = await client.query<{ id: string }>(
+        `SELECT id::text
+           FROM staff_invitations
+          WHERE is_owner=true
+            AND status='pending'
+            AND email_normalized=$1
+          LIMIT 1
+          FOR UPDATE`,
+        [emailNormalized],
+      );
+      if (protectedOwnerGrant.rows[0]) {
+        throw new AppError(
+          409,
+          "OWNER_ACCESS_PROTECTED",
+          "The protected Owner email cannot be assigned as Staff",
+        );
+      }
+
+      const existingUser = await client.query<{ id: string }>(
+        `SELECT id::text
+           FROM users
+          WHERE account_type='staff'
+            AND email_normalized=$1
+            AND deleted_at IS NULL
+          LIMIT 1
+          FOR UPDATE`,
+        [emailNormalized],
+      );
+      if (existingUser.rows[0]) {
+        throw new AppError(
+          409,
+          "STAFF_ACCOUNT_ALREADY_EXISTS",
+          "A Staff account with this email already exists",
+        );
+      }
+
+      if (permissionKeys.length) {
+        const valid = await client.query<{ key: string }>(
+          "SELECT key FROM permissions WHERE key = ANY($1::text[])",
+          [permissionKeys],
+        );
+        if (valid.rows.length !== permissionKeys.length) {
+          throw new AppError(
+            422,
+            "INVALID_PERMISSION",
+            "One or more selected permissions do not exist",
+          );
+        }
+      }
+
+      const pending = await client.query<{
+        id: string;
+        email: string;
+        display_name: string;
+        phone_normalized: string | null;
+        permission_keys: unknown[];
+      }>(
+        `SELECT id::text, email, display_name, phone_normalized, permission_keys
+           FROM staff_invitations
+          WHERE email_normalized=$1
+            AND access_mode='google'
+            AND status='pending'
+            AND is_owner=false
+          ORDER BY created_at DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [emailNormalized],
+      );
+      const previous = pending.rows[0] ?? null;
+      if (previous) {
+        const previousPermissions = Array.isArray(previous.permission_keys)
+          ? previous.permission_keys
+              .map((key) => String(key || "").trim())
+              .filter(Boolean)
+              .sort()
+          : [];
+        const samePermissions =
+          previousPermissions.length === permissionKeys.length &&
+          previousPermissions.every(
+            (permission, index) => permission === permissionKeys[index],
+          );
+        if (
+          previous.display_name === displayName &&
+          previous.phone_normalized === phoneNormalized &&
+          samePermissions
+        ) {
+          await client.query("COMMIT");
+          return {
+            allowanceId: previous.id,
+            email: previous.email,
+          };
+        }
+      }
+
+      await client.query(
+        `UPDATE staff_invitations
+            SET status='revoked',
+                revoked_at=now(),
+                revoked_reason='replaced',
+                updated_at=now()
+          WHERE email_normalized=$1
+            AND status='pending'
+            AND is_owner=false`,
+        [emailNormalized],
+      );
+      const allowance = await client.query<{ id: string }>(
+        `INSERT INTO staff_invitations (
+           email, email_normalized, phone, phone_normalized,
+           display_name, is_owner, mfa_required, permission_keys,
+           status, invited_by, expires_at, access_mode
+         ) VALUES (
+           $1,$2,$3,$4,$5,false,false,$6::jsonb,
+           'pending',$7,NULL,'google'
+         )
+         RETURNING id::text`,
+        [
+          email,
+          emailNormalized,
+          phoneDisplay,
+          phoneNormalized,
+          displayName,
+          JSON.stringify(permissionKeys),
+          account.userId,
+        ],
+      );
+      const allowanceId = allowance.rows[0]!.id;
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_EMAIL_ALLOWED",
+        "staff_invitations",
+        allowanceId,
+        metadata,
+        {
+          emailHash: digest(
+            `staff-google-email:${emailNormalized}`,
+            this.config.authPepper,
+          ),
+          permissionKeys,
+          replacedAllowanceId: previous?.id || null,
+        },
+      );
+      await client.query("COMMIT");
+      return { allowanceId, email };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error instanceof AppError) throw error;
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  public async removeStaffGoogleAllowance(
+    account: AuthenticatedAccount,
+    allowanceId: string,
+    reason: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    await this.requireOwnerForStaffManagement(account);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const target = await client.query<{
+        is_owner: boolean;
+        email_normalized: string;
+      }>(
+        `SELECT is_owner, email_normalized
+           FROM staff_invitations
+          WHERE id=$1
+            AND access_mode='google'
+            AND status='pending'
+          FOR UPDATE`,
+        [allowanceId],
+      );
+      if (!target.rows[0]) {
+        throw new AppError(
+          404,
+          "STAFF_ALLOWANCE_NOT_FOUND",
+          "Staff access entry not found",
+        );
+      }
+      if (target.rows[0].is_owner) {
+        throw new AppError(
+          409,
+          "OWNER_ACCESS_PROTECTED",
+          "Owner access cannot be removed",
+        );
+      }
+      await client.query(
+        `UPDATE staff_invitations
+            SET status='revoked',
+                revoked_at=now(),
+                revoked_reason=$2,
+                updated_at=now()
+          WHERE id=$1`,
+        [allowanceId, reason || "removed_by_owner"],
+      );
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_EMAIL_REMOVED",
+        "staff_invitations",
+        allowanceId,
+        metadata,
+        {
+          emailHash: digest(
+            `staff-google-email:${target.rows[0].email_normalized}`,
+            this.config.authPepper,
+          ),
+          reason: reason || "removed_by_owner",
+        },
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async setStaffAccessStatus(
+    account: AuthenticatedAccount,
+    staffUserId: string,
+    active: boolean,
+    reason: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    await this.requireOwnerForStaffManagement(account);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const target = await client.query<{
+        is_owner: boolean;
+        status: string;
+      }>(
+        `SELECT s.is_owner, u.status
+           FROM staff_users s
+           JOIN users u ON u.id=s.user_id
+          WHERE s.user_id=$1
+            AND u.deleted_at IS NULL
+          FOR UPDATE OF s, u`,
+        [staffUserId],
+      );
+      if (!target.rows[0]) {
+        throw new AppError(
+          404,
+          "STAFF_NOT_FOUND",
+          "Staff account not found",
+        );
+      }
+      if (target.rows[0].is_owner) {
+        throw new AppError(
+          409,
+          "OWNER_ACCESS_PROTECTED",
+          "Owner access cannot be disabled",
+        );
+      }
+
+      const desiredStatus = active ? "active" : "suspended";
+      const previousStatus = target.rows[0].status;
+      if (previousStatus === desiredStatus) {
+        await client.query("COMMIT");
+        return;
+      }
+
+      await client.query(
+        `UPDATE users
+            SET status=$2,
+                session_version=session_version+1,
+                updated_at=now(),
+                version=version+1
+          WHERE id=$1`,
+        [staffUserId, desiredStatus],
+      );
+      await client.query(
+        `UPDATE staff_users
+            SET disabled_at=$2,
+                disabled_reason=$3,
+                updated_at=now()
+          WHERE user_id=$1`,
+        [
+          staffUserId,
+          active ? null : new Date(),
+          active ? null : reason || "disabled_by_owner",
+        ],
+      );
+      await client.query(
+        `UPDATE sessions
+            SET revoked_at=COALESCE(revoked_at,now()),
+                revoke_reason=COALESCE(revoke_reason,$2)
+          WHERE user_id=$1
+            AND revoked_at IS NULL`,
+        [staffUserId, active ? "staff_reactivated" : "staff_disabled"],
+      );
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        active ? "STAFF_ACCOUNT_ACTIVATED" : "STAFF_ACCOUNT_DISABLED",
+        "staff_users",
+        staffUserId,
+        metadata,
+        { reason: reason || null },
+        {
+          oldValues: { status: previousStatus },
+          newValues: { status: desiredStatus },
+        },
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async revokeStaffSessions(
+    account: AuthenticatedAccount,
+    staffUserId: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    await this.requireOwnerForStaffManagement(account);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const target = await client.query<{ is_owner: boolean }>(
+        "SELECT is_owner FROM staff_users WHERE user_id=$1 FOR UPDATE",
+        [staffUserId],
+      );
+      if (!target.rows[0]) {
+        throw new AppError(
+          404,
+          "STAFF_NOT_FOUND",
+          "Staff account not found",
+        );
+      }
+      await client.query(
+        `UPDATE users
+            SET session_version=session_version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [staffUserId],
+      );
+      const revokedSessions = await client.query<{ id: string }>(
+        `UPDATE sessions
+            SET revoked_at=COALESCE(revoked_at,now()),
+                revoke_reason=COALESCE(revoke_reason,'admin_revoked')
+          WHERE user_id=$1
+            AND revoked_at IS NULL
+          RETURNING id::text`,
+        [staffUserId],
+      );
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_SESSIONS_REVOKED",
+        "staff_users",
+        staffUserId,
+        metadata,
+        { revokedSessionCount: revokedSessions.rowCount || 0 },
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async relinkStaffGoogleIdentity(
+    account: AuthenticatedAccount,
+    staffUserId: string,
+    nextEmailInput: string,
+    reason: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    await this.requireOwnerForStaffManagement(account);
+    const nextEmail = nextEmailInput.trim();
+    const nextEmailNormalized = normalizeEmail(nextEmail);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+        [`staff-google-email:${nextEmailNormalized}`],
+      );
+      const target = await client.query<{
+        is_owner: boolean;
+        email_normalized: string;
+      }>(
+        `SELECT s.is_owner, u.email_normalized
+           FROM staff_users s
+           JOIN users u ON u.id=s.user_id
+          WHERE s.user_id=$1
+            AND u.deleted_at IS NULL
+          FOR UPDATE OF s, u`,
+        [staffUserId],
+      );
+      if (!target.rows[0]) {
+        throw new AppError(
+          404,
+          "STAFF_NOT_FOUND",
+          "Staff account not found",
+        );
+      }
+      if (target.rows[0].is_owner) {
+        throw new AppError(
+          409,
+          "OWNER_RELINK_REQUIRES_BREAK_GLASS",
+          "Owner Google identity must be recovered using the server break-glass procedure",
+        );
+      }
+      const duplicate = await client.query<{ id: string }>(
+        `SELECT id::text
+           FROM users
+          WHERE account_type='staff'
+            AND email_normalized=$1
+            AND deleted_at IS NULL
+            AND id<>$2
+          LIMIT 1`,
+        [nextEmailNormalized, staffUserId],
+      );
+      if (duplicate.rows[0]) {
+        throw new AppError(
+          409,
+          "STAFF_ACCOUNT_ALREADY_EXISTS",
+          "A Staff account with this email already exists",
+        );
+      }
+
+      await client.query(
+        `UPDATE staff_invitations
+            SET status='revoked',
+                revoked_at=now(),
+                revoked_reason='claimed_by_explicit_relink',
+                updated_at=now()
+          WHERE email_normalized=$1
+            AND status='pending'
+            AND is_owner=false`,
+        [nextEmailNormalized],
+      );
+
+      await client.query(
+        `UPDATE users
+            SET email=$2,
+                email_normalized=$3,
+                email_verified_at=now(),
+                session_version=session_version+1,
+                updated_at=now(),
+                version=version+1
+          WHERE id=$1`,
+        [staffUserId, nextEmail, nextEmailNormalized],
+      );
+      await client.query(
+        `UPDATE staff_users
+            SET auth_provider=NULL,
+                supabase_user_id=NULL,
+                provider_subject=NULL,
+                identity_linked_at=NULL,
+                identity_last_login_at=NULL,
+                updated_at=now()
+          WHERE user_id=$1`,
+        [staffUserId],
+      );
+      await client.query(
+        `UPDATE sessions
+            SET revoked_at=COALESCE(revoked_at,now()),
+                revoke_reason=COALESCE(
+                  revoke_reason,
+                  'google_identity_relink'
+                )
+          WHERE user_id=$1
+            AND revoked_at IS NULL`,
+        [staffUserId],
+      );
+      const oldEmailHash = digest(
+        `staff-google-email:${target.rows[0].email_normalized}`,
+        this.config.authPepper,
+      );
+      const newEmailHash = digest(
+        `staff-google-email:${nextEmailNormalized}`,
+        this.config.authPepper,
+      );
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_GOOGLE_RELINK_ALLOWED",
+        "staff_users",
+        staffUserId,
+        metadata,
+        { reason: reason || "gmail_changed" },
+        {
+          oldValues: { emailHash: oldEmailHash },
+          newValues: { emailHash: newEmailHash },
+        },
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error instanceof AppError) throw error;
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
   public async createStaffInvitation(
     account: AuthenticatedAccount,
     input: {
@@ -1149,54 +2122,69 @@ export class IdentityService {
       !account.permissions.includes("staff.read") ||
       !account.mfaSatisfied
     ) {
-      throw new AppError(403, "FORBIDDEN", "You do not have permission to read Staff accounts");
+      throw new AppError(
+        403,
+        "FORBIDDEN",
+        "You do not have permission to read Staff accounts",
+      );
     }
 
-    const [permissionsResult, invitationsResult, staffResult] = await Promise.all([
-      this.pool.query<{ key: string; description: string }>(
-        "SELECT key, description FROM permissions ORDER BY key",
-      ),
-      this.pool.query<{
-        id: string;
-        email: string;
-        phone: string | null;
-        display_name: string;
-        permission_keys: unknown[];
-        status: string;
-        expires_at: Date | null;
-        created_at: Date;
-      }>(
-        `SELECT id::text, email, phone, display_name, permission_keys, status,
-                expires_at, created_at
-           FROM staff_invitations
-          WHERE is_owner=false
-          ORDER BY created_at DESC
-          LIMIT 500`,
-      ),
-      this.pool.query<{
-        user_id: string;
-        staff_code: string;
-        display_name: string;
-        is_owner: boolean;
-        mfa_required: boolean;
-        email: string;
-        phone: string | null;
-        status: string;
-        created_at: Date;
-      }>(
-        `SELECT s.user_id::text, s.staff_code, s.display_name, s.is_owner,
-                s.mfa_required, u.email, p.phone_display AS phone,
-                u.status, s.created_at
-           FROM staff_users s
-           JOIN users u ON u.id=s.user_id
-           LEFT JOIN account_phones p
-             ON p.user_id=s.user_id
-            AND p.account_type='staff'
-            AND p.is_primary=true
-          WHERE u.deleted_at IS NULL
-          ORDER BY s.is_owner DESC, s.created_at`,
-      ),
-    ]);
+    const [permissionsResult, invitationsResult, staffResult] =
+      await Promise.all([
+        this.pool.query<{ key: string; description: string }>(
+          "SELECT key, description FROM permissions ORDER BY key",
+        ),
+        this.pool.query<{
+          id: string;
+          email: string;
+          phone: string | null;
+          display_name: string;
+          permission_keys: unknown[];
+          status: string;
+          access_mode: string;
+          expires_at: Date | null;
+          created_at: Date;
+        }>(
+          `SELECT id::text, email, phone, display_name, permission_keys,
+                  status, access_mode, expires_at, created_at
+             FROM staff_invitations
+            WHERE is_owner=false
+            ORDER BY created_at DESC
+            LIMIT 500`,
+        ),
+        this.pool.query<{
+          user_id: string;
+          staff_code: string;
+          display_name: string;
+          is_owner: boolean;
+          email: string;
+          phone: string | null;
+          status: string;
+          auth_provider: string | null;
+          supabase_user_id: string | null;
+          provider_subject: string | null;
+          identity_linked_at: Date | null;
+          identity_last_login_at: Date | null;
+          disabled_at: Date | null;
+          disabled_reason: string | null;
+          created_at: Date;
+        }>(
+          `SELECT s.user_id::text, s.staff_code, s.display_name,
+                  s.is_owner, u.email, p.phone_display AS phone, u.status,
+                  s.auth_provider, s.supabase_user_id::text,
+                  s.provider_subject, s.identity_linked_at,
+                  s.identity_last_login_at, s.disabled_at,
+                  s.disabled_reason, s.created_at
+             FROM staff_users s
+             JOIN users u ON u.id=s.user_id
+             LEFT JOIN account_phones p
+               ON p.user_id=s.user_id
+              AND p.account_type='staff'
+              AND p.is_primary=true
+            WHERE u.deleted_at IS NULL
+            ORDER BY s.is_owner DESC, s.created_at`,
+        ),
+      ]);
 
     const staff = [];
     for (const row of staffResult.rows) {
@@ -1207,9 +2195,16 @@ export class IdentityService {
         name: row.display_name,
         email: row.email,
         phone: row.phone,
-        status: row.status,
+        status: row.status === "active" ? "Active" : "Disabled",
         isOwner: row.is_owner,
-        mfaRequired: row.mfa_required,
+        googleLinked:
+          row.auth_provider === "google" &&
+          Boolean(row.supabase_user_id && row.provider_subject),
+        provider: row.auth_provider,
+        linkedAt: row.identity_linked_at?.toISOString() || null,
+        lastLoginAt: row.identity_last_login_at?.toISOString() || null,
+        disabledAt: row.disabled_at?.toISOString() || null,
+        disabledReason: row.disabled_reason,
         permissions: effective,
         createdAt: row.created_at.toISOString(),
       });
@@ -1225,6 +2220,7 @@ export class IdentityService {
           ? row.permission_keys
           : [],
         status: row.status,
+        accessMode: row.access_mode,
         expiresAt: row.expires_at?.toISOString() || null,
         createdAt: row.created_at.toISOString(),
       })),
@@ -1238,50 +2234,83 @@ export class IdentityService {
     permissionKeys: string[],
     metadata: RequestMetadata,
   ): Promise<string[]> {
-    if (
-      account.accountType !== "staff" ||
-      !account.permissions.includes("staff.manage") ||
-      !account.mfaSatisfied
-    ) {
-      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage Staff");
-    }
-    const ownerCheck = await this.pool.query<{ is_owner: boolean }>(
-      "SELECT is_owner FROM staff_users WHERE user_id=$1",
-      [account.userId],
-    );
-    if (!ownerCheck.rows[0]?.is_owner) {
-      throw new AppError(403, "OWNER_REQUIRED", "Only the Owner can change Staff permissions");
-    }
-    const target = await this.pool.query<{ is_owner: boolean }>(
-      "SELECT is_owner FROM staff_users WHERE user_id=$1",
-      [staffUserId],
-    );
-    if (!target.rows[0]) {
-      throw new AppError(404, "STAFF_NOT_FOUND", "Staff account not found");
-    }
-    if (target.rows[0].is_owner) {
-      throw new AppError(409, "OWNER_PERMISSIONS_PROTECTED", "Owner permissions cannot be reduced");
-    }
+    await this.requireOwnerForStaffManagement(account);
 
-    const uniqueKeys = [
+    const requestedKeys = [
       ...new Set(permissionKeys.map((key) => key.trim()).filter(Boolean)),
     ];
+    const protectedSelfPermissions = [
+      "profile.read_own",
+      "profile.update_own",
+      "sessions.read_own",
+      "sessions.revoke_own",
+    ];
+
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-permissions:${staffUserId}`],
+      );
+
+      const target = await client.query<{ is_owner: boolean }>(
+        `SELECT s.is_owner
+           FROM staff_users s
+           JOIN users u ON u.id=s.user_id
+          WHERE s.user_id=$1
+            AND u.deleted_at IS NULL
+          FOR UPDATE OF s, u`,
+        [staffUserId],
+      );
+      if (!target.rows[0]) {
+        throw new AppError(404, "STAFF_NOT_FOUND", "Staff account not found");
+      }
+      if (target.rows[0].is_owner) {
+        throw new AppError(
+          409,
+          "OWNER_PERMISSIONS_PROTECTED",
+          "Owner permissions cannot be reduced",
+        );
+      }
+
       const allPermissions = await client.query<{ id: string; key: string }>(
         "SELECT id::text, key FROM permissions ORDER BY key",
       );
       const validKeys = new Set(allPermissions.rows.map((row) => row.key));
-      if (uniqueKeys.some((key) => !validKeys.has(key))) {
-        throw new AppError(422, "INVALID_PERMISSION", "One or more selected permissions do not exist");
+      if (requestedKeys.some((key) => !validKeys.has(key))) {
+        throw new AppError(
+          422,
+          "INVALID_PERMISSION",
+          "One or more selected permissions do not exist",
+        );
+      }
+
+      const desiredPermissions = [
+        ...new Set([
+          ...requestedKeys,
+          ...protectedSelfPermissions.filter((key) => validKeys.has(key)),
+        ]),
+      ].sort();
+      const previousPermissions = (
+        await this.permissionsForUser(staffUserId, client)
+      ).sort();
+
+      if (
+        previousPermissions.length === desiredPermissions.length &&
+        previousPermissions.every(
+          (permission, index) => permission === desiredPermissions[index],
+        )
+      ) {
+        await client.query("COMMIT");
+        return previousPermissions;
       }
 
       await client.query(
         "DELETE FROM user_permission_overrides WHERE user_id=$1",
         [staffUserId],
       );
-      const selected = new Set(uniqueKeys);
+      const selected = new Set(desiredPermissions);
       for (const permission of allPermissions.rows) {
         await client.query(
           `INSERT INTO user_permission_overrides (
@@ -1297,7 +2326,9 @@ export class IdentityService {
       }
       await client.query(
         `UPDATE users
-            SET session_version=session_version+1, updated_at=now(), version=version+1
+            SET session_version=session_version+1,
+                updated_at=now(),
+                version=version+1
           WHERE id=$1`,
         [staffUserId],
       );
@@ -1305,7 +2336,8 @@ export class IdentityService {
         `UPDATE sessions
             SET revoked_at=COALESCE(revoked_at, now()),
                 revoke_reason=COALESCE(revoke_reason, 'permissions_changed')
-          WHERE user_id=$1 AND revoked_at IS NULL`,
+          WHERE user_id=$1
+            AND revoked_at IS NULL`,
         [staffUserId],
       );
       await this.audit(
@@ -1316,10 +2348,14 @@ export class IdentityService {
         "staff_users",
         staffUserId,
         metadata,
-        { permissionKeys: uniqueKeys },
+        {},
+        {
+          oldValues: { permissions: previousPermissions },
+          newValues: { permissions: desiredPermissions },
+        },
       );
       await client.query("COMMIT");
-      return this.permissionsForUser(staffUserId);
+      return desiredPermissions;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -1343,6 +2379,10 @@ export class IdentityService {
     }
     if (row.locked_until && row.locked_until.getTime() > Date.now()) {
       throw new AppError(429, "ACCOUNT_TEMPORARILY_LOCKED", "Too many failed attempts; try again later");
+    }
+    if (!row.password_hash) {
+      await hashPassword(password);
+      throw generic;
     }
     if (!(await verifyPassword(row.password_hash, password))) {
       await this.recordFailedLogin(row.id, metadata);
@@ -2968,17 +4008,26 @@ export class IdentityService {
     entityId: string,
     metadata: RequestMetadata,
     details: Record<string, unknown> = {},
+    changes?: {
+      oldValues?: Record<string, unknown>;
+      newValues?: Record<string, unknown>;
+    },
   ): Promise<void> {
     await client.query(
       `INSERT INTO audit_logs (
-        actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+        actor_type, actor_id, action, entity_type, entity_id,
+        old_values, new_values, request_id, metadata
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9::jsonb
+      )`,
       [
         actorType,
         actorId,
         action,
         entityType,
         entityId,
+        changes?.oldValues ? JSON.stringify(changes.oldValues) : null,
+        changes?.newValues ? JSON.stringify(changes.newValues) : null,
         metadata.requestId,
         JSON.stringify({
           ipHash: ipHash(metadata.ipAddress, this.config.authPepper),

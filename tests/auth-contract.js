@@ -25,14 +25,29 @@ assert(representative.includes("Representative login requires the secure account
 assert(representative.includes("Representative registration requires the secure account API"), "Production representative registration must fail closed without the API");
 assert(representative.includes("if (API_ENABLED) return apiWork.orders || [];"), "API representative sessions must read assigned orders only from the server work snapshot");
 
-assert(admin.includes("/api/v1/admin/auth/login"), "Admin login endpoint is not wired");
-assert(admin.includes("/api/v1/admin/auth/mfa/setup"), "Admin MFA setup is not wired");
-assert(admin.includes("/api/v1/admin/auth/mfa/confirm"), "Admin MFA confirmation is not wired");
-assert(admin.includes("Dashboard access is blocked"), "Production dashboard must fail closed without API configuration");
+assert(admin.includes("/api/v1/admin/auth/google/config"), "Admin Google auth config endpoint is not wired");
+assert(admin.includes("/api/v1/admin/auth/google/exchange"), "Admin Google exchange endpoint is not wired");
+assert(admin.includes("signInWithIdToken"), "Admin login must exchange the Google ID token through Supabase Auth");
+assert(admin.includes('provider: "google"'), "Admin identity provider must be Google");
+assert(admin.includes("persistSession: false"), "Supabase dashboard auth must not persist a browser session");
+assert(admin.includes("autoRefreshToken: false"), "Supabase dashboard auth must not keep refreshing a browser token");
+assert(admin.includes('digest("SHA-256"'), "Admin Google login must hash a secure nonce");
+assert(admin.includes("nonce: currentGoogleNonce"), "Supabase ID-token exchange must use the raw nonce");
+assert(!admin.includes("localStorage.setItem"), "Admin auth must not persist tokens in localStorage");
+assert(admin.includes("/api/v1/admin/auth/login"), "Phase-1 rollback login endpoint must remain wired temporarily");
+assert(
+  admin.includes("document.body.classList.add(\"dart-admin-locked\")") &&
+    admin.includes("/api/v1/health/live") &&
+    admin.includes("API_VERSION_MISMATCH"),
+  "Production dashboard must start locked and fail closed when the same-origin API is unavailable or incompatible",
+);
 assert(admin.includes("DASHBOARD_HYDRATION_TIMEOUT"), "Dashboard authoritative hydration must have a bounded timeout");
 assert(admin.includes("DartAdminHydration"), "Dashboard must expose authoritative hydration readiness/failure state");
 assert(admin.includes("Dashboard remains locked."), "Dashboard must remain locked when required server hydration fails");
 assert(dashboard.includes('id="dart-admin-auth"'), "Dashboard auth gate HTML is missing");
+assert(dashboard.includes('id="dart-admin-google-button"'), "Dashboard Google button host is missing");
+assert(dashboard.includes("Continue with Google"), "Dashboard must present Google as the primary sign-in path");
+assert(dashboard.includes('id="dart-admin-login-form" hidden'), "Legacy Staff login must stay hidden during Phase 1");
 assert(dashboard.includes('src="dart-admin-auth.js"'), "Dashboard auth gate script is not loaded");
 assert(
   !/<script(?![^>]*\bsrc=)(?![^>]*type=["']application\/ld\+json["'])[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/i.test(signup),
@@ -43,4 +58,4 @@ assert(
   "Dashboard must not depend on inline JavaScript event handlers",
 );
 
-console.log("PASS server-backed customer, representative and admin auth contracts");
+console.log("PASS server-backed customer, representative and Google-first admin auth contracts");

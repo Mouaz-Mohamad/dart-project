@@ -32,10 +32,25 @@ Core:
 - `SESSION_TTL_DAYS`
 - `EMAIL_OTP_TTL_MINUTES`
 - `STAFF_INVITE_OTP_TTL_HOURS`
-- `DART_OWNER_EMAIL` (the only email allowed to open the one-time browser Owner bootstrap)
-- `DART_OWNER_NAME`
+- `STAFF_GOOGLE_AUTH_ENABLED`
+- `STAFF_LEGACY_AUTH_ENABLED` (keep `true` only during Phase 1 rollback testing)
+- `STAFF_LEGACY_AUTH_UI_ENABLED` (normally `false`)
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_PROJECT_REF`
+- `SUPABASE_AUTH_TIMEOUT_MS`
+- `GOOGLE_CLIENT_ID`
 - `OUTBOX_CRON_SECRET` or `CRON_SECRET`
 - `OUTBOX_BATCH_SIZE`
+
+Dart Eye Google/Supabase identity:
+
+- Configure the Google OAuth Web Client ID/Secret in Google + Supabase. The Google Client Secret stays there and is never a frontend or Git variable.
+- Add the production storefront origin and localhost development origin to Google Authorized JavaScript origins.
+- Enable Google in Supabase Auth. Dart Eye uses Supabase Auth only to prove identity.
+- The frontend receives only public values from `GET /api/v1/admin/auth/google/config`; no Vercel frontend secret is required.
+- Do **not** add `SUPABASE_SERVICE_ROLE_KEY` for this login flow. The backend verifies the presented session through Supabase Auth and then creates the normal Dart session.
+- Keep the protected Owner allowlist at `midomoaaz3@gmail.com` for first production sign-in. `dart.official.eg@gmail.com` remains the notification sender and is not a dashboard Owner unless explicitly added later.
 
 Email:
 - `EMAIL_PROVIDER=smtp`
@@ -54,7 +69,7 @@ WhatsApp remains optional for approved notification flows:
 - `WHATSAPP_GRAPH_API_VERSION`
 - `WHATSAPP_TEMPLATE_LANGUAGE`
 
-Do not store or document environment values in Git.
+Do not store or document environment values in Git. Never put a Google Client Secret, Supabase service-role key, access token, refresh token or Dart session token in frontend code, logs, commits or support/chat messages.
 
 ## Health
 

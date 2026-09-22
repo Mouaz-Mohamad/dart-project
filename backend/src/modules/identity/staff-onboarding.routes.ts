@@ -43,12 +43,26 @@ export function createStaffOnboardingRouter(
   service: IdentityService,
   config: Pick<
     AppConfig,
-    "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite"
+    "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite" | "staffLegacyAuthEnabled"
   >,
   outbox?: OutboxService,
   logger?: Logger,
 ): Router {
   const router = Router();
+
+  router.use((_request, _response, next) => {
+    if (config.staffLegacyAuthEnabled === false) {
+      next(
+        new AppError(
+          410,
+          "STAFF_LEGACY_AUTH_DISABLED",
+          "This Staff onboarding method has been retired.",
+        ),
+      );
+      return;
+    }
+    next();
+  });
 
   async function startOrResend(request: Request, response: Response) {
     const body = z.object({ email: z.email().max(254) }).parse(request.body);

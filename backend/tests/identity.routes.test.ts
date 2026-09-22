@@ -123,6 +123,60 @@ function app(service: IdentityService, outboxService?: OutboxService) {
 }
 
 describe("identity HTTP boundaries", () => {
+  it("exposes only public Google auth configuration and fails closed before configuration", async () => {
+    const service = fakeService();
+    const application = app(service);
+
+    const configResponse = await request(application)
+      .get("/api/v1/admin/auth/google/config");
+    expect(configResponse.status).toBe(200);
+    expect(configResponse.body).toEqual({
+      enabled: false,
+      legacyUiEnabled: false,
+    });
+    expect(JSON.stringify(configResponse.body)).not.toContain("service_role");
+    expect(JSON.stringify(configResponse.body)).not.toContain("clientSecret");
+
+    const exchange = await request(application)
+      .post("/api/v1/admin/auth/google/exchange")
+      .send({ accessToken: "x".repeat(40) });
+    expect(exchange.status).toBe(503);
+    expect(exchange.body.error.code).toBe("GOOGLE_AUTH_NOT_CONFIGURED");
+  });
+
+  it("does not treat a public Supabase key as a Dart dashboard session", async () => {
+    const response = await request(app(fakeService()))
+      .get("/api/v1/admin/staff")
+      .set("apikey", "sb_publishable_public_test")
+      .set("Authorization", "Bearer public-supabase-token");
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("AUTH_REQUIRED");
+  });
+
+  it("returns 410 for the legacy Staff password login after the Phase-2 flag is disabled", async () => {
+    const application = createApp(
+      {
+        ...config,
+        staffLegacyAuthEnabled: false,
+      },
+      {
+        databasePing: async () => undefined,
+        identityService: fakeService(),
+        logger: pino({ level: "silent" }),
+        startedAt: new Date("2026-09-20T00:00:00.000Z"),
+        version: "test",
+      },
+    );
+    const response = await request(application)
+      .post("/api/v1/admin/auth/login")
+      .send({
+        identifier: "owner@example.com",
+        password: "StrongPassword123",
+      });
+    expect(response.status).toBe(410);
+    expect(response.body.error.code).toBe("STAFF_LEGACY_AUTH_DISABLED");
+  });
+
   it("does not claim an onboarding OTP was sent when email is disabled", async () => {
     const service = fakeService();
     const outbox = {

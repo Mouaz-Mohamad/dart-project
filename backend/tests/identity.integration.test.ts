@@ -105,31 +105,34 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     expect(signedIn.account.permissions).toContain("profile.read_own");
   });
 
-  it("opens browser onboarding only for the configured first Owner email", async () => {
+  it("keeps the protected Owner allowlist authoritative over legacy bootstrap configuration", async () => {
     const stranger = await service!.startStaffOnboarding(
       "not-invited@example.com",
       requestMetadata,
     );
     expect(stranger.deliveryQueued).toBe(false);
 
-    const onboarding = await service!.startStaffOnboarding(
+    const legacyConfiguredOwner = await service!.startStaffOnboarding(
       "BOOTSTRAP-OWNER@example.com",
       requestMetadata,
     );
-    expect(onboarding.deliveryQueued).toBe(true);
+    expect(legacyConfiguredOwner.deliveryQueued).toBe(false);
+
     const invitation = await testPool!.query<{
       display_name: string;
       is_owner: boolean;
       status: string;
+      access_mode: string;
     }>(
-      `SELECT display_name, is_owner, status
+      `SELECT display_name, is_owner, status, access_mode
          FROM staff_invitations
-        WHERE email_normalized='bootstrap-owner@example.com'`,
+        WHERE email_normalized='midomoaaz3@gmail.com'`,
     );
     expect(invitation.rows[0]).toMatchObject({
-      display_name: "Bootstrap Owner",
+      display_name: "Mouaz Mohamad",
       is_owner: true,
       status: "pending",
+      access_mode: "google",
     });
   });
 

@@ -25,8 +25,10 @@ The production frontend is database-authoritative through `/api/v1`; PostgreSQL 
 - `GET /api/v1/health/live` reports process liveness without depending on PostgreSQL.
 - `GET /api/v1/health/ready` reports PostgreSQL readiness and returns `503` without leaking connection details when unavailable.
 - Migration `0001_platform_foundation.sql` adds append-only `audit_logs`, transactional `outbox_events`, and hashed `idempotency_keys` storage.
-- Migration `0002_identity_auth.sql` and the Identity/Auth module implement separate Customer, Staff and Representative realms, Argon2id passwords, customer Email OTP, rotating/revocable server sessions, CSRF enforcement, reset requests, protected Owner bootstrap and TOTP MFA.
-- The existing customer login/registration/profile and representative login adapters use these endpoints when `window.DART_API_BASE_URL` is configured. Dart Eye has a Staff/Owner login and first-login Authenticator gate.
+- Migration `0002_identity_auth.sql` and the Identity/Auth module implement separate Customer, Staff and Representative realms, Argon2id credentials for the realms that still use passwords, customer Email OTP, rotating/revocable Dart sessions, CSRF enforcement and deny-by-default permissions.
+- Migration `0024_staff_google_identity.sql` moves Dart Eye Owner/Admin/Staff authentication to Google identity through Supabase Auth while PostgreSQL remains authoritative for the Staff allowlist, account state and API permissions. The protected Owner allowlist is seeded as `midomoaaz3@gmail.com`; the brand sender address is not an Owner account.
+- Dart Eye exchanges the short-lived Supabase access token once at `POST /api/v1/admin/auth/google/exchange`. The API validates it against the configured Dart Supabase project, requires a verified Google-only identity, links the immutable provider subject transactionally on first sign-in, creates the existing Dart HttpOnly session, then never needs Supabase on normal dashboard API requests.
+- Phase 1 keeps the old Staff password/OTP/TOTP server routes only as a hidden, explicitly feature-flagged rollback path. Customers and representatives are unchanged. Phase 2 removes those Staff-only primitives only after the real Owner Google login and rollback test are approved.
 - Representative registration now stores verification documents encrypted in PostgreSQL and validates the declared JPG/PNG/WebP type against file magic bytes before persistence. Automated approval remains prohibited until metadata stripping, malware scanning and a human identity-review policy are configured.
 - Catalogue, inventory, cart reservation, orders, customer commerce, representative workflow, site settings, finance summaries and transactional outbox delivery are implemented under `/api/v1`. Remaining sections below distinguish implemented behavior from future hardening.
 - Production must never fall back silently to `localStorage` when the API is unavailable.
@@ -43,6 +45,8 @@ Production automation is optional at core API startup. When `AUTOMATION_WEBHOOK_
 
 - Use Node.js with Express and a transactional database selected by the backend developer. PostgreSQL is recommended for orders, unique identities, inventory reservations and reporting.
 - Store passwords with Argon2id (preferred) or bcrypt. Never send password hashes to the browser.
+- Google/Supabase authenticates Dart Eye identity only. Never authorize from Google email, Supabase metadata or frontend claims. All Staff permissions and Active/Disabled state come from Dart PostgreSQL and are enforced by the existing backend middleware.
+- Never store a Supabase Staff access/refresh token in localStorage. The dashboard Supabase client uses `persistSession:false`; after exchange, only the Dart HttpOnly session is authoritative.
 - Use secure, HttpOnly, SameSite cookies, CSRF protection, strict CORS, validation, rate limits and role-based access (`customer`, `representative`, `admin`).
 - Add database unique indexes for normalized customer email and every normalized phone inside the customer role. Add separate unique indexes for representative email, phone, National ID and Rep ID inside the representative role; the same person may own one customer account and one representative account using the same contact details.
 - Generate Client ID, Order ID, Item Code, Return ID and Rep ID atomically on the server. Never use `MAX(id)+1` without a locked sequence.
@@ -134,6 +138,19 @@ Each model owns one reusable size chart; do not create a separate HTML table for
 ```
 
 `discountSource` is `Site`, `Model` or an empty string. Model and site-wide discounts never stack. When an active site-wide discount exists it takes precedence for the current product-card display and checkout; otherwise the model discount applies. Recalculate these fields on the server and snapshot the accepted order line so later price changes never rewrite old sales.
+
+## Dart Eye Staff authentication (Google + Supabase identity)
+
+- `GET /api/v1/admin/auth/google/config` returns only the public Supabase URL/publishable key and Google client ID needed by Dart Eye.
+- `POST /api/v1/admin/auth/google/exchange` accepts the short-lived Supabase access token, verifies the configured project and Google-only identity, checks the PostgreSQL allowlist/status, links provider subject once and issues the normal Dart session.
+- `GET /api/v1/admin/staff` returns Staff access state, effective permissions, Google link state and last Google login.
+- `POST /api/v1/admin/staff/allowlist` adds a Staff Gmail without creating a password or sending an OTP.
+- `DELETE /api/v1/admin/staff/allowlist/:id` removes a pending, unclaimed Gmail allowance.
+- `PATCH /api/v1/admin/staff/:id/access` activates/disables a Staff account and revokes sessions on state change.
+- `POST /api/v1/admin/staff/:id/sessions/revoke` revokes all Dart sessions for that Staff account.
+- `POST /api/v1/admin/staff/:id/google/relink` is an explicit audited non-Owner Gmail change that clears the old provider link and sessions.
+- The Owner cannot be disabled, deleted, demoted or relinked from the dashboard. Owner recovery is server-side only through `npm run admin:recover-owner-google -- --email <gmail> --reason "<reason>"`, and every attempt is audited.
+- Legacy Staff login/onboarding/MFA routes are Phase-1 rollback only and return `410 Gone` once `STAFF_LEGACY_AUTH_ENABLED=false`.
 
 ## Customer authentication
 
