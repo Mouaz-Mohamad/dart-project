@@ -66,6 +66,15 @@ describe("commerce concurrency and representative safety contracts", () => {
     );
   });
 
+  it("binds each birthday reward to one customer-year and only reactivates cancelled/refused reservations while still valid", () => {
+    expect(service).toContain("const rewardId = `BDAY-${customerPromotion.client_code}-${birthday.year}`;");
+    expect(service).toContain('birthdayReward.status = "Reserved"');
+    expect(service).toContain('if (nextStatus === "Delivered")');
+    expect(service).toContain('reward.status = "Used"');
+    expect(service).toContain('["Cancelled", "Refused"].includes(nextStatus)');
+    expect(service).toContain('reward.status = String(reward.expiresAt || "") > cairoDateKey() ? "Active" : "Expired"');
+  });
+
   it("never runs relational leaderboard reads concurrently on one pg client", () => {
     expect(service).not.toMatch(
       /Promise\.all\(\[\s*readRelationalDashboardDomain\(client, "returns"\),\s*readRelationalDashboardDomain\(client, "cards"\)/,
