@@ -23,68 +23,28 @@
       <div class="dart-admin-auth-card">
         <img src="../Photos/192px.png" alt="Dart Logo">
 
-        <div id="dart-admin-google-view" class="dart-admin-auth-view">
+        <form id="dart-admin-email-form" class="dart-admin-auth-view" novalidate>
           <h1 id="dart-admin-auth-title">Dart Eye</h1>
           <p>Owner or authorized Staff only.</p>
-          <div id="dart-admin-google-button" class="dart-admin-google-button" aria-label="Continue with Google"></div>
-          <div id="dart-admin-google-loading" class="dart-admin-auth-loading" hidden aria-live="polite">
-            <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
-            <span>Verifying your Google account…</span>
-          </div>
-          <button id="dart-admin-legacy-toggle" type="button" class="dart-admin-auth-secondary" hidden>
-            Emergency legacy sign-in
-          </button>
-          <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
-        </div>
-
-        <form id="dart-admin-login-form" hidden novalidate>
-          <h1>Emergency Staff Login</h1>
-          <p>This temporary rollback path is available only when enabled by the server.</p>
-          <label>Email or Staff ID<input name="identifier" type="text" autocomplete="username" required></label>
-          <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-          <label data-admin-totp-field hidden>Authenticator code<input name="totp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"></label>
-          <button type="submit">Login</button>
-          <button id="dart-admin-first-time" type="button" class="dart-admin-auth-secondary">First time? Activate legacy account</button>
-          <button type="button" data-admin-back-google class="dart-admin-auth-secondary">Back to Google</button>
-          <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
-        </form>
-
-        <form id="dart-admin-onboarding-email-form" hidden novalidate>
-          <h1>Legacy account activation</h1>
-          <p>This rollback path is temporary. Enter the exact email already invited by the Owner.</p>
-          <label>Email<input name="email" type="email" autocomplete="email" required></label>
+          <label>
+            Email
+            <input name="email" type="email" autocomplete="email" maxlength="254" required>
+          </label>
           <button type="submit">Send verification code</button>
-          <button type="button" data-admin-back-login class="dart-admin-auth-secondary">Back to Login</button>
+          <p class="dart-admin-auth-note">No password. No Google login. Only emails allowed by the Owner can enter.</p>
           <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
         </form>
 
-        <form id="dart-admin-onboarding-code-form" hidden novalidate>
+        <form id="dart-admin-code-form" hidden novalidate>
           <h1>Verify email</h1>
-          <p>Enter the 6-digit legacy activation code.</p>
-          <label>Verification code<input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
-          <button type="submit">Verify code</button>
-          <button id="dart-admin-onboarding-resend" type="button" class="dart-admin-auth-secondary">Resend code</button>
-          <button type="button" data-admin-back-login class="dart-admin-auth-secondary">Cancel</button>
-          <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
-        </form>
-
-        <form id="dart-admin-onboarding-password-form" hidden novalidate>
-          <h1>Create legacy password</h1>
-          <p>This exists only for the temporary rollback path during Phase 1.</p>
-          <label>New password<input name="credential" type="password" autocomplete="new-password" minlength="12" required></label>
-          <label>Confirm password<input name="confirmation" type="password" autocomplete="new-password" minlength="12" required></label>
-          <button type="submit">Activate legacy account</button>
-          <button type="button" data-admin-back-login class="dart-admin-auth-secondary">Cancel</button>
-          <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
-        </form>
-
-        <form id="dart-admin-mfa-form" hidden novalidate>
-          <h1>Legacy Owner 2FA</h1>
-          <p>This authenticator setup belongs only to the temporary rollback path.</p>
-          <output id="dart-admin-mfa-secret"></output>
-          <input id="dart-admin-mfa-uri" type="text" readonly aria-label="Authenticator setup URI">
-          <label>Authenticator code<input name="token" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
-          <button type="submit">Activate legacy 2FA</button>
+          <p>Enter the 6-digit code sent to your allowed email.</p>
+          <label>
+            Verification code
+            <input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+          </label>
+          <button type="submit">Continue to Dart Eye</button>
+          <button id="dart-admin-resend" type="button" class="dart-admin-auth-secondary">Resend code</button>
+          <button id="dart-admin-change-email" type="button" class="dart-admin-auth-secondary">Change email</button>
           <p class="dart-admin-auth-status" role="status" aria-live="polite"></p>
         </form>
       </div>
@@ -1284,26 +1244,30 @@
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-user-shield"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>STAFF ACCESS</span>
-                        <h2>Employees &amp; API permissions</h2>
-                        <p>أضف Gmail المسموح للموظف وحدد صلاحياته. لا يتم إرسال OTP أو Password؛ الموظف يدخل من زر Continue with Google بنفس البريد المسجل.</p>
+                        <h2>Dashboard access &amp; API permissions</h2>
+                        <p>أضف الإيميل وحدد نوع الحساب. عند أول دخول يثبت صاحب الإيميل ملكيته بكود واحد، وبعدها يعتمد النظام على جلسة Dart الآمنة بدون Password أو Google Login.</p>
                     </div>
                     <form id="settings-staff-invite-form" class="dart-settings-fields">
-                        <label for="settings-staff-name">Employee name<input id="settings-staff-name" type="text" maxlength="120" required></label>
-                        <label for="settings-staff-email">Allowed Gmail<input id="settings-staff-email" type="email" maxlength="254" required></label>
-                        <label for="settings-staff-phone">Phone (optional)<input id="settings-staff-phone" type="tel" inputmode="tel" maxlength="25" placeholder="01xxxxxxxxx"></label>
-                        <div class="dart-settings-field-wide">
+                        <label for="settings-staff-email">Allowed email<input id="settings-staff-email" type="email" maxlength="254" required></label>
+                        <label for="settings-staff-role">Role
+                            <select id="settings-staff-role" required>
+                                <option value="staff" selected>Staff</option>
+                                <option value="owner">Owner</option>
+                            </select>
+                        </label>
+                        <div id="settings-staff-permissions-wrap" class="dart-settings-field-wide">
                             <strong>Allowed APIs / actions</strong>
                             <div id="settings-staff-invite-permissions" class="dart-staff-permissions"></div>
                         </div>
-                        <button type="submit" class="dart-settings-save">Allow employee</button>
+                        <button type="submit" class="dart-settings-save">Allow email</button>
                     </form>
                     <p id="settings-staff-status" class="dart-settings-status" role="status" aria-live="polite"></p>
                     <div class="dart-settings-field-wide">
-                        <h3>Staff accounts</h3>
+                        <h3>Active dashboard accounts</h3>
                         <div id="settings-staff-list" class="dart-settings-list"></div>
                     </div>
                     <div class="dart-settings-field-wide">
-                        <h3>Pending Google access</h3>
+                        <h3>Waiting for email verification</h3>
                         <div id="settings-staff-invitations" class="dart-settings-list"></div>
                     </div>
                 </article>
