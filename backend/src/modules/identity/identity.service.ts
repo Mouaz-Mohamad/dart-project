@@ -676,7 +676,6 @@ export class IdentityService {
             encryptedParameters: {
               otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
             },
-            dashboardUrl: `${this.config.corsOrigins?.[0] || ""}/Eye/Dart%20Eye.html`,
             expiresAt: expiresAt.toISOString(),
           }),
           `staff-onboarding-code:${challengeId}`,
