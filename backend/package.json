@@ -26,7 +26,6 @@
     "db:migrate:one": "node --env-file-if-exists=.env --import tsx src/database/migrate.ts --one",
     "db:seed:dev": "node --env-file-if-exists=.env --import tsx src/database/seed.ts",
     "admin:bootstrap-owner": "node --env-file-if-exists=.env --import tsx src/database/bootstrap-owner.ts",
-    "admin:recover-owner-google": "node --env-file-if-exists=.env --import tsx src/database/recover-owner-google.ts",
     "check:vercel": "node scripts/check-vercel-config.mjs",
     "db:backup": "node --env-file-if-exists=.env scripts/database-backup.mjs create",
     "db:backup:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs verify",
