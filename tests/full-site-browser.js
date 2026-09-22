@@ -206,7 +206,8 @@ const server = http.createServer((request, response) => {
   );
   await account.locator(".register-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), true);
-  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("minlength"), "4");
+  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("minlength"), "8");
+  assert.equal(await account.locator('#customerEmailVerificationForm').count(), 0);
   await account.locator(".login-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), false);
   await account.close();

@@ -41,8 +41,9 @@ assert.ok(
 assert.ok(
   adminAuth.includes("/api/v1/admin/auth/email/start") &&
     adminAuth.includes("/api/v1/admin/auth/email/verify") &&
-    !adminAuth.includes("localStorage.setItem"),
-  "Dashboard Staff auth must use server email verification and must not persist auth tokens",
+    adminAuth.includes('localStorage.setItem(STAFF_EMAIL_CACHE_KEY, emailAddress)') &&
+    !/localStorage\.setItem\([^\n]*(?:token|otp|session|secret|csrf)/i.test(adminAuth),
+  "Dashboard Staff auth may remember only the email address and must never persist auth tokens, OTPs, sessions, CSRF values or secrets",
 );
 assert.ok(
   identity.includes("staff_email_login_challenges") &&
