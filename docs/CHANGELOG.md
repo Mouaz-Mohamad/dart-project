@@ -1,5 +1,10 @@
 # Dart Project changelog
 
+## Production activation — 2026-09-22
+
+- Activate the simplified Dart Eye Staff email-verification flow after SMTP production configuration was completed.
+- This deployment applies pending database migrations through the API production build and publishes the matching storefront/dashboard assets.
+
 ## Simplified Dart Eye Staff Email Access — 2026-09-22
 
 - Replaced the unlaunched Google/Supabase Staff sign-in path with an Owner-managed email allowlist and six-digit one-time email verification.
