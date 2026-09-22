@@ -117,6 +117,21 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain("CART_RESERVATION_EXPIRED");
   });
 
+  it("keeps customer live tracking lightweight, private, and fast enough for one-second map updates", () => {
+    expect(routes).toContain('"/me/tracking/live"');
+    const liveRoute = routes.indexOf('"/me/tracking/live"');
+    expect(liveRoute).toBeGreaterThan(-1);
+    expect(routes.slice(liveRoute, liveRoute + 260)).toContain("limit: 120");
+    expect(service).toContain("public async customerLiveTracking(");
+    expect(service).toContain("payload->>'clientId'=$1");
+    expect(service).toContain("status='Representative On The Way'");
+    expect(service).toContain("payload->>'status'='Pickup On The Way'");
+
+    const locationRoute = routes.indexOf('"/representatives/location"');
+    expect(locationRoute).toBeGreaterThan(-1);
+    expect(routes.slice(locationRoute, locationRoute + 260)).toContain("limit: 120");
+  });
+
   it("rate-limits representative delivery and return mutations", () => {
     for (const route of [
       "/representatives/orders/:orderCode/action",
