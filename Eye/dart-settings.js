@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-settings.js
+// Dashboard Settings forms, templates, general settings, and internal Settings navigation.
+// BEGIN MODULE
+
 /* ========================================================================== */
 /* DART SETTINGS — owner-only server-authoritative business-data reset         */
 /* PostgreSQL is reset first; browser caches are cleared only after commit.     */
@@ -509,3 +513,5 @@
   });
 })(typeof window !== "undefined" ? window : globalThis);
 /* END Settings internal navigation */
+
+// END MODULE
