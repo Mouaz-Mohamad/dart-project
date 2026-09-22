@@ -174,6 +174,8 @@ const server = http.createServer((request, response) => {
     await page.waitForSelector("#header-container .hedar-nav");
     await page.waitForSelector("#footer .footer-continear");
     assert.equal(await page.locator("#header-container .hedar-nav").count(), 1);
+    assert.equal(await page.locator("#header-container .dart-nav-icon").count(), 2);
+    assert.equal(await page.locator("#header-container .social-icons svg").count(), 5);
     assert.equal(await page.locator("#footer .footer-continear").count(), 1);
     await page.close();
   }
@@ -196,8 +198,13 @@ const server = http.createServer((request, response) => {
   await products.close();
 
   const account = await open("Sign%20Up%20modern.html");
+  assert.ok(
+    (await account.locator(".dart-auth-icon").count()) >= 7,
+    "customer auth controls must render local SVG icons",
+  );
   await account.locator(".register-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), true);
+  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("minlength"), "4");
   await account.locator(".login-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), false);
   await account.close();
@@ -253,6 +260,12 @@ const server = http.createServer((request, response) => {
     "dashboard must render the next-year control without inline handlers",
   );
   assert.equal(await dashboard.locator("link[rel='manifest']").count(), 1);
+  await dashboard.locator('[data-target="settings"]').first().click();
+  assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "general");
+  await dashboard.locator('[data-settings-tab="hero"]').click();
+  assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "hero");
+  assert.equal(await dashboard.locator("#settings-typing-card").isVisible(), true);
+  assert.equal(await dashboard.locator("#settings-commerce-card").isVisible(), false);
   const dashboardTargets = await dashboard.locator("a[data-target]").evaluateAll((links) =>
     [...new Set(links.map((link) => link.dataset.target))],
   );
