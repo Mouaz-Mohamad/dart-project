@@ -31,6 +31,7 @@ const server = http.createServer((request, response) => {
             capabilities: [
               "staff-onboarding-v1",
               "staff-google-auth-v1",
+              "staff-email-access-v1",
               "dashboard-domain-state-v1",
               "bulk-domain-state-v1",
             ],

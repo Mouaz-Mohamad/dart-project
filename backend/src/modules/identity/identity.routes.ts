@@ -2,7 +2,6 @@ import { Router, type Request, type Response } from "express";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
-import { AppError } from "../../http/app-error.js";
 import {
   authenticate,
   csrfProtection,
@@ -12,7 +11,6 @@ import {
 } from "../../middleware/authentication.js";
 import type { AccountType, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
-import { verifySupabaseGoogleAccessToken } from "./supabase-google.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
 const password = z.string().min(12).max(200);
@@ -47,7 +45,6 @@ const registerRepresentativeSchema = z.object({
 const loginSchema = z.object({
   identifier: z.string().trim().min(3).max(254),
   password: z.string().min(1).max(200),
-  totp: z.string().regex(/^\d{6}$/).optional(),
 });
 
 function metadata(request: Request): RequestMetadata {
@@ -116,94 +113,13 @@ export function createIdentityRouter(
   service: IdentityService,
   config: Pick<
     AppConfig,
-    | "nodeEnv"
-    | "sessionCookieName"
-    | "sessionCookieSameSite"
-    | "authPepper"
-    | "staffGoogleAuthEnabled"
-    | "staffLegacyAuthEnabled"
-    | "staffLegacyAuthUiEnabled"
-    | "supabaseUrl"
-    | "supabasePublishableKey"
-    | "supabaseProjectRef"
-    | "supabaseAuthTimeoutMs"
-    | "googleClientId"
+    "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite" | "authPepper"
   >,
   outbox?: OutboxService,
 ): Router {
   const router = Router();
   const signedIn = authenticate(service, config);
   const csrf = csrfProtection(config);
-
-  router.get("/admin/auth/google/config", (_request, response) => {
-    response.setHeader("Cache-Control", "no-store");
-    const configured = Boolean(
-      config.staffGoogleAuthEnabled &&
-        config.supabaseUrl &&
-        config.supabasePublishableKey &&
-        config.supabaseProjectRef &&
-        config.googleClientId,
-    );
-    response.status(200).json({
-      enabled: configured,
-      legacyUiEnabled: Boolean(
-        config.staffLegacyAuthUiEnabled && config.staffLegacyAuthEnabled,
-      ),
-      ...(configured
-        ? {
-            supabaseUrl: config.supabaseUrl,
-            supabasePublishableKey: config.supabasePublishableKey,
-            googleClientId: config.googleClientId,
-            supabaseJsVersion: "2.116.0",
-          }
-        : {}),
-    });
-  });
-
-  router.post(
-    "/admin/auth/google/exchange",
-    authLimiter(),
-    async (request, response) => {
-      if (
-        !config.staffGoogleAuthEnabled ||
-        !config.supabaseUrl ||
-        !config.supabasePublishableKey ||
-        !config.supabaseProjectRef ||
-        !config.googleClientId
-      ) {
-        throw new AppError(
-          503,
-          "GOOGLE_AUTH_NOT_CONFIGURED",
-          "Dashboard Google sign-in is temporarily unavailable.",
-        );
-      }
-      const body = z
-        .object({
-          accessToken: z.string().trim().min(20).max(8192),
-        })
-        .parse(request.body);
-      const identity = await verifySupabaseGoogleAccessToken(
-        body.accessToken,
-        {
-          supabaseUrl: config.supabaseUrl,
-          supabasePublishableKey: config.supabasePublishableKey,
-          supabaseProjectRef: config.supabaseProjectRef,
-          googleClientId: config.googleClientId,
-          supabaseAuthTimeoutMs: config.supabaseAuthTimeoutMs ?? 6_000,
-        },
-      );
-      const session = await service.exchangeStaffGoogleIdentity(
-        identity,
-        metadata(request),
-      );
-      setSessionCookies(response, config, session);
-      response.status(200).json({
-        user: await service.profile(session.account),
-        permissions: session.account.permissions,
-        csrfToken: session.csrfToken,
-      });
-    },
-  );
 
   router.post("/auth/register", authLimiter(), async (request, response) => {
     const result = await service.registerCustomer(registerCustomerSchema.parse(request.body), metadata(request));
@@ -238,25 +154,6 @@ export function createIdentityRouter(
     const session = await service.login("customer", body.identifier, body.password, metadata(request));
     setSessionCookies(response, config, session);
     response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
-  });
-
-  router.post("/admin/auth/login", authLimiter(), async (request, response) => {
-    if (config.staffLegacyAuthEnabled === false) {
-      throw new AppError(
-        410,
-        "STAFF_LEGACY_AUTH_DISABLED",
-        "This Staff sign-in method has been retired.",
-      );
-    }
-    const body = loginSchema.parse(request.body);
-    const session = await service.login("staff", body.identifier, body.password, metadata(request), body.totp);
-    setSessionCookies(response, config, session);
-    response.status(200).json({
-      user: await service.profile(session.account),
-      permissions: session.account.permissions,
-      csrfToken: session.csrfToken,
-      mfaSetupRequired: session.account.mfaRequired && !session.account.mfaSatisfied,
-    });
   });
 
   router.post("/representatives/register", authLimiter(), async (request, response) => {
@@ -337,7 +234,12 @@ export function createIdentityRouter(
     clearSessionCookies(response, config);
     response.status(204).end();
   });
-  router.post("/auth/change-temporary-password", signedIn, csrf, async (request, response) => {
+  router.post(
+    "/auth/change-temporary-password",
+    signedIn,
+    csrf,
+    requireAccountType("customer", "representative"),
+    async (request, response) => {
     const body = z
       .object({ password, confirmation: password })
       .refine((value) => value.password === value.confirmation, {
@@ -348,7 +250,8 @@ export function createIdentityRouter(
     const session = await service.replaceTemporaryPassword(request.auth!, body.password, metadata(request));
     setSessionCookies(response, config, session);
     response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
-  });
+    },
+  );
 
   router.get("/auth/sessions", signedIn, requirePermission("sessions.read_own"), async (request, response) => {
     response.status(200).json({ sessions: await service.listSessions(request.auth!) });
@@ -364,21 +267,6 @@ export function createIdentityRouter(
       response.status(204).end();
     },
   );
-
-  router.post("/admin/auth/mfa/setup", signedIn, csrf, requireAccountType("staff"), async (request, response) => {
-    if (config.staffLegacyAuthEnabled === false) {
-      throw new AppError(410, "STAFF_LEGACY_AUTH_DISABLED", "This Staff authentication method has been retired.");
-    }
-    response.status(200).json(await service.setupMfa(request.auth!));
-  });
-  router.post("/admin/auth/mfa/confirm", signedIn, csrf, requireAccountType("staff"), async (request, response) => {
-    if (config.staffLegacyAuthEnabled === false) {
-      throw new AppError(410, "STAFF_LEGACY_AUTH_DISABLED", "This Staff authentication method has been retired.");
-    }
-    const body = z.object({ token: z.string().regex(/^\d{6}$/) }).parse(request.body);
-    await service.confirmMfa(request.auth!, body.token, metadata(request));
-    response.status(204).end();
-  });
 
   router.get(
     "/admin/representatives",

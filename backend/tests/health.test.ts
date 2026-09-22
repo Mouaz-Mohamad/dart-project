@@ -21,7 +21,6 @@ const config: AppConfig = {
   sessionCookieSameSite: "strict",
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
-  staffInviteOtpTtlHours: 48,
   mfaEncryptionKey: Buffer.alloc(32, 7),
   emailProvider: "disabled",
   smtpHost: null,

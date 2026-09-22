@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { generate as generateTotp } from "otplib";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AppConfig } from "../src/config/env.js";
@@ -20,19 +19,11 @@ const authConfig: Pick<
   | "sessionTtlDays"
   | "emailOtpTtlMinutes"
   | "mfaEncryptionKey"
-  | "staffInviteOtpTtlHours"
-  | "corsOrigins"
-  | "ownerBootstrapEmail"
-  | "ownerBootstrapName"
 > = {
   authPepper: "integration-test-auth-pepper-32-characters-long",
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
   mfaEncryptionKey: Buffer.alloc(32, 4),
-  staffInviteOtpTtlHours: 48,
-  corsOrigins: ["https://dart.example"],
-  ownerBootstrapEmail: "bootstrap-owner@example.com",
-  ownerBootstrapName: "Bootstrap Owner",
 };
 
 const requestMetadata = {
@@ -105,14 +96,14 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     expect(signedIn.account.permissions).toContain("profile.read_own");
   });
 
-  it("keeps the protected Owner allowlist authoritative over legacy bootstrap configuration", async () => {
-    const stranger = await service!.startStaffOnboarding(
-      "not-invited@example.com",
+  it("keeps the protected Owner email allowlist authoritative over legacy bootstrap configuration", async () => {
+    const stranger = await service!.startStaffEmailAccess(
+      "not-allowed@example.com",
       requestMetadata,
     );
     expect(stranger.deliveryQueued).toBe(false);
 
-    const legacyConfiguredOwner = await service!.startStaffOnboarding(
+    const legacyConfiguredOwner = await service!.startStaffEmailAccess(
       "BOOTSTRAP-OWNER@example.com",
       requestMetadata,
     );
@@ -123,8 +114,9 @@ describe.skipIf(!databaseUrl)("identity service", () => {
       is_owner: boolean;
       status: string;
       access_mode: string;
+      mfa_required: boolean;
     }>(
-      `SELECT display_name, is_owner, status, access_mode
+      `SELECT display_name, is_owner, status, access_mode, mfa_required
          FROM staff_invitations
         WHERE email_normalized='midomoaaz3@gmail.com'`,
     );
@@ -132,15 +124,18 @@ describe.skipIf(!databaseUrl)("identity service", () => {
       display_name: "Mouaz Mohamad",
       is_owner: true,
       status: "pending",
-      access_mode: "google",
+      access_mode: "email_otp",
+      mfa_required: false,
     });
   });
 
-  it("activates the Owner and invited Staff using email OTPs without WhatsApp", async () => {
-    const onboarding = await service!.startStaffOnboarding(
+  it("queues the protected Owner verification code through email without password or TOTP setup", async () => {
+    const challenge = await service!.startStaffEmailAccess(
       "midomoaaz3@gmail.com",
       requestMetadata,
     );
+    expect(challenge.deliveryQueued).toBe(true);
+
     const event = await testPool!.query<{
       payload: {
         channel: string;
@@ -149,7 +144,7 @@ describe.skipIf(!databaseUrl)("identity service", () => {
       };
     }>(
       `SELECT payload FROM outbox_events WHERE deduplication_key=$1 LIMIT 1`,
-      [`staff-onboarding-code:${onboarding.challengeId}`],
+      [`staff-email-access-code:${challenge.challengeId}`],
     );
     expect(event.rows[0]!.payload.channel).toBe("email");
     expect(event.rows[0]!.payload.to).toBe("midomoaaz3@gmail.com");
@@ -157,93 +152,7 @@ describe.skipIf(!databaseUrl)("identity service", () => {
       Buffer.from(event.rows[0]!.payload.encryptedParameters.otp, "base64"),
       authConfig.mfaEncryptionKey,
     );
-    const verified = await service!.verifyStaffOnboarding(
-      onboarding.challengeId,
-      otp,
-      requestMetadata,
-    );
-    const session = await service!.completeStaffOnboarding(
-      onboarding.challengeId,
-      verified.setupToken,
-      "OwnerStrongPassword123",
-      requestMetadata,
-    );
-    expect(session.account.accountType).toBe("staff");
-    expect(session.account.mfaRequired).toBe(true);
-
-    const ownerBootstrapAfterActivation = await service!.startStaffOnboarding(
-      "bootstrap-owner@example.com",
-      requestMetadata,
-    );
-    expect(ownerBootstrapAfterActivation.deliveryQueued).toBe(false);
-
-    expect(session.account.permissions).toContain("staff.manage");
-    await expect(
-      service!.createStaffInvitation(
-        session.account,
-        {
-          email: "blocked-before-mfa@example.com",
-          phone: "",
-          displayName: "Blocked Before MFA",
-          permissionKeys: ["orders.read"],
-          mfaRequired: false,
-        },
-        requestMetadata,
-      ),
-    ).rejects.toMatchObject({ code: "FORBIDDEN" });
-
-    const mfaSetup = await service!.setupMfa(session.account);
-    const mfaToken = await generateTotp({ secret: mfaSetup.secret });
-    await service!.confirmMfa(session.account, mfaToken, requestMetadata);
-
-    const separator = session.sessionToken.indexOf(".");
-    expect(separator).toBeGreaterThan(0);
-    const ownerAccount = await service!.authenticate(
-      session.sessionToken.slice(0, separator),
-      session.sessionToken.slice(separator + 1),
-    );
-    expect(ownerAccount?.mfaSatisfied).toBe(true);
-    expect(ownerAccount?.permissions).toContain("staff.manage");
-
-    const invitation = await service!.createStaffInvitation(
-      ownerAccount!,
-      {
-        email: "staff@example.com",
-        phone: "",
-        displayName: "Test Staff",
-        permissionKeys: ["orders.read"],
-        mfaRequired: false,
-      },
-      requestMetadata,
-    );
-    const staffEvent = await testPool!.query<{
-      payload: { channel: string; to: string; encryptedParameters: { otp: string } };
-    }>(
-      `SELECT payload FROM outbox_events WHERE deduplication_key=$1`,
-      [`staff-onboarding-code:${invitation.challengeId}`],
-    );
-    expect(staffEvent.rows[0]!.payload).toMatchObject({
-      channel: "email",
-      to: "staff@example.com",
-    });
-    const staffOtp = decryptSecret(
-      Buffer.from(staffEvent.rows[0]!.payload.encryptedParameters.otp, "base64"),
-      authConfig.mfaEncryptionKey,
-    );
-    const staffVerified = await service!.verifyStaffOnboarding(
-      invitation.challengeId,
-      staffOtp,
-      requestMetadata,
-    );
-    const staffSession = await service!.completeStaffOnboarding(
-      invitation.challengeId,
-      staffVerified.setupToken,
-      "StaffStrongPassword123",
-      requestMetadata,
-    );
-    expect(staffSession.account.mfaRequired).toBe(false);
-    expect(staffSession.account.permissions).toContain("orders.read");
-    expect(staffSession.account.permissions).not.toContain("staff.manage");
+    expect(otp).toMatch(/^\d{6}$/);
   });
 
   it("rejects duplicate customer identities but permits the same contact in another realm", async () => {

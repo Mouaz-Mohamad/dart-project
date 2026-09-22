@@ -6,37 +6,21 @@
   ).replace(/\/$/, "");
   const authView = document.getElementById("dart-admin-auth");
   const authCard = authView?.querySelector(".dart-admin-auth-card");
-  const googleView = document.getElementById("dart-admin-google-view");
-  const googleButton = document.getElementById("dart-admin-google-button");
-  const googleLoading = document.getElementById("dart-admin-google-loading");
-  const legacyToggle = document.getElementById("dart-admin-legacy-toggle");
-  const loginForm = document.getElementById("dart-admin-login-form");
-  const onboardingEmailForm = document.getElementById("dart-admin-onboarding-email-form");
-  const onboardingCodeForm = document.getElementById("dart-admin-onboarding-code-form");
-  const onboardingPasswordForm = document.getElementById("dart-admin-onboarding-password-form");
-  const firstTimeButton = document.getElementById("dart-admin-first-time");
-  const onboardingResendButton = document.getElementById("dart-admin-onboarding-resend");
-  const mfaForm = document.getElementById("dart-admin-mfa-form");
+  const emailForm = document.getElementById("dart-admin-email-form");
+  const codeForm = document.getElementById("dart-admin-code-form");
+  const resendButton = document.getElementById("dart-admin-resend");
+  const changeEmailButton = document.getElementById("dart-admin-change-email");
   const logoutButton = document.getElementById("dart-admin-logout");
 
   const HYDRATION_TIMEOUT_MS = 12_000;
-  const SUPABASE_JS_CDN =
-    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js";
-  const GOOGLE_GSI_CDN = "https://accounts.google.com/gsi/client";
-  const UNAUTHORIZED_MESSAGE =
-    "This Google account is not authorized to access the Dart dashboard.";
 
-  let onboardingChallengeId = "";
-  let onboardingSetupToken = "";
-  let onboardingEmail = "";
+  let challengeId = "";
+  let emailAddress = "";
   let csrfMemory = "";
   let compatibilityPromise = null;
-  let googleConfigPromise = null;
-  let supabaseClient = null;
-  let currentGoogleNonce = "";
   let permissionSet = new Set();
 
-  if (!API_BASE || !authView || !authCard || !googleView || !googleButton || !logoutButton) {
+  if (!API_BASE || !authView || !authCard || !emailForm || !codeForm || !logoutButton) {
     document.body.classList.add("dart-admin-locked");
     return;
   }
@@ -73,7 +57,9 @@
         body: options.body ? JSON.stringify(options.body) : undefined,
       });
     } catch (cause) {
-      const error = new Error("Unable to reach the Dart API. Check your connection and try again.");
+      const error = new Error(
+        "Unable to reach the Dart API. Check your connection and try again.",
+      );
       error.code = "NETWORK_ERROR";
       error.cause = cause;
       throw error;
@@ -105,7 +91,7 @@
         if (
           !response.ok ||
           payload?.apiCompatibility !== "dart-database-v1" ||
-          !capabilities.has("staff-google-auth-v1") ||
+          !capabilities.has("staff-email-access-v1") ||
           !capabilities.has("dashboard-domain-state-v1") ||
           !capabilities.has("bulk-domain-state-v1")
         ) {
@@ -150,48 +136,26 @@
     element.classList.toggle("is-error", Boolean(isError));
   }
 
-  function showAuthView(view) {
-    [
-      googleView,
-      loginForm,
-      onboardingEmailForm,
-      onboardingCodeForm,
-      onboardingPasswordForm,
-      mfaForm,
-    ]
-      .filter(Boolean)
-      .forEach((node) => {
-        node.hidden = node !== view;
-      });
-  }
-
-  function showGoogleView() {
-    showAuthView(googleView);
-  }
-
-  function resetOnboarding() {
-    onboardingChallengeId = "";
-    onboardingSetupToken = "";
-    onboardingEmail = "";
-    onboardingEmailForm?.reset();
-    onboardingCodeForm?.reset();
-    onboardingPasswordForm?.reset();
-  }
-
-  function setGoogleLoading(loading, message = "Verifying your Google account…") {
-    googleButton.hidden = Boolean(loading);
-    if (googleLoading) {
-      googleLoading.hidden = !loading;
-      const text = googleLoading.querySelector("span");
-      if (text) text.textContent = message;
+  function show(view) {
+    [emailForm, codeForm].forEach((node) => {
+      node.hidden = node !== view;
+    });
+    if (view) {
+      status(view, "");
     }
-    googleView.setAttribute("aria-busy", loading ? "true" : "false");
   }
 
   function clearAdminPrivateCache() {
     window.DartState?.clearBusiness?.();
     csrfMemory = "";
     permissionSet = new Set();
+  }
+
+  function resetVerification() {
+    challengeId = "";
+    emailAddress = "";
+    emailForm.reset();
+    codeForm.reset();
   }
 
   function lock() {
@@ -248,10 +212,7 @@
       } else {
         window.DartState?.remove?.("dart_orders");
       }
-      if (
-        can("dashboard_state.read") &&
-        window.DartDomainState?.hydrateAll
-      ) {
+      if (can("dashboard_state.read") && window.DartDomainState?.hydrateAll) {
         await hydrateStage(
           "dashboard-state",
           () => window.DartDomainState.hydrateAll(),
@@ -265,8 +226,9 @@
         code: error?.code || "DASHBOARD_HYDRATION_FAILED",
       });
       lock();
+      show(emailForm);
       status(
-        googleView,
+        emailForm,
         `Database connection failed while loading ${stage}. Dashboard remains locked.`,
         true,
       );
@@ -284,427 +246,108 @@
     window.dispatchEvent(new CustomEvent("dart:admin-authenticated"));
   }
 
-  function loadExternalScript(src, ready) {
-    if (ready()) return Promise.resolve();
-    const existing = document.querySelector(`script[data-dart-auth-src="${src}"]`);
-    if (existing) {
-      return new Promise((resolve, reject) => {
-        if (ready()) {
-          resolve();
-          return;
-        }
-        existing.addEventListener("load", resolve, { once: true });
-        existing.addEventListener("error", reject, { once: true });
-      });
-    }
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = src;
-      script.async = true;
-      script.defer = true;
-      script.dataset.dartAuthSrc = src;
-      script.referrerPolicy = "no-referrer";
-      script.addEventListener("load", () => resolve(), { once: true });
-      script.addEventListener(
-        "error",
-        () => reject(new Error("Authentication provider script failed to load.")),
-        { once: true },
-      );
-      document.head.appendChild(script);
-    });
-  }
-
-  function randomNonce() {
-    if (!window.crypto?.getRandomValues || !window.crypto?.subtle) {
-      throw new Error("Secure browser cryptography is unavailable.");
-    }
-    const bytes = new Uint8Array(32);
-    window.crypto.getRandomValues(bytes);
-    return btoa(String.fromCharCode(...bytes));
-  }
-
-  async function hashNonce(nonce) {
-    const encoded = new TextEncoder().encode(nonce);
-    const hash = await window.crypto.subtle.digest("SHA-256", encoded);
-    return [...new Uint8Array(hash)]
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
-  }
-
-  async function googleAuthConfig() {
-    if (!googleConfigPromise) {
-      googleConfigPromise = request("/api/v1/admin/auth/google/config")
-        .catch((error) => {
-          googleConfigPromise = null;
-          throw error;
-        });
-    }
-    return googleConfigPromise;
-  }
-
-  async function clearEphemeralSupabaseSession() {
-    if (!supabaseClient?.auth?.signOut) return;
-    try {
-      await supabaseClient.auth.signOut({ scope: "local" });
-    } catch {
-      // The Dart session is authoritative after exchange. Local cleanup is best-effort.
-    }
-  }
-
-  function friendlyGoogleError(error) {
-    if (
-      error?.code === "DASHBOARD_ACCESS_DENIED" ||
-      error?.status === 403
-    ) {
-      return UNAUTHORIZED_MESSAGE;
+  function friendlyAuthError(error) {
+    if (error?.code === "EMAIL_DELIVERY_UNAVAILABLE") {
+      return "Dart could not send the email right now. Check SMTP settings and try again.";
     }
     if (
-      error?.code === "SUPABASE_AUTH_UNAVAILABLE" ||
-      error?.code === "GOOGLE_AUTH_NOT_CONFIGURED"
+      error?.code === "STAFF_EMAIL_CODE_INVALID" ||
+      error?.code === "DASHBOARD_ACCESS_DENIED"
     ) {
-      return "Google sign-in is temporarily unavailable. Please try again shortly.";
+      return "The verification code is invalid, expired, or this email is not allowed.";
     }
     if (error?.code === "NETWORK_ERROR") {
       return "Network error. Check your connection and try again.";
     }
-    return "Google sign-in could not be completed. Please try again.";
+    return error?.message || "Unable to verify dashboard access.";
   }
 
-  async function exchangeGoogleCredential(credential) {
-    if (!supabaseClient || !currentGoogleNonce || !credential) {
-      throw new Error("Google sign-in was cancelled or did not complete.");
-    }
-
-    const result = await supabaseClient.auth.signInWithIdToken({
-      provider: "google",
-      token: credential,
-      nonce: currentGoogleNonce,
-    });
-    if (result.error) throw result.error;
-
-    const accessToken = result.data?.session?.access_token;
-    if (!accessToken) {
-      throw new Error("Google sign-in did not produce a valid session.");
-    }
-
-    return request("/api/v1/admin/auth/google/exchange", {
-      method: "POST",
-      body: { accessToken },
-    });
-  }
-
-  async function renderGoogleButton(config) {
-    currentGoogleNonce = randomNonce();
-    const hashedNonce = await hashNonce(currentGoogleNonce);
-    googleButton.replaceChildren();
-
-    window.google.accounts.id.initialize({
-      client_id: config.googleClientId,
-      callback: async (credentialResponse) => {
-        setGoogleLoading(true);
-        status(googleView, "");
-        try {
-          const payload = await exchangeGoogleCredential(
-            credentialResponse?.credential || "",
-          );
-          if (payload.user?.accountType !== "staff") {
-            throw new Error("Staff account required");
-          }
-          setAdminAccess(payload);
-          await clearEphemeralSupabaseSession();
-          await unlock();
-        } catch (error) {
-          await clearEphemeralSupabaseSession();
-          lock();
-          showGoogleView();
-          status(googleView, friendlyGoogleError(error), true);
-          setGoogleLoading(false);
-          await renderGoogleButton(config).catch(() => undefined);
-        }
-      },
-      nonce: hashedNonce,
-      ux_mode: "popup",
-      auto_select: false,
-      cancel_on_tap_outside: true,
-      use_fedcm_for_prompt: true,
-      itp_support: true,
-    });
-
-    window.google.accounts.id.renderButton(googleButton, {
-      type: "standard",
-      theme: "outline",
-      size: "large",
-      shape: "pill",
-      text: "continue_with",
-      logo_alignment: "left",
-      width: 320,
-    });
-    setGoogleLoading(false);
-  }
-
-  async function initializeGoogleSignIn() {
-    showGoogleView();
-    setGoogleLoading(true, "Loading secure Google sign-in…");
-    status(googleView, "");
-    try {
-      await ensureApiCompatibility();
-      const config = await googleAuthConfig();
-      legacyToggle.hidden = !(
-        config.legacyUiEnabled === true
-      );
-      if (
-        !config.enabled ||
-        !config.supabaseUrl ||
-        !config.supabasePublishableKey ||
-        !config.googleClientId
-      ) {
-        throw Object.assign(
-          new Error("Google sign-in is not configured."),
-          { code: "GOOGLE_AUTH_NOT_CONFIGURED" },
-        );
-      }
-
-      await Promise.all([
-        loadExternalScript(
-          SUPABASE_JS_CDN,
-          () => Boolean(window.supabase?.createClient),
-        ),
-        loadExternalScript(
-          GOOGLE_GSI_CDN,
-          () => Boolean(window.google?.accounts?.id),
-        ),
-      ]);
-
-      supabaseClient = window.supabase.createClient(
-        config.supabaseUrl,
-        config.supabasePublishableKey,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          },
-        },
-      );
-      await renderGoogleButton(config);
-    } catch (error) {
-      setGoogleLoading(false);
-      status(googleView, friendlyGoogleError(error), true);
-      legacyToggle.hidden = true;
-    }
-  }
-
-  async function beginLegacyMfaSetup() {
-    const setup = await request("/api/v1/admin/auth/mfa/setup", {
-      method: "POST",
-    });
-    showAuthView(mfaForm);
-    document.getElementById("dart-admin-mfa-secret").textContent = setup.secret;
-    document.getElementById("dart-admin-mfa-uri").value = setup.otpauthUri;
-    mfaForm.elements.token.focus();
-  }
-
-  legacyToggle?.addEventListener("click", () => {
-    showAuthView(loginForm);
-    loginForm.elements.identifier.focus();
-  });
-
-  document.querySelectorAll("[data-admin-back-google]").forEach((button) => {
-    button.addEventListener("click", () => {
-      loginForm?.reset();
-      resetOnboarding();
-      showGoogleView();
-    });
-  });
-
-  firstTimeButton?.addEventListener("click", () => {
-    resetOnboarding();
-    showAuthView(onboardingEmailForm);
-    onboardingEmailForm.elements.email.focus();
-  });
-
-  document.querySelectorAll("[data-admin-back-login]").forEach((button) => {
-    button.addEventListener("click", () => {
-      resetOnboarding();
-      showAuthView(loginForm);
-      loginForm.elements.identifier.focus();
-    });
-  });
-
-  onboardingEmailForm?.addEventListener("submit", async (event) => {
+  emailForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!onboardingEmailForm.checkValidity()) {
-      onboardingEmailForm.reportValidity();
+    if (!emailForm.checkValidity()) {
+      emailForm.reportValidity();
       return;
     }
-    const submit = onboardingEmailForm.querySelector('button[type="submit"]');
+    const submit = emailForm.querySelector('button[type="submit"]');
     submit.disabled = true;
     try {
       await ensureApiCompatibility();
-      const payload = await request("/api/v1/admin/auth/onboarding/start", {
+      emailAddress = emailForm.elements.email.value.trim();
+      const payload = await request("/api/v1/admin/auth/email/start", {
         method: "POST",
-        body: { email: onboardingEmailForm.elements.email.value.trim() },
+        body: { email: emailAddress },
       });
-      onboardingChallengeId = payload.challengeId || "";
-      onboardingEmail = onboardingEmailForm.elements.email.value.trim();
-      showAuthView(onboardingCodeForm);
+      challengeId = payload.challengeId || "";
+      show(codeForm);
       status(
-        onboardingCodeForm,
-        "If this email is invited for the temporary rollback path, a verification code was sent.",
+        codeForm,
+        "If this email is allowed, a 6-digit verification code has been sent.",
       );
-      onboardingCodeForm.elements.code.focus();
+      codeForm.elements.code.focus();
     } catch (error) {
-      status(onboardingEmailForm, error.message, true);
+      status(emailForm, friendlyAuthError(error), true);
     } finally {
       submit.disabled = false;
     }
   });
 
-  onboardingResendButton?.addEventListener("click", async () => {
-    if (!onboardingEmail) return;
-    onboardingResendButton.disabled = true;
+  resendButton?.addEventListener("click", async () => {
+    if (!emailAddress) {
+      show(emailForm);
+      emailForm.elements.email.focus();
+      return;
+    }
+    resendButton.disabled = true;
     try {
-      const payload = await request("/api/v1/admin/auth/onboarding/resend", {
+      const payload = await request("/api/v1/admin/auth/email/resend", {
         method: "POST",
-        body: { email: onboardingEmail },
+        body: { email: emailAddress },
       });
-      onboardingChallengeId = payload.challengeId || "";
-      status(onboardingCodeForm, "A fresh legacy verification code was requested.");
-      onboardingCodeForm.elements.code.value = "";
-      onboardingCodeForm.elements.code.focus();
+      challengeId = payload.challengeId || "";
+      codeForm.elements.code.value = "";
+      status(codeForm, "A fresh verification code was requested.");
+      codeForm.elements.code.focus();
     } catch (error) {
-      status(onboardingCodeForm, error.message, true);
+      status(codeForm, friendlyAuthError(error), true);
     } finally {
-      onboardingResendButton.disabled = false;
+      resendButton.disabled = false;
     }
   });
 
-  onboardingCodeForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!onboardingCodeForm.checkValidity()) {
-      onboardingCodeForm.reportValidity();
-      return;
-    }
-    const submit = onboardingCodeForm.querySelector('button[type="submit"]');
-    submit.disabled = true;
-    try {
-      const payload = await request("/api/v1/admin/auth/onboarding/verify", {
-        method: "POST",
-        body: {
-          challengeId: onboardingChallengeId,
-          code: onboardingCodeForm.elements.code.value.trim(),
-        },
-      });
-      onboardingSetupToken = payload.setupToken || "";
-      showAuthView(onboardingPasswordForm);
-      onboardingPasswordForm.elements.credential.focus();
-    } catch (error) {
-      status(onboardingCodeForm, error.message, true);
-    } finally {
-      submit.disabled = false;
-    }
+  changeEmailButton?.addEventListener("click", () => {
+    challengeId = "";
+    codeForm.reset();
+    show(emailForm);
+    emailForm.elements.email.value = emailAddress;
+    emailForm.elements.email.focus();
   });
 
-  onboardingPasswordForm?.addEventListener("submit", async (event) => {
+  codeForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!onboardingPasswordForm.checkValidity()) {
-      onboardingPasswordForm.reportValidity();
+    if (!codeForm.checkValidity() || !challengeId) {
+      codeForm.reportValidity();
       return;
     }
-    if (
-      onboardingPasswordForm.elements.credential.value !==
-      onboardingPasswordForm.elements.confirmation.value
-    ) {
-      status(onboardingPasswordForm, "Passwords do not match.", true);
-      return;
-    }
-    const submit = onboardingPasswordForm.querySelector('button[type="submit"]');
+    const submit = codeForm.querySelector('button[type="submit"]');
     submit.disabled = true;
     try {
-      const payload = await request("/api/v1/admin/auth/onboarding/complete", {
+      const payload = await request("/api/v1/admin/auth/email/verify", {
         method: "POST",
         body: {
-          challengeId: onboardingChallengeId,
-          setupToken: onboardingSetupToken,
-          credential: onboardingPasswordForm.elements.credential.value,
-          confirmation: onboardingPasswordForm.elements.confirmation.value,
+          challengeId,
+          code: codeForm.elements.code.value.trim(),
         },
       });
       if (payload.user?.accountType !== "staff") {
         throw new Error("Staff account required");
       }
       setAdminAccess(payload);
-      resetOnboarding();
-      if (payload.mfaSetupRequired) {
-        await beginLegacyMfaSetup();
-      } else {
-        await unlock();
-      }
-    } catch (error) {
-      status(onboardingPasswordForm, error.message, true);
-    } finally {
-      submit.disabled = false;
-    }
-  });
-
-  loginForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!loginForm.checkValidity()) {
-      loginForm.reportValidity();
-      return;
-    }
-    const submit = loginForm.querySelector('button[type="submit"]');
-    submit.disabled = true;
-    try {
-      await ensureApiCompatibility();
-      const payload = await request("/api/v1/admin/auth/login", {
-        method: "POST",
-        body: {
-          identifier: loginForm.elements.identifier.value,
-          password: loginForm.elements.password.value,
-          ...(loginForm.elements.totp.value
-            ? { totp: loginForm.elements.totp.value }
-            : {}),
-        },
-      });
-      if (payload.user?.accountType !== "staff") {
-        throw new Error("Staff account required");
-      }
-      setAdminAccess(payload);
-      if (payload.mfaSetupRequired) {
-        await beginLegacyMfaSetup();
-        return;
-      }
+      resetVerification();
       await unlock();
     } catch (error) {
-      if (error.code === "MFA_REQUIRED" || error.code === "MFA_INVALID") {
-        const field = loginForm.querySelector("[data-admin-totp-field]");
-        field.hidden = false;
-        field.querySelector("input").required = true;
-      }
-      status(loginForm, error.message, true);
+      status(codeForm, friendlyAuthError(error), true);
     } finally {
       submit.disabled = false;
-    }
-  });
-
-  mfaForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!mfaForm.checkValidity()) {
-      mfaForm.reportValidity();
-      return;
-    }
-    try {
-      await request("/api/v1/admin/auth/mfa/confirm", {
-        method: "POST",
-        body: { token: mfaForm.elements.token.value },
-      });
-      mfaForm.reset();
-      document.getElementById("dart-admin-mfa-secret").textContent = "";
-      document.getElementById("dart-admin-mfa-uri").value = "";
-      await unlock();
-    } catch (error) {
-      status(mfaForm, error.message, true);
     }
   });
 
@@ -712,12 +355,10 @@
     try {
       await request("/api/v1/auth/logout", { method: "POST" });
     } finally {
-      await clearEphemeralSupabaseSession();
       clearAdminPrivateCache();
+      resetVerification();
       lock();
-      loginForm?.reset();
-      resetOnboarding();
-      showGoogleView();
+      show(emailForm);
       location.reload();
     }
   });
@@ -734,12 +375,12 @@
       await unlock();
     } catch (error) {
       lock();
+      show(emailForm);
       if (error?.code === "API_VERSION_MISMATCH") {
-        showGoogleView();
-        status(googleView, error.message, true);
+        status(emailForm, error.message, true);
         return;
       }
-      await initializeGoogleSignIn();
+      emailForm.elements.email.focus();
     }
   })();
 })();

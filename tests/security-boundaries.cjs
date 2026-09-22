@@ -5,7 +5,6 @@ const sw = fs.readFileSync("sw.js", "utf8");
 const state = fs.readFileSync("Js/dart-state.js", "utf8");
 const adminAuth = fs.readFileSync("Eye/dart-admin-auth.js", "utf8");
 const identity = fs.readFileSync("backend/src/modules/identity/identity.service.ts", "utf8");
-const googleIdentity = fs.readFileSync("backend/src/modules/identity/supabase-google.ts", "utf8");
 const logger = fs.readFileSync("backend/src/config/logger.ts", "utf8");
 
 assert.match(
@@ -38,16 +37,16 @@ assert.ok(
   "Dashboard authenticated mutations must keep cookie + CSRF protection",
 );
 assert.ok(
-  adminAuth.includes("persistSession: false") &&
-    adminAuth.includes("autoRefreshToken: false") &&
+  adminAuth.includes("/api/v1/admin/auth/email/start") &&
+    adminAuth.includes("/api/v1/admin/auth/email/verify") &&
     !adminAuth.includes("localStorage.setItem"),
-  "Dashboard Supabase identity must remain ephemeral and must not persist tokens",
+  "Dashboard Staff auth must use server email verification and must not persist auth tokens",
 );
 assert.ok(
-  googleIdentity.includes('candidate.provider === "google"') &&
-    googleIdentity.includes("supabaseProjectRef") &&
-    googleIdentity.includes("/auth/v1/user"),
-  "Backend must verify Google-only identity against the configured Supabase project",
+  identity.includes("staff_email_login_challenges") &&
+    identity.includes("STAFF_EMAIL_CODE_INVALID") &&
+    identity.includes("issueSession(client, userId!, true"),
+  "Backend must verify Staff email ownership before issuing the secure Dart session",
 );
 assert.ok(
   logger.includes('"req.body.accessToken"') &&

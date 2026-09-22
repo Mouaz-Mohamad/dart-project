@@ -14,12 +14,6 @@ describe("environment configuration", () => {
     expect(config.allowDevelopmentSeed).toBe(false);
     expect(config.corsOrigins).toEqual(["http://localhost:4173"]);
     expect(config.sessionCookieSameSite).toBe("strict");
-    expect(config.ownerBootstrapEmail).toBeNull();
-    expect(config.staffGoogleAuthEnabled).toBe(false);
-    expect(config.staffLegacyAuthEnabled).toBe(true);
-    expect(config.staffLegacyAuthUiEnabled).toBe(false);
-    expect(config.supabaseUrl).toBeNull();
-    expect(config.googleClientId).toBeNull();
     expect(config.emailFromName).toBe("Dart | for you");
   });
 
@@ -95,65 +89,10 @@ describe("environment configuration", () => {
       SMTP_PASS: "app-password",
       EMAIL_FROM: "dart@example.com",
       EMAIL_FROM_NAME: "Dart | for you",
-      DART_OWNER_EMAIL: "owner@example.com",
-      DART_OWNER_NAME: "Dart Owner",
     });
     expect(smtp.emailProvider).toBe("smtp");
     expect(smtp.smtpPort).toBe(587);
-    expect(smtp.staffInviteOtpTtlHours).toBe(48);
-    expect(smtp.ownerBootstrapEmail).toBe("owner@example.com");
-    expect(smtp.ownerBootstrapName).toBe("Dart Owner");
     expect(smtp.emailFromName).toBe("Dart | for you");
-  });
-
-  it("accepts a valid Google/Supabase Staff auth configuration without any service-role secret", () => {
-    const config = loadConfig({
-      ...baseEnvironment,
-      STAFF_GOOGLE_AUTH_ENABLED: "true",
-      STAFF_LEGACY_AUTH_ENABLED: "true",
-      STAFF_LEGACY_AUTH_UI_ENABLED: "false",
-      SUPABASE_URL: "https://darttest.supabase.co",
-      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
-      SUPABASE_PROJECT_REF: "darttest",
-      GOOGLE_CLIENT_ID: "123456789.apps.googleusercontent.com",
-    });
-    expect(config.staffGoogleAuthEnabled).toBe(true);
-    expect(config.staffLegacyAuthEnabled).toBe(true);
-    expect(config.staffLegacyAuthUiEnabled).toBe(false);
-    expect(config.supabaseUrl).toBe("https://darttest.supabase.co");
-    expect(config.supabaseProjectRef).toBe("darttest");
-    expect(config.googleClientId).toBe("123456789.apps.googleusercontent.com");
-    expect("supabaseServiceRoleKey" in config).toBe(false);
-  });
-
-  it("fails closed when Google auth is enabled with a mismatched Supabase project or missing client config", () => {
-    expect(() =>
-      loadConfig({
-        ...baseEnvironment,
-        STAFF_GOOGLE_AUTH_ENABLED: "true",
-        SUPABASE_URL: "https://other.supabase.co",
-        SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
-        SUPABASE_PROJECT_REF: "darttest",
-        GOOGLE_CLIENT_ID: "123456789.apps.googleusercontent.com",
-      }),
-    ).toThrow("SUPABASE_URL");
-
-    expect(() =>
-      loadConfig({
-        ...baseEnvironment,
-        STAFF_GOOGLE_AUTH_ENABLED: "true",
-      }),
-    ).toThrow("SUPABASE_URL");
-  });
-
-  it("does not expose a legacy login UI when legacy Staff auth is disabled", () => {
-    expect(() =>
-      loadConfig({
-        ...baseEnvironment,
-        STAFF_LEGACY_AUTH_ENABLED: "false",
-        STAFF_LEGACY_AUTH_UI_ENABLED: "true",
-      }),
-    ).toThrow("STAFF_LEGACY_AUTH_UI_ENABLED");
   });
 
   it("validates optional direct WhatsApp settings", () => {

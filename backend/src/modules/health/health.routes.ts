@@ -18,7 +18,7 @@ export function createHealthRouter(dependencies: HealthDependencies): Router {
       capabilities: [
         "database-authoritative-v1",
         "staff-onboarding-v1",
-        "staff-google-auth-v1",
+        "staff-email-access-v1",
         "guest-cart-v1",
         "dashboard-domain-state-v1",
         "bulk-domain-state-v1",

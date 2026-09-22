@@ -25,7 +25,6 @@ const config: AppConfig = {
   sessionCookieSameSite: "strict",
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
-  staffInviteOtpTtlHours: 48,
   mfaEncryptionKey: Buffer.alloc(32, 3),
   emailProvider: "disabled",
   smtpHost: null,
@@ -99,11 +98,12 @@ function fakeService(auth = account()) {
       status: "pending_approval",
     }),
     login: vi.fn().mockResolvedValue(issued(auth)),
-    startStaffOnboarding: vi.fn().mockResolvedValue({
+    startStaffEmailAccess: vi.fn().mockResolvedValue({
       challengeId: "123e4567-e89b-12d3-a456-426614174004",
       expiresAt: new Date(Date.now() + 600_000),
       deliveryQueued: true,
     }),
+    verifyStaffEmailAccess: vi.fn().mockResolvedValue(issued(auth)),
     profile: vi.fn().mockResolvedValue(profile(auth)),
     authenticate: vi.fn().mockResolvedValue(auth),
     logout: vi.fn().mockResolvedValue(undefined),
@@ -123,25 +123,29 @@ function app(service: IdentityService, outboxService?: OutboxService) {
 }
 
 describe("identity HTTP boundaries", () => {
-  it("exposes only public Google auth configuration and fails closed before configuration", async () => {
-    const service = fakeService();
-    const application = app(service);
+  it("does not expose retired Google, Staff password or Staff TOTP routes", async () => {
+    const application = app(fakeService());
 
-    const configResponse = await request(application)
-      .get("/api/v1/admin/auth/google/config");
-    expect(configResponse.status).toBe(200);
-    expect(configResponse.body).toEqual({
-      enabled: false,
-      legacyUiEnabled: false,
-    });
-    expect(JSON.stringify(configResponse.body)).not.toContain("service_role");
-    expect(JSON.stringify(configResponse.body)).not.toContain("clientSecret");
-
-    const exchange = await request(application)
-      .post("/api/v1/admin/auth/google/exchange")
-      .send({ accessToken: "x".repeat(40) });
-    expect(exchange.status).toBe(503);
-    expect(exchange.body.error.code).toBe("GOOGLE_AUTH_NOT_CONFIGURED");
+    const responses = [
+      await request(application).get("/api/v1/admin/auth/google/config"),
+      await request(application)
+        .post("/api/v1/admin/auth/google/exchange")
+        .send({ accessToken: "x".repeat(40) }),
+      await request(application)
+        .post("/api/v1/admin/auth/login")
+        .send({
+          identifier: "owner@example.com",
+          password: "StrongPassword123",
+        }),
+      await request(application).post("/api/v1/admin/auth/mfa/setup").send({}),
+      await request(application)
+        .post("/api/v1/admin/auth/mfa/confirm")
+        .send({ token: "123456" }),
+    ];
+    for (const response of responses) {
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe("ROUTE_NOT_FOUND");
+    }
   });
 
   it("does not treat a public Supabase key as a Dart dashboard session", async () => {
@@ -153,44 +157,20 @@ describe("identity HTTP boundaries", () => {
     expect(response.body.error.code).toBe("AUTH_REQUIRED");
   });
 
-  it("returns 410 for the legacy Staff password login after the Phase-2 flag is disabled", async () => {
-    const application = createApp(
-      {
-        ...config,
-        staffLegacyAuthEnabled: false,
-      },
-      {
-        databasePing: async () => undefined,
-        identityService: fakeService(),
-        logger: pino({ level: "silent" }),
-        startedAt: new Date("2026-09-20T00:00:00.000Z"),
-        version: "test",
-      },
-    );
-    const response = await request(application)
-      .post("/api/v1/admin/auth/login")
-      .send({
-        identifier: "owner@example.com",
-        password: "StrongPassword123",
-      });
-    expect(response.status).toBe(410);
-    expect(response.body.error.code).toBe("STAFF_LEGACY_AUTH_DISABLED");
-  });
-
-  it("does not claim an onboarding OTP was sent when email is disabled", async () => {
+  it("does not claim a Staff email code was sent when SMTP is disabled", async () => {
     const service = fakeService();
     const outbox = {
       configured: vi.fn().mockReturnValue(false),
     } as unknown as OutboxService;
     const response = await request(app(service, outbox))
-      .post("/api/v1/admin/auth/onboarding/start")
+      .post("/api/v1/admin/auth/email/start")
       .send({ email: "owner@example.com" });
     expect(response.status).toBe(503);
     expect(response.body.error.code).toBe("EMAIL_DELIVERY_UNAVAILABLE");
-    expect(service.startStaffOnboarding).not.toHaveBeenCalled();
+    expect(service.startStaffEmailAccess).not.toHaveBeenCalled();
   });
 
-  it("reports an immediate SMTP failure while keeping the OTP queued for retry", async () => {
+  it("keeps the Staff email request generic when immediate SMTP delivery fails", async () => {
     const service = fakeService();
     const outbox = {
       configured: vi.fn().mockReturnValue(true),
@@ -202,14 +182,38 @@ describe("identity HTTP boundaries", () => {
       }),
     } as unknown as OutboxService;
     const response = await request(app(service, outbox))
-      .post("/api/v1/admin/auth/onboarding/start")
+      .post("/api/v1/admin/auth/email/start")
       .send({ email: "owner@example.com" });
-    expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe("EMAIL_DELIVERY_UNAVAILABLE");
+    expect(response.status).toBe(202);
+    expect(response.body.message).toBe(
+      "If this email is allowed, a verification code has been sent.",
+    );
     expect(outbox.processBatch).toHaveBeenCalledWith(
       1,
-      "staff-onboarding-code:123e4567-e89b-12d3-a456-426614174004",
+      "staff-email-access-code:123e4567-e89b-12d3-a456-426614174004",
     );
+  });
+
+  it("sets a secure Dart session after a valid Staff email code", async () => {
+    const staff = account({
+      accountType: "staff",
+      email: "owner@example.com",
+      permissions: ["staff.read", "staff.manage"],
+      mfaRequired: false,
+      mfaSatisfied: true,
+    });
+    const service = fakeService(staff);
+    const response = await request(app(service))
+      .post("/api/v1/admin/auth/email/verify")
+      .send({
+        challengeId: "123e4567-e89b-12d3-a456-426614174004",
+        code: "123456",
+      });
+    expect(response.status).toBe(200);
+    expect(service.verifyStaffEmailAccess).toHaveBeenCalled();
+    const cookies = response.headers["set-cookie"] as unknown as string[];
+    expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
+    expect(cookies.some((value) => value.startsWith("dart_csrf=") && !value.includes("HttpOnly"))).toBe(true);
   });
 
   it("queues registration verification without creating a browser credential", async () => {
