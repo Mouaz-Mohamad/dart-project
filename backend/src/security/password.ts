@@ -11,6 +11,12 @@ function loadArgon2(): Promise<typeof argon2> {
   return argon2Module;
 }
 
+export function validateCustomerPasswordPolicy(password: string): string[] {
+  return password.length < 4
+    ? ["Password must contain at least 4 characters"]
+    : [];
+}
+
 export function validatePasswordPolicy(password: string): string[] {
   const problems: string[] = [];
   if (password.length < 12) problems.push("Password must contain at least 12 characters");
