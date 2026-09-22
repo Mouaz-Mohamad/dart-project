@@ -21,11 +21,45 @@ interface AppliedMigration {
 }
 
 const MIGRATION_LOCK_NAME = "dart_backend_schema_migrations";
+const MIGRATION_NAME_PATTERN = /^\d{4}_[a-z0-9_]+\.sql$/;
+const LEGACY_DUPLICATE_MIGRATION_PREFIXES = new Set(["0013", "0014", "0015"]);
+
+export function assertMigrationNamingPolicy(names: string[]): void {
+  const counts = new Map<string, number>();
+
+  for (const name of names) {
+    if (!MIGRATION_NAME_PATTERN.test(name)) {
+      throw new Error(`Invalid migration filename: ${name}`);
+    }
+
+    const prefix = name.slice(0, 4);
+    if (Number(prefix) < 1) {
+      throw new Error(`Invalid migration sequence prefix: ${prefix}`);
+    }
+    counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+  }
+
+  const invalidDuplicatePrefixes = [...counts.entries()]
+    .filter(
+      ([prefix, count]) =>
+        count > 1 && !LEGACY_DUPLICATE_MIGRATION_PREFIXES.has(prefix),
+    )
+    .map(([prefix]) => prefix)
+    .sort();
+
+  if (invalidDuplicatePrefixes.length > 0) {
+    throw new Error(
+      `Duplicate migration sequence prefixes are not allowed: ${invalidDuplicatePrefixes.join(", ")}`,
+    );
+  }
+}
 
 export async function readMigrationFiles(directory: string): Promise<MigrationFile[]> {
-  const names = (await readdir(directory))
-    .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name))
-    .sort((left, right) => left.localeCompare(right));
+  const directoryEntries = await readdir(directory);
+  const sqlNames = directoryEntries.filter((name) => name.endsWith(".sql"));
+  assertMigrationNamingPolicy(sqlNames);
+
+  const names = sqlNames.sort((left, right) => left.localeCompare(right));
 
   return Promise.all(
     names.map(async (name) => {
