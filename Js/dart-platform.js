@@ -33,6 +33,8 @@
     window.DART_API_BASE_URL || location.origin,
   ).replace(/\/$/, "");
   const API_USER_CACHE_KEY = "dart_api_user_cache";
+  const CART_UI_CACHE_KEY = "dart_cart_ui_cache_v1";
+  let checkoutSubmissionBusy = false;
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;
@@ -55,6 +57,10 @@
   const read = (key, fallback) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
     window.DartState?.write?.(key, value, { source: "platform" });
+    if (key === "dart_cart") {
+      try { sessionStorage.setItem(CART_UI_CACHE_KEY, JSON.stringify(Array.isArray(value) ? value : [])); }
+      catch {}
+    }
     if (
       [
         KEYS.items,
@@ -701,7 +707,15 @@
       birthday: String(payload.birthday || "").trim() || undefined,
     };
     if (API_BASE) {
-      return apiRequest("/api/v1/auth/register", { method: "POST", body: cleanPayload });
+      const result = await apiRequest("/api/v1/auth/register", {
+        method: "POST",
+        body: cleanPayload,
+      });
+      if (result.user) {
+        cacheApiUser(result.user);
+        await hydrateCustomerCommerce();
+      }
+      return result;
     }
     payload = cleanPayload;
     if (API_REQUIRED)
@@ -718,8 +732,8 @@
       throw new Error("رقم الهاتف المصري غير صحيح.");
     if (phone2 && !/^\+201[0125]\d{8}$/.test(phone2))
       throw new Error("رقم الهاتف الثاني غير صحيح.");
-    if (String(payload.password || "").length < 4)
-      throw new Error("كلمة المرور يجب ألا تقل عن 4 أحرف.");
+    if (String(payload.password || "").length < 8)
+      throw new Error("كلمة المرور يجب ألا تقل عن 8 أحرف.");
     const conflict = identityConflict({ email, phone1, phone2 });
     if (conflict) throw new Error(conflict);
     const customerId = nextCode("DA", read(KEYS.customers, []), "clientId");
@@ -835,8 +849,8 @@
     }
     const user = currentUser();
     if (!user) throw new Error("Your login session has expired.");
-    if (String(password || "").length < 4)
-      throw new Error("Password must be at least 4 characters.");
+    if (String(password || "").length < 8)
+      throw new Error("Password must be at least 8 characters.");
     if (password !== confirmation) throw new Error("Passwords do not match.");
     const users = read(KEYS.users, []),
       stored = users.find((row) => row.id === user.id);
@@ -863,6 +877,7 @@
       API_USER_CACHE_KEY,
       "dart_cart_reservation_id",
       "dart_pending_email_verification",
+      CART_UI_CACHE_KEY,
     ].forEach((key) => sessionStorage.removeItem(key));
     if (typeof cartData !== "undefined") cartData = [];
   }
@@ -2183,17 +2198,30 @@
         } else if (form.id === "checkoutForm") {
           event.preventDefault();
           event.stopImmediatePropagation();
+          if (checkoutSubmissionBusy) return;
+          checkoutSubmissionBusy = true;
+          form.setAttribute("aria-busy", "true");
+          const submit = form.querySelector('button[type="submit"], input[type="submit"]');
+          if (submit) submit.disabled = true;
+          let completed = false;
           try {
             const order = await checkout(form);
+            completed = true;
             if (typeof showToast === "function")
               showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
             setTimeout(() => {
               sessionStorage.setItem("dart_internal_navigation", "1");
               location.assign("index.html");
-            }, 700);
+            }, 300);
           } catch (error) {
             if (typeof showToast === "function") showToast(error.message);
             else setStatus(form, error.message, true);
+          } finally {
+            if (!completed) {
+              checkoutSubmissionBusy = false;
+              form.removeAttribute("aria-busy");
+              if (submit) submit.disabled = false;
+            }
           }
         } else if (form.id === "contactForm") {
           event.preventDefault();

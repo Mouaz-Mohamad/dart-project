@@ -11,6 +11,7 @@
   "use strict";
 
   const STORAGE_KEY = "dart_site_settings";
+  const PUBLIC_CACHE_KEY = "dart_public_site_settings_v2";
   const API_BASE = String(root.DART_API_BASE_URL || root.location?.origin || "").replace(/\/$/, "");
   const IS_ADMIN = /\/Eye\//i.test(root.location?.pathname || "");
   let serverVersion = 0;
@@ -97,6 +98,12 @@
   }
 
   function localRaw() {
+    try {
+      const cached = JSON.parse(root.localStorage?.getItem(PUBLIC_CACHE_KEY) || "null");
+      if (cached && typeof cached === "object") return cached;
+    } catch {
+      try { root.localStorage?.removeItem(PUBLIC_CACHE_KEY); } catch {}
+    }
     const value = root.DartState?.read?.(STORAGE_KEY, {});
     return value && typeof value === "object" ? value : {};
   }
@@ -109,7 +116,10 @@
   function setCache(value, persist = true) {
     const normalized = merge(value);
     cachedSettings = normalized;
-    if (persist) root.DartState?.write?.(STORAGE_KEY, normalized, { source: "site-settings" });
+    if (persist) {
+      root.DartState?.write?.(STORAGE_KEY, normalized, { source: "site-settings" });
+      try { root.localStorage?.setItem(PUBLIC_CACHE_KEY, JSON.stringify(normalized)); } catch {}
+    }
     announce(normalized);
     return normalized;
   }
@@ -308,6 +318,7 @@
       if (error.status !== 401) console.warn("Dart site settings hydration failed", error);
     });
   });
+  root.document.addEventListener("dart:section-loaded", applyPublicMedia);
   root.document.addEventListener("dart:sections-loaded", applyPublicMedia);
   root.addEventListener("dart:site-settings-changed", applyPublicMedia);
   root.addEventListener("focus", checkForChanges);

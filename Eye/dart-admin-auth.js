@@ -20,9 +20,14 @@
   const logoutButton = document.getElementById("dart-admin-logout");
 
   const HYDRATION_TIMEOUT_MS = 12_000;
+  const STAFF_EMAIL_CACHE_KEY = "dart_staff_email";
 
   let challengeId = "";
   let emailAddress = "";
+  try {
+    emailAddress = String(localStorage.getItem(STAFF_EMAIL_CACHE_KEY) || "").trim();
+    if (emailAddress) emailForm.elements.email.value = emailAddress;
+  } catch {}
   let csrfMemory = "";
   let compatibilityPromise = null;
   let permissionSet = new Set();
@@ -160,9 +165,11 @@
 
   function resetVerification() {
     challengeId = "";
-    emailAddress = "";
-    emailForm.reset();
     codeForm.reset();
+    emailForm.reset();
+    try { emailAddress = String(localStorage.getItem(STAFF_EMAIL_CACHE_KEY) || "").trim(); }
+    catch { emailAddress = ""; }
+    if (emailAddress) emailForm.elements.email.value = emailAddress;
   }
 
   function lock() {
@@ -280,6 +287,7 @@
     try {
       await ensureApiCompatibility();
       emailAddress = emailForm.elements.email.value.trim();
+      try { localStorage.setItem(STAFF_EMAIL_CACHE_KEY, emailAddress); } catch {}
       const payload = await request("/api/v1/admin/auth/email/start", {
         method: "POST",
         body: { email: emailAddress },
@@ -301,6 +309,7 @@
   resendButton?.addEventListener("click", async () => {
     if (!emailAddress) {
       show(emailForm);
+      if (emailAddress) emailForm.elements.email.value = emailAddress;
       emailForm.elements.email.focus();
       return;
     }
@@ -371,6 +380,9 @@
   });
 
   lock();
+  // Do not flash the email form on every reload. First verify the persistent
+  // HttpOnly Staff session; only show the form if that secure session is absent.
+  show(null);
   void (async () => {
     try {
       await ensureApiCompatibility();

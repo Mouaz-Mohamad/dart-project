@@ -186,7 +186,8 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) check();
   });
-  window.setInterval(check, 8000);
+  // Lightweight version check only; no full-page reload.
+  window.setInterval(check, 3000);
 
   window.DartOrdersApi = {
     hydrate,

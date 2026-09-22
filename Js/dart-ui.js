@@ -59,7 +59,25 @@ async function hydratePublicReviews() {
     }
 }
 
-let cartData = window.DartState?.read?.('dart_cart', []) || [];
+const DART_CART_UI_CACHE_KEY = 'dart_cart_ui_cache_v1';
+function readFastCartSnapshot() {
+    const memory = window.DartState?.read?.('dart_cart', []) || [];
+    if (Array.isArray(memory) && memory.length) return memory;
+    try {
+        const cached = JSON.parse(sessionStorage.getItem(DART_CART_UI_CACHE_KEY) || '[]');
+        return Array.isArray(cached) ? cached : [];
+    } catch {
+        sessionStorage.removeItem(DART_CART_UI_CACHE_KEY);
+        return [];
+    }
+}
+function cacheFastCartSnapshot(value) {
+    try {
+        sessionStorage.setItem(DART_CART_UI_CACHE_KEY, JSON.stringify(Array.isArray(value) ? value : []));
+    } catch {}
+}
+let cartData = readFastCartSnapshot();
+if (cartData.length) window.DartState?.write?.('dart_cart', cartData, { source: 'cart-ui-cache', emit: false });
 let appliedDiscountRate = 0;
 
 let selectedSize = null;
@@ -147,10 +165,13 @@ function filterCatalogProducts(source = publicCatalogProducts()) {
         if (productFilterState.availability === 'out-of-stock' && available) return false;
 
         const price = Number(product.price) || 0;
-        if (productFilterState.price === 'under-500' && price >= 500) return false;
-        if (productFilterState.price === '500-750' && (price < 500 || price > 750)) return false;
-        if (productFilterState.price === '750-1000' && (price <= 750 || price > 1000)) return false;
-        if (productFilterState.price === 'over-1000' && price <= 1000) return false;
+        if (productFilterState.price !== 'all') {
+            const range = String(productFilterState.price).match(/^range:(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+            if (range) {
+                const min = Number(range[1]), max = Number(range[2]);
+                if (price < min || price > max) return false;
+            }
+        }
         return true;
     });
 
@@ -239,29 +260,66 @@ window.addEventListener('pagehide', () => {
     dartPageUnloading = true;
 }, { once: true });
 
-async function loadSection(containerId, filePath, timeoutMs = 8000) {
-    const container = document.getElementById(containerId);
-    if (!container) return false;
+const DART_FRAGMENT_CACHE_PREFIX = 'dart_fragment_v2:';
 
-    setUiState(container, 'loading', 'Loading', 'Preparing this section…');
+function fragmentCacheKey(filePath) {
+    return DART_FRAGMENT_CACHE_PREFIX + String(filePath || '');
+}
+
+function readFragmentCache(filePath) {
+    try { return localStorage.getItem(fragmentCacheKey(filePath)) || ''; }
+    catch { return ''; }
+}
+
+function writeFragmentCache(filePath, html) {
+    try { localStorage.setItem(fragmentCacheKey(filePath), html); }
+    catch {}
+}
+
+function emitSectionLoaded(containerId, filePath, cached = false) {
+    document.dispatchEvent(new CustomEvent('dart:section-loaded', {
+        detail: { containerId, filePath, cached }
+    }));
+}
+
+async function fetchStaticFragment(filePath, timeoutMs = 8000) {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetch(filePath, {
             signal: controller.signal,
-            cache: 'no-cache',
+            cache: 'force-cache',
             credentials: 'same-origin'
         });
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
         const html = await response.text();
+        writeFragmentCache(filePath, html);
+        return html;
+    } finally {
+        window.clearTimeout(timeout);
+    }
+}
+
+async function loadSection(containerId, filePath, timeoutMs = 8000) {
+    const container = document.getElementById(containerId);
+    if (!container) return false;
+
+    const cached = readFragmentCache(filePath);
+    if (cached) {
+        container.innerHTML = cached;
+        emitSectionLoaded(containerId, filePath, true);
+        // Revalidate only for the next navigation so active DOM/listeners do not jump.
+        void fetchStaticFragment(filePath, timeoutMs).catch(() => {});
+        return true;
+    }
+
+    setUiState(container, 'loading', 'Loading', 'Preparing this section…');
+    try {
+        const html = await fetchStaticFragment(filePath, timeoutMs);
         container.innerHTML = html;
-        document.dispatchEvent(new CustomEvent('dart:section-loaded', {
-            detail: { containerId, filePath }
-        }));
+        emitSectionLoaded(containerId, filePath, false);
         return true;
     } catch (error) {
-        // A full-page navigation can abort optional fragment fetches. That is not a
-        // section failure and should not create console noise or a transient error UI.
         if (dartPageUnloading) return false;
         console.error(`Failed to load (${filePath}):`, error);
         setUiState(
@@ -275,8 +333,6 @@ async function loadSection(containerId, filePath, timeoutMs = 8000) {
             () => loadSection(containerId, filePath, timeoutMs)
         );
         return false;
-    } finally {
-        window.clearTimeout(timeout);
     }
 }
 
@@ -835,6 +891,7 @@ async function persistCartReservation() {
     const previous = window.DartState?.clone?.(window.DartState?.read?.('dart_cart', []) || [])
         ?? JSON.parse(JSON.stringify(window.DartState?.read?.('dart_cart', []) || []));
     try {
+        cacheFastCartSnapshot(cartData);
         if (window.DartPlatform?.reserveCart) {
             await window.DartPlatform.reserveCart(cartData);
         } else {
@@ -850,6 +907,7 @@ async function persistCartReservation() {
         return true;
     } catch (error) {
         cartData = previous;
+        cacheFastCartSnapshot(previous);
         window.DartState?.write?.('dart_cart', previous, { source: 'cart-rollback' });
         showToast(error.message || 'تعذر حجز القطعة. حاول مرة أخرى.');
         return false;
@@ -911,9 +969,13 @@ function initCartAndCheckoutEvents() {
                 });
             }
 
+            // Optimistic UI: the cart badge/list updates immediately, while the
+            // backend reservation remains authoritative and can roll this back.
+            cacheFastCartSnapshot(cartData);
+            renderCart();
+            updateCartCount();
             if (!await persistCartReservation()) { renderCart(); return; }
             showToast("تم إضافة المنتج إلى السلة بنجاح!");
-            updateCartCount();
             showCartBanner(activeProduct.title);
             closeProductModal();
             renderCart();
@@ -1494,22 +1556,46 @@ function initProductFilterToggle() {
 
 function renderFilterButtons() {
     const filterContainer = document.getElementById('filterContainer');
-    if (!filterContainer || !productsData.length) return;
+    if (!filterContainer) return;
+    productsData = DartCatalog.products();
+    if (!productsData.length && !publicCatalogProducts().length) return;
 
     const catalog = publicCatalogProducts();
     const categories = ['All', ...new Set(catalog.map(p => p.category).filter(Boolean))];
     const pairs = catalog.flatMap(productStockPairs);
     const sizes = [...new Set(pairs.map(pair => pair.size))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     const colors = [...new Set(pairs.map(pair => pair.color))].sort((a, b) => a.localeCompare(b, ['en', 'ar']));
+    const prices = catalog.map(product => Number(product.price) || 0).filter(price => price > 0).sort((a, b) => a - b);
 
-    filterContainer.innerHTML = categories.map((cat, index) => `
-        <button type="button" class="filter-btn ${index === 0 ? 'active' : ''}" data-category="${escapeCatalogHtml(cat)}">
+    filterContainer.innerHTML = categories.map(cat => `
+        <button type="button" class="filter-btn ${String(productFilterState.category).toLocaleLowerCase() === String(cat).toLocaleLowerCase() ? 'active' : ''}" data-category="${escapeCatalogHtml(cat)}">
             ${escapeCatalogHtml(cat)}
         </button>
     `).join('');
 
     setProductFilterSelectOptions(document.getElementById('productSizeFilter'), sizes, 'All sizes');
     setProductFilterSelectOptions(document.getElementById('productColorFilter'), colors, 'All colors');
+    const priceSelect = document.getElementById('productPriceFilter');
+    if (priceSelect) {
+        const current = priceSelect.value || productFilterState.price || 'all';
+        priceSelect.replaceChildren(new Option('All prices', 'all'));
+        if (prices.length) {
+            const min = Math.floor(prices[0] / 50) * 50;
+            const max = Math.ceil(prices[prices.length - 1] / 50) * 50;
+            if (min === max) {
+                priceSelect.add(new Option(`${min} EGP`, `range:${min}:${max}`));
+            } else {
+                const step = Math.max(50, Math.ceil((max - min) / 3 / 50) * 50);
+                for (let low = min; low <= max; low += step) {
+                    const high = Math.min(max, low + step - 1);
+                    priceSelect.add(new Option(`${low} – ${high} EGP`, `range:${low}:${high}`));
+                    if (high >= max) break;
+                }
+            }
+        }
+        priceSelect.value = [...priceSelect.options].some(option => option.value === current) ? current : 'all';
+        productFilterState.price = priceSelect.value;
+    }
 
     filterContainer.onclick = function(e) {
         const btn = e.target.closest('.filter-btn');
@@ -1710,6 +1796,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProductsLogic();
     renderFilterButtons();
     initProductFilterToggle();
+    window.addEventListener('dart:catalog-hydrated', () => {
+        productsData = DartCatalog.products();
+        renderProductsLogic();
+        renderFilterButtons();
+    });
     renderReviewsLogic();
     if (document.getElementById('reviewsContainer')) void hydratePublicReviews();
     initCartAndCheckoutEvents();
@@ -1741,6 +1832,27 @@ function initAccountModeToggle() {
     if (!container || !registerButton || !loginButton) return;
     registerButton.addEventListener('click', () => container.classList.add('active'));
     loginButton.addEventListener('click', () => container.classList.remove('active'));
+}
+
+function warmInternalPageCache() {
+    const seen = new Set();
+    const warm = (link) => {
+        try {
+            const url = new URL(link.href, location.href);
+            if (url.origin !== location.origin || url.pathname.startsWith('/Eye/') ||
+                ['/profile.html','/cart-checkout.html','/track.html','/rep.html','/Sign%20Up%20modern.html'].includes(url.pathname)) return;
+            if (!/\.html$|\/$/i.test(url.pathname) || seen.has(url.href)) return;
+            seen.add(url.href);
+            void fetch(url.href, { credentials: 'same-origin', cache: 'force-cache' }).catch(() => {});
+        } catch {}
+    };
+    document.querySelectorAll('a[href]').forEach(link => {
+        link.addEventListener('pointerenter', () => warm(link), { once: true, passive: true });
+        link.addEventListener('touchstart', () => warm(link), { once: true, passive: true });
+    });
+    const idleWarm = () => document.querySelectorAll('a[href]').forEach(warm);
+    if ('requestIdleCallback' in window) window.requestIdleCallback(idleWarm, { timeout: 1500 });
+    else window.setTimeout(idleWarm, 500);
 }
 
 function registerDartServiceWorker() {

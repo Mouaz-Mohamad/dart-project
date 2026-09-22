@@ -538,7 +538,7 @@
 
   function startLiveRefresh() {
     clearInterval(versionPollTimer);
-    const intervalMs = IS_ADMIN ? 8000 : 20000;
+    const intervalMs = IS_ADMIN ? 3000 : 20000;
     versionPollTimer = window.setInterval(() => {
       if (!document.hidden) void checkForServerChanges();
     }, intervalMs);

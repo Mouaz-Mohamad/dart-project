@@ -290,7 +290,7 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) checkAll();
   });
-  window.setInterval(checkAll, 12000);
+  window.setInterval(checkAll, 3000);
 
   window.DartDomainState = {
     hydrateAll,
