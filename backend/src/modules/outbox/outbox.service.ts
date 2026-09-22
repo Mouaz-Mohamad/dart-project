@@ -248,6 +248,10 @@ export class OutboxService {
         prefix: "staff-onboarding-code:",
         table: "staff_onboarding_challenges",
       },
+      STAFF_EMAIL_ACCESS_CODE_REQUESTED: {
+        prefix: "staff-email-access-code:",
+        table: "staff_email_login_challenges",
+      },
       EMAIL_VERIFICATION_REQUESTED: {
         prefix: "email-verification:",
         table: "email_verification_challenges",
