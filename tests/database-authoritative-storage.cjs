@@ -45,12 +45,12 @@ if (/indexedDB\s*\.\s*(?:open|deleteDatabase)\s*\(/.test(catalog)) {
   failures.push("Js/dart-catalog.js: product media must be persisted through the API, never IndexedDB");
 }
 
-const cart = fs.readFileSync("Js/one .js", "utf8");
+const cart = fs.readFileSync("Js/dart-ui.js", "utf8");
 if (/function\s+saveCartToLocalStorage\s*\(/.test(cart)) {
-  failures.push("Js/one .js: stale saveCartToLocalStorage name hides the server-backed cart contract");
+  failures.push("Js/dart-ui.js: stale saveCartToLocalStorage name hides the server-backed cart contract");
 }
 if (!/function\s+persistCartReservation\s*\(/.test(cart)) {
-  failures.push("Js/one .js: server-backed cart persistence function is missing");
+  failures.push("Js/dart-ui.js: server-backed cart persistence function is missing");
 }
 
 if (failures.length) {
