@@ -1,3 +1,7 @@
+// DART | MODULE: dart-rep.js
+// Representative portal auth, assignments, delivery, return pickup, and live-location UI.
+// BEGIN MODULE
+
 (function () {
   "use strict";
 
@@ -1516,3 +1520,6 @@
       renderOrders();
   });
 })();
+
+
+// END MODULE
