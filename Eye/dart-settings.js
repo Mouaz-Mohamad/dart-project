@@ -201,11 +201,10 @@
 
   async function saveSettings(next, note) {
     const before = clone(root.DartSiteSettings.get());
-    root.DartSiteSettings.save(next);
     try {
       const saved = root.DartSiteSettings.sync
-        ? await root.DartSiteSettings.sync()
-        : root.DartSiteSettings.get();
+        ? await root.DartSiteSettings.sync(next)
+        : root.DartSiteSettings.save(next);
       void before;
       void note;
       await root.DartDomainState?.hydrateAudit?.().catch(() => {});
@@ -458,11 +457,27 @@
     saveSettings(next, "Product card color visibility updated");
   });
 
-  function init() {
-    const settings = root.DartSiteSettings.get();
-    fillGeneral(settings); renderMedia(settings); renderAnnouncements(settings); renderTyping(settings); renderModelCards(settings);
+  function renderSettings(settings = root.DartSiteSettings.get()) {
+    fillGeneral(settings);
+    renderMedia(settings);
+    renderAnnouncements(settings);
+    renderTyping(settings);
+    renderModelCards(settings);
   }
-  document.addEventListener("DOMContentLoaded", init);
+
+  async function init() {
+    let settings = root.DartSiteSettings.get();
+    try {
+      settings = await root.DartSiteSettings.hydrate?.(true) || settings;
+    } catch (error) {
+      announce(error.message || "تعذر تحميل أحدث إعدادات الموقع.", true);
+    }
+    renderSettings(settings);
+  }
+  document.addEventListener("DOMContentLoaded", () => { void init(); });
+  root.addEventListener("dart:site-settings-changed", (event) => {
+    renderSettings(event.detail || root.DartSiteSettings.get());
+  });
   root.addEventListener("dart:data-changed", (event) => { if (event.detail?.key === "dart_models") renderModelCards(root.DartSiteSettings.get()); });
 })(typeof window !== "undefined" ? window : globalThis);
 

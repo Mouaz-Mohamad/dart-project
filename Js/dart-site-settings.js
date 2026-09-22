@@ -175,14 +175,18 @@
     return cachedSettings;
   }
 
-  async function sync() {
-    if (!IS_ADMIN || !API_BASE || !serverVersion) return get();
+  async function sync(value = get()) {
+    if (!IS_ADMIN || !API_BASE) return get();
+    clearTimeout(syncTimer);
+    syncTimer = 0;
+    if (!serverVersion) await hydrate(true);
+    const normalized = merge(value);
     const payload = await api("/api/v1/admin/site-settings", {
       method: "PUT",
-      body: { expectedVersion: serverVersion, settings: get() },
+      body: { expectedVersion: serverVersion, settings: normalized },
     });
     serverVersion = Number(payload.version || serverVersion);
-    return setCache(payload.settings || get());
+    return setCache(payload.settings || normalized);
   }
 
   function scheduleSync() {
@@ -202,10 +206,10 @@
     return normalized;
   }
 
-  async function hydrate(_force = false) {
+  async function hydrate(force = false) {
     if (!API_BASE) throw new Error("Site settings API is not configured.");
     const payload = await api("/api/v1/site-settings", {
-      headers: publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
+      headers: !force && publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
     });
     if (payload?.notModified) return get();
     serverVersion = Number(payload.version || 1);

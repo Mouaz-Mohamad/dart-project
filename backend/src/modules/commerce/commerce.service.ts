@@ -4950,6 +4950,7 @@ export class CommerceService {
     cards: unknown[];
     birthdayRewards: unknown[];
     birthdayMessages: unknown[];
+    reviewEligible: boolean;
     savedAddress: Record<string, unknown> | null;
   }> {
     const customerResult = await this.pool.query<{ client_code: string }>(
@@ -5136,6 +5137,7 @@ export class CommerceService {
       cards: onlyCustomer(stateByDomain.get("cards") || []),
       birthdayRewards: onlyCustomer(stateByDomain.get("birthday_rewards") || []),
       birthdayMessages: onlyCustomer(stateByDomain.get("birthday_messages") || []),
+      reviewEligible: ordersResult.rows.some((row) => row.status === "Delivered"),
       savedAddress: preferencesResult.rows[0]?.last_address || null,
     };
   }

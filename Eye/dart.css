@@ -1,7 +1,7 @@
 /* DART CODE GUIDE | Eye/dart.css
    الغرض: تنسيقات قسم من Dart Eye Dashboard مع دعم الكمبيوتر والموبايل. */
 /* ربط الخط وأيقونات Boxicons إذا لم تكن مضافة مسبقاً */
-@import url('https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/boxicons/2.1.4/css/boxicons.min.css');
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -144,6 +144,15 @@ textarea {
   z-index: 100;
   padding: 20px 15px;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.cont-menu > img {
+  display: block;
+  width: min(132px, 82%);
+  max-height: 82px;
+  margin: 0 auto 4px;
+  object-fit: contain;
+  border-radius: 10px;
 }
 
 .menu {

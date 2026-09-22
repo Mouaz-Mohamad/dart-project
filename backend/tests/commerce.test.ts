@@ -178,11 +178,69 @@ describe("CommerceService relational customer snapshot", () => {
     expect(snapshot.cards).toHaveLength(1);
     expect(snapshot.birthdayRewards).toHaveLength(1);
     expect(snapshot.birthdayMessages).toHaveLength(1);
+    expect(snapshot.reviewEligible).toBe(false);
     expect(
       query.mock.calls.some(([sql]) =>
         String(sql).includes("SELECT domain, data FROM dashboard_domain_state"),
       ),
     ).toBe(false);
+  });
+
+  it("marks a customer review-eligible when any authoritative order is Delivered", async () => {
+    const now = new Date("2026-09-22T12:00:00.000Z");
+    const query = vi.fn(async (sql: string, values: unknown[] = []) => {
+      if (sql.includes("SELECT client_code FROM customers")) {
+        return { rows: [{ client_code: "DR-1" }] };
+      }
+      if (sql.includes("FROM orders o") && sql.includes("WHERE o.customer_user_id")) {
+        return {
+          rows: [{
+            id: "o1",
+            order_code: "K-1",
+            status: "Delivered",
+            payment_method: "COD",
+            payment_status: "Paid",
+            subtotal_minor: "10000",
+            order_discount_minor: "0",
+            final_minor: "10000",
+            delivery_cost_minor: "0",
+            amount_paid_minor: "10000",
+            amount_refunded_minor: "0",
+            promotion: null,
+            contact_snapshot: {},
+            delivery_address: {},
+            delivery_notes: "",
+            created_at: now,
+            updated_at: now,
+            delivered_at: now,
+            delivery_started_at: null,
+            representative_user_id: null,
+            representative_code: null,
+            representative_name: null,
+            representative_phone: null,
+            courier_latitude: null,
+            courier_longitude: null,
+            courier_accuracy_meters: null,
+            courier_updated_at: null,
+            items: [],
+          }],
+        };
+      }
+      if (sql.includes("FROM return_requests")) return { rows: [] };
+      if (sql.includes("FROM loyalty_cards")) return { rows: [] };
+      if (sql.includes("FROM birthday_rewards")) return { rows: [] };
+      if (sql.includes("FROM message_records")) {
+        expect(values[0]).toBe("birthday_messages");
+        return { rows: [] };
+      }
+      if (sql.includes("FROM customer_preferences")) return { rows: [{ last_address: null }] };
+      throw new Error(`Unexpected query in review eligibility snapshot test: ${sql}`);
+    });
+    const pool = { query } as unknown as Pool;
+    const snapshot = await new CommerceService(pool).customerSnapshot(
+      "123e4567-e89b-12d3-a456-426614174001",
+    );
+    expect(snapshot.reviewEligible).toBe(true);
   });
 });
 

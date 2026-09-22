@@ -35,6 +35,9 @@
   const API_USER_CACHE_KEY = "dart_api_user_cache";
   const CART_UI_CACHE_KEY = "dart_cart_ui_cache_v1";
   let checkoutSubmissionBusy = false;
+  let serverReviewEligible = null;
+  let customerCommercePromise = null;
+  let customerCommerceGeneration = 0;
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;
@@ -460,7 +463,14 @@
   }
 
   function cacheApiUser(profile) {
+    const previousId = apiUserCache?.id || null;
     apiUserCache = adaptApiUser(profile);
+    const nextId = apiUserCache?.id || null;
+    if (previousId !== nextId) {
+      customerCommerceGeneration += 1;
+      customerCommercePromise = null;
+      serverReviewEligible = null;
+    }
     if (apiUserCache)
       sessionStorage.setItem(API_USER_CACHE_KEY, JSON.stringify(apiUserCache));
     else sessionStorage.removeItem(API_USER_CACHE_KEY);
@@ -469,23 +479,55 @@
 
   async function hydrateCustomerCommerce() {
     if (!API_BASE || !apiUserCache) return null;
-    const payload = await apiRequest("/api/v1/me/commerce");
-    const snapshots = [
-      [KEYS.orders, payload.orders || []],
-      [KEYS.returns, payload.returns || []],
-      [KEYS.cards, payload.cards || []],
-      [KEYS.birthdayRewards, payload.birthdayRewards || []],
-      [KEYS.birthdayMessages, payload.birthdayMessages || []],
-    ];
-    snapshots.forEach(([key, value]) => write(key, value));
-    if (payload.savedAddress) write("user_last_address", payload.savedAddress);
-    else window.DartState?.remove?.("user_last_address", { source: "platform" });
-    window.dispatchEvent(
-      new CustomEvent("dart:saved-address-hydrated", {
-        detail: { address: payload.savedAddress || null },
-      }),
-    );
-    return payload;
+    if (customerCommercePromise) return customerCommercePromise;
+    const generation = customerCommerceGeneration;
+    const customerId = apiUserCache.id;
+    const task = (async () => {
+      const payload = await apiRequest("/api/v1/me/commerce");
+      if (
+        generation !== customerCommerceGeneration ||
+        !apiUserCache ||
+        apiUserCache.id !== customerId
+      ) {
+        return payload;
+      }
+      serverReviewEligible = payload.reviewEligible === true;
+      const snapshots = [
+        [KEYS.orders, payload.orders || []],
+        [KEYS.returns, payload.returns || []],
+        [KEYS.cards, payload.cards || []],
+        [KEYS.birthdayRewards, payload.birthdayRewards || []],
+        [KEYS.birthdayMessages, payload.birthdayMessages || []],
+      ];
+      snapshots.forEach(([key, value]) => write(key, value));
+      if (payload.savedAddress) write("user_last_address", payload.savedAddress);
+      else window.DartState?.remove?.("user_last_address", { source: "platform" });
+      window.dispatchEvent(
+        new CustomEvent("dart:saved-address-hydrated", {
+          detail: { address: payload.savedAddress || null },
+        }),
+      );
+      return payload;
+    })();
+    customerCommercePromise = task;
+    try {
+      return await task;
+    } finally {
+      if (customerCommercePromise === task) customerCommercePromise = null;
+    }
+  }
+
+  function refreshCustomerCommerceInBackground() {
+    if (!API_BASE || !apiUserCache) return;
+    void hydrateCustomerCommerce().catch((error) => {
+      if (error?.status !== 401) {
+        window.dispatchEvent(
+          new CustomEvent("dart:customer-commerce-unavailable", {
+            detail: { code: error?.code || "API_ERROR" },
+          }),
+        );
+      }
+    });
   }
 
   async function saveCustomerAddress(address) {
@@ -548,7 +590,7 @@
     try {
       const payload = await apiRequest("/api/v1/me");
       const user = cacheApiUser(payload.user);
-      if (user) await hydrateCustomerCommerce();
+      if (user) refreshCustomerCommerceInBackground();
       return user;
     } catch (error) {
       if (error.status === 401) return cacheApiUser(null);
@@ -713,7 +755,7 @@
       });
       if (result.user) {
         cacheApiUser(result.user);
-        await hydrateCustomerCommerce();
+        refreshCustomerCommerceInBackground();
       }
       return result;
     }
@@ -768,7 +810,7 @@
         body: { identifier, password },
       });
       const user = cacheApiUser(payload.user);
-      await hydrateCustomerCommerce();
+      refreshCustomerCommerceInBackground();
       return user;
     }
     if (API_REQUIRED)
@@ -1516,13 +1558,15 @@
   function renderFeedbackEligibility() {
     const section = document.getElementById("reviewForm")?.closest(".feedback-section");
     if (!section || section.dataset.eligibilityRendered) return;
-    const user = currentUser(),
-      eligible =
-        user &&
-        read(KEYS.orders, []).some(
-          (order) =>
-            order.clientId === user.customerId && order.status === "Delivered",
-        );
+    const user = currentUser();
+    const eligible =
+      Boolean(user) &&
+      (API_BASE
+        ? serverReviewEligible === true
+        : read(KEYS.orders, []).some(
+            (order) =>
+              order.clientId === user.customerId && order.status === "Delivered",
+          ));
     if (eligible) {
       section.dataset.eligibilityRendered = "1";
       section.querySelector(".feedback-access-message")?.remove();
@@ -2161,7 +2205,7 @@
               setStatus(form, "تم إرسال كود التأكيد إلى بريدك الإلكتروني.");
             } else {
               setStatus(form, "تم إنشاء الحساب بنجاح.");
-              setTimeout(() => location.assign(requestedAuthDestination()), 450);
+              location.assign(requestedAuthDestination());
             }
           } catch (error) {
             setStatus(form, error.message, true);
@@ -2190,7 +2234,7 @@
               const dialog = document.getElementById("customerPasswordChange");
               if (dialog) dialog.hidden = false;
             } else
-              setTimeout(() => location.assign(requestedAuthDestination()), 350);
+              location.assign(requestedAuthDestination());
           } catch (error) {
             setStatus(form, error.message, true);
           }
@@ -3164,7 +3208,6 @@
         if (!window.DartCatalog?.isServerAuthoritative?.()) {
           await window.DartCatalog?.hydrate?.();
         }
-        if (currentUser()) await hydrateCustomerCommerce();
         await hydrateCustomerCart();
       } catch (error) {
         // Expected connectivity/API bootstrap failures are surfaced as UI state,
