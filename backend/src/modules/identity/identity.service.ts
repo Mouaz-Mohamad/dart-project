@@ -4,7 +4,12 @@ import type { AppConfig } from "../../config/env.js";
 import { AppError } from "../../http/app-error.js";
 import { decryptSecret, digest, encryptSecret, randomToken, safeEqual } from "../../security/crypto.js";
 import { normalizeEmail, normalizeEgyptianPhone, normalizeIdentifier } from "../../security/normalization.js";
-import { hashPassword, validatePasswordPolicy, verifyPassword } from "../../security/password.js";
+import {
+  hashPassword,
+  validateCustomerPasswordPolicy,
+  validatePasswordPolicy,
+  verifyPassword,
+} from "../../security/password.js";
 import {
   createSessionSecret,
   hashCsrfToken,
@@ -104,6 +109,13 @@ function passwordPolicyOrThrow(password: string): void {
   }
 }
 
+function customerPasswordPolicyOrThrow(password: string): void {
+  const problems = validateCustomerPasswordPolicy(password);
+  if (problems.length > 0) {
+    throw new AppError(422, "WEAK_PASSWORD", "Password must contain at least 4 characters", problems);
+  }
+}
+
 function normalizePhonesOrThrow(phones: string[]): string[] {
   try {
     return [...new Set(phones.map(normalizeEgyptianPhone))];
@@ -193,7 +205,7 @@ export class IdentityService {
     input: RegisterCustomerInput,
     metadata: RequestMetadata,
   ): Promise<{ userId: string; challengeId: string; expiresAt: Date }> {
-    passwordPolicyOrThrow(input.password);
+    customerPasswordPolicyOrThrow(input.password);
     const email = input.email.trim();
     const emailNormalized = normalizeEmail(email);
     const phones = [input.phone1, input.phone2].filter((value): value is string => Boolean(value?.trim()));
@@ -2907,7 +2919,8 @@ export class IdentityService {
     if (!account.mustChangePassword) {
       throw new AppError(409, "TEMPORARY_PASSWORD_NOT_ACTIVE", "This account does not require a password replacement");
     }
-    passwordPolicyOrThrow(newPassword);
+    if (account.accountType === "customer") customerPasswordPolicyOrThrow(newPassword);
+    else passwordPolicyOrThrow(newPassword);
     const history = await this.pool.query<{ password_hash: string }>(
       `SELECT password_hash FROM (
         SELECT password_hash, created_at FROM password_history WHERE user_id = $1
