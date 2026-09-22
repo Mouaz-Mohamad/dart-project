@@ -76,6 +76,7 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
         "notification_records",
         "message_records",
         "finance_records",
+        "cod_verification_events",
       ]),
     );
 
@@ -238,6 +239,166 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
     );
     expect(cleared.rows[0]!.count).toBe("0");
   });
+
+  it("blocks COD Preparing until verification, then accepts a verified order and rejects a stale verification retry", async () => {
+    const suffix = randomUUID().replaceAll("-", "").slice(0, 10);
+    const customerUserId = randomUUID();
+    const staffUserId = randomUUID();
+    const orderId = randomUUID();
+    const orderCode = `K-RISK-${suffix}`;
+
+    await testPool!.query(
+      `INSERT INTO users (
+         id, account_type, email, email_normalized, password_hash, status, email_verified_at
+       ) VALUES
+         ($1,'customer',$2,$2,'test-hash','active',now()),
+         ($3,'staff',$4,$4,'test-hash','active',now())`,
+      [
+        customerUserId,
+        `risk-customer-${suffix}@example.com`,
+        staffUserId,
+        `risk-staff-${suffix}@example.com`,
+      ],
+    );
+    await testPool!.query(
+      "INSERT INTO customers (user_id, full_name) VALUES ($1,'Risk Test Customer')",
+      [customerUserId],
+    );
+    await testPool!.query(
+      `INSERT INTO staff_users (user_id, display_name, is_owner, mfa_required)
+       VALUES ($1,'Risk Test Staff',false,false)`,
+      [staffUserId],
+    );
+    await testPool!.query(
+      `INSERT INTO account_phones (
+         user_id, account_type, phone_normalized, phone_display, is_primary, verified_at
+       ) VALUES ($1,'customer',$2,$3,true,now())`,
+      [customerUserId, `2010${suffix.slice(0, 8)}`, `+2010${suffix.slice(0, 8)}`],
+    );
+    await testPool!.query(
+      `INSERT INTO orders (
+         id, order_code, customer_user_id, status, payment_method, payment_status,
+         subtotal_minor, final_minor, contact_snapshot, delivery_address
+       ) VALUES (
+         $1,$2,$3,'Accepted','Cash on Delivery','Unpaid',
+         60000,60000,$4::jsonb,$5::jsonb
+       )`,
+      [
+        orderId,
+        orderCode,
+        customerUserId,
+        JSON.stringify({ name: "Risk Test Customer", phone1: "+201000000000" }),
+        JSON.stringify({
+          country: "Egypt",
+          governorate: "Cairo",
+          area: "Nasr City",
+          street: "Test Street",
+          building: "1",
+        }),
+      ],
+    );
+
+    const commerce = new CommerceService(testPool!);
+    await expect(
+      commerce.adminOrderWorkflowAction(
+        staffUserId,
+        orderCode,
+        { expectedStatus: "Accepted", target: "Preparing" },
+        `risk-block-${suffix}`,
+      ),
+    ).rejects.toMatchObject({
+      code: "COD_VERIFICATION_REQUIRED",
+      statusCode: 409,
+    });
+
+    const blocked = await testPool!.query<{
+      status: string;
+      version: string;
+      cod_verification_status: string;
+      cod_risk_level: string;
+    }>(
+      `SELECT status, version::text, cod_verification_status, cod_risk_level
+         FROM orders WHERE id=$1`,
+      [orderId],
+    );
+    expect(blocked.rows[0]).toMatchObject({
+      status: "Accepted",
+      cod_verification_status: "Required",
+      cod_risk_level: "Medium",
+    });
+    const expectedVersion = Number(blocked.rows[0]!.version);
+
+    await commerce.adminCodVerificationAction(
+      staffUserId,
+      orderCode,
+      {
+        expectedVersion,
+        decision: "verify",
+        reason: "Customer confirmed COD order details",
+      },
+      `risk-verify-${suffix}`,
+    );
+
+    const verified = await testPool!.query<{
+      version: string;
+      cod_verification_status: string;
+      cod_verified_by: string | null;
+    }>(
+      `SELECT version::text, cod_verification_status, cod_verified_by::text
+         FROM orders WHERE id=$1`,
+      [orderId],
+    );
+    expect(verified.rows[0]).toMatchObject({
+      cod_verification_status: "Verified",
+      cod_verified_by: staffUserId,
+    });
+
+    await expect(
+      commerce.adminCodVerificationAction(
+        staffUserId,
+        orderCode,
+        {
+          expectedVersion,
+          decision: "verify",
+          reason: "Duplicate retry with stale version",
+        },
+        `risk-stale-${suffix}`,
+      ),
+    ).rejects.toMatchObject({
+      code: "ORDER_VERSION_CONFLICT",
+      statusCode: 409,
+    });
+
+    await commerce.adminOrderWorkflowAction(
+      staffUserId,
+      orderCode,
+      { expectedStatus: "Accepted", target: "Preparing" },
+      `risk-prepare-${suffix}`,
+    );
+
+    const prepared = await testPool!.query<{
+      status: string;
+      cod_verification_status: string;
+    }>(
+      "SELECT status, cod_verification_status FROM orders WHERE id=$1",
+      [orderId],
+    );
+    expect(prepared.rows[0]).toEqual({
+      status: "Preparing",
+      cod_verification_status: "Verified",
+    });
+
+    const events = await testPool!.query<{ event_type: string }>(
+      `SELECT event_type FROM cod_verification_events
+        WHERE order_id=$1
+        ORDER BY occurred_at`,
+      [orderId],
+    );
+    expect(events.rows.map((row) => row.event_type)).toEqual(
+      expect.arrayContaining(["RISK_EVALUATED", "VERIFICATION_APPROVED"]),
+    );
+  });
+
 
   it("enforces append-only audit records", async () => {
     const inserted = await testPool!.query<{ id: string }>(
