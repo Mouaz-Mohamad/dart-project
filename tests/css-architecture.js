@@ -5,8 +5,8 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
-const main = fs.readFileSync(path.join(root, "CSS/Stayle 1.css"), "utf8");
-const responsive = fs.readFileSync(path.join(root, "CSS/fixes.css"), "utf8");
+const main = fs.readFileSync(path.join(root, "CSS/main.css"), "utf8");
+const responsive = fs.readFileSync(path.join(root, "CSS/responsive.css"), "utf8");
 const dashboard = fs.readFileSync(path.join(root, "Eye/dart.css"), "utf8");
 
 function skipQuoted(text, index, quote) {
