@@ -225,13 +225,13 @@ describe("identity HTTP boundaries", () => {
       email: "customer@example.com",
       phone1: "01012345678",
       phone2: "",
-      password: "abcd",
+      password: "abcd1234",
     });
     expect(response.status).toBe(202);
     expect(response.body.status).toBe("verification_required");
     expect(response.headers["set-cookie"]).toBeUndefined();
     expect(service.registerCustomer).toHaveBeenCalledWith(
-      expect.objectContaining({ phone2: undefined, password: "abcd" }),
+      expect.objectContaining({ phone2: undefined, password: "abcd1234" }),
       expect.any(Object),
     );
   });

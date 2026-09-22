@@ -19,7 +19,7 @@ describe("identity security primitives", () => {
     await expect(verifyPassword(hash, "WrongPassword123")).resolves.toBe(false);
   });
 
-  it("keeps representative passwords strong while allowing 4+ character customer passwords", () => {
+  it("keeps representative passwords strong while requiring 8+ character customer passwords", () => {
     expect(validateCustomerPasswordPolicy("abc")).not.toHaveLength(0);
     expect(validateCustomerPasswordPolicy("abcd")).toEqual([]);
     expect(validatePasswordPolicy("short")).not.toHaveLength(0);

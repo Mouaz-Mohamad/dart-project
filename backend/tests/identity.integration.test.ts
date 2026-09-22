@@ -64,13 +64,13 @@ describe.skipIf(!databaseUrl)("identity service", () => {
         email: "Mouaz@Example.com",
         phone1: "01012345678",
         birthday: "2008-09-02",
-        password: "abcd",
+        password: "abcd1234",
       },
       requestMetadata,
     );
 
     await expect(
-      service!.login("customer", "mouaz@example.com", "abcd", requestMetadata),
+      service!.login("customer", "mouaz@example.com", "abcd1234", requestMetadata),
     ).rejects.toMatchObject({ code: "EMAIL_NOT_VERIFIED" });
 
     const event = await testPool!.query<{ payload: { encryptedParameters: { otp: string } } }>(
@@ -92,7 +92,7 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     const signedIn = await service!.login(
       "customer",
       "01012345678",
-      "abcd",
+      "abcd1234",
       requestMetadata,
     );
     expect(signedIn.account.permissions).toContain("profile.read_own");

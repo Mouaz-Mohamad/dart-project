@@ -15,7 +15,7 @@ import type { AccountType, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
-const customerPassword = z.string().min(4).max(200);
+const customerPassword = z.string().min(8).max(200);
 const password = z.string().min(12).max(200);
 const email = z.email().max(254);
 const egyptianPhone = z.string().min(10).max(25);
