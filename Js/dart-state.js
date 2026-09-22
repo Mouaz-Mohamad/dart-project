@@ -1,3 +1,7 @@
+// DART | MODULE: dart-state.js
+// Small browser-state compatibility adapter; never the production business authority.
+// BEGIN MODULE
+
 /* DART DATABASE-FIRST RUNTIME STATE
  * Business data lives in PostgreSQL. This file is an in-memory projection only.
  */
@@ -66,3 +70,6 @@
     keys: () => [...values.keys()],
   });
 })(typeof window !== "undefined" ? window : globalThis);
+
+
+// END MODULE
