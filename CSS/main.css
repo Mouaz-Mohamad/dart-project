@@ -1352,7 +1352,7 @@ header {
     background: var(--white);
     backdrop-filter: blur(10px);
     border-radius: 15px;
-    box-shadow: 1px 4px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
     font-family: var(--font-cabin);
     color: var(--bragnte);
 }
