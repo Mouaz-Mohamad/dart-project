@@ -20,8 +20,8 @@ describe("identity security primitives", () => {
   });
 
   it("keeps representative passwords strong while requiring 8+ character customer passwords", () => {
-    expect(validateCustomerPasswordPolicy("abc")).not.toHaveLength(0);
-    expect(validateCustomerPasswordPolicy("abcd")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("abcdefg")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("abcdefgh")).toEqual([]);
     expect(validatePasswordPolicy("short")).not.toHaveLength(0);
     expect(validatePasswordPolicy("StrongPassword123")).toEqual([]);
   });
