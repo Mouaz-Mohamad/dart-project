@@ -522,6 +522,64 @@ export function createCommerceRouter(
   );
 
   router.get(
+    "/admin/live-operations",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requireAnyPermission("live_map.read", "orders.read"),
+    async (_request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.adminLiveOperations());
+    },
+  );
+
+  router.post(
+    "/admin/live-operations/orders/:orderRef/state",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requireAnyPermission("live_map.manage", "orders.manage"),
+    async (request, response) => {
+      const orderRef = z.string().trim().min(1).max(160).parse(request.params.orderRef);
+      const body = z.object({
+        state: z.enum(["current", "upcoming", "waiting", "problem"]),
+        note: z.string().trim().max(500).optional(),
+      }).parse(request.body);
+      await commerce.adminLiveRouteState(
+        request.auth!.userId,
+        orderRef,
+        body.state,
+        body.note || "",
+        String(request.id),
+      );
+      response.status(200).json(await commerce.adminLiveOperations());
+    },
+  );
+
+  router.post(
+    "/admin/live-operations/representatives/:representativeId/reorder",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requireAnyPermission("live_map.manage", "orders.manage"),
+    async (request, response) => {
+      const representativeId = z.uuid().parse(request.params.representativeId);
+      const body = z.object({
+        orderCodes: z.array(z.string().trim().min(1).max(160)).min(1).max(100),
+      }).parse(request.body);
+      await commerce.reorderLiveRoute(
+        request.auth!.userId,
+        representativeId,
+        body.orderCodes,
+        String(request.id),
+      );
+      response.status(200).json(await commerce.adminLiveOperations());
+    },
+  );
+
+  router.get(
     "/me/tracking/live",
     rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
@@ -556,7 +614,7 @@ export function createCommerceRouter(
 
   router.put(
     "/representatives/location",
-    rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
@@ -586,7 +644,7 @@ export function createCommerceRouter(
     async (request, response) => {
       const orderCode = z.string().trim().min(2).max(120).parse(request.params.orderCode);
       const body = z.object({
-        action: z.enum(["start", "cancel", "delivered"]),
+        action: z.enum(["start", "cancel", "delivered", "waiting", "problem"]),
       }).parse(request.body);
       const order = await commerce.representativeOrderAction(
           request.auth!.userId,
