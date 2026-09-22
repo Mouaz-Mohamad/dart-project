@@ -318,10 +318,32 @@
 
   if (!root.document) return;
   root.document.addEventListener("DOMContentLoaded", () => {
-    applyPublicMedia();
-    hydrate().then(applyPublicMedia).catch((error) => {
-      if (error.status !== 401) console.warn("Dart site settings hydration failed", error);
-    });
+    let hasCachedPublicSettings = false;
+    try {
+      hasCachedPublicSettings = Boolean(root.localStorage?.getItem(PUBLIC_CACHE_KEY));
+    } catch {}
+    const hero = root.document?.querySelector(".hero > img[data-dart-hero]");
+    if (hasCachedPublicSettings) {
+      void applyPublicMedia();
+    } else if (hero) {
+      // On a brand-new browser, keep the default hero hidden until the
+      // authoritative site settings arrive. This prevents old/default media flash.
+      hero.dataset.dartMediaReady = "false";
+    }
+    hydrate()
+      .then(applyPublicMedia)
+      .catch((error) => {
+        // If the settings API is genuinely unavailable, reveal the local fallback
+        // instead of leaving the hero blank indefinitely.
+        if (hero) hero.dataset.dartMediaReady = "true";
+        if (error.status !== 401) {
+          root.dispatchEvent?.(
+            new CustomEvent("dart:site-settings-unavailable", {
+              detail: { code: error?.code || "SITE_SETTINGS_UNAVAILABLE" },
+            }),
+          );
+        }
+      });
   });
   root.document.addEventListener("dart:section-loaded", applyPublicMedia);
   root.document.addEventListener("dart:sections-loaded", applyPublicMedia);

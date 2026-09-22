@@ -2173,8 +2173,26 @@ function restartHeroTyping() {
     if (scenes.length) typeScene(typingRunId);
 }
 
-restartHeroTyping();
-window.addEventListener("dart:site-settings-changed", restartHeroTyping);
+let dartHeroSettingsReady = false;
+try {
+    dartHeroSettingsReady = Boolean(localStorage.getItem('dart_public_site_settings_v2'));
+} catch {}
+if (dartHeroSettingsReady) {
+    restartHeroTyping();
+} else if (typingContainer) {
+    typingContainer.replaceChildren();
+}
+window.addEventListener("dart:site-settings-changed", () => {
+    dartHeroSettingsReady = true;
+    restartHeroTyping();
+});
+// Offline/API-failure fallback: never leave the hero copy blank forever.
+window.setTimeout(() => {
+    if (!dartHeroSettingsReady) {
+        dartHeroSettingsReady = true;
+        restartHeroTyping();
+    }
+}, 2500);
 
 
 // Keep public reviews current without a page reload, but only on pages that render them.
