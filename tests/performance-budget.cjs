@@ -47,11 +47,20 @@ function walk(root) {
 }
 
 const jsFiles = ["Js", "Eye"].flatMap(walk).filter((file) => file.endsWith(".js"));
+const lazyFeatureFiles = new Set(["Eye/dart-live-operations.js"]);
+const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
+const dashboardRuntime = fs.readFileSync("Eye/dart.js", "utf8");
+if (/script[^>]+src=["']dart-live-operations\.js["']/i.test(dashboardHtml)) {
+  failures.push("Eye/Dart Eye.html: Live Operations must remain lazy-loaded");
+}
+if (!dashboardRuntime.includes('script.src = "dart-live-operations.js"')) {
+  failures.push("Eye/dart.js: Live Operations lazy loader is missing");
+}
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
 for (const file of jsFiles) {
   const size = fs.statSync(file).size;
-  totalJsBytes += size;
+  if (!lazyFeatureFiles.has(file)) totalJsBytes += size;
   if (size > maxJsBytes) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
