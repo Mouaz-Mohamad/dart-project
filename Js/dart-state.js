@@ -42,15 +42,6 @@
     if (options.emit !== false) emit(key, value, options.source || "memory");
     return value;
   }
-  function remove(key, options = {}) {
-    const existed = values.delete(key);
-    if (existed && options.emit !== false) emit(key, undefined, options.source || "memory");
-    return existed;
-  }
-  function clearBusiness(options = {}) {
-    for (const key of BUSINESS_KEYS) values.delete(key);
-    if (options.emit !== false) root.dispatchEvent?.(new CustomEvent("dart:business-state-cleared"));
-  }
   function purgeLegacyBrowserBusinessData() {
     const marker = "dart_database_only_migration_v1";
     try {
@@ -62,13 +53,7 @@
     } catch {}
   }
   purgeLegacyBrowserBusinessData();
-  root.DartState = Object.freeze({
-    read, write, remove, clone, clearBusiness, purgeLegacyBrowserBusinessData,
-    has: (key) => values.has(key),
-    revision: (key) => revisions.get(key) || 0,
-    isBusinessKey: (key) => BUSINESS_KEYS.has(key),
-    keys: () => [...values.keys()],
-  });
+  root.DartState = Object.freeze({ read, write, clone });
 })(typeof window !== "undefined" ? window : globalThis);
 
 
