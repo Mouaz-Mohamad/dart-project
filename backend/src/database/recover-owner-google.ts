@@ -139,20 +139,23 @@ export async function recoverOwnerGoogleIdentity(
             AND revoked_at IS NULL`,
         [userId],
       );
+      const oldOwnerEmailHash = digest(
+        `staff-google-email:${owner.rows[0].email_normalized}`,
+        config.authPepper,
+      );
       await client.query(
         `INSERT INTO audit_logs (
-           actor_type, actor_id, action, entity_type, entity_id, metadata
+           actor_type, actor_id, action, entity_type, entity_id,
+           old_values, new_values, metadata
          ) VALUES (
-           'system',NULL,'OWNER_BREAK_GLASS_SUCCEEDED','staff_users',$1,$2::jsonb
+           'system',NULL,'OWNER_BREAK_GLASS_SUCCEEDED','staff_users',
+           $1,$2::jsonb,$3::jsonb,$4::jsonb
          )`,
         [
           userId,
+          JSON.stringify({ emailHash: oldOwnerEmailHash }),
+          JSON.stringify({ emailHash }),
           JSON.stringify({
-            oldEmailHash: digest(
-              `staff-google-email:${owner.rows[0].email_normalized}`,
-              config.authPepper,
-            ),
-            newEmailHash: emailHash,
             reason: input.reason,
             mode: "active_owner",
           }),
@@ -188,20 +191,23 @@ export async function recoverOwnerGoogleIdentity(
         WHERE id=$1`,
       [pendingOwner.rows[0].id, input.email.trim(), emailNormalized],
     );
+    const oldPendingEmailHash = digest(
+      `staff-google-email:${pendingOwner.rows[0].email_normalized}`,
+      config.authPepper,
+    );
     await client.query(
       `INSERT INTO audit_logs (
-         actor_type, actor_id, action, entity_type, entity_id, metadata
+         actor_type, actor_id, action, entity_type, entity_id,
+         old_values, new_values, metadata
        ) VALUES (
-         'system',NULL,'OWNER_BREAK_GLASS_SUCCEEDED','staff_invitations',$1,$2::jsonb
+         'system',NULL,'OWNER_BREAK_GLASS_SUCCEEDED','staff_invitations',
+         $1,$2::jsonb,$3::jsonb,$4::jsonb
        )`,
       [
         pendingOwner.rows[0].id,
+        JSON.stringify({ emailHash: oldPendingEmailHash }),
+        JSON.stringify({ emailHash }),
         JSON.stringify({
-          oldEmailHash: digest(
-            `staff-google-email:${pendingOwner.rows[0].email_normalized}`,
-            config.authPepper,
-          ),
-          newEmailHash: emailHash,
           reason: input.reason,
           mode: "pending_owner",
         }),

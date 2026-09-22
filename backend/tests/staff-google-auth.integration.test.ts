@@ -310,26 +310,24 @@ describe.skipIf(!databaseUrl)("Staff Google/Supabase identity integration", () =
     expect(fresh.account.permissions).toContain("orders.manage");
 
     const permissionAudit = await testPool!.query<{
-      metadata: {
-        oldPermissions: string[];
-        newPermissions: string[];
-      };
+      old_values: { permissions: string[] };
+      new_values: { permissions: string[] };
     }>(
-      `SELECT metadata
+      `SELECT old_values, new_values
          FROM audit_logs
         WHERE action='STAFF_PERMISSIONS_UPDATED'
           AND entity_id=$1
-        ORDER BY created_at DESC
+        ORDER BY occurred_at DESC
         LIMIT 1`,
       [fresh.account.userId],
     );
-    expect(permissionAudit.rows[0]?.metadata.oldPermissions).toContain(
+    expect(permissionAudit.rows[0]?.old_values.permissions).toContain(
       "orders.read",
     );
-    expect(permissionAudit.rows[0]?.metadata.oldPermissions).not.toContain(
+    expect(permissionAudit.rows[0]?.old_values.permissions).not.toContain(
       "orders.manage",
     );
-    expect(permissionAudit.rows[0]?.metadata.newPermissions).toContain(
+    expect(permissionAudit.rows[0]?.new_values.permissions).toContain(
       "orders.manage",
     );
 
@@ -369,22 +367,22 @@ describe.skipIf(!databaseUrl)("Staff Google/Supabase identity integration", () =
       metadata,
     );
     const accessAudit = await testPool!.query<{
-      metadata: {
-        oldStatus: string;
-        newStatus: string;
-      };
+      old_values: { status: string };
+      new_values: { status: string };
     }>(
-      `SELECT metadata
+      `SELECT old_values, new_values
          FROM audit_logs
         WHERE action='STAFF_ACCOUNT_DISABLED'
           AND entity_id=$1
-        ORDER BY created_at DESC
+        ORDER BY occurred_at DESC
         LIMIT 1`,
       [staffSession!.account.userId],
     );
-    expect(accessAudit.rows[0]?.metadata).toMatchObject({
-      oldStatus: "active",
-      newStatus: "suspended",
+    expect(accessAudit.rows[0]?.old_values).toEqual({
+      status: "active",
+    });
+    expect(accessAudit.rows[0]?.new_values).toEqual({
+      status: "suspended",
     });
 
     staffSession = await service!.exchangeStaffGoogleIdentity(

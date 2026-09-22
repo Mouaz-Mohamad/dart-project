@@ -1744,10 +1744,10 @@ export class IdentityService {
         "staff_users",
         staffUserId,
         metadata,
+        { reason: reason || null },
         {
-          oldStatus: previousStatus,
-          newStatus: desiredStatus,
-          reason: reason || null,
+          oldValues: { status: previousStatus },
+          newValues: { status: desiredStatus },
         },
       );
       await client.query("COMMIT");
@@ -1920,6 +1920,14 @@ export class IdentityService {
             AND revoked_at IS NULL`,
         [staffUserId],
       );
+      const oldEmailHash = digest(
+        `staff-google-email:${target.rows[0].email_normalized}`,
+        this.config.authPepper,
+      );
+      const newEmailHash = digest(
+        `staff-google-email:${nextEmailNormalized}`,
+        this.config.authPepper,
+      );
       await this.audit(
         client,
         "staff",
@@ -1928,16 +1936,10 @@ export class IdentityService {
         "staff_users",
         staffUserId,
         metadata,
+        { reason: reason || "gmail_changed" },
         {
-          oldEmailHash: digest(
-            `staff-google-email:${target.rows[0].email_normalized}`,
-            this.config.authPepper,
-          ),
-          newEmailHash: digest(
-            `staff-google-email:${nextEmailNormalized}`,
-            this.config.authPepper,
-          ),
-          reason: reason || "gmail_changed",
+          oldValues: { emailHash: oldEmailHash },
+          newValues: { emailHash: newEmailHash },
         },
       );
       await client.query("COMMIT");
@@ -2346,9 +2348,10 @@ export class IdentityService {
         "staff_users",
         staffUserId,
         metadata,
+        {},
         {
-          oldPermissions: previousPermissions,
-          newPermissions: desiredPermissions,
+          oldValues: { permissions: previousPermissions },
+          newValues: { permissions: desiredPermissions },
         },
       );
       await client.query("COMMIT");
@@ -4005,17 +4008,26 @@ export class IdentityService {
     entityId: string,
     metadata: RequestMetadata,
     details: Record<string, unknown> = {},
+    changes?: {
+      oldValues?: Record<string, unknown>;
+      newValues?: Record<string, unknown>;
+    },
   ): Promise<void> {
     await client.query(
       `INSERT INTO audit_logs (
-        actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+        actor_type, actor_id, action, entity_type, entity_id,
+        old_values, new_values, request_id, metadata
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9::jsonb
+      )`,
       [
         actorType,
         actorId,
         action,
         entityType,
         entityId,
+        changes?.oldValues ? JSON.stringify(changes.oldValues) : null,
+        changes?.newValues ? JSON.stringify(changes.newValues) : null,
         metadata.requestId,
         JSON.stringify({
           ipHash: ipHash(metadata.ipAddress, this.config.authPepper),
