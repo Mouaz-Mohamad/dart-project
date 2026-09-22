@@ -23,24 +23,24 @@ export type WaitingAdminAction =
 
 export interface WaitingAdminActionInput {
   action: WaitingAdminAction;
-  reason?: string;
-  hours?: number;
-  color?: string;
-  size?: string;
-  targetWaitlistId?: string;
-  cancelPrevious?: boolean;
+  reason?: string | undefined;
+  hours?: number | undefined;
+  color?: string | undefined;
+  size?: string | undefined;
+  targetWaitlistId?: string | undefined;
+  cancelPrevious?: boolean | undefined;
 }
 
 export interface WaitingAdminFilters {
-  search?: string;
-  modelId?: string;
-  color?: string;
-  size?: string;
-  status?: string;
-  from?: string;
-  to?: string;
-  limit?: number;
-  offset?: number;
+  search?: string | undefined;
+  modelId?: string | undefined;
+  color?: string | undefined;
+  size?: string | undefined;
+  status?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
 }
 
 interface WaitingSettings {
