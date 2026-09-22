@@ -3773,7 +3773,8 @@ export class CommerceService {
             clientId: clientCode || "-",
             source: "Manual Admin",
             deliveryCost: manualDeliveryCostMinor / 100,
-            deliveryCostPerPiece: manualCourierFeePerOrderMinor / 100,
+            courierFee: manualDeliveryCostMinor / 100,
+            courierFeePerOrder: manualCourierFeePerOrderMinor / 100,
           }),
         ],
       );
@@ -4130,7 +4131,10 @@ export class CommerceService {
             reasonDeduction: requestedDiscount ? "Order discount" : "-",
             deliveryCost: updatedDeliveryCostMinor / 100,
             ...(updatedCourierFeePerOrderMinor
-              ? { deliveryCostPerPiece: updatedCourierFeePerOrderMinor / 100 }
+              ? {
+                  courierFee: updatedCourierFeePerOrderMinor / 100,
+                  courierFeePerOrder: updatedCourierFeePerOrderMinor / 100,
+                }
               : {}),
           }),
         ],
@@ -4351,22 +4355,12 @@ export class CommerceService {
           orderDbId &&
           (!existingOrder || Number.isFinite(Number(raw.deliveryCost)))
         ) {
-          const legacyItemCount = Array.isArray(raw.priceSnapshot)
-            ? raw.priceSnapshot.reduce(
-                (sum, line) =>
-                  sum +
-                  Math.max(
-                    1,
-                    Number((line as Record<string, unknown>)?.qty || 1),
-                  ),
-                0,
-              )
-            : Array.isArray(raw.items)
-              ? raw.items.length
-              : 0;
-          const rawDeliveryCostMinor = Number.isFinite(Number(raw.deliveryCost))
-            ? Math.max(0, Math.round(Number(raw.deliveryCost) * 100))
-            : Math.max(0, legacyItemCount * 10000);
+          const rawCourierFee = Number(
+            raw.courierFee ?? raw.courierFeePerOrder ?? raw.deliveryCost,
+          );
+          const rawDeliveryCostMinor = Number.isFinite(rawCourierFee)
+            ? Math.max(0, Math.round(rawCourierFee * 100))
+            : 10000;
           await client.query(
             "UPDATE orders SET delivery_cost_minor=$2 WHERE id=$1",
             [orderDbId, rawDeliveryCostMinor],

@@ -41,28 +41,20 @@ const deliveryCostSummary = finance.calculateSummary(baseData({
     id: "ORDER-DELIVERY-COST",
     orderId: "K-DELIVERY-COST",
     finalAmount: 2000,
-    deliveryCost: 200,
+    deliveryCost: 100,
     priceSnapshot: [
       { itemCode: "SHIP-1", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 },
       { itemCode: "SHIP-2", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 },
     ],
   }],
-}), range("2026-09-01", "2026-09-30"));
-assert.strictEqual(deliveryCostSummary.deliveryCosts, 200, "Two delivered pieces at 100 EGP each must recognize 200 EGP delivery cost.");
-assert.strictEqual(deliveryCostSummary.netRevenue, 2000, "Delivery cost is a Dart cost and must not increase what the customer pays.");
+}));
+assert.strictEqual(deliveryCostSummary.deliveryCosts, 100, "Courier entitlement is once per order regardless of item count.");
+assert.strictEqual(deliveryCostSummary.netRevenue, 2000, "Courier allocation does not change the customer selling value.");
 assert.strictEqual(deliveryCostSummary.netCogs, 800);
-assert.strictEqual(deliveryCostSummary.totalCost, 1000, "P&L Total Cost must include immutable COGS plus the delivery snapshot.");
-assert.strictEqual(deliveryCostSummary.netProfit, 1000);
-assert.strictEqual(deliveryCostSummary.cashOut, 200, "Delivery cost must be reflected in Dart cash outflow.");
+assert.strictEqual(deliveryCostSummary.totalCost, 800, "Courier allocation is already embedded in item cost and must not be counted twice.");
+assert.strictEqual(deliveryCostSummary.netProfit, 1200);
+assert.strictEqual(deliveryCostSummary.cashOut, 0, "Courier allocation retained before Dart receipt must not be deducted again from Dart cash flow.");
 
-const returnedData = baseData({
-  orders: [{ ...deliveredOrder, amountRefunded: 1000, refundedAt: "2026-09-05T10:00:00+03:00" }],
-  returns: [
-    { id: "R-1", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05T11:00:00+03:00" },
-    { id: "R-1-DUPLICATE", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05T12:00:00+03:00" },
-  ],
-  expenses: [{ id: "E-1", date: "2026-09-03", amount: 100, status: "Unpaid", category: "Packaging" }],
-});
 const returnedSummary = finance.calculateSummary(returnedData, range("2026-09-01", "2026-09-30"));
 assert.strictEqual(returnedSummary.grossRevenue, 1000);
 assert.strictEqual(returnedSummary.refunds, 1000, "Detailed return refunds must not be duplicated by order.amountRefunded.");
@@ -232,3 +224,20 @@ const customerMetric = finance.brandMetrics(baseData({ customers: [{ id: "C1", c
 assert.strictEqual(customerMetric.customers, 1, "Customer KPI must recognize the registeredAt field used by dashboard-created customers.");
 
 console.log("Dart finance unit tests passed.");
+
+// Owner scenario: five 600 EGP pieces, 400 EGP all-in cost, split across 3 COD orders (1 + 1 + 3).
+const ownerThreeOrderScenario = finance.calculateSummary(baseData({
+  orders: [
+    { ...deliveredOrder, id: "OWN-1", orderId: "K-OWN-1", finalAmount: 600, deliveryCost: 100, priceSnapshot: [{ itemCode: "OWN-I-1", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] },
+    { ...deliveredOrder, id: "OWN-2", orderId: "K-OWN-2", finalAmount: 600, deliveryCost: 100, priceSnapshot: [{ itemCode: "OWN-I-2", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] },
+    { ...deliveredOrder, id: "OWN-3", orderId: "K-OWN-3", finalAmount: 1800, deliveryCost: 100, priceSnapshot: [
+      { itemCode: "OWN-I-3", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 },
+      { itemCode: "OWN-I-4", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 },
+      { itemCode: "OWN-I-5", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 },
+    ] },
+  ],
+}));
+assert.strictEqual(ownerThreeOrderScenario.netRevenue, 3000);
+assert.strictEqual(ownerThreeOrderScenario.netCogs, 2000);
+assert.strictEqual(ownerThreeOrderScenario.deliveryCosts, 300, "Three orders owe the courier 300 EGP total, not 500 EGP.");
+assert.strictEqual(ownerThreeOrderScenario.netProfit, 1000, "Five pieces at 600 selling / 400 all-in cost must produce 1000 EGP net profit.");

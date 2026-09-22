@@ -85,8 +85,11 @@ assert(
   "The browser must not award monthly Dart Cards authoritatively.",
 );
 assert(finance.includes("returnCourierCosts"), "Total Cost must include Dart-paid return/exchange representative fees.");
-assert(finance.includes("deliveryCosts"), "Total Cost must include snapshotted delivery costs.");
-assert(html.includes('id="settings-delivery-cost"'), "Settings must expose the per-piece delivery cost used for future order snapshots.");
+assert(finance.includes("deliveryCosts"), "Finance must expose courier allocation for reconciliation without double-counting it.");
+assert(finance.includes("Courier Due") && finance.includes("Due to Dart"), "COD must separate courier entitlement from Dart receivable.");
+assert(!finance.includes("returnCourierCosts + deliveryCosts"), "Courier allocation must not be added on top of item COGS.");
+assert(html.includes('id="settings-delivery-cost"'), "Settings must expose the per-order courier fee used for future order snapshots.");
+assert(html.includes("Courier fee per order"), "Settings must clearly label the courier fee as per-order.");
 assert(finance.includes("inStockCost"), "Brand must calculate the filtered In Stock Cost Value.");
 assert(dashboard.includes("dartAssignReturnRepresentative"), "Dashboard return requests must support representative assignment.");
 
