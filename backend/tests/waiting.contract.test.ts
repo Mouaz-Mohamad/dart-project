@@ -67,6 +67,13 @@ describe("Waiting restock reservation contract", () => {
     expect(dashboard).toContain('id="settings-waiting-hours"');
   });
 
+  it("keeps confirmed Waiting consistent when the normal cart is rebuilt or cleared", () => {
+    expect(commerce).toContain("WAITLIST_CART_PHYSICAL_ITEM_REBOUND");
+    expect(commerce).toContain("confirmed_item_removed_from_cart");
+    expect(commerce).toContain("w.status='confirmed'");
+    expect(migration).toContain("dart.skip_waitlist_allocation");
+  });
+
   it("converts confirmed Waiting demand when the final order is created", () => {
     expect(commerce).toContain("WAITLIST_CONVERTED_TO_ORDER");
     expect(commerce).toContain("converted_order_code");

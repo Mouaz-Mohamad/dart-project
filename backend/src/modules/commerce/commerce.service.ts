@@ -763,18 +763,175 @@ export class CommerceService {
       );
       await client.query(
         `UPDATE waitlist_allocations wa
-            SET status='expired',
-                released_at=now(),
-                release_reason=COALESCE(release_reason,'cart_rebuilt_with_different_item'),
+            SET expires_at=$2,
                 version=version+1,
                 updated_at=now()
-           FROM inventory_items i
-          WHERE wa.inventory_item_id=i.id
-            AND wa.status='cart'
+          WHERE wa.status='cart'
             AND wa.cart_reservation_id=$1
-            AND lower(i.status)='in stock'`,
+            AND EXISTS (
+              SELECT 1
+                FROM inventory_items i
+               WHERE i.id=wa.inventory_item_id
+                 AND i.cart_reservation_id=$1
+                 AND lower(i.status)='cart reserved'
+            )`,
+        [reservationId, expiresAt],
+      );
+
+      const reboundWaiting = await client.query<{ waitlist_entry_id: string }>(
+        `WITH needs AS (
+           SELECT wa.id AS allocation_id,
+                  w.id AS waitlist_entry_id,
+                  w.model_id,
+                  w.size,
+                  wa.offered_color,
+                  row_number() OVER (
+                    PARTITION BY w.model_id,w.size,wa.offered_color
+                    ORDER BY w.confirmed_at,w.requested_at,w.id
+                  ) AS rn
+             FROM waitlist_allocations wa
+             JOIN waitlist_entries w ON w.id=wa.waitlist_entry_id
+            WHERE wa.status='cart'
+              AND wa.cart_reservation_id=$1
+              AND w.status='confirmed'
+              AND NOT EXISTS (
+                SELECT 1
+                  FROM inventory_items old_item
+                 WHERE old_item.id=wa.inventory_item_id
+                   AND old_item.cart_reservation_id=$1
+                   AND lower(old_item.status)='cart reserved'
+              )
+         ),
+         available AS (
+           SELECT i.id AS inventory_item_id,
+                  i.model_id,
+                  i.size,
+                  i.color,
+                  row_number() OVER (
+                    PARTITION BY i.model_id,i.size,i.color
+                    ORDER BY i.created_at,i.id
+                  ) AS rn
+             FROM inventory_items i
+            WHERE i.cart_reservation_id=$1
+              AND lower(i.status)='cart reserved'
+              AND NOT EXISTS (
+                SELECT 1
+                  FROM waitlist_allocations current_allocation
+                 WHERE current_allocation.inventory_item_id=i.id
+                   AND current_allocation.cart_reservation_id=$1
+                   AND current_allocation.status='cart'
+              )
+         ),
+         matches AS (
+           SELECT needs.allocation_id,
+                  needs.waitlist_entry_id,
+                  available.inventory_item_id
+             FROM needs
+             JOIN available
+               ON available.model_id=needs.model_id
+              AND available.size=needs.size
+              AND available.color=needs.offered_color
+              AND available.rn=needs.rn
+         )
+         UPDATE waitlist_allocations wa
+            SET inventory_item_id=matches.inventory_item_id,
+                expires_at=$2,
+                version=wa.version+1,
+                updated_at=now()
+           FROM matches
+          WHERE wa.id=matches.allocation_id
+          RETURNING wa.waitlist_entry_id::text`,
+        [reservationId, expiresAt],
+      );
+
+      await client.query(
+        `UPDATE waitlist_entries w
+            SET reserved_until=$2,
+                version=w.version+1,
+                updated_at=now()
+          WHERE w.status='confirmed'
+            AND EXISTS (
+              SELECT 1
+                FROM waitlist_allocations wa
+                JOIN inventory_items i ON i.id=wa.inventory_item_id
+               WHERE wa.waitlist_entry_id=w.id
+                 AND wa.cart_reservation_id=$1
+                 AND wa.status='cart'
+                 AND i.cart_reservation_id=$1
+                 AND lower(i.status)='cart reserved'
+            )`,
+        [reservationId, expiresAt],
+      );
+
+      const expiredWaiting = await client.query<{ waitlist_entry_id: string }>(
+        `WITH expired_allocations AS (
+           UPDATE waitlist_allocations wa
+              SET status='expired',
+                  released_at=now(),
+                  release_reason=COALESCE(
+                    release_reason,
+                    'confirmed_item_removed_from_cart'
+                  ),
+                  version=wa.version+1,
+                  updated_at=now()
+            WHERE wa.status='cart'
+              AND wa.cart_reservation_id=$1
+              AND NOT EXISTS (
+                SELECT 1
+                  FROM inventory_items i
+                 WHERE i.id=wa.inventory_item_id
+                   AND i.cart_reservation_id=$1
+                   AND lower(i.status)='cart reserved'
+              )
+            RETURNING wa.waitlist_entry_id
+         )
+         UPDATE waitlist_entries w
+            SET status='expired',
+                reserved_until=NULL,
+                version=w.version+1,
+                updated_at=now()
+           FROM expired_allocations expired
+          WHERE w.id=expired.waitlist_entry_id
+            AND w.status='confirmed'
+          RETURNING w.id::text AS waitlist_entry_id`,
         [reservationId],
       );
+
+      const waitingChangedIds = [
+        ...new Set([
+          ...reboundWaiting.rows.map((row) => row.waitlist_entry_id),
+          ...expiredWaiting.rows.map((row) => row.waitlist_entry_id),
+        ]),
+      ];
+      if (waitingChangedIds.length) {
+        await client.query(
+          `INSERT INTO audit_logs(
+             actor_type,actor_id,action,entity_type,entity_id,metadata
+           )
+           SELECT 'system',NULL,
+                  CASE
+                    WHEN id = ANY($1::uuid[])
+                      THEN 'WAITLIST_CART_PHYSICAL_ITEM_REBOUND'
+                    ELSE 'WAITLIST_CONFIRMED_CART_RELEASED'
+                  END,
+                  'waitlist',
+                  id::text,
+                  jsonb_build_object(
+                    'reservationId',$3,
+                    'source','cart_rebuild'
+                  )
+             FROM unnest($2::uuid[]) AS ids(id)`,
+          [
+            reboundWaiting.rows.map((row) => row.waitlist_entry_id),
+            waitingChangedIds,
+            reservationId,
+          ],
+        );
+        await client.query(
+          "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='waiting'",
+        );
+      }
+
       await client.query(
         `SELECT dart_waitlist_try_allocate_item(candidate.id)
            FROM (

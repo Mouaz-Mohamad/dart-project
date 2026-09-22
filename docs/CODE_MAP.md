@@ -76,3 +76,17 @@ Model يملك الأسعار والوصف والمقاسات والألوان. 
 | `tests/settings-reset-unit.js` | اختبار نطاق المسح ومنع حذف أي بيانات غير تابعة لـDart وفحص وجود عناصر Settings الثابتة |
 
 البيانات المالية تبدأ كمصفوفات فارغة ولا يوجد seed تجريبي. `FinanceRepository` هو الحد الفاصل الذي يستبدله مطور الـBackend بطبقة HTTP، بينما تظل الحسابات النهائية والصلاحيات والتدقيق مسؤولية الخادم حسب `API_CONTRACT.md`.
+
+
+## Waiting / Restock Reservation
+
+| File | Responsibility |
+| --- | --- |
+| `backend/migrations/0030_waitlist_reservations.sql` | Waiting schema, FIFO indexes, staff permissions, automatic stock matching and reservation transition trigger |
+| `backend/migrations/0031_waitlist_cart_consistency.sql` | Confirmed-Waiting/cart consistency when a customer rebuilds, clears or lets the normal cart expire |
+| `backend/src/modules/waiting/waiting.service.ts` | Customer Waiting lifecycle, admin Actions, Demand analytics, audit, exact/alternative allocation and reassignment |
+| `backend/src/modules/waiting/waiting.routes.ts` | Customer/admin Waiting HTTP API and granular permission gates |
+| `Js/dart-storefront.js` + `Js/dart-ui.js` | Select unavailable variants and join Waiting from the product modal |
+| `Js/dart-platform.js` + `profile.html` | My Waiting, queue status, confirm/decline/cancel and customer notification refresh |
+| `Eye/dart-waiting.js` + `Eye/Dart Eye.html` | Waiting Queue, Demand, search/filters, row Actions and permission-aware admin controls |
+| `Eye/dart-settings.js` | Waiting enable switch, reservation duration and notification/alternative-color settings |

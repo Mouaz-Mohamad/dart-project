@@ -116,3 +116,8 @@ See `VERIFICATION_REPORT.md` for the current verification results.
 ## Database-authoritative browser state
 
 All durable commerce and dashboard data is sourced from PostgreSQL through the API. The browser keeps only an in-memory projection in `window.DartState`; localStorage is limited to UI preferences and session/navigation helpers. Product images are compressed in the browser and uploaded to the catalogue asset API, not persisted in IndexedDB. Customer and guest carts are restored from server cart reservations.
+
+
+### Waiting / Restock Reservation
+
+Unavailable product variants now use the PostgreSQL-backed Waiting system rather than a browser-only “notify me” flag. Customers must sign in, can join a specific model/size/color queue, see **My Waiting**, cancel, accept an exact or alternative-color reservation, and then continue through the ordinary cart/checkout flow. Dart Eye includes the **Waiting** section with Queue/Demand views, search/filters, per-row Actions, audit history, FIFO overrides and permission-controlled reassignment. Reservation duration and notification/alternative-color behavior are controlled from Settings.

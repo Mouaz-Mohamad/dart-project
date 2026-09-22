@@ -414,3 +414,34 @@ Marketing records contain channel, campaign, date, spend, impressions, clicks, a
 - Monthly winner selection reads the same committed customer snapshot and excludes `eligible=false` before ranking. Existing customers default to eligible only through an explicit database migration; new-customer defaults must be documented and enforced server-side.
 
 > CI note: fine-grained permission middleware is lint/typechecked and unit-tested independently from browser chart smoke; chart CDN behavior is not part of authorization acceptance.
+
+
+## Waiting / Restock Reservation — implemented
+
+Dart uses a server-authoritative Waiting queue for unavailable model/color/size combinations. Joining Waiting is free and requires an authenticated customer account.
+
+Customer endpoints:
+- `GET /api/v1/me/waiting` — list the customer's Waiting history and active queue positions.
+- `POST /api/v1/me/waiting` — join with `modelId`, `size`, and `color`.
+- `DELETE /api/v1/me/waiting/:entryId` — cancel Waiting. If a physical item is reserved, release it immediately so the next eligible customer can receive it.
+- `POST /api/v1/me/waiting/:entryId/confirm` — accept the reserved physical item and move it into the ordinary 15-minute cart.
+- `POST /api/v1/me/waiting/:entryId/decline-alternative` — reject the offered alternative color and continue waiting for the requested color.
+
+Admin endpoints:
+- `GET /api/v1/admin/waiting/version`
+- `GET /api/v1/admin/waiting` — queue plus Demand analytics; supports search and model/color/size/status/date filters.
+- `GET /api/v1/admin/waiting/:entryId/audit`
+- `POST /api/v1/admin/waiting/reconcile` — match currently available stock.
+- `POST /api/v1/admin/waiting/:entryId/action` — `cancel`, `release`, `extend`, `resend`, `edit_request`, `offer_alternative`, `move_top`, `reset_priority`, or `reassign`.
+
+Allocation rules:
+- FIFO is the default: priority override descending, then request time, then stable ID.
+- Exact model + size + requested color is attempted first.
+- If enabled in Settings, another color for the same model + size may be offered only after no exact-color customer can take that piece.
+- Stock allocation locks a real `inventory_items` row. One physical item is never offered to multiple active Waiting customers.
+- Waiting reservations default to 4 hours and `site_settings.waiting.reservationHours` can change the duration from the dashboard.
+- Confirming Waiting converts the reservation into the normal cart phase. Removing the confirmed item from the cart expires that confirmed Waiting allocation; rebuilding the cart while retaining the same variant safely rebinds the Waiting record to the newly reserved physical item.
+- Email delivery uses the transactional outbox; in-site availability is also represented in the customer Waiting state/notifications.
+
+Waiting permissions:
+`waiting.view`, `waiting.cancel`, `waiting.release`, `waiting.extend`, `waiting.edit`, `waiting.offer_alternative`, `waiting.resend`, `waiting.priority_override`, `waiting.reassign`, and `waiting.audit_read`. Owner receives all; Staff receive only explicitly granted permissions.
