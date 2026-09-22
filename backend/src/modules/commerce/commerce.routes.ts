@@ -485,6 +485,19 @@ export function createCommerceRouter(
   );
 
   router.get(
+    "/me/tracking/live",
+    rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
+    signedIn,
+    requireAccountType("customer"),
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(
+        await commerce.customerLiveTracking(request.auth!.userId),
+      );
+    },
+  );
+
+  router.get(
     "/me/commerce",
     signedIn,
     requireAccountType("customer"),
@@ -506,7 +519,7 @@ export function createCommerceRouter(
 
   router.put(
     "/representatives/location",
-    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
