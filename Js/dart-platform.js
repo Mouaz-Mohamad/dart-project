@@ -1,3 +1,7 @@
+// DART | MODULE: dart-platform.js
+// Customer auth/session, cart reservation, checkout, rewards, and site-wide platform behavior.
+// BEGIN MODULE
+
 (function () {
   "use strict";
 
@@ -3272,3 +3276,6 @@
     isConfigured: Boolean(API_BASE),
   };
 })();
+
+
+// END MODULE
