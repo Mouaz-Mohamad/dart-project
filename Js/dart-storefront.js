@@ -1,3 +1,7 @@
+// DART | MODULE: dart-storefront.js
+// Storefront product cards, product modal, option availability, and carousel behavior.
+// BEGIN MODULE
+
 /* BEGIN STOREFRONT — كارت لكل لون، ونافذة واحدة لكل تصميم.
  * No quantities are stored here. The selected model/color/size is revalidated
  * by the reservation and checkout layer. Public colors need images for cards,
@@ -188,3 +192,6 @@
   window.addEventListener("dart:site-settings-changed", refresh);
 })();
 /* END STOREFRONT */
+
+
+// END MODULE
