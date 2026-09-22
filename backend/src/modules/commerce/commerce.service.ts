@@ -5133,6 +5133,151 @@ export class CommerceService {
     );
   }
 
+  public async customerLiveTracking(customerUserId: string): Promise<{
+    capturedAt: string;
+    orders: Record<string, unknown>[];
+    returns: Record<string, unknown>[];
+  }> {
+    const customerResult = await this.pool.query<{ client_code: string }>(
+      "SELECT client_code FROM customers WHERE user_id=$1",
+      [customerUserId],
+    );
+    const clientCode = customerResult.rows[0]?.client_code;
+    if (!clientCode) {
+      throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
+    }
+
+    const ordersResult = await this.pool.query<{
+      id: string;
+      order_code: string;
+      status: string;
+      delivery_started_at: Date | null;
+      representative_user_id: string | null;
+      latitude: number | null;
+      longitude: number | null;
+      accuracy_meters: number | null;
+      location_updated_at: Date | null;
+    }>(
+      `SELECT o.id::text, o.order_code, o.status, o.delivery_started_at,
+              o.representative_user_id::text,
+              rl.latitude, rl.longitude, rl.accuracy_meters,
+              rl.updated_at AS location_updated_at
+         FROM orders o
+         LEFT JOIN representative_locations rl
+           ON rl.representative_user_id=o.representative_user_id
+        WHERE o.customer_user_id=$1
+          AND o.status='Representative On The Way'
+          AND o.delivery_started_at IS NOT NULL
+          AND NOT o.is_deleted
+          AND NOT o.is_archived
+        ORDER BY o.created_at DESC`,
+      [customerUserId],
+    );
+
+    const returnResult = await this.pool.query<{ payload: Record<string, unknown> }>(
+      `SELECT payload
+         FROM return_requests
+        WHERE payload->>'clientId'=$1
+          AND payload->>'status'='Pickup On The Way'
+          AND COALESCE(payload->>'isDeleted','false') <> 'true'
+          AND COALESCE(payload->>'isArchived','false') <> 'true'
+        ORDER BY position`,
+      [clientCode],
+    );
+    const activeReturns = returnResult.rows.map((row) => row.payload || {});
+    const representativeRefs = [
+      ...new Set(
+        activeReturns.flatMap((record) => [
+          String(record.representativeId || "").trim(),
+          String(record.representativeBusinessId || "").trim(),
+        ]).filter(Boolean),
+      ),
+    ];
+
+    const returnLocations = representativeRefs.length
+      ? await this.pool.query<{
+          user_id: string;
+          representative_code: string;
+          latitude: number | null;
+          longitude: number | null;
+          accuracy_meters: number | null;
+          location_updated_at: Date | null;
+        }>(
+          `SELECT r.user_id::text, r.representative_code,
+                  rl.latitude, rl.longitude, rl.accuracy_meters,
+                  rl.updated_at AS location_updated_at
+             FROM representatives r
+             LEFT JOIN representative_locations rl
+               ON rl.representative_user_id=r.user_id
+            WHERE r.user_id::text = ANY($1::text[])
+               OR r.representative_code = ANY($1::text[])`,
+          [representativeRefs],
+        )
+      : { rows: [] as Array<{
+          user_id: string;
+          representative_code: string;
+          latitude: number | null;
+          longitude: number | null;
+          accuracy_meters: number | null;
+          location_updated_at: Date | null;
+        }> };
+
+    const returnLocationByRepresentative = new Map<string, typeof returnLocations.rows[number]>();
+    for (const row of returnLocations.rows) {
+      returnLocationByRepresentative.set(String(row.user_id), row);
+      returnLocationByRepresentative.set(String(row.representative_code), row);
+    }
+
+    const courierLocation = (
+      latitude: number | null,
+      longitude: number | null,
+      accuracy: number | null,
+      updatedAt: Date | null,
+    ) => latitude !== null && longitude !== null
+      ? {
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          updatedAt: updatedAt?.toISOString() || null,
+        }
+      : null;
+
+    return {
+      capturedAt: new Date().toISOString(),
+      orders: ordersResult.rows.map((row) => ({
+        id: row.id,
+        orderId: row.order_code,
+        status: row.status,
+        deliveryStartedAt: row.delivery_started_at?.toISOString() || null,
+        courierLocation: courierLocation(
+          row.latitude,
+          row.longitude,
+          row.accuracy_meters,
+          row.location_updated_at,
+        ),
+      })),
+      returns: activeReturns.map((record) => {
+        const representative = returnLocationByRepresentative.get(
+          String(record.representativeId || record.representativeBusinessId || ""),
+        );
+        return {
+          id: String(record.id || ""),
+          returnId: String(record.returnId || ""),
+          status: String(record.status || ""),
+          pickupStartedAt: record.pickupStartedAt || null,
+          courierLocation: representative
+            ? courierLocation(
+                representative.latitude,
+                representative.longitude,
+                representative.accuracy_meters,
+                representative.location_updated_at,
+              )
+            : null,
+        };
+      }),
+    };
+  }
+
   public async customerSnapshot(customerUserId: string): Promise<{
     orders: Record<string, unknown>[];
     returns: unknown[];
