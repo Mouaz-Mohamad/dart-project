@@ -52,6 +52,13 @@ const environmentSchema = z.object({
   SMTP_PASS: z.string().default(""),
   EMAIL_FROM: z.string().trim().default(""),
   EMAIL_FROM_NAME: z.string().trim().min(1).max(120).default("Dart | for you"),
+  MONITORING_ALERT_EMAIL: z.string().trim().default(""),
+  MONITORING_ALERT_COOLDOWN_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .max(3_600_000)
+    .default(300_000),
   WHATSAPP_CLOUD_API_TOKEN: z.string().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).or(z.literal("")).default(""),
   WHATSAPP_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
@@ -90,6 +97,8 @@ export interface AppConfig {
   smtpPass: string | null;
   emailFrom: string | null;
   emailFromName?: string;
+  monitoringAlertEmail?: string | null;
+  monitoringAlertCooldownMs?: number;
   whatsappAccessToken?: string | null;
   whatsappPhoneNumberId?: string | null;
   whatsappGraphApiVersion?: string;
@@ -146,6 +155,12 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       invalidEnvironment("EMAIL_FROM");
     }
   }
+  if (
+    parsed.data.MONITORING_ALERT_EMAIL &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.data.MONITORING_ALERT_EMAIL)
+  ) {
+    invalidEnvironment("MONITORING_ALERT_EMAIL");
+  }
 
   const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
   const whatsappOwnerPhone = parsed.data.WHATSAPP_OWNER_PHONE.replace(/\D/g, "");
@@ -179,6 +194,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     smtpPass: parsed.data.SMTP_PASS || null,
     emailFrom: parsed.data.EMAIL_FROM || null,
     emailFromName: parsed.data.EMAIL_FROM_NAME,
+    monitoringAlertEmail: parsed.data.MONITORING_ALERT_EMAIL || null,
+    monitoringAlertCooldownMs: parsed.data.MONITORING_ALERT_COOLDOWN_MS,
     whatsappAccessToken: parsed.data.WHATSAPP_CLOUD_API_TOKEN || null,
     whatsappPhoneNumberId: parsed.data.WHATSAPP_PHONE_NUMBER_ID || null,
     whatsappGraphApiVersion: parsed.data.WHATSAPP_GRAPH_API_VERSION,
