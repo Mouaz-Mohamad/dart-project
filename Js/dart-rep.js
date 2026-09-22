@@ -751,7 +751,14 @@
     document.getElementById("repDashboardView").hidden = false;
     document.getElementById("repIdentity").textContent =
       `${rep.name} · ${rep.repId} · ${rep.phone1}`;
-    const orders = repOrders(rep),
+    const orders = [...repOrders(rep)].sort((first, second) => {
+        const firstCurrent = first.routeState === "current" || first.status === "Representative On The Way";
+        const secondCurrent = second.routeState === "current" || second.status === "Representative On The Way";
+        if (firstCurrent !== secondCurrent) return firstCurrent ? -1 : 1;
+        const firstSequence = Number(first.routeSequence || first.suggestedSequence || 9999);
+        const secondSequence = Number(second.routeSequence || second.suggestedSequence || 9999);
+        return firstSequence - secondSequence;
+      }),
       list = document.getElementById("repOrdersList");
     clearDeliveryMaps();
     activeOrderIds.clear();
@@ -784,6 +791,19 @@
               .join("") || "<div>No item details</div>";
           return `<article class="rep-driver-card" data-order-id="${esc(order.id)}">
         <div class="rep-header"><div><h2>Order #${esc(order.orderId)}</h2><span>${esc(order.date || "")} ${esc(order.time || "")}</span></div><span class="rep-status-badge">${esc(order.status)}</span></div>
+        <div class="dart-rep-route-hint">
+          <span class="dart-rep-route-state dart-route-${esc(order.routeState || (started ? "current" : "upcoming"))}">${esc(
+            order.routeState === "waiting"
+              ? "Waiting"
+              : order.routeState === "problem"
+                ? "Problem"
+                : started
+                  ? "Delivering now"
+                  : "Upcoming"
+          )}</span>
+          ${Number(order.suggestedSequence) > 0 ? `<span>Suggested stop #${esc(order.suggestedSequence)}</span>` : ""}
+          ${Number(order.routeSequence) > 0 ? `<span>Saved route #${esc(order.routeSequence)}</span>` : ""}
+        </div>
         <div class="rep-info-box"><div class="rep-info-title">Customer &amp; address</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "Address missing")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
         <div class="rep-info-box"><div class="rep-info-title">Items &amp; cash collection</div>${items}<div class="dart-rep-total"><span>Collect cash</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>
         <p class="dart-rep-proximity ${proximity.ok ? "is-ready" : ""}" role="status">${esc(proximity.reason)}</p>
@@ -792,7 +812,9 @@
           <a href="tel:${esc(order.phone1)}" class="rep-btn rep-btn-call"><i class="fa-solid fa-phone"></i> Call customer</a>
           ${!started ? '<button type="button" class="rep-btn rep-btn-go" data-action="start"><i class="fa-solid fa-diamond-turn-right"></i> Start delivery</button>' : ""}
           ${started ? `<a class="rep-btn rep-btn-go" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Open navigation</a>` : ""}
-          ${started ? '<button type="button" class="rep-btn rep-btn-cancel" data-action="cancel"><i class="fa-solid fa-xmark"></i> Cancel delivery</button>' : ""}
+          ${started ? '<button type="button" class="rep-btn rep-btn-wait" data-action="waiting"><i class="fa-solid fa-clock"></i> Waiting</button>' : ""}
+          ${started ? '<button type="button" class="rep-btn rep-btn-problem" data-action="problem"><i class="fa-solid fa-triangle-exclamation"></i> Report problem</button>' : ""}
+          ${started ? '<button type="button" class="rep-btn rep-btn-cancel" data-action="cancel"><i class="fa-solid fa-arrow-rotate-left"></i> Stop current delivery</button>' : ""}
           ${started && proximity.ok ? '<button type="button" class="rep-btn rep-btn-complete" data-action="complete"><i class="fa-solid fa-circle-check"></i> Delivered</button>' : ""}
         </div>
       </article>`;
@@ -827,9 +849,13 @@
           ? "start"
           : status === "Delivered"
             ? "delivered"
-            : status === "Out With Representative"
-              ? "cancel"
-              : "";
+            : status === "Waiting"
+              ? "waiting"
+              : status === "Problem"
+                ? "problem"
+                : status === "Out With Representative"
+                  ? "cancel"
+                  : "";
       if (!action) throw new Error("Unsupported delivery action.");
       await window.DartApi.request(
         `/api/v1/representatives/orders/${encodeURIComponent(order.orderId)}/action`,
@@ -838,7 +864,9 @@
       await refreshApiWork();
       if (status === "Delivered") activeOrderIds.delete(order.id);
       if (status === "Representative On The Way") activeOrderIds.add(order.id);
-      if (status === "Out With Representative") activeOrderIds.delete(order.id);
+      if (["Out With Representative", "Waiting", "Problem"].includes(status)) {
+        activeOrderIds.delete(order.id);
+      }
       saveActiveIds();
       return (apiWork.orders || []).find(
         (row) => String(row.orderId) === String(order.orderId),
@@ -857,7 +885,18 @@
     )
       throw new Error("This order is not assigned to your account.");
     const previous = order.status;
-    order.status = status;
+    const routeOnlyState = status === "Waiting" || status === "Problem";
+    order.status = routeOnlyState ? "Out With Representative" : status;
+    order.routeState =
+      status === "Waiting"
+        ? "waiting"
+        : status === "Problem"
+          ? "problem"
+          : status === "Representative On The Way"
+            ? "current"
+            : status === "Delivered"
+              ? "delivered"
+              : "upcoming";
     order.updatedAt = now();
     if (status === "Representative On The Way") {
       order.representativeOnWayAt = now();
@@ -1216,7 +1255,7 @@
         const rep = currentRep();
         if (API_ENABLED) {
           const currentTime = Date.now();
-          if (currentTime - lastLocationSyncAt < 1000) return;
+          if (currentTime - lastLocationSyncAt < 3000) return;
           lastLocationSyncAt = currentTime;
           try {
             const payload = await window.DartApi.request("/api/v1/representatives/location", {
@@ -1311,7 +1350,7 @@
           "error",
         );
       },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
     );
   }
 
@@ -1461,6 +1500,19 @@
             if (!confirm(`Mark ${freshOrder.orderId} as delivered and paid?`))
               return;
             await updateOrderStatus(freshOrder.id, "Delivered");
+            renderOrders();
+          }
+          if (button.dataset.action === "waiting") {
+            activeOrderIds.delete(order.id);
+            await updateOrderStatus(order.id, "Waiting");
+            ensureLocationWatch();
+            renderOrders();
+          }
+          if (button.dataset.action === "problem") {
+            if (!confirm(`Report a delivery problem for ${order.orderId}?`)) return;
+            activeOrderIds.delete(order.id);
+            await updateOrderStatus(order.id, "Problem");
+            ensureLocationWatch();
             renderOrders();
           }
           if (button.dataset.action === "cancel") {
