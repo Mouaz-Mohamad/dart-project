@@ -269,7 +269,8 @@
   }
 
   async function check() {
-    if (!adminPollingEnabled || document.hidden || authoritativeMutations > 0) return;
+    if (!adminPollingEnabled || document.hidden) return;
+    if (authoritativeMutations > 0) return;
     try {
       if (!serverVersion) {
         await hydrate();
