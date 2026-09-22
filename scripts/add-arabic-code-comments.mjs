@@ -189,6 +189,9 @@ async function main() {
   const allFiles = await walk(ROOT);
   const candidates = allFiles
     .filter((file) => ALLOWED_EXTENSIONS.has(path.extname(file).toLowerCase()))
+    // GitHub Actions' GITHUB_TOKEN cannot rewrite workflow files from a workflow
+    // without the workflows permission. Those few files are documented manually.
+    .filter((file) => !file.startsWith(".github/"))
     .filter((file) => !file.startsWith("docs/"))
     .sort();
 
