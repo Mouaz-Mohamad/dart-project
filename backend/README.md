@@ -18,6 +18,9 @@ Vercel detects `src/server.ts` as the Express entrypoint and captures its HTTP l
 
 Dart PostgreSQL/Neon remains authoritative for Staff access, roles, granular permissions and sessions.
 
+
+> Production batch 4 publishes the post-launch UI/icon fixes, Settings tabs, and customer signup validation/password updates together with the matching frontend.
+
 ## Dart Eye Staff access
 
 The active Staff flow is deliberately simple:
