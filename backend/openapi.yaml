@@ -345,7 +345,7 @@ components:
         phone1: { type: string }
         phone2: { type: string }
         birthday: { type: string, format: date }
-        password: { type: string, minLength: 12, writeOnly: true }
+        password: { type: string, minLength: 4, writeOnly: true }
     Login:
       type: object
       required: [identifier, password]
