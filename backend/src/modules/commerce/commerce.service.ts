@@ -340,10 +340,12 @@ export class CommerceService {
           ORDER BY COALESCE(o.delivered_at, o.updated_at), o.order_code`,
       );
 
-      const [returnRows, cardRows] = await Promise.all([
-        readRelationalDashboardDomain(client, "returns"),
-        readRelationalDashboardDomain(client, "cards"),
-      ]);
+      // A single pg PoolClient must execute statements sequentially.
+      // Running both reads with Promise.all on the same client triggers pg's
+      // "client already executing a query" deprecation warning and can become
+      // an error in pg@9, so keep these domain reads intentionally ordered.
+      const returnRows = await readRelationalDashboardDomain(client, "returns");
+      const cardRows = await readRelationalDashboardDomain(client, "cards");
       const states = new Map<string, unknown[]>([
         ["returns", returnRows],
         ["cards", cardRows],
