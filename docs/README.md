@@ -45,7 +45,7 @@ Then open `http://localhost:4173/`.
 
 ### Backend foundation and Identity/Auth
 
-The provider-neutral Node.js/Express/TypeScript backend lives in `backend/`. Customer and representative auth keep their existing flows. Dart Eye Owner/Admin/Staff now use Google identity through Supabase Auth, followed by the existing rotating HttpOnly Dart session, CSRF protection and deny-by-default PostgreSQL permissions.
+The provider-neutral Node.js/Express/TypeScript backend lives in `backend/`. Customer and representative auth keep their existing flows. Dart Eye Owner/Staff use an Owner-managed email allowlist plus a six-digit one-time email verification code, followed by the existing rotating HttpOnly Dart session, CSRF protection and deny-by-default PostgreSQL permissions.
 
 ```bash
 cd backend
@@ -56,7 +56,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Run `npm run check` for backend lint, type checking and tests. Migration 0024 seeds the protected Owner Google allowlist for `midomoaaz3@gmail.com`; no Owner password bootstrap is required for the new Dart Eye flow. Docker/PostgreSQL are required for applying real migrations and running database integration tests; see `backend/README.md`.
+Run `npm run check` for backend lint, type checking and tests. Migration 0025 converts the protected Owner entry to the simplified email-verification flow; no Staff password, Google OAuth, Supabase Auth or TOTP setup is required. Docker/PostgreSQL are required for applying real migrations and running database integration tests; see `backend/README.md`.
 
 ## Checks
 
