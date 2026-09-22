@@ -30,6 +30,7 @@ const server = http.createServer((request, response) => {
             apiCompatibility: "dart-database-v1",
             capabilities: [
               "staff-onboarding-v1",
+              "staff-google-auth-v1",
               "dashboard-domain-state-v1",
               "bulk-domain-state-v1",
             ],

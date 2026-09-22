@@ -1608,6 +1608,17 @@ section{
 .dart-admin-auth{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:24px;background:#f7f2ea}.dart-admin-auth[hidden]{display:none}.dart-admin-auth-card{width:min(440px,100%);padding:28px;border:1px solid #e5d9ce;border-radius:18px;background:#fff;box-shadow:0 24px 70px rgba(54,20,26,.16)}.dart-admin-auth-card>img{display:block;width:110px;margin:0 auto 20px}.dart-admin-auth-card form{display:grid;gap:14px}.dart-admin-auth-card h1{margin:0;color:#6f1d2a}.dart-admin-auth-card p{margin:0;color:#626262}.dart-admin-auth-card label{display:grid;gap:6px;font-weight:700}.dart-admin-auth-card input,.dart-admin-auth-card output{min-height:44px;padding:10px 12px;border:1px solid #cfc6bf;border-radius:9px;background:#fff;font:inherit}.dart-admin-auth-card output{overflow-wrap:anywhere;background:#faf7f2}.dart-admin-auth-card button,.dart-admin-logout{min-height:42px;padding:10px 16px;border:0;border-radius:9px;background:#6f1d2a;color:#fff;font-weight:800;cursor:pointer}.dart-admin-auth-status{min-height:22px;color:#0f766e!important}.dart-admin-auth-status.is-error{color:#b42318!important}.dart-admin-logout{margin:18px auto;width:calc(100% - 28px)}body.dart-admin-locked>.cont-menu,body.dart-admin-locked>.nav-tow,body.dart-admin-locked>main{visibility:hidden;pointer-events:none}
 /* END Server-backed admin authentication gate. */
 
+.dart-admin-auth-view{display:grid;gap:16px;text-align:center}
+.dart-admin-google-button{display:flex;justify-content:center;min-height:44px}
+.dart-admin-google-button[hidden]{display:none}
+.dart-admin-auth-loading{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:10px 14px;border:1px solid #e5d9ce;border-radius:10px;background:#faf7f2;color:#6f1d2a;font-weight:700}
+.dart-admin-auth-loading[hidden]{display:none}
+.dart-admin-auth-secondary{background:#f7f2ea!important;color:#6f1d2a!important;border:1px solid #d8c9bf!important}
+.dart-staff-badges{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.dart-staff-badges span{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border-radius:999px;background:#f7f2ea;color:#6f1d2a;font-size:11px;font-weight:800}
+.dart-staff-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px}
+
+
 /* BEGIN V9 requested dashboard controls */
 #birthdayWindowLabel {
   display: block;

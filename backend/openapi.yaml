@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Dart Backend API
-  version: 0.2.0
+  version: 0.5.0
   description: Server-authoritative API for Dart | for you. Identity sessions use Secure HttpOnly cookies and CSRF tokens.
 servers:
   - url: /api/v1
@@ -76,6 +76,32 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /admin/auth/google/config:
+    get:
+      tags: [Staff Auth]
+      summary: Return public Dart Eye Google/Supabase sign-in configuration
+      description: Returns only public configuration. Never returns a Google client secret or Supabase service-role key.
+      operationId: getStaffGoogleAuthConfig
+      responses:
+        "200":
+          description: Public Google/Supabase sign-in configuration
+  /admin/auth/google/exchange:
+    post:
+      tags: [Staff Auth]
+      summary: Verify a Supabase Google identity and issue the secure Dart Staff session
+      description: The Supabase access token is verified against the configured Dart Supabase project, checked for Google-only identity, matched to the PostgreSQL Staff allowlist, then discarded after a Dart HttpOnly session is created.
+      operationId: exchangeStaffGoogleIdentity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GoogleIdentityExchange" }
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /admin/auth/login:
     post:
       tags: [Staff Auth]
@@ -84,9 +110,12 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Authenticated" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+      deprecated: true
+      description: Phase-1 rollback only. Returns 410 when STAFF_LEGACY_AUTH_ENABLED=false.
   /admin/auth/mfa/setup:
     post:
       tags: [Staff Auth]
+      deprecated: true
       summary: Begin first-time TOTP setup
       operationId: setupStaffMfa
       security: [{ sessionCookie: [], csrfToken: [] }]
@@ -96,6 +125,7 @@ paths:
   /admin/auth/mfa/confirm:
     post:
       tags: [Staff Auth]
+      deprecated: true
       summary: Verify the first TOTP and activate staff MFA
       operationId: confirmStaffMfa
       security: [{ sessionCookie: [], csrfToken: [] }]
@@ -240,6 +270,87 @@ paths:
       responses:
         "204": { description: Temporary password assigned }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/staff:
+    get:
+      tags: [Staff Auth]
+      summary: List Staff accounts, pending Google allowlist entries and permission catalogue
+      operationId: listStaffAccess
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Staff access directory }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/staff/allowlist:
+    post:
+      tags: [Staff Auth]
+      summary: Allow a Staff Gmail for first Google sign-in
+      operationId: allowStaffGoogleEmail
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffGoogleAllowance" }
+      responses:
+        "201": { description: Staff Gmail added to the PostgreSQL allowlist }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/staff/allowlist/{id}:
+    delete:
+      tags: [Staff Auth]
+      summary: Remove an unclaimed Staff Google allowlist entry
+      operationId: removeStaffGoogleAllowance
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Pending allowlist entry removed }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/staff/{id}/access:
+    patch:
+      tags: [Staff Auth]
+      summary: Activate or disable Staff access and revoke old sessions
+      operationId: setStaffAccessStatus
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Staff access state updated }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/staff/{id}/sessions/revoke:
+    post:
+      tags: [Staff Auth]
+      summary: Revoke every Dart session for one Staff account
+      operationId: revokeStaffSessions
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Staff sessions revoked }
+  /admin/staff/{id}/google/relink:
+    post:
+      tags: [Staff Auth]
+      summary: Explicitly change a non-Owner Staff Gmail and clear the old Google identity link
+      operationId: relinkStaffGoogleIdentity
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Google identity link cleared and Gmail updated }
+        "409": { $ref: "#/components/responses/Conflict" }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -268,6 +379,27 @@ components:
         identifier: { type: string }
         password: { type: string, writeOnly: true }
         totp: { type: string, pattern: "^[0-9]{6}$", writeOnly: true }
+    GoogleIdentityExchange:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+          minLength: 20
+          maxLength: 8192
+          writeOnly: true
+          description: Short-lived Supabase access token produced by Google ID-token sign-in. Never persisted as the Dart session.
+    StaffGoogleAllowance:
+      type: object
+      required: [displayName, email]
+      properties:
+        displayName: { type: string, minLength: 3, maxLength: 120 }
+        email: { type: string, format: email }
+        phone: { type: string }
+        permissionKeys:
+          type: array
+          maxItems: 300
+          items: { type: string }
     VerificationRequired:
       type: object
       required: [status, challengeId, expiresAt]

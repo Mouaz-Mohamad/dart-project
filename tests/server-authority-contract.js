@@ -277,7 +277,21 @@ assert.match(
   /script-src-attr 'none'/,
   "inline JavaScript event attributes must be blocked by CSP",
 );
-assert.match(csp, /frame-src 'none'/, "frames must be blocked by default");
+assert.match(
+  csp,
+  /frame-src https:\/\/accounts\.google\.com;/,
+  "frames must remain restricted to the Google Identity origin required by Dart Eye",
+);
+assert.match(
+  csp,
+  /connect-src[^;]*https:\/\/\*\.supabase\.co/,
+  "Dart Eye may connect only to Supabase HTTPS project hosts allowed by CSP",
+);
+assert.match(
+  csp,
+  /script-src[^;]*https:\/\/accounts\.google\.com/,
+  "Google Identity Services must be the only new external auth script origin",
+);
 
 assert.ok(
   Array.isArray(vercelConfig.rewrites) &&

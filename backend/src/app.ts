@@ -73,7 +73,7 @@ export function createRuntimeApplication(
     logger,
     databasePing: () => pingDatabase(database),
     startedAt: new Date(),
-    version: "0.4.0",
+    version: "0.5.0",
     identityService,
     catalogService,
     catalogAssetService,

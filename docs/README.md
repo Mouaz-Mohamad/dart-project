@@ -45,7 +45,7 @@ Then open `http://localhost:4173/`.
 
 ### Backend foundation and Identity/Auth
 
-The provider-neutral Node.js/Express/TypeScript backend lives in `backend/`. It now includes customer Email OTP, Argon2id passwords, rotating HttpOnly sessions, CSRF protection, separate Customer/Staff/Representative realms, Owner Authenticator MFA, password-reset requests and deny-by-default permission foundations.
+The provider-neutral Node.js/Express/TypeScript backend lives in `backend/`. Customer and representative auth keep their existing flows. Dart Eye Owner/Admin/Staff now use Google identity through Supabase Auth, followed by the existing rotating HttpOnly Dart session, CSRF protection and deny-by-default PostgreSQL permissions.
 
 ```bash
 cd backend
@@ -53,11 +53,10 @@ npm install
 docker compose up -d postgres
 cp .env.example .env
 npm run db:migrate
-npm run admin:bootstrap-owner
 npm run dev
 ```
 
-Run `npm run check` for backend lint, type checking and tests. Set the Owner bootstrap environment values before its one-time command, then remove the bootstrap password. Docker/PostgreSQL are required for applying real migrations and running database integration tests; see `backend/README.md`.
+Run `npm run check` for backend lint, type checking and tests. Migration 0024 seeds the protected Owner Google allowlist for `midomoaaz3@gmail.com`; no Owner password bootstrap is required for the new Dart Eye flow. Docker/PostgreSQL are required for applying real migrations and running database integration tests; see `backend/README.md`.
 
 ## Checks
 

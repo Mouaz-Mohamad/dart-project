@@ -7,6 +7,8 @@ import { normalizeEmail, normalizeEgyptianPhone } from "../security/normalizatio
 import { hashPassword, validatePasswordPolicy } from "../security/password.js";
 import { createDatabasePool } from "./pool.js";
 
+const PROTECTED_OWNER_EMAIL = "midomoaaz3@gmail.com";
+
 interface OwnerInput {
   name: string;
   email: string;
@@ -25,6 +27,11 @@ function readOwnerInput(source: NodeJS.ProcessEnv): OwnerInput {
     .filter(([, value]) => !value)
     .map(([key]) => key);
   if (missing.length > 0) throw new Error(`Missing owner bootstrap values: ${missing.join(", ")}`);
+  if (normalizeEmail(input.email) !== PROTECTED_OWNER_EMAIL) {
+    throw new Error(
+      "Legacy Owner bootstrap is restricted to the protected Dart Owner email",
+    );
+  }
   const passwordProblems = validatePasswordPolicy(input.password);
   if (passwordProblems.length > 0) throw new Error(passwordProblems.join("; "));
   return input;
@@ -72,7 +79,10 @@ export async function bootstrapOwner(source: NodeJS.ProcessEnv = process.env): P
       [userId, JSON.stringify({ mfaRequired: true })],
     );
     await client.query("COMMIT");
-    logger.info({ ownerUserId: userId }, "Protected Owner account created; MFA setup is required at first login");
+    logger.warn(
+      { ownerUserId: userId },
+      "Legacy protected Owner bootstrap used; migrate this Owner to Google identity before disabling rollback auth",
+    );
     return userId;
   } catch (error) {
     await client.query("ROLLBACK");
