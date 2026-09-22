@@ -2139,13 +2139,14 @@ export class IdentityService {
           email: string;
           phone: string | null;
           display_name: string;
+          is_owner: boolean;
           permission_keys: unknown[];
           status: string;
           access_mode: string;
           expires_at: Date | null;
           created_at: Date;
         }>(
-          `SELECT id::text, email, phone, display_name, permission_keys,
+          `SELECT id::text, email, phone, display_name, is_owner, permission_keys,
                   status, access_mode, expires_at, created_at
              FROM staff_invitations
             WHERE is_owner=false
@@ -2220,6 +2221,7 @@ export class IdentityService {
         email: row.email,
         phone: row.phone,
         name: row.display_name,
+        role: row.is_owner ? "owner" : "staff",
         permissions: Array.isArray(row.permission_keys)
           ? row.permission_keys
           : [],
