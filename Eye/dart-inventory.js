@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-inventory.js
+// Inventory/model/item grouping, forms, stock rendering, and alerts.
+// BEGIN MODULE
+
 /* BEGIN INVENTORY UI — نوافذ التصميم والقطعة وعروض المجموعات.
  * Reads/writes existing dashboard arrays; DartCatalog owns derived stock/media.
  * BACKEND: replace persistence at dartSaveAll/repositories, not individual rows.
@@ -625,3 +629,5 @@
   });
 })();
 /* END INVENTORY UI */
+
+// END MODULE
