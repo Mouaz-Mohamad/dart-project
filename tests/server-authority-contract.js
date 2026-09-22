@@ -279,18 +279,12 @@ assert.match(
 );
 assert.match(
   csp,
-  /frame-src https:\/\/accounts\.google\.com;/,
-  "frames must remain restricted to the Google Identity origin required by Dart Eye",
+  /frame-src 'none';/,
+  "Dart Eye no longer needs third-party authentication frames",
 );
-assert.match(
-  csp,
-  /connect-src[^;]*https:\/\/\*\.supabase\.co/,
-  "Dart Eye may connect only to Supabase HTTPS project hosts allowed by CSP",
-);
-assert.match(
-  csp,
-  /script-src[^;]*https:\/\/accounts\.google\.com/,
-  "Google Identity Services must be the only new external auth script origin",
+assert.ok(
+  !/accounts\.google\.com/.test(csp) && !/supabase\.co/.test(csp),
+  "retired Google/Supabase Staff auth origins must not remain in the browser CSP",
 );
 
 assert.ok(
