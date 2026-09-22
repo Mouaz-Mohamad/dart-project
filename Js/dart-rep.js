@@ -708,6 +708,35 @@
     });
   }
 
+  function updateDeliveryMapsLocation(location) {
+    const courierLat = Number(location?.lat);
+    const courierLng = Number(location?.lng);
+    if (!Number.isFinite(courierLat) || !Number.isFinite(courierLng)) return;
+
+    for (const entry of deliveryMaps.values()) {
+      const destination = entry.destinationMarker?.getLatLng?.();
+      if (!destination) continue;
+      if (!entry.courierMarker) {
+        entry.courierMarker = window.L.marker([courierLat, courierLng])
+          .addTo(entry.map)
+          .bindPopup("You");
+      } else {
+        entry.courierMarker.setLatLng([courierLat, courierLng]);
+      }
+      if (!entry.route) {
+        entry.route = window.L.polyline(
+          [[courierLat, courierLng], [destination.lat, destination.lng]],
+          { weight: 4, opacity: 0.7 },
+        ).addTo(entry.map);
+      } else {
+        entry.route.setLatLngs([
+          [courierLat, courierLng],
+          [destination.lat, destination.lng],
+        ]);
+      }
+    }
+  }
+
   function renderOrders() {
     const rep = currentRep();
     if (!rep) {
@@ -1220,7 +1249,7 @@
               "Live location is being shared securely with Dart.",
               "success",
             );
-            renderOrders();
+            updateDeliveryMapsLocation(latestApiLocation);
           } catch (error) {
             setLocationStatus(error.message || "Could not update live location.", "error");
           }
