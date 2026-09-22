@@ -38,6 +38,8 @@ import type { FinanceService } from "./modules/finance/finance.service.js";
 import type { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { createOutboxRouter } from "./modules/outbox/outbox.routes.js";
 import type { OutboxService } from "./modules/outbox/outbox.service.js";
+import { createWaitingRouter } from "./modules/waiting/waiting.routes.js";
+import type { WaitingService } from "./modules/waiting/waiting.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -51,6 +53,7 @@ export interface AppDependencies extends HealthDependencies {
   platformAdminService?: PlatformAdminService;
   financeService?: FinanceService;
   outboxService?: OutboxService;
+  waitingService?: WaitingService;
   operationalAlerts?: Pick<OperationalAlertService, "report">;
 }
 
@@ -175,6 +178,17 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         "/api/v1",
         createCommerceRouter(
           dependencies.commerceService,
+          dependencies.identityService,
+          config,
+          dependencies.outboxService,
+        ),
+      );
+    }
+    if (dependencies.waitingService) {
+      app.use(
+        "/api/v1",
+        createWaitingRouter(
+          dependencies.waitingService,
           dependencies.identityService,
           config,
           dependencies.outboxService,

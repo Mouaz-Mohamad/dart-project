@@ -511,6 +511,9 @@ export class CommerceService {
     try {
       await client.query("BEGIN");
       await this.releaseExpired(client);
+      await client.query(
+        "SELECT set_config('dart.skip_waitlist_allocation','1',true)",
+      );
 
       const currentReservation = await client.query<{
         customer_user_id: string | null;
@@ -519,6 +522,7 @@ export class CommerceService {
         `SELECT customer_user_id::text, guest_owner_hash
            FROM cart_reservations
           WHERE id=$1
+            AND source='cart'
           FOR UPDATE`,
         [reservationId],
       );
@@ -571,7 +575,9 @@ export class CommerceService {
         const otherReservations = await client.query<{ id: string }>(
           `SELECT id
              FROM cart_reservations
-            WHERE customer_user_id=$1 AND id<>$2
+            WHERE customer_user_id=$1
+              AND source='cart'
+              AND id<>$2
             FOR UPDATE`,
           [customerUserId, reservationId],
         );
@@ -598,6 +604,7 @@ export class CommerceService {
           `SELECT id
              FROM cart_reservations
             WHERE customer_user_id IS NULL
+              AND source='cart'
               AND guest_owner_hash=$1
               AND id<>$2
             FOR UPDATE`,
@@ -646,8 +653,8 @@ export class CommerceService {
 
       await client.query(
         `INSERT INTO cart_reservations (
-           id, customer_user_id, guest_owner_hash, expires_at
-         ) VALUES ($1,$2,$3,$4)`,
+           id, customer_user_id, guest_owner_hash, expires_at, source
+         ) VALUES ($1,$2,$3,$4,'cart')`,
         [
           reservationId,
           customerUserId ?? null,
@@ -752,6 +759,36 @@ export class CommerceService {
       );
 
       await client.query(
+        "SELECT set_config('dart.skip_waitlist_allocation','0',true)",
+      );
+      await client.query(
+        `UPDATE waitlist_allocations wa
+            SET status='expired',
+                released_at=now(),
+                release_reason=COALESCE(release_reason,'cart_rebuilt_with_different_item'),
+                version=version+1,
+                updated_at=now()
+           FROM inventory_items i
+          WHERE wa.inventory_item_id=i.id
+            AND wa.status='cart'
+            AND wa.cart_reservation_id=$1
+            AND lower(i.status)='in stock'`,
+        [reservationId],
+      );
+      await client.query(
+        `SELECT dart_waitlist_try_allocate_item(candidate.id)
+           FROM (
+             SELECT id
+               FROM inventory_items
+              WHERE active
+                AND NOT is_archived
+                AND NOT is_deleted
+                AND lower(status)='in stock'
+              ORDER BY updated_at DESC,id
+              LIMIT 100
+           ) candidate`,
+      );
+      await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
       );
       await client.query("COMMIT");
@@ -784,6 +821,7 @@ export class CommerceService {
         `SELECT id, expires_at
            FROM cart_reservations
           WHERE customer_user_id=$1
+            AND source='cart'
             AND expires_at > now()
           ORDER BY updated_at DESC
           LIMIT 1
@@ -859,7 +897,9 @@ export class CommerceService {
       }>(
         `SELECT id, expires_at, customer_user_id::text, guest_owner_hash
            FROM cart_reservations
-          WHERE id=$1 AND expires_at > now()
+          WHERE id=$1
+            AND source='cart'
+            AND expires_at > now()
           FOR SHARE`,
         [reservationId],
       );
@@ -927,7 +967,9 @@ export class CommerceService {
       }>(
         `SELECT id, customer_user_id::text, guest_owner_hash, expires_at
            FROM cart_reservations
-          WHERE id=$1 AND expires_at > now()
+          WHERE id=$1
+            AND source='cart'
+            AND expires_at > now()
           FOR UPDATE`,
         [reservationId],
       );
@@ -965,7 +1007,9 @@ export class CommerceService {
       const otherReservations = await client.query<{ id: string }>(
         `SELECT id
            FROM cart_reservations
-          WHERE customer_user_id=$1 AND id<>$2
+          WHERE customer_user_id=$1
+            AND source='cart'
+            AND id<>$2
           FOR UPDATE`,
         [customerUserId, reservationId],
       );
@@ -1046,6 +1090,7 @@ export class CommerceService {
         `SELECT id
            FROM cart_reservations
           WHERE customer_user_id=$1
+            AND source='cart'
           FOR UPDATE`,
         [customerUserId],
       );
@@ -1097,6 +1142,7 @@ export class CommerceService {
         `SELECT customer_user_id::text, guest_owner_hash
            FROM cart_reservations
           WHERE id=$1
+            AND source='cart'
           FOR UPDATE`,
         [reservationId],
       );
@@ -1201,6 +1247,7 @@ export class CommerceService {
                 pricing_snapshot
            FROM cart_reservations
           WHERE id=$1
+            AND source='cart'
           FOR UPDATE`,
         [input.reservationId],
       );
@@ -1566,6 +1613,81 @@ export class CommerceService {
       if ((inventoryUpdate.rowCount ?? 0) !== itemSnapshots.length) {
         throw new AppError(409, "RESERVATION_CHANGED", "Reserved inventory changed during checkout");
       }
+
+      let waitlistConversions = 0;
+      for (const snapshot of itemSnapshots) {
+        const row = snapshot.row;
+        const conversion = await client.query<{ id: string }>(
+          `WITH candidate AS (
+             SELECT w.id
+               FROM waitlist_entries w
+              WHERE w.customer_user_id=$1
+                AND w.status='confirmed'
+                AND w.model_id=$2
+                AND w.size=$3
+                AND (
+                  w.desired_color=$4
+                  OR EXISTS (
+                    SELECT 1
+                      FROM waitlist_allocations wa
+                     WHERE wa.waitlist_entry_id=w.id
+                       AND wa.offered_color=$4
+                  )
+                )
+              ORDER BY w.confirmed_at DESC NULLS LAST,w.requested_at DESC,w.id
+              LIMIT 1
+              FOR UPDATE
+           )
+           UPDATE waitlist_entries w
+              SET status='converted',
+                  converted_at=now(),
+                  converted_order_code=$5,
+                  reserved_until=NULL,
+                  version=w.version+1,
+                  updated_at=now()
+             FROM candidate c
+            WHERE w.id=c.id
+            RETURNING w.id::text`,
+          [customerUserId, row.model_id, row.size, row.color, order.order_code],
+        );
+        const convertedId = conversion.rows[0]?.id;
+        if (!convertedId) continue;
+        waitlistConversions += 1;
+        await client.query(
+          `UPDATE waitlist_allocations
+              SET status='converted',
+                  converted_at=now(),
+                  converted_order_code=$2,
+                  version=version+1,
+                  updated_at=now()
+            WHERE waitlist_entry_id=$1
+              AND status IN ('cart','confirmed','expired')`,
+          [convertedId, order.order_code],
+        );
+        await client.query(
+          `INSERT INTO audit_logs (
+             actor_type,actor_id,action,entity_type,entity_id,request_id,metadata
+           ) VALUES (
+             'customer',$1,'WAITLIST_CONVERTED_TO_ORDER','waitlist',$2,$3,$4::jsonb
+           )`,
+          [
+            customerUserId,
+            convertedId,
+            requestId,
+            JSON.stringify({
+              orderCode: order.order_code,
+              itemCode: row.item_code,
+              fallbackMatch: true,
+            }),
+          ],
+        );
+      }
+      if (waitlistConversions > 0) {
+        await client.query(
+          "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='waiting'",
+        );
+      }
+
       await client.query("DELETE FROM cart_reservations WHERE id=$1", [input.reservationId]);
 
       await client.query(

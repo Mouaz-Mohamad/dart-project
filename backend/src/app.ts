@@ -21,6 +21,7 @@ import { PlatformAdminService } from "./modules/platform/platform-admin.service.
 import { FinanceService } from "./modules/finance/finance.service.js";
 import { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { OutboxService } from "./modules/outbox/outbox.service.js";
+import { WaitingService } from "./modules/waiting/waiting.service.js";
 import { createEmailProvider } from "./modules/outbox/email-provider.js";
 
 export interface DartRuntime {
@@ -74,6 +75,7 @@ export function createRuntimeApplication(
     config,
     emailProvider,
   );
+  const waitingService = new WaitingService(database);
 
   database.on("error", (error) => {
     logger.error({ err: error }, "Unexpected PostgreSQL pool error");
@@ -99,6 +101,7 @@ export function createRuntimeApplication(
     platformAdminService,
     financeService,
     outboxService,
+    waitingService,
     operationalAlerts,
   });
   return { app, config, database, logger, operationalAlerts };

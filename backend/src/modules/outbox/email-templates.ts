@@ -33,6 +33,11 @@ export function renderOutboxEmail(
   const parameters = parameterMap(payload);
   const otp = parameters.otp || "";
   const temporaryPassword = parameters.temporaryPassword || "";
+  const customerName = parameters.customerName || "Dart customer";
+  const modelName = parameters.modelName || parameters.modelId || "your item";
+  const size = parameters.size || "-";
+  const requestedColor = parameters.requestedColor || "-";
+  const availableColor = parameters.availableColor || requestedColor;
   const dashboardUrl = String(
     payload.dashboardUrl || "https://dart-project-psi.vercel.app/Eye/Dart%20Eye.html",
   );
@@ -69,6 +74,14 @@ export function renderOutboxEmail(
     subject = "Dart temporary password";
     english = `A temporary Dart password was assigned: ${temporaryPassword}. Change it immediately after signing in.`;
     arabic = `تم تعيين كلمة مرور مؤقتة لحساب Dart: ${temporaryPassword}. غيّرها فور تسجيل الدخول.`;
+  } else if (eventType === "WAITLIST_STOCK_RESERVED") {
+    subject = "Your Dart item is available";
+    english = `Hi ${customerName}, ${modelName} in size ${size} and color ${availableColor} is available and reserved for you until ${expiry || "the reservation expires"}. Open My Account > My Waiting to confirm it.`;
+    arabic = `أهلًا ${customerName}، ${modelName} مقاس ${size} ولون ${availableColor} أصبح متاحًا وتم حجزه لك حتى ${expiry || "انتهاء مدة الحجز"}. افتح My Account ثم My Waiting لتأكيده.`;
+  } else if (eventType === "WAITLIST_ALTERNATIVE_RESERVED") {
+    subject = "A Dart alternative color is available";
+    english = `Hi ${customerName}, your requested color ${requestedColor} is still unavailable, but ${availableColor} is available for ${modelName} in size ${size} and is reserved for you until ${expiry || "the reservation expires"}. Open My Account > My Waiting to accept or decline it.`;
+    arabic = `أهلًا ${customerName}، اللون المطلوب ${requestedColor} لسه غير متاح، لكن لون ${availableColor} متاح لنفس ${modelName} مقاس ${size} وتم حجزه لك حتى ${expiry || "انتهاء مدة الحجز"}. افتح My Account ثم My Waiting للقبول أو الرفض.`;
   } else {
     throw new Error(`Unsupported email event type: ${eventType}`);
   }
