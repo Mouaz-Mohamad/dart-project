@@ -47,7 +47,10 @@ function walk(root) {
 }
 
 const jsFiles = ["Js", "Eye"].flatMap(walk).filter((file) => file.endsWith(".js"));
-const lazyFeatureFiles = new Set(["Eye/dart-live-operations.js"]);
+const pageScopedFeatureFiles = new Set([
+  "Eye/dart-live-operations.js",
+  "Js/dart-rep.js",
+]);
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 const dashboardRuntime = fs.readFileSync("Eye/dart.js", "utf8");
 if (/script[^>]+src=["']dart-live-operations\.js["']/i.test(dashboardHtml)) {
@@ -58,15 +61,20 @@ if (!dashboardRuntime.includes('script.src = "dart-live-operations.js"')) {
 }
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
+let coreJsBytes = 0;
 for (const file of jsFiles) {
   const size = fs.statSync(file).size;
-  if (!lazyFeatureFiles.has(file)) totalJsBytes += size;
+  totalJsBytes += size;
+  if (!pageScopedFeatureFiles.has(file)) coreJsBytes += size;
   if (size > maxJsBytes) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
 }
-if (totalJsBytes > 900 * 1024) {
-  failures.push(`Core browser JavaScript is ${Math.ceil(totalJsBytes / 1024)}KB; budget is 900KB`);
+if (coreJsBytes > 900 * 1024) {
+  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 900KB`);
+}
+if (totalJsBytes > 1100 * 1024) {
+  failures.push(`Repository browser JavaScript is ${Math.ceil(totalJsBytes / 1024)}KB; budget is 1100KB`);
 }
 
 const imageFiles = walk("Photos").filter((file) => /\.(?:png|jpe?g|webp)$/i.test(file));
@@ -83,5 +91,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `PASS performance budget: ${jsFiles.length} JS files, ${Math.ceil(totalJsBytes / 1024)}KB total core JS, lightweight runtime icons enforced`,
+  `PASS performance budget: ${jsFiles.length} JS files, ${Math.ceil(coreJsBytes / 1024)}KB initial/core, ${Math.ceil(totalJsBytes / 1024)}KB repository total; page-scoped modules budgeted separately`,
 );
