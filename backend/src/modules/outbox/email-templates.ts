@@ -61,6 +61,10 @@ export function renderOutboxEmail(
     subject = "Verify your Dart email";
     english = `Your Dart verification code is ${otp}. It expires ${expiry || "soon"}.`;
     arabic = `كود تأكيد البريد الإلكتروني في Dart هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}.`;
+  } else if (eventType === "PASSWORD_RESET_CODE_REQUESTED") {
+    subject = "Dart password reset code";
+    english = `Your Dart password reset code is ${otp}. It expires ${expiry || "soon"}. Enter this code, then choose a new password. If you did not request a reset, ignore this email.`;
+    arabic = `كود إعادة تعيين كلمة مرور Dart هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. أدخل الكود ثم اختر كلمة مرور جديدة. إذا لم تطلب إعادة التعيين فتجاهل الرسالة.`;
   } else if (eventType === "TEMPORARY_PASSWORD_ASSIGNED") {
     subject = "Dart temporary password";
     english = `A temporary Dart password was assigned: ${temporaryPassword}. Change it immediately after signing in.`;

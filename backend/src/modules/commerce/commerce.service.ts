@@ -2669,7 +2669,7 @@ export class CommerceService {
     actorId: string,
     returnRef: string,
     input: {
-      action: "approve" | "reject" | "assign" | "inspect";
+      action: "approve" | "reject" | "assign" | "inspect" | "back";
       replacementItemCode?: string | undefined;
       reason?: string | undefined;
       representativeId?: string | undefined;
@@ -2833,6 +2833,60 @@ export class CommerceService {
         record.pickupGroupId = String(record.pickupGroupId || `RPG-${Date.now()}`);
         record.assignedAt = now;
         record.updatedAt = now;
+      }
+
+      if (input.action === "back") {
+        if (previousStatus === "Pickup On The Way") {
+          record.status = "Representative Assigned";
+          record.pickupStartedAt = null;
+          record.courierLocation = null;
+          record.updatedAt = now;
+        } else if (previousStatus === "Representative Assigned") {
+          record.status = "Approved - Awaiting Representative";
+          record.representativeId = "";
+          record.representativeBusinessId = "";
+          record.representativeName = "";
+          record.representativePhone = "";
+          record.pickupGroupId = "";
+          record.assignedAt = null;
+          record.pickupStartedAt = null;
+          record.courierLocation = null;
+          record.updatedAt = now;
+        } else if (previousStatus === "Approved - Awaiting Representative") {
+          if (String(record.requestType || "") === "Exchange" && record.replacementItemCode) {
+            await client.query(
+              `UPDATE inventory_items
+                  SET status='In stock',
+                      order_id=NULL,
+                      return_request_id=NULL,
+                      cart_reservation_id=NULL,
+                      reservation_until=NULL,
+                      version=version+1,
+                      updated_at=now()
+                WHERE item_code=$1
+                  AND status='Processing/Held'`,
+              [String(record.replacementItemCode)],
+            );
+            record.replacementItemCode = "";
+            record.replacementItemId = "";
+            record.replacementLineSnapshot = null;
+            inventoryChanged = true;
+          }
+          record.status = "Pending Request";
+          record.acceptedAt = null;
+          record.updatedAt = now;
+        } else if (previousStatus === "Rejected") {
+          record.status = "Pending Request";
+          record.rejectionReason = "";
+          record.rejectedAt = null;
+          record.updatedAt = now;
+        } else {
+          throw new AppError(
+            409,
+            "RETURN_ROLLBACK_INVALID",
+            "This return cannot be moved back from its current state",
+          );
+        }
       }
 
       if (input.action === "inspect") {
@@ -3077,14 +3131,20 @@ export class CommerceService {
         record.pickupStartedAt = String(record.pickupStartedAt || now);
         record.updatedAt = now;
       } else if (action === "cancel") {
-        if (previousStatus !== "Pickup On The Way") {
-          throw new AppError(409, "RETURN_STATE_INVALID", "This pickup is not currently active");
+        if (!["Representative Assigned", "Pickup On The Way"].includes(previousStatus)) {
+          throw new AppError(409, "RETURN_STATE_INVALID", "This pickup cannot be cancelled from its current status");
         }
-        record.status = "Representative Assigned";
+        record.status = "Approved - Awaiting Representative";
         record.pickupStartedAt = null;
         record.courierLocation = null;
         record.lastFailedPickupAt = now;
         record.failedPickupAttempts = Number(record.failedPickupAttempts || 0) + 1;
+        record.representativeId = "";
+        record.representativeBusinessId = "";
+        record.representativeName = "";
+        record.representativePhone = "";
+        record.pickupGroupId = "";
+        record.assignedAt = null;
         record.updatedAt = now;
       } else {
         if (previousStatus !== "Pickup On The Way" || !record.pickupStartedAt) {

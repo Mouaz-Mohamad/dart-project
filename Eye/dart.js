@@ -2071,7 +2071,7 @@ async function dartInspectReturn(record, condition) {
   dartRefreshAll();
 }
 
-function dartRollbackReturn(record) {
+async function dartRollbackReturn(record) {
   const rules = dartReturnRules();
   if (!record || !rules?.canRollback?.(record)) {
     alert("لا توجد خطوة سابقة آمنة لهذا المرتجع.");
@@ -2079,10 +2079,18 @@ function dartRollbackReturn(record) {
   }
   const warning = [
     `تحذير: سيتم إرجاع المرتجع ${record.returnId || record.id} خطوة واحدة للخلف.`,
-    "سيتم عكس أي تغيير مرتبط بهذه الخطوة في المخزون والمبلغ المرتجع والكارت ورسوم المندوب.",
-    "سيُسجل الإجراء بالكامل في سجل المراجعة. هل تريد المتابعة؟",
+    "سيتم عكس الحالة التشغيلية الآمنة لهذه الخطوة، وسيُسجل الإجراء في سجل المراجعة.",
+    "بعد استلام المرتجع تنتهي رحلة الاسترجاع/الاستبدال ولا يمكن الرجوع منها بهذه الأداة.",
   ].join("\n\n");
   if (!confirm(warning)) return;
+  if (window.DartAdminApi?.request) {
+    try {
+      await dartAdminReturnAction(record, { action: "back" });
+    } catch (error) {
+      alert(error.message || "تعذر إرجاع المرتجع خطوة واحدة.");
+    }
+    return;
+  }
   const before = {
     status: record.status,
     inspectionStatus: record.inspectionStatus || "Pending",
@@ -2813,7 +2821,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     if (sectionKey === "returns") {
       const r = returnsData.find((x) => String(x.id) === String(id));
       if (e.target.closest(".return-rollback-btn")) {
-        dartRollbackReturn(r);
+        await dartRollbackReturn(r);
         return;
       }
       if (e.target.closest(".return-accept-btn")) dartDecideReturn(r, "accept");
@@ -3720,7 +3728,7 @@ function renderReturns(dataArray) {
         modelId: r.modelId || "-",
         itemCode: r.itemCode || "-",
         replacement,
-        status: r.status || "-",
+        status: dartReturnRules()?.publicStatus?.(r) || r.status || "-",
         inspection: r.inspectionStatus || (r.status === "Good" || r.status === "Damaged" ? r.status : "Pending"),
         date: r.date || "-",
         clientName: r.clientName || "-",

@@ -315,11 +315,12 @@ export function createCommerceRouter(
       reject: ["returns.manage", "returns.review"],
       assign: ["returns.manage", "returns.assign"],
       inspect: ["returns.manage", "returns.inspect"],
+      back: ["returns.manage"],
     }),
     async (request, response) => {
       const returnRef = z.string().trim().min(2).max(120).parse(request.params.returnRef);
       const body = z.object({
-        action: z.enum(["approve", "reject", "assign", "inspect"]),
+        action: z.enum(["approve", "reject", "assign", "inspect", "back"]),
         replacementItemCode: z.string().trim().min(1).max(120).optional(),
         reason: z.string().trim().min(3).max(500).optional(),
         representativeId: z.string().trim().min(1).max(120).optional(),
