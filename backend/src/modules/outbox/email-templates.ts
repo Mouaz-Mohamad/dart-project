@@ -41,14 +41,17 @@ export function renderOutboxEmail(
   let english = "";
   let arabic = "";
 
-  if (
-    eventType === "STAFF_INVITED" ||
-    eventType === "STAFF_ONBOARDING_CODE_REQUESTED" ||
-    eventType === "STAFF_EMAIL_ACCESS_CODE_REQUESTED"
-  ) {
+  if (eventType === "STAFF_EMAIL_ACCESS_CODE_REQUESTED") {
     subject = "Dart Eye verification code";
-    english = `Your Dart Eye verification code is ${otp}. It expires ${expiry || "soon"}. Open the dashboard: ${dashboardUrl}`;
-    arabic = `كود تأكيد الدخول إلى Dart Eye هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. افتح الداشبورد: ${dashboardUrl}`;
+    english = `Your Dart Eye verification code is ${otp}. It expires ${expiry || "soon"}. If you did not request this code, ignore this email.`;
+    arabic = `كود تأكيد الدخول إلى Dart Eye هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. إذا لم تطلب هذا الكود فتجاهل الرسالة.`;
+  } else if (
+    eventType === "STAFF_INVITED" ||
+    eventType === "STAFF_ONBOARDING_CODE_REQUESTED"
+  ) {
+    subject = "Dart Staff verification code";
+    english = `Your Dart Staff verification code is ${otp}. It expires ${expiry || "soon"}. Open the dashboard: ${dashboardUrl}`;
+    arabic = `كود تفعيل حساب الموظف في Dart هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. افتح الداشبورد: ${dashboardUrl}`;
   } else if (
     eventType === "EMAIL_VERIFICATION_REQUESTED" ||
     eventType === "EMAIL_CHANGE_VERIFICATION_REQUESTED"
