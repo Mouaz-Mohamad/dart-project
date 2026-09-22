@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-orders-api.js
+// Server-backed order hydration, writes, and synchronization.
+// BEGIN MODULE
+
 (function () {
   "use strict";
 
@@ -194,3 +198,5 @@
     serverVersion: () => serverVersion,
   };
 })();
+
+// END MODULE
