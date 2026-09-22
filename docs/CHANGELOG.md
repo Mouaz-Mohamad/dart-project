@@ -1,6 +1,16 @@
 # Dart Project changelog
 
-## Dart Eye Google/Supabase Staff Auth Phase 1 — 2026-09-21
+## Simplified Dart Eye Staff Email Access — 2026-09-22
+
+- Replaced the unlaunched Google/Supabase Staff sign-in path with an Owner-managed email allowlist and six-digit one-time email verification.
+- Removed active Staff password, TOTP, Google exchange and Supabase verification endpoints from the runtime surface.
+- Added migration 0025 for email access challenges and conversion of the protected pending Owner entry to `email_otp`.
+- Kept Dart PostgreSQL/Neon authoritative for Owner/Staff roles, Active/Disabled state, granular permissions, sessions and audit.
+- Added immediate session revocation on Staff disable or permission changes and kept unknown-email responses generic to prevent allowlist enumeration.
+- Removed obsolete Google/Supabase browser CSP origins, runtime config, verifier code, live tests and recovery command.
+- Customer and Representative authentication remain unchanged.
+
+## Dart Eye Google/Supabase Staff Auth Phase 1 — 2026-09-21 (superseded before production)
 
 - Replaced the primary Owner/Admin/Staff dashboard sign-in UX with Google Identity Services + Supabase Auth while retaining Dart PostgreSQL, RBAC and HttpOnly sessions as the authorization/session authority.
 - Added migration 0024 for Google provider binding, Supabase user IDs, provider subjects, linked/last-login timestamps, Staff disable metadata, protected Owner constraints and the permanent first Owner allowlist entry for `midomoaaz3@gmail.com`.
