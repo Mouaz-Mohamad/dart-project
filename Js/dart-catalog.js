@@ -1,3 +1,7 @@
+// DART | MODULE: dart-catalog.js
+// Catalog/models/items authority adapter and inventory-derived helpers.
+// BEGIN MODULE
+
 /* BEGIN DART CATALOG — المصدر المشترك للتصميمات والمخزون والصور.
  * BACKEND: replace read/write with authenticated repositories; keep the public
  * product response free of cost, customer details and internal physical IDs.
@@ -555,3 +559,6 @@
   });
 })();
 /* END DART CATALOG */
+
+
+// END MODULE
