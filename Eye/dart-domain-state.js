@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-domain-state.js
+// Dashboard domain hydration/synchronization adapters backed by the admin API.
+// BEGIN MODULE
+
 (function () {
   "use strict";
 
@@ -305,3 +309,5 @@
     },
   };
 })();
+
+// END MODULE
