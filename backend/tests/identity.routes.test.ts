@@ -222,11 +222,16 @@ describe("identity HTTP boundaries", () => {
       name: "Test Customer",
       email: "customer@example.com",
       phone1: "01012345678",
-      password: "StrongPassword123",
+      phone2: "",
+      password: "abcd",
     });
     expect(response.status).toBe(202);
     expect(response.body.status).toBe("verification_required");
     expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(service.registerCustomer).toHaveBeenCalledWith(
+      expect.objectContaining({ phone2: undefined, password: "abcd" }),
+      expect.any(Object),
+    );
   });
 
   it("sets an HttpOnly session cookie and a separate CSRF cookie after login", async () => {
