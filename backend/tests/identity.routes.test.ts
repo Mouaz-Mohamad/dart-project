@@ -171,7 +171,7 @@ describe("identity HTTP boundaries", () => {
     expect(service.startStaffEmailAccess).not.toHaveBeenCalled();
   });
 
-  it("reports an immediate SMTP failure while keeping the Staff email code queued for retry", async () => {
+  it("keeps the Staff email request generic when immediate SMTP delivery fails", async () => {
     const service = fakeService();
     const outbox = {
       configured: vi.fn().mockReturnValue(true),
@@ -185,8 +185,10 @@ describe("identity HTTP boundaries", () => {
     const response = await request(app(service, outbox))
       .post("/api/v1/admin/auth/email/start")
       .send({ email: "owner@example.com" });
-    expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe("EMAIL_DELIVERY_UNAVAILABLE");
+    expect(response.status).toBe(202);
+    expect(response.body.message).toBe(
+      "If this email is allowed, a verification code has been sent.",
+    );
     expect(outbox.processBatch).toHaveBeenCalledWith(
       1,
       "staff-email-access-code:123e4567-e89b-12d3-a456-426614174004",
