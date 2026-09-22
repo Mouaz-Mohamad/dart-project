@@ -1,5 +1,11 @@
+/* ==========================================================================
+   DART | STOREFRONT RESPONSIVE
+   Media-query-only overrides. Keep normal component rules in Stayle 1.css.
+   ========================================================================== */
+
+/* BEGIN Tablet / narrow desktop */
 @media (max-width: 900px) {
-  .form-row {
+.form-row {
     flex-wrap: wrap;
   }
   .form-row > * {
@@ -30,56 +36,11 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+/* END Tablet / narrow desktop */
 
-@media (max-width: 650px) {
-  .products-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-  .product-card {
-    min-width: 0;
-  }
-  .product-title,
-  .product-category,
-  .product-code {
-    overflow-wrap: anywhere;
-  }
-  .model {
-    width: calc(100% - 20px);
-    max-height: 92vh;
-    overflow: auto;
-  }
-  .checkout-summary-box,
-  .totals-calculation,
-  .discount-box,
-  .address-form {
-    width: 100%;
-  }
-  .account .djasb {
-    gap: 10px;
-  }
-  .total-order,
-  .monthly-order {
-    min-width: 0;
-    flex: 1 1 0;
-  }
-  .profile-details {
-    padding: 20px 12px;
-  }
-  .info-profile {
-    margin-top: 14px;
-  }
-  .profile-record-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .profile-record-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
+/* BEGIN Representative tablet layout */
 @media (max-width: 800px) {
-  .dart-rep-hero {
+.dart-rep-hero {
     min-height: auto;
     align-items: center;
     padding: 22px;
@@ -97,34 +58,11 @@
     padding: 18px;
   }
 }
+/* END Representative tablet layout */
 
-@media (max-width: 520px) {
-  .dart-rep-hero {
-    flex-direction: column;
-    text-align: center;
-  }
-  .dart-rep-hero img {
-    width: 150px;
-  }
-  .dart-rep-dashboard-head {
-    flex-direction: column;
-  }
-  .dart-rep-order-actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 560px) {
-  .leaderboard-entry {
-    grid-template-columns: 34px 1fr;
-  }
-  .leaderboard-score {
-    grid-column: 2;
-  }
-}
-
+/* BEGIN Mobile storefront and representative layout */
 @media (max-width: 700px) {
-  .product-filter-panel {
+.product-filter-panel {
     width: calc(100% - 18px);
     padding: 10px;
   }
@@ -141,31 +79,8 @@
   .product-size-chart-dialog {
     padding: 20px 12px;
   }
-}
 
-@media (max-width: 640px) {
-  .dart-return-address-panel,
-  .dart-return-exchange-options { padding: 12px; }
-  .dart-return-address-map { height: 240px; }
-  .dart-return-address-panel .form-row,
-  .dart-return-exchange-options .form-row { flex-direction: column; }
-}
-
-@media (max-width: 560px) {
-  .top-client-period-filters {
-    width: 100%;
-  }
-  .top-client-period-filters label {
-    flex: 1 1 135px;
-  }
-  .top-client-period-filters select {
-    min-width: 0;
-    width: 100%;
-  }
-}
-
-@media (max-width: 700px) {
-  .product-filter-toggle,
+.product-filter-toggle,
   .product-filter-panel {
     width: calc(100% - 18px);
   }
@@ -264,11 +179,88 @@
     gap: 10px;
   }
 }
+/* END Mobile storefront and representative layout */
 
-@media (max-width:520px) { .serial-result-skeleton { grid-template-columns:1fr; } .serial-skeleton-image { width:100%; height:220px; } }
+/* BEGIN Compact product/account layout */
+@media (max-width: 650px) {
+.products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .product-card {
+    min-width: 0;
+  }
+  .product-title,
+  .product-category,
+  .product-code {
+    overflow-wrap: anywhere;
+  }
+  .model {
+    width: calc(100% - 20px);
+    max-height: 92vh;
+    overflow: auto;
+  }
+  .checkout-summary-box,
+  .totals-calculation,
+  .discount-box,
+  .address-form {
+    width: 100%;
+  }
+  .account .djasb {
+    gap: 10px;
+  }
+  .total-order,
+  .monthly-order {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+  .profile-details {
+    padding: 20px 12px;
+  }
+  .info-profile {
+    margin-top: 14px;
+  }
+  .profile-record-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .profile-record-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* END Compact product/account layout */
 
+/* BEGIN Return/exchange mobile layout */
+@media (max-width: 640px) {
+.dart-return-address-panel,
+  .dart-return-exchange-options { padding: 12px; }
+  .dart-return-address-map { height: 240px; }
+  .dart-return-address-panel .form-row,
+  .dart-return-exchange-options .form-row { flex-direction: column; }
+}
+/* END Return/exchange mobile layout */
+
+/* BEGIN Small mobile layout */
 @media (max-width: 560px) {
-  .serial-product {
+.leaderboard-entry {
+    grid-template-columns: 34px 1fr;
+  }
+  .leaderboard-score {
+    grid-column: 2;
+  }
+
+.top-client-period-filters {
+    width: 100%;
+  }
+  .top-client-period-filters label {
+    flex: 1 1 135px;
+  }
+  .top-client-period-filters select {
+    min-width: 0;
+    width: 100%;
+  }
+
+.serial-product {
     grid-template-columns: 1fr;
   }
   .serial-product-image {
@@ -295,71 +287,60 @@
     align-items: center;
   }
 }
+/* END Small mobile layout */
 
+/* BEGIN Extra-small mobile layout */
+@media (max-width: 520px) {
+.dart-rep-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+  .dart-rep-hero img {
+    width: 150px;
+  }
+  .dart-rep-dashboard-head {
+    flex-direction: column;
+  }
+  .dart-rep-order-actions {
+    grid-template-columns: 1fr;
+  }
+}
+/* END Extra-small mobile layout */
+
+/* BEGIN Reduced-motion accessibility */
 @media (prefers-reduced-motion: reduce) {
-  .dart-nav-ticker-track { transition: none; }
+.dart-nav-ticker-track { transition: none; }
   .dart-confetti-piece,
   .dart-balloon { animation-play-state: paused; }
 }
+/* END Reduced-motion accessibility */
 
+/* BEGIN Browser dark-mode protection */
+@media (prefers-color-scheme: dark) {
+body {
+    background-color: #ffffff !important; /* إجبار الخلفية تفضل بيضاء */
+  }
 
-/* Performance containment: defer rendering of below-the-fold reusable sections. */
-@supports (content-visibility: auto) {
-  #birthday,
-  #feedback-form,
-  #contact-form,
-  #story,
-  #dart-for-you,
-  #birthday-details,
-  #card-details,
-  #why,
-  #footer {
-    content-visibility: auto;
-    contain-intrinsic-size: 1px 420px;
+  /* لو المتصفح غيّر خلفية العنصر أو كسر الألوان */
+  .search-container,
+  .leaderboard-list,
+  .story,
+  .top {
+    background-color: #ffffff !important;
+    color: var(--bg-dark) !important;
+  }
+
+  /* الحفاظ على ألوان العلامة التجارية الخاصة بـ Dart */
+  .under-nav,
+  .icon-menu,
+  .side-menu {
+    background-color: var(--bragnte) !important;
   }
 }
+/* END Browser dark-mode protection */
 
-
-/* BEGIN shared icon hardening — avoid missing icon-font glyphs in the navbar. */
-#header-container .dart-nav-icon {
-  display: block;
-  width: 100%;
-  height: 100%;
-  color: inherit;
+/* BEGIN (max-width:520px) */
+@media (max-width:520px) {
+.serial-result-skeleton { grid-template-columns:1fr; } .serial-skeleton-image { width:100%; height:220px; }
 }
-#header-container .icon-menu .dart-nav-menu-icon {
-  width: 32px;
-  height: 22px;
-  color: #fff;
-}
-#header-container .icon-shop .dart-nav-cart-icon {
-  width: 24px;
-  height: 24px;
-  color: var(--bragnte, #ab012b);
-}
-#header-container .social-icons svg {
-  width: 20px;
-  height: 20px;
-  fill: currentColor;
-  stroke: currentColor;
-  stroke-width: 1.6;
-}
-#header-container .social-icons svg rect,
-#header-container .social-icons svg circle {
-  fill: none;
-}
-#header-container .account-btn a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-#header-container .dart-account-icon {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-/* END shared icon hardening */
+/* END (max-width:520px) */
