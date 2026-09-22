@@ -42,12 +42,11 @@ export function createStaffManagementRouter(
     async (request, response) => {
       const body = z.object({
         email: z.email().max(254),
-        phone: z.string().trim().max(25).optional().default(""),
-        displayName: z.string().trim().min(3).max(120),
+        role: z.enum(["owner", "staff"]).default("staff"),
         permissionKeys: z.array(z.string().trim().min(3).max(120)).max(300).default([]),
       }).parse(request.body);
       response.status(201).json(
-        await service.createStaffGoogleAllowance(
+        await service.createStaffEmailAccess(
           request.auth!,
           body,
           {
@@ -73,7 +72,7 @@ export function createStaffManagementRouter(
       const body = z.object({
         reason: z.string().trim().max(500).default(""),
       }).parse(request.body || {});
-      await service.removeStaffGoogleAllowance(
+      await service.removeStaffEmailAccess(
         request.auth!,
         z.uuid().parse(request.params.id),
         body.reason,
