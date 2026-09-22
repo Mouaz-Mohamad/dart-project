@@ -1,3 +1,7 @@
+// DART | MODULE: dart-site-settings.js
+// Public site settings cache, live refresh, and template propagation.
+// BEGIN MODULE
+
 /* ========================================================================== */
 /* DART SITE SETTINGS — browser repository prepared for a future backend API  */
 /* ========================================================================== */
@@ -310,3 +314,6 @@
   });
   root.setInterval?.(checkForChanges, SETTINGS_POLL_MS);
 })(typeof window !== "undefined" ? window : globalThis);
+
+
+// END MODULE
