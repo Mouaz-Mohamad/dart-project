@@ -1419,6 +1419,7 @@ export class IdentityService {
     await this.requireOwnerForStaffManagement(account);
     const email = input.email.trim();
     const emailNormalized = normalizeEmail(email);
+    const displayName = input.displayName.trim();
     const phoneDisplay = input.phone?.trim() || null;
     const phoneNormalized = phoneDisplay
       ? normalizePhonesOrThrow([phoneDisplay])[0]!
@@ -1427,7 +1428,8 @@ export class IdentityService {
       ...new Set(
         input.permissionKeys.map((key) => key.trim()).filter(Boolean),
       ),
-    ];
+    ].sort();
+
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -1435,6 +1437,7 @@ export class IdentityService {
         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
         [`staff-google-email:${emailNormalized}`],
       );
+
       const protectedOwnerGrant = await client.query<{ id: string }>(
         `SELECT id::text
            FROM staff_invitations
@@ -1470,6 +1473,7 @@ export class IdentityService {
           "A Staff account with this email already exists",
         );
       }
+
       if (permissionKeys.length) {
         const valid = await client.query<{ key: string }>(
           "SELECT key FROM permissions WHERE key = ANY($1::text[])",
@@ -1483,6 +1487,51 @@ export class IdentityService {
           );
         }
       }
+
+      const pending = await client.query<{
+        id: string;
+        email: string;
+        display_name: string;
+        phone_normalized: string | null;
+        permission_keys: unknown[];
+      }>(
+        `SELECT id::text, email, display_name, phone_normalized, permission_keys
+           FROM staff_invitations
+          WHERE email_normalized=$1
+            AND access_mode='google'
+            AND status='pending'
+            AND is_owner=false
+          ORDER BY created_at DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [emailNormalized],
+      );
+      const previous = pending.rows[0] ?? null;
+      if (previous) {
+        const previousPermissions = Array.isArray(previous.permission_keys)
+          ? previous.permission_keys
+              .map((key) => String(key || "").trim())
+              .filter(Boolean)
+              .sort()
+          : [];
+        const samePermissions =
+          previousPermissions.length === permissionKeys.length &&
+          previousPermissions.every(
+            (permission, index) => permission === permissionKeys[index],
+          );
+        if (
+          previous.display_name === displayName &&
+          previous.phone_normalized === phoneNormalized &&
+          samePermissions
+        ) {
+          await client.query("COMMIT");
+          return {
+            allowanceId: previous.id,
+            email: previous.email,
+          };
+        }
+      }
+
       await client.query(
         `UPDATE staff_invitations
             SET status='revoked',
@@ -1509,7 +1558,7 @@ export class IdentityService {
           emailNormalized,
           phoneDisplay,
           phoneNormalized,
-          input.displayName.trim(),
+          displayName,
           JSON.stringify(permissionKeys),
           account.userId,
         ],
@@ -1529,6 +1578,7 @@ export class IdentityService {
             this.config.authPepper,
           ),
           permissionKeys,
+          replacedAllowanceId: previous?.id || null,
         },
       );
       await client.query("COMMIT");
@@ -1650,6 +1700,13 @@ export class IdentityService {
         );
       }
 
+      const desiredStatus = active ? "active" : "suspended";
+      const previousStatus = target.rows[0].status;
+      if (previousStatus === desiredStatus) {
+        await client.query("COMMIT");
+        return;
+      }
+
       await client.query(
         `UPDATE users
             SET status=$2,
@@ -1657,7 +1714,7 @@ export class IdentityService {
                 updated_at=now(),
                 version=version+1
           WHERE id=$1`,
-        [staffUserId, active ? "active" : "suspended"],
+        [staffUserId, desiredStatus],
       );
       await client.query(
         `UPDATE staff_users
@@ -1674,10 +1731,7 @@ export class IdentityService {
       await client.query(
         `UPDATE sessions
             SET revoked_at=COALESCE(revoked_at,now()),
-                revoke_reason=COALESCE(
-                  revoke_reason,
-                  $2
-                )
+                revoke_reason=COALESCE(revoke_reason,$2)
           WHERE user_id=$1
             AND revoked_at IS NULL`,
         [staffUserId, active ? "staff_reactivated" : "staff_disabled"],
@@ -1690,7 +1744,11 @@ export class IdentityService {
         "staff_users",
         staffUserId,
         metadata,
-        { reason: reason || null },
+        {
+          oldStatus: previousStatus,
+          newStatus: desiredStatus,
+          reason: reason || null,
+        },
       );
       await client.query("COMMIT");
     } catch (error) {
@@ -2172,50 +2230,83 @@ export class IdentityService {
     permissionKeys: string[],
     metadata: RequestMetadata,
   ): Promise<string[]> {
-    if (
-      account.accountType !== "staff" ||
-      !account.permissions.includes("staff.manage") ||
-      !account.mfaSatisfied
-    ) {
-      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage Staff");
-    }
-    const ownerCheck = await this.pool.query<{ is_owner: boolean }>(
-      "SELECT is_owner FROM staff_users WHERE user_id=$1",
-      [account.userId],
-    );
-    if (!ownerCheck.rows[0]?.is_owner) {
-      throw new AppError(403, "OWNER_REQUIRED", "Only the Owner can change Staff permissions");
-    }
-    const target = await this.pool.query<{ is_owner: boolean }>(
-      "SELECT is_owner FROM staff_users WHERE user_id=$1",
-      [staffUserId],
-    );
-    if (!target.rows[0]) {
-      throw new AppError(404, "STAFF_NOT_FOUND", "Staff account not found");
-    }
-    if (target.rows[0].is_owner) {
-      throw new AppError(409, "OWNER_PERMISSIONS_PROTECTED", "Owner permissions cannot be reduced");
-    }
+    await this.requireOwnerForStaffManagement(account);
 
-    const uniqueKeys = [
+    const requestedKeys = [
       ...new Set(permissionKeys.map((key) => key.trim()).filter(Boolean)),
     ];
+    const protectedSelfPermissions = [
+      "profile.read_own",
+      "profile.update_own",
+      "sessions.read_own",
+      "sessions.revoke_own",
+    ];
+
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-permissions:${staffUserId}`],
+      );
+
+      const target = await client.query<{ is_owner: boolean }>(
+        `SELECT s.is_owner
+           FROM staff_users s
+           JOIN users u ON u.id=s.user_id
+          WHERE s.user_id=$1
+            AND u.deleted_at IS NULL
+          FOR UPDATE OF s, u`,
+        [staffUserId],
+      );
+      if (!target.rows[0]) {
+        throw new AppError(404, "STAFF_NOT_FOUND", "Staff account not found");
+      }
+      if (target.rows[0].is_owner) {
+        throw new AppError(
+          409,
+          "OWNER_PERMISSIONS_PROTECTED",
+          "Owner permissions cannot be reduced",
+        );
+      }
+
       const allPermissions = await client.query<{ id: string; key: string }>(
         "SELECT id::text, key FROM permissions ORDER BY key",
       );
       const validKeys = new Set(allPermissions.rows.map((row) => row.key));
-      if (uniqueKeys.some((key) => !validKeys.has(key))) {
-        throw new AppError(422, "INVALID_PERMISSION", "One or more selected permissions do not exist");
+      if (requestedKeys.some((key) => !validKeys.has(key))) {
+        throw new AppError(
+          422,
+          "INVALID_PERMISSION",
+          "One or more selected permissions do not exist",
+        );
+      }
+
+      const desiredPermissions = [
+        ...new Set([
+          ...requestedKeys,
+          ...protectedSelfPermissions.filter((key) => validKeys.has(key)),
+        ]),
+      ].sort();
+      const previousPermissions = (
+        await this.permissionsForUser(staffUserId, client)
+      ).sort();
+
+      if (
+        previousPermissions.length === desiredPermissions.length &&
+        previousPermissions.every(
+          (permission, index) => permission === desiredPermissions[index],
+        )
+      ) {
+        await client.query("COMMIT");
+        return previousPermissions;
       }
 
       await client.query(
         "DELETE FROM user_permission_overrides WHERE user_id=$1",
         [staffUserId],
       );
-      const selected = new Set(uniqueKeys);
+      const selected = new Set(desiredPermissions);
       for (const permission of allPermissions.rows) {
         await client.query(
           `INSERT INTO user_permission_overrides (
@@ -2231,7 +2322,9 @@ export class IdentityService {
       }
       await client.query(
         `UPDATE users
-            SET session_version=session_version+1, updated_at=now(), version=version+1
+            SET session_version=session_version+1,
+                updated_at=now(),
+                version=version+1
           WHERE id=$1`,
         [staffUserId],
       );
@@ -2239,7 +2332,8 @@ export class IdentityService {
         `UPDATE sessions
             SET revoked_at=COALESCE(revoked_at, now()),
                 revoke_reason=COALESCE(revoke_reason, 'permissions_changed')
-          WHERE user_id=$1 AND revoked_at IS NULL`,
+          WHERE user_id=$1
+            AND revoked_at IS NULL`,
         [staffUserId],
       );
       await this.audit(
@@ -2250,10 +2344,13 @@ export class IdentityService {
         "staff_users",
         staffUserId,
         metadata,
-        { permissionKeys: uniqueKeys },
+        {
+          oldPermissions: previousPermissions,
+          newPermissions: desiredPermissions,
+        },
       );
       await client.query("COMMIT");
-      return this.permissionsForUser(staffUserId);
+      return desiredPermissions;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

@@ -191,7 +191,7 @@ describe.skipIf(!databaseUrl)("Staff Google/Supabase identity integration", () =
   });
 
   it("allows active Staff, prevents duplicate first-login rows and rejects identity conflicts", async () => {
-    await service!.createStaffGoogleAllowance(
+    const firstAllowance = await service!.createStaffGoogleAllowance(
       ownerSession!.account,
       {
         email: employeeIdentity.email,
@@ -201,6 +201,26 @@ describe.skipIf(!databaseUrl)("Staff Google/Supabase identity integration", () =
       },
       metadata,
     );
+    const retriedAllowance = await service!.createStaffGoogleAllowance(
+      ownerSession!.account,
+      {
+        email: employeeIdentity.email,
+        displayName: "Google Employee",
+        phone: "",
+        permissionKeys: ["orders.read"],
+      },
+      metadata,
+    );
+    expect(retriedAllowance.allowanceId).toBe(firstAllowance.allowanceId);
+    const pendingAllowances = await testPool!.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM staff_invitations
+        WHERE email_normalized=$1
+          AND access_mode='google'
+          AND status='pending'`,
+      [employeeIdentity.emailNormalized],
+    );
+    expect(pendingAllowances.rows[0]?.count).toBe("1");
 
     const concurrentIdentity = identity(
       "race.google@example.com",
@@ -288,6 +308,42 @@ describe.skipIf(!databaseUrl)("Staff Google/Supabase identity integration", () =
       metadata,
     );
     expect(fresh.account.permissions).toContain("orders.manage");
+
+    const permissionAudit = await testPool!.query<{
+      metadata: {
+        oldPermissions: string[];
+        newPermissions: string[];
+      };
+    }>(
+      `SELECT metadata
+         FROM audit_logs
+        WHERE action='STAFF_PERMISSIONS_UPDATED'
+          AND entity_id=$1
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [fresh.account.userId],
+    );
+    expect(permissionAudit.rows[0]?.metadata.oldPermissions).toContain(
+      "orders.read",
+    );
+    expect(permissionAudit.rows[0]?.metadata.oldPermissions).not.toContain(
+      "orders.manage",
+    );
+    expect(permissionAudit.rows[0]?.metadata.newPermissions).toContain(
+      "orders.manage",
+    );
+
+    const [samePermissionSessionId, samePermissionSecret] = splitSession(fresh);
+    await service!.setStaffPermissions(
+      ownerSession!.account,
+      fresh.account.userId,
+      ["orders.read", "orders.manage"],
+      metadata,
+    );
+    await expect(
+      service!.authenticate(samePermissionSessionId, samePermissionSecret),
+    ).resolves.not.toBeNull();
+
     staffSession = fresh;
   });
 
@@ -312,11 +368,42 @@ describe.skipIf(!databaseUrl)("Staff Google/Supabase identity integration", () =
       "reactivated",
       metadata,
     );
+    const accessAudit = await testPool!.query<{
+      metadata: {
+        oldStatus: string;
+        newStatus: string;
+      };
+    }>(
+      `SELECT metadata
+         FROM audit_logs
+        WHERE action='STAFF_ACCOUNT_DISABLED'
+          AND entity_id=$1
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [staffSession!.account.userId],
+    );
+    expect(accessAudit.rows[0]?.metadata).toMatchObject({
+      oldStatus: "active",
+      newStatus: "suspended",
+    });
+
     staffSession = await service!.exchangeStaffGoogleIdentity(
       employeeIdentity,
       metadata,
     );
     expect(staffSession.account.status).toBe("active");
+
+    const [sameStatusSessionId, sameStatusSecret] = splitSession(staffSession);
+    await service!.setStaffAccessStatus(
+      ownerSession!.account,
+      staffSession.account.userId,
+      true,
+      "duplicate active retry",
+      metadata,
+    );
+    await expect(
+      service!.authenticate(sameStatusSessionId, sameStatusSecret),
+    ).resolves.not.toBeNull();
   });
 
   it("supports explicit Staff session revocation and logout", async () => {
