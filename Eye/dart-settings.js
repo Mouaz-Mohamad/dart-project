@@ -228,6 +228,12 @@
     $("settings-site-discount-percent").value = settings.siteDiscount.percent;
     $("settings-site-discount-start").value = settings.siteDiscount.startsAt || "";
     $("settings-site-discount-end").value = settings.siteDiscount.endsAt || "";
+    const waiting = settings.waiting || {};
+    $("settings-waiting-enabled").checked = waiting.enabled !== false;
+    $("settings-waiting-hours").value = Math.min(72, Math.max(1, Number(waiting.reservationHours) || 4));
+    $("settings-waiting-alternatives").checked = waiting.alternativeColorsEnabled !== false;
+    $("settings-waiting-email").checked = waiting.emailNotificationEnabled !== false;
+    $("settings-waiting-site").checked = waiting.inSiteNotificationEnabled !== false;
   }
 
   async function previewAsset(asset, image, fallback) {
@@ -352,6 +358,19 @@
     next.refundCustomerFee = Math.max(0, number("settings-refund-fee", 100));
     next.repeatExchangeCustomerFee = Math.max(0, number("settings-repeat-exchange-fee", 50));
     saveSettings(next, "Pricing and future-record fee defaults updated");
+  });
+
+  $("settings-waiting-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const next = root.DartSiteSettings.get();
+    next.waiting = {
+      enabled: $("settings-waiting-enabled").checked,
+      reservationHours: Math.min(72, Math.max(1, number("settings-waiting-hours", 4))),
+      alternativeColorsEnabled: $("settings-waiting-alternatives").checked,
+      emailNotificationEnabled: $("settings-waiting-email").checked,
+      inSiteNotificationEnabled: $("settings-waiting-site").checked,
+    };
+    saveSettings(next, "Waiting reservation settings updated");
   });
 
   $("settings-site-discount-form")?.addEventListener("submit", (event) => {

@@ -61,6 +61,7 @@
             <li><a href="#" data-target="items">Items</a></li>
             <li><a href="#" data-target="customers">Clients</a></li>
             <li><a href="#" data-target="orders">Orders</a></li>
+            <li><a href="#" data-target="waiting">Waiting</a></li>
             <li><a href="#" data-target="returns">Returns</a></li>
             <li><a href="#" data-target="damage">Damage</a></li>
             <li><a href="#" data-target="review">Review</a></li>
@@ -80,6 +81,7 @@
         <li><a href="#" data-target="items"><i class='bx bx-box'></i><span>Items</span></a></li>
         <li><a href="#" data-target="customers"><i class='bx bx-user-pin'></i><span>Clients</span></a></li>
         <li><a href="#" data-target="orders"><i class='bx bx-cart'></i><span>Orders</span></a></li>
+        <li><a href="#" data-target="waiting"><i class='bx bx-time-five'></i><span>Waiting</span></a></li>
         <li><a href="#" data-target="returns"><i class='bx bx-undo'></i><span>Returns</span></a></li>
         <li><a href="#" data-target="damage"><i class='bx bx-error-circle'></i><span>Damage</span></a></li>
         <li><a href="#" data-target="review"><i class='bx bx-star'></i><span>Review</span></a></li>
@@ -745,6 +747,65 @@
             </div>
         </section>
 
+
+        <!-- Waiting / Restock Reservation -->
+        <section id="waiting" class="dashboard-section dart-waiting-section" aria-labelledby="waiting-page-title">
+            <div class="dart-waiting-head">
+                <div>
+                    <p class="dart-waiting-eyebrow">RESTOCK RESERVATION</p>
+                    <h1 id="waiting-page-title">Waiting</h1>
+                    <p>FIFO by default. Manual priority and reassignment are permission-controlled and audited.</p>
+                </div>
+                <div class="dart-waiting-head-actions">
+                    <button type="button" id="waiting-reconcile-btn"><i class="fa-solid fa-arrows-rotate"></i> Match available stock</button>
+                    <button type="button" id="waiting-refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                </div>
+            </div>
+
+            <div class="dart-waiting-kpis">
+                <article><span>Waiting</span><strong id="waiting-kpi-waiting">0</strong></article>
+                <article><span>Reserved</span><strong id="waiting-kpi-reserved">0</strong></article>
+                <article><span>Converted</span><strong id="waiting-kpi-converted">0</strong></article>
+                <article><span>Conversion</span><strong id="waiting-kpi-conversion">0%</strong></article>
+            </div>
+
+            <div class="first filter-bar dart-waiting-filters">
+                <div class="search-box">
+                    <input id="waiting-search" type="search" placeholder="Search customer, code, model, color or size">
+                    <i class="bx bx-search"></i>
+                </div>
+                <div class="select-box"><select id="waiting-model-filter"><option value="">All models</option></select><i class="bx bx-chevron-down arrow-icon"></i></div>
+                <div class="select-box"><select id="waiting-color-filter"><option value="">All colors</option></select><i class="bx bx-chevron-down arrow-icon"></i></div>
+                <div class="select-box"><select id="waiting-size-filter"><option value="">All sizes</option></select><i class="bx bx-chevron-down arrow-icon"></i></div>
+                <div class="select-box">
+                    <select id="waiting-status-filter">
+                        <option value="">All statuses</option>
+                        <option value="waiting">Waiting</option>
+                        <option value="reserved">Reserved</option>
+                        <option value="confirmed">Confirmed / In cart</option>
+                        <option value="converted">Converted</option>
+                        <option value="expired">Expired</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <label class="dart-waiting-date">From<input id="waiting-from-filter" type="date"></label>
+                <label class="dart-waiting-date">To<input id="waiting-to-filter" type="date"></label>
+            </div>
+
+            <div class="second dart-waiting-view-switch">
+                <button type="button" class="is-active" data-waiting-view="queue">Queue</button>
+                <button type="button" data-waiting-view="demand">Demand</button>
+            </div>
+
+            <div id="waiting-queue-view">
+                <div id="waiting-table" class="dart-waiting-table-wrap" aria-live="polite"></div>
+            </div>
+            <div id="waiting-demand-view" hidden>
+                <div id="waiting-demand-table" class="dart-waiting-table-wrap" aria-live="polite"></div>
+            </div>
+        </section>
+
         <!-- return -->
         <section id="returns" class="dashboard-section">
             <div class="first filter-bar">
@@ -1164,6 +1225,24 @@
                         <label for="settings-refund-fee">Refund customer fee (EGP)<input id="settings-refund-fee" type="number" min="0" step="1" required></label>
                         <label for="settings-repeat-exchange-fee">Repeat exchange fee (EGP)<input id="settings-repeat-exchange-fee" type="number" min="0" step="1" required></label>
                         <button id="save-commerce-settings" type="submit" class="dart-settings-save">Save pricing &amp; fees</button>
+                    </form>
+                </article>
+
+
+                <article id="settings-waiting-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-regular fa-clock"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>WAITING / RESTOCK</span>
+                        <h2>Reservation rules</h2>
+                        <p>الانتظار مجاني. عند توفر قطعة فعلية يتم حجزها لأول عميل مستحق، والمدة قابلة للتعديل هنا.</p>
+                    </div>
+                    <form id="settings-waiting-form" class="dart-settings-fields">
+                        <label class="dart-settings-check" for="settings-waiting-enabled"><input id="settings-waiting-enabled" type="checkbox"> Enable Waiting</label>
+                        <label for="settings-waiting-hours">Reservation duration (hours)<input id="settings-waiting-hours" type="number" min="1" max="72" step="1" required></label>
+                        <label class="dart-settings-check" for="settings-waiting-alternatives"><input id="settings-waiting-alternatives" type="checkbox"> Allow alternative colors</label>
+                        <label class="dart-settings-check" for="settings-waiting-email"><input id="settings-waiting-email" type="checkbox"> Email notification</label>
+                        <label class="dart-settings-check" for="settings-waiting-site"><input id="settings-waiting-site" type="checkbox"> In-site notification</label>
+                        <button id="save-waiting-settings" type="submit" class="dart-settings-save">Save Waiting settings</button>
                     </form>
                 </article>
 
@@ -2035,6 +2114,7 @@
     <script src="dart-domain-state.js"></script>
     <script src="dart-admin-auth.js"></script>
     <script src="dart.js"></script>
+    <script src="dart-waiting.js"></script>
     <script src="dart-inventory.js"></script>
 <script src="dart-operations.js"></script>
     <script src="dart-size-chart.js"></script>

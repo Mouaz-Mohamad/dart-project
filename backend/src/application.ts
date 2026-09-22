@@ -160,6 +160,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
           dependencies.catalogService,
           dependencies.identityService,
           config,
+          dependencies.outboxService,
         ),
       );
     }

@@ -11,6 +11,7 @@ import {
   requireAnyPermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
+import type { OutboxService } from "../outbox/outbox.service.js";
 import type { CatalogService } from "./catalog.service.js";
 
 const stateSchema = z.object({
@@ -23,6 +24,7 @@ export function createCatalogRouter(
   catalog: CatalogService,
   identity: IdentityService,
   config: Pick<AppConfig, "sessionCookieName" | "authPepper">,
+  outbox?: OutboxService,
 ): Router {
   const router = Router();
   const signedIn = authenticate(identity, config);
@@ -94,6 +96,7 @@ export function createCatalogRouter(
         request.auth!.userId,
         String(request.id),
       );
+      await outbox?.processBatch(20).catch(() => undefined);
       response.status(200).json(result);
     },
   );
