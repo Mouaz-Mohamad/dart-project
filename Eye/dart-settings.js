@@ -458,3 +458,54 @@
   document.addEventListener("DOMContentLoaded", init);
   root.addEventListener("dart:data-changed", (event) => { if (event.detail?.key === "dart_models") renderModelCards(root.DartSiteSettings.get()); });
 })(typeof window !== "undefined" ? window : globalThis);
+
+
+/* BEGIN Settings internal navigation */
+(function (root) {
+  "use strict";
+  if (!root.document) return;
+
+  const content = document.getElementById("settings-content");
+  const tabs = [...document.querySelectorAll("[data-settings-tab]")];
+  if (!content || !tabs.length) return;
+
+  const allowed = new Set(["general", "hero", "staff"]);
+
+  function activateSettingsTab(requested) {
+    const target =
+      allowed.has(requested) &&
+      tabs.some((tab) => tab.dataset.settingsTab === requested && !tab.hidden)
+        ? requested
+        : "general";
+
+    content.dataset.activeSettingsTab = target;
+    tabs.forEach((tab) => {
+      const active = tab.dataset.settingsTab === target;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+      tab.tabIndex = active ? 0 : -1;
+    });
+    try {
+      root.sessionStorage.setItem("dart_settings_tab", target);
+    } catch {}
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => activateSettingsTab(tab.dataset.settingsTab));
+  });
+
+  let initial = "general";
+  try {
+    initial = root.sessionStorage.getItem("dart_settings_tab") || "general";
+  } catch {}
+  activateSettingsTab(initial);
+
+  root.DartSettingsTabs = Object.freeze({
+    activate: activateSettingsTab,
+    refresh() {
+      const active = content.dataset.activeSettingsTab || "general";
+      activateSettingsTab(active);
+    },
+  });
+})(typeof window !== "undefined" ? window : globalThis);
+/* END Settings internal navigation */
