@@ -1,3 +1,7 @@
+// DART | MODULE: dart-address.js
+// Storefront address validation, geocoding, and delivery-zone helpers.
+// BEGIN MODULE
+
 (function () {
   'use strict';
 
@@ -418,3 +422,6 @@
     isInsideDeliveryBounds
   };
 })();
+
+
+// END MODULE
