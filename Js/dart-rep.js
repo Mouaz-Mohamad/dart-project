@@ -1187,7 +1187,7 @@
         const rep = currentRep();
         if (API_ENABLED) {
           const currentTime = Date.now();
-          if (currentTime - lastLocationSyncAt < 4000) return;
+          if (currentTime - lastLocationSyncAt < 1000) return;
           lastLocationSyncAt = currentTime;
           try {
             const payload = await window.DartApi.request("/api/v1/representatives/location", {
@@ -1282,7 +1282,7 @@
           "error",
         );
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
     );
   }
 
