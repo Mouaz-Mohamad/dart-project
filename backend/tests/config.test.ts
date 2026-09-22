@@ -17,6 +17,8 @@ describe("environment configuration", () => {
     expect(config.corsOrigins).toEqual(["http://localhost:4173"]);
     expect(config.sessionCookieSameSite).toBe("strict");
     expect(config.emailFromName).toBe("Dart | for you");
+    expect(config.monitoringAlertEmail).toBeNull();
+    expect(config.monitoringAlertCooldownMs).toBe(300_000);
   });
 
   it("accepts an explicit cross-site session-cookie policy", () => {
@@ -95,6 +97,23 @@ describe("environment configuration", () => {
     expect(smtp.emailProvider).toBe("smtp");
     expect(smtp.smtpPort).toBe(587);
     expect(smtp.emailFromName).toBe("Dart | for you");
+  });
+
+  it("validates optional operational monitoring alert settings", () => {
+    expect(() =>
+      loadConfig({
+        ...baseEnvironment,
+        MONITORING_ALERT_EMAIL: "not-an-email",
+      }),
+    ).toThrow("MONITORING_ALERT_EMAIL");
+
+    const config = loadConfig({
+      ...baseEnvironment,
+      MONITORING_ALERT_EMAIL: "alerts@example.com",
+      MONITORING_ALERT_COOLDOWN_MS: "60000",
+    });
+    expect(config.monitoringAlertEmail).toBe("alerts@example.com");
+    expect(config.monitoringAlertCooldownMs).toBe(60_000);
   });
 
   it("validates optional direct WhatsApp settings", () => {
