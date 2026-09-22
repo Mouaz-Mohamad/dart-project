@@ -89,11 +89,7 @@ function profile(auth = account()) {
 
 function fakeService(auth = account()) {
   return {
-    registerCustomer: vi.fn().mockResolvedValue({
-      userId: auth.userId,
-      challengeId: "123e4567-e89b-12d3-a456-426614174003",
-      expiresAt: new Date(Date.now() + 600_000),
-    }),
+    registerCustomer: vi.fn().mockResolvedValue(issued(auth)),
     registerRepresentative: vi.fn().mockResolvedValue({
       userId: "123e4567-e89b-12d3-a456-426614174008",
       representativeCode: "REP-1",
@@ -218,7 +214,7 @@ describe("identity HTTP boundaries", () => {
     expect(cookies.some((value) => value.startsWith("dart_csrf=") && !value.includes("HttpOnly"))).toBe(true);
   });
 
-  it("queues registration verification without creating a browser credential", async () => {
+  it("creates a customer session immediately without an email OTP signup gate", async () => {
     const service = fakeService();
     const response = await request(app(service)).post("/api/v1/auth/register").send({
       name: "Test Customer",
@@ -227,9 +223,11 @@ describe("identity HTTP boundaries", () => {
       phone2: "",
       password: "abcd1234",
     });
-    expect(response.status).toBe(202);
-    expect(response.body.status).toBe("verification_required");
-    expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(response.status).toBe(201);
+    expect(response.body.user.accountType).toBe("customer");
+    expect(response.body.challengeId).toBeUndefined();
+    const cookies = response.headers["set-cookie"] as unknown as string[];
+    expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
     expect(service.registerCustomer).toHaveBeenCalledWith(
       expect.objectContaining({ phone2: undefined, password: "abcd1234" }),
       expect.any(Object),

@@ -206,62 +206,60 @@ export class IdentityService {
   public async registerCustomer(
     input: RegisterCustomerInput,
     metadata: RequestMetadata,
-  ): Promise<{ userId: string; challengeId: string; expiresAt: Date }> {
+  ): Promise<IssuedSession> {
     customerPasswordPolicyOrThrow(input.password);
     const email = input.email.trim();
     const emailNormalized = normalizeEmail(email);
-    const phones = [input.phone1, input.phone2].filter((value): value is string => Boolean(value?.trim()));
+    const phones = [input.phone1, input.phone2].filter(
+      (value): value is string => Boolean(value?.trim()),
+    );
     const normalizedPhones = normalizePhonesOrThrow(phones);
     if (normalizedPhones.length === 0) {
-      throw new AppError(422, "PHONE_REQUIRED", "At least one valid Egyptian phone number is required");
+      throw new AppError(
+        422,
+        "PHONE_REQUIRED",
+        "At least one valid Egyptian phone number is required",
+      );
     }
     const passwordHash = await hashPassword(input.password);
     const userId = randomUUID();
-    const challengeId = randomUUID();
-    const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    const expiresAt = new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000);
-    const encryptedOtp = encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64");
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // Customers register directly. Email OTP is reserved for Staff access and
+      // explicit email-change verification; it is not a customer signup gate.
       await client.query(
         `INSERT INTO users (
           id, account_type, email, email_normalized, password_hash, status
-        ) VALUES ($1, 'customer', $2, $3, $4, 'pending_verification')`,
+        ) VALUES ($1, 'customer', $2, $3, $4, 'active')`,
         [userId, email, emailNormalized, passwordHash],
       );
-      await this.insertPhones(client, userId, "customer", phones, normalizedPhones);
+      await this.insertPhones(
+        client,
+        userId,
+        "customer",
+        phones,
+        normalizedPhones,
+      );
       await client.query(
         `INSERT INTO customers (user_id, full_name, birthday)
          VALUES ($1, $2, $3::date)`,
         [userId, input.name.trim(), input.birthday ?? null],
       );
       await this.assignRole(client, userId, "Customer");
-      await client.query(
-        `INSERT INTO email_verification_challenges
-          (id, user_id, purpose, code_hash, expires_at)
-         VALUES ($1, $2, 'register', $3, $4)`,
-        [challengeId, userId, digest(`email-otp:${challengeId}:${otp}`, this.config.authPepper), expiresAt],
+      await this.audit(
+        client,
+        "customer",
+        userId,
+        "CUSTOMER_REGISTERED",
+        "users",
+        userId,
+        metadata,
+        { emailVerificationRequired: false },
       );
-      await client.query(
-        `INSERT INTO outbox_events (
-          aggregate_type, aggregate_id, event_type, payload, deduplication_key
-        ) VALUES ('user', $1, 'EMAIL_VERIFICATION_REQUESTED', $2::jsonb, $3)`,
-        [
-          userId,
-          JSON.stringify({
-            channel: "email",
-            to: email,
-            template: "customer_email_verification",
-            encryptedParameters: { otp: encryptedOtp },
-            expiresAt: expiresAt.toISOString(),
-          }),
-          `email-verification:${challengeId}`,
-        ],
-      );
-      await this.audit(client, "customer", userId, "CUSTOMER_REGISTERED", "users", userId, metadata);
+      const session = await this.issueSession(client, userId, true, metadata);
       await client.query("COMMIT");
-      return { userId, challengeId, expiresAt };
+      return session;
     } catch (error) {
       await client.query("ROLLBACK");
       mapDatabaseConflict(error);

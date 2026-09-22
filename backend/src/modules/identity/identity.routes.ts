@@ -129,12 +129,14 @@ export function createIdentityRouter(
   const csrf = csrfProtection(config);
 
   router.post("/auth/register", authLimiter(), async (request, response) => {
-    const result = await service.registerCustomer(registerCustomerSchema.parse(request.body), metadata(request));
-    await outbox?.processBatch(5).catch(() => undefined);
-    response.status(202).json({
-      status: "verification_required",
-      challengeId: result.challengeId,
-      expiresAt: result.expiresAt.toISOString(),
+    const session = await service.registerCustomer(
+      registerCustomerSchema.parse(request.body),
+      metadata(request),
+    );
+    setSessionCookies(response, config, session);
+    response.status(201).json({
+      user: await service.profile(session.account),
+      csrfToken: session.csrfToken,
     });
   });
 

@@ -57,7 +57,7 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     }
   });
 
-  it("registers, verifies and signs in a customer without exposing the OTP in logs", async () => {
+  it("registers and signs in a customer without creating a signup OTP", async () => {
     const registration = await service!.registerCustomer(
       {
         name: "Mouaz Mohammed",
@@ -69,23 +69,19 @@ describe.skipIf(!databaseUrl)("identity service", () => {
       requestMetadata,
     );
 
-    await expect(
-      service!.login("customer", "mouaz@example.com", "abcd1234", requestMetadata),
-    ).rejects.toMatchObject({ code: "EMAIL_NOT_VERIFIED" });
+    expect(registration.account.accountType).toBe("customer");
+    expect(registration.account.status).toBe("active");
 
-    const event = await testPool!.query<{ payload: { encryptedParameters: { otp: string } } }>(
-      "SELECT payload FROM outbox_events WHERE aggregate_id = $1",
-      [registration.userId],
+    const otpEvents = await testPool!.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM outbox_events
+        WHERE aggregate_id = $1
+          AND event_type='EMAIL_VERIFICATION_REQUESTED'`,
+      [registration.account.userId],
     );
-    const otp = decryptSecret(
-      Buffer.from(event.rows[0]!.payload.encryptedParameters.otp, "base64"),
-      authConfig.mfaEncryptionKey,
-    );
-    const session = await service!.verifyCustomerEmail(registration.challengeId, otp, requestMetadata);
-    expect(session.account.accountType).toBe("customer");
-    expect(session.sessionToken).not.toContain(otp);
+    expect(Number(otpEvents.rows[0]!.count)).toBe(0);
 
-    const profile = await service!.profile(session.account);
+    const profile = await service!.profile(registration.account);
     expect(profile.email).toBe("Mouaz@Example.com");
     expect(profile.code).toMatch(/^DR-/);
 
