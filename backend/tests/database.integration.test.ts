@@ -273,7 +273,7 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       `INSERT INTO account_phones (
          user_id, account_type, phone_normalized, phone_display, is_primary, verified_at
        ) VALUES ($1,'customer',$2,$3,true,now())`,
-      [customerUserId, `2010${suffix.slice(0, 8)}`, `+2010${suffix.slice(0, 8)}`],
+      [customerUserId, "201000000001", "+201000000001"],
     );
     await testPool!.query(
       `INSERT INTO orders (
