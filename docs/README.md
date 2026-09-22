@@ -75,8 +75,8 @@ python3 tests/static_checks.py
 node tests/seo_checks.js
 node tests/catalog-browser.js
 node --check Js/dart-platform.js
-node --check Eye/dart-operations-v4.js
-node --check Eye/dart-size-chart-v5.js
+node --check Eye/dart-operations.js
+node --check Eye/dart-size-chart.js
 ```
 
 Checkout and dashboard address creation accept verified locations in Cairo or Giza only. Building/name and floor are mandatory. Representative delivery confirmation is blocked until a fresh device location is within 1 km of the order coordinates. The browser test requires Playwright and Chromium. Install them in your development environment, or set `CHROMIUM_EXECUTABLE` to a compatible local browser executable. It fails with an explicit message if the browser is unavailable.
