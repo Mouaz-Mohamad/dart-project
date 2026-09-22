@@ -1,3 +1,7 @@
+// DART | MODULE: dart-groups.js
+// Address/order grouping helpers shared by tracking and operations.
+// BEGIN MODULE
+
 /* Operational grouping keeps every order/return record independent. */
 (function (root) {
   "use strict";
@@ -78,3 +82,6 @@
   root.DartGroups = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
+
+
+// END MODULE
