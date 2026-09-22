@@ -1586,7 +1586,16 @@ function renderFilterButtons() {
     if (!productsData.length && !publicCatalogProducts().length) return;
 
     const catalog = publicCatalogProducts();
-    const categories = ['All', ...new Set(catalog.map(p => p.category).filter(Boolean))];
+    const categoryMap = new Map();
+    catalog.forEach(product => {
+        const label = String(product.category || '').trim();
+        if (!label) return;
+        const key = label.toLocaleLowerCase();
+        if (!categoryMap.has(key)) categoryMap.set(key, label);
+    });
+    const categories = ['All', ...[...categoryMap.values()].sort((a, b) =>
+        a.localeCompare(b, ['en', 'ar'], { sensitivity: 'base' })
+    )];
     const pairs = catalog.flatMap(productStockPairs);
     const sizes = [...new Set(pairs.map(pair => pair.size))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     const colors = [...new Set(pairs.map(pair => pair.color))].sort((a, b) => a.localeCompare(b, ['en', 'ar']));
