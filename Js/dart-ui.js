@@ -1,3 +1,7 @@
+// DART | MODULE: dart-ui.js
+// Storefront rendering, filters, cart UI, checkout UI, and reusable page sections.
+// BEGIN MODULE
+
 // ============================================================================
  // DART | STOREFRONT UI
  // Page rendering, filters, cart UI, checkout UI, and shared storefront events.
@@ -2039,3 +2043,6 @@ if (document.getElementById('reviewsContainer')) {
 }
 
 // END DART | STOREFRONT UI
+
+
+// END MODULE
