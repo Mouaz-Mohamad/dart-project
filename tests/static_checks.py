@@ -44,7 +44,7 @@ if not re.search(r'id="orderFloor"[^>]+required',dashboard): errors.append('Dash
 products=(ROOT/'products.html').read_text(encoding='utf-8')
 for required in ['toggleProductFilters','productFiltersPanel','productSearchInput','productSizeFilter','productColorFilter','productAvailabilityFilter','productPriceFilter','productSortSelect','clearProductFilters','productSizeChartBtn','productSizeChartPanel']:
     if f'id="{required}"' not in products: errors.append(f'Products page missing #{required}')
-if 'dart-size-chart-v5.js' not in dashboard: errors.append('Dashboard size-chart behavior script is not loaded')
+if 'dart-size-chart.js' not in dashboard: errors.append('Dashboard size-chart behavior script is not loaded')
 if dashboard.count('id="size-chart-modal"') != 1: errors.append('Dashboard must contain exactly one reusable size-chart modal')
 
 for page_name in ['index.html','products.html']:
@@ -79,11 +79,11 @@ dashboard_styles=(ROOT/'Eye/dart.css').read_text(encoding='utf-8')
 if not re.search(r'#representative\s+\.row-action-btns\s*\{[^}]*width:\s*300px',dashboard_styles,re.S):
     errors.append('Representative Action cell must be fixed at 300px')
 
-checkout_code=(ROOT/'Js/one .js').read_text(encoding='utf-8')
+checkout_code=(ROOT/'Js/dart-ui.js').read_text(encoding='utf-8')
 for required_text in ["sessionStorage.setItem('dart_last_order_id'", "window.location.href = 'index.html'", 'dartCheckoutAddress?.invalidate']:
     if required_text not in checkout_code: errors.append(f'Checkout flow missing: {required_text}')
 
-dashboard_ops=(ROOT/'Eye/dart-operations-v4.js').read_text(encoding='utf-8')
+dashboard_ops=(ROOT/'Eye/dart-operations.js').read_text(encoding='utf-8')
 if "emptyKeys.forEach(key => write(key, []))" in dashboard_ops:
     errors.append('Dashboard still clears website orders during first initialization')
 
