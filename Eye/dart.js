@@ -3115,7 +3115,7 @@ function dartSetupOperationalModals() {
     });
   document
     .getElementById("order-bulk-actions")
-    ?.addEventListener("click", (e) => {
+    ?.addEventListener("click", async (e) => {
       const target = e.target.closest("[data-bulk-order-status]")?.dataset
         .bulkOrderStatus;
       if (!target) return;
@@ -3129,7 +3129,7 @@ function dartSetupOperationalModals() {
         alert("حدد أوردر واحد على الأقل من الصفوف الظاهرة.");
         return;
       }
-      dartRequestOrderTransition(selected, target);
+      await dartRequestOrderTransition(selected, target);
     });
 }
 
