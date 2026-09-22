@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="dart-inventory.css">
     <link rel="stylesheet" href="dart-finance.css">
     <link rel="stylesheet" href="dart-settings.css">
+    <link rel="stylesheet" href="dart-live-operations.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="manifest" href="/manifest.json">
@@ -66,6 +67,7 @@
             <li><a href="#" data-target="damage">Damage</a></li>
             <li><a href="#" data-target="review">Review</a></li>
             <li><a href="#" data-target="representative">Rep</a></li>
+            <li><a href="#" data-target="live-operations">Live Map</a></li>
             <li><a href="#" data-target="card">Dart Card</a></li>
             <li><a href="#" data-target="finance"> Finance</a></li>
             <li><a href="#" data-target="settings"> Settings</a></li>
@@ -86,6 +88,7 @@
         <li><a href="#" data-target="damage"><i class='bx bx-error-circle'></i><span>Damage</span></a></li>
         <li><a href="#" data-target="review"><i class='bx bx-star'></i><span>Review</span></a></li>
         <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
+        <li><a href="#" data-target="live-operations"><i class="fa-solid fa-map-location-dot"></i><span>Live</span></a></li>
         <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
         <li><a href="#" data-target="finance"><i class="fa-solid fa-wallet"></i><span>Finance</span></a></li>
         <li><a href="#" data-target="settings"><i class="fa-solid fa-gear"></i><span>Settings</span></a></li>
@@ -1082,6 +1085,67 @@
             </div>
         </section>
         
+        <!-- Live Operations Map -->
+        <section id="live-operations" class="dashboard-section dart-live-operations" aria-labelledby="live-operations-title">
+            <header class="dart-live-head">
+                <div>
+                    <span class="dart-live-eyebrow">DART OPERATIONS</span>
+                    <h1 id="live-operations-title">Live Operations Map</h1>
+                    <p>تابع كل المندوبين النشطين والأوردر الجاري والتالي والمسلم لحظيًا. ترتيب النظام مقترح فقط والمندوب يقدر يختار طريقه بحرية.</p>
+                </div>
+                <div id="live-map-connection" class="dart-live-connection" role="status" aria-live="polite">
+                    <span class="dart-live-dot" aria-hidden="true"></span>
+                    <span id="live-map-connection-text">Waiting for live data</span>
+                </div>
+            </header>
+
+            <div class="dart-live-cards" aria-label="Live delivery totals">
+                <article class="dart-live-card"><div><span>Total Orders</span><strong id="live-map-total-orders">0</strong></div><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></article>
+                <article class="dart-live-card"><div><span>Delivered</span><strong id="live-map-delivered-orders">0</strong></div><i class="fa-solid fa-circle-check" aria-hidden="true"></i></article>
+                <article class="dart-live-card"><div><span>Delivering Now</span><strong id="live-map-current-orders">0</strong></div><i class="fa-solid fa-route" aria-hidden="true"></i></article>
+                <article class="dart-live-card"><div><span>Active Representatives</span><strong id="live-map-active-reps">0</strong></div><i class="fa-solid fa-motorcycle" aria-hidden="true"></i></article>
+            </div>
+
+            <div class="dart-live-toolbar" aria-label="Live map controls">
+                <select id="live-map-representative-filter" aria-label="Representative filter">
+                    <option value="">All active representatives</option>
+                </select>
+                <div class="dart-live-filter-group" aria-label="Route status filters">
+                    <label class="dart-live-filter" style="--status-color:#AB012B"><input type="checkbox" data-live-filter="current" checked><span class="dart-live-filter-bullet"></span>Delivering</label>
+                    <label class="dart-live-filter" style="--status-color:#2563eb"><input type="checkbox" data-live-filter="upcoming" checked><span class="dart-live-filter-bullet"></span>Upcoming</label>
+                    <label class="dart-live-filter" style="--status-color:#16a34a"><input type="checkbox" data-live-filter="delivered" checked><span class="dart-live-filter-bullet"></span>Delivered</label>
+                    <label class="dart-live-filter" style="--status-color:#eab308"><input type="checkbox" data-live-filter="waiting" checked><span class="dart-live-filter-bullet"></span>Waiting</label>
+                    <label class="dart-live-filter" style="--status-color:#ea580c"><input type="checkbox" data-live-filter="problem" checked><span class="dart-live-filter-bullet"></span>Problems</label>
+                </div>
+                <button id="live-map-fit" type="button"><i class="fa-solid fa-expand"></i> Fit all</button>
+                <button id="live-map-refresh" type="button"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                <button id="live-map-fullscreen" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Full screen</button>
+            </div>
+
+            <div class="dart-live-layout">
+                <aside class="dart-live-sidebar" aria-label="Active representatives">
+                    <div class="dart-live-sidebar-head"><strong>Active Representatives</strong><small>Assigned delivery rounds only</small></div>
+                    <div id="live-map-representatives" class="dart-live-reps"></div>
+                </aside>
+                <div class="dart-live-map-shell">
+                    <div id="dart-live-operations-map" role="application" aria-label="Map of active representatives and delivery stops"></div>
+                    <div class="dart-live-overlay">
+                        <div class="dart-live-legend" aria-label="Map legend">
+                            <span><i class="dart-live-state" style="background:#AB012B"></i>Delivering</span>
+                            <span><i class="dart-live-state" style="background:#2563eb"></i>Upcoming</span>
+                            <span><i class="dart-live-state" style="background:#16a34a"></i>Delivered</span>
+                            <span><i class="dart-live-state" style="background:#eab308"></i>Waiting</span>
+                            <span><i class="dart-live-state" style="background:#ea580c"></i>Problem / Cancelled / Refused</span>
+                        </div>
+                    </div>
+                    <div id="live-map-loading" class="dart-live-loading">Loading live operations…</div>
+                    <div id="live-map-empty" class="dart-live-empty" hidden>No active representatives currently have delivery work.</div>
+                    <div id="live-map-error" class="dart-live-error" hidden>Live operations could not be loaded.</div>
+                    <aside id="live-map-panel" class="dart-live-panel" hidden aria-live="polite"><div id="live-map-panel-body"></div></aside>
+                </div>
+            </div>
+        </section>
+
         <!-- dart card -->
         <section id="card" class="dashboard-section">
             <div class="filter-bar overflow">
@@ -2117,6 +2181,7 @@
     <script src="dart-waiting.js"></script>
     <script src="dart-inventory.js"></script>
 <script src="dart-operations.js"></script>
+    <script src="dart-live-operations.js"></script>
     <script src="dart-size-chart.js"></script>
     <script src="dart-finance.js"></script>
     <script src="dart-settings.js"></script>
