@@ -26,12 +26,12 @@ for (const [file, forbidden] of [
   }
 }
 
-const storefront = fs.readFileSync("Js/one .js", "utf8");
+const storefront = fs.readFileSync("Js/dart-ui.js", "utf8");
 if (!storefront.includes("img.loading = 'lazy'")) {
-  failures.push("Js/one .js: product-card images must lazy-load");
+  failures.push("Js/dart-ui.js: product-card images must lazy-load");
 }
 if (!storefront.includes("img.decoding = 'async'")) {
-  failures.push("Js/one .js: product-card images must decode asynchronously");
+  failures.push("Js/dart-ui.js: product-card images must decode asynchronously");
 }
 
 function walk(root) {
