@@ -1,4 +1,4 @@
-// Production activation marker: simplified Staff email access + post-launch UI/customer fixes.
+// Production activation marker: simplified Staff email access + post-launch UI/customer fixes (frontend publish).
 (function () {
   "use strict";
 
