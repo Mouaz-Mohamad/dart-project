@@ -90,3 +90,15 @@ Model يملك الأسعار والوصف والمقاسات والألوان. 
 | `Js/dart-platform.js` + `profile.html` | My Waiting, queue status, confirm/decline/cancel and customer notification refresh |
 | `Eye/dart-waiting.js` + `Eye/Dart Eye.html` | Waiting Queue, Demand, search/filters, row Actions and permission-aware admin controls |
 | `Eye/dart-settings.js` | Waiting enable switch, reservation duration and notification/alternative-color settings |
+
+
+## Live Operations Map
+
+- `Eye/Dart Eye.html`: fixed Live Operations section, four KPI cards, filters, sidebar and map/panel containers.
+- `Eye/dart-live-operations.css`: responsive Dart Eye live-map layout, state markers and mobile bottom-panel behavior.
+- `Eye/dart-live-operations.js`: 3-second snapshot polling, Leaflet markers/routes, filters, suggested route controls and audited owner actions.
+- `Js/dart-rep.js`: representative GPS upload every 3 seconds, Start/Delivered/Waiting/Problem route actions and suggested sequence display.
+- `backend/migrations/0032_live_operations.sql`: route-stop persistence, one-current-stop constraint and live-map permissions.
+- `backend/src/modules/commerce/commerce.service.ts`: authoritative live snapshot, route-state transitions, nearest-neighbor route suggestion and route ordering.
+- `backend/src/modules/commerce/commerce.routes.ts`: protected admin live-map endpoints and representative action/location contracts.
+- `backend/tests/live-operations.contract.test.ts`: core migration, permission, state, rate-limit and audit contracts.
