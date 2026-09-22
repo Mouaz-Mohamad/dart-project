@@ -64,6 +64,18 @@ describe("commerce concurrency and representative safety contracts", () => {
     );
   });
 
+  it("never runs relational leaderboard reads concurrently on one pg client", () => {
+    expect(service).not.toMatch(
+      /Promise\.all\(\[\s*readRelationalDashboardDomain\(client, "returns"\),\s*readRelationalDashboardDomain\(client, "cards"\)/,
+    );
+    expect(service).toContain(
+      'const returnRows = await readRelationalDashboardDomain(client, "returns");',
+    );
+    expect(service).toContain(
+      'const cardRows = await readRelationalDashboardDomain(client, "cards");',
+    );
+  });
+
   it("does not expose archived deliveries as active representative work", () => {
     expect(service).toContain("AND NOT is_archived");
     expect(service).toMatch(
