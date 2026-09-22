@@ -123,6 +123,42 @@ function distanceKm(
   return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
+function suggestedStopOrder<T extends { latitude: number; longitude: number }>(
+  startLatitude: number | null,
+  startLongitude: number | null,
+  stops: T[],
+): T[] {
+  const remaining = [...stops];
+  const ordered: T[] = [];
+  let latitude = Number.isFinite(startLatitude) ? Number(startLatitude) : null;
+  let longitude = Number.isFinite(startLongitude) ? Number(startLongitude) : null;
+
+  while (remaining.length) {
+    if (latitude === null || longitude === null) {
+      const next = remaining.shift()!;
+      ordered.push(next);
+      latitude = next.latitude;
+      longitude = next.longitude;
+      continue;
+    }
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < remaining.length; index += 1) {
+      const stop = remaining[index]!;
+      const distance = distanceKm(latitude, longitude, stop.latitude, stop.longitude);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    }
+    const [next] = remaining.splice(bestIndex, 1);
+    ordered.push(next!);
+    latitude = next!.latitude;
+    longitude = next!.longitude;
+  }
+  return ordered;
+}
+
 function finalModelPriceMinor(sellingMinor: number, discountPercent: number): number {
   return Math.max(0, Math.round(sellingMinor * (1 - Math.min(100, Math.max(0, discountPercent)) / 100)));
 }
@@ -1940,6 +1976,422 @@ export class CommerceService {
     }
   }
 
+  public async adminLiveOperations(): Promise<{
+    capturedAt: string;
+    totals: {
+      totalOrders: number;
+      deliveredOrders: number;
+      deliveringNow: number;
+      activeRepresentatives: number;
+    };
+    representatives: Record<string, unknown>[];
+  }> {
+    const representativeResult = await this.pool.query<{
+      representative_user_id: string;
+      representative_code: string;
+      representative_name: string;
+      latitude: number | null;
+      longitude: number | null;
+      accuracy_meters: number | null;
+      location_updated_at: Date | null;
+      round_started_at: Date;
+    }>(
+      `WITH active_reps AS (
+         SELECT representative_user_id,
+                MIN(updated_at) AS round_started_at
+           FROM orders
+          WHERE representative_user_id IS NOT NULL
+            AND status IN ('Out With Representative','Representative On The Way')
+            AND NOT is_deleted
+            AND NOT is_archived
+          GROUP BY representative_user_id
+       )
+       SELECT r.user_id::text AS representative_user_id,
+              r.representative_code,
+              r.full_name AS representative_name,
+              rl.latitude,
+              rl.longitude,
+              rl.accuracy_meters,
+              rl.updated_at AS location_updated_at,
+              active_reps.round_started_at
+         FROM active_reps
+         JOIN representatives r ON r.user_id=active_reps.representative_user_id
+         JOIN users u ON u.id=r.user_id
+         LEFT JOIN representative_locations rl
+           ON rl.representative_user_id=r.user_id
+        WHERE r.approval_status='approved'
+          AND u.status='active'
+        ORDER BY r.full_name`,
+    );
+
+    if (!representativeResult.rows.length) {
+      return {
+        capturedAt: new Date().toISOString(),
+        totals: {
+          totalOrders: 0,
+          deliveredOrders: 0,
+          deliveringNow: 0,
+          activeRepresentatives: 0,
+        },
+        representatives: [],
+      };
+    }
+
+    const representativeIds = representativeResult.rows.map(
+      (row) => row.representative_user_id,
+    );
+    const ordersResult = await this.pool.query<{
+      id: string;
+      order_code: string;
+      representative_user_id: string;
+      status: string;
+      contact_snapshot: Record<string, unknown>;
+      delivery_address: Record<string, unknown>;
+      final_minor: string;
+      updated_at: Date;
+      delivered_at: Date | null;
+      route_state: string | null;
+      sequence_number: number | null;
+      route_note: string | null;
+    }>(
+      `SELECT o.id::text,
+              o.order_code,
+              o.representative_user_id::text,
+              o.status,
+              o.contact_snapshot,
+              o.delivery_address,
+              o.final_minor::text,
+              o.updated_at,
+              o.delivered_at,
+              drs.route_state,
+              drs.sequence_number,
+              drs.note AS route_note
+         FROM orders o
+         LEFT JOIN delivery_route_stops drs
+           ON drs.order_id=o.id
+          AND drs.representative_user_id=o.representative_user_id
+        WHERE o.representative_user_id = ANY($1::uuid[])
+          AND NOT o.is_deleted
+          AND NOT o.is_archived
+        ORDER BY o.created_at`,
+      [representativeIds],
+    );
+
+    const nowMs = Date.now();
+    const representatives = representativeResult.rows.map((representative) => {
+      const roundStartedAt = representative.round_started_at.getTime();
+      const visible = ordersResult.rows.filter((order) => {
+        if (order.representative_user_id !== representative.representative_user_id) return false;
+        if (["Out With Representative", "Representative On The Way"].includes(order.status)) {
+          return true;
+        }
+        const terminalAt = order.delivered_at?.getTime() ?? order.updated_at.getTime();
+        return terminalAt >= roundStartedAt &&
+          ["Delivered", "Refused", "Cancelled"].includes(order.status);
+      });
+
+      const normalizedStops = visible.map((order) => {
+        const address = order.delivery_address || {};
+        const latitude = Number(address.latitude);
+        const longitude = Number(address.longitude);
+        const routeState =
+          order.status === "Delivered"
+            ? "delivered"
+            : order.status === "Cancelled"
+              ? "cancelled"
+              : order.status === "Refused"
+                ? "refused"
+                : order.status === "Representative On The Way"
+                  ? "current"
+                  : ["waiting", "problem"].includes(String(order.route_state || ""))
+                    ? String(order.route_state)
+                    : "upcoming";
+        return {
+          id: order.id,
+          orderId: order.order_code,
+          status: order.status,
+          routeState,
+          sequenceNumber: Number(order.sequence_number ?? 0),
+          suggestedSequence: 0,
+          note: order.route_note || "",
+          clientName: String(order.contact_snapshot?.name || "Customer"),
+          fullAddress: String(
+            address.fullAddress ||
+            [address.building, address.street, address.area, address.governorate, address.country]
+              .filter(Boolean)
+              .join(", "),
+          ),
+          latitude: Number.isFinite(latitude) ? latitude : null,
+          longitude: Number.isFinite(longitude) ? longitude : null,
+          finalAmount: Number(order.final_minor) / 100,
+          deliveredAt: order.delivered_at?.toISOString() || null,
+        };
+      });
+
+      const routable = normalizedStops.filter(
+        (stop) =>
+          ["current", "upcoming", "waiting", "problem"].includes(stop.routeState) &&
+          stop.latitude !== null &&
+          stop.longitude !== null,
+      ) as Array<(typeof normalizedStops)[number] & { latitude: number; longitude: number }>;
+      const suggested = suggestedStopOrder(
+        representative.latitude,
+        representative.longitude,
+        routable,
+      );
+      const suggestedIndex = new Map(
+        suggested.map((stop, index) => [stop.orderId, index + 1]),
+      );
+      normalizedStops.forEach((stop) => {
+        stop.suggestedSequence = suggestedIndex.get(stop.orderId) || 0;
+      });
+      normalizedStops.sort((first, second) => {
+        if (first.routeState === "current" && second.routeState !== "current") return -1;
+        if (second.routeState === "current" && first.routeState !== "current") return 1;
+        const firstSequence = first.sequenceNumber || first.suggestedSequence || 9999;
+        const secondSequence = second.sequenceNumber || second.suggestedSequence || 9999;
+        return firstSequence - secondSequence;
+      });
+
+      const locationAgeMs = representative.location_updated_at
+        ? Math.max(0, nowMs - representative.location_updated_at.getTime())
+        : Number.POSITIVE_INFINITY;
+      const connectionStatus =
+        locationAgeMs <= 15_000
+          ? "Online"
+          : locationAgeMs <= 60_000
+            ? "Location Stale"
+            : "Offline";
+      const current = normalizedStops.find((stop) => stop.routeState === "current") || null;
+      const next = normalizedStops.find((stop) => stop.routeState === "upcoming") || null;
+
+      return {
+        id: representative.representative_user_id,
+        repId: representative.representative_code,
+        name: representative.representative_name,
+        connectionStatus,
+        lastLocationAt: representative.location_updated_at?.toISOString() || null,
+        location: representative.latitude !== null && representative.longitude !== null
+          ? {
+              lat: representative.latitude,
+              lng: representative.longitude,
+              accuracy: representative.accuracy_meters,
+            }
+          : null,
+        currentOrderId: current?.orderId || null,
+        nextOrderId: next?.orderId || null,
+        orders: normalizedStops,
+      };
+    });
+
+    const allOrders = representatives.flatMap(
+      (representative) => (representative.orders as Record<string, unknown>[]) || [],
+    );
+    return {
+      capturedAt: new Date().toISOString(),
+      totals: {
+        totalOrders: allOrders.length,
+        deliveredOrders: allOrders.filter((order) => order.routeState === "delivered").length,
+        deliveringNow: allOrders.filter((order) => order.routeState === "current").length,
+        activeRepresentatives: representatives.length,
+      },
+      representatives,
+    };
+  }
+
+  public async adminLiveRouteState(
+    actorId: string,
+    orderRef: string,
+    state: "current" | "upcoming" | "waiting" | "problem",
+    note: string,
+    requestId: string,
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const orderResult = await client.query<{
+        id: string;
+        order_code: string;
+        representative_user_id: string | null;
+        status: string;
+      }>(
+        `SELECT id::text, order_code, representative_user_id::text, status
+           FROM orders
+          WHERE (id::text=$1 OR order_code=$1)
+            AND NOT is_deleted
+            AND NOT is_archived
+          LIMIT 1
+          FOR UPDATE`,
+        [orderRef],
+      );
+      const order = orderResult.rows[0];
+      if (!order || !order.representative_user_id) {
+        throw new AppError(404, "LIVE_ORDER_NOT_FOUND", "Assigned live order not found");
+      }
+      if (!["Out With Representative", "Representative On The Way"].includes(order.status)) {
+        throw new AppError(409, "LIVE_ORDER_STATE_INVALID", "Only active assigned orders can change live route state");
+      }
+
+      if (state === "current") {
+        const previousCurrent = await client.query<{ id: string; order_code: string }>(
+          `SELECT id::text, order_code
+             FROM orders
+            WHERE representative_user_id=$1
+              AND status='Representative On The Way'
+              AND id<>$2::uuid
+              AND NOT is_deleted
+              AND NOT is_archived
+            FOR UPDATE`,
+          [order.representative_user_id, order.id],
+        );
+        if (previousCurrent.rows.length) {
+          await client.query(
+            `UPDATE orders
+                SET status='Out With Representative',
+                    delivery_started_at=NULL,
+                    version=version+1,
+                    updated_at=now()
+              WHERE id = ANY($1::uuid[])`,
+            [previousCurrent.rows.map((row) => row.id)],
+          );
+          await client.query(
+            `UPDATE delivery_route_stops
+                SET route_state='upcoming', updated_at=now()
+              WHERE representative_user_id=$1
+                AND order_id = ANY($2::uuid[])`,
+            [order.representative_user_id, previousCurrent.rows.map((row) => row.id)],
+          );
+        }
+        await client.query(
+          `UPDATE orders
+              SET status='Representative On The Way',
+                  delivery_started_at=COALESCE(delivery_started_at,now()),
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [order.id],
+        );
+      } else if (order.status === "Representative On The Way") {
+        await client.query(
+          `UPDATE orders
+              SET status='Out With Representative',
+                  delivery_started_at=NULL,
+                  version=version+1,
+                  updated_at=now()
+            WHERE id=$1`,
+          [order.id],
+        );
+      }
+
+      await client.query(
+        `INSERT INTO delivery_route_stops (
+           representative_user_id,order_id,sequence_number,route_state,note,
+           started_at,completed_at,updated_at
+         ) VALUES (
+           $1,$2,
+           COALESCE((SELECT MAX(sequence_number)+1 FROM delivery_route_stops WHERE representative_user_id=$1),1),
+           $3,$4,
+           CASE WHEN $3='current' THEN now() ELSE NULL END,
+           NULL,now()
+         )
+         ON CONFLICT (representative_user_id,order_id) DO UPDATE SET
+           route_state=EXCLUDED.route_state,
+           note=EXCLUDED.note,
+           started_at=CASE WHEN EXCLUDED.route_state='current'
+             THEN COALESCE(delivery_route_stops.started_at,now())
+             ELSE delivery_route_stops.started_at END,
+           updated_at=now()`,
+        [order.representative_user_id, order.id, state, note || null],
+      );
+
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type,actor_id,action,entity_type,entity_id,request_id,metadata
+         ) VALUES ('staff',$1,'LIVE_ROUTE_STATE_CHANGED','orders',$2,$3,$4::jsonb)`,
+        [
+          actorId,
+          order.order_code,
+          requestId,
+          JSON.stringify({ state, note, representativeId: order.representative_user_id }),
+        ],
+      );
+      await client.query(
+        "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async reorderLiveRoute(
+    actorId: string,
+    representativeUserId: string,
+    orderCodes: string[],
+    requestId: string,
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const activeResult = await client.query<{ id: string; order_code: string }>(
+        `SELECT id::text, order_code
+           FROM orders
+          WHERE representative_user_id=$1
+            AND status IN ('Out With Representative','Representative On The Way')
+            AND NOT is_deleted
+            AND NOT is_archived
+          FOR UPDATE`,
+        [representativeUserId],
+      );
+      const activeCodes = new Set(activeResult.rows.map((row) => row.order_code));
+      if (
+        orderCodes.length !== activeCodes.size ||
+        new Set(orderCodes).size !== orderCodes.length ||
+        orderCodes.some((code) => !activeCodes.has(code))
+      ) {
+        throw new AppError(
+          409,
+          "LIVE_ROUTE_ORDER_MISMATCH",
+          "Route ordering must contain every currently active assigned order exactly once",
+        );
+      }
+      const byCode = new Map(activeResult.rows.map((row) => [row.order_code, row.id]));
+      for (let index = 0; index < orderCodes.length; index += 1) {
+        const code = orderCodes[index]!;
+        await client.query(
+          `INSERT INTO delivery_route_stops (
+             representative_user_id,order_id,sequence_number,route_state,manually_ordered,updated_at
+           ) VALUES (
+             $1,$2,$3,
+             CASE WHEN (SELECT status FROM orders WHERE id=$2::uuid)='Representative On The Way'
+               THEN 'current' ELSE 'upcoming' END,
+             true,now()
+           )
+           ON CONFLICT (representative_user_id,order_id) DO UPDATE SET
+             sequence_number=EXCLUDED.sequence_number,
+             manually_ordered=true,
+             updated_at=now()`,
+          [representativeUserId, byCode.get(code), index + 1],
+        );
+      }
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type,actor_id,action,entity_type,entity_id,request_id,metadata
+         ) VALUES ('staff',$1,'LIVE_ROUTE_REORDERED','representatives',$2,$3,$4::jsonb)`,
+        [actorId, representativeUserId, requestId, JSON.stringify({ orderCodes })],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async representativeWork(
     representativeUserId: string,
   ): Promise<{ orders: Record<string, unknown>[]; returns: Record<string, unknown>[] }> {
@@ -1955,11 +2407,14 @@ export class CommerceService {
       delivery_notes: string;
       created_at: Date;
       delivery_started_at: Date | null;
+      route_state: string | null;
+      sequence_number: number | null;
       item_rows: Array<Record<string, unknown>>;
     }>(
       `SELECT o.id::text, o.order_code, o.status, o.payment_method, o.payment_status,
               o.final_minor::text, o.contact_snapshot, o.delivery_address,
               o.delivery_notes, o.created_at, o.delivery_started_at,
+              drs.route_state, drs.sequence_number,
               COALESCE((
                 SELECT jsonb_agg(
                   jsonb_build_object(
@@ -1978,6 +2433,9 @@ export class CommerceService {
                 WHERE oi.order_id=o.id
               ), '[]'::jsonb) AS item_rows
          FROM orders o
+         LEFT JOIN delivery_route_stops drs
+           ON drs.order_id=o.id
+          AND drs.representative_user_id=o.representative_user_id
         WHERE o.representative_user_id=$1
           AND NOT o.is_deleted
           AND NOT o.is_archived
@@ -1991,6 +2449,18 @@ export class CommerceService {
       [representativeUserId],
     );
     const repCode = representative.rows[0]?.representative_code || "";
+    const locationResult = await this.pool.query<{
+      latitude: number | null;
+      longitude: number | null;
+    }>(
+      "SELECT latitude, longitude FROM representative_locations WHERE representative_user_id=$1",
+      [representativeUserId],
+    );
+    const representativeLocation = locationResult.rows[0] || {
+      latitude: null,
+      longitude: null,
+    };
+
     const returnRows = await readRelationalDashboardDomain(
       this.pool,
       "returns",
@@ -2004,6 +2474,22 @@ export class CommerceService {
         ["Representative Assigned", "Pickup On The Way"].includes(String(row.status || ""))
       );
     }) as Record<string, unknown>[];
+
+    const suggested = suggestedStopOrder(
+      representativeLocation.latitude,
+      representativeLocation.longitude,
+      ordersResult.rows.flatMap((row) => {
+        const address = row.delivery_address || {};
+        const latitude = Number(address.latitude);
+        const longitude = Number(address.longitude);
+        return Number.isFinite(latitude) && Number.isFinite(longitude)
+          ? [{ orderId: row.order_code, latitude, longitude }]
+          : [];
+      }),
+    );
+    const suggestedSequence = new Map(
+      suggested.map((stop, index) => [stop.orderId, index + 1]),
+    );
 
     return {
       orders: ordersResult.rows.map((row) => {
@@ -2032,6 +2518,14 @@ export class CommerceService {
           deliveryNotes: row.delivery_notes,
           createdAt: row.created_at.toISOString(),
           deliveryStartedAt: row.delivery_started_at?.toISOString() || null,
+          routeState:
+            row.status === "Representative On The Way"
+              ? "current"
+              : ["waiting", "problem"].includes(String(row.route_state || ""))
+                ? String(row.route_state)
+                : "upcoming",
+          routeSequence: Number(row.sequence_number || 0),
+          suggestedSequence: suggestedSequence.get(row.order_code) || 0,
           priceSnapshot: row.item_rows || [],
           items: (row.item_rows || []).map((item) => item.itemCode),
         };
@@ -2094,7 +2588,7 @@ export class CommerceService {
   public async representativeOrderAction(
     representativeUserId: string,
     orderCode: string,
-    action: "start" | "cancel" | "delivered",
+    action: "start" | "cancel" | "delivered" | "waiting" | "problem",
   ): Promise<Record<string, unknown>> {
     const client = await this.pool.connect();
     try {
@@ -2122,6 +2616,53 @@ export class CommerceService {
         throw new AppError(404, "ASSIGNED_ORDER_NOT_FOUND", "This order is not assigned to your account");
       }
 
+      if (action === "start") {
+        const previousCurrent = await client.query<{ id: string; order_code: string }>(
+          `SELECT id::text, order_code
+             FROM orders
+            WHERE representative_user_id=$1
+              AND status='Representative On The Way'
+              AND id<>$2::uuid
+              AND NOT is_deleted
+              AND NOT is_archived
+            FOR UPDATE`,
+          [representativeUserId, order.id],
+        );
+        if (previousCurrent.rows.length) {
+          await client.query(
+            `UPDATE orders
+                SET status='Out With Representative',
+                    delivery_started_at=NULL,
+                    version=version+1,
+                    updated_at=now()
+              WHERE id = ANY($1::uuid[])`,
+            [previousCurrent.rows.map((row) => row.id)],
+          );
+          await client.query(
+            `UPDATE delivery_route_stops
+                SET route_state='upcoming', updated_at=now()
+              WHERE representative_user_id=$1
+                AND order_id = ANY($2::uuid[])`,
+            [representativeUserId, previousCurrent.rows.map((row) => row.id)],
+          );
+          for (const previous of previousCurrent.rows) {
+            await client.query(
+              `INSERT INTO order_events (
+                 order_id,event_type,from_status,to_status,actor_type,actor_id,metadata
+               ) VALUES (
+                 $1,'DELIVERY_ROUTE_SWITCHED','Representative On The Way','Out With Representative',
+                 'representative',$2,$3::jsonb
+               )`,
+              [
+                previous.id,
+                representativeUserId,
+                JSON.stringify({ nextOrderCode: orderCode }),
+              ],
+            );
+          }
+        }
+      }
+
       if (action === "start" && order.status === "Representative On The Way") {
         await client.query("COMMIT");
         return {
@@ -2137,7 +2678,7 @@ export class CommerceService {
           throw new AppError(409, "ORDER_STATE_INVALID", "This delivery cannot be started from its current status");
         }
         nextStatus = "Representative On The Way";
-      } else if (action === "cancel") {
+      } else if (["cancel", "waiting", "problem"].includes(action)) {
         if (order.status !== "Representative On The Way") {
           throw new AppError(409, "ORDER_STATE_INVALID", "This delivery is not currently active");
         }
@@ -2210,6 +2751,41 @@ export class CommerceService {
          WHERE id=$1`,
         [order.id, nextStatus],
       );
+      const routeState =
+        action === "start"
+          ? "current"
+          : action === "delivered"
+            ? "delivered"
+            : action === "waiting"
+              ? "waiting"
+              : action === "problem"
+                ? "problem"
+                : "upcoming";
+      await client.query(
+        `INSERT INTO delivery_route_stops (
+           representative_user_id,order_id,sequence_number,route_state,note,
+           started_at,completed_at,updated_at
+         ) VALUES (
+           $1,$2,
+           COALESCE((SELECT MAX(sequence_number)+1 FROM delivery_route_stops WHERE representative_user_id=$1),1),
+           $3,
+           CASE WHEN $3='problem' THEN 'Representative reported a delivery problem' ELSE NULL END,
+           CASE WHEN $3='current' THEN now() ELSE NULL END,
+           CASE WHEN $3='delivered' THEN now() ELSE NULL END,
+           now()
+         )
+         ON CONFLICT (representative_user_id,order_id) DO UPDATE SET
+           route_state=EXCLUDED.route_state,
+           note=EXCLUDED.note,
+           started_at=CASE WHEN EXCLUDED.route_state='current'
+             THEN COALESCE(delivery_route_stops.started_at,now())
+             ELSE delivery_route_stops.started_at END,
+           completed_at=CASE WHEN EXCLUDED.route_state='delivered'
+             THEN now() ELSE delivery_route_stops.completed_at END,
+           updated_at=now()`,
+        [representativeUserId, order.id, routeState],
+      );
+
       await this.applyOrderStatusTransition(
         client,
         order.id,
@@ -2231,7 +2807,7 @@ export class CommerceService {
           representativeUserId,
           `REPRESENTATIVE_ORDER_${action.toUpperCase()}`,
           orderCode,
-          JSON.stringify({ from: order.status, to: nextStatus }),
+          JSON.stringify({ from: order.status, to: nextStatus, routeState }),
         ],
       );
       await client.query("COMMIT");
