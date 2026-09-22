@@ -685,7 +685,12 @@
     if (activeSection()) startPolling();
   }
 
-  document.addEventListener("DOMContentLoaded", initialize);
+  window.DartLiveOperationsLoaded = true;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize, { once: true });
+  } else {
+    initialize();
+  }
   window.addEventListener("dart:admin-authenticated", () => {
     if (!applyAccess()) return;
     if (activeSection()) startPolling();
