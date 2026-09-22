@@ -12,7 +12,7 @@ tags:
   - name: Customer Auth
   - name: Staff Auth
   - name: Representative Auth
-  - name: Sessions
+  - name: Sessions\n  - name: Live Operations
 paths:
   /health/live:
     get:
