@@ -14,7 +14,6 @@ describe("environment configuration", () => {
     expect(config.allowDevelopmentSeed).toBe(false);
     expect(config.corsOrigins).toEqual(["http://localhost:4173"]);
     expect(config.sessionCookieSameSite).toBe("strict");
-    expect(config.ownerBootstrapEmail).toBeNull();
     expect(config.emailFromName).toBe("Dart | for you");
   });
 
@@ -90,14 +89,9 @@ describe("environment configuration", () => {
       SMTP_PASS: "app-password",
       EMAIL_FROM: "dart@example.com",
       EMAIL_FROM_NAME: "Dart | for you",
-      DART_OWNER_EMAIL: "owner@example.com",
-      DART_OWNER_NAME: "Dart Owner",
     });
     expect(smtp.emailProvider).toBe("smtp");
     expect(smtp.smtpPort).toBe(587);
-    expect(smtp.staffInviteOtpTtlHours).toBe(48);
-    expect(smtp.ownerBootstrapEmail).toBe("owner@example.com");
-    expect(smtp.ownerBootstrapName).toBe("Dart Owner");
     expect(smtp.emailFromName).toBe("Dart | for you");
   });
 
