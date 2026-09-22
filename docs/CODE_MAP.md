@@ -53,7 +53,7 @@ Model يملك الأسعار والوصف والمقاسات والألوان. 
 | `Js/dart-ui.js` | عرض وتثبيت خصم عيد الميلاد التلقائي داخل إجماليات Checkout |
 | `Js/dart-tracking.js` | استبعاد الطلبات Delivered من صفحة التتبع النشط |
 | `Eye/dart.js` | بوكس مواليد الغد، منح Dart Card يدويًا، خياري الحذف النهائي، واسترجاع رصيد الكارت بعد المرتجع المكتمل |
-| `CSS/Stayle 1.css` + `CSS/fixes.css` | قواعد المكونات الأساسية في Main CSS، والاستجابات فقط داخل Responsive CSS |
+| `CSS/main.css` + `CSS/responsive.css` | قواعد المكونات الأساسية في Main CSS، والاستجابات فقط داخل Responsive CSS |
 | `tests/dashboard-v9-unit.js` | اختبار بيانات معزول لطابور مواليد الغد وخياري الحذف فقط/مع البيانات المرتبطة |
 | `tests/v9-requested-features.js` | فحص ثابت لجميع عقود الواجهة المطلوبة في V9 |
 
