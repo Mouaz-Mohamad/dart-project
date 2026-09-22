@@ -3,12 +3,25 @@
 
   const card = document.getElementById("settings-staff-access-card");
   const form = document.getElementById("settings-staff-invite-form");
+  const emailInput = document.getElementById("settings-staff-email");
+  const roleSelect = document.getElementById("settings-staff-role");
+  const permissionsWrap = document.getElementById("settings-staff-permissions-wrap");
   const invitePermissions = document.getElementById("settings-staff-invite-permissions");
   const staffList = document.getElementById("settings-staff-list");
   const invitationsList = document.getElementById("settings-staff-invitations");
   const statusNode = document.getElementById("settings-staff-status");
 
-  if (!card || !form || !invitePermissions || !staffList || !invitationsList || !statusNode) {
+  if (
+    !card ||
+    !form ||
+    !emailInput ||
+    !roleSelect ||
+    !permissionsWrap ||
+    !invitePermissions ||
+    !staffList ||
+    !invitationsList ||
+    !statusNode
+  ) {
     return;
   }
 
@@ -90,12 +103,22 @@
       .join("");
   }
 
+  function syncRoleUi() {
+    const owner = roleSelect.value === "owner";
+    permissionsWrap.hidden = owner;
+    invitePermissions
+      .querySelectorAll('input[type="checkbox"]')
+      .forEach((input) => {
+        input.disabled = owner || protectedBasics.has(input.value);
+      });
+  }
+
   function staffPermissionEditor(member) {
     if (member.isOwner) {
       return `
         <div class="dart-staff-protected">
           <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-          Owner permissions and Owner identity are protected.
+          Owner access and permissions are protected.
         </div>`;
     }
     const selected = new Set(member.permissions || []);
@@ -121,16 +144,13 @@
         <button type="button" class="dart-settings-secondary" data-staff-action="revoke-sessions">
           Revoke all sessions
         </button>
-        <button type="button" class="dart-settings-secondary" data-staff-action="relink-google">
-          Change Gmail / relink
-        </button>
       </div>`;
   }
 
   function renderStaff() {
     if (!directory.staff.length) {
       staffList.innerHTML =
-        '<div class="dart-empty-state">No Staff accounts yet.</div>';
+        '<div class="dart-empty-state">No dashboard accounts yet.</div>';
       return;
     }
 
@@ -144,18 +164,17 @@
         >
           <summary>
             <div>
-              <strong>${esc(member.name)}</strong>
-              <small>${esc(member.email)} · ${esc(member.staffCode || "")}</small>
+              <strong>${esc(member.email)}</strong>
+              <small>${esc(member.staffCode || "")} · ${member.isOwner ? "Owner" : "Staff"}</small>
             </div>
             <div class="dart-staff-badges">
-              <span>${member.isOwner ? "Owner" : esc(member.status)}</span>
-              <span>${member.googleLinked ? "Google Linked" : "Google Not linked"}</span>
+              <span>${esc(member.status)}</span>
+              <span>${member.emailVerified ? "Email verified" : "Email pending"}</span>
             </div>
           </summary>
           <div class="dart-staff-member-body">
-            <p>Google identity: <strong>${member.googleLinked ? "Linked" : "Not linked"}</strong></p>
-            <p>Last Google login: <strong>${esc(displayDate(member.lastLoginAt))}</strong></p>
-            <p>Identity linked: <strong>${esc(displayDate(member.linkedAt))}</strong></p>
+            <p>Role: <strong>${member.isOwner ? "Owner" : "Staff"}</strong></p>
+            <p>Last login: <strong>${esc(displayDate(member.lastLoginAt))}</strong></p>
             ${member.disabledReason
               ? `<p>Disabled reason: <strong>${esc(member.disabledReason)}</strong></p>`
               : ""}
@@ -170,12 +189,12 @@
   function renderAllowances() {
     const pending = directory.invitations.filter(
       (entry) =>
-        entry.accessMode === "google" &&
+        entry.accessMode === "email_otp" &&
         entry.status === "pending",
     );
     if (!pending.length) {
       invitationsList.innerHTML =
-        '<div class="dart-empty-state">No pending Google access entries.</div>';
+        '<div class="dart-empty-state">No emails waiting for verification.</div>';
       return;
     }
 
@@ -183,12 +202,12 @@
       .map((entry) => `
         <div class="dart-settings-list-row" data-allowance-id="${esc(entry.id)}">
           <div>
-            <strong>${esc(entry.name)}</strong>
-            <small>${esc(entry.email)} · waiting for first Google sign-in</small>
+            <strong>${esc(entry.email)}</strong>
+            <small>${entry.role === "owner" ? "Owner" : "Staff"} · waiting for first email verification</small>
           </div>
-          ${can("staff.manage")
+          ${can("staff.manage") && entry.role !== "owner"
             ? '<button type="button" class="dart-settings-secondary" data-remove-allowance>Remove</button>'
-            : '<span>Pending</span>'}
+            : '<span>Protected</span>'}
         </div>`)
       .join("");
   }
@@ -202,6 +221,7 @@
     try {
       directory = await window.DartAdminApi.request("/api/v1/admin/staff");
       renderInvitePermissions();
+      syncRoleUi();
       renderStaff();
       renderAllowances();
       setStatus("");
@@ -209,6 +229,8 @@
       setStatus(error.message || "Unable to load Staff access.", true);
     }
   }
+
+  roleSelect.addEventListener("change", syncRoleUi);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -221,11 +243,15 @@
       return;
     }
 
-    const selected = [
-      ...invitePermissions.querySelectorAll(
-        'input[type="checkbox"]:checked:not(:disabled)',
-      ),
-    ].map((input) => input.value);
+    const role = roleSelect.value === "owner" ? "owner" : "staff";
+    const selected =
+      role === "owner"
+        ? []
+        : [
+            ...invitePermissions.querySelectorAll(
+              'input[type="checkbox"]:checked:not(:disabled)',
+            ),
+          ].map((input) => input.value);
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
 
@@ -233,19 +259,20 @@
       await window.DartAdminApi.request("/api/v1/admin/staff/allowlist", {
         method: "POST",
         body: {
-          displayName: document.getElementById("settings-staff-name").value.trim(),
-          email: document.getElementById("settings-staff-email").value.trim(),
-          phone: document.getElementById("settings-staff-phone").value.trim(),
+          email: emailInput.value.trim(),
+          role,
           permissionKeys: selected,
         },
       });
       form.reset();
+      roleSelect.value = "staff";
+      syncRoleUi();
       setStatus(
-        "Employee Gmail allowed. No OTP or password was sent; they can use Continue with Google.",
+        "Email allowed. The account will activate after the owner of that email enters the verification code.",
       );
       await load();
     } catch (error) {
-      setStatus(error.message || "Unable to allow Staff access.", true);
+      setStatus(error.message || "Unable to allow dashboard access.", true);
     } finally {
       submit.disabled = false;
     }
@@ -264,10 +291,10 @@
         `/api/v1/admin/staff/allowlist/${encodeURIComponent(allowanceId)}`,
         {
           method: "DELETE",
-          body: { reason: "removed_before_first_google_login" },
+          body: { reason: "removed_by_owner" },
         },
       );
-      setStatus("Pending Staff Gmail access removed.");
+      setStatus("Pending email access removed.");
       await load();
     } catch (error) {
       setStatus(error.message || "Unable to remove Staff access.", true);
@@ -329,30 +356,6 @@
           { method: "POST" },
         );
         setStatus("All sessions for this Staff account were revoked.");
-      } else if (action === "relink-google") {
-        const email = window.prompt(
-          "Enter the new allowed Gmail. The current Google link and all sessions will be revoked:",
-          "",
-        );
-        if (!email) return;
-        const reason = window.prompt(
-          "Enter the reason for this Gmail change (minimum 8 characters):",
-          "gmail changed",
-        );
-        if (!reason) return;
-        await window.DartAdminApi.request(
-          `/api/v1/admin/staff/${encodeURIComponent(staffId)}/google/relink`,
-          {
-            method: "POST",
-            body: {
-              email: email.trim(),
-              reason: reason.trim(),
-            },
-          },
-        );
-        setStatus(
-          "Google identity unlinked safely. The employee must sign in again with the new allowed Gmail.",
-        );
       }
       await load();
     } catch (error) {
