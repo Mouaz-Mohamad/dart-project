@@ -1,3 +1,4 @@
+// Production activation marker: simplified Staff email access.
 (function () {
   "use strict";
 
