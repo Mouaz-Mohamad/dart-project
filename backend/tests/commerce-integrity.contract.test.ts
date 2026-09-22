@@ -132,6 +132,16 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(routes.slice(locationRoute, locationRoute + 260)).toContain("limit: 120");
   });
 
+  it("commits admin order workflow changes atomically and rejects stale UI state", () => {
+    expect(routes).toContain('"/admin/orders/:orderRef/workflow"');
+    expect(service).toContain("public async adminOrderWorkflowAction(");
+    expect(service).toContain('"ORDER_STATE_STALE"');
+    expect(service).toContain("FOR UPDATE");
+    expect(service).toContain("await this.applyOrderStatusTransition(");
+    expect(service).toContain("'ORDER_WORKFLOW_CHANGED'");
+    expect(service).toContain("direction: isBack ? \"back\" : \"forward\"");
+  });
+
   it("rate-limits representative delivery and return mutations", () => {
     for (const route of [
       "/representatives/orders/:orderCode/action",
