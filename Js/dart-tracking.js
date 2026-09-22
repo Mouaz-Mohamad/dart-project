@@ -8,6 +8,14 @@
   "use strict";
 
   const maps = new Map();
+  const liveTrips = new Map();
+  const LIVE_LOCATION_POLL_MS = 1000;
+  const SNAPSHOT_REFRESH_MS = 3000;
+  let lastViewSignature = "";
+  let lastLiveTripSignature = "";
+  let liveRefreshBusy = false;
+  let snapshotRefreshBusy = false;
+  let liveTrackingUnsupported = false;
   const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const money = (value) => `${Math.trunc(Number(value) || 0)} EGP`;
   const orderTotal = (order) => Number.isFinite(Number(order?.finalAmount))
@@ -90,7 +98,7 @@
   }
 
   function markerIcon(type) {
-    const safeType = type === "courier" ? "courier" : "customer";
+    const safeType = type === "courier" ? "courier" : "destination";
     const iconClass = safeType === "courier" ? "fa-motorcycle" : "fa-location-dot";
     return L.divIcon({
       className: "dart-route-pin",
@@ -104,36 +112,346 @@
     return record.fullAddress || [record.building, record.street, record.area, record.governorate, record.country].filter(Boolean).join("، ");
   }
 
-  function createMap(container, record, shell, overlay, summary) {
-    const destination = { lat: Number(record.latitude), lng: Number(record.longitude) };
-    const courier = { lat: Number(record.courierLocation?.lat), lng: Number(record.courierLocation?.lng) };
-    const hasDestination = Number.isFinite(destination.lat) && Number.isFinite(destination.lng) && destination.lat && destination.lng;
+  function tripKey(kind, record) {
+    const id = record?.id || (kind === "order" ? record?.orderId : record?.returnId);
+    return `${kind}:${String(id || "")}`;
+  }
+
+  function hasCoordinate(value) {
+    return Number.isFinite(Number(value)) && Number(value) !== 0;
+  }
+
+  function liveRecord(kind, record) {
+    return liveTrips.get(tripKey(kind, record)) || null;
+  }
+
+  function clearAnimation(state) {
+    if (state.animationFrame == null) return;
+    if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(state.animationFrame);
+    else clearTimeout(state.animationFrame);
+    state.animationFrame = null;
+  }
+
+  function scheduleAnimation(callback) {
+    if (typeof requestAnimationFrame === "function") return requestAnimationFrame(callback);
+    return setTimeout(() => callback(Date.now()), 16);
+  }
+
+  function showResetControl(state, show) {
+    if (state.resetButton) state.resetButton.hidden = !show;
+  }
+
+  function markManualView(state) {
+    if (!state.courierPosition || state.programmaticViewChange) return;
+    state.manualView = true;
+    showResetControl(state, true);
+  }
+
+  function fitTrip(state, animate = true) {
+    if (!state?.map || state.manualView) return;
+    state.programmaticViewChange = true;
+    if (state.courierPosition) {
+      const samePoint =
+        Math.abs(state.courierPosition.lat - state.destination.lat) < 0.00001 &&
+        Math.abs(state.courierPosition.lng - state.destination.lng) < 0.00001;
+      if (samePoint) {
+        state.map.setView(
+          [state.destination.lat, state.destination.lng],
+          17,
+          { animate },
+        );
+      } else {
+        state.map.fitBounds(
+          [
+            [state.destination.lat, state.destination.lng],
+            [state.courierPosition.lat, state.courierPosition.lng],
+          ],
+          {
+            padding: [45, 45],
+            maxZoom: 17,
+            animate,
+            duration: animate ? 0.55 : 0,
+          },
+        );
+      }
+    } else {
+      state.map.setView([state.destination.lat, state.destination.lng], 15, { animate });
+    }
+    setTimeout(() => {
+      state.programmaticViewChange = false;
+    }, animate ? 650 : 0);
+  }
+
+  function addResetControl(state) {
+    const control = L.control({ position: "topright" });
+    control.onAdd = () => {
+      const wrap = L.DomUtil.create("div", "dart-map-reset-control leaflet-bar");
+      const button = L.DomUtil.create("button", "dart-map-reset", wrap);
+      button.type = "button";
+      button.hidden = true;
+      button.textContent = "Reset view";
+      button.title = "Show the customer and representative at the best zoom";
+      button.setAttribute("aria-label", button.title);
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation?.(wrap);
+      L.DomEvent.on(button, "click", (event) => {
+        L.DomEvent.stop(event);
+        state.manualView = false;
+        showResetControl(state, false);
+        fitTrip(state, true);
+      });
+      state.resetButton = button;
+      return wrap;
+    };
+    control.addTo(state.map);
+    state.resetControl = control;
+  }
+
+  function ensureCourierLayers(state, position) {
+    if (!state.courierMarker) {
+      state.courierMarker = L.marker([position.lat, position.lng], {
+        icon: markerIcon("courier"),
+      }).addTo(state.map).bindPopup("Dart representative");
+    }
+    if (!state.route) {
+      state.route = L.polyline(
+        [
+          [state.destination.lat, state.destination.lng],
+          [position.lat, position.lng],
+        ],
+        { color: "#8c1d2c", weight: 4, opacity: 0.82 },
+      ).addTo(state.map);
+    }
+  }
+
+  function removeCourierLayers(state) {
+    clearAnimation(state);
+    if (state.courierMarker) {
+      state.map.removeLayer(state.courierMarker);
+      state.courierMarker = null;
+    }
+    if (state.route) {
+      state.map.removeLayer(state.route);
+      state.route = null;
+    }
+    state.courierPosition = null;
+    state.manualView = false;
+    showResetControl(state, false);
+  }
+
+  function animateCourier(state, nextPosition) {
+    ensureCourierLayers(state, nextPosition);
+    const currentLatLng = state.courierMarker.getLatLng();
+    const from = {
+      lat: Number(currentLatLng.lat),
+      lng: Number(currentLatLng.lng),
+    };
+    const distance =
+      Math.abs(from.lat - nextPosition.lat) + Math.abs(from.lng - nextPosition.lng);
+    if (!Number.isFinite(distance) || distance < 0.000001) {
+      state.courierMarker.setLatLng([nextPosition.lat, nextPosition.lng]);
+      state.route.setLatLngs([
+        [state.destination.lat, state.destination.lng],
+        [nextPosition.lat, nextPosition.lng],
+      ]);
+      state.courierPosition = nextPosition;
+      if (!state.manualView) fitTrip(state, true);
+      return;
+    }
+
+    clearAnimation(state);
+    const startedAt = typeof performance !== "undefined" && performance.now
+      ? performance.now()
+      : Date.now();
+    const duration = 850;
+
+    const step = (timestamp) => {
+      const nowValue = Number(timestamp) || Date.now();
+      const progress = Math.min(1, Math.max(0, (nowValue - startedAt) / duration));
+      const eased = 1 - ((1 - progress) ** 3);
+      const position = {
+        lat: from.lat + (nextPosition.lat - from.lat) * eased,
+        lng: from.lng + (nextPosition.lng - from.lng) * eased,
+      };
+      state.courierMarker.setLatLng([position.lat, position.lng]);
+      state.route.setLatLngs([
+        [state.destination.lat, state.destination.lng],
+        [position.lat, position.lng],
+      ]);
+      state.courierPosition = position;
+      if (progress < 1) {
+        state.animationFrame = scheduleAnimation(step);
+        return;
+      }
+      state.animationFrame = null;
+      state.courierPosition = nextPosition;
+      if (!state.manualView) fitTrip(state, true);
+    };
+
+    state.animationFrame = scheduleAnimation(step);
+  }
+
+  function updateMapState(state, record, live = null) {
+    if (!state || !record) return;
+    state.record = record;
+    const courier = live?.courierLocation || record.courierLocation || null;
+    const started = Boolean(
+      live?.deliveryStartedAt ||
+      live?.pickupStartedAt ||
+      record.deliveryStartedAt ||
+      record.pickupStartedAt
+    );
+    const hasRep = Boolean(record.representativeId || record.representativeBusinessId);
+    const hasCourier =
+      started &&
+      hasCoordinate(courier?.lat) &&
+      hasCoordinate(courier?.lng);
+
+    if (hasCourier) {
+      const nextPosition = {
+        lat: Number(courier.lat),
+        lng: Number(courier.lng),
+      };
+      state.shell?.classList.remove("is-disabled");
+      if (state.overlay) state.overlay.hidden = true;
+      if (state.summary) state.summary.textContent = "The representative location is updating live.";
+      if (!state.courierPosition) {
+        ensureCourierLayers(state, nextPosition);
+        state.courierMarker.setLatLng([nextPosition.lat, nextPosition.lng]);
+        state.route.setLatLngs([
+          [state.destination.lat, state.destination.lng],
+          [nextPosition.lat, nextPosition.lng],
+        ]);
+        state.courierPosition = nextPosition;
+        fitTrip(state, false);
+      } else {
+        animateCourier(state, nextPosition);
+      }
+      return;
+    }
+
+    if (state.courierMarker || state.route) removeCourierLayers(state);
+    state.shell?.classList.add("is-disabled");
+    if (state.overlay) {
+      state.overlay.hidden = false;
+      state.overlay.textContent = hasRep
+        ? "Waiting for the representative to start"
+        : "Waiting for representative assignment";
+    }
+    if (state.summary) {
+      state.summary.textContent = `Saved destination: ${fullAddress(record) || "-"}`;
+    }
+  }
+
+  function createMap(container, record, shell, overlay, summary, kind) {
+    const destination = {
+      lat: Number(record.latitude),
+      lng: Number(record.longitude),
+    };
+    const hasDestination =
+      hasCoordinate(destination.lat) &&
+      hasCoordinate(destination.lng);
+
     if (!container || typeof L === "undefined" || !hasDestination) {
       shell?.classList.add("is-disabled");
-      if (overlay) { overlay.hidden = false; overlay.textContent = hasDestination ? "Map unavailable" : "Saved coordinates are unavailable"; }
+      if (overlay) {
+        overlay.hidden = false;
+        overlay.textContent = hasDestination
+          ? "Map unavailable"
+          : "Saved coordinates are unavailable";
+      }
       if (summary) summary.textContent = fullAddress(record) || "Address unavailable";
       return;
     }
-    const map = L.map(container, { zoomControl: false, attributionControl: false }).setView([destination.lat, destination.lng], 15);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19, subdomains: "abcd" }).addTo(map);
-    L.marker([destination.lat, destination.lng], { icon: markerIcon("destination") }).addTo(map).bindPopup("Saved destination");
-    maps.set(container, map);
-    const started = Boolean(record.deliveryStartedAt || record.pickupStartedAt);
-    const hasRep = Boolean(record.representativeId || record.representativeBusinessId);
-    const hasCourier = Number.isFinite(courier.lat) && Number.isFinite(courier.lng) && courier.lat && courier.lng;
-    if (started && hasCourier) {
-      L.marker([courier.lat, courier.lng], { icon: markerIcon("courier") }).addTo(map).bindPopup("Dart representative");
-      L.polyline([[destination.lat, destination.lng], [courier.lat, courier.lng]], { color: "#2563eb", weight: 4, opacity: .82 }).addTo(map);
-      map.fitBounds([[destination.lat, destination.lng], [courier.lat, courier.lng]], { padding: [45, 45], maxZoom: 16 });
-      shell?.classList.remove("is-disabled");
-      if (overlay) overlay.hidden = true;
-      if (summary) summary.textContent = "The representative location is updating automatically.";
-    } else {
-      shell?.classList.add("is-disabled");
-      if (overlay) { overlay.hidden = false; overlay.textContent = hasRep ? "Waiting for the representative to start" : "Waiting for representative assignment"; }
-      if (summary) summary.textContent = `Saved destination: ${fullAddress(record) || "-"}`;
-    }
+
+    const map = L.map(container, {
+      zoomControl: false,
+      attributionControl: false,
+    }).setView([destination.lat, destination.lng], 15);
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      { maxZoom: 19, subdomains: "abcd" },
+    ).addTo(map);
+
+    const state = {
+      kind,
+      entityKey: tripKey(kind, record),
+      record,
+      map,
+      container,
+      shell,
+      overlay,
+      summary,
+      destination,
+      destinationMarker: L.marker(
+        [destination.lat, destination.lng],
+        { icon: markerIcon("destination") },
+      ).addTo(map).bindPopup(
+        kind === "return" ? "Saved pickup location" : "Saved delivery location",
+      ),
+      courierMarker: null,
+      route: null,
+      courierPosition: null,
+      animationFrame: null,
+      manualView: false,
+      programmaticViewChange: false,
+      resetControl: null,
+      resetButton: null,
+    };
+
+    maps.set(container, state);
+    addResetControl(state);
+    map.on("dragstart", () => markManualView(state));
+    map.on("zoomstart", () => {
+      if (!state.programmaticViewChange) markManualView(state);
+    });
+    updateMapState(state, record, liveRecord(kind, record));
     setTimeout(() => map.invalidateSize(), 60);
+  }
+
+  function disposeMaps() {
+    for (const state of maps.values()) {
+      clearAnimation(state);
+      try { state.map.remove(); } catch {}
+    }
+    maps.clear();
+  }
+
+  function recordForMapState(state) {
+    const records = state.kind === "order" ? currentOrders() : currentReturns();
+    return records.find((record) => tripKey(state.kind, record) === state.entityKey) || state.record;
+  }
+
+  function updateLiveMaps() {
+    for (const state of maps.values()) {
+      const record = recordForMapState(state);
+      updateMapState(state, record, liveTrips.get(state.entityKey) || null);
+    }
+  }
+
+  function stableTrackingRecord(record) {
+    const {
+      courierLocation: _courierLocation,
+      updatedAt: _updatedAt,
+      ...stable
+    } = record || {};
+    return stable;
+  }
+
+  function trackingStructureSignature() {
+    return JSON.stringify({
+      orders: currentOrders().map(stableTrackingRecord),
+      returns: currentReturns().map(stableTrackingRecord),
+    });
+  }
+
+  function syncTrackingView() {
+    const signature = trackingStructureSignature();
+    if (!lastViewSignature || signature !== lastViewSignature) {
+      render();
+      return;
+    }
+    updateLiveMaps();
   }
 
   function statusIndex(order) {
@@ -181,7 +499,7 @@
   function renderOrders() {
     const list = document.getElementById("orderTrackingList"), template = document.getElementById("order-tracking-card-template");
     if (!list || !template) return;
-    maps.forEach((map) => { try { map.remove(); } catch {} }); maps.clear(); list.replaceChildren();
+    list.replaceChildren();
     const groups = orderGroups(currentOrders());
     if (!groups.length) {
       const empty = templateFragment("order-tracking-empty-template");
@@ -212,7 +530,7 @@
       card.querySelector("[data-order-eta]").textContent = first.deliveryStartedAt ? "Live trip" : "ETA: Not determined";
       list.appendChild(fragment);
       const inserted = list.lastElementChild;
-      createMap(inserted.querySelector("[data-order-map]"), first, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"));
+      createMap(inserted.querySelector("[data-order-map]"), first, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"), "order");
     });
   }
 
@@ -278,48 +596,128 @@
       const call = card.querySelector("[data-return-call]"); call.hidden = !first.representativePhone; call.href = call.hidden ? "#" : `tel:${first.representativePhone}`;
       list.appendChild(fragment);
       const inserted = list.lastElementChild;
-      createMap(inserted.querySelector("[data-return-map]"), first, inserted.querySelector("[data-return-map-shell]"), inserted.querySelector("[data-return-map-disabled]"), inserted.querySelector("[data-return-map-summary]"));
+      createMap(inserted.querySelector("[data-return-map]"), first, inserted.querySelector("[data-return-map-shell]"), inserted.querySelector("[data-return-map-disabled]"), inserted.querySelector("[data-return-map-summary]"), "return");
     });
   }
 
-  function render() { renderOrders(); renderReturns(); }
+  function render() {
+    disposeMaps();
+    renderOrders();
+    renderReturns();
+    lastViewSignature = trackingStructureSignature();
+    updateLiveMaps();
+  }
 
   async function refreshServerTracking() {
-    if (document.hidden) return;
-    if (window.DartPlatform?.currentUser?.() && window.DartPlatform?.hydrateCustomerCommerce) {
-      try {
-        await window.DartPlatform.hydrateCustomerCommerce();
-      } catch (error) {
-        if (error.status !== 401) console.warn("Dart tracking refresh failed", error);
-      }
+    if (document.hidden || snapshotRefreshBusy) return;
+    if (!window.DartPlatform?.currentUser?.() || !window.DartPlatform?.hydrateCustomerCommerce) {
+      syncTrackingView();
+      return;
     }
-    render();
+    snapshotRefreshBusy = true;
+    try {
+      await window.DartPlatform.hydrateCustomerCommerce();
+    } catch (error) {
+      if (error.status !== 401) console.warn("Dart tracking refresh failed", error);
+    } finally {
+      snapshotRefreshBusy = false;
+    }
+    syncTrackingView();
+  }
+
+  async function refreshLiveTracking() {
+    if (
+      document.hidden ||
+      liveRefreshBusy ||
+      liveTrackingUnsupported ||
+      !window.DartPlatform?.currentUser?.() ||
+      !window.DartApi?.request
+    ) return;
+
+    liveRefreshBusy = true;
+    try {
+      const payload = await window.DartApi.request("/api/v1/me/tracking/live");
+      const next = new Map();
+      const signatureRows = [];
+
+      for (const row of payload?.orders || []) {
+        const key = tripKey("order", row);
+        next.set(key, row);
+        signatureRows.push([
+          key,
+          row.status || "",
+          row.deliveryStartedAt || "",
+          Boolean(row.courierLocation),
+        ]);
+      }
+      for (const row of payload?.returns || []) {
+        const key = tripKey("return", row);
+        next.set(key, row);
+        signatureRows.push([
+          key,
+          row.status || "",
+          row.pickupStartedAt || "",
+          Boolean(row.courierLocation),
+        ]);
+      }
+
+      liveTrips.clear();
+      for (const [key, value] of next) liveTrips.set(key, value);
+      updateLiveMaps();
+
+      const liveSignature = JSON.stringify(signatureRows.sort((a, b) =>
+        String(a[0]).localeCompare(String(b[0]))
+      ));
+      if (lastLiveTripSignature && liveSignature !== lastLiveTripSignature) {
+        void refreshServerTracking();
+      }
+      lastLiveTripSignature = liveSignature;
+    } catch (error) {
+      if (error.status === 404) {
+        liveTrackingUnsupported = true;
+      } else if (error.status !== 401) {
+        console.warn("Dart live tracking refresh failed", error);
+      }
+    } finally {
+      liveRefreshBusy = false;
+    }
   }
 
   window.DartTracking = {
     render,
     refreshServerTracking,
+    refreshLiveTracking,
     currentOrder,
     currentOrders,
     currentReturns,
     renderReturns,
     orderGroups,
   };
+
   document.addEventListener("DOMContentLoaded", () => {
     render();
     void refreshServerTracking();
+    void refreshLiveTracking();
   });
   window.addEventListener("storage", (event) => {
-    if (["dart_orders", "dart_returns"].includes(event.key)) render();
+    if (["dart_orders", "dart_returns"].includes(event.key)) syncTrackingView();
   });
   window.addEventListener("dart:data-changed", (event) => {
-    if (["dart_orders", "dart_returns"].includes(event.detail?.key)) render();
+    if (["dart_orders", "dart_returns"].includes(event.detail?.key)) syncTrackingView();
   });
-  window.addEventListener("focus", () => void refreshServerTracking());
+  window.addEventListener("focus", () => {
+    void refreshServerTracking();
+    void refreshLiveTracking();
+  });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) void refreshServerTracking();
+    if (!document.hidden) {
+      void refreshServerTracking();
+      void refreshLiveTracking();
+    }
   });
-  setInterval(() => void refreshServerTracking(), 3000);
+  setInterval(() => void refreshLiveTracking(), LIVE_LOCATION_POLL_MS);
+  setInterval(() => void refreshServerTracking(), SNAPSHOT_REFRESH_MS);
+
 })();
 
 
