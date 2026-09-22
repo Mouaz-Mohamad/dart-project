@@ -67,7 +67,19 @@ Synthetic data is disabled by default and forbidden in Production. To run the cu
 - Apply all pending migrations: `npm run db:migrate`.
 - Apply exactly the next pending migration: `npm run db:migrate:one -- <migration-name>`.
 
-Applied migration checksums are recorded in `dart_schema_migrations`. Editing an already-applied migration is rejected; add a new migration instead.
+Applied migration checksums are recorded in `dart_schema_migrations`. Editing or renaming an already-applied migration is rejected; add a new migration instead.
+
+Historical duplicate numeric prefixes `0013`, `0014` and `0015` are grandfathered because those filenames may already exist in migration history. They are deterministic because the runner sorts complete filenames, but they must never be copied as a pattern for new work. The runtime now rejects every other duplicate numeric prefix, including attempts to add a new duplicate using an older number. New migrations continue with one unique four-digit sequence number per file.
+
+## Operational monitoring
+
+Dart already has structured Pino/Pino HTTP logs, request IDs, secret redaction, centralized error responses, process-level fatal logging, and separate liveness/readiness health checks.
+
+For immediate owner-facing backend alerts, configure the existing SMTP provider and set `MONITORING_ALERT_EMAIL`. Unhandled HTTP 500 errors and unexpected PostgreSQL pool errors trigger a sanitized alert containing the source, request ID, method/path when applicable, and timestamp. Email addresses, long phone-like numbers and bearer tokens found in error text are redacted before delivery.
+
+`MONITORING_ALERT_COOLDOWN_MS` defaults to five minutes and suppresses repeated identical alerts to avoid an alert storm. The structured server log remains the detailed source for the stack trace and request correlation.
+
+This lightweight alert path does not replace a dedicated error-tracking product if Dart later needs browser error capture, release-level grouping, source maps, traces or performance monitoring.
 
 ## Current scope and boundaries
 
