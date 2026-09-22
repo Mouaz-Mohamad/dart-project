@@ -945,6 +945,7 @@ function initCartAndCheckoutEvents() {
     const toCheckoutBtn = document.getElementById('toCheckoutBtn');
     const checkoutForm = document.getElementById('checkoutForm');
     const modalBuyBtn = document.getElementById('modalBuyBtn');
+    const modalWaitBtn = document.getElementById('modalWaitBtn');
     
     const discountBtn = document.getElementById('applyDiscountBtn');
     const discountInput = document.getElementById('discountInput');
@@ -954,6 +955,41 @@ function initCartAndCheckoutEvents() {
     if (cartView) cartView.style.display = 'block';
 
     renderCart();
+
+    if (modalWaitBtn) {
+        modalWaitBtn.addEventListener('click', async () => {
+            if (!selectedSize || !selectedColor || !activeProduct) {
+                showToast('Choose the size and color you want first.');
+                return;
+            }
+            if (!window.DartPlatform?.currentUser?.()) {
+                sessionStorage.setItem('dart_internal_navigation', '1');
+                location.assign(`Sign Up modern.html?next=${encodeURIComponent(location.pathname.split('/').pop() || 'products.html')}`);
+                return;
+            }
+            modalWaitBtn.disabled = true;
+            try {
+                await window.DartPlatform.joinWaiting(
+                    String(activeProduct.id),
+                    String(selectedSize),
+                    String(selectedColor)
+                );
+                modalWaitBtn.textContent = 'You are in Waiting';
+                showToast('تم تسجيلك في Waiting وسنبلغك عند توفر القطعة.');
+            } catch (error) {
+                if (error?.code === 'WAITING_ALREADY_EXISTS') {
+                    modalWaitBtn.textContent = 'Already in Waiting';
+                    showToast('أنت بالفعل في Waiting لنفس التصميم واللون والمقاس.');
+                } else if (error?.code === 'STOCK_AVAILABLE') {
+                    showToast('القطعة أصبحت متاحة الآن. أضفها إلى السلة.');
+                    window.DartStorefront?.refresh?.();
+                } else {
+                    modalWaitBtn.disabled = false;
+                    showToast(error?.message || 'تعذر الانضمام إلى Waiting.');
+                }
+            }
+        });
+    }
 
     if (modalBuyBtn) {
         modalBuyBtn.addEventListener('click', async () => {
@@ -1724,7 +1760,7 @@ function showCartBanner(productTitle) {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    const sections = document.querySelectorAll('.profile-details, .order-info, .return-info');
+    const sections = document.querySelectorAll('.profile-details, .order-info, .return-info, .waiting-info');
     if (!sections.length) return;
 
     function closeAllSections() {
@@ -1755,6 +1791,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const returnBtns = document.querySelectorAll('.retur2n');
     if (returnBtns.length) {
         returnBtns.forEach(el => el.addEventListener('click', () => openTargetSection('.return-info')));
+    }
+
+    const waitingBtns = document.querySelectorAll('.waitin2g');
+    if (waitingBtns.length) {
+        waitingBtns.forEach(el => el.addEventListener('click', async () => {
+            await window.DartPlatform?.hydrateWaiting?.(true).catch(() => {});
+            openTargetSection('.waiting-info');
+        }));
     }
 
     const closeBtns = document.querySelectorAll('.fa-arrow-right-from-bracket');

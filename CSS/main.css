@@ -34,7 +34,8 @@ header, .side-menu, .pge-que .pge, .que,
 .reviews-container,
 .profile-details,
 .return-info,
-.order-info {
+.order-info,
+.waiting-info {
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
@@ -42,7 +43,8 @@ header, .side-menu, .pge-que .pge, .que,
 .reviews-container::-webkit-scrollbar,
 .profile-details::-webkit-scrollbar,
 .return-info::-webkit-scrollbar,
-.order-info::-webkit-scrollbar {
+.order-info::-webkit-scrollbar,
+.waiting-info::-webkit-scrollbar {
     display: none;
 }
 
@@ -1566,7 +1568,7 @@ header {
 
 
 /* ========= Profile info */
-.profile-details, .order-info, .return-info {
+.profile-details, .order-info, .return-info, .waiting-info {
     width: 100%;
     height: 100vh;
     background-color: var(--white);
@@ -1591,7 +1593,7 @@ header {
     transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
 }
 
-.profile-details.active, .order-info.active, .return-info.active {
+.profile-details.active, .order-info.active, .return-info.active, .waiting-info.active {
     opacity: 1;
     visibility: visible;
     transform: translateY(0); /* ترجع لمكانها الطبيعي بسلاسة */
@@ -4270,3 +4272,58 @@ button,
 .dart-profile-password-form label{display:grid;gap:6px;font-weight:600}
 .dart-profile-password-form input{width:100%;min-height:44px;border:1px solid rgba(0,0,0,.15);border-radius:10px;padding:9px 12px;background:#fff}
 /* END Dart account security */
+
+
+/* BEGIN Waiting / Restock Reservation */
+.model .dart-waiting-btn {
+  margin-top: 10px;
+  border: 1px solid #ab012b;
+  background: #fff;
+  color: #ab012b;
+}
+.model .dart-waiting-btn:hover {
+  background: rgba(171, 1, 43, 0.06);
+}
+.model .dart-waiting-btn[hidden] {
+  display: none !important;
+}
+.size-btn.is-unavailable {
+  border-style: dashed;
+  opacity: 0.62;
+  text-decoration: line-through;
+}
+.dart-waiting-profile-note {
+  width: min(1100px, 100%);
+  margin: -28px auto 18px;
+  color: #5c646c;
+  line-height: 1.7;
+}
+.dart-waiting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+.dart-waiting-action {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid rgba(171, 1, 43, 0.24);
+  border-radius: 9px;
+  background: #fff;
+  color: #ab012b;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dart-waiting-action.is-primary {
+  background: #ab012b;
+  color: #fff;
+}
+.dart-waiting-action.is-danger {
+  border-color: rgba(153, 27, 27, 0.28);
+  color: #991b1b;
+}
+.dart-waiting-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+/* END Waiting / Restock Reservation */

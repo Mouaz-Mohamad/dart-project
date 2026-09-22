@@ -32,6 +32,13 @@
     refundCustomerFee: 100,
     repeatExchangeCustomerFee: 50,
     siteDiscount: { enabled: false, percent: 0, startsAt: "", endsAt: "" },
+    waiting: {
+      enabled: true,
+      reservationHours: 4,
+      alternativeColorsEnabled: true,
+      emailNotificationEnabled: true,
+      inSiteNotificationEnabled: true,
+    },
     announcements: [],
     modelCards: {},
     typing: {
@@ -93,6 +100,7 @@
         1000000,
       ),
       siteDiscount: { ...defaults.siteDiscount, ...(value.siteDiscount || {}) },
+      waiting: { ...defaults.waiting, ...(value.waiting || {}) },
       typing: {
         ...clone(defaults.typing),
         ...(value.typing || {}),

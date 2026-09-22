@@ -30,8 +30,6 @@
   // BEGIN Bidirectional color/gallery selection. Programmatic fallback does not select its color.
   function chooseColor(product, color, fromSlide = false) {
     selectedColor = color;
-    if (selectedSize && getAvailableStock(product, selectedSize, color) <= 0)
-      selectedSize = null;
     const modal = $("SectionModel");
     modal.querySelectorAll(".color-btn").forEach((b) => {
       b.classList.toggle("active", b.dataset.color === color);
@@ -39,8 +37,10 @@
     });
     modal.querySelectorAll(".size-btn").forEach((b) => {
       const stock = getAvailableStock(product, b.dataset.size, color);
-      b.disabled = stock <= 0;
-      b.classList.toggle("disabled", b.disabled);
+      b.disabled = false;
+      b.classList.toggle("disabled", false);
+      b.classList.toggle("is-unavailable", stock <= 0);
+      b.title = stock <= 0 ? "Out of stock — Waiting is available" : "";
       b.classList.toggle("active", b.dataset.size === selectedSize);
       b.setAttribute("aria-pressed", String(b.dataset.size === selectedSize));
     });
@@ -77,16 +77,30 @@
       selectedColor && selectedSize
         ? getAvailableStock(product, selectedSize, selectedColor)
         : 0;
-    $("modalBuyBtn").disabled = qty <= 0;
+    const hasVariant = Boolean(selectedColor && selectedSize);
+    $("modalBuyBtn").disabled = !hasVariant || qty <= 0;
+    const waitingButton = $("modalWaitBtn");
+    if (waitingButton) {
+      const waitingEnabled =
+        window.DartSiteSettings?.get?.().waiting?.enabled !== false;
+      waitingButton.hidden = !(waitingEnabled && hasVariant && qty <= 0);
+      waitingButton.disabled = false;
+      waitingButton.dataset.modelId = product.id;
+      waitingButton.dataset.color = selectedColor || "";
+      waitingButton.dataset.size = selectedSize || "";
+      waitingButton.textContent = "Notify me when available";
+    }
+    const qtyRow = $("modalQtyControl")?.closest(".modal-qty-row");
+    if (qtyRow) qtyRow.hidden = hasVariant && qty <= 0;
     const colorStock = Object.keys(product.stock).reduce(
       (n, size) => n + getAvailableStock(product, size, selectedColor),
       0,
     );
     setProductOptionStatus(
-      colorStock === 0
-        ? "Sold Out — choose another color."
-        : !selectedSize
-          ? "Choose a size for " + selectedColor
+      !selectedSize
+        ? "Choose a size for " + selectedColor
+        : qty <= 0
+          ? `${selectedColor} / ${selectedSize} is out of stock — join Waiting and we will reserve it for you when it returns.`
           : qty <= product.lowStockLimit
             ? `Only ${qty} left in ${selectedColor} / ${selectedSize}`
             : `${selectedColor} / ${selectedSize} selected.`,
