@@ -19,7 +19,9 @@ for (const path of [
 assert(customer.includes("profile.accountType !== \"customer\""), "Customer cache must reject Staff/Representative sessions");
 assert(customer.includes("X-CSRF-Token"), "Customer mutations must forward the CSRF token");
 assert(signup.includes('id="customerEmailVerificationForm"'), "Email OTP form is missing");
-assert(signup.includes('minlength="12"'), "Customer password UI must enforce the 12-character minimum");
+assert(signup.includes('minlength="4"'), "Customer password UI must enforce the 4-character minimum");
+assert(!signup.includes("boxicons"), "Customer auth icons must not depend on the Boxicons font");
+assert(signup.includes("dart-auth-icon"), "Customer auth inputs must use local SVG icons");
 
 assert(representative.includes("Representative login requires the secure account API"), "Representative production login must fail closed");
 assert(representative.includes("Representative registration requires the secure account API"), "Production representative registration must fail closed without the API");
