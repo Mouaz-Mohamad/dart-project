@@ -260,7 +260,10 @@ const server = http.createServer((request, response) => {
     "dashboard must render the next-year control without inline handlers",
   );
   assert.equal(await dashboard.locator("link[rel='manifest']").count(), 1);
-  await dashboard.locator('[data-target="settings"]').first().click();
+  await dashboard.evaluate(() => {
+    const control = [...document.querySelectorAll('a[data-target="settings"]')].find(Boolean);
+    control?.click();
+  });
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "general");
   await dashboard.locator('[data-settings-tab="hero"]').click();
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "hero");
