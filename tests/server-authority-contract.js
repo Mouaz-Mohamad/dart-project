@@ -35,6 +35,7 @@ const dashboardHtml = read("Eye/Dart Eye.html");
 const dashboardRuntime = read("Eye/dart.js");
 const storefrontRuntime = read("Js/dart-ui.js");
 const operationsRuntime = read("Eye/dart-operations.js");
+const ordersApiRuntime = read("Eye/dart-orders-api.js");
 const platformRuntime = read("Js/dart-platform.js");
 const stateRuntime = read("Js/dart-state.js");
 
@@ -82,6 +83,26 @@ assert.match(
   operations,
   /DartOrdersApi\.write/,
   "order operations must route through the orders synchronizer",
+);
+assert.match(
+  ordersApiRuntime,
+  /\/api\/v1\/admin\/orders\/\$\{encodeURIComponent\(orderRef\)\}\/workflow/,
+  "dashboard order workflow changes must use the atomic workflow endpoint",
+);
+assert.match(
+  ordersApiRuntime,
+  /authoritativeEpoch[\s\S]*hasMutationBarrier\(\)[\s\S]*return readLocal\(\)/,
+  "stale order hydration must be blocked while an authoritative mutation is active",
+);
+assert.match(
+  dashboardRuntime,
+  /await window\.DartOrdersApi\.workflow\(order\.orderId \|\| order\.id/,
+  "forward order transitions must wait for server confirmation",
+);
+assert.match(
+  dashboardRuntime,
+  /async function dartRollbackOrderOneStep[\s\S]*await window\.DartOrdersApi\.workflow/,
+  "Back must use the same server-authoritative workflow path",
 );
 assert.match(
   operations,
