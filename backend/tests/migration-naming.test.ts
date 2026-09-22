@@ -3,18 +3,40 @@
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { assertMigrationNamingPolicy } from "../src/database/migrate.js";
 
 describe("migration naming policy", () => {
-  it("allows historical duplicate prefixes but forbids new duplicate prefixes from 0023 onward", () => {
+  it("allows only the known historical duplicate prefixes", () => {
     const names = readdirSync(resolve(process.cwd(), "migrations"))
-      .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name));
-    const counts = new Map<string, number>();
-    for (const name of names) {
-      const prefix = name.slice(0, 4);
-      counts.set(prefix, (counts.get(prefix) || 0) + 1);
-    }
-    const invalid = [...counts.entries()]
-      .filter(([prefix, count]) => Number(prefix) >= 23 && count > 1);
-    expect(invalid).toEqual([]);
+      .filter((name) => name.endsWith(".sql"));
+
+    expect(() => assertMigrationNamingPolicy(names)).not.toThrow();
+  });
+
+  it("rejects a new duplicate prefix even when the number is below the current latest migration", () => {
+    expect(() =>
+      assertMigrationNamingPolicy([
+        "0016_guest_cart_ownership.sql",
+        "0016_new_accidental_duplicate.sql",
+      ]),
+    ).toThrow("Duplicate migration sequence prefixes are not allowed: 0016");
+  });
+
+  it("rejects duplicate prefixes for future migrations", () => {
+    expect(() =>
+      assertMigrationNamingPolicy([
+        "0030_first.sql",
+        "0030_second.sql",
+      ]),
+    ).toThrow("Duplicate migration sequence prefixes are not allowed: 0030");
+  });
+
+  it("rejects malformed SQL migration filenames and sequence 0000", () => {
+    expect(() => assertMigrationNamingPolicy(["30_bad.sql"])).toThrow(
+      "Invalid migration filename",
+    );
+    expect(() => assertMigrationNamingPolicy(["0000_zero.sql"])).toThrow(
+      "Invalid migration sequence prefix: 0000",
+    );
   });
 });
