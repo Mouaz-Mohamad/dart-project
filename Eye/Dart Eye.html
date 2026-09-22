@@ -403,13 +403,8 @@
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
-                    <select data-filter-key="reason">
-                        <option value="">All Reasons</option>
-                        <option value="" disabled selected hidden>Category</option>
+                    <select data-filter-key="category">
                         <option value="all">All Categories</option>
-                        <option value="t-shirts">T-Shirts</option>
-                        <option value="hoodies">Hoodies</option>
-                        <option value="pants">Pants</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -477,12 +472,8 @@
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>Category</option>
+                    <select data-filter-key="category">
                         <option value="all">All Categories</option>
-                        <option value="t-shirts">T-Shirts</option>
-                        <option value="hoodies">Hoodies</option>
-                        <option value="pants">Pants</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -1323,12 +1314,9 @@
                     </div>
                     <div class="form-group">
                         <label for="modal-category">Category</label>
-                        <select id="modal-category" required>
-                            <option value="" disabled selected hidden>Value</option>
-                            <option value="t-shirts">T-Shirts</option>
-                            <option value="hoodies">Hoodies</option>
-                            <option value="pants">Pants</option>
-                        </select>
+                        <input id="modal-category" type="text" list="model-category-options" placeholder="Choose or type a new category" autocomplete="off" required>
+                        <datalist id="model-category-options"></datalist>
+                        <small>Choose an existing category or type a new one. New categories are saved with the model and become available in filters automatically.</small>
                     </div>
                     <div class="form-group">
                         <label for="modal-description">Description</label>
