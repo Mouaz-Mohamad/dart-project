@@ -20,6 +20,7 @@ function token(payloadOverrides: Record<string, unknown> = {}): string {
       exp: Math.floor(Date.now() / 1000) + 300,
       sub: "11111111-1111-4111-8111-111111111111",
       email: "owner@example.com",
+      role: "authenticated",
       is_anonymous: false,
       amr: [{ method: "oauth", timestamp: Date.now() }],
       ...payloadOverrides,
