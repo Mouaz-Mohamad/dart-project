@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const finance = readFileSync(new URL("../../Eye/dart-finance.js", import.meta.url), "utf8");
 const orders = readFileSync(new URL("../../Eye/dart-orders-api.js", import.meta.url), "utf8");
 const domains = readFileSync(new URL("../../Eye/dart-domain-state.js", import.meta.url), "utf8");
-const operations = readFileSync(new URL("../../Eye/dart-operations-v4.js", import.meta.url), "utf8");
+const operations = readFileSync(new URL("../../Eye/dart-operations.js", import.meta.url), "utf8");
 const siteSettings = readFileSync(new URL("../../Js/dart-site-settings.js", import.meta.url), "utf8");
 
 describe("browser polling safety contracts", () => {
