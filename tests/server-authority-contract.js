@@ -16,9 +16,8 @@ function walkJsFiles(root) {
 }
 
 const catalog = read("Js/dart-catalog.js");
-const sizeChart = read("Eye/dart-size-chart-v5.js");
-const fixes = read("Eye/dart-fixes.js");
-const operations = read("Eye/dart-operations-v4.js");
+const sizeChart = read("Eye/dart-size-chart.js");
+const operations = read("Eye/dart-operations.js");
 const serviceWorker = read("sw.js");
 const vercel = read("vercel.json");
 const commerceService = read("backend/src/modules/commerce/commerce.service.ts");
@@ -32,8 +31,8 @@ const catalogRoutes = read("backend/src/modules/catalog/catalog.routes.ts");
 const actionPermissionMigration = read("backend/migrations/0021_action_permissions.sql");
 const dashboardHtml = read("Eye/Dart Eye.html");
 const dashboardRuntime = read("Eye/dart.js");
-const storefrontRuntime = read("Js/one .js");
-const operationsRuntime = read("Eye/dart-operations-v4.js");
+const storefrontRuntime = read("Js/dart-ui.js");
+const operationsRuntime = read("Eye/dart-operations.js");
 const platformRuntime = read("Js/dart-platform.js");
 const stateRuntime = read("Js/dart-state.js");
 
@@ -68,12 +67,12 @@ assert.match(
   "size chart changes must wait for server persistence",
 );
 assert.match(
-  fixes,
+  dashboardRuntime,
   /DartDomainState\.write\(['"]dart_message_queue['"]/,
   "birthday message queue must persist through server domain state",
 );
 assert.match(
-  fixes,
+  dashboardRuntime,
   /DartDomainState\.write\(['"]dart_birthday_messages['"]/,
   "birthday message history must persist through server domain state",
 );
