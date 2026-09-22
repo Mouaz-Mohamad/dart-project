@@ -276,18 +276,19 @@
       const { stops, coordinates } = routeCoordinates(rep);
       if (coordinates.length < 2) continue;
 
-      const road = await roadGeometry(rep, coordinates);
+      const currentStop = stops.find((stop) => stop.routeState === "current") || null;
+      const road = currentStop ? await roadGeometry(rep, coordinates.slice(0, 2)) : null;
       if (road?.length) {
-        const currentState = stops.find((stop) => stop.routeState === "current")?.routeState || "upcoming";
         const layer = window.L.polyline(road, {
-          color: COLORS[currentState],
-          weight: 5,
-          opacity: .78,
+          color: COLORS.current,
+          weight: 6,
+          opacity: .82,
         }).addTo(map);
-        routeLayers.set(`${rep.id}:road`, layer);
-        continue;
+        routeLayers.set(`${rep.id}:road-current`, layer);
       }
 
+      // Keep the full operational route visible with its approved state colors.
+      // The selected representative additionally receives a road-aware current segment above.
       for (let index = 1; index < coordinates.length; index += 1) {
         const target = stops[Math.max(0, index - 1)];
         if (!target) continue;
