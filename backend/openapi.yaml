@@ -76,62 +76,50 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
-  /admin/auth/google/config:
-    get:
-      tags: [Staff Auth]
-      summary: Return public Dart Eye Google/Supabase sign-in configuration
-      description: Returns only public configuration. Never returns a Google client secret or Supabase service-role key.
-      operationId: getStaffGoogleAuthConfig
-      responses:
-        "200":
-          description: Public Google/Supabase sign-in configuration
-  /admin/auth/google/exchange:
+  /admin/auth/email/start:
     post:
       tags: [Staff Auth]
-      summary: Verify a Supabase Google identity and issue the secure Dart Staff session
-      description: The Supabase access token is verified against the configured Dart Supabase project, checked for Google-only identity, matched to the PostgreSQL Staff allowlist, then discarded after a Dart HttpOnly session is created.
-      operationId: exchangeStaffGoogleIdentity
+      summary: Request a six-digit verification code for an allowed dashboard email
+      description: Always returns a generic response when email delivery is configured so callers cannot enumerate the Staff allowlist.
+      operationId: startStaffEmailAccess
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/GoogleIdentityExchange" }
+            schema: { $ref: "#/components/schemas/StaffEmailStart" }
       responses:
-        "200": { $ref: "#/components/responses/Authenticated" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "202": { description: Generic verification challenge response }
         "429": { $ref: "#/components/responses/RateLimited" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /admin/auth/login:
+  /admin/auth/email/resend:
     post:
       tags: [Staff Auth]
-      summary: Create a staff session; TOTP is mandatory after setup
-      operationId: loginStaff
+      summary: Request a replacement verification code for an allowed dashboard email
+      operationId: resendStaffEmailAccess
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffEmailStart" }
+      responses:
+        "202": { description: Generic verification challenge response }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /admin/auth/email/verify:
+    post:
+      tags: [Staff Auth]
+      summary: Verify the one-time email code and issue the secure Dart Staff session
+      operationId: verifyStaffEmailAccess
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffEmailVerify" }
       responses:
         "200": { $ref: "#/components/responses/Authenticated" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-      deprecated: true
-      description: Phase-1 rollback only. Returns 410 when STAFF_LEGACY_AUTH_ENABLED=false.
-  /admin/auth/mfa/setup:
-    post:
-      tags: [Staff Auth]
-      deprecated: true
-      summary: Begin first-time TOTP setup
-      operationId: setupStaffMfa
-      security: [{ sessionCookie: [], csrfToken: [] }]
-      responses:
-        "200": { description: Manual Authenticator secret and otpauth URI }
-        "409": { $ref: "#/components/responses/Conflict" }
-  /admin/auth/mfa/confirm:
-    post:
-      tags: [Staff Auth]
-      deprecated: true
-      summary: Verify the first TOTP and activate staff MFA
-      operationId: confirmStaffMfa
-      security: [{ sessionCookie: [], csrfToken: [] }]
-      responses:
-        "204": { description: MFA activated }
-        "422": { $ref: "#/components/responses/ValidationError" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /representatives/register:
     post:
       tags: [Representative Auth]
@@ -273,7 +261,7 @@ paths:
   /admin/staff:
     get:
       tags: [Staff Auth]
-      summary: List Staff accounts, pending Google allowlist entries and permission catalogue
+      summary: List Staff accounts, pending email access entries and permission catalogue
       operationId: listStaffAccess
       security: [{ sessionCookie: [] }]
       responses:
@@ -282,24 +270,24 @@ paths:
   /admin/staff/allowlist:
     post:
       tags: [Staff Auth]
-      summary: Allow a Staff Gmail for first Google sign-in
-      operationId: allowStaffGoogleEmail
+      summary: Allow a dashboard email and assign Owner or Staff role
+      operationId: allowStaffEmail
       security: [{ sessionCookie: [], csrfToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/StaffGoogleAllowance" }
+            schema: { $ref: "#/components/schemas/StaffEmailAllowance" }
       responses:
-        "201": { description: Staff Gmail added to the PostgreSQL allowlist }
+        "201": { description: Dashboard email added to the PostgreSQL allowlist }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
   /admin/staff/allowlist/{id}:
     delete:
       tags: [Staff Auth]
-      summary: Remove an unclaimed Staff Google allowlist entry
-      operationId: removeStaffGoogleAllowance
+      summary: Remove an unclaimed Staff email access entry
+      operationId: removeStaffEmailAccess
       security: [{ sessionCookie: [], csrfToken: [] }]
       parameters:
         - in: path
@@ -336,20 +324,6 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: Staff sessions revoked }
-  /admin/staff/{id}/google/relink:
-    post:
-      tags: [Staff Auth]
-      summary: Explicitly change a non-Owner Staff Gmail and clear the old Google identity link
-      operationId: relinkStaffGoogleIdentity
-      security: [{ sessionCookie: [], csrfToken: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "204": { description: Google identity link cleared and Gmail updated }
-        "409": { $ref: "#/components/responses/Conflict" }
 
 components:
   securitySchemes:
@@ -379,23 +353,23 @@ components:
         identifier: { type: string }
         password: { type: string, writeOnly: true }
         totp: { type: string, pattern: "^[0-9]{6}$", writeOnly: true }
-    GoogleIdentityExchange:
+    StaffEmailStart:
       type: object
-      required: [accessToken]
+      required: [email]
       properties:
-        accessToken:
-          type: string
-          minLength: 20
-          maxLength: 8192
-          writeOnly: true
-          description: Short-lived Supabase access token produced by Google ID-token sign-in. Never persisted as the Dart session.
-    StaffGoogleAllowance:
+        email: { type: string, format: email, maxLength: 254 }
+    StaffEmailVerify:
       type: object
-      required: [displayName, email]
+      required: [challengeId, code]
       properties:
-        displayName: { type: string, minLength: 3, maxLength: 120 }
-        email: { type: string, format: email }
-        phone: { type: string }
+        challengeId: { type: string, format: uuid }
+        code: { type: string, pattern: "^[0-9]{6}$", writeOnly: true }
+    StaffEmailAllowance:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        role: { type: string, enum: [owner, staff] }
         permissionKeys:
           type: array
           maxItems: 300
