@@ -24,7 +24,7 @@ describe("live operations contracts", () => {
     for (const permission of [
       "live_map.read",
       "live_map.manage",
-      "representatives.location.read",
+      "representative_location.read",
     ]) {
       expect(migration).toContain(permission);
     }
