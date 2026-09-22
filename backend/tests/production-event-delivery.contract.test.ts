@@ -21,8 +21,12 @@ const outboxService = readFileSync(
 );
 
 describe("production event delivery contracts", () => {
-  it("attempts immediate delivery for customer and representative identity events", () => {
-    expect(identityRoutes.match(/outbox\?\.processBatch\(5\)/g)?.length).toBeGreaterThanOrEqual(4);
+  it("attempts immediate delivery for identity events that still require external notification", () => {
+    expect(identityRoutes.match(/outbox\?\.processBatch\(5\)/g)?.length).toBeGreaterThanOrEqual(3);
+    const registerStart = identityRoutes.indexOf('router.post("/auth/register"');
+    const registerEnd = identityRoutes.indexOf('router.post("/auth/verify-email"', registerStart);
+    expect(identityRoutes.slice(registerStart, registerEnd)).not.toContain("processBatch");
+    expect(identityRoutes.slice(registerStart, registerEnd)).not.toContain("verification_required");
   });
 
   it("attempts immediate delivery for checkout and courier workflow events", () => {
