@@ -127,17 +127,23 @@ describe("identity HTTP boundaries", () => {
   it("does not expose retired Google, Staff password or Staff TOTP routes", async () => {
     const application = app(fakeService());
 
-    for (const [method, path, body] of [
-      ["get", "/api/v1/admin/auth/google/config", undefined],
-      ["post", "/api/v1/admin/auth/google/exchange", { accessToken: "x".repeat(40) }],
-      ["post", "/api/v1/admin/auth/login", {
-        identifier: "owner@example.com",
-        password: "StrongPassword123",
-      }],
-      ["post", "/api/v1/admin/auth/mfa/setup", {}],
-      ["post", "/api/v1/admin/auth/mfa/confirm", { token: "123456" }],
-    ]) {
-      const response = await (request(application) as any)[method](path).send(body);
+    const responses = [
+      await request(application).get("/api/v1/admin/auth/google/config"),
+      await request(application)
+        .post("/api/v1/admin/auth/google/exchange")
+        .send({ accessToken: "x".repeat(40) }),
+      await request(application)
+        .post("/api/v1/admin/auth/login")
+        .send({
+          identifier: "owner@example.com",
+          password: "StrongPassword123",
+        }),
+      await request(application).post("/api/v1/admin/auth/mfa/setup").send({}),
+      await request(application)
+        .post("/api/v1/admin/auth/mfa/confirm")
+        .send({ token: "123456" }),
+    ];
+    for (const response of responses) {
       expect(response.status).toBe(404);
       expect(response.body.error.code).toBe("ROUTE_NOT_FOUND");
     }
