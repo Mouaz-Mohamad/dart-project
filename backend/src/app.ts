@@ -19,6 +19,7 @@ import { DashboardStateService } from "./modules/dashboard/dashboard-state.servi
 import { CustomerInteractionService } from "./modules/commerce/customer-interaction.service.js";
 import { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
 import { FinanceService } from "./modules/finance/finance.service.js";
+import { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { OutboxService } from "./modules/outbox/outbox.service.js";
 import { createEmailProvider } from "./modules/outbox/email-provider.js";
 
@@ -27,6 +28,7 @@ export interface DartRuntime {
   config: AppConfig;
   database: ReturnType<typeof createDatabasePool>;
   logger: ReturnType<typeof createLogger>;
+  operationalAlerts: OperationalAlertService;
 }
 
 export function createMisconfiguredApplication(): Express {
@@ -52,6 +54,12 @@ export function createRuntimeApplication(
   const config = loadConfig(source);
   const logger = createLogger(config);
   const database = createDatabasePool(config);
+  const emailProvider = createEmailProvider(config);
+  const operationalAlerts = new OperationalAlertService(
+    emailProvider,
+    config.monitoringAlertEmail,
+    config.monitoringAlertCooldownMs ?? 300_000,
+  );
   const identityService = new IdentityService(database, config);
   const catalogService = new CatalogService(database);
   const catalogAssetService = new CatalogAssetService(database);
@@ -64,11 +72,16 @@ export function createRuntimeApplication(
   const outboxService = new OutboxService(
     database,
     config,
-    createEmailProvider(config),
+    emailProvider,
   );
 
   database.on("error", (error) => {
     logger.error({ err: error }, "Unexpected PostgreSQL pool error");
+    void operationalAlerts
+      .report(error, { source: "database" })
+      .catch((alertError) => {
+        logger.warn({ err: alertError }, "Operational monitoring alert delivery failed");
+      });
   });
 
   const app = createApp(config, {
@@ -86,8 +99,9 @@ export function createRuntimeApplication(
     platformAdminService,
     financeService,
     outboxService,
+    operationalAlerts,
   });
-  return { app, config, database, logger };
+  return { app, config, database, logger, operationalAlerts };
 }
 
 export let runtime: DartRuntime | null = null;
