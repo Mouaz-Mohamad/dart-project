@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-finance.js
+// Finance calculations, filters, charts, goals, marketing, and management UI.
+// BEGIN MODULE
+
 /* ========================================================================== */
 /* DART FINANCE V1 — dashboard finance, goals and server-backed draw eligibility */
 /* Draw eligibility changes use the secure API; winner selection stays server-owned. */
@@ -2049,3 +2053,5 @@
     if (adminAuthenticated && !serverFinanceDenied) scheduleFinanceRefresh(1_000);
   });
 })(typeof window !== "undefined" ? window : globalThis);
+
+// END MODULE
