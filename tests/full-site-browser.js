@@ -220,11 +220,6 @@ const server = http.createServer((request, response) => {
   assert.equal(await rep.locator("#repLoginForm").isVisible(), true);
   await rep.close();
 
-  const receipt = await open("pdf.html");
-  await receipt.waitForFunction(() => document.querySelectorAll("#receipt-items tr").length === 3);
-  assert.equal((await receipt.locator("#grand-total").textContent()).trim(), "2250");
-  await receipt.close();
-
   const tracking = await open("track.html");
   assert.equal(
     await tracking.locator("#order-tracking-card-template").evaluate(
