@@ -1140,8 +1140,23 @@
                 <i class="fa-solid fa-gear" aria-hidden="true"></i>
             </header>
 
-            <div id="settings-content" class="dart-settings-grid">
-                <article id="settings-commerce-card" class="dart-settings-card dart-settings-form-card">
+            <nav class="dart-settings-tabs" aria-label="Settings sections">
+                <button type="button" class="dart-settings-tab is-active" data-settings-tab="general" aria-selected="true">
+                    <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                    <span>General</span>
+                </button>
+                <button type="button" class="dart-settings-tab" data-settings-tab="hero" aria-selected="false">
+                    <i class="fa-solid fa-keyboard" aria-hidden="true"></i>
+                    <span>Hero Words</span>
+                </button>
+                <button id="settings-tab-staff" type="button" class="dart-settings-tab" data-settings-tab="staff" aria-selected="false" hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                    <span>Staff</span>
+                </button>
+            </nav>
+
+            <div id="settings-content" class="dart-settings-grid" data-active-settings-tab="general">
+                <article id="settings-commerce-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-calculator"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>PRICING &amp; FEES</span>
@@ -1159,7 +1174,7 @@
                     </form>
                 </article>
 
-                <article id="settings-site-discount-card" class="dart-settings-card dart-settings-form-card">
+                <article id="settings-site-discount-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-percent"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>STORE PROMOTION</span>
@@ -1175,7 +1190,7 @@
                     </form>
                 </article>
 
-                <article id="settings-media-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-media-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-regular fa-images"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>SITE MEDIA</span>
@@ -1190,7 +1205,7 @@
                     </form>
                 </article>
 
-                <article id="settings-announcements-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-announcements-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-bullhorn"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>UNDER NAV</span>
@@ -1211,7 +1226,7 @@
                     <template id="settings-announcement-row-template"><div class="dart-settings-list-row" data-announcement-row><div><strong data-announcement-field="text"></strong><small data-announcement-field="dates"></small></div><span data-announcement-field="status"></span><button type="button" data-announcement-action="edit">Edit</button><button type="button" data-announcement-action="delete">Delete</button></div></template>
                 </article>
 
-                <article id="settings-typing-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-typing-card" data-settings-group="hero" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-keyboard"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>HERO WORDS</span>
@@ -1230,7 +1245,7 @@
                     <template id="settings-typing-row-template"><div class="dart-settings-typing-row" data-typing-row><label>Scene<input data-typing-field="scene" type="number" min="1" step="1" required></label><label>Hold ms<input data-typing-field="hold" type="number" min="0" step="1" required></label><label>Text<input data-typing-field="text" type="text" maxlength="80" required></label><label>Color<input data-typing-field="color" type="color" required></label><label>Size px<input data-typing-field="size" type="number" min="10" max="120" required></label><label>Weight<input data-typing-field="weight" type="number" min="100" max="900" step="100" required></label><button type="button" data-typing-remove aria-label="Delete word"><i class="fa-solid fa-trash"></i></button></div></template>
                 </article>
 
-                <article id="settings-model-cards-card" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-model-cards-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-shirt"></i></div>
                     <div class="dart-settings-card-copy"><span>PRODUCT CARDS</span><h2>Colors shown per model</h2><p>يتطبق على Home وProducts، بينما نافذة الموديل تظل تعرض كل ألوان التصميم.</p></div>
                     <form id="settings-model-cards-form">
@@ -1240,7 +1255,7 @@
                     <template id="settings-model-card-row-template"><div class="dart-settings-model-row" data-model-card-row><div><strong data-model-field="name"></strong><small data-model-field="code"></small></div><label>Cards<select data-model-field="mode"><option value="all">All colors</option><option value="one">One card</option><option value="two">Two cards</option><option value="count">Custom number</option><option value="custom">Choose colors</option></select></label><label data-model-count-wrap hidden>Number<input data-model-field="count" type="number" min="1" step="1" value="1"></label><div data-model-colors class="dart-settings-color-options"></div></div></template>
                 </article>
 
-                <article id="settings-staff-access-card" class="dart-settings-card dart-settings-form-card dart-settings-wide" hidden>
+                <article id="settings-staff-access-card" data-settings-group="staff" class="dart-settings-card dart-settings-form-card dart-settings-wide" hidden>
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-user-shield"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>STAFF ACCESS</span>
@@ -1272,7 +1287,7 @@
                     </div>
                 </article>
 
-                <article id="settings-reset-card" class="dart-settings-card dart-settings-danger-card">
+                <article id="settings-reset-card" data-settings-group="general" class="dart-settings-card dart-settings-danger-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>Danger Zone</span>

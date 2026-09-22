@@ -2,6 +2,7 @@
   "use strict";
 
   const card = document.getElementById("settings-staff-access-card");
+  const staffTab = document.getElementById("settings-tab-staff");
   const form = document.getElementById("settings-staff-invite-form");
   const emailInput = document.getElementById("settings-staff-email");
   const roleSelect = document.getElementById("settings-staff-role");
@@ -215,9 +216,13 @@
   async function load() {
     if (!can("staff.read") || !window.DartAdminApi?.request) {
       card.hidden = true;
+      if (staffTab) staffTab.hidden = true;
+      window.DartSettingsTabs?.refresh?.();
       return;
     }
     card.hidden = false;
+    if (staffTab) staffTab.hidden = false;
+    window.DartSettingsTabs?.refresh?.();
     try {
       directory = await window.DartAdminApi.request("/api/v1/admin/staff");
       renderInvitePermissions();

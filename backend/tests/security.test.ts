@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret } from "../src/security/crypto.js";
 import { normalizeEgyptianPhone } from "../src/security/normalization.js";
-import { hashPassword, validatePasswordPolicy, verifyPassword } from "../src/security/password.js";
+import {
+  hashPassword,
+  validateCustomerPasswordPolicy,
+  validatePasswordPolicy,
+  verifyPassword,
+} from "../src/security/password.js";
 import { parseSessionToken, serializeSessionToken } from "../src/security/session-token.js";
 
 describe("identity security primitives", () => {
@@ -12,7 +17,9 @@ describe("identity security primitives", () => {
     await expect(verifyPassword(hash, "WrongPassword123")).resolves.toBe(false);
   });
 
-  it("enforces the launch password policy", () => {
+  it("keeps representative passwords strong while allowing 4+ character customer passwords", () => {
+    expect(validateCustomerPasswordPolicy("abc")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("abcd")).toEqual([]);
     expect(validatePasswordPolicy("short")).not.toHaveLength(0);
     expect(validatePasswordPolicy("StrongPassword123")).toEqual([]);
   });

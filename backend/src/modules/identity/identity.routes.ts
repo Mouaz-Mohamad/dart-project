@@ -13,18 +13,23 @@ import type { AccountType, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
+const customerPassword = z.string().min(4).max(200);
 const password = z.string().min(12).max(200);
 const email = z.email().max(254);
 const egyptianPhone = z.string().min(10).max(25);
+const optionalEgyptianPhone = z
+  .union([egyptianPhone, z.literal("")])
+  .optional()
+  .transform((value) => value?.trim() || undefined);
 const uuid = z.uuid();
 
 const registerCustomerSchema = z.object({
   name: z.string().trim().min(3).max(120),
   email,
   phone1: egyptianPhone,
-  phone2: egyptianPhone.optional(),
+  phone2: optionalEgyptianPhone,
   birthday: z.iso.date().optional(),
-  password,
+  password: customerPassword,
 });
 
 const representativeImageDataUrl = z.string().min(100).max(1_500_000).regex(/^data:image\/(?:jpeg|png|webp);base64,/);
@@ -33,7 +38,7 @@ const registerRepresentativeSchema = z.object({
   name: z.string().trim().min(3).max(120),
   email,
   phone1: egyptianPhone,
-  phone2: egyptianPhone.optional(),
+  phone2: optionalEgyptianPhone,
   nationalId: z.string().regex(/^\d{14}$/),
   address: z.string().trim().min(8).max(500),
   password,
@@ -197,7 +202,7 @@ export function createIdentityRouter(
         name: z.string().trim().min(3).max(120),
         email,
         phone1: egyptianPhone,
-        phone2: egyptianPhone.optional(),
+        phone2: optionalEgyptianPhone,
         birthday: z.iso.date().optional(),
       })
       .parse(request.body);
@@ -241,7 +246,7 @@ export function createIdentityRouter(
     requireAccountType("customer", "representative"),
     async (request, response) => {
     const body = z
-      .object({ password, confirmation: password })
+      .object({ password: customerPassword, confirmation: customerPassword })
       .refine((value) => value.password === value.confirmation, {
         path: ["confirmation"],
         message: "Passwords do not match",
