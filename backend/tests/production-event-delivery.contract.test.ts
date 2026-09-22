@@ -31,16 +31,19 @@ describe("production event delivery contracts", () => {
     expect(commerceRoutes.match(/outbox\?\.processBatch\(10\)/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("targets the exact Staff invitation email event", () => {
-    expect(staffManagementRoutes).toContain(
-      "processBatch(1, `staff-onboarding-code:${invitation.challengeId}`)",
+  it("targets the exact Staff email verification event", () => {
+    expect(staffOnboardingRoutes).toContain(
+      "const eventKey = `staff-email-access-code:${result.challengeId}`",
     );
-    expect(staffManagementRoutes).toContain("emailDelivery");
+    expect(staffOnboardingRoutes).toContain("outbox.processBatch(1, eventKey)");
   });
 
-  it("keeps Staff onboarding anti-enumeration generic when delivery fails", () => {
-    expect(staffOnboardingRoutes).toContain("/admin/auth/onboarding/resend");
+  it("keeps Staff email access anti-enumeration generic when delivery fails", () => {
+    expect(staffOnboardingRoutes).toContain("/admin/auth/email/resend");
     expect(staffOnboardingRoutes).toContain("remains queued");
+    expect(staffOnboardingRoutes).toContain(
+      "If this email is allowed, a verification code has been sent.",
+    );
     expect(staffOnboardingRoutes).not.toContain("WHATSAPP_DELIVERY_FAILED");
   });
 
