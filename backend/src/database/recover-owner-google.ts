@@ -84,8 +84,11 @@ export async function recoverOwnerGoogleIdentity(
       );
     }
 
-    const owner = await client.query<{ user_id: string }>(
-      `SELECT s.user_id::text
+    const owner = await client.query<{
+      user_id: string;
+      email_normalized: string;
+    }>(
+      `SELECT s.user_id::text, u.email_normalized
          FROM staff_users s
          JOIN users u ON u.id=s.user_id
         WHERE s.is_owner=true
@@ -145,7 +148,11 @@ export async function recoverOwnerGoogleIdentity(
         [
           userId,
           JSON.stringify({
-            emailHash,
+            oldEmailHash: digest(
+              `staff-google-email:${owner.rows[0].email_normalized}`,
+              config.authPepper,
+            ),
+            newEmailHash: emailHash,
             reason: input.reason,
             mode: "active_owner",
           }),
@@ -155,8 +162,11 @@ export async function recoverOwnerGoogleIdentity(
       return "active_owner";
     }
 
-    const pendingOwner = await client.query<{ id: string }>(
-      `SELECT id::text
+    const pendingOwner = await client.query<{
+      id: string;
+      email_normalized: string;
+    }>(
+      `SELECT id::text, email_normalized
          FROM staff_invitations
         WHERE is_owner=true
           AND status='pending'
@@ -187,7 +197,11 @@ export async function recoverOwnerGoogleIdentity(
       [
         pendingOwner.rows[0].id,
         JSON.stringify({
-          emailHash,
+          oldEmailHash: digest(
+            `staff-google-email:${pendingOwner.rows[0].email_normalized}`,
+            config.authPepper,
+          ),
+          newEmailHash: emailHash,
           reason: input.reason,
           mode: "pending_owner",
         }),

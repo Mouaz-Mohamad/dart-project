@@ -100,7 +100,13 @@ export function createStaffManagementRouter(
       const body = z.object({
         active: z.boolean(),
         reason: z.string().trim().max(500).default(""),
-      }).parse(request.body);
+      }).refine(
+        (value) => value.active || value.reason.length >= 3,
+        {
+          path: ["reason"],
+          message: "A disable reason is required",
+        },
+      ).parse(request.body);
       await service.setStaffAccessStatus(
         request.auth!,
         z.uuid().parse(request.params.id),

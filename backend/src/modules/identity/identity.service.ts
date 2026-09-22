@@ -1786,12 +1786,13 @@ export class IdentityService {
           WHERE id=$1`,
         [staffUserId],
       );
-      await client.query(
+      const revokedSessions = await client.query<{ id: string }>(
         `UPDATE sessions
             SET revoked_at=COALESCE(revoked_at,now()),
                 revoke_reason=COALESCE(revoke_reason,'admin_revoked')
           WHERE user_id=$1
-            AND revoked_at IS NULL`,
+            AND revoked_at IS NULL
+          RETURNING id::text`,
         [staffUserId],
       );
       await this.audit(
@@ -1802,6 +1803,7 @@ export class IdentityService {
         "staff_users",
         staffUserId,
         metadata,
+        { revokedSessionCount: revokedSessions.rowCount || 0 },
       );
       await client.query("COMMIT");
     } catch (error) {
