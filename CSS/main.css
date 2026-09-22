@@ -3625,6 +3625,33 @@ button,
   background: #fff;
   color: #475569;
 }
+.dart-rep-route-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: -2px 0 12px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+.dart-rep-route-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: #2563eb;
+}
+.dart-rep-route-state.dart-route-current { background: #ab012b; }
+.dart-rep-route-state.dart-route-upcoming { background: #2563eb; }
+.dart-rep-route-state.dart-route-waiting { background: #eab308; color: #171717; }
+.dart-rep-route-state.dart-route-problem { background: #ea580c; }
+.dart-rep-route-state.dart-route-delivered { background: #16a34a; }
+.dart-rep-order-actions .rep-btn-wait { background: #eab308; color: #171717; }
+.dart-rep-order-actions .rep-btn-problem { background: #ea580c; color: #fff; }
+
 .dart-rep-proximity {
   margin: 0 0 12px;
   padding: 9px 12px;
