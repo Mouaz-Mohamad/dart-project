@@ -10,13 +10,12 @@
 | `backend/src/database/pool.ts` | اتصال PostgreSQL وفحص الجاهزية |
 | `backend/src/database/migrate.ts` | Migrations مرتبة مع checksum وadvisory lock ومنع التنفيذ خارج الترتيب |
 | `backend/migrations/0001_platform_foundation.sql` | `audit_logs` و`outbox_events` و`idempotency_keys` |
-| `backend/migrations/0002_identity_auth.sql` | حسابات Customer/Staff/Representative والجلسات وEmail OTP وPassword Reset وRBAC وMFA |
+| `backend/migrations/0002_identity_auth.sql` | أساس حسابات Customer/Staff/Representative والجلسات وEmail OTP وPassword Reset وRBAC |
 | `backend/src/database/seed.ts` | Seed تجريبي يتطلب تفعيلًا صريحًا وممنوع في Production |
-| `backend/src/database/bootstrap-owner.ts` | تجهيز هوية الـOwner المحمية ومسار الاستعادة الإداري |
 | `backend/src/modules/health/` | Liveness وReadiness بدون تسريب أخطاء قاعدة البيانات |
 | `backend/src/modules/identity/` | تسجيل العملاء والمندوبين، جلسات Dart، Email OTP، وإدارة دخول وصلاحيات Staff بالبريد |
 | `backend/src/security/` | Argon2id والتشفير والتطبيع وSession/CSRF tokens |
-| `backend/src/middleware/authentication.ts` | التحقق المركزي من الجلسة ونوع الحساب والصلاحية وMFA وCSRF |
+| `backend/src/middleware/authentication.ts` | التحقق المركزي من الجلسة ونوع الحساب والصلاحية وCSRF |
 | `backend/tests/` | اختبارات الإعدادات والصحة والأمان وHTTP Auth والترتيب والـseed واختبارات PostgreSQL المعزولة |
 | `backend/openapi.yaml` | عقد Foundation وIdentity/Auth المنفذ؛ بقية العقود داخل `docs/API_CONTRACT.md` |
 
