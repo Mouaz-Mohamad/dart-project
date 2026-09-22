@@ -9,10 +9,6 @@ const commerceRoutes = readFileSync(
   new URL("../src/modules/commerce/commerce.routes.ts", import.meta.url),
   "utf8",
 );
-const staffManagementRoutes = readFileSync(
-  new URL("../src/modules/identity/staff-management.routes.ts", import.meta.url),
-  "utf8",
-);
 const staffOnboardingRoutes = readFileSync(
   new URL("../src/modules/identity/staff-onboarding.routes.ts", import.meta.url),
   "utf8",
