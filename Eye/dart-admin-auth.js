@@ -1,3 +1,7 @@
+// DART EYE | MODULE: dart-admin-auth.js
+// Dart Eye Staff email verification, secure session bootstrap, and auth gate UI.
+// BEGIN MODULE
+
 // Production activation marker: simplified Staff email access + post-launch UI/customer fixes (frontend publish).
 (function () {
   "use strict";
@@ -385,3 +389,5 @@
     }
   })();
 })();
+
+// END MODULE
