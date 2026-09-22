@@ -19,19 +19,11 @@ const authConfig: Pick<
   | "sessionTtlDays"
   | "emailOtpTtlMinutes"
   | "mfaEncryptionKey"
-  | "staffInviteOtpTtlHours"
-  | "corsOrigins"
-  | "ownerBootstrapEmail"
-  | "ownerBootstrapName"
 > = {
   authPepper: "integration-test-auth-pepper-32-characters-long",
   sessionTtlDays: 30,
   emailOtpTtlMinutes: 10,
   mfaEncryptionKey: Buffer.alloc(32, 4),
-  staffInviteOtpTtlHours: 48,
-  corsOrigins: ["https://dart.example"],
-  ownerBootstrapEmail: "bootstrap-owner@example.com",
-  ownerBootstrapName: "Bootstrap Owner",
 };
 
 const requestMetadata = {
