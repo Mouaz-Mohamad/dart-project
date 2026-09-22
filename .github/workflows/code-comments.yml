@@ -1,3 +1,5 @@
+# DART CODE GUIDE | .github/workflows/code-comments.yml
+# الغرض: توليد التعليقات العربية القصيرة ودليل الملفات على فرع التنظيف.
 name: Add Arabic code guides
 
 on:

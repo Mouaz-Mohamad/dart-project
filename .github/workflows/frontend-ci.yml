@@ -1,3 +1,5 @@
+# DART CODE GUIDE | .github/workflows/frontend-ci.yml
+# الغرض: فحص JavaScript واختبارات العقود وChromium smoke للموقع والداشبورد.
 name: Frontend CI
 
 on:

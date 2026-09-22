@@ -1,3 +1,5 @@
+# DART CODE GUIDE | .github/workflows/batch-policy.yml
+# الغرض: ضبط سياسة دفعات النشر لمنع تغييرات Production العشوائية.
 name: Production batch policy
 
 on:

@@ -1,3 +1,5 @@
+# DART CODE GUIDE | .github/workflows/backend-ci.yml
+# الغرض: تشغيل lint وtypecheck واختبارات Backend وPostgreSQL قبل اعتبار التغيير صالحًا.
 name: Backend CI
 
 on:

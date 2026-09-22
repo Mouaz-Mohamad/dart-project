@@ -1,3 +1,5 @@
+# DART CODE GUIDE | .github/dependabot.yml
+# الغرض: متابعة تحديثات الاعتمادات تلقائيًا مع إبقاء المراجعة والدمج تحت التحكم.
 version: 2
 updates:
   - package-ecosystem: "npm"
