@@ -60,11 +60,6 @@ let selectedSize = null;
 let selectedColor = null;
 let activeProduct = null;
 let modalQuantity = 1;
-let modalCarouselIndex = 0;
-
-
-
-
 // ==========================================
 // 2. الدوال المساعدة الأساسية
 // ==========================================
@@ -580,43 +575,9 @@ function openProductModal(product) {
 // Product modal carousel state synchronization
 // ==========================================
 
-function updateCarouselPosition(track) {
-    window.DartStorefront?.onSlide();
-    const modal = document.getElementById('SectionModel');
-    track.style.transform = `translateX(-${modalCarouselIndex * 100}%)`;
-
-    modal.querySelectorAll('.carousel-dot').forEach((dot, i) => {
-        dot.classList.toggle('active', i === modalCarouselIndex);
-    });
-}
-
 // ==========================================
 // عداد الكمية داخل المودال (قبل الإضافة للسلة)
 // ==========================================
-
-function updateModalQtyMax(product) {
-    const modal = document.getElementById('SectionModel');
-    const decreaseBtn = modal.querySelector('#modalQtyDecrease');
-    const increaseBtn = modal.querySelector('#modalQtyIncrease');
-    const valueEl = modal.querySelector('#modalQtyValue');
-
-    if (!decreaseBtn || !increaseBtn || !valueEl) return;
-
-    const maxQty = (selectedSize && selectedColor)
-        ? getAvailableStock(product, selectedSize, selectedColor)
-        : 0;
-
-    if (modalQuantity > maxQty && maxQty > 0) {
-        modalQuantity = maxQty;
-    }
-    if (maxQty === 0) {
-        modalQuantity = 1;
-    }
-
-    valueEl.textContent = modalQuantity;
-    decreaseBtn.classList.toggle('disabled-btn', modalQuantity <= 1);
-    increaseBtn.classList.toggle('disabled-btn', modalQuantity >= maxQty);
-}
 
 // ==========================================
 // 4. دوال السلة، الخصم، وإتمام الطلب
