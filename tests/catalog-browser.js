@@ -26,7 +26,7 @@ const server=http.createServer((q,r)=>{
  assert.equal(await page.locator('.dashboard-section.active-section').getAttribute('id'),'brand');
  await page.evaluate(()=>{window.firstRef=document.querySelector('#items .first');window.secondRef=document.querySelector('#items .second');});
  await page.locator('[data-target="models"]').first().click();await page.locator('#models .add-btn').click();
- await page.locator('#modal-id').fill('#1');await page.locator('#modal-name').fill('Dart Hoodie');await page.locator('#modal-category').selectOption('hoodies');await page.locator('#modal-description').fill('Cotton hoodie');await page.locator('#modal-cost').fill('400');
+ await page.locator('#modal-id').fill('#1');await page.locator('#modal-name').fill('Dart Hoodie');await page.locator('#modal-category').fill('Overshirts');await page.locator('#modal-description').fill('Cotton hoodie');await page.locator('#modal-cost').fill('400');
  assert.equal(Number(await page.locator('#modal-selling').inputValue()),600);
  await page.locator('#modal-selling').fill('700');await page.locator('#modal-discount').fill('20');
  assert.equal(await page.locator('#modal-final-price').textContent(),'560 EGP');
@@ -37,7 +37,7 @@ const server=http.createServer((q,r)=>{
  await page.locator('[data-upload-color="1"]').setInputFiles(path.join(root,'Photos/products/2.jpg'));
  await page.waitForFunction(()=>document.querySelectorAll('#model-color-editors figure').length===3);
  await page.locator('#btn-submit-modal').click();
- assert.equal(await page.evaluate(()=>modelsData.length),1);
+ assert.equal(await page.evaluate(()=>modelsData.length),1);assert.equal(await page.evaluate(()=>modelsData[0].category),'Overshirts');
  assert.equal(await page.locator('.dart-size-chart-btn').count(),1);
  await page.locator('[data-target="items"]').first().click();
  async function addItem(code,color,size){await page.locator('#items .add-btn').click();await page.locator('#modal-item-model-id').fill('#1');await page.locator('#modal-item-code-pic').fill(code);await page.locator('#modal-item-color').selectOption(color);await page.locator('#modal-item-size').selectOption(size);await page.locator('#item-add-form button[type="submit"]').click();}
@@ -66,7 +66,7 @@ const server=http.createServer((q,r)=>{
  await page.screenshot({path:path.join(root,'tests/dashboard-mobile.png')});
  const shop=await context.newPage();shop.on('dialog',d=>d.accept());await shop.goto(origin+'/products.html');
  const cards=shop.locator('#productsPart1 .product-card[data-id],#productsPart2 .product-card[data-id]');
- await shop.waitForFunction(()=>document.getElementById('productResultsCount')?.textContent==='2 products');assert.equal(await cards.count(),2);
+ await shop.waitForFunction(()=>document.getElementById('productResultsCount')?.textContent==='2 products');assert.equal(await cards.count(),2);assert.equal(await shop.locator('#filterContainer .filter-btn[data-category="Overshirts"]').count(),1);
  assert.equal(await shop.locator('#productsPart1 .product-card[data-color="Beige"]').count(),0);
  await shop.locator('#productsPart1 .product-card[data-color="White"]').click();
  await shop.waitForFunction(()=>selectedColor==='White' && document.getElementById('SectionModel').style.display==='flex');

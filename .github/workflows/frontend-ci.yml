@@ -52,6 +52,7 @@ jobs:
           node tests/auth-contract.js
           node tests/security-boundaries.cjs
           node tests/performance-budget.cjs
+          node tests/catalog-category-contract.js
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js
           node tests/server-authority-contract.js
