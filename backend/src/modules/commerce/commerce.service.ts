@@ -2544,7 +2544,7 @@ export class CommerceService {
       `SELECT 1
          FROM orders
         WHERE representative_user_id=$1
-          AND status='Representative On The Way'
+          AND status IN ('Out With Representative','Representative On The Way')
           AND NOT is_deleted
           AND NOT is_archived
         LIMIT 1`,
