@@ -1,3 +1,7 @@
+// DART | MODULE: dart-returns.js
+// Customer return/exchange rules, pricing, states, and helpers.
+// BEGIN MODULE
+
 /* ========================================================================== */
 /* DART RETURNS — shared, backend-ready return and exchange business rules     */
 /* The production API must run the same rules transactionally on the server.  */
@@ -499,3 +503,6 @@
   root.DartReturns = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
+
+
+// END MODULE
