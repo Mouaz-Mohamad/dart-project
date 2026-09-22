@@ -4,7 +4,7 @@ name: Frontend CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, full-code-cleanup]
     paths:
       - "*.html"
       - "Eye/**"
