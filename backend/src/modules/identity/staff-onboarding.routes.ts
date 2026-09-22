@@ -72,26 +72,18 @@ export function createStaffOnboardingRouter(
       try {
         const delivery = await outbox.processBatch(1, eventKey);
         if (delivery.published !== 1) {
-          logger?.warn({ eventKey }, "Staff access email is queued for retry");
-          throw new AppError(
-            503,
-            "EMAIL_DELIVERY_UNAVAILABLE",
-            "Dart could not send the verification email. Please try again shortly.",
+          logger?.warn(
+            { eventKey },
+            "Staff access email was not delivered immediately and remains queued",
           );
         }
       } catch (error) {
-        if (error instanceof AppError) throw error;
         logger?.warn(
           {
             eventKey,
             errorName: error instanceof Error ? error.name : "Error",
           },
           "Staff access email dispatch failed and remains queued",
-        );
-        throw new AppError(
-          503,
-          "EMAIL_DELIVERY_UNAVAILABLE",
-          "Dart could not send the verification email. Please try again shortly.",
         );
       }
     }
