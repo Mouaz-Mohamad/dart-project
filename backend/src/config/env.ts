@@ -39,9 +39,6 @@ const environmentSchema = z.object({
   SESSION_COOKIE_SAME_SITE: z.enum(["strict", "lax", "none"]).default("strict"),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().min(3).max(30).default(10),
-  STAFF_INVITE_OTP_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(48),
-  DART_OWNER_EMAIL: z.email().or(z.literal("")).default(""),
-  DART_OWNER_NAME: z.string().trim().min(3).max(120).default("Dart Owner"),
   MFA_ENCRYPTION_KEY: z
     .string()
     .default("ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyYnl0ZSE="),
@@ -82,9 +79,6 @@ export interface AppConfig {
   sessionCookieSameSite: "strict" | "lax" | "none";
   sessionTtlDays: number;
   emailOtpTtlMinutes: number;
-  staffInviteOtpTtlHours: number;
-  ownerBootstrapEmail?: string | null;
-  ownerBootstrapName?: string;
   mfaEncryptionKey: Buffer;
   emailProvider: "disabled" | "smtp";
   smtpHost: string | null;
@@ -174,9 +168,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     sessionCookieSameSite: parsed.data.SESSION_COOKIE_SAME_SITE,
     sessionTtlDays: parsed.data.SESSION_TTL_DAYS,
     emailOtpTtlMinutes: parsed.data.EMAIL_OTP_TTL_MINUTES,
-    staffInviteOtpTtlHours: parsed.data.STAFF_INVITE_OTP_TTL_HOURS,
-    ownerBootstrapEmail: parsed.data.DART_OWNER_EMAIL || null,
-    ownerBootstrapName: parsed.data.DART_OWNER_NAME,
     mfaEncryptionKey,
     emailProvider: parsed.data.EMAIL_PROVIDER,
     smtpHost: parsed.data.SMTP_HOST || null,
