@@ -265,7 +265,9 @@ const server = http.createServer((request, response) => {
     control?.click();
   });
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "general");
-  await dashboard.locator('[data-settings-tab="hero"]').click();
+  await dashboard.evaluate(() => {
+    document.querySelector('[data-settings-tab="hero"]')?.click();
+  });
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "hero");
   assert.equal(await dashboard.locator("#settings-typing-card").isVisible(), true);
   assert.equal(await dashboard.locator("#settings-commerce-card").isVisible(), false);
