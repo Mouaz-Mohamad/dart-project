@@ -12,9 +12,8 @@ const requirePattern = (source, pattern, message) => {
 };
 
 const platform = read("Js/dart-platform.js");
-const checkout = read("Js/one .js");
+const checkout = read("Js/dart-ui.js");
 const dashboard = read("Eye/dart.js");
-const dashboardFixes = read("Eye/dart-fixes.js");
 const representativePortal = read("Js/dart-rep.js");
 const commerceService = read("backend/src/modules/commerce/commerce.service.ts");
 const dashboardHtml = read("Eye/Dart Eye.html");
@@ -49,8 +48,8 @@ requireText(platform, 'reward.status = new Date() < new Date(reward.expiresAt)',
 // Dashboard birthday message queue remains visible and rolls over at 8 PM.
 requireText(dashboard, "const targetOffset = cairo.hour >= 20 ? 1 : 0", "Birthday queue must roll over at 8 PM Cairo while staying visible.");
 requireText(dashboard, 'row.birthdayDate === key', "Birthday send history must be scoped to the target date.");
-requireText(dashboardFixes, "DartDomainState.write('dart_birthday_messages', history)", "Queued birthday clients must be recorded through server-backed state and removed from the widget.");
-requireText(dashboardFixes, "renderBirthdayWidget();", "Birthday widget must refresh immediately after queueing.");
+requireText(dashboard, "DartDomainState.write('dart_birthday_messages', history)", "Queued birthday clients must be recorded through server-backed state and removed from the widget.");
+requireText(dashboard, "renderBirthdayWidget();", "Birthday widget must refresh immediately after queueing.");
 
 // Requested dashboard controls.
 for (const id of [
