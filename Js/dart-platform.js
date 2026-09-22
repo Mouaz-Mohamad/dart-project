@@ -689,9 +689,15 @@
   }
 
   async function register(payload) {
+    const cleanPayload = {
+      ...payload,
+      phone2: String(payload.phone2 || "").trim() || undefined,
+      birthday: String(payload.birthday || "").trim() || undefined,
+    };
     if (API_BASE) {
-      return apiRequest("/api/v1/auth/register", { method: "POST", body: payload });
+      return apiRequest("/api/v1/auth/register", { method: "POST", body: cleanPayload });
     }
+    payload = cleanPayload;
     if (API_REQUIRED)
       throw new Error("تعذر إنشاء الحساب لأن خدمة الحسابات غير مهيأة.");
     const users = read(KEYS.users, []);
@@ -706,8 +712,8 @@
       throw new Error("رقم الهاتف المصري غير صحيح.");
     if (phone2 && !/^\+201[0125]\d{8}$/.test(phone2))
       throw new Error("رقم الهاتف الثاني غير صحيح.");
-    if (String(payload.password || "").length < 12)
-      throw new Error("كلمة المرور يجب ألا تقل عن 12 حرفًا.");
+    if (String(payload.password || "").length < 4)
+      throw new Error("كلمة المرور يجب ألا تقل عن 4 أحرف.");
     const conflict = identityConflict({ email, phone1, phone2 });
     if (conflict) throw new Error(conflict);
     const customerId = nextCode("DA", read(KEYS.customers, []), "clientId");
@@ -823,8 +829,8 @@
     }
     const user = currentUser();
     if (!user) throw new Error("Your login session has expired.");
-    if (String(password || "").length < 12)
-      throw new Error("Password must be at least 12 characters.");
+    if (String(password || "").length < 4)
+      throw new Error("Password must be at least 4 characters.");
     if (password !== confirmation) throw new Error("Passwords do not match.");
     const users = read(KEYS.users, []),
       stored = users.find((row) => row.id === user.id);
