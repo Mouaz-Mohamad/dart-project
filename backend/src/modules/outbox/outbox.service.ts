@@ -262,6 +262,10 @@ export class OutboxService {
         prefix: "email-change-verification:",
         table: "email_verification_challenges",
       },
+      PASSWORD_RESET_CODE_REQUESTED: {
+        prefix: "password-reset-code:",
+        table: "password_reset_requests",
+      },
     };
     const source = challengeSources[row.event_type];
     if (!source) return true;

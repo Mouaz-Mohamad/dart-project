@@ -186,9 +186,71 @@ export function createIdentityRouter(
         accountType: z.enum(["customer", "representative"]).default("customer"),
       })
       .parse(request.body);
-    await service.requestPasswordReset(body.accountType, body.identifier, metadata(request));
-    response.status(202).json({ message: "If the account exists, the request has been recorded" });
+    const result = await service.requestPasswordReset(
+      body.accountType,
+      body.identifier,
+      metadata(request),
+    );
+    await outbox?.processBatch(5).catch(() => undefined);
+    response.status(202).json({
+      message: "If the account exists, a verification code has been sent to its registered email",
+      challengeId: result.challengeId,
+      expiresAt: result.expiresAt.toISOString(),
+    });
   });
+
+  router.post("/auth/reset-password", authLimiter(), async (request, response) => {
+    const body = z
+      .object({
+        challengeId: uuid,
+        code: z.string().regex(/^\d{6}$/),
+        password: customerPassword,
+        confirmation: customerPassword,
+      })
+      .refine((value) => value.password === value.confirmation, {
+        path: ["confirmation"],
+        message: "Passwords do not match",
+      })
+      .parse(request.body);
+    await service.resetPasswordWithOtp(
+      body.challengeId,
+      body.code,
+      body.password,
+      metadata(request),
+    );
+    response.status(200).json({ message: "Password changed successfully. Sign in with the new password." });
+  });
+
+  router.post(
+    "/auth/change-password",
+    signedIn,
+    csrf,
+    requireAccountType("customer"),
+    async (request, response) => {
+      const body = z
+        .object({
+          currentPassword: z.string().min(1).max(200),
+          password: customerPassword,
+          confirmation: customerPassword,
+        })
+        .refine((value) => value.password === value.confirmation, {
+          path: ["confirmation"],
+          message: "Passwords do not match",
+        })
+        .parse(request.body);
+      const session = await service.changeCustomerPassword(
+        request.auth!,
+        body.currentPassword,
+        body.password,
+        metadata(request),
+      );
+      setSessionCookies(response, config, session);
+      response.status(200).json({
+        user: await service.profile(session.account),
+        csrfToken: session.csrfToken,
+      });
+    },
+  );
 
   router.get("/me", signedIn, async (request, response) => {
     response.status(200).json({

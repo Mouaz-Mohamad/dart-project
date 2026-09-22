@@ -51,14 +51,24 @@
 
   function currentOrder() { return currentOrders()[0] || null; }
 
+  function allTrackableReturns() {
+    return read("dart_returns", []).filter(
+      (record) => !record.isDeleted && !record.isArchived && record.isPostDeliveryReturn,
+    );
+  }
+
   function activeReturns() {
-    return read("dart_returns", []).filter((record) => !record.isDeleted && !record.isArchived && record.isPostDeliveryReturn && record.status !== "Completed");
+    return allTrackableReturns().filter(
+      (record) => !["Completed", "Rejected"].includes(String(record.status || "")),
+    );
   }
 
   function currentReturns() {
-    const records = activeReturns();
+    const active = activeReturns();
+    const all = allTrackableReturns();
     const requested = new URLSearchParams(location.search).get("return");
     const lastId = sessionStorage.getItem("dart_last_return_id");
+    const records = requested || lastId ? all : active;
     const user = window.DartPlatform?.currentUser?.();
     if (requested) {
       const exact = records.find((record) => String(record.returnId) === String(requested) || String(record.id) === String(requested));
@@ -66,13 +76,17 @@
       const group = (window.DartGroups?.groupReturns?.(records) || []).find((entry) => entry.records.includes(exact));
       return group?.records || [exact];
     }
-    const own = user?.customerId ? records.filter((record) => String(record.clientId) === String(user.customerId)) : [];
-    if (own.length) return own.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     if (lastId) {
-      const exact = records.find((record) => String(record.returnId) === String(lastId) || String(record.id) === String(lastId));
-      return exact ? [exact] : [];
+      const exact = all.find((record) => String(record.returnId) === String(lastId) || String(record.id) === String(lastId));
+      if (exact) {
+        const group = (window.DartGroups?.groupReturns?.(all) || []).find((entry) => entry.records.includes(exact));
+        return group?.records || [exact];
+      }
     }
-    return [];
+    const own = user?.customerId
+      ? active.filter((record) => String(record.clientId) === String(user.customerId))
+      : [];
+    return own.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   }
 
   function markerIcon(type) {
@@ -205,7 +219,10 @@
   function publicReturnState(record) {
     const value = window.DartReturns?.publicStatus(record) || "Under Review";
     if (value === "Rejected") return { label: "مرفوض", index: 1, rejected: true };
-    if (value === "Approved") return { label: "تمت الموافقة", index: 1, rejected: false };
+    if (value === "Return Received") return { label: "تم استلام المرتجع", index: 3, rejected: false };
+    if (value === "Representative On The Way")
+      return { label: "المندوب في الطريق", index: 2, rejected: false };
+    if (value === "Approved") return { label: "تم قبول الطلب", index: 1, rejected: false };
     return { label: "جاري المراجعة", index: 0, rejected: false };
   }
 
@@ -255,7 +272,7 @@
         if (unit) details.appendChild(unit);
       });
       card.querySelectorAll("[data-return-step]").forEach((step, index) => { step.classList.toggle("active", index <= minimum); step.querySelector(".circle").textContent = index < minimum ? "✓" : String(index + 1); });
-      card.querySelector("[data-return-progress]").style.width = `${minimum * 50}%`;
+      card.querySelector("[data-return-progress]").style.width = `${minimum * (100 / 3)}%`;
       card.querySelector('[data-return-field="representative"]').textContent = first.representativeName || "لم يتم تعيين مندوب بعد";
       card.querySelector('[data-return-field="representativeMeta"]').textContent = first.representativeBusinessId ? `رقم المندوب: ${first.representativeBusinessId}` : "بانتظار الموافقة والتعيين";
       const call = card.querySelector("[data-return-call]"); call.hidden = !first.representativePhone; call.href = call.hidden ? "#" : `tel:${first.representativePhone}`;

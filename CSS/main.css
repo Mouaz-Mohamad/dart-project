@@ -4231,3 +4231,13 @@ button,
     overflow: hidden;
     background: #f5f5f5;
 }
+
+
+/* BEGIN Dart account security */
+.dart-account-security{align-items:center;gap:12px;flex-wrap:wrap}
+.dart-profile-security-btn{border:0;border-radius:12px;background:#ab012b;color:#fff;padding:10px 16px;font-weight:700;cursor:pointer}
+.dart-profile-password-form{display:grid;gap:12px;width:100%;padding:16px;border:1px solid rgba(171,1,43,.16);border-radius:16px;background:rgba(255,255,255,.72)}
+.dart-profile-password-form[hidden]{display:none}
+.dart-profile-password-form label{display:grid;gap:6px;font-weight:600}
+.dart-profile-password-form input{width:100%;min-height:44px;border:1px solid rgba(0,0,0,.15);border-radius:10px;padding:9px 12px;background:#fff}
+/* END Dart account security */

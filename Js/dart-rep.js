@@ -619,7 +619,7 @@
       const values = {
         title: `${record.requestType || "Return"} #${record.returnId || record.id}`,
         date: `${record.date || ""}`,
-        status: record.status || "-",
+        status: window.DartReturns?.publicStatus?.(record) || record.status || "-",
         customer: record.clientName || record.clientId || "Customer",
         phones: [record.phone1, record.phone2].filter((phone) => phone && phone !== "-").join(" · ") || "-",
         address: fullAddress(record) || "Address missing",
@@ -640,7 +640,7 @@
       call.href = record.phone1 ? `tel:${record.phone1}` : "#";
       call.hidden = !record.phone1;
       card.querySelector('[data-return-action="start"]').hidden = started;
-      card.querySelector('[data-return-action="cancel"]').hidden = !started;
+      card.querySelector('[data-return-action="cancel"]').hidden = false;
       card.querySelector('[data-return-action="complete"]').hidden = !started || !proximity.ok;
       card.querySelector('[data-return-field="proximity"]').classList.toggle("is-ready", proximity.ok);
       list.appendChild(fragment);
@@ -974,21 +974,27 @@
       await refreshApiWork();
       return (apiWork.returns || []).find((row) => String(row.id) === String(record.id)) || {
         ...record,
-        status: "Representative Assigned",
+        status: "Approved - Awaiting Representative",
       };
     }
     const { rep, records, record } = assignedReturn(recordId);
-    if (record.status !== "Pickup On The Way")
-      throw new Error("This pickup is not currently active.");
+    if (!["Representative Assigned", "Pickup On The Way"].includes(record.status))
+      throw new Error("This pickup cannot be cancelled in its current status.");
     const previous = record.status;
-    record.status = "Representative Assigned";
+    record.status = "Approved - Awaiting Representative";
     record.pickupStartedAt = null;
     record.courierLocation = null;
     record.lastFailedPickupAt = now();
     record.failedPickupAttempts = Number(record.failedPickupAttempts || 0) + 1;
+    record.representativeId = "";
+    record.representativeBusinessId = "";
+    record.representativeName = "";
+    record.representativePhone = "";
+    record.pickupGroupId = "";
+    record.assignedAt = null;
     record.updatedAt = record.lastFailedPickupAt;
     activeReturnIds.delete(record.id);
-    addReturnActivity(record, previous, record.status, "RETURN_PICKUP_FAILED", rep);
+    addReturnActivity(record, previous, record.status, "RETURN_PICKUP_CANCELLED", rep);
     write(KEYS.returns, records);
     saveActiveIds();
     audit("RETURN_PICKUP_FAILED", rep.id, { returnId: record.returnId });
@@ -1357,58 +1363,14 @@
       changeForm.reset();
       renderOrders();
     });
-    document.getElementById("repForgotPassword").onclick = async () => {
-      const identifier = prompt(
-        "Enter your phone, email, Rep ID or National ID:",
-      );
-      if (!identifier) return;
-      if (API_ENABLED) {
-        await window.DartApi.request("/api/v1/auth/forgot-password", {
-          method: "POST",
-          body: { identifier, accountType: "representative" },
-        });
-        alert(
-          "If the account exists, a reset request is now waiting for dashboard review.",
-        );
+    document.getElementById("repForgotPassword").onclick = () => {
+      const identifier =
+        document.getElementById("repLoginForm")?.elements?.identifier?.value || "";
+      if (!window.DartPlatform?.openPasswordReset) {
+        alert("Password recovery is unavailable until the secure account service loads.");
         return;
       }
-      const reps = read(KEYS.reps, []),
-        rep = reps.find(
-          (row) =>
-            normalizeEmail(row.email) === normalizeEmail(identifier) ||
-            phoneDigits(row.phone1) === phoneDigits(identifier) ||
-            String(row.repId).toLowerCase() ===
-              String(identifier).toLowerCase() ||
-            String(row.nationalId) === String(identifier),
-        );
-      const requests = read(KEYS.passwordRequests, []);
-      if (
-        rep &&
-        !requests.some(
-          (row) => row.status === "Pending" && row.accountId === rep.id,
-        )
-      ) {
-        requests.unshift({
-          id: uid("PWR"),
-          accountType: "Representative",
-          accountId: rep.id,
-          identifier,
-          displayName: rep.name,
-          status: "Pending",
-          createdAt: now(),
-          source: "Representative Portal",
-        });
-        write(KEYS.passwordRequests, requests);
-        notify(
-          "password_reset",
-          "Representative password reset request",
-          `${rep.repId} requested a temporary password.`,
-          rep.id,
-        );
-      }
-      alert(
-        "If the account exists, a reset request is now waiting for dashboard review.",
-      );
+      window.DartPlatform.openPasswordReset("representative", identifier);
     };
     document.getElementById("repLogout").onclick = async () => {
       const rep = currentRep();

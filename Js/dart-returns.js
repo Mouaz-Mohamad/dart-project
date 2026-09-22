@@ -157,8 +157,9 @@
   function publicStatus(record) {
     const status = String(record?.status || "");
     if (status === FLOW.REJECTED) return "Rejected";
-    if (isCompleted(record)) return "Return Completed";
-    if ([FLOW.APPROVED, FLOW.ASSIGNED, FLOW.ON_THE_WAY, "Pending Inspection"].includes(status)) {
+    if (isCompleted(record)) return "Return Received";
+    if (status === FLOW.ON_THE_WAY) return "Representative On The Way";
+    if ([FLOW.APPROVED, FLOW.ASSIGNED, "Pending Inspection"].includes(status)) {
       return "Approved";
     }
     return "Under Review";
@@ -259,11 +260,11 @@
     if (!record) return false;
     const status = String(record.status || "");
     const inspected = inspectionStatus(record) !== INSPECTION.PENDING;
+    if (isCompleted(record)) return false;
     return inspected || [
       FLOW.APPROVED,
       FLOW.ASSIGNED,
       FLOW.ON_THE_WAY,
-      FLOW.COMPLETED,
       FLOW.REJECTED,
       "Good",
       "Damaged",

@@ -2285,51 +2285,310 @@ export class IdentityService {
 
 
   public async requestPasswordReset(
-    accountType: AccountType,
+    accountType: "customer" | "representative",
     identifier: string,
     metadata: RequestMetadata,
-  ): Promise<void> {
+  ): Promise<{ challengeId: string; expiresAt: Date }> {
     const user = await this.findLogin(accountType, identifier);
-    const identifierHash = digest(`reset-identifier:${normalizeIdentifier(identifier)}`, this.config.authPepper);
-    if (user) {
-      const existing = await this.pool.query<{ id: string }>(
-        `SELECT id::text
-           FROM password_reset_requests
-          WHERE user_id=$1
-            AND account_type=$2
-            AND status='pending'
-          ORDER BY requested_at DESC
-          LIMIT 1`,
-        [user.id, accountType],
-      );
-      if (existing.rows[0]) return;
-    }
-    const result = await this.pool.query<{ id: string }>(
-      `INSERT INTO password_reset_requests (user_id, account_type, identifier_hash)
-       VALUES ($1, $2, $3) RETURNING id`,
-      [user?.id ?? null, accountType, identifierHash],
+    const challengeId = randomUUID();
+    const expiresAt = new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000);
+    const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const identifierHash = digest(
+      `reset-identifier:${normalizeIdentifier(identifier)}`,
+      this.config.authPepper,
     );
-    if (user) {
-      await this.writeAudit(
-        {
-          userId: user.id,
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      if (user) {
+        await client.query(
+          `UPDATE password_reset_requests
+              SET status='expired', consumed_at=COALESCE(consumed_at, now())
+            WHERE user_id=$1
+              AND account_type=$2
+              AND status='pending'
+              AND code_hash IS NOT NULL`,
+          [user.id, accountType],
+        );
+      }
+      const codeHash = user
+        ? digest(`password-reset:${challengeId}:${otp}`, this.config.authPepper)
+        : null;
+      await client.query(
+        `INSERT INTO password_reset_requests (
+           id, user_id, account_type, identifier_hash,
+           code_hash, attempts_remaining, expires_at
+         ) VALUES ($1,$2,$3,$4,$5,5,$6)`,
+        [
+          challengeId,
+          user?.id ?? null,
           accountType,
-          status: user.status,
-          email: user.email,
-          emailVerified: Boolean(user.email_verified_at),
-          mustChangePassword: user.must_change_password,
-          sessionId: result.rows[0]!.id,
-          sessionFamilyId: result.rows[0]!.id,
-          csrfTokenHash: "",
-          mfaRequired: Boolean(user.mfa_required),
-          mfaSatisfied: false,
-          permissions: [],
-        },
-        "PASSWORD_RESET_REQUESTED",
-        "password_reset_requests",
-        result.rows[0]!.id,
+          identifierHash,
+          codeHash,
+          expiresAt,
+        ],
+      );
+      if (user) {
+        await client.query(
+          `INSERT INTO outbox_events (
+             aggregate_type, aggregate_id, event_type, payload, deduplication_key
+           ) VALUES ('user',$1,'PASSWORD_RESET_CODE_REQUESTED',$2::jsonb,$3)
+           ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
+          [
+            user.id,
+            JSON.stringify({
+              channel: "email",
+              to: user.email,
+              encryptedParameters: {
+                otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
+              },
+              expiresAt: expiresAt.toISOString(),
+            }),
+            `password-reset-code:${challengeId}`,
+          ],
+        );
+        await this.audit(
+          client,
+          accountType,
+          user.id,
+          "PASSWORD_RESET_CODE_REQUESTED",
+          "password_reset_requests",
+          challengeId,
+          metadata,
+        );
+      }
+      await client.query("COMMIT");
+      return { challengeId, expiresAt };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async resetPasswordWithOtp(
+    challengeId: string,
+    code: string,
+    newPassword: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{
+        user_id: string | null;
+        account_type: "customer" | "representative";
+        status: string;
+        code_hash: string | null;
+        attempts_remaining: number;
+        expires_at: Date | null;
+        consumed_at: Date | null;
+      }>(
+        `SELECT user_id::text, account_type, status, code_hash,
+                attempts_remaining, expires_at, consumed_at
+           FROM password_reset_requests
+          WHERE id=$1
+          FOR UPDATE`,
+        [challengeId],
+      );
+      const row = result.rows[0];
+      if (
+        !row ||
+        row.status !== "pending" ||
+        !row.user_id ||
+        !row.code_hash ||
+        row.consumed_at
+      ) {
+        throw new AppError(422, "OTP_INVALID", "The verification code is invalid or already used");
+      }
+      if (
+        !row.expires_at ||
+        row.expires_at.getTime() <= Date.now() ||
+        row.attempts_remaining <= 0
+      ) {
+        await client.query(
+          `UPDATE password_reset_requests
+              SET status='expired', consumed_at=COALESCE(consumed_at, now())
+            WHERE id=$1`,
+          [challengeId],
+        );
+        await client.query("COMMIT");
+        throw new AppError(422, "OTP_EXPIRED", "The verification code has expired");
+      }
+      const candidate = digest(
+        `password-reset:${challengeId}:${code}`,
+        this.config.authPepper,
+      );
+      if (!safeEqual(candidate, row.code_hash)) {
+        await client.query(
+          `UPDATE password_reset_requests
+              SET attempts_remaining=greatest(0, attempts_remaining - 1)
+            WHERE id=$1`,
+          [challengeId],
+        );
+        await client.query("COMMIT");
+        throw new AppError(422, "OTP_INVALID", "The verification code is invalid");
+      }
+
+      if (row.account_type === "customer") customerPasswordPolicyOrThrow(newPassword);
+      else passwordPolicyOrThrow(newPassword);
+
+      const history = await client.query<{ password_hash: string }>(
+        `SELECT password_hash FROM (
+           SELECT password_hash, created_at
+             FROM password_history
+            WHERE user_id=$1
+           UNION ALL
+           SELECT password_hash, now()
+             FROM users
+            WHERE id=$1 AND password_hash IS NOT NULL
+         ) password_versions
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [row.user_id],
+      );
+      for (const previous of history.rows) {
+        if (await verifyPassword(previous.password_hash, newPassword)) {
+          throw new AppError(422, "PASSWORD_REUSED", "Choose a password that was not used recently");
+        }
+      }
+
+      const nextHash = await hashPassword(newPassword);
+      await client.query(
+        `INSERT INTO password_history (user_id, password_hash)
+         SELECT id, password_hash FROM users
+          WHERE id=$1 AND password_hash IS NOT NULL`,
+        [row.user_id],
+      );
+      await client.query(
+        `UPDATE users
+            SET password_hash=$2,
+                must_change_password=false,
+                failed_login_count=0,
+                locked_until=NULL,
+                session_version=session_version+1,
+                updated_at=now(),
+                version=version+1
+          WHERE id=$1`,
+        [row.user_id, nextHash],
+      );
+      await client.query(
+        `UPDATE sessions
+            SET revoked_at=now(), revoke_reason='password_reset'
+          WHERE user_id=$1 AND revoked_at IS NULL`,
+        [row.user_id],
+      );
+      await client.query(
+        `UPDATE password_reset_requests
+            SET status='resolved', resolved_at=now(), consumed_at=now()
+          WHERE id=$1`,
+        [challengeId],
+      );
+      await this.audit(
+        client,
+        row.account_type,
+        row.user_id,
+        "PASSWORD_RESET_COMPLETED",
+        "users",
+        row.user_id,
         metadata,
       );
+      await client.query("COMMIT");
+    } catch (error) {
+      try { await client.query("ROLLBACK"); } catch {}
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async changeCustomerPassword(
+    account: AuthenticatedAccount,
+    currentPassword: string,
+    newPassword: string,
+    metadata: RequestMetadata,
+  ): Promise<IssuedSession> {
+    if (account.accountType !== "customer") {
+      throw new AppError(403, "FORBIDDEN", "Only customers can change their password here");
+    }
+    customerPasswordPolicyOrThrow(newPassword);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const current = await client.query<{ password_hash: string | null }>(
+        "SELECT password_hash FROM users WHERE id=$1 AND account_type='customer' FOR UPDATE",
+        [account.userId],
+      );
+      const currentHash = current.rows[0]?.password_hash;
+      if (!currentHash || !(await verifyPassword(currentHash, currentPassword))) {
+        throw new AppError(401, "CURRENT_PASSWORD_INVALID", "Current password is incorrect");
+      }
+
+      const history = await client.query<{ password_hash: string }>(
+        `SELECT password_hash FROM (
+           SELECT password_hash, created_at
+             FROM password_history
+            WHERE user_id=$1
+           UNION ALL
+           SELECT password_hash, now()
+             FROM users
+            WHERE id=$1 AND password_hash IS NOT NULL
+         ) password_versions
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [account.userId],
+      );
+      for (const previous of history.rows) {
+        if (await verifyPassword(previous.password_hash, newPassword)) {
+          throw new AppError(422, "PASSWORD_REUSED", "Choose a password that was not used recently");
+        }
+      }
+
+      const nextHash = await hashPassword(newPassword);
+      await client.query(
+        `INSERT INTO password_history (user_id, password_hash)
+         SELECT id, password_hash FROM users WHERE id=$1 AND password_hash IS NOT NULL`,
+        [account.userId],
+      );
+      await client.query(
+        `UPDATE users
+            SET password_hash=$2,
+                must_change_password=false,
+                session_version=session_version+1,
+                updated_at=now(),
+                version=version+1
+          WHERE id=$1`,
+        [account.userId, nextHash],
+      );
+      await client.query(
+        `UPDATE sessions
+            SET revoked_at=now(), revoke_reason='password_changed'
+          WHERE user_id=$1 AND revoked_at IS NULL`,
+        [account.userId],
+      );
+      const replacement = await this.issueSession(
+        client,
+        account.userId,
+        account.mfaSatisfied,
+        metadata,
+      );
+      await this.audit(
+        client,
+        "customer",
+        account.userId,
+        "PASSWORD_CHANGED",
+        "users",
+        account.userId,
+        metadata,
+      );
+      await client.query("COMMIT");
+      return replacement;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
   }
 

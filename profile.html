@@ -165,6 +165,18 @@
                         <span class="value" id="user-birthday"></span>
                     </div>
 
+                    <div class="info-profile dart-account-security">
+                        <span class="label">Password</span>
+                        <button type="button" class="dart-profile-security-btn" data-change-password-toggle>Change Password</button>
+                    </div>
+                    <form id="customerAccountPasswordForm" class="dart-profile-password-form" hidden novalidate>
+                        <label>Current password<input type="password" name="currentPassword" autocomplete="current-password" required></label>
+                        <label>New password<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
+                        <label>Confirm new password<input type="password" name="confirmPassword" minlength="8" autocomplete="new-password" required></label>
+                        <button type="submit" class="dart-profile-security-btn">Save new password</button>
+                        <p class="form-status" role="status" aria-live="polite"></p>
+                    </form>
+
                 </section>
                 <!-- ============ ناقذه الطلبات ========= -->
                 <section class="order-info">
@@ -273,6 +285,7 @@
     <script src="Js/dart-returns.js"></script>
     <script src="Js/dart-ui.js"></script>
     <script src="Js/dart-storefront.js"></script>
+    <script src="Js/dart-password-visibility.js"></script>
     <script src="Js/dart-platform.js"></script>
 </body>
 </html>

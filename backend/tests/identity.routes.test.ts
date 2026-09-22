@@ -96,6 +96,12 @@ function fakeService(auth = account()) {
       status: "pending_approval",
     }),
     login: vi.fn().mockResolvedValue(issued(auth)),
+    requestPasswordReset: vi.fn().mockResolvedValue({
+      challengeId: "123e4567-e89b-12d3-a456-426614174009",
+      expiresAt: new Date("2026-09-22T10:10:00.000Z"),
+    }),
+    resetPasswordWithOtp: vi.fn().mockResolvedValue(undefined),
+    changeCustomerPassword: vi.fn().mockResolvedValue(issued(auth)),
     startStaffEmailAccess: vi.fn().mockResolvedValue({
       challengeId: "123e4567-e89b-12d3-a456-426614174004",
       expiresAt: new Date(Date.now() + 600_000),
@@ -121,6 +127,52 @@ function app(service: IdentityService, outboxService?: OutboxService) {
 }
 
 describe("identity HTTP boundaries", () => {
+  it("queues an email OTP password reset without revealing whether the account exists", async () => {
+    const service = fakeService();
+    const outbox = {
+      processBatch: vi.fn().mockResolvedValue({
+        configured: true,
+        claimed: 1,
+        published: 1,
+        failed: 0,
+      }),
+    } as unknown as OutboxService;
+    const response = await request(app(service, outbox))
+      .post("/api/v1/auth/forgot-password")
+      .send({ identifier: "customer@example.com", accountType: "customer" });
+
+    expect(response.status).toBe(202);
+    expect(response.body).toMatchObject({
+      challengeId: "123e4567-e89b-12d3-a456-426614174009",
+    });
+    expect(service.requestPasswordReset).toHaveBeenCalledWith(
+      "customer",
+      "customer@example.com",
+      expect.any(Object),
+    );
+    expect(outbox.processBatch).toHaveBeenCalledWith(5);
+  });
+
+  it("requires the OTP flow to finish by setting a new password", async () => {
+    const service = fakeService();
+    const response = await request(app(service))
+      .post("/api/v1/auth/reset-password")
+      .send({
+        challengeId: "123e4567-e89b-12d3-a456-426614174009",
+        code: "123456",
+        password: "NewCustomerPassword123",
+        confirmation: "NewCustomerPassword123",
+      });
+
+    expect(response.status).toBe(200);
+    expect(service.resetPasswordWithOtp).toHaveBeenCalledWith(
+      "123e4567-e89b-12d3-a456-426614174009",
+      "123456",
+      "NewCustomerPassword123",
+      expect.any(Object),
+    );
+  });
+
   it("does not expose retired Google, Staff password or Staff TOTP routes", async () => {
     const application = app(fakeService());
 
