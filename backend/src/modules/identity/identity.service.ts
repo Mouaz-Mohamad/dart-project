@@ -2165,6 +2165,8 @@ export class IdentityService {
           provider_subject: string | null;
           identity_linked_at: Date | null;
           identity_last_login_at: Date | null;
+          email_verified_at: Date | null;
+          last_login_at: Date | null;
           disabled_at: Date | null;
           disabled_reason: string | null;
           created_at: Date;
@@ -2173,7 +2175,8 @@ export class IdentityService {
                   s.is_owner, u.email, p.phone_display AS phone, u.status,
                   s.auth_provider, s.supabase_user_id::text,
                   s.provider_subject, s.identity_linked_at,
-                  s.identity_last_login_at, s.disabled_at,
+                  s.identity_last_login_at, u.email_verified_at, u.last_login_at,
+                  s.disabled_at,
                   s.disabled_reason, s.created_at
              FROM staff_users s
              JOIN users u ON u.id=s.user_id
@@ -2195,14 +2198,15 @@ export class IdentityService {
         name: row.display_name,
         email: row.email,
         phone: row.phone,
-        status: row.status === "active" ? "Active" : "Disabled",
+        status:
+          row.status === "active"
+            ? "Active"
+            : row.status === "pending_verification"
+              ? "Pending verification"
+              : "Disabled",
         isOwner: row.is_owner,
-        googleLinked:
-          row.auth_provider === "google" &&
-          Boolean(row.supabase_user_id && row.provider_subject),
-        provider: row.auth_provider,
-        linkedAt: row.identity_linked_at?.toISOString() || null,
-        lastLoginAt: row.identity_last_login_at?.toISOString() || null,
+        emailVerified: Boolean(row.email_verified_at),
+        lastLoginAt: row.last_login_at?.toISOString() || null,
         disabledAt: row.disabled_at?.toISOString() || null,
         disabledReason: row.disabled_reason,
         permissions: effective,
@@ -2226,6 +2230,695 @@ export class IdentityService {
       })),
       staff,
     };
+  }
+
+
+  public async createStaffEmailAccess(
+    account: AuthenticatedAccount,
+    input: {
+      email: string;
+      role: "owner" | "staff";
+      permissionKeys: string[];
+    },
+    metadata: RequestMetadata,
+  ): Promise<{ accessId: string; email: string; role: "owner" | "staff" }> {
+    await this.requireOwnerForStaffManagement(account);
+    const email = input.email.trim();
+    const emailNormalized = normalizeEmail(email);
+    const isOwner = input.role === "owner";
+    const permissionKeys = [
+      ...new Set(input.permissionKeys.map((key) => key.trim()).filter(Boolean)),
+    ].sort();
+    const localName = email.split("@")[0]!.replace(/[._-]+/g, " ").trim();
+    const displayName = (
+      isOwner ? "Dart Owner" : localName.length >= 3 ? localName : `Staff ${localName || "User"}`
+    ).slice(0, 120);
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-email-access:${emailNormalized}`],
+      );
+
+      const existingUser = await client.query<{ id: string; is_owner: boolean }>(
+        `SELECT u.id::text, s.is_owner
+           FROM users u
+           JOIN staff_users s ON s.user_id=u.id
+          WHERE u.account_type='staff'
+            AND u.email_normalized=$1
+            AND u.deleted_at IS NULL
+          LIMIT 1
+          FOR UPDATE OF u, s`,
+        [emailNormalized],
+      );
+      if (existingUser.rows[0]) {
+        throw new AppError(
+          409,
+          "STAFF_ACCOUNT_ALREADY_EXISTS",
+          "A dashboard account with this email already exists",
+        );
+      }
+
+      const pending = await client.query<{
+        id: string;
+        email: string;
+        is_owner: boolean;
+        permission_keys: unknown[];
+      }>(
+        `SELECT id::text, email, is_owner, permission_keys
+           FROM staff_invitations
+          WHERE email_normalized=$1
+            AND access_mode='email_otp'
+            AND status='pending'
+          ORDER BY created_at DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [emailNormalized],
+      );
+      const previous = pending.rows[0] ?? null;
+
+      if (isOwner) {
+        const activeOwner = await client.query<{ id: string }>(
+          "SELECT user_id::text AS id FROM staff_users WHERE is_owner LIMIT 1 FOR UPDATE",
+        );
+        const otherPendingOwner = await client.query<{ id: string }>(
+          `SELECT id::text
+             FROM staff_invitations
+            WHERE is_owner=true
+              AND status='pending'
+              AND id IS DISTINCT FROM $1::uuid
+            LIMIT 1
+            FOR UPDATE`,
+          [previous?.id || null],
+        );
+        if (activeOwner.rows[0] || otherPendingOwner.rows[0]) {
+          throw new AppError(
+            409,
+            "OWNER_ALREADY_EXISTS",
+            "Dart can have only one protected Owner",
+          );
+        }
+      } else {
+        const protectedOwnerGrant = await client.query<{ id: string }>(
+          `SELECT id::text
+             FROM staff_invitations
+            WHERE is_owner=true
+              AND status='pending'
+              AND email_normalized=$1
+            LIMIT 1
+            FOR UPDATE`,
+          [emailNormalized],
+        );
+        if (protectedOwnerGrant.rows[0]) {
+          throw new AppError(
+            409,
+            "OWNER_ACCESS_PROTECTED",
+            "The protected Owner email cannot be assigned as Staff",
+          );
+        }
+      }
+
+      if (!isOwner && permissionKeys.length) {
+        const valid = await client.query<{ key: string }>(
+          "SELECT key FROM permissions WHERE key = ANY($1::text[])",
+          [permissionKeys],
+        );
+        if (valid.rows.length !== permissionKeys.length) {
+          throw new AppError(
+            422,
+            "INVALID_PERMISSION",
+            "One or more selected permissions do not exist",
+          );
+        }
+      }
+
+      if (previous && previous.is_owner === isOwner) {
+        const previousPermissions = Array.isArray(previous.permission_keys)
+          ? previous.permission_keys
+              .map((key) => String(key || "").trim())
+              .filter(Boolean)
+              .sort()
+          : [];
+        const desiredPermissions = isOwner ? [] : permissionKeys;
+        if (
+          previousPermissions.length === desiredPermissions.length &&
+          previousPermissions.every(
+            (permission, index) => permission === desiredPermissions[index],
+          )
+        ) {
+          await client.query("COMMIT");
+          return {
+            accessId: previous.id,
+            email: previous.email,
+            role: isOwner ? "owner" : "staff",
+          };
+        }
+      }
+
+      if (previous?.is_owner) {
+        throw new AppError(
+          409,
+          "OWNER_ACCESS_PROTECTED",
+          "The protected Owner access entry cannot be replaced",
+        );
+      }
+
+      await client.query(
+        `UPDATE staff_invitations
+            SET status='revoked',
+                revoked_at=now(),
+                revoked_reason='replaced',
+                updated_at=now()
+          WHERE email_normalized=$1
+            AND status='pending'
+            AND is_owner=false`,
+        [emailNormalized],
+      );
+
+      const access = await client.query<{ id: string }>(
+        `INSERT INTO staff_invitations (
+           email, email_normalized, display_name, is_owner, mfa_required,
+           permission_keys, status, invited_by, expires_at, access_mode
+         ) VALUES (
+           $1,$2,$3,$4,false,$5::jsonb,'pending',$6,NULL,'email_otp'
+         )
+         RETURNING id::text`,
+        [
+          email,
+          emailNormalized,
+          displayName,
+          isOwner,
+          JSON.stringify(isOwner ? [] : permissionKeys),
+          account.userId,
+        ],
+      );
+      const accessId = access.rows[0]!.id;
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_EMAIL_ACCESS_ALLOWED",
+        "staff_invitations",
+        accessId,
+        metadata,
+        {
+          role: isOwner ? "owner" : "staff",
+          emailHash: digest(`staff-email:${emailNormalized}`, this.config.authPepper),
+          permissionKeys: isOwner ? [] : permissionKeys,
+          replacedAccessId: previous?.id || null,
+        },
+      );
+      await client.query("COMMIT");
+      return { accessId, email, role: isOwner ? "owner" : "staff" };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error instanceof AppError) throw error;
+      mapDatabaseConflict(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  public async removeStaffEmailAccess(
+    account: AuthenticatedAccount,
+    accessId: string,
+    reason: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    await this.requireOwnerForStaffManagement(account);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const target = await client.query<{
+        is_owner: boolean;
+        email_normalized: string;
+      }>(
+        `SELECT is_owner, email_normalized
+           FROM staff_invitations
+          WHERE id=$1
+            AND access_mode='email_otp'
+            AND status='pending'
+          FOR UPDATE`,
+        [accessId],
+      );
+      if (!target.rows[0]) {
+        throw new AppError(404, "STAFF_ACCESS_NOT_FOUND", "Staff access entry not found");
+      }
+      if (target.rows[0].is_owner) {
+        throw new AppError(
+          409,
+          "OWNER_ACCESS_PROTECTED",
+          "Owner access cannot be removed",
+        );
+      }
+      await client.query(
+        `UPDATE staff_invitations
+            SET status='revoked',
+                revoked_at=now(),
+                revoked_reason=$2,
+                updated_at=now()
+          WHERE id=$1`,
+        [accessId, reason || "removed_by_owner"],
+      );
+      await this.audit(
+        client,
+        "staff",
+        account.userId,
+        "STAFF_EMAIL_ACCESS_REMOVED",
+        "staff_invitations",
+        accessId,
+        metadata,
+        {
+          emailHash: digest(
+            `staff-email:${target.rows[0].email_normalized}`,
+            this.config.authPepper,
+          ),
+          reason: reason || "removed_by_owner",
+        },
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async startStaffEmailAccess(
+    emailInput: string,
+    metadata: RequestMetadata,
+  ): Promise<{ challengeId: string; expiresAt: Date; deliveryQueued: boolean }> {
+    const emailNormalized = normalizeEmail(emailInput);
+    const fallback = {
+      challengeId: randomUUID(),
+      expiresAt: new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000),
+      deliveryQueued: false,
+    };
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-email-login:${emailNormalized}`],
+      );
+
+      const existing = await client.query<{
+        user_id: string;
+        email: string;
+        status: string;
+      }>(
+        `SELECT u.id::text AS user_id, u.email, u.status
+           FROM users u
+           JOIN staff_users s ON s.user_id=u.id
+          WHERE u.account_type='staff'
+            AND u.email_normalized=$1
+            AND u.deleted_at IS NULL
+          LIMIT 1
+          FOR UPDATE OF u, s`,
+        [emailNormalized],
+      );
+
+      let staffUserId: string | null = null;
+      let invitationId: string | null = null;
+      let deliveryEmail = "";
+      const user = existing.rows[0] ?? null;
+
+      if (user && (user.status === "active" || user.status === "pending_verification")) {
+        staffUserId = user.user_id;
+        deliveryEmail = user.email;
+      } else if (!user) {
+        const invitation = await client.query<{
+          id: string;
+          email: string;
+          is_owner: boolean;
+        }>(
+          `SELECT id::text, email, is_owner
+             FROM staff_invitations
+            WHERE email_normalized=$1
+              AND access_mode='email_otp'
+              AND status='pending'
+              AND (expires_at IS NULL OR expires_at > now())
+            ORDER BY is_owner DESC, created_at DESC
+            LIMIT 1
+            FOR UPDATE`,
+          [emailNormalized],
+        );
+        const grant = invitation.rows[0] ?? null;
+        if (grant) {
+          if (grant.is_owner) {
+            const owner = await client.query<{ id: string }>(
+              "SELECT user_id::text AS id FROM staff_users WHERE is_owner LIMIT 1 FOR UPDATE",
+            );
+            if (owner.rows[0]) {
+              await client.query("COMMIT");
+              return fallback;
+            }
+          }
+          invitationId = grant.id;
+          deliveryEmail = grant.email;
+        }
+      }
+
+      if (!staffUserId && !invitationId) {
+        await client.query("COMMIT");
+        return fallback;
+      }
+
+      const recent = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+           FROM staff_email_login_challenges
+          WHERE email_normalized=$1
+            AND created_at >= now() - interval '1 hour'`,
+        [emailNormalized],
+      );
+      if (Number(recent.rows[0]?.count || 0) >= 4) {
+        await client.query("COMMIT");
+        return fallback;
+      }
+
+      await client.query(
+        `UPDATE staff_email_login_challenges
+            SET consumed_at=COALESCE(consumed_at, now())
+          WHERE email_normalized=$1
+            AND consumed_at IS NULL`,
+        [emailNormalized],
+      );
+
+      const challengeId = randomUUID();
+      const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      const expiresAt = new Date(
+        Date.now() + this.config.emailOtpTtlMinutes * 60_000,
+      );
+      await client.query(
+        `INSERT INTO staff_email_login_challenges (
+           id, email_normalized, staff_user_id, invitation_id,
+           code_hash, expires_at
+         ) VALUES ($1,$2,$3::uuid,$4::uuid,$5,$6)`,
+        [
+          challengeId,
+          emailNormalized,
+          staffUserId,
+          invitationId,
+          digest(`staff-email-login:${challengeId}:${otp}`, this.config.authPepper),
+          expiresAt,
+        ],
+      );
+      await client.query(
+        `INSERT INTO outbox_events (
+           aggregate_type, aggregate_id, event_type, payload, deduplication_key
+         ) VALUES ('staff_access',$1,'STAFF_EMAIL_ACCESS_CODE_REQUESTED',$2::jsonb,$3)
+         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
+        [
+          staffUserId || invitationId,
+          JSON.stringify({
+            channel: "email",
+            to: deliveryEmail,
+            encryptedParameters: {
+              otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
+            },
+            dashboardUrl: `${this.config.corsOrigins?.[0] || ""}/Eye/Dart%20Eye.html`,
+            expiresAt: expiresAt.toISOString(),
+          }),
+          `staff-email-access-code:${challengeId}`,
+        ],
+      );
+      await this.audit(
+        client,
+        "system",
+        null,
+        "STAFF_EMAIL_ACCESS_CODE_REQUESTED",
+        "staff_access",
+        staffUserId || invitationId!,
+        metadata,
+        {
+          emailHash: digest(`staff-email:${emailNormalized}`, this.config.authPepper),
+        },
+      );
+      await client.query("COMMIT");
+      return { challengeId, expiresAt, deliveryQueued: true };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async verifyStaffEmailAccess(
+    challengeId: string,
+    code: string,
+    metadata: RequestMetadata,
+  ): Promise<IssuedSession> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const challenge = await client.query<{
+        email_normalized: string;
+        staff_user_id: string | null;
+        invitation_id: string | null;
+        code_hash: string;
+        attempts_remaining: number;
+        expires_at: Date;
+        consumed_at: Date | null;
+      }>(
+        `SELECT email_normalized, staff_user_id::text, invitation_id::text,
+                code_hash, attempts_remaining, expires_at, consumed_at
+           FROM staff_email_login_challenges
+          WHERE id=$1
+          FOR UPDATE`,
+        [challengeId],
+      );
+      const row = challenge.rows[0];
+      if (
+        !row ||
+        row.consumed_at ||
+        row.expires_at.getTime() <= Date.now() ||
+        row.attempts_remaining <= 0
+      ) {
+        throw new AppError(
+          400,
+          "STAFF_EMAIL_CODE_INVALID",
+          "The verification code is invalid or expired",
+        );
+      }
+
+      const expected = digest(
+        `staff-email-login:${challengeId}:${code}`,
+        this.config.authPepper,
+      );
+      if (!safeEqual(expected, row.code_hash)) {
+        await client.query(
+          `UPDATE staff_email_login_challenges
+              SET attempts_remaining=GREATEST(0, attempts_remaining-1)
+            WHERE id=$1`,
+          [challengeId],
+        );
+        await client.query("COMMIT");
+        throw new AppError(
+          400,
+          "STAFF_EMAIL_CODE_INVALID",
+          "The verification code is invalid or expired",
+        );
+      }
+
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`staff-email-login:${row.email_normalized}`],
+      );
+
+      let userId = row.staff_user_id;
+      let activationAction = "STAFF_EMAIL_LOGIN_VERIFIED";
+
+      if (userId) {
+        const existing = await client.query<{
+          status: string;
+          deleted_at: Date | null;
+        }>(
+          `SELECT u.status, u.deleted_at
+             FROM users u
+             JOIN staff_users s ON s.user_id=u.id
+            WHERE u.id=$1
+              AND u.account_type='staff'
+            FOR UPDATE OF u, s`,
+          [userId],
+        );
+        const user = existing.rows[0];
+        if (
+          !user ||
+          user.deleted_at ||
+          !["active", "pending_verification"].includes(user.status)
+        ) {
+          throw new AppError(403, "DASHBOARD_ACCESS_DENIED", "Dashboard access is not allowed");
+        }
+        await client.query(
+          `UPDATE users
+              SET status='active',
+                  email_verified_at=COALESCE(email_verified_at, now()),
+                  last_login_at=now(),
+                  failed_login_count=0,
+                  locked_until=NULL,
+                  updated_at=now()
+            WHERE id=$1`,
+          [userId],
+        );
+        await client.query(
+          `UPDATE staff_users
+              SET mfa_required=false,
+                  updated_at=now()
+            WHERE user_id=$1`,
+          [userId],
+        );
+      } else {
+        const invitation = await client.query<{
+          id: string;
+          email: string;
+          email_normalized: string;
+          display_name: string;
+          is_owner: boolean;
+          permission_keys: unknown[];
+          invited_by: string | null;
+        }>(
+          `SELECT id::text, email, email_normalized, display_name,
+                  is_owner, permission_keys, invited_by::text
+             FROM staff_invitations
+            WHERE id=$1
+              AND status='pending'
+              AND access_mode='email_otp'
+              AND email_normalized=$2
+            FOR UPDATE`,
+          [row.invitation_id, row.email_normalized],
+        );
+        const grant = invitation.rows[0];
+        if (!grant) {
+          throw new AppError(403, "DASHBOARD_ACCESS_DENIED", "Dashboard access is not allowed");
+        }
+
+        if (grant.is_owner) {
+          const existingOwner = await client.query<{ id: string }>(
+            "SELECT user_id::text AS id FROM staff_users WHERE is_owner LIMIT 1 FOR UPDATE",
+          );
+          if (existingOwner.rows[0]) {
+            throw new AppError(
+              409,
+              "OWNER_ALREADY_EXISTS",
+              "The protected Owner account has already been activated",
+            );
+          }
+        }
+
+        const duplicate = await client.query<{ id: string }>(
+          `SELECT id::text
+             FROM users
+            WHERE account_type='staff'
+              AND email_normalized=$1
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE`,
+          [grant.email_normalized],
+        );
+        if (duplicate.rows[0]) {
+          throw new AppError(
+            409,
+            "STAFF_ACCOUNT_ALREADY_EXISTS",
+            "This dashboard account has already been activated",
+          );
+        }
+
+        userId = randomUUID();
+        await client.query(
+          `INSERT INTO users (
+             id, account_type, email, email_normalized, password_hash,
+             status, email_verified_at, must_change_password, last_login_at
+           ) VALUES ($1,'staff',$2,$3,NULL,'active',now(),false,now())`,
+          [userId, grant.email, grant.email_normalized],
+        );
+        await client.query(
+          `INSERT INTO staff_users (
+             user_id, display_name, is_owner, mfa_required, created_by
+           ) VALUES ($1,$2,$3,false,$4::uuid)`,
+          [userId, grant.display_name, grant.is_owner, grant.invited_by],
+        );
+        await this.assignRole(client, userId, grant.is_owner ? "Owner" : "Staff");
+
+        if (!grant.is_owner) {
+          const permissionKeys = Array.isArray(grant.permission_keys)
+            ? [...new Set(
+                grant.permission_keys
+                  .map((value) => String(value || "").trim())
+                  .filter(Boolean),
+              )]
+            : [];
+          if (permissionKeys.length) {
+            const valid = await client.query<{ id: string; key: string }>(
+              "SELECT id::text, key FROM permissions WHERE key = ANY($1::text[])",
+              [permissionKeys],
+            );
+            if (valid.rows.length !== permissionKeys.length) {
+              throw new AppError(
+                409,
+                "STAFF_ACCESS_PERMISSION_INVALID",
+                "One or more Staff permissions no longer exist",
+              );
+            }
+            for (const permission of valid.rows) {
+              await client.query(
+                `INSERT INTO user_permission_overrides (
+                   user_id, permission_id, allowed, granted_by
+                 ) VALUES ($1,$2,true,$3::uuid)
+                 ON CONFLICT (user_id, permission_id) DO UPDATE SET
+                   allowed=true,
+                   granted_by=EXCLUDED.granted_by,
+                   updated_at=now()`,
+                [userId, permission.id, grant.invited_by],
+              );
+            }
+          }
+        }
+
+        await client.query(
+          `UPDATE staff_invitations
+              SET status='claimed',
+                  claimed_by=$2,
+                  claimed_at=now(),
+                  updated_at=now()
+            WHERE id=$1`,
+          [grant.id, userId],
+        );
+        activationAction = grant.is_owner
+          ? "OWNER_EMAIL_ACCESS_ACTIVATED"
+          : "STAFF_EMAIL_ACCESS_ACTIVATED";
+      }
+
+      await client.query(
+        "UPDATE staff_email_login_challenges SET consumed_at=now() WHERE id=$1",
+        [challengeId],
+      );
+      const session = await this.issueSession(client, userId!, true, metadata);
+      await this.audit(
+        client,
+        "staff",
+        userId!,
+        activationAction,
+        "staff_users",
+        userId!,
+        metadata,
+        {
+          emailHash: digest(`staff-email:${row.email_normalized}`, this.config.authPepper),
+        },
+      );
+      await client.query("COMMIT");
+      return session;
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   public async setStaffPermissions(
