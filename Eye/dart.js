@@ -4796,7 +4796,7 @@ async function dartHashSensitiveValue(value) {
 }
 
 function setupRepresentativeModal() {
-  if (window.DartOperationsV4?.active) return;
+  if (window.DartOperations?.active) return;
   const modal = document.getElementById("representative-modal"),
     form = document.getElementById("rep-form");
   if (!form || form.dataset.dartV3) return;
@@ -5273,7 +5273,7 @@ function setupAllDelegatedEvents() {
 }
 
 function setupOrderModal() {
-  if (window.DartOperationsV4?.active) return;
+  if (window.DartOperations?.active) return;
   const modal = document.getElementById("orderModal"),
     form = document.getElementById("orderForm");
   if (!form || form.dataset.dartV3) return;
