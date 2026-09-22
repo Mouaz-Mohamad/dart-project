@@ -47,7 +47,7 @@ const deliveryCostSummary = finance.calculateSummary(baseData({
       { itemCode: "SHIP-2", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 },
     ],
   }],
-}));
+}), range("2026-09-01", "2026-09-30"));
 assert.strictEqual(deliveryCostSummary.deliveryCosts, 100, "Courier entitlement is once per order regardless of item count.");
 assert.strictEqual(deliveryCostSummary.netRevenue, 2000, "Courier allocation does not change the customer selling value.");
 assert.strictEqual(deliveryCostSummary.netCogs, 800);
@@ -55,6 +55,14 @@ assert.strictEqual(deliveryCostSummary.totalCost, 800, "Courier allocation is al
 assert.strictEqual(deliveryCostSummary.netProfit, 1200);
 assert.strictEqual(deliveryCostSummary.cashOut, 0, "Courier allocation retained before Dart receipt must not be deducted again from Dart cash flow.");
 
+const returnedData = baseData({
+  orders: [{ ...deliveredOrder, amountRefunded: 1000, refundedAt: "2026-09-05T10:00:00+03:00" }],
+  returns: [
+    { id: "R-1", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05T11:00:00+03:00" },
+    { id: "R-1-DUPLICATE", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05T12:00:00+03:00" },
+  ],
+  expenses: [{ id: "E-1", date: "2026-09-03", amount: 100, status: "Unpaid", category: "Packaging" }],
+});
 const returnedSummary = finance.calculateSummary(returnedData, range("2026-09-01", "2026-09-30"));
 assert.strictEqual(returnedSummary.grossRevenue, 1000);
 assert.strictEqual(returnedSummary.refunds, 1000, "Detailed return refunds must not be duplicated by order.amountRefunded.");
@@ -223,8 +231,6 @@ assert.strictEqual(ownerCostScenario.brandNetProfit, 20, "Brand profit must be t
 const customerMetric = finance.brandMetrics(baseData({ customers: [{ id: "C1", clientId: "DA-1", registeredAt: "2026-09-12T10:00:00Z" }] }), range("2026-09-01", "2026-09-30"), finance.calculateSummary(baseData(), range("2026-09-01", "2026-09-30")));
 assert.strictEqual(customerMetric.customers, 1, "Customer KPI must recognize the registeredAt field used by dashboard-created customers.");
 
-console.log("Dart finance unit tests passed.");
-
 // Owner scenario: five 600 EGP pieces, 400 EGP all-in cost, split across 3 COD orders (1 + 1 + 3).
 const ownerThreeOrderScenario = finance.calculateSummary(baseData({
   orders: [
@@ -236,8 +242,10 @@ const ownerThreeOrderScenario = finance.calculateSummary(baseData({
       { itemCode: "OWN-I-5", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 },
     ] },
   ],
-}));
+}), range("2026-09-01", "2026-09-30"));
 assert.strictEqual(ownerThreeOrderScenario.netRevenue, 3000);
 assert.strictEqual(ownerThreeOrderScenario.netCogs, 2000);
 assert.strictEqual(ownerThreeOrderScenario.deliveryCosts, 300, "Three orders owe the courier 300 EGP total, not 500 EGP.");
 assert.strictEqual(ownerThreeOrderScenario.netProfit, 1000, "Five pieces at 600 selling / 400 all-in cost must produce 1000 EGP net profit.");
+
+console.log("Dart finance unit tests passed.");
