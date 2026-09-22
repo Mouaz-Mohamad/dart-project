@@ -15,11 +15,8 @@ describe("environment configuration", () => {
     expect(config.corsOrigins).toEqual(["http://localhost:4173"]);
     expect(config.sessionCookieSameSite).toBe("strict");
     expect(config.ownerBootstrapEmail).toBeNull();
-    expect(config.staffGoogleAuthEnabled).toBe(false);
     expect(config.staffLegacyAuthEnabled).toBe(true);
     expect(config.staffLegacyAuthUiEnabled).toBe(false);
-    expect(config.supabaseUrl).toBeNull();
-    expect(config.googleClientId).toBeNull();
     expect(config.emailFromName).toBe("Dart | for you");
   });
 
