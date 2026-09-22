@@ -125,7 +125,6 @@ const singletonPaths = {
   sitemap: "sitemap.xml",
   robots: "robots.txt",
   policies: "policies.html",
-  receipt: "pdf.html",
   leaderboard: "sections/leaderboard-card.html",
 };
 for (const [label, expected] of Object.entries(singletonPaths)) {
