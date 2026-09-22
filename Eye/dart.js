@@ -1,3 +1,9 @@
+// ============================================================================
+ // DART EYE | DASHBOARD CORE
+ // Core dashboard rendering, forms, navigation, brand analytics, and shared UI.
+ // Feature-specific modules live in dart-inventory/finance/settings/staff/etc.
+ // ============================================================================
+
 // ==========================================
 // 1. الدوال العامة والمساعدة (Global Helpers & Utilities)
 // ==========================================
@@ -537,6 +543,16 @@ window.addEventListener("dart:orders-hydrated", (event) => {
   if (typeof dartRefreshAll === "function") dartRefreshAll();
 });
 
+/* BEGIN Dashboard data synchronization */
+window.addEventListener("dart:data-changed", () => {
+  try {
+    loadAllDataFromStorage(false);
+    dartRefreshAll();
+  } catch (error) {
+    console.warn("Dashboard sync failed", error);
+  }
+});
+
 window.addEventListener("dart:audit-hydrated", (event) => {
   const incoming = event.detail?.audit;
   if (!Array.isArray(incoming)) return;
@@ -581,6 +597,8 @@ window.addEventListener("dart:domain-hydrated", (event) => {
   if (typeof dartRefreshAll === "function") dartRefreshAll();
 });
 
+
+/* END Dashboard data synchronization */
 
 // ===========================================
 // 13. Chart in Brand Information
@@ -3301,6 +3319,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupAllDelegatedEvents();
   setupPasswordResetRequests();
   setupGlobalModalTriggers();
+  setupBirthdayMessageActions();
   setupModelModal();
   setupItemModal();
   setupCustomerModal();
@@ -3396,9 +3415,6 @@ function renderItems(dataArray) {
   return DartInventory.renderItems(dataArray);
 }
 
-function dartMonthKey(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 function dartDeliveredInMonth(clientId, year, month) {
   return ordersData
     .filter((o) => o.clientId === clientId && o.status === "Delivered")
@@ -4211,6 +4227,93 @@ function renderBirthdayWidget() {
     };
   }
 }
+
+/* BEGIN Brand — birthday message queue action */
+function setupBirthdayMessageActions() {
+  const send = document.getElementById("sendBdayBtn");
+  if (!send || send.dataset.dartBirthdayBound) return;
+  send.dataset.dartBirthdayBound = "1";
+
+  send.addEventListener("click", async () => {
+    const selected = [...document.querySelectorAll("#birthday-feed .bday-checkbox:checked")]
+      .map((box) => box.closest("[data-client-id]"))
+      .filter(Boolean);
+    if (!selected.length) {
+      alert("Select at least one customer.");
+      return;
+    }
+
+    const queue = structuredClone(
+      window.DartState?.read?.("dart_message_queue", []) || [],
+    );
+    const history = structuredClone(
+      window.DartState?.read?.("dart_birthday_messages", []) || [],
+    );
+    const birthdayDiscountPercent = Math.max(
+      0,
+      Math.min(
+        100,
+        Number(window.DartSiteSettings?.get?.().birthdayDiscountPercent) || 30,
+      ),
+    );
+
+    selected.forEach((row, index) => {
+      const recordId = row.dataset.clientId;
+      const birthdayDate = row.dataset.birthdayDate;
+      const customer = customersData.find(
+        (item) => String(item.id) === String(recordId),
+      );
+      const alreadyQueued = history.some(
+        (item) =>
+          item.birthdayDate === birthdayDate &&
+          (String(item.customerRecordId) === String(recordId) ||
+            String(item.clientId) === String(customer?.clientId)),
+      );
+      if (!customer || alreadyQueued) return;
+
+      const messageId = `BDAY-${birthdayDate}-${customer.clientId}`;
+      queue.unshift({
+        id: `${messageId}-${Date.now()}-${index}`,
+        messageKey: messageId,
+        customerId: customer.clientId,
+        customerName: customer.clientName,
+        phone: customer.phone1,
+        birthdayDate,
+        type: "birthday-discount",
+        discountPercent: birthdayDiscountPercent,
+        rewardDays: 7,
+        status: "Pending API",
+        createdAt: new Date().toISOString(),
+      });
+      history.unshift({
+        id: messageId,
+        customerRecordId: recordId,
+        clientId: customer.clientId,
+        birthdayDate,
+        queuedAt: new Date().toISOString(),
+        status: "Queued for Backend",
+      });
+    });
+
+    if (!window.DartDomainState?.write) {
+      alert("Birthday messaging requires the secure server state.");
+      return;
+    }
+
+    window.DartDomainState.write("dart_message_queue", queue);
+    window.DartDomainState.write("dart_birthday_messages", history);
+    await Promise.all([
+      window.DartDomainState.syncDomain?.("message_queue"),
+      window.DartDomainState.syncDomain?.("birthday_messages"),
+    ]);
+    renderBirthdayWidget();
+    alert(
+      `Birthday discount messages (${birthdayDiscountPercent}%) were queued for backend delivery.`,
+    );
+  });
+}
+/* END Brand — birthday message queue action */
+
 function renderTopClients() {
   const feed = document.getElementById("top-clients-feed");
   if (!feed) return;
@@ -4547,6 +4650,37 @@ function setupModelModal() {
   return DartInventory.setupModelModal();
 }
 
+/* BEGIN Clients — identity normalization and duplicate guard */
+function dartNormalizeCustomerEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function dartNormalizeCustomerPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("20") && digits.length === 12) return `+${digits}`;
+  if (digits.startsWith("01") && digits.length === 11) return `+2${digits}`;
+  return digits ? `+${digits}` : "";
+}
+
+function dartCustomerConflict(payload, editId = "") {
+  const wantedEmail = dartNormalizeCustomerEmail(payload?.email);
+  const wantedPhones = [payload?.phone1, payload?.phone2]
+    .map(dartNormalizeCustomerPhone)
+    .filter(Boolean);
+
+  return customersData.find((customer) => {
+    if (String(customer.id) === String(editId || "")) return false;
+    const sameEmail =
+      wantedEmail &&
+      dartNormalizeCustomerEmail(customer.email) === wantedEmail;
+    const currentPhones = [customer.phone1, customer.phone2]
+      .map(dartNormalizeCustomerPhone)
+      .filter(Boolean);
+    return sameEmail || wantedPhones.some((phone) => currentPhones.includes(phone));
+  }) || null;
+}
+/* END Clients — identity normalization and duplicate guard */
+
 function setupCustomerModal() {
   const modal = document.getElementById("customerModal"),
     form = document.getElementById("customerForm");
@@ -4573,6 +4707,11 @@ function setupCustomerModal() {
         country: document.getElementById("custCountry").value || "Egypt",
         governorate: document.getElementById("custGovernorate").value || "",
       };
+
+    if (dartCustomerConflict(p, id)) {
+      alert("Email or phone is already registered.");
+      return;
+    }
 
     if (id) {
       const x = customersData.find((customer) => String(customer.id) === String(id));
@@ -4624,19 +4763,6 @@ function setupCustomerModal() {
         dartSaveAll();
       }
     } else {
-      const duplicate = customersData.find(
-        (row) =>
-          String(row.email || "").toLowerCase() === p.email.toLowerCase() ||
-          [row.phone1, row.phone2].some(
-            (phone) =>
-              String(phone || "").replace(/\D/g, "") ===
-              String(p.phone1 || "").replace(/\D/g, ""),
-          ),
-      );
-      if (duplicate) {
-        alert("Email or phone is already registered.");
-        return;
-      }
       const x = {
         id: dartUid("CDB"),
         clientId: dartNextBusinessCode("DA", customersData, "clientId"),
@@ -5778,6 +5904,27 @@ function setupReturnModal() {
       return;
     }
 
+    const refundAmount =
+      Number(document.getElementById("modal-return-refund")?.value) || 0;
+    const remainingRefund = Math.max(
+      0,
+      dartOrderNet(order) - (Number(order.amountRefunded) || 0),
+    );
+    const duplicateReturn = returnsData.some(
+      (row) =>
+        String(row.id) !== String(id || "") &&
+        row.itemCode === code &&
+        !["Rejected", "Closed"].includes(row.status),
+    );
+    if (duplicateReturn) {
+      alert("There is already an active return for this item.");
+      return;
+    }
+    if (refundAmount < 0 || refundAmount > remainingRefund) {
+      alert(`Maximum remaining refund is ${Math.trunc(remainingRefund)} EGP.`);
+      return;
+    }
+
     const condition =
       document.getElementById("modal-item-condition").value || "Good";
     const payload = {
@@ -5785,8 +5932,7 @@ function setupReturnModal() {
       itemCode: code,
       reason: document.getElementById("modal-item-reason").value || "Other",
       condition: condition === "Bad" ? "Bad" : "Good",
-      refundAmount:
-        Number(document.getElementById("modal-return-refund")?.value) || 0,
+      refundAmount,
       clientName:
         document.getElementById("modal-return-name").value ||
         order.clientName ||
@@ -5946,3 +6092,5 @@ function dartTotalInventoryCost() {
       return a + (Number(i.costSnapshot ?? m?.cost) || 0);
     }, 0);
 }
+
+// END DART EYE | DASHBOARD CORE
