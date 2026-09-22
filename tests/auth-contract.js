@@ -45,7 +45,9 @@ assert(dashboard.includes('id="dart-admin-auth"'), "Dashboard auth gate HTML is 
 assert(dashboard.includes('id="dart-admin-email-form"'), "Dashboard email access form is missing");
 assert(dashboard.includes('id="dart-admin-code-form"'), "Dashboard email verification form is missing");
 assert(!dashboard.includes("Continue with Google"), "Dashboard must not present Google sign-in");
-assert(!dashboard.includes('type="password"'), "Staff dashboard auth must not ask for a password");
+assert(!dashboard.includes('id="dart-admin-login-form"'), "Staff dashboard must not expose the retired password login form");
+assert(!dashboard.includes('id="dart-admin-onboarding-password-form"'), "Staff dashboard must not expose password setup");
+assert(!dashboard.includes('id="dart-admin-mfa-form"'), "Staff dashboard must not expose TOTP setup");
 assert(dashboard.includes('src="dart-admin-auth.js"'), "Dashboard auth gate script is not loaded");
 assert(
   !/<script(?![^>]*\bsrc=)(?![^>]*type=["']application\/ld\+json["'])[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/i.test(signup),
