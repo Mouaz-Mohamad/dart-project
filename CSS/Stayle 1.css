@@ -1,3 +1,9 @@
+/* ==========================================================================
+   DART | STOREFRONT MAIN
+   Feature and component styles used outside media queries.
+   Responsive rules live only in CSS/fixes.css.
+   ========================================================================== */
+
 /* ========================================== */
 /* Shared Utilities & Global Layouts         */
 /* ========================================== */
@@ -22,19 +28,20 @@ header, .side-menu, .pge-que .pge, .que,
     flex-direction: column;
 }
 
-/* Vendor Prefixes Shared Utility */
-.icon-menu, .icon-shop, .product-img, .model img, .model {
-    -webkit-border-radius: inherit;
-    -moz-border-radius: inherit;
-    -ms-border-radius: inherit;
-    -o-border-radius: inherit;
-}
-
 /* Hide Scrollbar Shared Utility */
-.reviews-container,.profile-details,.return-info,.order-info {
-    &::-webkit-scrollbar { display: none; }
+.reviews-container,
+.profile-details,
+.return-info,
+.order-info {
     scrollbar-width: none;
     -ms-overflow-style: none;
+}
+
+.reviews-container::-webkit-scrollbar,
+.profile-details::-webkit-scrollbar,
+.return-info::-webkit-scrollbar,
+.order-info::-webkit-scrollbar {
+    display: none;
 }
 
 
@@ -1781,9 +1788,6 @@ header {
     scroll-snap-type: x mandatory;
     padding: 10px 0;
     scrollbar-width: thin;
-    &::-webkit-scrollbar { display: none; }
-    scrollbar-width: none;
-    -ms-overflow-style: none;
 }
 
 /* إخفاء شريط الإسكرول لو حابب الشكل يكون أضفئ (اختياري) */
@@ -1807,9 +1811,12 @@ header {
     padding: 10px 5px;
     margin-bottom: 15px;
     white-space: nowrap;
-        &::-webkit-scrollbar { display: none; }
     scrollbar-width: none;
     -ms-overflow-style: none;
+}
+
+.filter-container::-webkit-scrollbar {
+    display: none;
 }
 
 .filter-btn {
@@ -4122,3 +4129,64 @@ button,
 
 
 /* END V9 requested customer experience additions */
+
+/* BEGIN Performance Containment */
+@supports (content-visibility: auto) {
+  #birthday,
+  #feedback-form,
+  #contact-form,
+  #story,
+  #dart-for-you,
+  #birthday-details,
+  #card-details,
+  #why,
+  #footer {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 420px;
+  }
+}
+/* END Performance Containment */
+
+/* BEGIN Shared Inline Icon Styling */
+#header-container .dart-nav-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+}
+#header-container .icon-menu .dart-nav-menu-icon {
+  width: 32px;
+  height: 22px;
+  color: #fff;
+}
+#header-container .icon-shop .dart-nav-cart-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--bragnte, #ab012b);
+}
+#header-container .social-icons svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+#header-container .social-icons svg rect,
+#header-container .social-icons svg circle {
+  fill: none;
+}
+#header-container .account-btn a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+#header-container .dart-account-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* END Shared Inline Icon Styling */
