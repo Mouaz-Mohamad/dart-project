@@ -202,6 +202,67 @@
   }
   // END View switching and shared physical-item row template.
 
+  // BEGIN Dynamic model categories. Categories come from saved catalog models.
+  function categoryValues(extra = "") {
+    const values = [
+      ...modelsData.map((model) => model.category),
+      "T-Shirts",
+      "Hoodies",
+      "Pants",
+      extra,
+    ];
+    const unique = new Map();
+    values.forEach((value) => {
+      const label = String(value || "").trim();
+      if (!label) return;
+      const key = C.norm(label);
+      if (!unique.has(key)) unique.set(key, label);
+    });
+    return [...unique.values()].sort((a, b) =>
+      a.localeCompare(b, ["en", "ar"], { sensitivity: "base" }),
+    );
+  }
+
+  function canonicalCategory(value) {
+    const requested = String(value || "").trim();
+    if (!requested) return "";
+    const match = categoryValues().find(
+      (category) => C.norm(category) === C.norm(requested),
+    );
+    return match || requested;
+  }
+
+  function refreshCategoryOptions(extra = "") {
+    const categories = categoryValues(extra);
+    const datalist = $("model-category-options");
+    if (datalist) {
+      datalist.replaceChildren(
+        ...categories.map((category) => {
+          const option = document.createElement("option");
+          option.value = category;
+          return option;
+        }),
+      );
+    }
+
+    document
+      .querySelectorAll(
+        '#models .filter-bar select[data-filter-key="category"], #items .filter-bar select[data-filter-key="category"]',
+      )
+      .forEach((select) => {
+        const current = select.value || "all";
+        select.replaceChildren(new Option("All Categories", "all"));
+        categories.forEach((category) =>
+          select.add(new Option(category, category)),
+        );
+        const matched = [...select.options].find(
+          (option) => C.norm(option.value) === C.norm(current),
+        );
+        select.value = matched?.value || "all";
+      });
+  }
+  // END Dynamic model categories.
+
   // BEGIN Model editor. Editable color galleries own media; items contain references.
   function setupModelModal() {
     initViews();
@@ -328,10 +389,12 @@
         return alert("Model Code already exists.");
       if (!draft.sizes.some(C.active) || !draft.colors.some(C.active))
         return alert("Add at least one active size and color.");
+      const category = canonicalCategory($("modal-category").value);
+      if (!category) return alert("Category is required.");
       const payload = {
         modelId: code,
         name: $("modal-name").value.trim(),
-        category: $("modal-category").value,
+        category,
         description: $("modal-description").value,
         cost: Number($("modal-cost").value),
         selling: Number($("modal-selling").value),
@@ -515,6 +578,7 @@
     if (key === "models") {
       const m = modelsData.find((m) => m.id === id);
       $("model-form").reset();
+      refreshCategoryOptions(m?.category || "");
       $("modal-edit-id").value = id || "";
       draft = {
         sizes: structuredClone(C.sizes(m)),
@@ -560,6 +624,7 @@
   }
   // END Item editor.
   function refreshFilters() {
+    refreshCategoryOptions();
     const sel = document.querySelector('#items [data-filter-key="color"]');
     if (sel) {
       const old = sel.value;
@@ -618,6 +683,9 @@
     updateMaster,
     checkStockAlerts,
     refreshFilters,
+    refreshCategoryOptions,
+    categoryValues,
+    canonicalCategory,
     state,
   };
   window.addEventListener("dart:images-ready", () => {
