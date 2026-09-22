@@ -117,7 +117,7 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain("CART_RESERVATION_EXPIRED");
   });
 
-  it("keeps customer live tracking lightweight, private, and fast enough for one-second map updates", () => {
+  it("keeps customer live tracking lightweight, private, and within the approved three-second GPS cadence", () => {
     expect(routes).toContain('"/me/tracking/live"');
     const liveRoute = routes.indexOf('"/me/tracking/live"');
     expect(liveRoute).toBeGreaterThan(-1);
@@ -129,7 +129,7 @@ describe("commerce concurrency and representative safety contracts", () => {
 
     const locationRoute = routes.indexOf('"/representatives/location"');
     expect(locationRoute).toBeGreaterThan(-1);
-    expect(routes.slice(locationRoute, locationRoute + 260)).toContain("limit: 120");
+    expect(routes.slice(locationRoute, locationRoute + 260)).toContain("limit: 30");
   });
 
   it("commits admin order workflow changes atomically and rejects stale UI state", () => {
