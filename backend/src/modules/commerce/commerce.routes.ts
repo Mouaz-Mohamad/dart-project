@@ -266,6 +266,43 @@ export function createCommerceRouter(
   });
 
   router.post(
+    "/admin/orders/:orderRef/workflow",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requireAnyPermission("orders.manage", "orders.bulk_manage"),
+    async (request, response) => {
+      const orderRef = z.string().trim().min(1).max(160).parse(request.params.orderRef);
+      const body = z.object({
+        expectedStatus: z.string().trim().min(1).max(80).optional(),
+        target: z.enum([
+          "New",
+          "Accepted",
+          "Preparing",
+          "Out With Representative",
+          "Representative On The Way",
+          "Delivered",
+          "Refused",
+          "Cancelled",
+        ]),
+        representativeId: z.string().trim().max(160).optional(),
+        deliveryGroupId: z.string().trim().max(160).optional(),
+        reason: z.string().trim().max(500).optional(),
+        notes: z.string().trim().max(1500).optional(),
+      }).parse(request.body);
+      response.status(200).json(
+        await commerce.adminOrderWorkflowAction(
+          request.auth!.userId,
+          orderRef,
+          body,
+          String(request.id),
+        ),
+      );
+    },
+  );
+
+  router.post(
     "/admin/orders/:orderRef/state",
     signedIn,
     csrf,
