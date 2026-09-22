@@ -2505,6 +2505,35 @@ button,
   font-size: 18px;
 }
 
+.dart-map-reset-control {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.dart-map-reset {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(140, 29, 44, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.96);
+  color: #8c1d2c;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.dart-map-reset:hover,
+.dart-map-reset:focus-visible {
+  background: #fff;
+  outline: 2px solid rgba(140, 29, 44, 0.22);
+  outline-offset: 2px;
+}
+.dart-map-reset[hidden] {
+  display: none !important;
+}
+
 
 
 .dart-password-change-dialog {
