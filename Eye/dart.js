@@ -456,6 +456,28 @@ const sectionsMap = {
 // 12. الناف  (DOM Content Loaded)
 // ==========================================
 
+let dartLiveOperationsLoadPromise = null;
+function dartLoadLiveOperations() {
+  if (window.DartLiveOperationsLoaded) return Promise.resolve();
+  if (dartLiveOperationsLoadPromise) return dartLiveOperationsLoadPromise;
+  dartLiveOperationsLoadPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-dart-live-operations]');
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "dart-live-operations.js";
+    script.defer = true;
+    script.dataset.dartLiveOperations = "1";
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Live Operations module could not be loaded."));
+    document.body.appendChild(script);
+  });
+  return dartLiveOperationsLoadPromise;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // 1. تحميل البيانات المخزنة سابقاً
   loadAllDataFromStorage();
@@ -488,6 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // حفظ القسم النشط
     localStorage.setItem("dart_active_section", targetId);
+    if (targetId === "live-operations") void dartLoadLiveOperations();
   }
 
   // تفعيل القسم المخزن أو الافتراضي عند التحميل
@@ -3372,6 +3395,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sections.forEach((s) => s.classList.toggle("active-section", s.id === id));
     links.forEach((l) => l.classList.toggle("active", l.dataset.target === id));
     localStorage.setItem("dart_active_section", id);
+    if (id === "live-operations") void dartLoadLiveOperations();
     if (sectionsMap[id]) dartRenderSection(id);
   }
   links.forEach((l) => {
