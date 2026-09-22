@@ -1588,6 +1588,15 @@ function dartCanTransition(order, target) {
     return ["Out With Representative", "Representative On The Way"].includes(
       order.status,
     );
+  if (
+    target === "Preparing" &&
+    String(order.paymentMethod || "").toLowerCase().includes("cash")
+  ) {
+    const verificationStatus = String(
+      order.verificationStatus || order.codVerificationStatus || "Not Required",
+    );
+    if (!["Not Required", "Verified"].includes(verificationStatus)) return false;
+  }
   if (target === "Preparing" && order.status === "Out With Representative")
     return true; // representative cancelled pickup
   if (order.status === "Needs Attention") return false;
@@ -1715,7 +1724,9 @@ async function dartApplyTransition(order, target, meta = {}) {
       });
       return { ok: true };
     } catch (error) {
-      if (error?.code === "ORDER_STATE_STALE") {
+      if (
+        ["ORDER_STATE_STALE", "COD_VERIFICATION_REQUIRED"].includes(error?.code)
+      ) {
         await window.DartOrdersApi.hydrate(true).catch(() => {});
       }
       return {
@@ -2859,6 +2870,33 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     if (sectionKey === "orders") {
       const o = ordersData.find((x) => String(x.id) === String(id));
       if (!o) return;
+      const codDecision = e.target.closest("[data-order-cod-decision]")?.dataset
+        .orderCodDecision;
+      if (codDecision) {
+        if (!window.DartOrdersApi?.codVerification) {
+          alert("COD verification requires the secure server API.");
+          return;
+        }
+        const defaultReason =
+          codDecision === "verify"
+            ? "Customer/order COD details verified"
+            : "COD verification failed";
+        const reason = prompt("ملاحظة التحقق من COD:", defaultReason);
+        if (reason === null) return;
+        try {
+          await window.DartOrdersApi.codVerification(o.orderId || o.id, {
+            expectedVersion: Math.max(1, Number(o.version || 1)),
+            decision: codDecision,
+            reason: String(reason).trim() || defaultReason,
+          });
+        } catch (error) {
+          if (error?.code === "ORDER_VERSION_CONFLICT") {
+            await window.DartOrdersApi.hydrate(true).catch(() => {});
+          }
+          alert(error?.message || "COD verification update failed.");
+        }
+        return;
+      }
       const target = e.target.closest("[data-order-target]")?.dataset
         .orderTarget;
       if (target) {
@@ -3732,6 +3770,24 @@ function renderOrders(dataArray) {
       dartAppendOperationGroupHeading(c, "Delivery", meta.records.length, "orders", o, "Each order and item remains independent.");
     const next = dartNextStatus(o.status),
       net = dartOrderNet(o),
+      verificationStatus = String(
+        o.verificationStatus || o.codVerificationStatus || "Not Required",
+      ),
+      riskLevel = String(o.riskLevel || "Low"),
+      customerRiskLevel = String(o.customerRiskLevel || riskLevel),
+      isCashOrder = String(o.paymentMethod || "").toLowerCase().includes("cash"),
+      codBlocked =
+        isCashOrder && !["Not Required", "Verified"].includes(verificationStatus),
+      refusalHistory = Array.isArray(o.refusalHistory) ? o.refusalHistory : [],
+      refusalSummary = refusalHistory
+        .slice(0, 10)
+        .map(
+          (row) =>
+            `${row.orderId || "-"} · ${String(row.refusedAt || "-").slice(0, 10)} · ${row.reason || "Other"}`,
+        )
+        .join(" | "),
+      riskMeta =
+        `<small class="dart-kpi-inline" title="${dartEsc(refusalSummary || "No refusal history")}">Order risk ${dartEsc(riskLevel)} (${Number(o.riskScore) || 0}) · Customer ${dartEsc(customerRiskLevel)} · Verification ${dartEsc(verificationStatus)} · Refusals ${Number(o.refusalsInWindow) || 0}</small>`,
       rep =
         o.representativeName ||
         dartFindRepById(o.representativeId)?.name ||
@@ -3740,9 +3796,18 @@ function renderOrders(dataArray) {
         (o.items || [])
           .map((x) => `<div class="order-item-chip">${dartEsc(x)}</div>`)
           .join("") || "-";
-    const nextBtn = next
-        ? `<button class="dart-status-btn" data-order-target="${dartEsc(next)}">${dartEsc(next)}</button>`
-        : "",
+    const nextBtn =
+        next && dartCanTransition(o, next)
+          ? `<button class="dart-status-btn" data-order-target="${dartEsc(next)}">${dartEsc(next)}</button>`
+          : next === "Preparing" && codBlocked
+            ? '<button class="dart-status-btn" disabled title="COD verification required">Verify first</button>'
+            : "",
+      codActions =
+        codBlocked &&
+        ["New", "Accepted"].includes(o.status) &&
+        window.DartAdminAccess?.can?.("orders.verify_cod") === true
+          ? '<button class="dart-status-btn" data-order-cod-decision="verify">Verify COD</button><button class="dart-cancel-btn" data-order-cod-decision="fail">Fail COD</button>'
+          : "",
       back =
         dartPreviousStatus(o.status) &&
         !["Refused", "Cancelled", "Needs Attention"].includes(o.status)
@@ -3763,7 +3828,7 @@ function renderOrders(dataArray) {
           : "";
     c.insertAdjacentHTML(
       "beforeend",
-      `<div class="${getRowClass(o)}" data-id="${dartEsc(o.id)}"><input type="checkbox" class="model-checkbox" ${o.isChecked ? "checked" : ""} ${dartIsArchived(o) ? "disabled" : ""}><div class="w500 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(o) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-order-history="1"><i class="bx bx-history"></i></button>${back}<span class="dart-status-actions">${nextBtn}${refuse}${cancel}${pickup}</span></div><span class="text-item w150">${dartEsc(o.orderId)}</span><span class="text-item w150">${dartEsc(o.date || "-")}</span><span class="text-item w150">${dartEsc(o.time || "-")}</span><span class="text-item w200"><span class="status-pill ${dartStatusClass(o.status)}">${dartEsc(o.status)}</span></span><span class="text-item w150">${dartEsc(o.clientId || "-")}</span><span class="text-item w200">${dartEsc(o.clientName)}</span><span class="text-item w150">${dartEsc(o.phone1)}</span><span class="text-item w150">${dartEsc(o.phone2 || "-")}</span><span class="text-item w150">${dartEsc(o.email || "-")}</span><span class="text-item w150">${(o.items || []).length}</span><div class="text-item w500"><div class="order-items-grid">${chips}</div></div><span class="text-item w150">${dartMoney(o.totalPrice)}</span><span class="text-item w150">${Number(o.discount) || 0}%</span><span class="text-item w150">${dartEsc(o.reasonDeduction || "-")}</span><span class="text-item w150 order-final-amount">${dartMoney(net)}</span><span class="text-item w150"><span class="payment-cell"><i class="${dartPaymentIcon(o.paymentMethod)}"></i>${dartEsc(o.paymentMethod || "-")}</span></span><span class="text-item w150">${dartEsc(o.paymentStatus || "Unpaid")}</span><span class="text-item w150">${dartEsc(o.orderSource || "Manual")}</span><span class="text-item w150">${dartEsc(rep)}</span><span class="text-item w150">${dartEsc(o.deliveryNotes || "-")}</span><span class="text-item w150">${dartEsc(o.country || "Egypt")}</span><span class="text-item w150">${dartEsc(o.governorate || "-")}</span><span class="text-item w150">${dartEsc(o.area || "-")}</span><span class="text-item w150">${dartEsc(o.street || "-")}</span><span class="text-item w150">${dartEsc(o.building || "-")}</span><span class="text-item w150">${dartEsc(o.floor || "-")}</span></div>`,
+      `<div class="${getRowClass(o)}" data-id="${dartEsc(o.id)}"><input type="checkbox" class="model-checkbox" ${o.isChecked ? "checked" : ""} ${dartIsArchived(o) ? "disabled" : ""}><div class="w500 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(o) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-order-history="1"><i class="bx bx-history"></i></button>${back}<span class="dart-status-actions">${nextBtn}${codActions}${refuse}${cancel}${pickup}</span></div><span class="text-item w150">${dartEsc(o.orderId)}</span><span class="text-item w150">${dartEsc(o.date || "-")}</span><span class="text-item w150">${dartEsc(o.time || "-")}</span><span class="text-item w200"><span class="status-pill ${dartStatusClass(o.status)}">${dartEsc(o.status)}</span>${riskMeta}</span><span class="text-item w150">${dartEsc(o.clientId || "-")}</span><span class="text-item w200">${dartEsc(o.clientName)}</span><span class="text-item w150">${dartEsc(o.phone1)}</span><span class="text-item w150">${dartEsc(o.phone2 || "-")}</span><span class="text-item w150">${dartEsc(o.email || "-")}</span><span class="text-item w150">${(o.items || []).length}</span><div class="text-item w500"><div class="order-items-grid">${chips}</div></div><span class="text-item w150">${dartMoney(o.totalPrice)}</span><span class="text-item w150">${Number(o.discount) || 0}%</span><span class="text-item w150">${dartEsc(o.reasonDeduction || "-")}</span><span class="text-item w150 order-final-amount">${dartMoney(net)}</span><span class="text-item w150"><span class="payment-cell"><i class="${dartPaymentIcon(o.paymentMethod)}"></i>${dartEsc(o.paymentMethod || "-")}</span></span><span class="text-item w150">${dartEsc(o.paymentStatus || "Unpaid")}</span><span class="text-item w150">${dartEsc(o.orderSource || "Manual")}</span><span class="text-item w150">${dartEsc(rep)}</span><span class="text-item w150">${dartEsc(o.deliveryNotes || "-")}</span><span class="text-item w150">${dartEsc(o.country || "Egypt")}</span><span class="text-item w150">${dartEsc(o.governorate || "-")}</span><span class="text-item w150">${dartEsc(o.area || "-")}</span><span class="text-item w150">${dartEsc(o.street || "-")}</span><span class="text-item w150">${dartEsc(o.building || "-")}</span><span class="text-item w150">${dartEsc(o.floor || "-")}</span></div>`,
     );
   });
   updateOrderCards();

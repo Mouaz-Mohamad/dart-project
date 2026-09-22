@@ -214,9 +214,18 @@
     return normalized;
   }
 
+  function settingsReadPath() {
+    const mayReadPrivate =
+      IS_ADMIN && root.DartAdminAccess?.can?.("settings.manage") === true;
+    return mayReadPrivate
+      ? "/api/v1/admin/site-settings"
+      : "/api/v1/site-settings";
+  }
+
   async function hydrate(force = false) {
     if (!API_BASE) throw new Error("Site settings API is not configured.");
-    const payload = await api("/api/v1/site-settings", {
+    const settingsPath = settingsReadPath();
+    const payload = await api(settingsPath, {
       headers: !force && publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
     });
     if (payload?.notModified) return get();
@@ -228,8 +237,10 @@
     if (!API_BASE || root.document?.hidden) return;
     if (Date.now() - lastSettingsCheckAt < SETTINGS_POLL_MS) return;
     try {
-      const payload = await api("/api/v1/site-settings", {
-        headers: publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
+      const settingsPath = settingsReadPath();
+      const isPrivateRead = settingsPath.includes("/admin/");
+      const payload = await api(settingsPath, {
+        headers: !isPrivateRead && publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
       });
       if (payload?.notModified) return;
       const remoteVersion = Number(payload.version || 0);

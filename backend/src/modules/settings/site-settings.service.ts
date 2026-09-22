@@ -6,12 +6,20 @@ import { AppError } from "../../http/app-error.js";
 export class SiteSettingsService {
   public constructor(private readonly pool: Pool) {}
 
-  public async get(): Promise<{ version: number; settings: Record<string, unknown> }> {
+  public async get(
+    includePrivate = false,
+  ): Promise<{ version: number; settings: Record<string, unknown> }> {
     const result = await this.pool.query<{ version: string; data: Record<string, unknown> }>(
       "SELECT version::text, data FROM site_settings WHERE id='main'",
     );
     const row = result.rows[0];
-    return { version: Number(row?.version || 1), settings: row?.data || {} };
+    const settings = row?.data || {};
+    if (includePrivate) {
+      return { version: Number(row?.version || 1), settings };
+    }
+    const publicSettings = { ...settings };
+    delete publicSettings.codRisk;
+    return { version: Number(row?.version || 1), settings: publicSettings };
   }
 
   public async update(
@@ -23,28 +31,75 @@ export class SiteSettingsService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const current = await client.query<{ version: string }>(
-        "SELECT version::text FROM site_settings WHERE id='main' FOR UPDATE",
+      const current = await client.query<{
+        version: string;
+        data: Record<string, unknown>;
+      }>(
+        "SELECT version::text, data FROM site_settings WHERE id='main' FOR UPDATE",
       );
       const version = Number(current.rows[0]?.version || 1);
       if (version !== expectedVersion) {
         throw new AppError(409, "SETTINGS_VERSION_CONFLICT", "Settings changed on another device; reload and retry");
       }
+      const currentSettings = current.rows[0]?.data || {};
+      const currentCodRisk =
+        currentSettings.codRisk &&
+        typeof currentSettings.codRisk === "object" &&
+        !Array.isArray(currentSettings.codRisk)
+          ? currentSettings.codRisk as Record<string, unknown>
+          : null;
+      const incomingCodRisk =
+        settings.codRisk &&
+        typeof settings.codRisk === "object" &&
+        !Array.isArray(settings.codRisk)
+          ? settings.codRisk as Record<string, unknown>
+          : null;
+      const nextSettings: Record<string, unknown> = { ...settings };
+      let codRiskPolicyVersion = Number(currentCodRisk?.version || 1);
+
+      if (currentCodRisk && !incomingCodRisk) {
+        // Older Settings UIs do not know about COD policy yet; never delete it accidentally.
+        nextSettings.codRisk = currentCodRisk;
+      } else if (incomingCodRisk) {
+        const previousComparable = { ...(currentCodRisk || {}) };
+        const incomingComparable = { ...incomingCodRisk };
+        delete previousComparable.version;
+        delete incomingComparable.version;
+        const policyChanged =
+          JSON.stringify(previousComparable) !== JSON.stringify(incomingComparable);
+        codRiskPolicyVersion =
+          currentCodRisk && policyChanged
+            ? Number(currentCodRisk.version || 1) + 1
+            : Number(currentCodRisk?.version || incomingCodRisk.version || 1);
+        nextSettings.codRisk = {
+          ...incomingCodRisk,
+          version: Math.max(1, Math.round(codRiskPolicyVersion)),
+        };
+      }
+
       const next = version + 1;
       await client.query(
         `UPDATE site_settings
             SET data=$1::jsonb, version=$2, updated_by=$3, updated_at=now()
           WHERE id='main'`,
-        [JSON.stringify(settings), next, actorId],
+        [JSON.stringify(nextSettings), next, actorId],
       );
       await client.query(
         `INSERT INTO audit_logs (
            actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
          ) VALUES ('staff',$1,'SITE_SETTINGS_UPDATED','site_settings','main',$2,$3::jsonb)`,
-        [actorId, requestId, JSON.stringify({ previousVersion: version, newVersion: next })],
+        [
+          actorId,
+          requestId,
+          JSON.stringify({
+            previousVersion: version,
+            newVersion: next,
+            codRiskPolicyVersion,
+          }),
+        ],
       );
       await client.query("COMMIT");
-      return { version: next, settings };
+      return { version: next, settings: nextSettings };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

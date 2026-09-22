@@ -190,6 +190,13 @@
     );
   }
 
+  async function codVerification(orderRef, input) {
+    return await runAuthoritativeMutation(
+      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/cod-verification`,
+      input,
+    );
+  }
+
   async function stateAction(orderRef, action) {
     return await runAuthoritativeMutation(
       `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/state`,
@@ -314,6 +321,7 @@
     createManual,
     updateManual,
     workflow,
+    codVerification,
     stateAction,
     sync,
     flush,

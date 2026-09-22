@@ -1293,6 +1293,31 @@
                 </article>
 
 
+                <article id="settings-cod-risk-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>COD RISK &amp; VERIFICATION</span>
+                        <h2>Order verification policy</h2>
+                        <p>أول رفض يشدد التحقق، ورفضان داخل نافذة الرفض يدخلان Manual Review. القيم الخاصة بسرعة تكرار الطلب وقيمة الطلب قابلة للتعديل وليست قواعد مخفية في الكود.</p>
+                    </div>
+                    <form id="settings-cod-risk-form" class="dart-settings-fields">
+                        <label for="settings-cod-risk-version">Policy version<input id="settings-cod-risk-version" type="number" min="1" step="1" readonly></label>
+                        <label for="settings-cod-refusal-window">Refusal window (days)<input id="settings-cod-refusal-window" type="number" min="1" max="3650" step="1" required></label>
+                        <label for="settings-cod-manual-refusals">Manual review after refusals<input id="settings-cod-manual-refusals" type="number" min="2" max="100" step="1" required></label>
+                        <label for="settings-cod-rapid-window">Rapid repeat window (minutes)<input id="settings-cod-rapid-window" type="number" min="1" max="10080" step="1" required></label>
+                        <label for="settings-cod-rapid-count">Rapid repeat order count<input id="settings-cod-rapid-count" type="number" min="2" max="100" step="1" required></label>
+                        <label for="settings-cod-high-value">High order value (EGP)<input id="settings-cod-high-value" type="number" min="0" step="1" required></label>
+                        <label for="settings-cod-restricted-value">Restricted order value (EGP)<input id="settings-cod-restricted-value" type="number" min="0" step="1" required></label>
+                        <label for="settings-cod-medium-score">Medium score from<input id="settings-cod-medium-score" type="number" min="1" max="98" step="1" required></label>
+                        <label for="settings-cod-high-score">High score from<input id="settings-cod-high-score" type="number" min="2" max="99" step="1" required></label>
+                        <label for="settings-cod-restricted-score">Restricted score from<input id="settings-cod-restricted-score" type="number" min="3" max="100" step="1" required></label>
+                        <label class="dart-settings-check" for="settings-cod-first-order"><input id="settings-cod-first-order" type="checkbox"> Verify first order</label>
+                        <label class="dart-settings-check" for="settings-cod-unverified-phone"><input id="settings-cod-unverified-phone" type="checkbox"> Verify when phone is not verified</label>
+                        <button id="save-cod-risk-settings" type="submit" class="dart-settings-save">Save COD risk policy</button>
+                    </form>
+                </article>
+
+
                 <article id="settings-waiting-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-regular fa-clock"></i></div>
                     <div class="dart-settings-card-copy">

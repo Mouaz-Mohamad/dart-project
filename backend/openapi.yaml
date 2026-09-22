@@ -3,7 +3,7 @@
 openapi: 3.1.0
 info:
   title: Dart Backend API
-  version: 0.5.0
+  version: 0.6.0
   description: Server-authoritative API for Dart | for you. Identity sessions use Secure HttpOnly cookies and CSRF tokens.
 servers:
   - url: /api/v1
@@ -13,6 +13,7 @@ tags:
   - name: Staff Auth
   - name: Representative Auth
   - name: Sessions\n  - name: Live Operations
+  - name: Orders
 paths:
   /health/live:
     get:
@@ -326,6 +327,34 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: Staff sessions revoked }
+
+  /admin/orders/{orderRef}/cod-verification:
+    post:
+      tags: [Orders]
+      summary: Record a manual COD verification decision before Preparing
+      operationId: decideCodVerification
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: orderRef
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 160 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion, decision, reason]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                decision: { type: string, enum: [verify, fail] }
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        "200": { description: Verification decision committed and refreshed order state returned }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
 components:
   securitySchemes:

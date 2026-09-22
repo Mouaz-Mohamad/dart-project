@@ -303,6 +303,31 @@ export function createCommerceRouter(
   );
 
   router.post(
+    "/admin/orders/:orderRef/cod-verification",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("orders.verify_cod"),
+    async (request, response) => {
+      const orderRef = z.string().trim().min(1).max(160).parse(request.params.orderRef);
+      const body = z.object({
+        expectedVersion: z.number().int().positive(),
+        decision: z.enum(["verify", "fail"]),
+        reason: z.string().trim().min(3).max(500),
+      }).parse(request.body);
+      response.status(200).json(
+        await commerce.adminCodVerificationAction(
+          request.auth!.userId,
+          orderRef,
+          body,
+          String(request.id),
+        ),
+      );
+    },
+  );
+
+  router.post(
     "/admin/orders/:orderRef/state",
     signedIn,
     csrf,

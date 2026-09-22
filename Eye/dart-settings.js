@@ -228,6 +228,19 @@
     $("settings-site-discount-percent").value = settings.siteDiscount.percent;
     $("settings-site-discount-start").value = settings.siteDiscount.startsAt || "";
     $("settings-site-discount-end").value = settings.siteDiscount.endsAt || "";
+    const codRisk = settings.codRisk || {};
+    $("settings-cod-risk-version").value = Math.max(1, Number(codRisk.version) || 1);
+    $("settings-cod-refusal-window").value = Math.max(1, Number(codRisk.refusalWindowDays) || 90);
+    $("settings-cod-manual-refusals").value = Math.max(2, Number(codRisk.manualReviewRefusalCount) || 2);
+    $("settings-cod-rapid-window").value = Math.max(1, Number(codRisk.rapidRepeatWindowMinutes) || 120);
+    $("settings-cod-rapid-count").value = Math.max(2, Number(codRisk.rapidRepeatOrderCount) || 3);
+    $("settings-cod-high-value").value = Math.max(0, Number(codRisk.highOrderValueMinor) || 300000) / 100;
+    $("settings-cod-restricted-value").value = Math.max(0, Number(codRisk.restrictedOrderValueMinor) || 750000) / 100;
+    $("settings-cod-medium-score").value = Math.max(1, Number(codRisk.mediumScoreMin) || 20);
+    $("settings-cod-high-score").value = Math.max(2, Number(codRisk.highScoreMin) || 50);
+    $("settings-cod-restricted-score").value = Math.max(3, Number(codRisk.restrictedScoreMin) || 80);
+    $("settings-cod-first-order").checked = codRisk.requireFirstOrderVerification !== false;
+    $("settings-cod-unverified-phone").checked = codRisk.requireUnverifiedPhoneVerification !== false;
     const waiting = settings.waiting || {};
     $("settings-waiting-enabled").checked = waiting.enabled !== false;
     $("settings-waiting-hours").value = Math.min(72, Math.max(1, Number(waiting.reservationHours) || 4));
@@ -358,6 +371,40 @@
     next.refundCustomerFee = Math.max(0, number("settings-refund-fee", 100));
     next.repeatExchangeCustomerFee = Math.max(0, number("settings-repeat-exchange-fee", 50));
     saveSettings(next, "Pricing and future-record fee defaults updated");
+  });
+
+  $("settings-cod-risk-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const medium = Math.max(1, Math.min(98, number("settings-cod-medium-score", 20)));
+    const high = Math.max(2, Math.min(99, number("settings-cod-high-score", 50)));
+    const restricted = Math.max(3, Math.min(100, number("settings-cod-restricted-score", 80)));
+    const highValueMinor = Math.max(0, Math.round(number("settings-cod-high-value", 3000) * 100));
+    const restrictedValueMinor = Math.max(0, Math.round(number("settings-cod-restricted-value", 7500) * 100));
+    if (!(medium < high && high < restricted)) {
+      announce("Risk score thresholds must be ordered Medium < High < Restricted.", true);
+      return;
+    }
+    if (restrictedValueMinor < highValueMinor) {
+      announce("Restricted order value must be greater than or equal to High order value.", true);
+      return;
+    }
+    const next = root.DartSiteSettings.get();
+    next.codRisk = {
+      ...(next.codRisk || {}),
+      version: Math.max(1, Number(next.codRisk?.version) || 1),
+      refusalWindowDays: Math.max(1, Math.round(number("settings-cod-refusal-window", 90))),
+      manualReviewRefusalCount: Math.max(2, Math.round(number("settings-cod-manual-refusals", 2))),
+      rapidRepeatWindowMinutes: Math.max(1, Math.round(number("settings-cod-rapid-window", 120))),
+      rapidRepeatOrderCount: Math.max(2, Math.round(number("settings-cod-rapid-count", 3))),
+      highOrderValueMinor: highValueMinor,
+      restrictedOrderValueMinor: restrictedValueMinor,
+      mediumScoreMin: medium,
+      highScoreMin: high,
+      restrictedScoreMin: restricted,
+      requireFirstOrderVerification: $("settings-cod-first-order").checked,
+      requireUnverifiedPhoneVerification: $("settings-cod-unverified-phone").checked,
+    };
+    saveSettings(next, "COD risk thresholds updated");
   });
 
   $("settings-waiting-form")?.addEventListener("submit", (event) => {

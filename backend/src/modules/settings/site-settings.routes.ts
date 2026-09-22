@@ -39,6 +39,18 @@ export function createSiteSettingsRouter(
     response.status(200).json(payload);
   });
 
+  router.get(
+    "/admin/site-settings",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requirePermission("settings.manage"),
+    async (_request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await settings.get(true));
+    },
+  );
+
   router.put(
     "/admin/site-settings",
     signedIn,

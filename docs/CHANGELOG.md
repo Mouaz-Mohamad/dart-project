@@ -1,5 +1,15 @@
 # Dart Project changelog
 
+## COD Risk & Verification — 2026-09-23
+
+- Added server-authoritative Low / Medium / High / Restricted COD risk evaluation using first-order, verified-phone, refusal-history, rapid-repeat and order-value signals.
+- Added the approved refusal escalation: one refusal strengthens verification and two refusals inside the configured 90-day window require Manual Review.
+- Added versioned COD thresholds under Site Settings; unspecified rapid-repeat/order-value numbers ship as editable starter defaults instead of hidden hard-coded policy.
+- Added per-order verification state and a protected `orders.verify_cod` action with optimistic locking, audit history and a dedicated verification event timeline.
+- Added a hard Backend gate preventing entry into `Preparing` until required verification is `Verified`; transitional bulk order state writes cannot bypass it.
+- Added customer/order risk badges, refusal-window context and Verify/Fail COD controls to Dart Eye.
+- This is a CI-only batch with no `[deploy]` marker; Vercel deployment remains intentionally skipped.
+
 ## Production activation — 2026-09-22
 
 - Activate the simplified Dart Eye Staff email-verification flow after SMTP production configuration was completed.

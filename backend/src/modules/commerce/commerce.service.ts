@@ -4,6 +4,12 @@ import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
+import {
+  evaluateCodRisk,
+  resolveCodRiskPolicy,
+  type CodRiskLevel,
+  type CodVerificationStatus,
+} from "./cod-risk.js";
 
 export interface CartLineInput {
   modelId: string;
@@ -68,6 +74,23 @@ interface AdminOrderRow {
   id: string;
   order_code: string;
   status: string;
+  cod_risk_level: CodRiskLevel;
+  cod_risk_score: string | number;
+  cod_risk_reasons: string[] | null;
+  cod_refusals_in_window: string | number;
+  cod_risk_policy_version: string | number;
+  cod_verification_required: boolean;
+  cod_verification_status: CodVerificationStatus;
+  cod_verification_reason: string;
+  cod_verified_at: Date | string | null;
+  customer_cod_risk_level: CodRiskLevel | null;
+  customer_cod_risk_score: string | number | null;
+  customer_cod_refusals_in_window: string | number | null;
+  refusal_history: Array<{
+    orderId: string;
+    refusedAt: Date | string;
+    reason: string;
+  }> | null;
   created_at: Date | string;
   delivered_at: Date | string | null;
   client_code: string | null;
@@ -336,6 +359,310 @@ function flexibleDateExpiry(value: unknown): number | null {
 
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
+
+
+  private async refreshCodRiskForOrder(
+    client: PoolClient,
+    orderId: string,
+    customerUserId: string | null,
+    finalMinor: number,
+    options: {
+      preserveVerification?: boolean;
+      actorType?: "system" | "customer" | "staff";
+      actorId?: string | null;
+      reason?: string;
+      requestId?: string | undefined;
+    } = {},
+  ): Promise<{
+    riskLevel: CodRiskLevel;
+    riskScore: number;
+    riskReasons: string[];
+    verificationRequired: boolean;
+    verificationStatus: CodVerificationStatus;
+    policyVersion: number;
+    refusalsInWindow: number;
+    changed: boolean;
+  }> {
+    const settingsResult = await client.query<{ data: Record<string, unknown> }>(
+      "SELECT data FROM site_settings WHERE id='main'",
+    );
+    const settings = settingsResult.rows[0]?.data || {};
+    const policy = resolveCodRiskPolicy(settings.codRisk);
+
+    let priorOrderCount = 0;
+    let refusalsInWindow = 0;
+    let recentPriorOrders = 0;
+    let verifiedPhone = false;
+
+    if (customerUserId) {
+      const statsResult = await client.query<{
+        prior_orders: string;
+        refusals_in_window: string;
+        recent_prior_orders: string;
+        verified_phone: boolean;
+      }>(
+        `SELECT
+           (
+             SELECT count(*)::text
+               FROM orders prior
+              WHERE prior.customer_user_id=$1
+                AND prior.id<>$2
+                AND NOT prior.is_deleted
+           ) AS prior_orders,
+           (
+             SELECT count(*)::text
+               FROM orders refused
+              WHERE refused.customer_user_id=$1
+                AND refused.status='Refused'
+                AND NOT refused.is_deleted
+                AND refused.updated_at >= now() - ($3::int * interval '1 day')
+           ) AS refusals_in_window,
+           (
+             SELECT count(*)::text
+               FROM orders recent
+              WHERE recent.customer_user_id=$1
+                AND recent.id<>$2
+                AND NOT recent.is_deleted
+                AND recent.created_at >= now() - ($4::int * interval '1 minute')
+           ) AS recent_prior_orders,
+           EXISTS (
+             SELECT 1
+               FROM account_phones phone
+              WHERE phone.user_id=$1
+                AND phone.account_type='customer'
+                AND phone.verified_at IS NOT NULL
+           ) AS verified_phone`,
+        [
+          customerUserId,
+          orderId,
+          policy.refusalWindowDays,
+          policy.rapidRepeatWindowMinutes,
+        ],
+      );
+      const stats = statsResult.rows[0];
+      priorOrderCount = Number(stats?.prior_orders || 0);
+      refusalsInWindow = Number(stats?.refusals_in_window || 0);
+      recentPriorOrders = Number(stats?.recent_prior_orders || 0);
+      verifiedPhone = Boolean(stats?.verified_phone);
+    }
+
+    const decision = evaluateCodRisk(
+      {
+        priorOrderCount,
+        refusalsInWindow,
+        recentOrderCount: recentPriorOrders + 1,
+        verifiedPhone,
+        orderValueMinor: Math.max(0, Math.round(finalMinor)),
+      },
+      policy,
+    );
+    const customerDecision = evaluateCodRisk(
+      {
+        priorOrderCount,
+        refusalsInWindow,
+        recentOrderCount: recentPriorOrders + 1,
+        verifiedPhone,
+        orderValueMinor: 0,
+      },
+      policy,
+    );
+
+    const currentResult = await client.query<{
+      cod_risk_level: CodRiskLevel;
+      cod_risk_score: number;
+      cod_risk_reasons: string[];
+      cod_refusals_in_window: number;
+      cod_risk_policy_version: number;
+      cod_verification_required: boolean;
+      cod_verification_status: CodVerificationStatus;
+    }>(
+      `SELECT cod_risk_level, cod_risk_score, cod_risk_reasons,
+              cod_refusals_in_window, cod_risk_policy_version,
+              cod_verification_required, cod_verification_status
+         FROM orders
+        WHERE id=$1
+        FOR UPDATE`,
+      [orderId],
+    );
+    const current = currentResult.rows[0];
+    if (!current) throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+
+    let verificationStatus = decision.recommendedVerificationStatus;
+    const preserveVerification = options.preserveVerification !== false;
+    if (
+      preserveVerification &&
+      Number(current.cod_risk_policy_version) === policy.version &&
+      current.cod_verification_status === "Verified" &&
+      decision.recommendedVerificationStatus !== "Manual Review"
+    ) {
+      verificationStatus = "Verified";
+    } else if (
+      preserveVerification &&
+      Number(current.cod_risk_policy_version) === policy.version &&
+      current.cod_verification_status === "Failed" &&
+      decision.verificationRequired
+    ) {
+      verificationStatus = "Failed";
+    }
+
+    const riskReasons = decision.riskReasons;
+    const reason =
+      riskReasons.length > 0 ? riskReasons.join(", ") : "No elevated COD risk signals";
+    const currentReasons = Array.isArray(current.cod_risk_reasons)
+      ? current.cod_risk_reasons
+      : [];
+    const changed =
+      current.cod_risk_level !== decision.riskLevel ||
+      Number(current.cod_risk_score) !== decision.riskScore ||
+      JSON.stringify(currentReasons) !== JSON.stringify(riskReasons) ||
+      Number(current.cod_refusals_in_window) !== refusalsInWindow ||
+      Number(current.cod_risk_policy_version) !== policy.version ||
+      Boolean(current.cod_verification_required) !== decision.verificationRequired ||
+      current.cod_verification_status !== verificationStatus;
+
+    if (changed) {
+      await client.query(
+        `UPDATE orders
+            SET cod_risk_level=$2,
+                cod_risk_score=$3,
+                cod_risk_reasons=$4::jsonb,
+                cod_refusals_in_window=$5,
+                cod_risk_policy_version=$6,
+                cod_verification_required=$7,
+                cod_verification_status=$8,
+                cod_verification_reason=$9,
+                cod_verified_at=CASE WHEN $8='Verified' THEN cod_verified_at ELSE NULL END,
+                cod_verified_by=CASE WHEN $8='Verified' THEN cod_verified_by ELSE NULL END,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [
+          orderId,
+          decision.riskLevel,
+          decision.riskScore,
+          JSON.stringify(riskReasons),
+          refusalsInWindow,
+          policy.version,
+          decision.verificationRequired,
+          verificationStatus,
+          reason,
+        ],
+      );
+      await client.query(
+        `INSERT INTO cod_verification_events (
+           order_id, customer_user_id, event_type, risk_level, risk_score,
+           verification_status, policy_version, reason, actor_type, actor_id, metadata
+         ) VALUES ($1,$2,'RISK_EVALUATED',$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`,
+        [
+          orderId,
+          customerUserId,
+          decision.riskLevel,
+          decision.riskScore,
+          verificationStatus,
+          policy.version,
+          options.reason || reason,
+          options.actorType || "system",
+          options.actorId || null,
+          JSON.stringify({
+            riskReasons,
+            refusalsInWindow,
+            priorOrderCount,
+            recentOrderCount: recentPriorOrders + 1,
+            verifiedPhone,
+            orderValueMinor: Math.max(0, Math.round(finalMinor)),
+          }),
+        ],
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+         ) VALUES ($1,$2,'COD_RISK_EVALUATED','orders',$3,$4,$5::jsonb)`,
+        [
+          options.actorType || "system",
+          options.actorId || null,
+          orderId,
+          options.requestId || null,
+          JSON.stringify({
+            riskLevel: decision.riskLevel,
+            riskScore: decision.riskScore,
+            verificationStatus,
+            policyVersion: policy.version,
+            refusalsInWindow,
+            reason: options.reason || "",
+          }),
+        ],
+      );
+    }
+
+    if (customerUserId) {
+      await client.query(
+        `UPDATE customers
+            SET cod_risk_level=$2,
+                cod_risk_score=$3,
+                cod_risk_reasons=$4::jsonb,
+                cod_refusals_in_window=$5,
+                cod_risk_policy_version=$6,
+                cod_risk_updated_at=now(),
+                updated_at=now()
+          WHERE user_id=$1`,
+        [
+          customerUserId,
+          customerDecision.riskLevel,
+          customerDecision.riskScore,
+          JSON.stringify(customerDecision.riskReasons),
+          refusalsInWindow,
+          policy.version,
+        ],
+      );
+    }
+
+    return {
+      riskLevel: decision.riskLevel,
+      riskScore: decision.riskScore,
+      riskReasons,
+      verificationRequired: decision.verificationRequired,
+      verificationStatus,
+      policyVersion: policy.version,
+      refusalsInWindow,
+      changed,
+    };
+  }
+
+  private async refreshActiveCustomerCodRisk(
+    client: PoolClient,
+    customerUserId: string,
+    excludedOrderId: string,
+    actorId: string | null,
+    requestId?: string,
+  ): Promise<void> {
+    const rows = await client.query<{ id: string; final_minor: string }>(
+      `SELECT id::text, final_minor::text
+         FROM orders
+        WHERE customer_user_id=$1
+          AND id<>$2
+          AND status IN ('New','Accepted')
+          AND NOT is_deleted
+          AND lower(payment_method) LIKE '%cash%'
+        ORDER BY created_at
+        FOR UPDATE`,
+      [customerUserId, excludedOrderId],
+    );
+    for (const row of rows.rows) {
+      await this.refreshCodRiskForOrder(
+        client,
+        row.id,
+        customerUserId,
+        Number(row.final_minor || 0),
+        {
+          preserveVerification: false,
+          actorType: actorId ? "staff" : "system",
+          actorId,
+          requestId,
+          reason: "CUSTOMER_REFUSAL_PROFILE_CHANGED",
+        },
+      );
+    }
+  }
 
   public async publicLeaderboard(): Promise<{
     period: string;
@@ -1727,6 +2054,20 @@ export class CommerceService {
         ],
       );
       const order = orderResult.rows[0]!;
+
+      await this.refreshCodRiskForOrder(
+        client,
+        order.id,
+        customerUserId,
+        finalMinor,
+        {
+          preserveVerification: false,
+          actorType: "customer",
+          actorId: customerUserId,
+          requestId,
+          reason: "ORDER_CREATED",
+        },
+      );
 
       if (promotion?.type === "Birthday" && birthdayReward) {
         birthdayReward.status = "Reserved";
@@ -4471,6 +4812,39 @@ export class CommerceService {
     );
     const result = await this.pool.query<AdminOrderRow>(
       `SELECT o.*, c.client_code,
+          c.cod_risk_level AS customer_cod_risk_level,
+          c.cod_risk_score AS customer_cod_risk_score,
+          c.cod_refusals_in_window AS customer_cod_refusals_in_window,
+          COALESCE((
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'orderId', history.order_code,
+                'refusedAt', history.refused_at,
+                'reason', history.reason
+              )
+              ORDER BY history.refused_at DESC
+            )
+              FROM (
+                SELECT refused.order_code,
+                       COALESCE(
+                         (
+                           SELECT max(event.occurred_at)
+                             FROM order_events event
+                            WHERE event.order_id=refused.id
+                              AND event.to_status='Refused'
+                         ),
+                         refused.updated_at
+                       ) AS refused_at,
+                       COALESCE(NULLIF(refused.legacy->>'refusalReason',''),'Other') AS reason
+                  FROM orders refused
+                 WHERE refused.customer_user_id=o.customer_user_id
+                   AND o.customer_user_id IS NOT NULL
+                   AND refused.status='Refused'
+                   AND NOT refused.is_deleted
+                 ORDER BY refused_at DESC
+                 LIMIT 10
+              ) history
+          ), '[]'::jsonb) AS refusal_history,
           r.user_id::text AS representative_user_id,
           r.representative_code,
           r.full_name AS representative_name,
@@ -4527,6 +4901,20 @@ export class CommerceService {
           id: row.id,
           orderId: row.order_code,
           status: row.status,
+          riskLevel: row.cod_risk_level,
+          riskScore: Number(row.cod_risk_score || 0),
+          riskReasons: Array.isArray(row.cod_risk_reasons) ? row.cod_risk_reasons : [],
+          riskPolicyVersion: Number(row.cod_risk_policy_version || 1),
+          verificationRequired: Boolean(row.cod_verification_required),
+          verificationStatus: row.cod_verification_status,
+          verificationReason: row.cod_verification_reason || "",
+          verifiedAt: row.cod_verified_at || null,
+          customerRiskLevel: row.customer_cod_risk_level || row.cod_risk_level,
+          customerRiskScore: Number(row.customer_cod_risk_score ?? row.cod_risk_score ?? 0),
+          refusalsInWindow: Number(
+            row.customer_cod_refusals_in_window ?? row.cod_refusals_in_window ?? 0,
+          ),
+          refusalHistory: Array.isArray(row.refusal_history) ? row.refusal_history : [],
           createdAt: row.created_at,
           orderCreatedAt: row.created_at,
           deliveredAt: row.delivered_at || legacy.deliveredAt,
@@ -4892,6 +5280,22 @@ export class CommerceService {
         ],
       );
 
+      if (String(input.paymentMethod || "Cash on Delivery").toLowerCase().includes("cash")) {
+        await this.refreshCodRiskForOrder(
+          client,
+          order.id,
+          customerUserId,
+          finalMinor,
+          {
+            preserveVerification: false,
+            actorType: "staff",
+            actorId,
+            requestId,
+            reason: "MANUAL_ORDER_CREATED",
+          },
+        );
+      }
+
       await client.query(
         `INSERT INTO order_events (
            order_id, event_type, from_status, to_status, actor_type, actor_id, metadata
@@ -4993,10 +5397,11 @@ export class CommerceService {
         order_discount_minor: string;
         final_minor: string;
         delivery_cost_minor: string;
+        customer_user_id: string | null;
       }>(
         `SELECT id::text, order_code, status, subtotal_minor::text,
                 order_discount_minor::text, final_minor::text,
-                delivery_cost_minor::text
+                delivery_cost_minor::text, customer_user_id::text
            FROM orders
           WHERE (id::text=$1 OR order_code=$1)
             AND NOT is_deleted
@@ -5184,6 +5589,22 @@ export class CommerceService {
         ],
       );
 
+      if (String(input.paymentMethod || "Cash on Delivery").toLowerCase().includes("cash")) {
+        await this.refreshCodRiskForOrder(
+          client,
+          existing.id,
+          customerUserId || existing.customer_user_id,
+          finalMinor,
+          {
+            preserveVerification: false,
+            actorType: "staff",
+            actorId,
+            requestId,
+            reason: "MANUAL_ORDER_UPDATED",
+          },
+        );
+      }
+
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
       );
@@ -5243,8 +5664,10 @@ export class CommerceService {
       "Representative On The Way",
       "Delivered",
     ];
+    let transactionOpen = false;
     try {
       await client.query("BEGIN");
+      transactionOpen = true;
       const orderResult = await client.query<{
         id: string;
         order_code: string;
@@ -5254,10 +5677,14 @@ export class CommerceService {
         is_deleted: boolean;
         payment_method: string;
         representative_user_id: string | null;
+        customer_user_id: string | null;
+        final_minor: string;
+        cod_verification_status: CodVerificationStatus;
         legacy: Record<string, unknown> | null;
       }>(
         `SELECT id::text, order_code, status, promotion, is_archived, is_deleted,
-                payment_method, representative_user_id::text, legacy
+                payment_method, representative_user_id::text, customer_user_id::text,
+                final_minor::text, cod_verification_status, legacy
            FROM orders
           WHERE id::text=$1 OR order_code=$1
           LIMIT 1
@@ -5302,6 +5729,63 @@ export class CommerceService {
           "ORDER_STATE_INVALID",
           `Invalid order transition: ${previousStatus} -> ${target}`,
         );
+      }
+
+      if (
+        target === "Preparing" &&
+        String(order.payment_method || "").toLowerCase().includes("cash")
+      ) {
+        const risk = await this.refreshCodRiskForOrder(
+          client,
+          order.id,
+          order.customer_user_id,
+          Number(order.final_minor || 0),
+          {
+            preserveVerification: true,
+            actorType: "staff",
+            actorId,
+            requestId,
+            reason: "PREPARING_GATE_RECHECK",
+          },
+        );
+        if (!["Not Required", "Verified"].includes(risk.verificationStatus)) {
+          if (risk.changed) {
+            await client.query(
+              "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
+            );
+          }
+          await client.query(
+            `INSERT INTO audit_logs (
+               actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+             ) VALUES ('staff',$1,'ORDER_PREPARING_BLOCKED','orders',$2,$3,$4::jsonb)`,
+            [
+              actorId,
+              order.id,
+              requestId,
+              JSON.stringify({
+                orderCode: order.order_code,
+                riskLevel: risk.riskLevel,
+                riskScore: risk.riskScore,
+                verificationStatus: risk.verificationStatus,
+                riskReasons: risk.riskReasons,
+                policyVersion: risk.policyVersion,
+              }),
+            ],
+          );
+          await client.query("COMMIT");
+          transactionOpen = false;
+          throw new AppError(
+            409,
+            "COD_VERIFICATION_REQUIRED",
+            "COD verification must be completed before Preparing",
+            {
+              riskLevel: risk.riskLevel,
+              riskScore: risk.riskScore,
+              verificationStatus: risk.verificationStatus,
+              riskReasons: risk.riskReasons,
+            },
+          );
+        }
       }
 
       let representativeUserId = order.representative_user_id;
@@ -5431,6 +5915,29 @@ export class CommerceService {
         actorId,
       );
 
+      if (target === "Refused" && order.customer_user_id) {
+        await this.refreshCodRiskForOrder(
+          client,
+          order.id,
+          order.customer_user_id,
+          Number(order.final_minor || 0),
+          {
+            preserveVerification: false,
+            actorType: "staff",
+            actorId,
+            requestId,
+            reason: "ORDER_REFUSED",
+          },
+        );
+        await this.refreshActiveCustomerCodRisk(
+          client,
+          order.customer_user_id,
+          order.id,
+          actorId,
+          requestId,
+        );
+      }
+
       const versionUpdate = await client.query<{ version: string }>(
         `UPDATE domain_state_versions
             SET version=version+1, updated_at=now()
@@ -5460,6 +5967,183 @@ export class CommerceService {
         ],
       );
 
+      await client.query("COMMIT");
+      transactionOpen = false;
+      const state = await this.adminOrders();
+      return {
+        version: Number(versionUpdate.rows[0]?.version || state.version),
+        orders: state.orders,
+      };
+    } catch (error) {
+      if (transactionOpen) await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+
+  public async adminCodVerificationAction(
+    actorId: string,
+    orderRef: string,
+    input: {
+      expectedVersion: number;
+      decision: "verify" | "fail";
+      reason: string;
+    },
+    requestId: string,
+  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{
+        id: string;
+        order_code: string;
+        status: string;
+        customer_user_id: string | null;
+        final_minor: string;
+        version: string;
+        is_deleted: boolean;
+        cod_verification_status: CodVerificationStatus;
+        payment_method: string;
+      }>(
+        `SELECT id::text, order_code, status, customer_user_id::text,
+                final_minor::text, version::text, is_deleted, cod_verification_status,
+                payment_method
+           FROM orders
+          WHERE id::text=$1 OR order_code=$1
+          LIMIT 1
+          FOR UPDATE`,
+        [orderRef],
+      );
+      const order = result.rows[0];
+      if (!order || order.is_deleted) {
+        throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+      }
+      if (Number(order.version) !== input.expectedVersion) {
+        throw new AppError(
+          409,
+          "ORDER_VERSION_CONFLICT",
+          "Order changed on another device; reload and retry",
+        );
+      }
+      if (!String(order.payment_method || "").toLowerCase().includes("cash")) {
+        throw new AppError(
+          409,
+          "COD_VERIFICATION_NOT_APPLICABLE",
+          "COD verification only applies to Cash on Delivery orders",
+        );
+      }
+      if (!["New", "Accepted"].includes(order.status)) {
+        throw new AppError(
+          409,
+          "COD_VERIFICATION_STATE_INVALID",
+          "COD verification can only be changed before Preparing",
+        );
+      }
+
+      const risk = await this.refreshCodRiskForOrder(
+        client,
+        order.id,
+        order.customer_user_id,
+        Number(order.final_minor || 0),
+        {
+          preserveVerification: true,
+          actorType: "staff",
+          actorId,
+          requestId,
+          reason: "MANUAL_VERIFICATION_REVIEW",
+        },
+      );
+      const currentAfterRisk = await client.query<{
+        cod_verification_status: CodVerificationStatus;
+      }>(
+        "SELECT cod_verification_status FROM orders WHERE id=$1 FOR UPDATE",
+        [order.id],
+      );
+      const previousVerificationStatus =
+        currentAfterRisk.rows[0]?.cod_verification_status || risk.verificationStatus;
+      const nextVerificationStatus: CodVerificationStatus =
+        input.decision === "verify" ? "Verified" : "Failed";
+
+      await client.query(
+        `UPDATE orders
+            SET cod_verification_status=$2,
+                cod_verification_required=$5,
+                cod_verification_reason=$3,
+                cod_verified_at=CASE WHEN $2='Verified' THEN now() ELSE NULL END,
+                cod_verified_by=CASE WHEN $2='Verified' THEN $4::uuid ELSE NULL END,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1`,
+        [
+          order.id,
+          nextVerificationStatus,
+          input.reason,
+          actorId,
+          risk.verificationRequired,
+        ],
+      );
+      await client.query(
+        `INSERT INTO cod_verification_events (
+           order_id, customer_user_id, event_type, risk_level, risk_score,
+           verification_status, policy_version, reason, actor_type, actor_id, metadata
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'staff',$9,$10::jsonb)`,
+        [
+          order.id,
+          order.customer_user_id,
+          input.decision === "verify" ? "VERIFICATION_APPROVED" : "VERIFICATION_FAILED",
+          risk.riskLevel,
+          risk.riskScore,
+          nextVerificationStatus,
+          risk.policyVersion,
+          input.reason,
+          actorId,
+          JSON.stringify({ orderCode: order.order_code }),
+        ],
+      );
+      await client.query(
+        `INSERT INTO order_events (
+           order_id, event_type, from_status, to_status, actor_type, actor_id, metadata
+         ) VALUES ($1,'COD_VERIFICATION_UPDATED',$2,$3,'staff',$4,$5::jsonb)`,
+        [
+          order.id,
+          previousVerificationStatus,
+          nextVerificationStatus,
+          actorId,
+          JSON.stringify({
+            reason: input.reason,
+            riskLevel: risk.riskLevel,
+            riskScore: risk.riskScore,
+          }),
+        ],
+      );
+      const versionUpdate = await client.query<{ version: string }>(
+        `UPDATE domain_state_versions
+            SET version=version+1, updated_at=now()
+          WHERE domain='orders'
+          RETURNING version::text`,
+      );
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_type, actor_id, action, entity_type, entity_id, request_id,
+           old_values, new_values, metadata
+         ) VALUES ('staff',$1,'COD_VERIFICATION_UPDATED','orders',$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)`,
+        [
+          actorId,
+          order.id,
+          requestId,
+          JSON.stringify({ verificationStatus: previousVerificationStatus }),
+          JSON.stringify({ verificationStatus: nextVerificationStatus }),
+          JSON.stringify({
+            orderCode: order.order_code,
+            reason: input.reason,
+            riskLevel: risk.riskLevel,
+            riskScore: risk.riskScore,
+            policyVersion: risk.policyVersion,
+          }),
+        ],
+      );
       await client.query("COMMIT");
       const state = await this.adminOrders();
       return {
@@ -5512,8 +6196,14 @@ export class CommerceService {
           id: string;
           status: string;
           promotion: Record<string, unknown> | null;
+          customer_user_id: string | null;
+          cod_verification_status: CodVerificationStatus;
         }>(
-          "SELECT id::text, status, promotion FROM orders WHERE order_code=$1 FOR UPDATE",
+          `SELECT id::text, status, promotion, customer_user_id::text,
+                  cod_verification_status
+             FROM orders
+            WHERE order_code=$1
+            FOR UPDATE`,
           [orderCode],
         );
         const existingOrder = existingOrderResult.rows[0] || null;
@@ -5593,6 +6283,43 @@ export class CommerceService {
         const deliveredAt = status === "Delivered"
           ? String(raw.deliveredAt || new Date().toISOString())
           : null;
+        const effectiveCustomerUserId =
+          customerUserId || existingOrder?.customer_user_id || null;
+        const paymentMethod = String(raw.paymentMethod || "Cash on Delivery");
+
+        if (
+          existingOrder &&
+          status === "Preparing" &&
+          existingOrder.status !== "Preparing" &&
+          paymentMethod.toLowerCase().includes("cash")
+        ) {
+          const risk = await this.refreshCodRiskForOrder(
+            client,
+            existingOrder.id,
+            effectiveCustomerUserId,
+            finalMinor,
+            {
+              preserveVerification: true,
+              actorType: "staff",
+              actorId,
+              requestId,
+              reason: "BULK_PREPARING_GATE_RECHECK",
+            },
+          );
+          if (!["Not Required", "Verified"].includes(risk.verificationStatus)) {
+            throw new AppError(
+              409,
+              "COD_VERIFICATION_REQUIRED",
+              `Order ${orderCode} requires COD verification before Preparing`,
+            );
+          }
+        } else if (!existingOrder && status === "Preparing") {
+          throw new AppError(
+            409,
+            "COD_VERIFICATION_REQUIRED",
+            `Order ${orderCode} cannot be created directly in Preparing`,
+          );
+        }
 
         const upserted = await client.query<{ id: string }>(
           `INSERT INTO orders (
@@ -5634,7 +6361,7 @@ export class CommerceService {
             orderCode,
             customerUserId,
             status,
-            String(raw.paymentMethod || "Cash on Delivery"),
+            paymentMethod,
             String(raw.paymentStatus || "Unpaid"),
             subtotalMinor,
             discountMinor,
@@ -5689,6 +6416,34 @@ export class CommerceService {
             promotion,
             actorId,
           );
+          if (paymentMethod.toLowerCase().includes("cash")) {
+            await this.refreshCodRiskForOrder(
+              client,
+              orderDbId,
+              effectiveCustomerUserId,
+              finalMinor,
+              {
+                preserveVerification: Boolean(existingOrder),
+                actorType: "staff",
+                actorId,
+                requestId,
+                reason: "BULK_ORDER_SYNCED",
+              },
+            );
+          }
+          if (
+            status === "Refused" &&
+            existingOrder?.status !== "Refused" &&
+            effectiveCustomerUserId
+          ) {
+            await this.refreshActiveCustomerCodRisk(
+              client,
+              effectiveCustomerUserId,
+              orderDbId,
+              actorId,
+              requestId,
+            );
+          }
         }
       }
 
