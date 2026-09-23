@@ -3,11 +3,27 @@
 import "./instrument.js";
 import * as Sentry from "@sentry/node";
 import type { Server } from "node:http";
+import { resolve } from "node:path";
 import app, { runtime } from "./app.js";
 import { assertProductionOutboxCronSecret } from "./config/env.js";
 import { shouldStartHttpListener } from "./config/runtime.js";
+import { runMigrations } from "./database/migrate.js";
 
 assertProductionOutboxCronSecret(process.env);
+
+// Vercel build environments are not guaranteed to have database network access.
+// Run the idempotent, checksum-protected migration set when the serverless runtime
+// starts instead. PostgreSQL advisory locking makes concurrent cold starts safe.
+if (runtime && process.env.VERCEL === "1") {
+  const applied = await runMigrations(
+    runtime.database,
+    resolve(process.cwd(), "migrations"),
+  );
+  runtime.logger.info(
+    { applied },
+    applied.length ? "Runtime migrations applied" : "Runtime database schema is up to date",
+  );
+}
 
 let server: Server | undefined;
 
@@ -44,8 +60,8 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
 }
 
 function closeServer(target: Server): Promise<void> {
-  return new Promise((resolve, reject) => {
-    target.close((error) => (error ? reject(error) : resolve()));
+  return new Promise((resolvePromise, reject) => {
+    target.close((error) => (error ? reject(error) : resolvePromise()));
   });
 }
 
