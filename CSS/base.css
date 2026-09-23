@@ -204,3 +204,8 @@ section{
 }
 
 /* END Utility Classes */
+
+
+/* BEGIN WebP picture layout guard */
+picture.dart-picture { display: contents; }
+/* END WebP picture layout guard */
