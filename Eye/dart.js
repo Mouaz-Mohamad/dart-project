@@ -9,7 +9,7 @@
     if (!/\.webp(?:[?#].*)?$/i.test(src)) return;
     var base = src.replace(/\.webp(?=([?#].*)?$)/i, '');
     var stage = Number(img.dataset.dartFallbackStage || 0);
-    var candidates = ['.png', '.jpg', '.jpeg'];
+    var candidates = ['.png', '.jpg', '.jpeg', '.jfif'];
     if (stage >= candidates.length) return;
     img.dataset.dartFallbackStage = String(stage + 1);
     img.src = base + candidates[stage];
