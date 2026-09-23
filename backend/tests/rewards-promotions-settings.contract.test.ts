@@ -8,10 +8,10 @@ import { promotionCampaignInputSchema } from "../src/modules/promotions/promotio
 describe("Dart rewards/promotions/settings contracts", () => {
   it("keeps the storefront customer password policy separate from representative security", () => {
     expect(validateCustomerPasswordPolicy("abc123")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("ABC123")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("abcdef")).not.toHaveLength(0);
-    expect(validateCustomerPasswordPolicy("123456")).not.toHaveLength(0);
-    expect(validateCustomerPasswordPolicy("abc!123")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("123456")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("!!!!!!")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("دارت12")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("short")).not.toHaveLength(0);
     expect(validatePasswordPolicy("abc123")).not.toHaveLength(0);
     expect(validatePasswordPolicy("StrongPass123")).toEqual([]);
   });

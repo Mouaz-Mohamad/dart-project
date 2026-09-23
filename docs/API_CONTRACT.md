@@ -16,7 +16,28 @@
 
 `POST /api/v1/auth/register` ينشئ Customer + session مباشرة ويرجع `201`. تسجيل العميل الجديد ليس gated بـEmail OTP. OTP ما زال موجودًا للتدفقات الصريحة مثل password recovery / verification flows.
 
-Customer وRepresentative passwords يمران من سياسة واحدة: 12+ chars، lowercase، uppercase، digit. Staff flow منفصل ويعتمد على allowed Email + one-time email code ولا يستخدم Staff password.
+قواعد الحساب الحالية:
+
+- Birthday مطلوب عند إنشاء أي Customer جديد.
+- Customer password: **6 خانات على الأقل فقط**. لا يوجد شرط Uppercase/Lowercase ولا شرط حرف/رقم؛ الحروف والأرقام والرموز والمسافات والنص غير اللاتيني كلها مسموحة ضمن حد 200 حرف.
+- Representative password يظل أقوى: 12+ chars مع lowercase + uppercase + digit.
+- Staff flow منفصل ويعتمد على allowed Email + one-time email code ولا يستخدم Staff password.
+
+### Google / Facebook customer sign-in
+
+Social login للعملاء فقط ويستخدم OAuth authorization-code flow من الـBackend. الـprovider secret لا يخرج للمتصفح، وDart لا يخزن provider access/refresh tokens.
+
+Flow:
+
+1. العميل يبدأ Google أو Facebook من صفحة Login/Register.
+2. الـProvider يثبت الهوية والبريد ويرجع authorization code للـBackend.
+3. Dart ينشئ one-time completion capability قصيرة العمر؛ المخزن في PostgreSQL هو الـhash فقط، والـcapability نفسها ترجع للمتصفح داخل URL fragment وليس query string.
+4. كل Social completion يطلب **Dart Password + Confirm Password + Birthday**.
+5. إذا كان Social account جديدًا في Dart، يطلب أيضًا Full Name + Primary Phone (وPhone 2 اختياري) قبل إنشاء الحساب.
+6. إذا كان العميل موجودًا، يجب أن يؤكد Dart password الحالية. Birthday المحفوظة لا يتم استبدالها من تسجيل الدخول؛ القيمة المدخلة تملأ فقط Legacy account لا يحتوي Birthday.
+7. بعد النجاح تصدر نفس Secure HttpOnly Customer session العادية ويمكن Claim للـguest cart.
+
+Providers لا يصبحوا Active إلا عند ضبط server-side environment credentials. عدم ضبطهم لا يسبب fallback غير آمن؛ الواجهة توضح أن المزود غير مهيأ.
 
 ## Birthday discount
 
@@ -31,6 +52,7 @@ Business invariant:
 - تغيير Birthday بعد `Used` لا يفتح Reward جديدًا لنفس reward year، ولا يجب أن يظهر Active reward/message/countdown/navbar promotion مرة أخرى في نفس السنة.
 - تغيير Birthday قبل الاستخدام يمسح current-year unused birthday projection ويسمح بإنشاء Reward على التاريخ الجديد عند وصوله.
 - تعديل Birthday نفسه audited.
+- Migration `0038` تضيف DB insert guard حتى لا يمكن إنشاء Customer جديد بدون Birthday من مسار داخلي يتجاوز HTTP schema.
 
 ## Promotions Engine
 
@@ -95,7 +117,13 @@ Server ranking:
 
 1. أكبر عدد Delivered/non-returned pieces داخل الشهر.
 2. عند تعادل القطع: أعلى Net Spending في نفس الشهر.
-3. عند التعادل الكامل في الاثنين: random فقط بين exact ties، ويتم تسجيل tie set + method في الـAudit.
+3. إذا تساوى أعلى العملاء **تمامًا** في عدد القطع وصافي الإنفاق:
+   - شخص واحد: يفوز وحده.
+   - شخصان: كلاهما يفوز.
+   - 3 أشخاص: الثلاثة يفوزون.
+   - 4 أشخاص أو أكثر: يتم اختيار **3 فائزين مختلفين عشوائيًا** من مجموعة الـexact ties فقط.
+
+كل فائز يأخذ Dart Card مستقلة: 40% حتى 10 pieces أو سنة من issue date، أيهما أولًا. `dart_card_draw_winners` يحفظ كل الفائزين ومركز كل فائز والكرت الصادر له، بينما الحقول القديمة في `dart_card_draws` تحتفظ بأول فائز للتوافق مع القراءات القديمة. كل Tie method وكل قائمة Winners تسجل في Draw events + Audit.
 
 Eligibility:
 
@@ -104,7 +132,7 @@ Eligibility:
 - عنده purchases مؤهلة في الشهر
 - لا يملك Dart Card فعالة وغير منتهية وبها remaining capacity
 
-الفائز يأخذ Card: 40%، حتى 10 pieces أو سنة من issue date، أيهما أولًا. Active-card decisions serialized per customer داخل PostgreSQL لمنع concurrent duplicate awards.
+Active-card decisions serialized per customer داخل PostgreSQL لمنع concurrent duplicate awards.
 
 Endpoints:
 
@@ -113,7 +141,7 @@ Endpoints:
 - `GET /api/v1/admin/dart-card/draws`
 - `POST /api/v1/internal/dart-card/monthly-draw` protected by server-only `OUTBOX_CRON_SECRET`
 
-`period_key` unique وrun يستخدم PostgreSQL advisory transaction lock؛ إعادة نفس الشهر idempotent ولا تمنح Card ثانية.
+`period_key` unique وrun يستخدم PostgreSQL advisory transaction lock؛ إعادة نفس الشهر idempotent ولا تمنح كروت إضافية.
 
 ## Site Settings
 
@@ -132,19 +160,18 @@ Expected categories:
 - `429` rate limit
 - `5xx` unexpected infrastructure/server error without leaking stack/SQL/secrets
 
-`expectedVersion` is required on versioned mutable admin resources. Order creation already uses `Idempotency-Key`; monthly Dart Card draw uses unique period + lock.
+`expectedVersion` is required on versioned mutable admin resources. Order creation already uses `Idempotency-Key`; monthly Dart Card draw uses unique period + lock؛ Social completion يستخدم one-time hashed capability + row lock/advisory lock.
 
 ## Migration set
 
-Rewards/Promotions/Dart Card hardening is an ordered set:
+Rewards/Promotions/Dart Card/Social Auth hardening is an ordered set:
 
 - `0034_rewards_promotions_draw_integrity.sql` — ledgers, draw/audit tables, business triggers and permissions.
 - `0035_reward_history_reference_compatibility.sql` — preserves immutable historical IDs across legacy projection rebuilds.
 - `0036_dart_card_active_concurrency_lock.sql` — per-customer active-card serialization.
 - `0037_reward_reservation_after_order_insert.sql` — ensures FK-safe reward reservation timing while staying in the same order transaction.
-
-All four must be applied before the new endpoints are exposed to production traffic.
+- `0038_customer_social_auth_and_multi_winner_draw.sql` — hashed Social OAuth challenges/identity links, required-Birthday insert guard, and one-to-many Dart Card draw winners with maximum 3 winners.
 
 ## Deployment boundary
 
-Code in GitHub does not mean production schema is applied. The `0034`–`0037` migration set must run through the existing migration runner in the target environment. The internal monthly endpoint must be called by a trusted scheduler; it is intentionally scheduler-provider neutral.
+Code in GitHub does not mean production schema is applied. Migrations `0034`–`0038` must run through the existing migration runner in the target environment before enabling these current reward/social/draw contracts. Social providers also require their server-side environment credentials and provider callback registration. The internal monthly endpoint must be called by a trusted scheduler; it is intentionally scheduler-provider neutral.

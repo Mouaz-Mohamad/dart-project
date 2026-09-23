@@ -11,6 +11,11 @@ import {
 import { createLogger } from "./config/logger.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
+import {
+  loadSocialAuthConfig,
+  SocialAuthConfigError,
+  SocialAuthService,
+} from "./modules/identity/social-auth.service.js";
 import { CatalogService } from "./modules/catalog/catalog.service.js";
 import { CatalogAssetService } from "./modules/catalog/catalog.asset.service.js";
 import { CommerceService } from "./modules/commerce/commerce.service.js";
@@ -64,6 +69,15 @@ export function createRuntimeApplication(
     config.monitoringAlertCooldownMs ?? 300_000,
   );
   const identityService = new IdentityService(database, config);
+  const socialAuthService = new SocialAuthService(
+    database,
+    identityService,
+    loadSocialAuthConfig(source, {
+      port: config.port,
+      corsOrigins: config.corsOrigins,
+      authPepper: config.authPepper,
+    }),
+  );
   const catalogService = new CatalogService(database);
   const catalogAssetService = new CatalogAssetService(database);
   const commerceService = new CommerceService(database);
@@ -94,8 +108,9 @@ export function createRuntimeApplication(
     logger,
     databasePing: () => pingDatabase(database),
     startedAt: new Date(),
-    version: "0.6.0",
+    version: "0.6.1",
     identityService,
+    socialAuthService,
     catalogService,
     catalogAssetService,
     commerceService,
@@ -117,7 +132,12 @@ export let runtime: DartRuntime | null = null;
 try {
   runtime = createRuntimeApplication();
 } catch (error) {
-  if (!(error instanceof EnvironmentConfigError)) throw error;
+  if (
+    !(error instanceof EnvironmentConfigError) &&
+    !(error instanceof SocialAuthConfigError)
+  ) {
+    throw error;
+  }
   pino({ level: "error" }).error(
     { invalidFields: error.fields },
     "Dart backend environment is invalid",

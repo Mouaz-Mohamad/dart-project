@@ -38,6 +38,8 @@ const server = http.createServer((request, response) => {
               "bulk-domain-state-v1",
             ],
           }
+        : pathname === "/api/v1/auth/social/providers"
+          ? { providers: { google: false, facebook: false } }
         : pathname === "/api/v1/me"
           ? {
               user: { accountType: "staff", name: "CI Owner" },
@@ -206,7 +208,16 @@ const server = http.createServer((request, response) => {
   );
   await account.locator(".register-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), true);
-  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("minlength"), "8");
+  await account.waitForFunction(() => {
+    const input = document.querySelector('#registerForm input[name="password"]');
+    return input?.getAttribute("minlength") === "6" && !input?.hasAttribute("pattern");
+  });
+  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("minlength"), "6");
+  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("pattern"), null);
+  assert.equal(await account.locator('#registerForm input[name="birthday"]').getAttribute("required"), "");
+  assert.equal(await account.locator('[data-social-login="google"]').count(), 2);
+  assert.equal(await account.locator('[data-social-login="facebook"]').count(), 2);
+  await account.waitForSelector('script[data-dart-social-auth="1"]');
   assert.equal(await account.locator('#customerEmailVerificationForm').count(), 0);
   await account.locator(".login-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), false);
@@ -295,7 +306,7 @@ const server = http.createServer((request, response) => {
   }
 
   assert.deepEqual(failures, []);
-  console.log("PASS full-site pages, shared sections, menu, filters, auth switches, receipt, tracking, dashboard navigation and root files");
+  console.log("PASS full-site pages, shared sections, menu, filters, customer/social auth, tracking, dashboard navigation and root files");
   await context.close();
   await browser.close();
   server.close();

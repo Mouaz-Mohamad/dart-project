@@ -16,9 +16,11 @@ import {
   type HealthDependencies,
 } from "./modules/health/health.routes.js";
 import { createIdentityRouter } from "./modules/identity/identity.routes.js";
+import { createSocialAuthRouter } from "./modules/identity/social-auth.routes.js";
 import { createStaffOnboardingRouter } from "./modules/identity/staff-onboarding.routes.js";
 import { createStaffManagementRouter } from "./modules/identity/staff-management.routes.js";
 import type { IdentityService } from "./modules/identity/identity.service.js";
+import type { SocialAuthService } from "./modules/identity/social-auth.service.js";
 import { createCatalogRouter } from "./modules/catalog/catalog.routes.js";
 import type { CatalogService } from "./modules/catalog/catalog.service.js";
 import { createCatalogAssetRouter } from "./modules/catalog/catalog.asset.routes.js";
@@ -48,6 +50,7 @@ import type { DartCardDrawService } from "./modules/loyalty/dart-card-draw.servi
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
   identityService?: IdentityService;
+  socialAuthService?: SocialAuthService;
   catalogService?: CatalogService;
   catalogAssetService?: CatalogAssetService;
   commerceService?: CommerceService;
@@ -141,6 +144,16 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         dependencies.outboxService,
       ),
     );
+    if (dependencies.socialAuthService) {
+      app.use(
+        "/api/v1",
+        createSocialAuthRouter(
+          dependencies.socialAuthService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
     app.use(
       "/api/v1",
       createStaffOnboardingRouter(

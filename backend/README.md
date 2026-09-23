@@ -14,9 +14,32 @@ The API listens on `http://localhost:4000` by default. Use `/api/v1/health/live`
 
 ## Identity and access
 
-Customer registration creates the customer account/session directly; signup is **not** gated by a customer Email OTP. Email OTP remains available for explicit verification/password-recovery flows. Customer and representative passwords use the same policy: at least 12 characters containing lowercase, uppercase and a number.
+Customer registration creates the account/session directly and requires Birthday. Signup is **not** gated by a customer Email OTP. Email OTP remains available for explicit verification/password-recovery flows.
 
-Dart Eye Staff access remains passwordless and separate from customer/representative passwords:
+Password policies are intentionally different by account type:
+
+- Customer: minimum **6 characters**. Any character composition is accepted, including letters, numbers, symbols, spaces and non-Latin text.
+- Representative: minimum 12 characters containing lowercase, uppercase and a digit.
+- Staff: passwordless; allowed Email + one-time Email code.
+
+### Google and Facebook customer sign-in
+
+Customer social sign-in is implemented as server-side OAuth authorization-code flow. Provider client secrets stay in backend environment variables and provider access/refresh tokens are not persisted.
+
+Required environment fields are documented in `.env.example`:
+
+- `API_PUBLIC_ORIGIN`
+- `CUSTOMER_APP_ORIGIN`
+- `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET`
+- `FACEBOOK_OAUTH_APP_ID` + `FACEBOOK_OAUTH_APP_SECRET`
+- optional `FACEBOOK_GRAPH_API_VERSION`
+- optional `SOCIAL_AUTH_TTL_MINUTES`
+
+If a provider ID/secret pair is absent, that provider is safely reported as unavailable; a partial pair is treated as backend misconfiguration.
+
+Every social completion requires **Dart Password + Confirm Password + Birthday**. A new Dart customer also provides Full Name + Primary Phone (Phone 2 optional). Returning customers must confirm their existing Dart password. Their saved Birthday is not silently replaced during login; the submitted Birthday only fills a legacy missing value. The secure Customer session is the same HttpOnly/CSRF session used by normal login.
+
+Dart Eye Staff access remains separate:
 
 ```text
 Owner allows Email + Role (+ permissions)
@@ -32,6 +55,7 @@ There is no active Staff Google OAuth, Staff password or Staff TOTP flow. Staff 
 
 Birthday reward authority is PostgreSQL, not the navbar/card/countdown UI.
 
+- Birthday is required for every newly inserted Customer from migration `0038` onward.
 - A customer can **use** the Birthday discount only once per Cairo Birthday year/occurrence.
 - The usage row is unique by customer + reward year.
 - The reservation is created atomically after the order row exists and becomes `Used` only when the order is `Delivered`.
@@ -42,15 +66,7 @@ Birthday reward authority is PostgreSQL, not the navbar/card/countdown UI.
 
 ## Promotions Engine
 
-`PromotionService` evaluates eligibility server-side at Checkout. Campaign input is strictly validated and supports nested `AND`/`OR` rules over:
-
-- delivered order count,
-- delivered/non-returned piece count,
-- net delivered spending,
-- days since last delivered order,
-- selected Customer ID/client code,
-- account age,
-- Birthday day.
+`PromotionService` evaluates eligibility server-side at Checkout. Campaign input is strictly validated and supports nested `AND`/`OR` rules over delivered order count, delivered/non-returned piece count, net delivered spending, days since last delivered order, selected Customer ID/client code, account age and Birthday day.
 
 Campaigns also support start/end dates, automatic/code campaigns, priority, minimum order value, minimum quantity, category/model/product scope, total usage limit and per-customer usage limit. `promotion_usages` reserves usage atomically with order creation and finalizes it on `Delivered`; `Cancelled`/`Refused` releases it. Analytics are derived from the usage ledger and real orders.
 
@@ -71,9 +87,9 @@ Ranking is exactly:
 
 1. highest delivered/non-returned purchased piece count;
 2. if piece count ties, highest net delivered spending;
-3. if both values are exactly equal, cryptographic random selection only among the exact tied customers, with the tie set/method recorded in the draw audit.
+3. if the top group is exactly tied on both values: one person wins alone, two both win, three all win, and if four or more tie exactly then three distinct customers are selected randomly from that exact-tie group.
 
-Customers with `dart_card_draw_eligible=false` or an active, unexpired Dart Card with remaining piece capacity are excluded. A winner receives one 40% Dart Card for up to 10 pieces or one year. Duplicate active cards are serialized and rejected at the database boundary.
+Every selected winner receives an independent 40% Dart Card for up to 10 pieces or one year. `dart_card_draw_winners` records all winners while legacy first-winner fields remain on `dart_card_draws` for backward compatibility. Customers with `dart_card_draw_eligible=false` or an active, unexpired Dart Card with remaining piece capacity are excluded. Duplicate active cards are serialized and rejected at the database boundary.
 
 Admin contracts:
 
@@ -99,14 +115,14 @@ It executes the previous Cairo month and is safe to retry because `dart_card_dra
 
 Applied migration checksums are recorded in `dart_schema_migrations`. Never edit or rename an applied migration; add a new unique four-digit migration. Historical duplicate prefixes `0013`, `0014` and `0015` are grandfathered only.
 
-Rewards/Promotions/Dart Card hardening is one ordered set and requires migrations `0034` through `0037` to be applied together before exposing the new API routes to traffic.
+Current reward/social/draw integrity requires migrations `0034` through `0038`. Migration `0038` adds Social OAuth challenges/identity links, required-Birthday insertion guard and the one-to-many Dart Card draw winners table.
 
 ## Operational monitoring and internal jobs
 
 Dart uses structured Pino logging, request IDs, secret redaction, centralized error responses, liveness/readiness checks and the transactional outbox. `MONITORING_ALERT_EMAIL` can receive sanitized owner-facing backend alerts.
 
-The outbox retry endpoint remains `POST /api/v1/internal/outbox/process` with `Authorization: Bearer <OUTBOX_CRON_SECRET>`. The same server-only secret protects the scheduler-neutral Dart Card monthly draw endpoint. Never expose this secret to storefront/dashboard JavaScript.
+The outbox retry endpoint remains `POST /api/v1/internal/outbox/process` with `Authorization: Bearer <OUTBOX_CRON_SECRET>`. The same server-only secret protects the scheduler-neutral Dart Card monthly draw endpoint. Never expose this secret or OAuth client secrets to storefront/dashboard JavaScript.
 
 ## Deployment note
 
-Deployment is a separate operational action. Pushing application code or migrations does not mean production PostgreSQL has been migrated or that an internal scheduler has been configured. Run migrations `0034`–`0037` through the existing migration runner in the target environment before enabling the new reward/promotion/draw contracts.
+Deployment is a separate operational action. Pushing application code or migrations does not mean production PostgreSQL has been migrated, OAuth providers configured, or an internal scheduler configured. Run migrations `0034`–`0038` through the existing migration runner and configure the provider callback/environment values in the target environment before enabling the new contracts.

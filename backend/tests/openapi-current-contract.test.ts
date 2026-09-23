@@ -11,23 +11,30 @@ async function spec(): Promise<string> {
 }
 
 describe("OpenAPI current Dart contracts", () => {
-  it("documents immediate customer signup and the simple customer password policy", async () => {
+  it("documents immediate customer signup, required Birthday and the simple customer password policy", async () => {
     const text = await spec();
     expect(text).toContain("Register a customer and create the customer session immediately");
     expect(text).toContain('"201": { $ref: "#/components/responses/Authenticated" }');
     expect(text).toContain("CustomerPassword:");
     expect(text).toContain("minLength: 6");
-    expect(text).toContain("at least one letter and one number");
+    expect(text).toContain("any character composition");
+    expect(text).toContain("required: [name, email, phone1, birthday, password]");
     expect(text).toContain("StrongPassword:");
     expect(text).toContain("minLength: 12");
+    expect(text).not.toContain("at least one letter and one number");
     expect(text).not.toContain("Register a customer and queue a six-digit Email OTP");
     expect(text).not.toContain("minLength: 4");
     expect(text).not.toContain("Sessions\\n");
   });
 
-  it("documents the server-authoritative promotions, Dart Card draw and strict Settings surfaces", async () => {
+  it("documents Google/Facebook customer completion and the multi-winner Dart Card rule", async () => {
     const text = await spec();
     for (const path of [
+      "/auth/social/providers:",
+      "/auth/social/{provider}/start:",
+      "/auth/social/{provider}/callback:",
+      "/auth/social/challenge:",
+      "/auth/social/complete:",
       "/admin/promotions:",
       "/admin/promotions/{id}/analytics:",
       "/admin/dart-card/draws/{period}/preview:",
@@ -36,6 +43,7 @@ describe("OpenAPI current Dart contracts", () => {
       "/admin/site-settings:",
     ]) expect(text).toContain(path);
     expect(text).toContain("Unknown root keys are rejected by the Zod contract");
-    expect(text).toContain("ranking ordered by pieces then net spending");
+    expect(text).toContain("up to three exact-tie winners");
+    expect(text).toContain("Password + confirmation + Birthday");
   });
 });

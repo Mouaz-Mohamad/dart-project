@@ -15,14 +15,7 @@ import type { AccountType, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
-const customerPassword = z
-  .string()
-  .min(6)
-  .max(200)
-  .regex(
-    /^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]+$/,
-    "Password must be at least 6 characters and contain letters and numbers only",
-  );
+const customerPassword = z.string().min(6).max(200);
 const passwordCandidate = z.string().min(6).max(200);
 const password = z.string().min(12).max(200);
 const email = z.email().max(254);
@@ -38,7 +31,7 @@ const registerCustomerSchema = z.object({
   email,
   phone1: egyptianPhone,
   phone2: optionalEgyptianPhone,
-  birthday: z.iso.date().optional(),
+  birthday: z.iso.date(),
   password: customerPassword,
 });
 

@@ -77,6 +77,9 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
         "message_records",
         "finance_records",
         "cod_verification_events",
+        "customer_social_auth_challenges",
+        "customer_social_identities",
+        "dart_card_draw_winners",
       ]),
     );
 
@@ -150,7 +153,6 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
     expect(item.rows[0]?.status).toBe("Cart Reserved");
     expect(item.rows[0]?.cart_reservation_id).toMatch(/^CART-[AB]-/);
   });
-
 
   it("backfills and transactionally mirrors critical dashboard domains into relational rows", async () => {
     const row = {
@@ -261,7 +263,7 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       ],
     );
     await testPool!.query(
-      "INSERT INTO customers (user_id, full_name) VALUES ($1,'Risk Test Customer')",
+      "INSERT INTO customers (user_id, full_name, birthday) VALUES ($1,'Risk Test Customer','2000-01-01')",
       [customerUserId],
     );
     await testPool!.query(
@@ -398,7 +400,6 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
       expect.arrayContaining(["RISK_EVALUATED", "VERIFICATION_APPROVED"]),
     );
   });
-
 
   it("enforces append-only audit records", async () => {
     const inserted = await testPool!.query<{ id: string }>(

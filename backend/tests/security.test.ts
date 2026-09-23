@@ -1,6 +1,6 @@
 // DART CODE GUIDE | backend/tests/security.test.ts
 // الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
-// Contract note: storefront customers use 6+ alphanumeric passwords with at least one letter and one number; representatives keep the stronger operational policy.
+// Contract note: storefront customers need 6+ characters with any composition; representatives keep the stronger operational policy.
 import { describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret } from "../src/security/crypto.js";
 import { normalizeEgyptianPhone } from "../src/security/normalization.js";
@@ -22,11 +22,12 @@ describe("identity security primitives", () => {
 
   it("keeps customer passwords simple while representative passwords remain strong", () => {
     expect(validateCustomerPasswordPolicy("abc123")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("ABC123")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("abcdef")).not.toHaveLength(0);
-    expect(validateCustomerPasswordPolicy("123456")).not.toHaveLength(0);
-    expect(validateCustomerPasswordPolicy("abc!123")).not.toHaveLength(0);
-    expect(validatePasswordPolicy("short")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("123456")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("!!!!!!")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("abc!12")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("دارت12")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("short")).not.toHaveLength(0);
+    expect(validatePasswordPolicy("abc123")).not.toHaveLength(0);
     expect(validatePasswordPolicy("StrongPassword123")).toEqual([]);
   });
 

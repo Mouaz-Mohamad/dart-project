@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 
 const customer = fs.readFileSync("Js/dart-platform.js", "utf8");
+const customerPasswordUi = fs.readFileSync("Js/dart-password-visibility.js", "utf8");
+const social = fs.readFileSync("Js/dart-auth-social.js", "utf8");
 const representative = fs.readFileSync("Js/dart-rep.js", "utf8");
 const admin = fs.readFileSync("Eye/dart-admin-auth.js", "utf8");
 const signup = fs.readFileSync("Sign Up modern.html", "utf8");
@@ -21,7 +23,21 @@ for (const path of [
 assert(customer.includes("profile.accountType !== \"customer\""), "Customer cache must reject Staff/Representative sessions");
 assert(customer.includes("X-CSRF-Token"), "Customer mutations must forward the CSRF token");
 assert(!signup.includes('id="customerEmailVerificationForm"'), "Customer signup must not present an email OTP form");
-assert(signup.includes('minlength="8"'), "Customer password UI must enforce the 8-character minimum");
+assert(signup.includes('minlength="6"'), "Customer signup must expose the 6-character minimum");
+assert(signup.includes('name="birthday"') && signup.includes('autocomplete="bday" required'), "Customer signup must require Birthday");
+assert(customerPasswordUi.includes('input.removeAttribute("pattern")'), "Customer password UI must allow any character composition");
+assert(customerPasswordUi.includes("letters, numbers and symbols are all allowed"), "Customer signup must explain the relaxed password rule");
+assert.equal((signup.match(/data-social-login="google"/g) || []).length, 2, "Google must be offered in login and registration");
+assert.equal((signup.match(/data-social-login="facebook"/g) || []).length, 2, "Facebook must be offered in login and registration");
+for (const path of [
+  "/api/v1/auth/social/providers",
+  "/api/v1/auth/social/complete",
+  "/api/v1/auth/social/challenge",
+]) {
+  assert(social.includes(path), `Customer social auth UI is missing ${path}`);
+}
+assert(!social.includes("GOOGLE_OAUTH_CLIENT_SECRET"), "Google OAuth secret must never exist in storefront JavaScript");
+assert(!social.includes("FACEBOOK_OAUTH_APP_SECRET"), "Facebook OAuth secret must never exist in storefront JavaScript");
 assert(!signup.includes("boxicons"), "Customer auth icons must not depend on the Boxicons font");
 assert(signup.includes("dart-auth-icon"), "Customer auth inputs must use local SVG icons");
 
@@ -42,6 +58,10 @@ assert(
 assert(
   !/localStorage\.setItem\([^\n]*(?:token|otp|session|secret|csrf)/i.test(admin),
   "Admin auth must never persist tokens, OTPs, sessions, CSRF values or secrets in localStorage",
+);
+assert(
+  documentSafeSocialAuth(social),
+  "Customer social auth must not persist provider/completion tokens in browser storage",
 );
 assert(
   admin.includes("document.body.classList.add(\"dart-admin-locked\")") &&
@@ -69,4 +89,8 @@ assert(
   "Dashboard must not depend on inline JavaScript event handlers",
 );
 
-console.log("PASS server-backed customer, representative and simplified Staff email auth contracts");
+function documentSafeSocialAuth(source) {
+  return !/\b(?:localStorage|sessionStorage)\.(?:setItem|getItem)\s*\(/.test(source);
+}
+
+console.log("PASS server-backed customer/social, representative and simplified Staff email auth contracts");
