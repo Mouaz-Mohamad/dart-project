@@ -11,10 +11,14 @@ async function spec(): Promise<string> {
 }
 
 describe("OpenAPI current Dart contracts", () => {
-  it("documents immediate customer signup and the unified strong password", async () => {
+  it("documents immediate customer signup and the simple customer password policy", async () => {
     const text = await spec();
     expect(text).toContain("Register a customer and create the customer session immediately");
     expect(text).toContain('"201": { $ref: "#/components/responses/Authenticated" }');
+    expect(text).toContain("CustomerPassword:");
+    expect(text).toContain("minLength: 6");
+    expect(text).toContain("at least one letter and one number");
+    expect(text).toContain("StrongPassword:");
     expect(text).toContain("minLength: 12");
     expect(text).not.toContain("Register a customer and queue a six-digit Email OTP");
     expect(text).not.toContain("minLength: 4");

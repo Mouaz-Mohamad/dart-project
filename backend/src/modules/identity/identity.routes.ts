@@ -15,7 +15,15 @@ import type { AccountType, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
-const customerPassword = z.string().min(8).max(200);
+const customerPassword = z
+  .string()
+  .min(6)
+  .max(200)
+  .regex(
+    /^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]+$/,
+    "Password must be at least 6 characters and contain letters and numbers only",
+  );
+const passwordCandidate = z.string().min(6).max(200);
 const password = z.string().min(12).max(200);
 const email = z.email().max(254);
 const egyptianPhone = z.string().min(10).max(25);
@@ -204,8 +212,8 @@ export function createIdentityRouter(
       .object({
         challengeId: uuid,
         code: z.string().regex(/^\d{6}$/),
-        password: customerPassword,
-        confirmation: customerPassword,
+        password: passwordCandidate,
+        confirmation: passwordCandidate,
       })
       .refine((value) => value.password === value.confirmation, {
         path: ["confirmation"],
@@ -312,7 +320,7 @@ export function createIdentityRouter(
     requireAccountType("customer", "representative"),
     async (request, response) => {
     const body = z
-      .object({ password: customerPassword, confirmation: customerPassword })
+      .object({ password: passwordCandidate, confirmation: passwordCandidate })
       .refine((value) => value.password === value.confirmation, {
         path: ["confirmation"],
         message: "Passwords do not match",

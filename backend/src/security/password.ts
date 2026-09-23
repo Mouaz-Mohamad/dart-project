@@ -22,10 +22,16 @@ export function validatePasswordPolicy(password: string): string[] {
   return problems;
 }
 
-// Customers and representatives intentionally share one password contract.
-// Staff access remains on its separate passwordless/onboarding flow.
+// Customer passwords are intentionally simple for the storefront: at least
+// six alphanumeric characters with both a letter and a number. Representative
+// accounts keep the stronger operational password policy above.
 export function validateCustomerPasswordPolicy(password: string): string[] {
-  return validatePasswordPolicy(password);
+  const problems: string[] = [];
+  if (password.length < 6) problems.push("Password must contain at least 6 characters");
+  if (!/[A-Za-z]/.test(password)) problems.push("Password must contain a letter");
+  if (!/[0-9]/.test(password)) problems.push("Password must contain a number");
+  if (!/^[A-Za-z0-9]+$/.test(password)) problems.push("Password may contain letters and numbers only");
+  return problems;
 }
 
 export async function hashPassword(password: string): Promise<string> {

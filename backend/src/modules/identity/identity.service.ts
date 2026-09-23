@@ -114,7 +114,7 @@ function passwordPolicyOrThrow(password: string): void {
 function customerPasswordPolicyOrThrow(password: string): void {
   const problems = validateCustomerPasswordPolicy(password);
   if (problems.length > 0) {
-    throw new AppError(422, "WEAK_PASSWORD", "Password must contain at least 4 characters", problems);
+    throw new AppError(422, "WEAK_PASSWORD", "Password must be at least 6 characters and contain letters and numbers", problems);
   }
 }
 

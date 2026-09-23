@@ -19,9 +19,12 @@ describe("identity security primitives", () => {
     await expect(verifyPassword(hash, "WrongPassword123")).resolves.toBe(false);
   });
 
-  it("uses the same strong password policy for customers and representatives", () => {
-    expect(validateCustomerPasswordPolicy("short")).not.toHaveLength(0);
-    expect(validateCustomerPasswordPolicy("StrongPassword123")).toEqual([]);
+  it("keeps customer passwords simple while representative passwords remain strong", () => {
+    expect(validateCustomerPasswordPolicy("abc123")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("ABC123")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("abcdef")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("123456")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("abc!123")).not.toHaveLength(0);
     expect(validatePasswordPolicy("short")).not.toHaveLength(0);
     expect(validatePasswordPolicy("StrongPassword123")).toEqual([]);
   });

@@ -139,6 +139,15 @@
             margin: 8px 0;
         }
 
+        .password-rule {
+            width: 85%;
+            margin: -6px auto 8px !important;
+            text-align: left;
+            color: #666;
+            font-size: 11px !important;
+            line-height: 1.35;
+        }
+
         .social-icons {
             display: flex;
             justify-content: center;
@@ -355,9 +364,10 @@
                 </div>
 
                 <div class="input-box">
-                    <input type="password" name="password" placeholder="Password (8+ characters)" autocomplete="new-password" minlength="8" required>
+                    <input type="password" name="password" placeholder="Password (6+ letters & numbers)" autocomplete="new-password" minlength="6" pattern="(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,}" title="Use at least 6 characters with both letters and numbers." required>
                     <svg class="dart-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
                 </div>
+                <p class="password-rule">6+ characters — use a mix of letters and numbers.</p>
 
                 <div class="input-box">
                     <input type="date" name="birthday" aria-label="Your birthday" autocomplete="bday" required>
@@ -393,8 +403,8 @@
         <form id="customerChangePasswordForm" novalidate>
             <h2 id="customerPasswordChangeTitle">Replace temporary password</h2>
             <p>Create a private password before continuing to your profile.</p>
-            <label>New password<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
-            <label>Confirm new password<input type="password" name="confirmPassword" minlength="8" autocomplete="new-password" required></label>
+            <label>New password<input type="password" name="password" minlength="6" pattern="(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,}" autocomplete="new-password" required></label>
+            <label>Confirm new password<input type="password" name="confirmPassword" minlength="6" pattern="(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,}" autocomplete="new-password" required></label>
             <button type="submit" class="btn">Save new password</button>
             <p class="form-status" role="status" aria-live="polite"></p>
         </form>

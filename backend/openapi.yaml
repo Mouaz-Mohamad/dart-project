@@ -436,6 +436,19 @@ components:
       required: true
       schema: { type: string, pattern: "^20[0-9]{2}-(0[1-9]|1[0-2])$" }
   schemas:
+    CustomerPassword:
+      type: string
+      minLength: 6
+      maxLength: 200
+      pattern: "^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,200}$"
+      description: Customer password with at least one letter and one number; uppercase/lowercase is not required.
+      writeOnly: true
+    PasswordCandidate:
+      type: string
+      minLength: 6
+      maxLength: 200
+      description: Reset/temporary-password candidate; the server applies the account-type-specific policy after resolving the account.
+      writeOnly: true
     StrongPassword:
       type: string
       minLength: 12
@@ -452,7 +465,7 @@ components:
         phone1: { type: string, minLength: 10, maxLength: 25 }
         phone2: { type: string, minLength: 10, maxLength: 25 }
         birthday: { type: string, format: date }
-        password: { $ref: "#/components/schemas/StrongPassword" }
+        password: { $ref: "#/components/schemas/CustomerPassword" }
     Login:
       type: object
       required: [identifier, password]
@@ -466,8 +479,8 @@ components:
       properties:
         challengeId: { type: string, format: uuid }
         code: { type: string, pattern: "^[0-9]{6}$" }
-        password: { $ref: "#/components/schemas/StrongPassword" }
-        confirmation: { $ref: "#/components/schemas/StrongPassword" }
+        password: { $ref: "#/components/schemas/PasswordCandidate" }
+        confirmation: { $ref: "#/components/schemas/PasswordCandidate" }
     Profile:
       type: object
       required: [id, accountType, code, name, email, phones, status]
