@@ -25,13 +25,13 @@
   --border-color: #dee2e6;
 
   /* Typography */
-  --font-main: 'Readex Pro', 'Montserrat', sans-serif;
+  --font-main: 'Readex Pro', sans-serif;
   --font-mono: SFMono-Regular, Consolas, monospace;
-  --font-itim: 'Itim', cursive;
-  --font-cairo: 'Cairo', sans-serif;
-  --font-irish: 'Irish Grover', cursive;
+  --font-itim: 'Cabin Condensed', sans-serif;
+  --font-cairo: 'Readex Pro', sans-serif;
+  --font-irish: 'Cabin Condensed', sans-serif;
   --font-cabin: 'Cabin Condensed', sans-serif;
-  --font-inter: 'Inter', sans-serif;
+  --font-inter: 'Readex Pro', sans-serif;
 
   /* Spacing & Radius */
   --spacing-xs: 0.25rem;
