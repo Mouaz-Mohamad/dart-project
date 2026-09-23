@@ -1,6 +1,5 @@
 // DART CODE GUIDE | backend/src/app.ts
 // الغرض: إنشاء Runtime وربط الخدمات وقاعدة البيانات بالتطبيق، مع fallback آمن عند سوء الإعداد.
-import { resolve } from "node:path";
 import express, { type Express } from "express";
 import pino from "pino";
 import { createApp } from "./application.js";
@@ -10,7 +9,6 @@ import {
   type AppConfig,
 } from "./config/env.js";
 import { createLogger } from "./config/logger.js";
-import { runMigrations } from "./database/migrate.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
 import {
@@ -106,29 +104,11 @@ export function createRuntimeApplication(
       });
   });
 
-  const runtimeMigrationDependency = source.VERCEL === "1"
-    ? {
-        databaseReady: async (): Promise<void> => {
-          const applied = await runMigrations(
-            database,
-            resolve(process.cwd(), "migrations"),
-          );
-          logger.info(
-            { applied },
-            applied.length
-              ? "Runtime migrations applied"
-              : "Runtime database schema is up to date",
-          );
-        },
-      }
-    : {};
-
   const app = createApp(config, {
     logger,
     databasePing: () => pingDatabase(database),
     startedAt: new Date(),
     version: "0.6.2",
-    ...runtimeMigrationDependency,
     identityService,
     socialAuthService,
     catalogService,
