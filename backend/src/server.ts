@@ -14,12 +14,13 @@ assertProductionOutboxCronSecret(process.env);
 // Vercel build environments are not guaranteed to have database network access.
 // Run the idempotent, checksum-protected migration set when the serverless runtime
 // starts instead. PostgreSQL advisory locking makes concurrent cold starts safe.
-if (runtime && process.env.VERCEL === "1") {
+const activeRuntime = runtime;
+if (activeRuntime && process.env.VERCEL === "1") {
   const applied = await runMigrations(
-    runtime.database,
+    activeRuntime.database,
     resolve(process.cwd(), "migrations"),
   );
-  runtime.logger.info(
+  activeRuntime.logger.info(
     { applied },
     applied.length ? "Runtime migrations applied" : "Runtime database schema is up to date",
   );
