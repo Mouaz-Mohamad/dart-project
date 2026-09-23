@@ -64,7 +64,7 @@ describe.skipIf(!databaseUrl)("identity service", () => {
         email: "Mouaz@Example.com",
         phone1: "01012345678",
         birthday: "2008-09-02",
-        password: "abcd1234",
+        password: "StrongPassword123",
       },
       requestMetadata,
     );
@@ -88,7 +88,7 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     const signedIn = await service!.login(
       "customer",
       "01012345678",
-      "abcd1234",
+      "StrongPassword123",
       requestMetadata,
     );
     expect(signedIn.account.permissions).toContain("profile.read_own");
