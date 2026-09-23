@@ -178,6 +178,31 @@
     logoutButton.hidden = true;
   }
 
+  function isAuthFailure(error) {
+    return (
+      error?.status === 401 ||
+      error?.code === "AUTH_REQUIRED" ||
+      error?.code === "SESSION_EXPIRED" ||
+      error?.code === "SESSION_INVALID"
+    );
+  }
+
+  function hydrationFailureMessage(error, stage) {
+    if (isAuthFailure(error)) {
+      return "Your Dart Eye session expired or is no longer valid. Sign in again.";
+    }
+    if (error?.code === "NETWORK_ERROR") {
+      return `Network error while loading ${stage}. Check your connection and try again.`;
+    }
+    if (error?.code === "DASHBOARD_HYDRATION_TIMEOUT") {
+      return `${stage} took too long to load. Try again; your dashboard data was not changed.`;
+    }
+    if (error?.status === 403 || error?.code === "DASHBOARD_ACCESS_DENIED") {
+      return `Your Staff account does not have permission to load ${stage}.`;
+    }
+    return `Unable to load ${stage} from the server. Dashboard remains locked to protect your data.`;
+  }
+
   async function hydrateStage(label, task) {
     let timer = 0;
     const work = Promise.resolve()
@@ -233,19 +258,17 @@
         );
       }
     } catch (error) {
-      const stage = error?.dartHydrationStage || "database";
+      const stage = error?.dartHydrationStage || "dashboard data";
       window.DartAdminHydration = Object.freeze({
         ready: false,
         stage,
         code: error?.code || "DASHBOARD_HYDRATION_FAILED",
       });
+      if (isAuthFailure(error)) clearAdminPrivateCache();
       lock();
       show(emailForm);
-      status(
-        emailForm,
-        `Database connection failed while loading ${stage}. Dashboard remains locked.`,
-        true,
-      );
+      status(emailForm, hydrationFailureMessage(error, stage), true);
+      error.dartAuthHandled = true;
       throw error;
     }
 
@@ -269,6 +292,9 @@
       error?.code === "DASHBOARD_ACCESS_DENIED"
     ) {
       return "The verification code is invalid, expired, or this email is not allowed.";
+    }
+    if (isAuthFailure(error)) {
+      return "Your Dart Eye session is no longer valid. Sign in again.";
     }
     if (error?.code === "NETWORK_ERROR") {
       return "Network error. Check your connection and try again.";
@@ -361,7 +387,9 @@
       resetVerification();
       await unlock();
     } catch (error) {
-      status(codeForm, friendlyAuthError(error), true);
+      if (!error?.dartAuthHandled) {
+        status(codeForm, friendlyAuthError(error), true);
+      }
     } finally {
       submit.disabled = false;
     }
@@ -398,6 +426,9 @@
       if (error?.code === "API_VERSION_MISMATCH") {
         status(emailForm, error.message, true);
         return;
+      }
+      if (!error?.dartAuthHandled && isAuthFailure(error)) {
+        clearAdminPrivateCache();
       }
       emailForm.elements.email.focus();
     }
