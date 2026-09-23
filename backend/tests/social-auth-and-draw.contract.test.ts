@@ -44,6 +44,24 @@ describe("customer social auth and Dart Card tie contracts", () => {
     ).toThrow(SocialAuthConfigError);
   });
 
+  it("keeps the one-time social completion capability out of request URLs", async () => {
+    const routesPath = fileURLToPath(
+      new URL("../src/modules/identity/social-auth.routes.ts", import.meta.url),
+    );
+    const browserPath = fileURLToPath(
+      new URL("../../Js/dart-auth-social.js", import.meta.url),
+    );
+    const [routes, browser] = await Promise.all([
+      readFile(routesPath, "utf8"),
+      readFile(browserPath, "utf8"),
+    ]);
+    expect(routes).toContain('router.post(\n    "/auth/social/challenge"');
+    expect(routes).not.toContain("request.query.token");
+    expect(browser).toContain('api("/api/v1/auth/social/challenge", {');
+    expect(browser).toContain("body: { token }");
+    expect(browser).not.toContain("/auth/social/challenge?token=");
+  });
+
   it("awards every exact top tie up to three customers", () => {
     expect(selectExactTieWinners([candidate(1)])).toHaveLength(1);
     expect(selectExactTieWinners([candidate(1), candidate(2)])).toHaveLength(2);
