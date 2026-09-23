@@ -67,22 +67,28 @@ describe("environment configuration", () => {
     expect(() => loadConfig({ NODE_ENV: "test" })).toThrow("DATABASE_URL");
   });
 
-  it("requires OUTBOX_CRON_SECRET in production and rejects legacy fallback", () => {
+  it("keeps outbox jobs optional while validating configured secrets and supporting CRON_SECRET fallback", () => {
     expect(() =>
       assertProductionOutboxCronSecret({
         NODE_ENV: "production",
         OUTBOX_CRON_SECRET: "",
       }),
-    ).toThrow("OUTBOX_CRON_SECRET");
+    ).not.toThrow();
 
-    expect(() =>
-      loadConfig({
-        ...productionEnvironment,
-        ...productionEmailEnvironment,
-        OUTBOX_CRON_SECRET: "",
-        CRON_SECRET: "c".repeat(32),
-      }),
-    ).toThrow("OUTBOX_CRON_SECRET");
+    const withoutCron = loadConfig({
+      ...productionEnvironment,
+      ...productionEmailEnvironment,
+      OUTBOX_CRON_SECRET: "",
+    });
+    expect(withoutCron.outboxCronSecret).toBeNull();
+
+    const legacy = loadConfig({
+      ...productionEnvironment,
+      ...productionEmailEnvironment,
+      OUTBOX_CRON_SECRET: "",
+      CRON_SECRET: "c".repeat(32),
+    });
+    expect(legacy.outboxCronSecret).toBe("c".repeat(32));
 
     expect(() =>
       loadConfig({
@@ -90,6 +96,13 @@ describe("environment configuration", () => {
         OUTBOX_CRON_SECRET: "too-short",
       }),
     ).toThrow("OUTBOX_CRON_SECRET");
+
+    expect(() =>
+      loadConfig({
+        ...baseEnvironment,
+        CRON_SECRET: "too-short",
+      }),
+    ).toThrow("CRON_SECRET");
   });
 
   it("rejects development authentication secrets in production", () => {
