@@ -27,8 +27,8 @@ assert(signup.includes('minlength="6"'), "Customer signup must expose the 6-char
 assert(signup.includes('name="birthday"') && signup.includes('autocomplete="bday" required'), "Customer signup must require Birthday");
 assert(customerPasswordUi.includes('input.removeAttribute("pattern")'), "Customer password UI must allow any character composition");
 assert(customerPasswordUi.includes("letters, numbers and symbols are all allowed"), "Customer signup must explain the relaxed password rule");
-assert.equal((signup.match(/data-social-login="google"/g) || []).length, 2, "Google must be offered in login and registration");
-assert.equal((signup.match(/data-social-login="facebook"/g) || []).length, 2, "Facebook must be offered in login and registration");
+assert.equal((signup.match(/data-social-login="google"/g) || []).length, 0, "Google must stay hidden until OAuth credentials are configured");
+assert.equal((signup.match(/data-social-login="facebook"/g) || []).length, 2, "Facebook must remain offered in login and registration");
 for (const path of [
   "/api/v1/auth/social/providers",
   "/api/v1/auth/social/complete",
