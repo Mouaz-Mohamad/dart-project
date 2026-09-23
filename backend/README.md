@@ -1,100 +1,112 @@
-# Dart backend foundation and Identity/Auth
+# Dart backend
 
-This folder is the server-authoritative Node.js/Express/TypeScript backend. Identity/Auth, catalogue, inventory, cart reservations, orders, customer commerce, representative workflows, site settings, finance summaries, dashboard domain persistence and transactional outbox delivery are implemented behind `/api/v1`. The Vanilla storefront, representative portal and Dart Eye consume these server contracts while keeping only transient browser UI/session state locally.
+`backend/` is the server-authoritative Node.js/Express/TypeScript API for Dart | for you. PostgreSQL is the source of truth for Identity/Auth, catalogue, inventory, cart reservations, orders, returns, customer rewards, Promotions, Dart Card draws, Settings, finance, permissions and transactional outbox delivery. Browser storage is UI/cache only and must never decide stock, discounts, permissions or financial state.
 
 ## Local setup
 
-1. Copy `.env.example` to `.env` and keep the file uncommitted.
+1. Copy `.env.example` to `.env` and keep it uncommitted.
 2. Start PostgreSQL: `docker compose up -d postgres`.
 3. Install dependencies: `npm install`.
 4. Apply migrations: `npm run db:migrate`.
 5. Start the API: `npm run dev`.
 
-The API listens on `http://localhost:4000` by default. Check `/api/v1/health/live` for process liveness and `/api/v1/health/ready` for PostgreSQL readiness.
+The API listens on `http://localhost:4000` by default. Use `/api/v1/health/live` for process liveness and `/api/v1/health/ready` for PostgreSQL readiness.
 
-## Vercel deployment
+## Identity and access
 
-Vercel detects `src/server.ts` as the Express entrypoint and captures its HTTP listener as one Vercel Function. Keep the Vercel project Root Directory set to `backend`. The complete production checklist and required environment variables are in [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md).
+Customer registration creates the customer account/session directly; signup is **not** gated by a customer Email OTP. Email OTP remains available for explicit verification/password-recovery flows. Customer and representative passwords use the same policy: at least 12 characters containing lowercase, uppercase and a number.
 
-Dart PostgreSQL/Neon remains authoritative for Staff access, roles, granular permissions and sessions.
-
-
-> Production batch 4 publishes the post-launch UI/icon fixes, Settings tabs, and customer signup validation/password updates together with the matching frontend.
-
-## Dart Eye Staff access
-
-The active Staff flow is deliberately simple:
+Dart Eye Staff access remains passwordless and separate from customer/representative passwords:
 
 ```text
-Owner manually allows Email + Role (+ Staff permissions)
-  -> Employee enters the allowed email
-  -> Dart sends a six-digit email verification code
-  -> Dart verifies the one-time code server-side
-  -> Dart creates the existing Secure HttpOnly session
-  -> PostgreSQL permissions control every dashboard/API action
+Owner allows Email + Role (+ permissions)
+  -> Employee requests a six-digit email code
+  -> Server verifies the one-time code
+  -> Secure HttpOnly Staff session is issued
+  -> PostgreSQL permissions authorize each dashboard/API action
 ```
 
-There is no Google OAuth, Supabase Auth, Staff password or Staff TOTP in the active Dart Eye flow.
+There is no active Staff Google OAuth, Staff password or Staff TOTP flow. Staff email challenges are hashed, limited-attempt, expiring and audited. Permission changes/access disabling revoke sessions.
 
-Migration `0025_staff_simple_email_access.sql` converts the pending protected Owner allowance to `email_otp`, disables Staff MFA requirements for this flow and creates replay-safe one-time Staff email challenges. The protected Owner remains single and cannot be disabled, deleted or demoted.
+## Birthday reward integrity
 
-The Owner manages dashboard access from Settings using:
-- allowed email,
-- role: `Owner` or `Staff`,
-- granular API/action permissions for Staff,
-- Active/Disabled state,
-- session revocation.
+Birthday reward authority is PostgreSQL, not the navbar/card/countdown UI.
 
-Unknown emails receive the same generic request response as allowed emails. Verification codes expire, have limited attempts, are hashed in the challenge table and are encrypted inside the transactional outbox payload until delivery. Permission changes and access disabling revoke current sessions immediately.
+- A customer can **use** the Birthday discount only once per Cairo Birthday year/occurrence.
+- The usage row is unique by customer + reward year.
+- The reservation is created atomically after the order row exists and becomes `Used` only when the order is `Delivered`.
+- `Cancelled`/`Refused` releases the reservation while the Birthday window is still valid.
+- Changing Birthday after that year's reward was used cannot create a second reward/message/countdown in the same reward year.
+- Changing Birthday before using that year's reward clears the unused current-year projection; the new date can still receive that year's reward when its window arrives.
+- The last successful use is recorded on the customer and in `birthday_discount_usage`.
 
-Customer and representative authentication are unchanged.
+## Promotions Engine
 
-## Identity/Auth behavior
+`PromotionService` evaluates eligibility server-side at Checkout. Campaign input is strictly validated and supports nested `AND`/`OR` rules over:
 
-- Dart PostgreSQL is the authority for Staff allowlist, Active/Disabled state, roles and permissions.
-- Server sessions are hashed, rotating, revocable per device, transported in HttpOnly cookies and protected by CSRF on state-changing authenticated requests.
-- Customer registration still queues a six-digit Email OTP in the transactional outbox.
-- Customer/representative password behavior is unchanged.
-- Customer, Staff and Representative remain separate account realms.
-- Representative registration continues to validate JPG/PNG/WebP magic bytes and store accepted verification documents encrypted in PostgreSQL.
+- delivered order count,
+- delivered/non-returned piece count,
+- net delivered spending,
+- days since last delivered order,
+- selected Customer ID/client code,
+- account age,
+- Birthday day.
 
-## Development seed
+Campaigns also support start/end dates, automatic/code campaigns, priority, minimum order value, minimum quantity, category/model/product scope, total usage limit and per-customer usage limit. `promotion_usages` reserves usage atomically with order creation and finalizes it on `Delivered`; `Cancelled`/`Refused` releases it. Analytics are derived from the usage ledger and real orders.
 
-Synthetic data is disabled by default and forbidden in Production. To run the current foundation seed, set `ALLOW_DEVELOPMENT_SEED=true`, then run `npm run db:seed:dev`.
+Because the existing Commerce checkout applies one promotion percentage per order, a scoped campaign is eligible only when every cart line is inside its configured scope. This prevents accidental discounting of out-of-scope lines until line-level mixed-cart promotion allocation is introduced deliberately.
+
+Admin contracts:
+
+- `GET /api/v1/admin/promotions`
+- `POST /api/v1/admin/promotions`
+- `PUT /api/v1/admin/promotions/:id`
+- `GET /api/v1/admin/promotions/:id/analytics`
+
+## Dart Card monthly draw
+
+The monthly draw is server-authoritative and idempotent per `YYYY-MM` period.
+
+Ranking is exactly:
+
+1. highest delivered/non-returned purchased piece count;
+2. if piece count ties, highest net delivered spending;
+3. if both values are exactly equal, cryptographic random selection only among the exact tied customers, with the tie set/method recorded in the draw audit.
+
+Customers with `dart_card_draw_eligible=false` or an active, unexpired Dart Card with remaining piece capacity are excluded. A winner receives one 40% Dart Card for up to 10 pieces or one year. Duplicate active cards are serialized and rejected at the database boundary.
+
+Admin contracts:
+
+- `GET /api/v1/admin/dart-card/draws/:period/preview`
+- `POST /api/v1/admin/dart-card/draws/:period/run`
+- `GET /api/v1/admin/dart-card/draws`
+
+Scheduler-neutral automation endpoint:
+
+- `POST /api/v1/internal/dart-card/monthly-draw`
+- `Authorization: Bearer <OUTBOX_CRON_SECRET>`
+
+It executes the previous Cairo month and is safe to retry because `dart_card_draws.period_key` is unique and the transaction uses an advisory lock.
+
+## Settings contract
+
+`PUT /api/v1/admin/site-settings` uses the central strict Zod schema in `site-settings.schema.ts`; unknown root keys are rejected. The public endpoint returns an explicit allowlist and never exposes the private `codRisk` policy. Writes remain optimistic-concurrency controlled through `expectedVersion` and audited.
 
 ## Migrations
 
 - Apply all pending migrations: `npm run db:migrate`.
 - Apply exactly the next pending migration: `npm run db:migrate:one -- <migration-name>`.
 
-Applied migration checksums are recorded in `dart_schema_migrations`. Editing or renaming an already-applied migration is rejected; add a new migration instead.
+Applied migration checksums are recorded in `dart_schema_migrations`. Never edit or rename an applied migration; add a new unique four-digit migration. Historical duplicate prefixes `0013`, `0014` and `0015` are grandfathered only.
 
-Historical duplicate numeric prefixes `0013`, `0014` and `0015` are grandfathered because those filenames may already exist in migration history. They are deterministic because the runner sorts complete filenames, but they must never be copied as a pattern for new work. The runtime now rejects every other duplicate numeric prefix, including attempts to add a new duplicate using an older number. New migrations continue with one unique four-digit sequence number per file.
+Rewards/Promotions/Dart Card hardening is one ordered set and requires migrations `0034` through `0037` to be applied together before exposing the new API routes to traffic.
 
-## Operational monitoring
+## Operational monitoring and internal jobs
 
-Dart already has structured Pino/Pino HTTP logs, request IDs, secret redaction, centralized error responses, process-level fatal logging, and separate liveness/readiness health checks.
+Dart uses structured Pino logging, request IDs, secret redaction, centralized error responses, liveness/readiness checks and the transactional outbox. `MONITORING_ALERT_EMAIL` can receive sanitized owner-facing backend alerts.
 
-For immediate owner-facing backend alerts, configure the existing SMTP provider and set `MONITORING_ALERT_EMAIL`. Unhandled HTTP 500 errors and unexpected PostgreSQL pool errors trigger a sanitized alert containing the source, request ID, method/path when applicable, and timestamp. Email addresses, long phone-like numbers and bearer tokens found in error text are redacted before delivery.
+The outbox retry endpoint remains `POST /api/v1/internal/outbox/process` with `Authorization: Bearer <OUTBOX_CRON_SECRET>`. The same server-only secret protects the scheduler-neutral Dart Card monthly draw endpoint. Never expose this secret to storefront/dashboard JavaScript.
 
-`MONITORING_ALERT_COOLDOWN_MS` defaults to five minutes and suppresses repeated identical alerts to avoid an alert storm. The structured server log remains the detailed source for the stack trace and request correlation.
+## Deployment note
 
-This lightweight alert path does not replace a dedicated error-tracking product if Dart later needs browser error capture, release-level grouping, source maps, traces or performance monitoring.
-
-## Current scope and boundaries
-
-Return creation locks the shared return domain inside the PostgreSQL transaction. Exchange-chain identity is resolved server-side across replacement Item Codes, and courier-fee policy is snapshotted when the request is created.
-
-Identity/Auth, simplified Dart Eye Staff email access, secure Dart sessions, deny-by-default permissions, customer Email OTP, representative encrypted documents, catalogue/inventory, orders, finance and database-backed dashboard state are present.
-
-## Transactional outbox retries
-
-The API keeps immediate event dispatch for normal transactional flows. The Vercel Cron entry is a safety retry. Faster retry cadence can come from a trusted external scheduler calling the protected outbox processor endpoint.
-
-The protected processor is `POST /api/v1/internal/outbox/process` with `Authorization: Bearer <OUTBOX_CRON_SECRET>`. Keep that secret server-side only.
-
-## Email
-
-SMTP is required for Dart Eye Staff verification and customer email verification. Configure the server-only email variables documented in `VERCEL_DEPLOYMENT.md`. WhatsApp remains optional and is not required for Owner or Staff sign-in.
-
-Dashboard server polling starts only after authentication.
+Deployment is a separate operational action. Pushing application code or migrations does not mean production PostgreSQL has been migrated or that an internal scheduler has been configured. Run migrations `0034`–`0037` through the existing migration runner in the target environment before enabling the new reward/promotion/draw contracts.

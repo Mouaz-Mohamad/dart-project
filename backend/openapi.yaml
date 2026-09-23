@@ -1,10 +1,10 @@
 # DART CODE GUIDE | backend/openapi.yaml
-# الغرض: ملف إعداد تشغيلي/CI؛ تغيير القيم هنا يؤثر على الأتمتة وليس منطق المتجر مباشرة.
+# الغرض: العقد التشغيلي للـHTTP APIs الحساسة والمعلنة في Dart.
 openapi: 3.1.0
 info:
   title: Dart Backend API
   version: 0.6.0
-  description: Server-authoritative API for Dart | for you. Identity sessions use Secure HttpOnly cookies and CSRF tokens.
+  description: Server-authoritative API for Dart | for you. PostgreSQL owns business state. Authenticated mutations use Secure HttpOnly sessions and CSRF.
 servers:
   - url: /api/v1
 tags:
@@ -12,28 +12,32 @@ tags:
   - name: Customer Auth
   - name: Staff Auth
   - name: Representative Auth
-  - name: Sessions\n  - name: Live Operations
+  - name: Sessions
   - name: Orders
+  - name: Settings
+  - name: Promotions
+  - name: Dart Card
+  - name: Internal Jobs
 paths:
   /health/live:
     get:
       tags: [Health]
-      summary: Process liveness
       operationId: getLiveness
       responses:
         "200": { description: API process is running }
   /health/ready:
     get:
       tags: [Health]
-      summary: PostgreSQL readiness
       operationId: getReadiness
       responses:
         "200": { description: Required dependencies are ready }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
   /auth/register:
     post:
       tags: [Customer Auth]
-      summary: Register a customer and queue a six-digit Email OTP
+      summary: Register a customer and create the customer session immediately
+      description: Customer signup is not gated by Email OTP. Email OTP remains available for explicit verification/recovery flows.
       operationId: registerCustomer
       requestBody:
         required: true
@@ -41,17 +45,14 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/CustomerRegistration" }
       responses:
-        "202":
-          description: Email verification required
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/VerificationRequired" }
+        "201": { $ref: "#/components/responses/Authenticated" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /auth/verify-email:
     post:
       tags: [Customer Auth]
-      summary: Consume an Email OTP and create the customer session
+      summary: Consume an explicit Email verification challenge and create/replace the customer session
       operationId: verifyCustomerEmail
       responses:
         "200": { $ref: "#/components/responses/Authenticated" }
@@ -59,7 +60,7 @@ paths:
   /auth/resend-verification:
     post:
       tags: [Customer Auth]
-      summary: Replace a registration challenge and queue a new Email OTP
+      summary: Replace an existing Email verification challenge
       operationId: resendCustomerVerification
       responses:
         "202": { description: Replacement verification challenge }
@@ -67,7 +68,6 @@ paths:
   /auth/login:
     post:
       tags: [Customer Auth]
-      summary: Create a customer session
       operationId: loginCustomer
       requestBody:
         required: true
@@ -79,78 +79,36 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
-  /admin/auth/email/start:
-    post:
-      tags: [Staff Auth]
-      summary: Request a six-digit verification code for an allowed dashboard email
-      description: Always returns a generic response when email delivery is configured so callers cannot enumerate the Staff allowlist.
-      operationId: startStaffEmailAccess
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/StaffEmailStart" }
-      responses:
-        "202": { description: Generic verification challenge response }
-        "429": { $ref: "#/components/responses/RateLimited" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /admin/auth/email/resend:
-    post:
-      tags: [Staff Auth]
-      summary: Request a replacement verification code for an allowed dashboard email
-      operationId: resendStaffEmailAccess
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/StaffEmailStart" }
-      responses:
-        "202": { description: Generic verification challenge response }
-        "429": { $ref: "#/components/responses/RateLimited" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /admin/auth/email/verify:
-    post:
-      tags: [Staff Auth]
-      summary: Verify the one-time email code and issue the secure Dart Staff session
-      operationId: verifyStaffEmailAccess
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/StaffEmailVerify" }
-      responses:
-        "200": { $ref: "#/components/responses/Authenticated" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-  /representatives/register:
-    post:
-      tags: [Representative Auth]
-      summary: Representative registration boundary
-      description: Returns 503 until encrypted private document storage and malware scanning are configured; no incomplete application is saved.
-      operationId: registerRepresentative
-      responses:
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /representatives/login:
-    post:
-      tags: [Representative Auth]
-      summary: Create a session for an approved representative
-      operationId: loginRepresentative
-      responses:
-        "200": { $ref: "#/components/responses/Authenticated" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
   /auth/forgot-password:
     post:
       tags: [Customer Auth, Representative Auth]
-      summary: Record a reset request using a non-enumerating response
       operationId: requestPasswordReset
       responses:
-        "202": { description: Generic request accepted response }
+        "202": { description: Non-enumerating reset challenge response }
+  /auth/reset-password:
+    post:
+      tags: [Customer Auth, Representative Auth]
+      summary: Consume reset OTP and replace the account password
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordReset" }
+      responses:
+        "200": { description: Password changed }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/change-password:
+    post:
+      tags: [Customer Auth]
+      operationId: changeCustomerPassword
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /auth/change-temporary-password:
     post:
       tags: [Customer Auth, Representative Auth]
-      summary: Replace a temporary password and rotate all sessions
       operationId: changeTemporaryPassword
       security: [{ sessionCookie: [], csrfToken: [] }]
       responses:
@@ -159,7 +117,6 @@ paths:
   /auth/refresh:
     post:
       tags: [Sessions]
-      summary: Rotate the current server session
       operationId: refreshSession
       security: [{ sessionCookie: [], csrfToken: [] }]
       responses:
@@ -168,7 +125,6 @@ paths:
   /auth/logout:
     post:
       tags: [Sessions]
-      summary: Revoke the current session
       operationId: logout
       security: [{ sessionCookie: [], csrfToken: [] }]
       responses:
@@ -176,7 +132,6 @@ paths:
   /auth/logout-all:
     post:
       tags: [Sessions]
-      summary: Revoke every session for the account
       operationId: logoutAll
       security: [{ sessionCookie: [], csrfToken: [] }]
       responses:
@@ -184,7 +139,6 @@ paths:
   /auth/sessions:
     get:
       tags: [Sessions]
-      summary: List active owned sessions
       operationId: listOwnSessions
       security: [{ sessionCookie: [] }]
       responses:
@@ -192,169 +146,275 @@ paths:
   /auth/sessions/{sessionId}:
     delete:
       tags: [Sessions]
-      summary: Revoke one owned session
       operationId: revokeOwnSession
       security: [{ sessionCookie: [], csrfToken: [] }]
       parameters:
-        - in: path
-          name: sessionId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
       responses:
         "204": { description: Session revoked }
         "404": { $ref: "#/components/responses/NotFound" }
   /me:
     get:
       tags: [Sessions]
-      summary: Return the minimum signed-in profile
       operationId: getMe
       security: [{ sessionCookie: [] }]
       responses:
-        "200": { description: Signed-in profile }
+        "200": { description: Signed-in profile and permissions }
     patch:
       tags: [Customer Auth]
-      summary: Update customer profile; changing email requires a new OTP
+      summary: Update customer profile. Birthday changes are audited and cannot create a second used Birthday reward in the same year.
       operationId: updateMe
       security: [{ sessionCookie: [], csrfToken: [] }]
       responses:
-        "200": { description: Updated profile and optional verification challenge }
+        "200": { description: Updated profile }
         "409": { $ref: "#/components/responses/Conflict" }
-  /admin/representatives/{id}/approve:
+
+  /representatives/register:
+    post:
+      tags: [Representative Auth]
+      operationId: registerRepresentative
+      responses:
+        "202": { description: Representative application accepted when secure document storage is available }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /representatives/login:
+    post:
+      tags: [Representative Auth]
+      operationId: loginRepresentative
+      responses:
+        "200": { $ref: "#/components/responses/Authenticated" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/auth/email/start:
     post:
       tags: [Staff Auth]
-      summary: Approve a representative; Owner permission and MFA required
-      operationId: approveRepresentative
-      security: [{ sessionCookie: [], csrfToken: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+      operationId: startStaffEmailAccess
       responses:
-        "204": { description: Representative approved }
-        "403": { $ref: "#/components/responses/Forbidden" }
-  /admin/representatives/{id}/reject:
+        "202": { description: Generic Staff Email challenge response }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /admin/auth/email/resend:
     post:
       tags: [Staff Auth]
-      summary: Reject a representative; Owner permission and MFA required
-      operationId: rejectRepresentative
-      security: [{ sessionCookie: [], csrfToken: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+      operationId: resendStaffEmailAccess
       responses:
-        "204": { description: Representative rejected }
-        "403": { $ref: "#/components/responses/Forbidden" }
-  /admin/password-reset-requests/{id}/temporary-password:
+        "202": { description: Generic replacement challenge response }
+  /admin/auth/email/verify:
     post:
       tags: [Staff Auth]
-      summary: Set a temporary password, revoke sessions and audit the action
-      operationId: setTemporaryPassword
-      security: [{ sessionCookie: [], csrfToken: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+      operationId: verifyStaffEmailAccess
       responses:
-        "204": { description: Temporary password assigned }
+        "200": { $ref: "#/components/responses/Authenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /admin/staff:
     get:
       tags: [Staff Auth]
-      summary: List Staff accounts, pending email access entries and permission catalogue
       operationId: listStaffAccess
       security: [{ sessionCookie: [] }]
       responses:
-        "200": { description: Staff access directory }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "200": { description: Staff directory and permission catalogue }
   /admin/staff/allowlist:
     post:
       tags: [Staff Auth]
-      summary: Allow a dashboard email and assign Owner or Staff role
       operationId: allowStaffEmail
       security: [{ sessionCookie: [], csrfToken: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/StaffEmailAllowance" }
       responses:
-        "201": { description: Dashboard email added to the PostgreSQL allowlist }
+        "201": { description: Staff Email allowance created }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
-        "422": { $ref: "#/components/responses/ValidationError" }
   /admin/staff/allowlist/{id}:
     delete:
       tags: [Staff Auth]
-      summary: Remove an unclaimed Staff email access entry
       operationId: removeStaffEmailAccess
       security: [{ sessionCookie: [], csrfToken: [] }]
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
-        "204": { description: Pending allowlist entry removed }
+        "204": { description: Pending allowance removed }
         "409": { $ref: "#/components/responses/Conflict" }
   /admin/staff/{id}/access:
     patch:
       tags: [Staff Auth]
-      summary: Activate or disable Staff access and revoke old sessions
       operationId: setStaffAccessStatus
       security: [{ sessionCookie: [], csrfToken: [] }]
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
         "204": { description: Staff access state updated }
-        "409": { $ref: "#/components/responses/Conflict" }
   /admin/staff/{id}/sessions/revoke:
     post:
       tags: [Staff Auth]
-      summary: Revoke every Dart session for one Staff account
       operationId: revokeStaffSessions
       security: [{ sessionCookie: [], csrfToken: [] }]
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
         "204": { description: Staff sessions revoked }
 
+  /orders:
+    post:
+      tags: [Orders, Promotions]
+      summary: Create an order from an active reservation. Promotion eligibility is re-evaluated server-side before the Commerce transaction.
+      operationId: createOrder
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "201": { description: Order created }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /admin/orders/{orderRef}/cod-verification:
     post:
       tags: [Orders]
-      summary: Record a manual COD verification decision before Preparing
       operationId: decideCodVerification
       security: [{ sessionCookie: [], csrfToken: [] }]
       parameters:
-        - in: path
-          name: orderRef
-          required: true
-          schema: { type: string, minLength: 1, maxLength: 160 }
+        - { in: path, name: orderRef, required: true, schema: { type: string, minLength: 1, maxLength: 160 } }
+      responses:
+        "200": { description: COD verification decision committed }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /site-settings:
+    get:
+      tags: [Settings]
+      summary: Read public allowlisted Site Settings; private COD policy is never returned.
+      operationId: getPublicSiteSettings
+      responses:
+        "200": { description: Public settings and version }
+        "304": { description: ETag unchanged }
+  /admin/site-settings:
+    get:
+      tags: [Settings]
+      operationId: getAdminSiteSettings
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Full admin settings and version }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      tags: [Settings]
+      operationId: updateSiteSettings
+      security: [{ sessionCookie: [], csrfToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [expectedVersion, decision, reason]
-              properties:
-                expectedVersion: { type: integer, minimum: 1 }
-                decision: { type: string, enum: [verify, fail] }
-                reason: { type: string, minLength: 3, maxLength: 500 }
+            schema: { $ref: "#/components/schemas/SiteSettingsUpdate" }
       responses:
-        "200": { description: Verification decision committed and refreshed order state returned }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "200": { description: Updated settings }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
+
+  /me/promotions/validate-v2:
+    get:
+      tags: [Promotions]
+      operationId: validatePromotionV2
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { in: query, name: code, required: true, schema: { type: string, minLength: 1, maxLength: 60 } }
+      responses:
+        "200": { description: Dynamic customer campaign eligibility result }
+  /admin/promotions:
+    get:
+      tags: [Promotions]
+      operationId: listPromotions
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Promotion campaign list }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Promotions]
+      operationId: createPromotion
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PromotionCampaign" }
+      responses:
+        "201": { description: Promotion created }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/promotions/{id}:
+    put:
+      tags: [Promotions]
+      operationId: updatePromotion
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, minLength: 8, maxLength: 160 } }
+      responses:
+        "200": { description: Promotion updated }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/promotions/{id}/analytics:
+    get:
+      tags: [Promotions]
+      operationId: promotionAnalytics
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, minLength: 8, maxLength: 160 } }
+      responses:
+        "200": { description: Reservations, usages, customers, revenue, pieces, AOV and conversion }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/dart-card/draws:
+    get:
+      tags: [Dart Card]
+      operationId: listDartCardDraws
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 120, default: 24 } }
+      responses:
+        "200": { description: Audited draw history }
+  /admin/dart-card/draws/{period}/preview:
+    get:
+      tags: [Dart Card]
+      operationId: previewDartCardDraw
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/DrawPeriod" }
+      responses:
+        "200": { description: Eligible ranking ordered by pieces then net spending }
+  /admin/dart-card/draws/{period}/run:
+    post:
+      tags: [Dart Card]
+      operationId: runDartCardDraw
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/DrawPeriod" }
+      responses:
+        "200": { description: Idempotent monthly draw result and awarded Dart Card when eligible }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /internal/dart-card/monthly-draw:
+    get:
+      tags: [Internal Jobs, Dart Card]
+      operationId: runDueDartCardDrawGet
+      security: [{ internalBearer: [] }]
+      responses:
+        "200": { description: Previous Cairo month draw result }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Internal Jobs, Dart Card]
+      operationId: runDueDartCardDrawPost
+      security: [{ internalBearer: [] }]
+      responses:
+        "200": { description: Previous Cairo month draw result }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /internal/outbox/process:
+    get:
+      tags: [Internal Jobs]
+      operationId: processOutboxGet
+      security: [{ internalBearer: [] }]
+      responses:
+        "200": { description: Outbox batch result }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Internal Jobs]
+      operationId: processOutboxPost
+      security: [{ internalBearer: [] }]
+      responses:
+        "200": { description: Outbox batch result }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
 components:
   securitySchemes:
@@ -366,52 +426,48 @@ components:
       type: apiKey
       in: header
       name: X-CSRF-Token
+    internalBearer:
+      type: http
+      scheme: bearer
+  parameters:
+    DrawPeriod:
+      in: path
+      name: period
+      required: true
+      schema: { type: string, pattern: "^20[0-9]{2}-(0[1-9]|1[0-2])$" }
   schemas:
+    StrongPassword:
+      type: string
+      minLength: 12
+      maxLength: 200
+      pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{12,200}$"
+      writeOnly: true
     CustomerRegistration:
       type: object
+      additionalProperties: false
       required: [name, email, phone1, password]
       properties:
         name: { type: string, minLength: 3, maxLength: 120 }
-        email: { type: string, format: email }
-        phone1: { type: string }
-        phone2: { type: string }
+        email: { type: string, format: email, maxLength: 254 }
+        phone1: { type: string, minLength: 10, maxLength: 25 }
+        phone2: { type: string, minLength: 10, maxLength: 25 }
         birthday: { type: string, format: date }
-        password: { type: string, minLength: 4, writeOnly: true }
+        password: { $ref: "#/components/schemas/StrongPassword" }
     Login:
       type: object
       required: [identifier, password]
       properties:
-        identifier: { type: string }
-        password: { type: string, writeOnly: true }
-        totp: { type: string, pattern: "^[0-9]{6}$", writeOnly: true }
-    StaffEmailStart:
+        identifier: { type: string, minLength: 3, maxLength: 254 }
+        password: { type: string, minLength: 1, maxLength: 200, writeOnly: true }
+    PasswordReset:
       type: object
-      required: [email]
-      properties:
-        email: { type: string, format: email, maxLength: 254 }
-    StaffEmailVerify:
-      type: object
-      required: [challengeId, code]
+      additionalProperties: false
+      required: [challengeId, code, password, confirmation]
       properties:
         challengeId: { type: string, format: uuid }
-        code: { type: string, pattern: "^[0-9]{6}$", writeOnly: true }
-    StaffEmailAllowance:
-      type: object
-      required: [email, role]
-      properties:
-        email: { type: string, format: email, maxLength: 254 }
-        role: { type: string, enum: [owner, staff] }
-        permissionKeys:
-          type: array
-          maxItems: 300
-          items: { type: string }
-    VerificationRequired:
-      type: object
-      required: [status, challengeId, expiresAt]
-      properties:
-        status: { type: string, const: verification_required }
-        challengeId: { type: string, format: uuid }
-        expiresAt: { type: string, format: date-time }
+        code: { type: string, pattern: "^[0-9]{6}$" }
+        password: { $ref: "#/components/schemas/StrongPassword" }
+        confirmation: { $ref: "#/components/schemas/StrongPassword" }
     Profile:
       type: object
       required: [id, accountType, code, name, email, phones, status]
@@ -432,13 +488,68 @@ components:
       properties:
         user: { $ref: "#/components/schemas/Profile" }
         csrfToken: { type: string, writeOnly: true }
+    SiteSettingsUpdate:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, settings]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        settings:
+          type: object
+          description: Strict known SiteSettings root keys. Unknown root keys are rejected by the Zod contract.
+    PromotionRule:
+      oneOf:
+        - type: object
+          required: [field, operator, value]
+          additionalProperties: false
+          properties:
+            field: { type: string, enum: [ordersCount, purchasedPieces, totalSpendingMinor, lastOrderDaysAgo, customerId, accountAgeDays, isBirthday] }
+            operator: { type: string, enum: [eq, ne, gt, gte, lt, lte, between, in, notIn] }
+            value: {}
+        - type: object
+          required: [mode, rules]
+          additionalProperties: false
+          properties:
+            mode: { type: string, enum: [AND, OR] }
+            rules:
+              type: array
+              minItems: 1
+              maxItems: 50
+              items: { $ref: "#/components/schemas/PromotionRule" }
+    PromotionCampaign:
+      type: object
+      additionalProperties: false
+      required: [name, code, discountPercent]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 160 }
+        code: { type: string, minLength: 2, maxLength: 60, pattern: "^[A-Za-z0-9_-]+$" }
+        status: { type: string, enum: [Draft, Scheduled, Active, Paused, Expired], default: Draft }
+        discountPercent: { type: number, exclusiveMinimum: 0, maximum: 100 }
+        maxDiscountPercent: { type: number, exclusiveMinimum: 0, maximum: 100 }
+        startsAt: { type: string, format: date }
+        endsAt: { type: string, format: date }
+        automatic: { type: boolean, default: false }
+        priority: { type: integer, minimum: 0, maximum: 10000, default: 100 }
+        minOrderMinor: { type: integer, minimum: 0 }
+        minQuantity: { type: integer, minimum: 1, maximum: 100, default: 1 }
+        totalUsageLimit: { type: integer, minimum: 0 }
+        perCustomerUsageLimit: { type: integer, minimum: 0 }
+        customerRules: { $ref: "#/components/schemas/PromotionRule" }
+        productScope:
+          type: object
+          additionalProperties: false
+          required: [mode, values]
+          properties:
+            mode: { type: string, enum: [all, categories, models, products] }
+            values: { type: array, maxItems: 500, items: { type: string } }
+        stacking: { type: string, const: none, default: none }
     ErrorResponse:
       type: object
       required: [error]
       properties:
         error:
           type: object
-          required: [code, message, requestId]
+          required: [code, message]
           properties:
             code: { type: string }
             message: { type: string }
@@ -451,7 +562,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Authenticated" }
     Unauthorized:
-      description: Authentication failed or session expired
+      description: Authentication failed, internal bearer failed, or session expired
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -466,12 +577,12 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     Conflict:
-      description: Duplicate or stale state conflict
+      description: Duplicate, exhausted eligibility, or stale state conflict
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     ValidationError:
-      description: Request or business validation failed
+      description: Request/schema/business validation failed
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }

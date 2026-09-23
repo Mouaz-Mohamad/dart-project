@@ -13,12 +13,6 @@ function loadArgon2(): Promise<typeof argon2> {
   return argon2Module;
 }
 
-export function validateCustomerPasswordPolicy(password: string): string[] {
-  return password.length < 8
-    ? ["Password must contain at least 8 characters"]
-    : [];
-}
-
 export function validatePasswordPolicy(password: string): string[] {
   const problems: string[] = [];
   if (password.length < 12) problems.push("Password must contain at least 12 characters");
@@ -26,6 +20,12 @@ export function validatePasswordPolicy(password: string): string[] {
   if (!/[A-Z]/.test(password)) problems.push("Password must contain an uppercase letter");
   if (!/[0-9]/.test(password)) problems.push("Password must contain a number");
   return problems;
+}
+
+// Customers and representatives intentionally share one password contract.
+// Staff access remains on its separate passwordless/onboarding flow.
+export function validateCustomerPasswordPolicy(password: string): string[] {
+  return validatePasswordPolicy(password);
 }
 
 export async function hashPassword(password: string): Promise<string> {

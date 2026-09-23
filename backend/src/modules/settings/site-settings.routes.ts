@@ -12,11 +12,12 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { SiteSettingsService } from "./site-settings.service.js";
+import { siteSettingsSchema } from "./site-settings.schema.js";
 
 const updateSchema = z.object({
   expectedVersion: z.number().int().positive(),
-  settings: z.record(z.string(), z.unknown()),
-});
+  settings: siteSettingsSchema,
+}).strict();
 
 export function createSiteSettingsRouter(
   settings: SiteSettingsService,

@@ -2,6 +2,7 @@
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { publicSiteSettings, siteSettingsSchema } from "./site-settings.schema.js";
 
 export class SiteSettingsService {
   public constructor(private readonly pool: Pool) {}
@@ -14,20 +15,19 @@ export class SiteSettingsService {
     );
     const row = result.rows[0];
     const settings = row?.data || {};
-    if (includePrivate) {
-      return { version: Number(row?.version || 1), settings };
-    }
-    const publicSettings = { ...settings };
-    delete publicSettings.codRisk;
-    return { version: Number(row?.version || 1), settings: publicSettings };
+    return {
+      version: Number(row?.version || 1),
+      settings: includePrivate ? settings : publicSiteSettings(settings),
+    };
   }
 
   public async update(
     expectedVersion: number,
-    settings: Record<string, unknown>,
+    settingsInput: Record<string, unknown>,
     actorId: string,
     requestId: string,
   ): Promise<{ version: number; settings: Record<string, unknown> }> {
+    const parsedSettings = siteSettingsSchema.parse(settingsInput);
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -49,28 +49,26 @@ export class SiteSettingsService {
           ? currentSettings.codRisk as Record<string, unknown>
           : null;
       const incomingCodRisk =
-        settings.codRisk &&
-        typeof settings.codRisk === "object" &&
-        !Array.isArray(settings.codRisk)
-          ? settings.codRisk as Record<string, unknown>
+        parsedSettings.codRisk &&
+        typeof parsedSettings.codRisk === "object" &&
+        !Array.isArray(parsedSettings.codRisk)
+          ? parsedSettings.codRisk as Record<string, unknown>
           : null;
-      const nextSettings: Record<string, unknown> = { ...settings };
+      const nextSettings: Record<string, unknown> = { ...parsedSettings };
       let codRiskPolicyVersion = Number(currentCodRisk?.version || 1);
 
       if (currentCodRisk && !incomingCodRisk) {
-        // Older Settings UIs do not know about COD policy yet; never delete it accidentally.
+        // Keep the private COD policy when an older Settings UI sends only public keys.
         nextSettings.codRisk = currentCodRisk;
       } else if (incomingCodRisk) {
         const previousComparable = { ...(currentCodRisk || {}) };
         const incomingComparable = { ...incomingCodRisk };
         delete previousComparable.version;
         delete incomingComparable.version;
-        const policyChanged =
-          JSON.stringify(previousComparable) !== JSON.stringify(incomingComparable);
-        codRiskPolicyVersion =
-          currentCodRisk && policyChanged
-            ? Number(currentCodRisk.version || 1) + 1
-            : Number(currentCodRisk?.version || incomingCodRisk.version || 1);
+        const policyChanged = JSON.stringify(previousComparable) !== JSON.stringify(incomingComparable);
+        codRiskPolicyVersion = currentCodRisk && policyChanged
+          ? Number(currentCodRisk.version || 1) + 1
+          : Number(currentCodRisk?.version || incomingCodRisk.version || 1);
         nextSettings.codRisk = {
           ...incomingCodRisk,
           version: Math.max(1, Math.round(codRiskPolicyVersion)),
@@ -95,13 +93,14 @@ export class SiteSettingsService {
             previousVersion: version,
             newVersion: next,
             codRiskPolicyVersion,
+            acceptedKeys: Object.keys(parsedSettings).sort(),
           }),
         ],
       );
       await client.query("COMMIT");
       return { version: next, settings: nextSettings };
     } catch (error) {
-      await client.query("ROLLBACK");
+      await client.query("ROLLBACK").catch(() => undefined);
       throw error;
     } finally {
       client.release();

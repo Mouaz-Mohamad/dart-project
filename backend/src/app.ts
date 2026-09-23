@@ -22,6 +22,8 @@ import { FinanceService } from "./modules/finance/finance.service.js";
 import { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { OutboxService } from "./modules/outbox/outbox.service.js";
 import { WaitingService } from "./modules/waiting/waiting.service.js";
+import { PromotionService } from "./modules/promotions/promotion.service.js";
+import { DartCardDrawService } from "./modules/loyalty/dart-card-draw.service.js";
 import { createEmailProvider } from "./modules/outbox/email-provider.js";
 
 export interface DartRuntime {
@@ -65,6 +67,8 @@ export function createRuntimeApplication(
   const catalogService = new CatalogService(database);
   const catalogAssetService = new CatalogAssetService(database);
   const commerceService = new CommerceService(database);
+  const promotionService = new PromotionService(database);
+  const dartCardDrawService = new DartCardDrawService(database);
   const siteSettingsService = new SiteSettingsService(database);
   const dashboardStateService = new DashboardStateService(database);
   const customerInteractionService = new CustomerInteractionService(database);
@@ -90,11 +94,13 @@ export function createRuntimeApplication(
     logger,
     databasePing: () => pingDatabase(database),
     startedAt: new Date(),
-    version: "0.5.0",
+    version: "0.6.0",
     identityService,
     catalogService,
     catalogAssetService,
     commerceService,
+    promotionService,
+    dartCardDrawService,
     siteSettingsService,
     dashboardStateService,
     customerInteractionService,

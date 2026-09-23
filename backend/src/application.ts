@@ -40,6 +40,10 @@ import { createOutboxRouter } from "./modules/outbox/outbox.routes.js";
 import type { OutboxService } from "./modules/outbox/outbox.service.js";
 import { createWaitingRouter } from "./modules/waiting/waiting.routes.js";
 import type { WaitingService } from "./modules/waiting/waiting.service.js";
+import { createPromotionRouter } from "./modules/promotions/promotion.routes.js";
+import type { PromotionService } from "./modules/promotions/promotion.service.js";
+import { createDartCardDrawRouter } from "./modules/loyalty/dart-card-draw.routes.js";
+import type { DartCardDrawService } from "./modules/loyalty/dart-card-draw.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -47,6 +51,8 @@ export interface AppDependencies extends HealthDependencies {
   catalogService?: CatalogService;
   catalogAssetService?: CatalogAssetService;
   commerceService?: CommerceService;
+  promotionService?: PromotionService;
+  dartCardDrawService?: DartCardDrawService;
   siteSettingsService?: SiteSettingsService;
   dashboardStateService?: DashboardStateService;
   customerInteractionService?: CustomerInteractionService;
@@ -174,6 +180,18 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         ),
       );
     }
+    // Promotions must run before Commerce so server-side eligibility can normalize
+    // the promotion code without moving the final order write out of CommerceService.
+    if (dependencies.promotionService) {
+      app.use(
+        "/api/v1",
+        createPromotionRouter(
+          dependencies.promotionService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
     if (dependencies.commerceService) {
       app.use(
         "/api/v1",
@@ -182,6 +200,16 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
           dependencies.identityService,
           config,
           dependencies.outboxService,
+        ),
+      );
+    }
+    if (dependencies.dartCardDrawService) {
+      app.use(
+        "/api/v1",
+        createDartCardDrawRouter(
+          dependencies.dartCardDrawService,
+          dependencies.identityService,
+          config,
         ),
       );
     }
