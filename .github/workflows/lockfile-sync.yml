@@ -1,0 +1,38 @@
+# Temporary one-shot workflow for batch 7 dependency lock synchronization.
+name: Lockfile sync
+
+on:
+  push:
+    paths:
+      - ".github/workflows/lockfile-sync.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Regenerate backend package lock
+        working-directory: backend
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit synchronized lockfile
+        run: |
+          if git diff --quiet -- backend/package-lock.json; then
+            echo "package-lock.json is already synchronized"
+            exit 0
+          fi
+          git config user.name "Dart Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add backend/package-lock.json
+          git commit -m "chore: sync backend package lock [batch:7]"
+          git push origin HEAD:main
