@@ -6,6 +6,5 @@
       "includeFiles": "migrations/**"
     }
   },
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run db:migrate && npm run build"
 }
-
