@@ -2,6 +2,7 @@
 // الغرض: تشغيل HTTP server وإدارة الإغلاق الآمن واتصال PostgreSQL.
 import "./instrument.js";
 import * as Sentry from "@sentry/node";
+import express, { type Express } from "express";
 import type { Server } from "node:http";
 import { resolve } from "node:path";
 import app, { runtime } from "./app.js";
@@ -12,18 +13,27 @@ import { runMigrations } from "./database/migrate.js";
 assertProductionOutboxCronSecret(process.env);
 
 // Vercel build environments are not guaranteed to have database network access.
-// Run the idempotent, checksum-protected migration set when the serverless runtime
-// starts instead. PostgreSQL advisory locking makes concurrent cold starts safe.
+// Gate runtime requests on the idempotent migration promise instead of using
+// top-level await. PostgreSQL advisory locking makes concurrent cold starts safe.
 const activeRuntime = runtime;
+let exportedApp: Express = app;
 if (activeRuntime && process.env.VERCEL === "1") {
-  const applied = await runMigrations(
+  const migrationReady = runMigrations(
     activeRuntime.database,
     resolve(process.cwd(), "migrations"),
-  );
-  activeRuntime.logger.info(
-    { applied },
-    applied.length ? "Runtime migrations applied" : "Runtime database schema is up to date",
-  );
+  ).then((applied) => {
+    activeRuntime.logger.info(
+      { applied },
+      applied.length ? "Runtime migrations applied" : "Runtime database schema is up to date",
+    );
+  });
+
+  const gatedApp = express();
+  gatedApp.use((_request, _response, next) => {
+    void migrationReady.then(() => next(), next);
+  });
+  gatedApp.use(app);
+  exportedApp = gatedApp;
 }
 
 let server: Server | undefined;
@@ -31,7 +41,7 @@ let server: Server | undefined;
 if (shouldStartHttpListener()) {
   const configuredPort = Number(process.env.PORT || 4000);
   const port = runtime?.config.port || (Number.isInteger(configuredPort) ? configuredPort : 4000);
-  server = app.listen(port, () => {
+  server = exportedApp.listen(port, () => {
     if (runtime) runtime.logger.info({ port }, "Dart backend listening");
   });
 }
@@ -81,4 +91,4 @@ if (server) {
   });
 }
 
-export default app;
+export default exportedApp;
