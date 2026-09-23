@@ -1,6 +1,6 @@
 {
   "name": "@dart/backend",
-  "version": "0.2.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Server-authoritative API foundation for Dart | for you",
   "type": "module",
@@ -48,7 +48,7 @@
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
-    "@types/node": "26.6.2",
+    "@types/node": "24.13.6",
     "@types/pg": "8.23.1",
     "@types/supertest": "7.2.1",
     "@vitest/coverage-v8": "5.0.1",
