@@ -1,0 +1,132 @@
+name: One-time per-page font optimization
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/font-optimize-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  optimize-fonts:
+    if: github.event.head_commit.message == 'chore: prepare one-time per-page font optimization'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Replace broad Google Fonts bundles with per-page bundles
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          links = {
+              'index.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@400&family=Inter:wght@300;500;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'products.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@400&family=Inter:wght@300;500;700&family=Irish+Grover&family=Itim&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'cart-checkout.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'profile.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@400&family=Inter:wght@300;500;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;400;500;600;700&display=swap',
+              'about.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@400&family=Inter:wght@500;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'policies.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500&display=swap',
+              'Contact us.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500&display=swap',
+              'form-return.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Cairo:wght@400&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'search-serial.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'track.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'rep.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'Sign Up modern.html': 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap',
+              'Eye/Dart Eye.html': 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap',
+          }
+
+          anchors = {
+              'track.html': '    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">',
+              'rep.html': '  <link href="https://cdnjs.cloudflare.com/ajax/libs/boxicons/2.1.4/css/boxicons.min.css" rel="stylesheet">',
+              'Sign Up modern.html': '    <link rel="stylesheet" href="CSS/responsive.css">',
+              'Eye/Dart Eye.html': '    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">',
+          }
+
+          font_link_re = re.compile(r'(?m)^(?P<indent>\s*)<link href="https://fonts\.googleapis\.com/css2[^\"]+" rel="stylesheet">\s*$')
+          preconnect_google = '<link rel="preconnect" href="https://fonts.googleapis.com">'
+          preconnect_gstatic = '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+
+          changed = []
+          for path_str, url in links.items():
+              path = Path(path_str)
+              text = path.read_text(encoding='utf-8')
+              new_link = f'<link href="{url}" rel="stylesheet">'
+
+              if font_link_re.search(text):
+                  text2 = font_link_re.sub(lambda m: f'{m.group("indent")}{new_link}', text, count=1)
+              else:
+                  anchor = anchors.get(path_str)
+                  if not anchor or anchor not in text:
+                      raise SystemExit(f'Missing insertion anchor for {path_str}')
+                  indent = re.match(r'\s*', anchor).group(0)
+                  block = '\n'.join([
+                      anchor,
+                      f'{indent}{preconnect_google}',
+                      f'{indent}{preconnect_gstatic}',
+                      f'{indent}{new_link}',
+                  ])
+                  text2 = text.replace(anchor, block, 1)
+
+              if text2 == text:
+                  raise SystemExit(f'No font change made in {path_str}')
+              path.write_text(text2, encoding='utf-8')
+              changed.append(path_str)
+
+          old_families = ['Montserrat']
+          for path_str, expected_url in links.items():
+              text = Path(path_str).read_text(encoding='utf-8')
+              matches = re.findall(r'https://fonts\.googleapis\.com/css2[^\"]+', text)
+              if matches != [expected_url]:
+                  raise SystemExit(f'Unexpected Google Fonts link in {path_str}: {matches}')
+              if any(name in text for name in old_families):
+                  raise SystemExit(f'Unused family still loaded by {path_str}')
+
+          # Itim is intentionally required only by the live Dart For You section on products.html.
+          for path_str in links:
+              text = Path(path_str).read_text(encoding='utf-8')
+              if path_str != 'products.html' and 'family=Itim' in text:
+                  raise SystemExit(f'Unexpected Itim load in {path_str}')
+
+          # Every standalone HTML page in the repository must now have exactly one page-level font bundle.
+          standalone = [
+              p for p in Path('.').rglob('*.html')
+              if 'sections' not in p.parts
+          ]
+          missing = []
+          for p in standalone:
+              text = p.read_text(encoding='utf-8')
+              if 'fonts.googleapis.com/css2' not in text:
+                  missing.append(str(p))
+          if missing:
+              raise SystemExit('Standalone pages missing a font bundle: ' + ', '.join(missing))
+
+          print('Updated:', ', '.join(changed))
+          PY
+
+      - name: Run focused frontend checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/performance-budget.cjs
+          node tests/css-architecture.js
+          python tests/static_checks.py
+
+      - name: Commit optimized page fonts and remove one-time workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/font-optimize-once.yml
+          git config user.name "Dart Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -- '*.html' 'Eye/Dart Eye.html' .github/workflows/font-optimize-once.yml
+          git diff --cached --check
+          git commit -m "perf: load only fonts used by each page"
+          git push origin HEAD:main
