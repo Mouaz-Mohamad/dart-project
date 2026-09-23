@@ -88,7 +88,6 @@ export function createDartCardDrawRouter(
     response.status(200).json(await draws.runDue(null,String(request.id),"system"));
   }
 
-  router.get("/internal/dart-card/monthly-draw", runDue);
   router.post("/internal/dart-card/monthly-draw", runDue);
 
   return router;
