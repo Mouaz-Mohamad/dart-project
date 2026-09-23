@@ -4,6 +4,26 @@
 // Server-backed order hydration, writes, workflow mutations, and synchronization.
 // BEGIN MODULE
 
+// The shared catalog script is deferred in Dart Eye while dashboard modules below
+// are parser-blocking. Keep a stable reference for modules that capture DartCatalog
+// before the deferred catalog has executed; every property resolves against the
+// real catalog object once dart-catalog.js replaces window.DartCatalog.
+(function installDeferredCatalogBridge() {
+  "use strict";
+  if (window.DartCatalog) return;
+  let bridge;
+  bridge = new Proxy(Object.create(null), {
+    get(_target, property) {
+      if (property === "__dartDeferredBridge") return true;
+      const catalog = window.DartCatalog;
+      if (!catalog || catalog === bridge) return undefined;
+      const value = catalog[property];
+      return typeof value === "function" ? value.bind(catalog) : value;
+    },
+  });
+  window.DartCatalog = bridge;
+})();
+
 (function () {
   "use strict";
 
