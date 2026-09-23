@@ -32,6 +32,6 @@ describe("OpenAPI current Dart contracts", () => {
       "/admin/site-settings:",
     ]) expect(text).toContain(path);
     expect(text).toContain("Unknown root keys are rejected by the Zod contract");
-    expect(text).toContain("highest purchased piece count");
+    expect(text).toContain("ranking ordered by pieces then net spending");
   });
 });

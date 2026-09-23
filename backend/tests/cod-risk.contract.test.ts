@@ -19,6 +19,10 @@ const settings = readFileSync(
   new URL("../src/modules/settings/site-settings.service.ts", import.meta.url),
   "utf8",
 );
+const settingsSchema = readFileSync(
+  new URL("../src/modules/settings/site-settings.schema.ts", import.meta.url),
+  "utf8",
+);
 const settingsRoutes = readFileSync(
   new URL("../src/modules/settings/site-settings.routes.ts", import.meta.url),
   "utf8",
@@ -61,7 +65,9 @@ describe("COD risk server-authority contract", () => {
   });
 
   it("keeps COD risk thresholds private to authenticated Staff settings reads", () => {
-    expect(settings).toContain("delete publicSettings.codRisk");
+    expect(settings).toContain("publicSiteSettings(settings)");
+    expect(settingsSchema).toContain("const PUBLIC_KEYS");
+    expect(settingsSchema).not.toMatch(/PUBLIC_KEYS\s*=\s*\[[\s\S]*?"codRisk"/);
     expect(settingsRoutes).toContain('"/admin/site-settings"');
     expect(settingsRoutes).toContain("await settings.get(true)");
     expect(siteSettingsBrowser).toContain('IS_ADMIN');
