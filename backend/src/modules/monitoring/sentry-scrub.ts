@@ -1,7 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/monitoring/sentry-scrub.ts
 // الغرض: إزالة الأسرار والبيانات الحساسة من أحداث Sentry قبل خروجها من الخادم.
 const SENSITIVE_KEY = /(?:authorization|cookie|password|passcode|token|secret|api[-_]?key|otp|mfa|session|credential)/i;
-const KEY_VALUE_SECRET = /\b(password|passcode|token|secret|api[-_]?key|otp|mfa|session|credential)\b\s*[:=]\s*([^\s,;&]+)/gi;
+const KEY_VALUE_SECRET = /\b(authorization|cookie|password|passcode|token|secret|api[-_]?key|otp|mfa|session|credential)\b\s*[:=]\s*([^\s,;&]+)/gi;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const JWT_TOKEN = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g;
 const EMAIL_ADDRESS = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
