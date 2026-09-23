@@ -22,6 +22,8 @@ interface AppliedMigration {
 
 const MIGRATION_LOCK_NAME = "dart_backend_schema_migrations";
 const MIGRATION_NAME_PATTERN = /^\d{4}_[a-z0-9_]+\.sql$/;
+const DART_CODE_GUIDE_HEADER_PATTERN =
+  /^-- DART CODE GUIDE \|[^\r\n]*(?:\r?\n)-- الغرض:[^\r\n]*(?:\r?\n)/;
 
 // These aliases preserve upgrade safety for databases which already recorded the
 // historical duplicate-number migration filenames. The SQL blobs themselves are
@@ -60,6 +62,16 @@ const LEGACY_MIGRATION_NAME_BY_CURRENT = new Map<string, string>([
   ["0043_reward_reservation_after_order_insert.sql", "0037_reward_reservation_after_order_insert.sql"],
   ["0044_customer_social_auth_and_multi_winner_draw.sql", "0038_customer_social_auth_and_multi_winner_draw.sql"],
 ]);
+
+function checksumSql(sql: string): string {
+  return createHash("sha256").update(sql).digest("hex");
+}
+
+function documentationOnlyHistoricalChecksum(sql: string): string | undefined {
+  const header = DART_CODE_GUIDE_HEADER_PATTERN.exec(sql);
+  if (!header) return undefined;
+  return checksumSql(sql.slice(header[0].length));
+}
 
 function formatSequence(value: number): string {
   return String(value).padStart(4, "0");
@@ -115,7 +127,7 @@ export async function readMigrationFiles(directory: string): Promise<MigrationFi
       return {
         name,
         sql,
-        checksum: createHash("sha256").update(sql).digest("hex"),
+        checksum: checksumSql(sql),
       };
     }),
   );
@@ -143,7 +155,10 @@ export function selectMigrationsToApply(
   for (const file of files) {
     const existing = appliedMigrationFor(file.name, appliedByName);
     if (existing && existing.checksum !== file.checksum) {
-      throw new Error(`Applied migration checksum changed: ${existing.name}`);
+      const historicalChecksum = documentationOnlyHistoricalChecksum(file.sql);
+      if (!historicalChecksum || historicalChecksum !== existing.checksum) {
+        throw new Error(`Applied migration checksum changed: ${existing.name}`);
+      }
     }
   }
 
