@@ -36,6 +36,8 @@ for (const path of [
 ]) {
   assert(social.includes(path), `Customer social auth UI is missing ${path}`);
 }
+assert(social.includes('method: "POST"') && social.includes("body: { token }"), "Customer social challenge must send its one-time capability in a POST body");
+assert(!social.includes("/auth/social/challenge?token="), "Customer social completion capability must never be placed in a request URL");
 assert(!social.includes("GOOGLE_OAUTH_CLIENT_SECRET"), "Google OAuth secret must never exist in storefront JavaScript");
 assert(!social.includes("FACEBOOK_OAUTH_APP_SECRET"), "Facebook OAuth secret must never exist in storefront JavaScript");
 assert(!signup.includes("boxicons"), "Customer auth icons must not depend on the Boxicons font");
