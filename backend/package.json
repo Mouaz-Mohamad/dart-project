@@ -13,9 +13,9 @@
     "esbuild@0.28.2": true
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
+    "dev": "node --env-file-if-exists=.env --import tsx --import ./src/instrument.ts --watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node --env-file-if-exists=.env dist/server.js",
+    "start": "node --env-file-if-exists=.env --import ./dist/instrument.js dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests vitest.config.ts",
     "test": "vitest run",
@@ -32,6 +32,7 @@
     "check:env": "node --env-file-if-exists=.env --import tsx scripts/check-env.ts"
   },
   "dependencies": {
+    "@sentry/node": "10.75.2",
     "argon2": "0.44.0",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",

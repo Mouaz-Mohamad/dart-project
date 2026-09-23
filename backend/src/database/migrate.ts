@@ -22,7 +22,48 @@ interface AppliedMigration {
 
 const MIGRATION_LOCK_NAME = "dart_backend_schema_migrations";
 const MIGRATION_NAME_PATTERN = /^\d{4}_[a-z0-9_]+\.sql$/;
-const LEGACY_DUPLICATE_MIGRATION_PREFIXES = new Set(["0013", "0014", "0015"]);
+
+// These aliases preserve upgrade safety for databases which already recorded the
+// historical duplicate-number migration filenames. The SQL blobs themselves are
+// unchanged during the rename, so the checksum must still match before an alias
+// is accepted as already applied.
+const LEGACY_MIGRATION_NAME_BY_CURRENT = new Map<string, string>([
+  ["0014_customer_preferences.sql", "0013_customer_preferences.sql"],
+  ["0015_dashboard_domain_permissions.sql", "0013_dashboard_domain_permissions.sql"],
+  ["0016_representative_manage_permission.sql", "0013_representative_manage_permission.sql"],
+  ["0017_staff_onboarding.sql", "0013_staff_onboarding.sql"],
+  ["0018_cart_price_review.sql", "0014_cart_price_review.sql"],
+  ["0019_damage_manage_permission.sql", "0014_damage_manage_permission.sql"],
+  ["0020_inventory_cost_snapshot.sql", "0015_inventory_cost_snapshot.sql"],
+  ["0021_platform_reset_permission.sql", "0015_platform_reset_permission.sql"],
+  ["0022_guest_cart_ownership.sql", "0016_guest_cart_ownership.sql"],
+  ["0023_order_delivery_cost_snapshot.sql", "0017_order_delivery_cost_snapshot.sql"],
+  ["0024_relational_business_domains.sql", "0018_relational_business_domains.sql"],
+  ["0025_relational_domains_authoritative.sql", "0019_relational_domains_authoritative.sql"],
+  ["0026_return_damage_typed_core.sql", "0020_return_damage_typed_core.sql"],
+  ["0027_action_permissions.sql", "0021_action_permissions.sql"],
+  ["0028_staff_whatsapp_delivery.sql", "0022_staff_whatsapp_delivery.sql"],
+  ["0029_staff_mfa_pending_setup.sql", "0023_staff_mfa_pending_setup.sql"],
+  ["0030_staff_google_identity.sql", "0024_staff_google_identity.sql"],
+  ["0031_staff_simple_email_access.sql", "0025_staff_simple_email_access.sql"],
+  ["0032_remove_retired_staff_google_identity.sql", "0026_remove_retired_staff_google_identity.sql"],
+  ["0033_customer_signup_without_email_otp.sql", "0027_customer_signup_without_email_otp.sql"],
+  ["0034_courier_fee_per_order.sql", "0028_courier_fee_per_order.sql"],
+  ["0035_password_reset_email_otp.sql", "0029_password_reset_email_otp.sql"],
+  ["0036_waitlist_reservations.sql", "0030_waitlist_reservations.sql"],
+  ["0037_waitlist_cart_consistency.sql", "0031_waitlist_cart_consistency.sql"],
+  ["0038_live_operations.sql", "0032_live_operations.sql"],
+  ["0039_cod_risk_verification.sql", "0033_cod_risk_verification.sql"],
+  ["0040_rewards_promotions_draw_integrity.sql", "0034_rewards_promotions_draw_integrity.sql"],
+  ["0041_reward_history_reference_compatibility.sql", "0035_reward_history_reference_compatibility.sql"],
+  ["0042_dart_card_active_concurrency_lock.sql", "0036_dart_card_active_concurrency_lock.sql"],
+  ["0043_reward_reservation_after_order_insert.sql", "0037_reward_reservation_after_order_insert.sql"],
+  ["0044_customer_social_auth_and_multi_winner_draw.sql", "0038_customer_social_auth_and_multi_winner_draw.sql"],
+]);
+
+function formatSequence(value: number): string {
+  return String(value).padStart(4, "0");
+}
 
 export function assertMigrationNamingPolicy(names: string[]): void {
   const counts = new Map<string, number>();
@@ -39,18 +80,25 @@ export function assertMigrationNamingPolicy(names: string[]): void {
     counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
   }
 
-  const invalidDuplicatePrefixes = [...counts.entries()]
-    .filter(
-      ([prefix, count]) =>
-        count > 1 && !LEGACY_DUPLICATE_MIGRATION_PREFIXES.has(prefix),
-    )
+  const duplicatePrefixes = [...counts.entries()]
+    .filter(([, count]) => count > 1)
     .map(([prefix]) => prefix)
     .sort();
-
-  if (invalidDuplicatePrefixes.length > 0) {
+  if (duplicatePrefixes.length > 0) {
     throw new Error(
-      `Duplicate migration sequence prefixes are not allowed: ${invalidDuplicatePrefixes.join(", ")}`,
+      `Duplicate migration sequence prefixes are not allowed: ${duplicatePrefixes.join(", ")}`,
     );
+  }
+
+  const ordered = [...counts.keys()].map(Number).sort((left, right) => left - right);
+  for (let index = 1; index < ordered.length; index += 1) {
+    const expected = ordered[index - 1]! + 1;
+    const actual = ordered[index]!;
+    if (actual !== expected) {
+      throw new Error(
+        `Migration sequence must be consecutive: expected ${formatSequence(expected)}, found ${formatSequence(actual)}`,
+      );
+    }
   }
 }
 
@@ -73,6 +121,19 @@ export async function readMigrationFiles(directory: string): Promise<MigrationFi
   );
 }
 
+function appliedMigrationFor(
+  fileName: string,
+  appliedByName: Map<string, string>,
+): AppliedMigration | undefined {
+  const directChecksum = appliedByName.get(fileName);
+  if (directChecksum) return { name: fileName, checksum: directChecksum };
+
+  const legacyName = LEGACY_MIGRATION_NAME_BY_CURRENT.get(fileName);
+  if (!legacyName) return undefined;
+  const legacyChecksum = appliedByName.get(legacyName);
+  return legacyChecksum ? { name: legacyName, checksum: legacyChecksum } : undefined;
+}
+
 export function selectMigrationsToApply(
   files: MigrationFile[],
   applied: AppliedMigration[],
@@ -80,13 +141,15 @@ export function selectMigrationsToApply(
 ): MigrationFile[] {
   const appliedByName = new Map(applied.map((row) => [row.name, row.checksum]));
   for (const file of files) {
-    const existingChecksum = appliedByName.get(file.name);
-    if (existingChecksum && existingChecksum !== file.checksum) {
-      throw new Error(`Applied migration checksum changed: ${file.name}`);
+    const existing = appliedMigrationFor(file.name, appliedByName);
+    if (existing && existing.checksum !== file.checksum) {
+      throw new Error(`Applied migration checksum changed: ${existing.name}`);
     }
   }
 
-  const pending = files.filter((file) => !appliedByName.has(file.name));
+  const pending = files.filter(
+    (file) => !appliedMigrationFor(file.name, appliedByName),
+  );
   if (!requestedOne) return pending;
 
   const normalized = requestedOne.endsWith(".sql") ? requestedOne : `${requestedOne}.sql`;

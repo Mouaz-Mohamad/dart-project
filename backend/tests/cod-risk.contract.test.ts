@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  new URL("../migrations/0033_cod_risk_verification.sql", import.meta.url),
+  new URL("../migrations/0039_cod_risk_verification.sql", import.meta.url),
   "utf8",
 );
 const service = readFileSync(

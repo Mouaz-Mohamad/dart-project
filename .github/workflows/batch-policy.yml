@@ -39,7 +39,7 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - name: Install backend dependencies
         working-directory: backend
-        run: npm ci
+        run: npm install
       - name: Run backend static checks, production build and tests
         working-directory: backend
         run: npm run lint && npm run typecheck && npm run build && npm test

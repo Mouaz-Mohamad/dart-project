@@ -17,6 +17,18 @@ function invalidEnvironment(...fields: string[]): never {
   throw new EnvironmentConfigError(fields);
 }
 
+export function assertProductionOutboxCronSecret(
+  source: Pick<NodeJS.ProcessEnv, "NODE_ENV" | "OUTBOX_CRON_SECRET"> = process.env,
+): void {
+  const secret = source.OUTBOX_CRON_SECRET?.trim() ?? "";
+  if (secret && secret.length < 32) {
+    invalidEnvironment("OUTBOX_CRON_SECRET");
+  }
+  if (source.NODE_ENV === "production" && secret.length < 32) {
+    invalidEnvironment("OUTBOX_CRON_SECRET");
+  }
+}
+
 const booleanFromString = z
   .enum(["true", "false"])
   .default("false")
@@ -66,7 +78,7 @@ const environmentSchema = z.object({
   WHATSAPP_OWNER_PHONE: z.string().default(""),
   WHATSAPP_STAFF_OTP_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_otp"),
   WHATSAPP_STAFF_INVITE_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_invite"),
-  OUTBOX_CRON_SECRET: z.string().default(""),
+  OUTBOX_CRON_SECRET: z.string().trim().default(""),
   CRON_SECRET: z.string().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -116,6 +128,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join(".")))];
     throw new EnvironmentConfigError(fields);
   }
+
+  assertProductionOutboxCronSecret({
+    NODE_ENV: parsed.data.NODE_ENV,
+    OUTBOX_CRON_SECRET: parsed.data.OUTBOX_CRON_SECRET,
+  });
 
   const corsOrigins = parsed.data.CORS_ORIGINS.split(",")
     .map((origin) => origin.trim())
@@ -172,7 +189,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     invalidEnvironment("MONITORING_ALERT_EMAIL");
   }
 
-  const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
+  const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET;
   const whatsappOwnerPhone = parsed.data.WHATSAPP_OWNER_PHONE.replace(/\D/g, "");
   if (whatsappOwnerPhone && !/^201(?:0|1|2|5)\d{8}$/.test(whatsappOwnerPhone)) {
     invalidEnvironment("WHATSAPP_OWNER_PHONE");

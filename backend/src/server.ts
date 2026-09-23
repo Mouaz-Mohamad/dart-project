@@ -1,8 +1,13 @@
 // DART CODE GUIDE | backend/src/server.ts
 // الغرض: تشغيل HTTP server وإدارة الإغلاق الآمن واتصال PostgreSQL.
+import "./instrument.js";
+import * as Sentry from "@sentry/node";
 import type { Server } from "node:http";
 import app, { runtime } from "./app.js";
+import { assertProductionOutboxCronSecret } from "./config/env.js";
 import { shouldStartHttpListener } from "./config/runtime.js";
+
+assertProductionOutboxCronSecret(process.env);
 
 let server: Server | undefined;
 
@@ -27,6 +32,11 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
   forceTimer.unref();
 
   if (server) await closeServer(server);
+  try {
+    await Sentry.flush(2_000);
+  } catch (error) {
+    runtime?.logger.warn({ err: error }, "Sentry flush failed during shutdown");
+  }
   if (runtime) await runtime.database.end();
   clearTimeout(forceTimer);
   runtime?.logger.info("Graceful shutdown completed");
@@ -43,10 +53,12 @@ if (server) {
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("uncaughtException", (error) => {
+    Sentry.captureException(error);
     runtime?.logger.fatal({ err: error }, "Uncaught exception");
     void shutdown("uncaughtException", 1);
   });
   process.on("unhandledRejection", (error) => {
+    Sentry.captureException(error);
     runtime?.logger.fatal({ err: error }, "Unhandled promise rejection");
     void shutdown("unhandledRejection", 1);
   });

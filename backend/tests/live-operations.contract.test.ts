@@ -10,7 +10,7 @@ const routes = readFileSync(
   "utf8",
 );
 const migration = readFileSync(
-  new URL("../migrations/0032_live_operations.sql", import.meta.url),
+  new URL("../migrations/0038_live_operations.sql", import.meta.url),
   "utf8",
 );
 

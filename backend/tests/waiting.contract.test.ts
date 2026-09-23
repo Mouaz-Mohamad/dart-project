@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const migration = readFileSync(new URL("../migrations/0030_waitlist_reservations.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../migrations/0036_waitlist_reservations.sql", import.meta.url), "utf8");
 const service = readFileSync(new URL("../src/modules/waiting/waiting.service.ts", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../src/modules/waiting/waiting.routes.ts", import.meta.url), "utf8");
 const commerce = readFileSync(new URL("../src/modules/commerce/commerce.service.ts", import.meta.url), "utf8");

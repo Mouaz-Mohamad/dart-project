@@ -1,26 +1,17 @@
-# DART CODE GUIDE | .github/workflows/backend-ci.yml
-# الغرض: تشغيل lint وtypecheck واختبارات Backend وPostgreSQL قبل اعتبار التغيير صالحًا.
-name: Backend CI
+# DART CODE GUIDE | .github/workflows/ci.yml
+# الغرض: بوابة CI موحدة للـBackend تعمل على كل push وpull request وتفشل عند أي كسر.
+name: CI
 
 on:
   push:
-    paths:
-      - "backend/**"
-      - "Eye/**/*.js"
-      - "Js/**/*.js"
-      - ".github/workflows/backend-ci.yml"
   pull_request:
-    paths:
-      - "backend/**"
-      - "Eye/**/*.js"
-      - "Js/**/*.js"
-      - ".github/workflows/backend-ci.yml"
 
 permissions:
   contents: read
 
 jobs:
-  verify:
+  backend:
+    name: Backend checks
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -45,24 +36,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Node
+
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - name: Install
-        run: npm ci
-      - name: Production dependency audit
-        run: npm audit --omit=dev --audit-level=high
-      - name: Lint
-        run: npm run lint
-      - name: Typecheck
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript type-check
         run: npm run typecheck
+
+      - name: Lint backend
+        run: npm run lint
+
       - name: Production build
         run: npm run build
-      - name: Unit and PostgreSQL integration tests
+
+      - name: Run backend unit, contract, integration and security tests
         run: npm test
-      - name: Browser JavaScript syntax
-        run: |
-          find ../Eye ../Js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Run repository security-boundary checks
+        working-directory: .
+        run: node tests/security-boundaries.cjs
+
+      - name: Enforce database-authoritative browser storage
+        working-directory: .
+        run: node tests/database-authoritative-storage.cjs

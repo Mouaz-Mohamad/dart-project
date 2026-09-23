@@ -4,15 +4,15 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  new URL("../migrations/0018_relational_business_domains.sql", import.meta.url),
+  new URL("../migrations/0024_relational_business_domains.sql", import.meta.url),
   "utf8",
 );
 const authoritativeMigration = readFileSync(
-  new URL("../migrations/0019_relational_domains_authoritative.sql", import.meta.url),
+  new URL("../migrations/0025_relational_domains_authoritative.sql", import.meta.url),
   "utf8",
 );
 const typedMigration = readFileSync(
-  new URL("../migrations/0020_return_damage_typed_core.sql", import.meta.url),
+  new URL("../migrations/0026_return_damage_typed_core.sql", import.meta.url),
   "utf8",
 );
 const store = readFileSync(

@@ -1,5 +1,6 @@
 // DART CODE GUIDE | backend/src/middleware/error-handler.ts
 // الغرض: Middleware مركزي يطبّق قاعدة مشتركة على طلبات HTTP قبل وصولها للـroutes.
+import * as Sentry from "@sentry/node";
 import type { ErrorRequestHandler } from "express";
 import { ZodError } from "zod";
 import { AppError } from "../http/app-error.js";
@@ -72,6 +73,14 @@ export function createErrorHandler(
     }
 
     request.log.error({ err: error }, "Unhandled request error");
+    Sentry.withScope((scope) => {
+      scope.setTag("request_id", requestId);
+      scope.setContext("http", {
+        method: request.method,
+        path: request.path,
+      });
+      Sentry.captureException(error);
+    });
     if (operationalAlerts) {
       void operationalAlerts
         .report(error, {

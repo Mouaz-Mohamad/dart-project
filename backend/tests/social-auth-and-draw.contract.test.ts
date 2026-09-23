@@ -87,7 +87,7 @@ describe("customer social auth and Dart Card tie contracts", () => {
   it("stores only hashed social capabilities and persists all draw winners", async () => {
     const path = fileURLToPath(
       new URL(
-        "../migrations/0038_customer_social_auth_and_multi_winner_draw.sql",
+        "../migrations/0044_customer_social_auth_and_multi_winner_draw.sql",
         import.meta.url,
       ),
     );
