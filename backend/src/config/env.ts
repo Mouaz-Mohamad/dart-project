@@ -20,17 +20,18 @@ function invalidEnvironment(...fields: string[]): never {
 type OutboxEnvironmentSource = {
   NODE_ENV?: string;
   OUTBOX_CRON_SECRET?: string;
+  CRON_SECRET?: string;
 };
 
 export function assertProductionOutboxCronSecret(
   source: OutboxEnvironmentSource = process.env,
 ): void {
-  const secret = source.OUTBOX_CRON_SECRET?.trim() ?? "";
-  if (secret && secret.length < 32) {
-    invalidEnvironment("OUTBOX_CRON_SECRET");
-  }
-  if (source.NODE_ENV === "production" && secret.length < 32) {
-    invalidEnvironment("OUTBOX_CRON_SECRET");
+  const primary = source.OUTBOX_CRON_SECRET?.trim() ?? "";
+  const legacy = source.CRON_SECRET?.trim() ?? "";
+  const secret = primary || legacy;
+  if (!secret) return;
+  if (secret.length < 32) {
+    invalidEnvironment(primary ? "OUTBOX_CRON_SECRET" : "CRON_SECRET");
   }
 }
 
@@ -84,7 +85,7 @@ const environmentSchema = z.object({
   WHATSAPP_STAFF_OTP_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_otp"),
   WHATSAPP_STAFF_INVITE_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_invite"),
   OUTBOX_CRON_SECRET: z.string().trim().default(""),
-  CRON_SECRET: z.string().default(""),
+  CRON_SECRET: z.string().trim().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
 });
 
@@ -137,6 +138,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   assertProductionOutboxCronSecret({
     NODE_ENV: parsed.data.NODE_ENV,
     OUTBOX_CRON_SECRET: parsed.data.OUTBOX_CRON_SECRET,
+    CRON_SECRET: parsed.data.CRON_SECRET,
   });
 
   const corsOrigins = parsed.data.CORS_ORIGINS.split(",")
@@ -194,7 +196,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     invalidEnvironment("MONITORING_ALERT_EMAIL");
   }
 
-  const outboxCronSecret = parsed.data.OUTBOX_CRON_SECRET;
+  const outboxCronSecret =
+    parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
   const whatsappOwnerPhone = parsed.data.WHATSAPP_OWNER_PHONE.replace(/\D/g, "");
   if (whatsappOwnerPhone && !/^201(?:0|1|2|5)\d{8}$/.test(whatsappOwnerPhone)) {
     invalidEnvironment("WHATSAPP_OWNER_PHONE");
