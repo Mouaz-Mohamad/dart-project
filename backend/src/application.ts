@@ -49,6 +49,7 @@ import type { DartCardDrawService } from "./modules/loyalty/dart-card-draw.servi
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
+  databaseReady?: () => Promise<void>;
   identityService?: IdentityService;
   socialAuthService?: SocialAuthService;
   catalogService?: CatalogService;
@@ -74,6 +75,17 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   const app = express();
   app.disable("x-powered-by");
   if (config.trustProxyHops > 0) app.set("trust proxy", config.trustProxyHops);
+
+  let databaseReadyPromise: Promise<void> | null = null;
+  if (dependencies.databaseReady) {
+    app.use((_request, _response, next) => {
+      databaseReadyPromise ??= dependencies.databaseReady!().catch((error) => {
+        databaseReadyPromise = null;
+        throw error;
+      });
+      void databaseReadyPromise.then(() => next(), (error) => next(error));
+    });
+  }
 
   app.use(requestContext(dependencies.logger));
   app.use(createHelmetMiddleware());
