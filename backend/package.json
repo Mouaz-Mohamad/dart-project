@@ -32,7 +32,7 @@
     "check:env": "node --env-file-if-exists=.env --import tsx scripts/check-env.ts"
   },
   "dependencies": {
-    "argon2": "0.44.0",
+    "argon2": "0.45.1",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
     "express": "5.2.1",
@@ -42,22 +42,22 @@
     "pino": "10.3.1",
     "pino-http": "11.0.0",
     "zod": "4.6.5",
-    "nodemailer": "9.1.1"
+    "nodemailer": "10.0.10"
   },
   "devDependencies": {
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
-    "@types/node": "24.13.6",
+    "@types/node": "26.6.2",
     "@types/pg": "8.23.1",
     "@types/supertest": "7.2.1",
     "@vitest/coverage-v8": "5.0.1",
     "eslint": "10.11.0",
     "supertest": "7.2.2",
-    "tsx": "4.23.13",
-    "typescript": "6.0.3",
+    "tsx": "4.23.14",
+    "typescript": "7.0.2",
     "typescript-eslint": "8.70.0",
     "vitest": "5.0.1",
-    "@types/nodemailer": "8.0.1"
+    "@types/nodemailer": "8.0.2"
   }
 }
