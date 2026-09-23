@@ -6,12 +6,14 @@ import { publicSiteSettings, siteSettingsSchema } from "../src/modules/settings/
 import { promotionCampaignInputSchema } from "../src/modules/promotions/promotion.service.js";
 
 describe("Dart rewards/promotions/settings contracts", () => {
-  it("uses one password policy for customers and representatives", () => {
-    const weak = "abcdefgh";
-    const strong = "StrongPass123";
-    expect(validateCustomerPasswordPolicy(weak)).toEqual(validatePasswordPolicy(weak));
-    expect(validateCustomerPasswordPolicy(strong)).toEqual([]);
-    expect(validatePasswordPolicy(strong)).toEqual([]);
+  it("keeps the storefront customer password policy separate from representative security", () => {
+    expect(validateCustomerPasswordPolicy("abc123")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("ABC123")).toEqual([]);
+    expect(validateCustomerPasswordPolicy("abcdef")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("123456")).not.toHaveLength(0);
+    expect(validateCustomerPasswordPolicy("abc!123")).not.toHaveLength(0);
+    expect(validatePasswordPolicy("abc123")).not.toHaveLength(0);
+    expect(validatePasswordPolicy("StrongPass123")).toEqual([]);
   });
 
   it("rejects unknown Settings root keys and keeps codRisk private", () => {
