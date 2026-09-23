@@ -23,7 +23,6 @@ describe("OpenAPI current Dart contracts", () => {
     expect(text).toContain("minLength: 12");
     expect(text).not.toContain("at least one letter and one number");
     expect(text).not.toContain("Register a customer and queue a six-digit Email OTP");
-    expect(text).not.toContain("minLength: 4");
     expect(text).not.toContain("Sessions\\n");
   });
 

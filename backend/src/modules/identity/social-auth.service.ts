@@ -1,7 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/identity/social-auth.service.ts
 // الغرض: OAuth اجتماعي آمن للعملاء فقط؛ مزود الهوية يثبت البريد ثم Dart يطلب بيانات الحساب المحلية.
 import { randomUUID } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { digest, randomToken, safeEqual } from "../../security/crypto.js";
 import { normalizeEmail } from "../../security/normalization.js";
@@ -582,7 +582,7 @@ export class SocialAuthService {
   }
 
   private async linkIdentity(
-    client: import("pg").PoolClient,
+    client: PoolClient,
     row: SocialChallengeRow,
     userId: string,
   ): Promise<void> {

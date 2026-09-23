@@ -273,6 +273,7 @@ describe("identity HTTP boundaries", () => {
       email: "customer@example.com",
       phone1: "01012345678",
       phone2: "",
+      birthday: "2000-01-01",
       password: "abcd1234",
     });
     expect(response.status).toBe(201);

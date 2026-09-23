@@ -217,7 +217,7 @@ const server = http.createServer((request, response) => {
   assert.equal(await account.locator('#registerForm input[name="birthday"]').getAttribute("required"), "");
   assert.equal(await account.locator('[data-social-login="google"]').count(), 2);
   assert.equal(await account.locator('[data-social-login="facebook"]').count(), 2);
-  await account.waitForSelector('script[data-dart-social-auth="1"]');
+  await account.waitForSelector('script[data-dart-social-auth="1"]', { state: "attached" });
   assert.equal(await account.locator('#customerEmailVerificationForm').count(), 0);
   await account.locator(".login-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), false);

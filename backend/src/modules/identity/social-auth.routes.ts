@@ -134,12 +134,12 @@ export function createSocialAuthRouter(
     },
   );
 
-  router.get(
+  router.post(
     "/auth/social/challenge",
     authLimiter(30),
     async (request, response) => {
-      const token = z.string().min(40).max(500).parse(request.query.token);
-      response.status(200).json(await service.challenge(token));
+      const body = z.object({ token: z.string().min(40).max(500) }).parse(request.body);
+      response.status(200).json(await service.challenge(body.token));
     },
   );
 

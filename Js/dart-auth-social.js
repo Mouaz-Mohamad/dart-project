@@ -281,9 +281,10 @@
     }
     socialToken = token;
     try {
-      const challenge = await api(
-        `/api/v1/auth/social/challenge?token=${encodeURIComponent(token)}`,
-      );
+      const challenge = await api("/api/v1/auth/social/challenge", {
+        method: "POST",
+        body: { token },
+      });
       await showCompletion(challenge);
     } catch (error) {
       socialToken = "";

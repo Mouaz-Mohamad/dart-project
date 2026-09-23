@@ -31,7 +31,7 @@ Flow:
 
 1. العميل يبدأ Google أو Facebook من صفحة Login/Register.
 2. الـProvider يثبت الهوية والبريد ويرجع authorization code للـBackend.
-3. Dart ينشئ one-time completion capability قصيرة العمر؛ المخزن في PostgreSQL هو الـhash فقط، والـcapability نفسها ترجع للمتصفح داخل URL fragment وليس query string.
+3. Dart ينشئ one-time completion capability قصيرة العمر؛ المخزن في PostgreSQL هو الـhash فقط، والـcapability نفسها ترجع للمتصفح داخل URL fragment وليس query string. بعد إزالة الـfragment من العنوان، الواجهة تقرأ بيانات الـchallenge عبر `POST /api/v1/auth/social/challenge` وتضع الـcapability في JSON body حتى لا تظهر في request URL/logs.
 4. كل Social completion يطلب **Dart Password + Confirm Password + Birthday**.
 5. إذا كان Social account جديدًا في Dart، يطلب أيضًا Full Name + Primary Phone (وPhone 2 اختياري) قبل إنشاء الحساب.
 6. إذا كان العميل موجودًا، يجب أن يؤكد Dart password الحالية. Birthday المحفوظة لا يتم استبدالها من تسجيل الدخول؛ القيمة المدخلة تملأ فقط Legacy account لا يحتوي Birthday.

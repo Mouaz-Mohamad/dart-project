@@ -3,7 +3,7 @@
 openapi: 3.1.0
 info:
   title: Dart Backend API
-  version: 0.6.1
+  version: 0.6.2
   description: Server-authoritative API for Dart | for you. PostgreSQL owns business state. Authenticated mutations use Secure HttpOnly sessions and CSRF.
 servers:
   - url: /api/v1
@@ -110,12 +110,20 @@ paths:
       responses:
         "303": { description: Redirect to the Dart customer completion screen }
   /auth/social/challenge:
-    get:
+    post:
       tags: [Customer Auth]
-      summary: Read safe profile hints for a one-time social completion capability
+      summary: Read safe profile hints without putting the one-time social capability in request URLs
       operationId: getCustomerSocialChallenge
-      parameters:
-        - { in: query, name: token, required: true, schema: { type: string, minLength: 40, maxLength: 500 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token: { type: string, minLength: 40, maxLength: 500 }
       responses:
         "200": { description: Provider, verified email, new/existing account state and required completion fields }
         "400": { $ref: "#/components/responses/ValidationError" }
