@@ -2,46 +2,19 @@
 // الغرض: تشغيل HTTP server وإدارة الإغلاق الآمن واتصال PostgreSQL.
 import "./instrument.js";
 import * as Sentry from "@sentry/node";
-import express, { type Express } from "express";
 import type { Server } from "node:http";
-import { resolve } from "node:path";
 import app, { runtime } from "./app.js";
 import { assertProductionOutboxCronSecret } from "./config/env.js";
 import { shouldStartHttpListener } from "./config/runtime.js";
-import { runMigrations } from "./database/migrate.js";
 
 assertProductionOutboxCronSecret(process.env);
-
-// Vercel build environments are not guaranteed to have database network access.
-// Gate runtime requests on the idempotent migration promise instead of using
-// top-level await. PostgreSQL advisory locking makes concurrent cold starts safe.
-const activeRuntime = runtime;
-let exportedApp: Express = app;
-if (activeRuntime && process.env.VERCEL === "1") {
-  const migrationReady = runMigrations(
-    activeRuntime.database,
-    resolve(process.cwd(), "migrations"),
-  ).then((applied) => {
-    activeRuntime.logger.info(
-      { applied },
-      applied.length ? "Runtime migrations applied" : "Runtime database schema is up to date",
-    );
-  });
-
-  const gatedApp = express();
-  gatedApp.use((_request, _response, next) => {
-    void migrationReady.then(() => next(), next);
-  });
-  gatedApp.use(app);
-  exportedApp = gatedApp;
-}
 
 let server: Server | undefined;
 
 if (shouldStartHttpListener()) {
   const configuredPort = Number(process.env.PORT || 4000);
   const port = runtime?.config.port || (Number.isInteger(configuredPort) ? configuredPort : 4000);
-  server = exportedApp.listen(port, () => {
+  server = app.listen(port, () => {
     if (runtime) runtime.logger.info({ port }, "Dart backend listening");
   });
 }
@@ -71,8 +44,8 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
 }
 
 function closeServer(target: Server): Promise<void> {
-  return new Promise((resolvePromise, reject) => {
-    target.close((error) => (error ? reject(error) : resolvePromise()));
+  return new Promise((resolve, reject) => {
+    target.close((error) => (error ? reject(error) : resolve()));
   });
 }
 
@@ -91,4 +64,4 @@ if (server) {
   });
 }
 
-export default exportedApp;
+export default app;
