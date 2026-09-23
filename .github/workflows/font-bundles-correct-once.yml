@@ -1,0 +1,103 @@
+name: One-time exact page font bundle correction
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/font-bundles-correct-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  correct-font-bundles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Correct and validate page font bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          links = {
+              'index.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@200&family=Inter:wght@200;300;500;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'products.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@200&family=Inter:wght@200;300;500;700&family=Irish+Grover&family=Itim&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'cart-checkout.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'profile.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@200&family=Inter:wght@200;300;500;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;400;500;600;700&display=swap',
+              'about.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Cairo:wght@200&family=Inter:wght@500;700&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'policies.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500&display=swap',
+              'Contact us.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500&display=swap',
+              'form-return.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Cairo:wght@200&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'search-serial.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'track.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;700&display=swap',
+              'rep.html': 'https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;600&family=Irish+Grover&family=Readex+Pro:wght@200;300;500;600;700&display=swap',
+              'Sign Up modern.html': 'https://fonts.googleapis.com/css2?family=Poppins:wght@200;500;700&display=swap',
+              'Eye/Dart Eye.html': 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap',
+          }
+
+          font_link_re = re.compile(r'(?m)^(?P<indent>\s*)<link href="https://fonts\.googleapis\.com/css2[^\"]+" rel="stylesheet">\s*$')
+
+          changed = []
+          for path_str, url in links.items():
+              path = Path(path_str)
+              text = path.read_text(encoding='utf-8')
+              matches = list(font_link_re.finditer(text))
+              if len(matches) != 1:
+                  raise SystemExit(f'{path_str}: expected exactly one Google Fonts css2 link, found {len(matches)}')
+              updated = font_link_re.sub(lambda m: f'{m.group("indent")}<link href="{url}" rel="stylesheet">', text, count=1)
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(path_str)
+
+          for path_str, expected_url in links.items():
+              text = Path(path_str).read_text(encoding='utf-8')
+              found = re.findall(r'https://fonts\.googleapis\.com/css2[^\"]+', text)
+              if found != [expected_url]:
+                  raise SystemExit(f'{path_str}: unexpected Google Fonts bundle: {found}')
+              if 'Montserrat' in found[0]:
+                  raise SystemExit(f'{path_str}: Montserrat must not be loaded')
+              if path_str != 'products.html' and 'family=Itim' in found[0]:
+                  raise SystemExit(f'{path_str}: Itim loaded outside products page')
+
+          assertions = {
+              'index.html': ['Cairo:wght@200', 'Inter:wght@200;300;500;700'],
+              'products.html': ['Cairo:wght@200', 'Inter:wght@200;300;500;700', 'family=Itim'],
+              'profile.html': ['Cairo:wght@200', 'Inter:wght@200;300;500;700', 'Readex+Pro:wght@200;300;400;500;600;700'],
+              'about.html': ['Cairo:wght@200', 'Inter:wght@500;700'],
+              'form-return.html': ['Cairo:wght@200'],
+              'Sign Up modern.html': ['Poppins:wght@200;500;700'],
+              'Eye/Dart Eye.html': ['Cairo:wght@400;500;600;700;800;900', 'Inter:wght@400;500;600;700;800;900'],
+          }
+          for path_str, needles in assertions.items():
+              text = Path(path_str).read_text(encoding='utf-8')
+              for needle in needles:
+                  if needle not in text:
+                      raise SystemExit(f'{path_str}: missing required font segment {needle}')
+
+          print('Changed:', ', '.join(changed) if changed else 'none')
+          print(f'Validated {len(links)} standalone page font bundles.')
+          PY
+
+          git diff --check
+          node tests/performance-budget.cjs
+
+      - name: Commit corrected bundles and remove one-time workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/font-bundles-correct-once.yml
+          git config user.name "Dart Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix: correct exact page font weight bundles"
+          git push origin HEAD:main
