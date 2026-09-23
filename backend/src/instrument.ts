@@ -16,7 +16,9 @@ Sentry.init({
   sendDefaultPii: false,
   tracesSampleRate: 0,
   beforeSend(event) {
-    return scrubSentryEvent(event as SanitizableSentryEvent) as typeof event;
+    return scrubSentryEvent(
+      event as unknown as SanitizableSentryEvent,
+    ) as unknown as typeof event;
   },
   beforeBreadcrumb(breadcrumb) {
     return scrubSentryBreadcrumb(breadcrumb);

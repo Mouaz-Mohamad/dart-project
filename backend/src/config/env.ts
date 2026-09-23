@@ -17,8 +17,13 @@ function invalidEnvironment(...fields: string[]): never {
   throw new EnvironmentConfigError(fields);
 }
 
+type OutboxEnvironmentSource = {
+  NODE_ENV?: string;
+  OUTBOX_CRON_SECRET?: string;
+};
+
 export function assertProductionOutboxCronSecret(
-  source: Pick<NodeJS.ProcessEnv, "NODE_ENV" | "OUTBOX_CRON_SECRET"> = process.env,
+  source: OutboxEnvironmentSource = process.env,
 ): void {
   const secret = source.OUTBOX_CRON_SECRET?.trim() ?? "";
   if (secret && secret.length < 32) {

@@ -14,21 +14,17 @@ export interface SanitizableSentryEvent {
     headers?: Record<string, string>;
     url?: string;
     query_string?: unknown;
-    [key: string]: unknown;
   };
   message?: string;
   exception?: {
-    values?: Array<{ value?: string; [key: string]: unknown }>;
-    [key: string]: unknown;
+    values?: Array<{ value?: string }>;
   };
   breadcrumbs?: Array<{
     message?: string;
     data?: Record<string, unknown>;
-    [key: string]: unknown;
   }>;
   extra?: Record<string, unknown>;
   contexts?: Record<string, unknown>;
-  [key: string]: unknown;
 }
 
 export function redactSensitiveText(value: string): string {
@@ -55,10 +51,7 @@ function scrubValue(value: unknown, key = ""): unknown {
   return value;
 }
 
-function scrubHeaders(
-  headers: Record<string, string> | undefined,
-): Record<string, string> | undefined {
-  if (!headers) return undefined;
+function scrubHeaders(headers: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(headers).map(([key, value]) => [
       key,
@@ -67,8 +60,7 @@ function scrubHeaders(
   );
 }
 
-function scrubUrl(value: string | undefined): string | undefined {
-  if (!value) return value;
+function scrubUrl(value: string): string {
   return redactSensitiveText(value).replace(
     /([?&](?:password|passcode|token|secret|api[-_]?key|otp|mfa|session|credential)=)[^&#]*/gi,
     "$1[REDACTED]",
@@ -79,8 +71,12 @@ export function scrubSentryEvent<T extends SanitizableSentryEvent>(event: T): T 
   if (event.request) {
     event.request.data = undefined;
     event.request.cookies = undefined;
-    event.request.headers = scrubHeaders(event.request.headers);
-    event.request.url = scrubUrl(event.request.url);
+    if (event.request.headers) {
+      event.request.headers = scrubHeaders(event.request.headers);
+    }
+    if (event.request.url) {
+      event.request.url = scrubUrl(event.request.url);
+    }
     event.request.query_string = scrubValue(event.request.query_string);
   }
 
