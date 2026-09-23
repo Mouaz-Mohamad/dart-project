@@ -1,7 +1,7 @@
 // DART CODE GUIDE | sw.js
 // الغرض: Service Worker للموقع؛ يدير التخزين المؤقت وسلوك الشبكة دون أن يصبح مصدر بيانات تجاري.
-// Dart storefront cache: network-first for code, cache-first fallback for media.
-const CACHE = 'dart-static-v18-fast-navigation';
+// Dart storefront cache: network-first for documents/code, cache-first fallback for media.
+const CACHE = 'dart-static-v19-production-recovery';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
@@ -28,17 +28,21 @@ self.addEventListener('fetch', event => {
   ) return;
 
   if (request.mode === 'navigate' || /\.html$/i.test(url.pathname) || url.pathname.startsWith('/sections/')) {
-    const network = fetch(request).then(response => {
-      if (response.ok) {
-        const clone = response.clone();
-        caches.open(CACHE).then(cache => cache.put(request, clone));
-      }
-      return response;
-    });
     event.respondWith(
-      caches.match(request).then(cached => cached || network).catch(() => network)
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE).then(cache => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(async error => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          throw error;
+        })
     );
-    event.waitUntil(network.catch(() => undefined));
     return;
   }
 
