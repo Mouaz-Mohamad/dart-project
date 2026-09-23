@@ -1,0 +1,41 @@
+name: One-time JFIF image optimization
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/perf-step1b-jfif-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  optimize-jfif:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Optimize JFIF assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pillow
+          python scripts/perf_step1b_jfif.py
+          git diff --check
+          node tests/performance-budget.cjs
+      - name: Commit step 1 completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/perf-step1b-jfif-once.yml
+          rm scripts/perf_step1b_jfif.py
+          git config user.name "Dart Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "perf: complete WebP coverage for JFIF assets"
+          git push origin HEAD:main
