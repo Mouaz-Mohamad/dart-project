@@ -1,3 +1,22 @@
+/* BEGIN WebP runtime fallback for dynamically assigned local images */
+(function installDartWebpFallback() {
+  if (window.__dartWebpFallbackInstalled) return;
+  window.__dartWebpFallbackInstalled = true;
+  document.addEventListener('error', function (event) {
+    var img = event.target;
+    if (!img || img.tagName !== 'IMG') return;
+    var src = img.getAttribute('src') || '';
+    if (!/\.webp(?:[?#].*)?$/i.test(src)) return;
+    var base = src.replace(/\.webp(?=([?#].*)?$)/i, '');
+    var stage = Number(img.dataset.dartFallbackStage || 0);
+    var candidates = ['.png', '.jpg', '.jpeg'];
+    if (stage >= candidates.length) return;
+    img.dataset.dartFallbackStage = String(stage + 1);
+    img.src = base + candidates[stage];
+  }, true);
+})();
+/* END WebP runtime fallback for dynamically assigned local images */
+
 // DART CODE GUIDE | Eye/dart.js
 // الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
 // ============================================================================

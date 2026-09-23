@@ -259,9 +259,9 @@
   }
 
   function renderMedia(settings) {
-    previewAsset(settings.heroDayImage, $("settings-hero-day-preview"), "../Photos/hero 2.png");
-    previewAsset(settings.heroNightImage || settings.heroDayImage, $("settings-hero-night-preview"), "../Photos/hero 2.png");
-    previewAsset(settings.founderImage, $("settings-founder-preview"), "../Photos/me.png");
+    previewAsset(settings.heroDayImage, $("settings-hero-day-preview"), "../Photos/hero 2.webp");
+    previewAsset(settings.heroNightImage || settings.heroDayImage, $("settings-hero-night-preview"), "../Photos/hero 2.webp");
+    previewAsset(settings.founderImage, $("settings-founder-preview"), "../Photos/me.webp");
   }
 
   function renderAnnouncements(settings) {

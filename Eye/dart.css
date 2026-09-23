@@ -133,7 +133,7 @@ textarea {
   top: 0;
   left: 0;
   background-color: #19485f;
-  background-image: linear-gradient(rgba(25, 72, 95, 0.85), rgba(25, 72, 95, 0.85)), url('../Photos/dart-bird-.png');
+  background-image: linear-gradient(rgba(25, 72, 95, 0.85), rgba(25, 72, 95, 0.85)), image-set(url("../Photos/dart-bird-.webp") type("image/webp"), url("../Photos/dart-bird-.png") type("image/png"));
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
