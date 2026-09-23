@@ -1,5 +1,6 @@
 // DART CODE GUIDE | backend/tests/security.test.ts
 // الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
+// Contract note: storefront customers use 6+ alphanumeric passwords with at least one letter and one number; representatives keep the stronger operational policy.
 import { describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret } from "../src/security/crypto.js";
 import { normalizeEgyptianPhone } from "../src/security/normalization.js";
