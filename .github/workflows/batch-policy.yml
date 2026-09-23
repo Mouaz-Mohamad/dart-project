@@ -14,7 +14,7 @@ jobs:
   verify-batch-markers:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Require numbered batch marker
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
