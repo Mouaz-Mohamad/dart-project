@@ -12,12 +12,14 @@ if (config.ignoreCommand !== "bash scripts/vercel-ignore-backend.sh") {
   throw new Error("backend/vercel.json must keep the guarded batch ignoreCommand");
 }
 
-const expectedBuildCommand =
-  'if [ "$VERCEL_ENV" = "production" ]; then npm run db:migrate; fi && npm run build';
+const expectedBuildCommand = "npm run build";
 if (config.buildCommand !== expectedBuildCommand) {
   throw new Error(
-    "backend/vercel.json must migrate the production database before building",
+    "backend/vercel.json must build only; database migrations are an explicit operational step",
   );
+}
+if (/\bdb:migrate\b/.test(String(config.buildCommand || ""))) {
+  throw new Error("Vercel buildCommand must never run database migrations");
 }
 
 for (const cron of config.crons ?? []) {

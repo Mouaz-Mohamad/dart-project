@@ -6,5 +6,5 @@
       "includeFiles": "migrations/**"
     }
   },
-  "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then npm run db:migrate; fi && npm run build"
+  "buildCommand": "npm run build"
 }

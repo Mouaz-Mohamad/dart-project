@@ -143,6 +143,16 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   ) {
     invalidEnvironment("MFA_ENCRYPTION_KEY");
   }
+
+  // Dart Eye Staff/Owner authentication is email-OTP only. A production API
+  // without a configured email provider would appear healthy while locking every
+  // administrator out, so production must fail closed until SMTP is configured.
+  if (
+    parsed.data.NODE_ENV === "production" &&
+    parsed.data.EMAIL_PROVIDER !== "smtp"
+  ) {
+    invalidEnvironment("EMAIL_PROVIDER");
+  }
   if (parsed.data.NODE_ENV === "production" && parsed.data.EMAIL_PROVIDER === "smtp") {
     const missingEmailFields = [
       !parsed.data.SMTP_HOST && "SMTP_HOST",

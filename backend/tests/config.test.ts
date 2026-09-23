@@ -8,6 +8,17 @@ const baseEnvironment = {
   DATABASE_URL: "postgresql://dart:test@localhost:5432/dart_test",
 };
 
+const productionEmailEnvironment = {
+  EMAIL_PROVIDER: "smtp",
+  SMTP_HOST: "smtp.example.com",
+  SMTP_PORT: "587",
+  SMTP_SECURE: "false",
+  SMTP_USER: "dart@example.com",
+  SMTP_PASS: "app-password",
+  EMAIL_FROM: "dart@example.com",
+  EMAIL_FROM_NAME: "Dart | for you",
+};
+
 describe("environment configuration", () => {
   it("loads safe defaults without exposing source values in errors", () => {
     const config = loadConfig(baseEnvironment);
@@ -63,7 +74,7 @@ describe("environment configuration", () => {
     ).toThrow("MFA_ENCRYPTION_KEY");
   });
 
-  it("keeps email disabled by default and validates SMTP fields in production", () => {
+  it("requires SMTP email delivery in production and validates its fields", () => {
     const production = {
       ...baseEnvironment,
       NODE_ENV: "production",
@@ -71,10 +82,8 @@ describe("environment configuration", () => {
       AUTH_PEPPER: "production-auth-pepper-with-at-least-32-characters",
       MFA_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     };
-    const disabled = loadConfig(production);
-    expect(disabled.emailProvider).toBe("disabled");
-    expect(disabled.smtpHost).toBeNull();
-    expect(disabled.outboxCronSecret).toBeNull();
+
+    expect(() => loadConfig(production)).toThrow("EMAIL_PROVIDER");
 
     expect(() =>
       loadConfig({
@@ -85,18 +94,12 @@ describe("environment configuration", () => {
 
     const smtp = loadConfig({
       ...production,
-      EMAIL_PROVIDER: "smtp",
-      SMTP_HOST: "smtp.example.com",
-      SMTP_PORT: "587",
-      SMTP_SECURE: "false",
-      SMTP_USER: "dart@example.com",
-      SMTP_PASS: "app-password",
-      EMAIL_FROM: "dart@example.com",
-      EMAIL_FROM_NAME: "Dart | for you",
+      ...productionEmailEnvironment,
     });
     expect(smtp.emailProvider).toBe("smtp");
     expect(smtp.smtpPort).toBe(587);
     expect(smtp.emailFromName).toBe("Dart | for you");
+    expect(smtp.outboxCronSecret).toBeNull();
   });
 
   it("validates optional operational monitoring alert settings", () => {
@@ -123,6 +126,7 @@ describe("environment configuration", () => {
       CORS_ORIGINS: "https://dart.example",
       AUTH_PEPPER: "production-auth-pepper-with-at-least-32-characters",
       MFA_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
+      ...productionEmailEnvironment,
     };
     expect(() =>
       loadConfig({
