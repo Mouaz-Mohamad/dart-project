@@ -1,0 +1,342 @@
+name: Finalize Dart auth repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dart-auth-finalize.yml"
+
+permissions:
+  contents: write
+
+env:
+  NODE_ENV: test
+  TEST_DATABASE_URL: postgresql://dart:dart@127.0.0.1:5432/dart_test
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dart
+          POSTGRES_PASSWORD: dart
+          POSTGRES_DB: dart_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dart -d dart_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Apply focused auth and CI corrections
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def write(path, text):
+              Path(path).write_text(text, encoding="utf-8")
+
+          # 1) Customer identity: keep the simple 6+ policy wording and expose a
+          # transaction-aware registration primitive so social account creation,
+          # social identity linking, challenge consumption and session issuance can
+          # commit or roll back together.
+          path = Path("backend/src/modules/identity/identity.service.ts")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              '"Password must be at least 6 characters and contain letters and numbers"',
+              '"Password must contain at least 6 characters"',
+          )
+          start = text.index("  public async registerCustomer(")
+          end = text.index("  public async verifyCustomerEmail(", start)
+          new_block = '''  public async registerCustomer(
+              input: RegisterCustomerInput,
+              metadata: RequestMetadata,
+            ): Promise<IssuedSession> {
+              const client = await this.pool.connect();
+              try {
+                await client.query("BEGIN");
+                const session = await this.registerCustomerInTransaction(
+                  client,
+                  input,
+                  metadata,
+                );
+                await client.query("COMMIT");
+                return session;
+              } catch (error) {
+                await client.query("ROLLBACK");
+                throw error;
+              } finally {
+                client.release();
+              }
+            }
+
+            public async registerCustomerInTransaction(
+              client: PoolClient,
+              input: RegisterCustomerInput,
+              metadata: RequestMetadata,
+            ): Promise<IssuedSession> {
+              customerPasswordPolicyOrThrow(input.password);
+              const email = input.email.trim();
+              const emailNormalized = normalizeEmail(email);
+              const phones = [input.phone1, input.phone2].filter(
+                (value): value is string => Boolean(value?.trim()),
+              );
+              const normalizedPhones = normalizePhonesOrThrow(phones);
+              if (normalizedPhones.length === 0) {
+                throw new AppError(
+                  422,
+                  "PHONE_REQUIRED",
+                  "At least one valid Egyptian phone number is required",
+                );
+              }
+              const passwordHash = await hashPassword(input.password);
+              const userId = randomUUID();
+              try {
+                // Customers register directly. Email OTP is reserved for Staff access and
+                // explicit email-change verification; it is not a customer signup gate.
+                await client.query(
+                  `INSERT INTO users (
+                    id, account_type, email, email_normalized, password_hash, status
+                  ) VALUES ($1, 'customer', $2, $3, $4, 'active')`,
+                  [userId, email, emailNormalized, passwordHash],
+                );
+                await this.insertPhones(
+                  client,
+                  userId,
+                  "customer",
+                  phones,
+                  normalizedPhones,
+                );
+                await client.query(
+                  `INSERT INTO customers (user_id, full_name, birthday)
+                   VALUES ($1, $2, $3::date)`,
+                  [userId, input.name.trim(), input.birthday ?? null],
+                );
+                await this.assignRole(client, userId, "Customer");
+                await this.audit(
+                  client,
+                  "customer",
+                  userId,
+                  "CUSTOMER_REGISTERED",
+                  "users",
+                  userId,
+                  metadata,
+                  { emailVerificationRequired: false },
+                );
+                return await this.issueSession(client, userId, true, metadata);
+              } catch (error) {
+                mapDatabaseConflict(error);
+              }
+            }
+
+          '''
+          text = text[:start] + new_block + text[end:]
+          write(path, text)
+
+          # 2) Social service: use normal PoolClient type imports, keep lookups on
+          # the active transaction, and register brand-new social customers in that
+          # same transaction instead of committing a nested registration first.
+          path = Path("backend/src/modules/identity/social-auth.service.ts")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace('import type { Pool } from "pg";', 'import type { Pool, PoolClient } from "pg";')
+          text = text.replace('    client: import("pg").PoolClient,', '    client: PoolClient,')
+          old_sig = '''  private async existingCustomerForChallenge(
+              row: SocialChallengeRow,
+            ): Promise<{'''
+          new_sig = '''  private async existingCustomerForChallenge(
+              row: SocialChallengeRow,
+              client: Pool | PoolClient = this.pool,
+            ): Promise<{'''
+          if old_sig not in text:
+              raise SystemExit("social existing-customer signature not found")
+          text = text.replace(old_sig, new_sig, 1)
+          fn_start = text.index("  private async existingCustomerForChallenge(")
+          fn_end = text.index("  public async challenge(", fn_start)
+          fn = text[fn_start:fn_end].replace("this.pool.query", "client.query")
+          text = text[:fn_start] + fn + text[fn_end:]
+          text = text.replace(
+              "let existing = await this.existingCustomerForChallenge(current);",
+              "let existing = await this.existingCustomerForChallenge(current, client);",
+              1,
+          )
+          old_register = '''session = await this.identity.registerCustomer(
+                    {'''
+          new_register = '''session = await this.identity.registerCustomerInTransaction(
+                    client,
+                    {'''
+          if old_register not in text:
+              raise SystemExit("social registration call not found")
+          text = text.replace(old_register, new_register, 1)
+          write(path, text)
+
+          # 3) Never put the one-time social completion capability in request URLs.
+          path = Path("backend/src/modules/identity/social-auth.routes.ts")
+          text = path.read_text(encoding="utf-8")
+          start = text.index('  router.get(\n    "/auth/social/challenge",')
+          end = text.index('  router.post(\n    "/auth/social/complete",', start)
+          challenge_route = '''  router.post(
+              "/auth/social/challenge",
+              authLimiter(30),
+              async (request, response) => {
+                const body = z.object({ token: z.string().min(40).max(500) }).parse(request.body);
+                response.status(200).json(await service.challenge(body.token));
+              },
+            );
+
+          '''
+          text = text[:start] + challenge_route + text[end:]
+          write(path, text)
+
+          path = Path("Js/dart-auth-social.js")
+          text = path.read_text(encoding="utf-8")
+          old = '''const challenge = await api(
+                `/api/v1/auth/social/challenge?token=${encodeURIComponent(token)}`,
+              );'''
+          new = '''const challenge = await api("/api/v1/auth/social/challenge", {
+                method: "POST",
+                body: { token },
+              });'''
+          if old not in text:
+              raise SystemExit("browser social challenge request not found")
+          text = text.replace(old, new, 1)
+          write(path, text)
+
+          # 4) OpenAPI and canonical docs follow the POST-body capability contract.
+          path = Path("backend/openapi.yaml")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace("version: 0.6.1", "version: 0.6.2", 1)
+          start = text.index("  /auth/social/challenge:\n")
+          end = text.index("  /auth/social/complete:\n", start)
+          block = '''  /auth/social/challenge:
+              post:
+                tags: [Customer Auth]
+                summary: Read safe profile hints without putting the one-time social capability in request URLs
+                operationId: getCustomerSocialChallenge
+                requestBody:
+                  required: true
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        additionalProperties: false
+                        required: [token]
+                        properties:
+                          token: { type: string, minLength: 40, maxLength: 500 }
+                responses:
+                  "200": { description: Provider, verified email, new/existing account state and required completion fields }
+                  "400": { $ref: "#/components/responses/ValidationError" }
+          '''
+          text = text[:start] + block + text[end:]
+          write(path, text)
+
+          path = Path("docs/API_CONTRACT.md")
+          text = path.read_text(encoding="utf-8")
+          needle = "3. Dart ينشئ one-time completion capability قصيرة العمر؛ المخزن في PostgreSQL هو الـhash فقط، والـcapability نفسها ترجع للمتصفح داخل URL fragment وليس query string."
+          replacement = needle + " بعد إزالة الـfragment من العنوان، الواجهة تقرأ بيانات الـchallenge عبر `POST /api/v1/auth/social/challenge` وتضع الـcapability في JSON body حتى لا تظهر في request URL/logs."
+          if needle not in text:
+              raise SystemExit("API contract social capability paragraph not found")
+          text = text.replace(needle, replacement, 1)
+          write(path, text)
+
+          # 5) Chromium must check script attachment, not visibility; script tags are
+          # intentionally non-visible DOM nodes.
+          path = Path("tests/full-site-browser.js")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              'await account.waitForSelector(\'script[data-dart-social-auth="1"]\');',
+              'await account.waitForSelector(\'script[data-dart-social-auth="1"]\', { state: "attached" });',
+              1,
+          )
+          write(path, text)
+
+          # 6) Add a regression contract for capability transport.
+          path = Path("backend/tests/social-auth-and-draw.contract.test.ts")
+          text = path.read_text(encoding="utf-8")
+          anchor = '''  it("awards every exact top tie up to three customers", () => {'''
+          test = '''  it("keeps the one-time social completion capability out of request URLs", async () => {
+              const routesPath = fileURLToPath(
+                new URL("../src/modules/identity/social-auth.routes.ts", import.meta.url),
+              );
+              const browserPath = fileURLToPath(
+                new URL("../../Js/dart-auth-social.js", import.meta.url),
+              );
+              const [routes, browser] = await Promise.all([
+                readFile(routesPath, "utf8"),
+                readFile(browserPath, "utf8"),
+              ]);
+              expect(routes).toContain('router.post(\\n    "/auth/social/challenge"');
+              expect(routes).not.toContain("request.query.token");
+              expect(browser).toContain('api("/api/v1/auth/social/challenge", {');
+              expect(browser).toContain("body: { token }");
+              expect(browser).not.toContain("/auth/social/challenge?token=");
+            });
+
+          '''
+          if anchor not in text:
+              raise SystemExit("social contract insertion anchor not found")
+          text = text.replace(anchor, test + anchor, 1)
+          write(path, text)
+          PY
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Backend audit and verification
+        working-directory: backend
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm run lint
+          npm run typecheck
+          npm test
+      - name: Browser JavaScript and static contracts
+        run: |
+          find Eye Js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --check sw.js
+          node tests/database-authoritative-storage.cjs
+          node tests/auth-contract.js
+          node tests/security-boundaries.cjs
+          node tests/performance-budget.cjs
+          node tests/catalog-category-contract.js
+          node tests/dart-finance-unit.js
+          node tests/finance-dashboard-contract.js
+          node tests/server-authority-contract.js
+      - name: Install Chromium smoke dependency
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Full storefront and dashboard Chromium smoke
+        run: node tests/full-site-browser.js
+
+      - name: Commit verified correction and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Mouaz Mohammed"
+          git config user.email "midomoaaz3@gmail.com"
+          git rm .github/workflows/dart-auth-finalize.yml
+          git add \
+            backend/src/modules/identity/identity.service.ts \
+            backend/src/modules/identity/social-auth.service.ts \
+            backend/src/modules/identity/social-auth.routes.ts \
+            backend/tests/social-auth-and-draw.contract.test.ts \
+            backend/openapi.yaml \
+            docs/API_CONTRACT.md \
+            Js/dart-auth-social.js \
+            tests/full-site-browser.js
+          git commit -m "fix: finalize social auth safety and CI [batch:7] [no-deploy]"
+          git push origin HEAD:main
