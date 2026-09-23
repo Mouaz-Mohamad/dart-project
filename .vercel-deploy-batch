@@ -2,3 +2,4 @@ batch=8
 purpose=production-recovery
 frontend=hero-navbar-cache
 backend=api-runtime
+trigger=frontend-production-1
