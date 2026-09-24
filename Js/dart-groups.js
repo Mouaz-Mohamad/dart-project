@@ -46,9 +46,15 @@
       const id = String(record.id || record.orderId || record.returnId || Math.random());
       let key = `${type}:single:${id}`;
       if (type === "order") {
-        if (record.deliveryGroupId) key = `order:assigned:${record.deliveryGroupId}`;
-        else if (!record.representativeId && PRE_ASSIGNMENT_ORDERS.has(record.status) && validRoute(record))
-          key = `order:auto:${routeKey(record)}`;
+        if (record.deliveryGroupId) {
+          key = `order:assigned:${record.deliveryGroupId}`;
+        } else if (!record.representativeId && PRE_ASSIGNMENT_ORDERS.has(record.status) && customerKey(record)) {
+          // Before any order leaves with a representative, all active orders for
+          // the same customer are one operational group. Their individual
+          // addresses/items remain visible inside the group and remain separate
+          // records; assignment can still validate/route each destination.
+          key = `order:auto:${customerKey(record)}`;
+        }
       } else {
         if (record.pickupGroupId) key = `return:assigned:${record.pickupGroupId}`;
         else if (!record.representativeId && PRE_ASSIGNMENT_RETURNS.has(record.status) && validRoute(record))
