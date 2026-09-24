@@ -334,4 +334,5 @@
     isBusy: () => hasMutationBarrier(),
     serverVersion: () => serverVersion,
   };
+  document.head.append(Object.assign(document.createElement("script"), { src: "dart-order-group-ui.js" }));
 })();
