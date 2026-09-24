@@ -25,12 +25,12 @@ const vercel = read("vercel.json");
 const commerceService = read("backend/src/modules/commerce/commerce.service.ts");
 const financeService = read("backend/src/modules/finance/finance.service.ts");
 const relationalStore = read("backend/src/modules/dashboard/relational-domain.store.ts");
-const relationalAuthorityMigration = read("backend/migrations/0019_relational_domains_authoritative.sql");
+const relationalAuthorityMigration = read("backend/migrations/0025_relational_domains_authoritative.sql");
 const customerInteractionService = read("backend/src/modules/commerce/customer-interaction.service.ts");
-const typedReturnDamageMigration = read("backend/migrations/0020_return_damage_typed_core.sql");
+const typedReturnDamageMigration = read("backend/migrations/0026_return_damage_typed_core.sql");
 const commerceRoutes = read("backend/src/modules/commerce/commerce.routes.ts");
 const catalogRoutes = read("backend/src/modules/catalog/catalog.routes.ts");
-const actionPermissionMigration = read("backend/migrations/0021_action_permissions.sql");
+const actionPermissionMigration = read("backend/migrations/0027_action_permissions.sql");
 const dashboardHtml = read("Eye/Dart Eye.html");
 const dashboardRuntime = read("Eye/dart.js");
 const storefrontRuntime = read("Js/dart-ui.js");
@@ -293,7 +293,6 @@ assert.match(
 
 console.log("PASS server-authority contract");
 
-
 const vercelConfig = JSON.parse(vercel);
 const globalSecurityHeaders = vercelConfig.headers
   .find((entry) => entry.source === "/(.*)")?.headers || [];
@@ -328,7 +327,6 @@ assert.ok(
     ),
   "storefront must proxy API calls through its own origin",
 );
-
 
 const coreBusinessKeys = [
   "dart_models",

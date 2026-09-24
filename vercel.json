@@ -76,3 +76,4 @@
   ],
   "ignoreCommand": "bash scripts/vercel-ignore-frontend.sh"
 }
+

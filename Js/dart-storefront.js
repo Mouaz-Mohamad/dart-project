@@ -107,10 +107,9 @@
       qty > 0 ? "success" : "info",
     );
   }
-  async function open(product) {
-    await C.loadModelImages(product.id);
-    const fresh = C.products().find((p) => p.id === product.id);
-    if (!fresh) return;
+  function open(product) {
+    const requestedId = product.id;
+    const fresh = C.products().find((p) => p.id === requestedId) || product;
     const color = product.cardColor || fresh.colorOptions[0]?.name;
     activeProduct = fresh;
     product = fresh;
@@ -148,7 +147,7 @@
       b.className = "color-btn";
       b.dataset.color = c.name;
       b.textContent = c.name;
-      b.onclick = () => chooseColor(product, c.name);
+      b.onclick = () => chooseColor(activeProduct || product, c.name);
       colorBox.append(b);
     }
     for (const s of product.sizeOptions) {
@@ -163,7 +162,7 @@
           .querySelectorAll("button")
           .forEach((x) => x.classList.toggle("active", x === b));
         modalQuantity = 1;
-        updatePurchase(product);
+        updatePurchase(activeProduct || product);
       };
       sizeBox.append(b);
     }
@@ -173,6 +172,22 @@
     modal.style.display = "flex";
     document.body.style.overflow = "hidden";
     document.body.classList.add("modal-open");
+
+    // Product details must never wait for image I/O. The modal opens from the
+    // catalog snapshot immediately; image hydration continues in the background.
+    void Promise.resolve(C.loadModelImages(requestedId))
+      .then(() => {
+        if (!opened || activeProduct?.id !== requestedId) return;
+        const hydrated = C.products().find((p) => p.id === requestedId);
+        if (!hydrated) return;
+        activeProduct = hydrated;
+        renderModalCarousel(hydrated.images, hydrated.title);
+        renderProductSizeChart(hydrated);
+        if (selectedColor) chooseColor(hydrated, selectedColor);
+      })
+      .catch((error) => {
+        console.warn("Dart product images are still loading; product details remain available.", error);
+      });
   }
   // END Bidirectional selection.
   // BEGIN Data refresh: preserve active color/size; rerender cards from current models.
