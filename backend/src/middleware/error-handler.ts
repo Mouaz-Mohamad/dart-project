@@ -17,6 +17,19 @@ function errorProperty(error: unknown, property: string): unknown {
     : undefined;
 }
 
+function compactUnhandledError(error: unknown): Record<string, unknown> {
+  const message = error instanceof Error ? error.message : String(error || "Unknown error");
+  return {
+    errorName: error instanceof Error ? error.name : typeof error,
+    errorMessage: message.slice(0, 500),
+    errorCode: errorProperty(error, "code") ?? null,
+    constraint: errorProperty(error, "constraint") ?? null,
+    table: errorProperty(error, "table") ?? null,
+    column: errorProperty(error, "column") ?? null,
+    routine: errorProperty(error, "routine") ?? null,
+  };
+}
+
 export function createErrorHandler(
   operationalAlerts?: Pick<OperationalAlertService, "report">,
 ): ErrorRequestHandler {
@@ -72,6 +85,17 @@ export function createErrorHandler(
       return;
     }
 
+    const compactError = compactUnhandledError(error);
+    // Keep a short Vercel-visible diagnostic line that cannot be drowned out by
+    // the request logger's bound headers/cookies. Never include request bodies,
+    // cookies, authorization values, or PostgreSQL detail/hint fields here.
+    console.error(JSON.stringify({
+      event: "unhandled_request_error_compact",
+      requestId,
+      method: request.method,
+      path: request.path,
+      ...compactError,
+    }));
     request.log.error({ err: error }, "Unhandled request error");
     Sentry.withScope((scope) => {
       scope.setTag("request_id", requestId);
