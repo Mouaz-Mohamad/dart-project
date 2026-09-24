@@ -374,4 +374,51 @@
   };
 })();
 
+// New orders intentionally expose only Accept + Reject.
+// COD verification remains a server-side gate before Preparing, but is not an
+// initial New-order action. Reject maps to Cancelled because Refused means a
+// delivery refusal after the order has already left with a representative.
+(function installInitialOrderActionPolicy(root) {
+  "use strict";
+
+  function normalizeNewOrderActions() {
+    document.querySelectorAll('[data-order-target="Accepted"]').forEach((acceptButton) => {
+      const controls = acceptButton.parentElement;
+      if (!controls) return;
+      acceptButton.textContent = "Accept";
+      controls.querySelectorAll('[data-order-cod-decision]').forEach((button) => button.remove());
+      controls.querySelectorAll('[data-order-target="Cancelled"]').forEach((button) => button.remove());
+      if (!controls.querySelector('[data-dart-initial-reject="1"]')) {
+        const reject = document.createElement("button");
+        reject.type = "button";
+        reject.className = "dart-cancel-btn";
+        reject.dataset.orderTarget = "Cancelled";
+        reject.dataset.dartInitialReject = "1";
+        reject.textContent = "Reject";
+        acceptButton.insertAdjacentElement("afterend", reject);
+      }
+    });
+  }
+
+  function scheduleNormalize() {
+    root.requestAnimationFrame?.(normalizeNewOrderActions) || setTimeout(normalizeNewOrderActions, 0);
+  }
+
+  root.addEventListener("dart:orders-hydrated", scheduleNormalize);
+  root.addEventListener("dart:orders-synced", scheduleNormalize);
+  document.addEventListener("DOMContentLoaded", () => {
+    if (typeof root.renderOrders === "function" && !root.renderOrders.__dartInitialActionsWrapped) {
+      const original = root.renderOrders;
+      const wrapped = function (...args) {
+        const result = original.apply(this, args);
+        scheduleNormalize();
+        return result;
+      };
+      wrapped.__dartInitialActionsWrapped = true;
+      root.renderOrders = wrapped;
+    }
+    scheduleNormalize();
+  }, { once: true });
+})(window);
+
 // END MODULE
