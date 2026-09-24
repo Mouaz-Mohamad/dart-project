@@ -58,6 +58,7 @@ jobs:
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js
           node tests/server-authority-contract.js
+          node tests/product-button-state-contract.cjs
 
   browser-smoke:
     runs-on: ubuntu-latest
@@ -82,3 +83,4 @@ jobs:
         run: |
           node tests/full-site-browser.js
           node tests/storefront-settings-regression.js
+          node tests/product-waiting-browser.js

@@ -1,5 +1,6 @@
-batch=23
-purpose=storefront-settings-regression-fix
-frontend=navbar-product-modal-dashboard-settings
+batch=7
+purpose=waiting-button-only-variant-fix
+frontend=preserve-variant-intent-single-owner-controller-fallback-production-matrix
 backend=unchanged
+scope=product-modal-action-buttons-only
 trigger=production-deploy

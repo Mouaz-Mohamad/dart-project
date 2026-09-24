@@ -296,9 +296,8 @@
   // BEGIN Bidirectional color/gallery selection. Programmatic fallback does not select its color.
   function chooseColor(product, color, fromSlide = false) {
     selectedColor = color || null;
-    if (selectedSize && selectedColor && availableStock(product, selectedSize, selectedColor) <= 0) {
-      selectedSize = null;
-    }
+    // Preserve the customer's selected size even when this exact color/size is
+    // unavailable. Waiting needs the exact requested variant; stock must not erase intent.
     const modal = $("SectionModel");
     if (!modal) return;
     modal.querySelectorAll(".color-btn").forEach((button) => {
@@ -364,19 +363,34 @@
         ? availableStock(product, selectedSize, selectedColor)
         : 0;
     const hasVariant = Boolean(selectedColor && selectedSize);
+    const waitingEnabled =
+      window.DartSiteSettings?.get?.().waiting?.enabled !== false;
+    const showWaiting = Boolean(waitingEnabled && hasVariant && qty <= 0);
+    const actionController = window.DartProductButtonState;
     const buyButton = $("modalBuyBtn");
-    if (buyButton) buyButton.disabled = !hasVariant || qty <= 0;
-
     const waitingButton = $("modalWaitBtn");
-    if (waitingButton) {
-      const waitingEnabled =
-        window.DartSiteSettings?.get?.().waiting?.enabled !== false;
-      waitingButton.hidden = !(waitingEnabled && hasVariant && qty <= 0);
-      waitingButton.disabled = false;
-      waitingButton.dataset.modelId = product.id;
-      waitingButton.dataset.color = selectedColor || "";
-      waitingButton.dataset.size = selectedSize || "";
-      waitingButton.textContent = "Notify me when available";
+
+    if (actionController?.sync) {
+      // Once loaded, the action controller is the single owner of Buy/Waiting state.
+      actionController.sync();
+    } else {
+      // Safe startup fallback: Waiting still replaces Buy if the controller is late
+      // or fails to load. Only the two modal action buttons are touched here.
+      if (buyButton) {
+        buyButton.hidden = showWaiting;
+        buyButton.disabled = !hasVariant || qty <= 0;
+      }
+      if (waitingButton) {
+        waitingButton.hidden = !showWaiting;
+        waitingButton.disabled = false;
+        waitingButton.dataset.modelId = product.id;
+        waitingButton.dataset.color = selectedColor || "";
+        waitingButton.dataset.size = selectedSize || "";
+        waitingButton.textContent = "Notify me when available";
+        waitingButton.style.background = "#2563eb";
+        waitingButton.style.borderColor = "#2563eb";
+        waitingButton.style.color = "#fff";
+      }
     }
 
     const qtyRow = $("modalQtyControl")?.closest(".modal-qty-row");
