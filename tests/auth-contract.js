@@ -73,7 +73,7 @@ assert(
 );
 assert(admin.includes("DASHBOARD_HYDRATION_TIMEOUT"), "Dashboard authoritative hydration must have a bounded timeout");
 assert(admin.includes("DartAdminHydration"), "Dashboard must expose authoritative hydration readiness/failure state");
-assert(admin.includes("Dashboard remains locked."), "Dashboard must remain locked when required server hydration fails");
+assert(admin.includes("Dashboard remains locked"), "Dashboard must remain locked when required server hydration fails");
 assert(dashboard.includes('id="dart-admin-auth"'), "Dashboard auth gate HTML is missing");
 assert(dashboard.includes('id="dart-admin-email-form"'), "Dashboard email access form is missing");
 assert(dashboard.includes('id="dart-admin-code-form"'), "Dashboard email verification form is missing");

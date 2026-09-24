@@ -1,5 +1,5 @@
-batch=23
-purpose=storefront-settings-regression-fix
-frontend=navbar-product-modal-dashboard-settings
+batch=8
+purpose=restore-navbar-and-buy-waiting-state
+frontend=ad1a226-navbar-assets-buy-waiting-toggle
 backend=unchanged
 trigger=production-deploy

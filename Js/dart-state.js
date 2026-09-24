@@ -54,8 +54,38 @@
       root.localStorage?.setItem(marker, "1");
     } catch {}
   }
+  function purgeStaleNavbarFragment() {
+    const marker = "dart_navbar_asset_restore_ad1a226_v1";
+    try {
+      if (root.localStorage?.getItem(marker) === "1") return;
+      const staleKeys = [];
+      for (let index = 0; index < root.localStorage.length; index += 1) {
+        const key = root.localStorage.key(index);
+        if (key && key.startsWith("dart_fragment_") && key.includes("Nav-Bar.html")) {
+          staleKeys.push(key);
+        }
+      }
+      staleKeys.forEach((key) => root.localStorage.removeItem(key));
+      root.localStorage?.setItem(marker, "1");
+    } catch {}
+  }
+  function loadProductButtonStateWhenNeeded() {
+    const document = root.document;
+    if (!document?.getElementById?.("SectionModel")) return;
+    if (document.querySelector?.('script[data-dart-product-button-state="1"]')) return;
+    const script = document.createElement("script");
+    script.src = "/Js/dart-product-button-state.js";
+    script.async = false;
+    script.dataset.dartProductButtonState = "1";
+    script.addEventListener("error", () => {
+      console.error("Dart product button-state controller failed to load.");
+    }, { once: true });
+    document.head?.appendChild(script);
+  }
   purgeLegacyBrowserBusinessData();
+  purgeStaleNavbarFragment();
   root.DartState = Object.freeze({ read, write, clone });
+  loadProductButtonStateWhenNeeded();
 })(typeof window !== "undefined" ? window : globalThis);
 
 
