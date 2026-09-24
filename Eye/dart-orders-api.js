@@ -24,6 +24,27 @@
   window.DartCatalog = bridge;
 })();
 
+// DartSiteSettings is also deferred in Dart Eye while dart-settings.js is
+// parser-blocking. Without this bridge dart-settings.js exits before binding its
+// submit handlers, so browser-native form submission reloads the dashboard and
+// no PUT /api/v1/admin/site-settings request is sent. The real settings module
+// replaces this proxy before DOMContentLoaded; captured references keep working.
+(function installDeferredSiteSettingsBridge() {
+  "use strict";
+  if (window.DartSiteSettings) return;
+  let bridge;
+  bridge = new Proxy(Object.create(null), {
+    get(_target, property) {
+      if (property === "__dartDeferredBridge") return true;
+      const settings = window.DartSiteSettings;
+      if (!settings || settings === bridge) return undefined;
+      const value = settings[property];
+      return typeof value === "function" ? value.bind(settings) : value;
+    },
+  });
+  window.DartSiteSettings = bridge;
+})();
+
 (function () {
   "use strict";
 
