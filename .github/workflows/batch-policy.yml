@@ -32,7 +32,7 @@ jobs:
       - name: Check browser JavaScript syntax
         run: |
           find Js Eye -type f -name '*.js' -print0 | xargs -0 -n1 node --check
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
