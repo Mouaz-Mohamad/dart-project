@@ -79,4 +79,6 @@ jobs:
           npm install --no-save --package-lock=false playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Full storefront and dashboard Chromium smoke
-        run: node tests/full-site-browser.js
+        run: |
+          node tests/full-site-browser.js
+          node tests/storefront-settings-regression.js
