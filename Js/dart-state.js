@@ -99,10 +99,35 @@
     loadProductButtonStateWhenNeeded();
   }
 
+  function loadCheckoutStabilityWhenNeeded() {
+    const document = root.document;
+    if (!document?.getElementById?.("checkoutForm")) return;
+    if (document.querySelector?.('script[data-dart-checkout-stability="1"]')) return;
+    const script = document.createElement("script");
+    script.src = "/Js/dart-checkout-stability.js?v=20260924-mobile-checkout-v1";
+    script.async = false;
+    script.dataset.dartCheckoutStability = "1";
+    script.addEventListener("error", () => {
+      console.error("Dart checkout stability controller failed to load.");
+    }, { once: true });
+    document.head?.appendChild(script);
+  }
+
+  function scheduleCheckoutStability() {
+    const document = root.document;
+    if (!document) return;
+    if (document.readyState === "loading" || document.readyState === "interactive") {
+      document.addEventListener("DOMContentLoaded", loadCheckoutStabilityWhenNeeded, { once: true });
+      return;
+    }
+    loadCheckoutStabilityWhenNeeded();
+  }
+
   purgeLegacyBrowserBusinessData();
   purgeStaleNavbarFragment();
   root.DartState = Object.freeze({ read, write, clone });
   scheduleProductButtonState();
+  scheduleCheckoutStability();
 })(typeof window !== "undefined" ? window : globalThis);
 
 
