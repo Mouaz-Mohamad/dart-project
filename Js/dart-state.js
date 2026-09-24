@@ -123,11 +123,36 @@
     loadCheckoutStabilityWhenNeeded();
   }
 
+  function loadDashboardOrderGroupsWhenNeeded() {
+    const document = root.document;
+    if (!document?.getElementById?.("orders-container")) return;
+    if (document.querySelector?.('script[data-dart-order-group-ui="1"]')) return;
+    const script = document.createElement("script");
+    script.src = "/Eye/dart-order-group-ui.js?v=20260924-expandable-groups-v1";
+    script.async = false;
+    script.dataset.dartOrderGroupUi = "1";
+    script.addEventListener("error", () => {
+      console.error("Dart order group UI failed to load.");
+    }, { once: true });
+    document.head?.appendChild(script);
+  }
+
+  function scheduleDashboardOrderGroups() {
+    const document = root.document;
+    if (!document) return;
+    if (document.readyState === "loading" || document.readyState === "interactive") {
+      document.addEventListener("DOMContentLoaded", loadDashboardOrderGroupsWhenNeeded, { once: true });
+      return;
+    }
+    loadDashboardOrderGroupsWhenNeeded();
+  }
+
   purgeLegacyBrowserBusinessData();
   purgeStaleNavbarFragment();
   root.DartState = Object.freeze({ read, write, clone });
   scheduleProductButtonState();
   scheduleCheckoutStability();
+  scheduleDashboardOrderGroups();
 })(typeof window !== "undefined" ? window : globalThis);
 
 
