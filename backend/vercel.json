@@ -6,5 +6,5 @@
       "includeFiles": "migrations/**"
     }
   },
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run db:migrate:one -- 0045_inventory_resale_history_and_audit.sql && npm run build"
 }
