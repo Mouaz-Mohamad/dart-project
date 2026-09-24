@@ -390,6 +390,7 @@ section{
 
 .dashboard-section.active-section {
     display: block;
+    padding: 10px ;
 }
 
 .cont-card-info{
@@ -1760,7 +1761,7 @@ section{
 .dart-waiting-filters{flex-wrap:wrap}
 .dart-waiting-date{display:flex;align-items:center;gap:6px;padding:0 8px;color:#64748b;font-size:12px}
 .dart-waiting-date input{min-height:40px;border:1px solid #d8dee7;border-radius:7px;padding:6px}
-.dart-waiting-table-wrap{overflow:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px}
+.dart-waiting-table-wrap{ overflow:auto; background:#fff; border:1px solid #e5e7eb;height: 500px; border-radius:12px; -webkit-border-radius:12px; -moz-border-radius:12px; -ms-border-radius:12px; -o-border-radius:12px; }
 .dart-waiting-table{width:100%;min-width:1450px;border-collapse:collapse}
 .dart-waiting-table th,.dart-waiting-table td{padding:10px 9px;border-bottom:1px solid #edf0f3;text-align:left;vertical-align:middle;font-size:12px}
 .dart-waiting-table th{position:sticky;top:0;z-index:2;background:#8c1d2c;color:#fff;font-size:11px;white-space:nowrap}
@@ -1768,17 +1769,17 @@ section{
 .dart-waiting-status{display:inline-flex;padding:4px 8px;border-radius:999px;background:#f4e9ec;color:#8c1d2c;font-weight:800;font-size:11px}
 .dart-waiting-actions-menu{position:relative}
 .dart-waiting-actions-menu summary{cursor:pointer;list-style:none;width:34px;height:34px;display:grid;place-items:center;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:18px}
-.dart-waiting-actions-pop{position:absolute;right:0;top:38px;z-index:20;width:220px;display:grid;gap:5px;padding:8px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 14px 35px rgba(15,23,42,.16)}
-.dart-waiting-actions-pop button{width:100%;text-align:left;border:0;background:#fff;padding:8px;border-radius:7px;cursor:pointer}
+.dart-waiting-actions-pop{position:absolute;top:38px;z-index:20;width: 220px;display:grid;gap:5px;padding:8px;background:#e0e0e0;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 14px 35px rgba(15,23,42,.16)}
+.dart-waiting-actions-pop button{width:100%;text-align:left;border:0;padding:8px;border-radius:7px;cursor:pointer}
 .dart-waiting-actions-pop button:hover{background:#f7f2f3}
-.dart-waiting-action-danger{color:#991b1b!important}
+.dart-waiting-action-danger{color:#3cffe8!important}
 .dart-waiting-priority{font-weight:800;color:#8c1d2c}
 .dart-waiting-empty{padding:35px;text-align:center;color:#64748b}
-.dart-waiting-dialog{width:min(760px,92vw);max-height:82vh;border:0;border-radius:14px;padding:0;box-shadow:0 20px 60px rgba(15,23,42,.28)}
+.dart-waiting-dialog{ width:min(760px,92vw); max-height:82vh; border:0; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(15,23,42,.28); position: fixed; top: 50%; left: 50%; transform: translet(-50%,-50); -webkit-transform: translet(-50%,-50); -moz-transform: translet(-50%,-50); -ms-transform: translet(-50%,-50); -o-transform: translet(-50%,-50); }
 .dart-waiting-dialog::backdrop{background:rgba(15,23,42,.55)}
 .dart-waiting-dialog-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid #e5e7eb}
 .dart-waiting-dialog-body{padding:18px;max-height:65vh;overflow:auto}
-.dart-waiting-dialog-close{border:0;background:transparent;font-size:24px;cursor:pointer}
+.dart-waiting-dialog-close{border:0;font-size:24px;cursor:pointer}
 .dart-waiting-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .dart-waiting-detail-grid div{padding:9px;border:1px solid #eee;border-radius:8px}
 .dart-waiting-detail-grid small{display:block;color:#64748b;margin-bottom:3px}
