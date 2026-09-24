@@ -49,7 +49,9 @@ function walk(root) {
 const jsFiles = ["Js", "Eye"].flatMap(walk).filter((file) => file.endsWith(".js"));
 const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
+  "Eye/dart-order-group-ui.js",
   "Js/dart-rep.js",
+  "Js/dart-checkout-stability.js",
 ]);
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 const dashboardRuntime = fs.readFileSync("Eye/dart.js", "utf8");
