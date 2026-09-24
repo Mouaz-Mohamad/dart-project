@@ -1,5 +1,5 @@
-batch=8
-purpose=production-recovery
-frontend=hero-navbar-cache
-backend=api-runtime
-trigger=frontend-production-1
+batch=23
+purpose=storefront-settings-regression-fix
+frontend=navbar-product-modal-dashboard-settings
+backend=unchanged
+trigger=production-deploy
