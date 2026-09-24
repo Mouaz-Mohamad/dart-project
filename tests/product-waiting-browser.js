@@ -1,5 +1,5 @@
 // DART CODE GUIDE | tests/product-waiting-browser.js
-// Browser regression for Buy/Waiting replacement across unavailable size/color combinations.
+// Browser regression for Buy/Waiting replacement across real production-style unavailable size/color combinations.
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
@@ -25,23 +25,23 @@ const settings = {
 };
 const image = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='400'%3E%3Crect width='300' height='400' fill='%23AB012B'/%3E%3C/svg%3E";
 const model = {
-  modelId: "DT-WAIT-1",
-  name: "Waiting Regression Tee",
-  category: "T-Shirts",
-  description: "Waiting browser regression model.",
+  modelId: "Mouaz",
+  name: "Hadi cotton shirt",
+  category: "hoodies",
+  description: "Production-shaped Waiting regression model.",
   selling: 600,
   discount: 0,
   active: true,
   isArchived: false,
   isDeleted: false,
-  lowStockLimit: 2,
-  createdAt: "2026-09-24T00:00:00.000Z",
+  lowStockLimit: 5,
+  createdAt: "2026-09-22T10:26:46.043Z",
   colorOptions: [
-    { name: "Burgundy", active: true, images: [{ id: "burgundy", name: "burgundy.svg", url: image }] },
-    { name: "Blue", active: true, images: [{ id: "blue", name: "blue.svg", url: image }] },
+    { name: "Begi", active: true, images: [{ id: "begi", name: "begi.svg", url: image }] },
+    { name: "Red", active: true, images: [{ id: "red", name: "red.svg", url: image }] },
   ],
-  sizeOptions: [{ name: "M", active: true }, { name: "L", active: true }],
-  sizeChart: { unit: "cm", rows: [{ size: "M" }, { size: "L" }] },
+  sizeOptions: [{ name: "M", active: true }, { name: "Xl", active: true }],
+  sizeChart: { unit: "cm", rows: [{ size: "M" }, { size: "Xl" }] },
 };
 
 function json(res, status, payload) {
@@ -59,7 +59,8 @@ const server = http.createServer((req, res) => {
       return json(res, 200, {
         version: 1,
         models: [model],
-        stock: { '["DT-WAIT-1","Burgundy","M"]': 2 },
+        // Same shape as current production: only Begi + Xl is available.
+        stock: { '["Mouaz","Begi","Xl"]': 1 },
       });
     }
     if (pathname === "/api/v1/catalog/version") return json(res, 200, { version: 1 });
@@ -100,41 +101,66 @@ async function expectAction(page, expected) {
   } else {
     assert.equal(await buy.isVisible(), false);
     assert.equal(await waiting.isVisible(), true);
-    assert.equal(await waiting.evaluate((node) => node.style.background), "rgb(37, 99, 235)");
+    assert.equal(await waiting.evaluate((node) => getComputedStyle(node).backgroundColor), "rgb(37, 99, 235)");
   }
+}
+
+async function openModel(page) {
+  await page.waitForSelector('.product-card[data-id="Mouaz"]');
+  await page.locator('.product-card[data-id="Mouaz"]').first().click();
+  await page.waitForFunction(() => document.getElementById("SectionModel")?.style.display === "flex");
 }
 
 (async () => {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
+    // Normal production path with the dedicated Buy/Waiting controller loaded.
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.goto(`${origin}/products.html`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => Boolean(window.DartProductButtonState));
-    await page.waitForSelector('.product-card[data-id="DT-WAIT-1"]');
-    await page.locator('.product-card[data-id="DT-WAIT-1"]').first().click();
-    await page.waitForFunction(() => document.getElementById("SectionModel")?.style.display === "flex");
+    await openModel(page);
 
     // Available size + available color => Buy only.
-    await page.locator('#SectionModel .color-btn[data-color="Burgundy"]').click();
-    await page.locator('#SectionModel .size-btn[data-size="M"]').click();
+    await page.locator('#SectionModel .color-btn[data-color="Begi"]').click();
+    await page.locator('#SectionModel .size-btn[data-size="Xl"]').click();
     await expectAction(page, "buy");
 
-    // M is available elsewhere, but Blue is unavailable: preserve M intent and show Waiting.
-    await page.locator('#SectionModel .color-btn[data-color="Blue"]').click();
+    // Available size + unavailable color => Waiting replaces Buy and preserves Xl.
+    await page.locator('#SectionModel .color-btn[data-color="Red"]').click();
+    await expectAction(page, "waiting");
+    assert.equal(await page.locator('#SectionModel .size-btn[data-size="Xl"]').getAttribute("aria-pressed"), "true");
+
+    // Unavailable size + available color => Waiting replaces Buy.
+    await page.locator('#SectionModel .color-btn[data-color="Begi"]').click();
+    await page.locator('#SectionModel .size-btn[data-size="M"]').click();
     await expectAction(page, "waiting");
 
-    // Available color + unavailable size => Waiting.
-    await page.locator('#SectionModel .color-btn[data-color="Burgundy"]').click();
-    await page.locator('#SectionModel .size-btn[data-size="L"]').click();
+    // Both dimensions unavailable as a pair => Waiting remains visible.
+    await page.locator('#SectionModel .color-btn[data-color="Red"]').click();
     await expectAction(page, "waiting");
+    assert.equal(await page.locator('#SectionModel .size-btn[data-size="M"]').getAttribute("aria-pressed"), "true");
 
-    // Both selected option dimensions unavailable => Waiting remains visible.
-    await page.locator('#SectionModel .color-btn[data-color="Blue"]').click();
+    // A storefront refresh must not erase the requested unavailable variant.
+    await page.evaluate(() => window.DartStorefront.refresh());
     await expectAction(page, "waiting");
+    await page.close();
 
-    console.log("PASS product modal Buy/Waiting browser variant matrix");
+    // Startup/failure fallback: even if the action controller is unavailable,
+    // storefront state must still replace Buy with Waiting instead of showing nothing.
+    const fallbackPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await fallbackPage.route("**/Js/dart-product-button-state.js", (route) => route.abort());
+    await fallbackPage.goto(`${origin}/products.html`, { waitUntil: "domcontentloaded" });
+    await openModel(fallbackPage);
+    await fallbackPage.locator('#SectionModel .color-btn[data-color="Begi"]').click();
+    await fallbackPage.locator('#SectionModel .size-btn[data-size="M"]').click();
+    await expectAction(fallbackPage, "waiting");
+    await fallbackPage.locator('#SectionModel .color-btn[data-color="Red"]').click();
+    await expectAction(fallbackPage, "waiting");
+    await fallbackPage.close();
+
+    console.log("PASS production-shaped Buy/Waiting matrix + controller fallback");
   } finally {
     await browser.close();
     await new Promise((resolve) => server.close(resolve));

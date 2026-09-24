@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "Js/dart-product-button-state.js"), "utf8");
 const stateSource = fs.readFileSync(path.join(root, "Js/dart-state.js"), "utf8");
+const storefrontSource = fs.readFileSync(path.join(root, "Js/dart-storefront.js"), "utf8");
 
 function makeButton(text = "") {
   return {
@@ -24,6 +25,21 @@ function makeButton(text = "") {
 (async () => {
   assert.match(stateSource, /DOMContentLoaded/);
   assert.match(stateSource, /scheduleProductButtonState/);
+  assert.doesNotMatch(
+    storefrontSource,
+    /availableStock\(product, selectedSize, selectedColor\) <= 0\)[\s\S]{0,120}selectedSize = null/,
+    "Storefront must never erase the selected size just because the exact variant is out of stock",
+  );
+  assert.match(
+    storefrontSource,
+    /const showWaiting = Boolean\(waitingEnabled && hasVariant && qty <= 0\)/,
+    "Storefront must have an immediate Waiting fallback while the action controller loads",
+  );
+  assert.match(
+    storefrontSource,
+    /if \(actionController\?\.sync\)/,
+    "Loaded Buy\/Waiting controller must remain the action-button state owner",
+  );
 
   const buy = makeButton("Buy");
   const waiting = makeButton("Waiting");
