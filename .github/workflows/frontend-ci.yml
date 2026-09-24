@@ -83,3 +83,4 @@ jobs:
         run: |
           node tests/full-site-browser.js
           node tests/storefront-settings-regression.js
+          node tests/product-waiting-browser.js

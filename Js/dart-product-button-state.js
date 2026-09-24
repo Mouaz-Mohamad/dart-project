@@ -3,10 +3,10 @@
 (function (root) {
   "use strict";
 
-  let rememberedSize = "", observer = null, purchaseBusy = false, waitingBusy = false, reservedKey = "";
+  let rememberedSize = "", observer = null, purchaseBusy = false, waitingBusy = false, reservedKey = "", restoringSize = false;
   const $ = id => root.document?.getElementById?.(id) || null;
   const product = () => typeof activeProduct === "undefined" ? null : activeProduct;
-  const size = () => typeof selectedSize === "undefined" ? null : selectedSize;
+  const rawSize = () => typeof selectedSize === "undefined" ? null : selectedSize;
   const color = () => typeof selectedColor === "undefined" ? null : selectedColor;
   const quantity = () => Math.max(1, Number(typeof modalQuantity === "undefined" ? 1 : modalQuantity) || 1);
   const key = (p, s, c) => [p?.id || "", s || "", c || ""].join("::");
@@ -17,6 +17,18 @@
   const status = (message, state = "") => {
     if (typeof setProductOptionStatus === "function") setProductOptionStatus(message, state);
   };
+
+  function modal() { return $("SectionModel"); }
+  function rememberedSizeButton() {
+    if (!rememberedSize) return null;
+    return Array.from(modal()?.querySelectorAll?.(".size-btn") || [])
+      .find(node => String(node.dataset?.size || "") === rememberedSize) || null;
+  }
+  function size() {
+    const current = rawSize();
+    if (current) return current;
+    return rememberedSizeButton() ? rememberedSize : null;
+  }
 
   function decide({ hasColor, hasSize, stock, waitingEnabled }) {
     const hasVariant = Boolean(hasColor && hasSize);
@@ -53,15 +65,24 @@
   }
 
   function restoreSize() {
-    const modal = $("SectionModel");
-    if (!modal || !rememberedSize || !modal.querySelector?.(".color-btn.active") || modal.querySelector?.(".size-btn.active")) return false;
-    const button = Array.from(modal.querySelectorAll?.(".size-btn") || [])
-      .find(node => String(node.dataset?.size || "") === rememberedSize);
-    if (!button) return false;
-    button.click();
+    const currentModal = modal();
+    const button = rememberedSizeButton();
+    if (restoringSize || !currentModal || !button || !color() || rawSize()) return false;
+    restoringSize = true;
+    try {
+      if (typeof selectedSize !== "undefined") selectedSize = rememberedSize;
+      Array.from(currentModal.querySelectorAll?.(".size-btn") || []).forEach(node => {
+        const active = node === button;
+        node.classList?.toggle?.("active", active);
+        node.setAttribute?.("aria-pressed", String(active));
+      });
+      button.click?.();
+    } finally {
+      restoringSize = false;
+    }
     return true;
   }
-  const settle = () => root.queueMicrotask?.(() => { if (!restoreSize()) sync(); });
+  const settle = () => root.queueMicrotask?.(() => { restoreSize(); sync(); });
 
   async function handleBuy() {
     if (purchaseBusy) return false;
@@ -106,12 +127,13 @@
       return false;
     } finally {
       purchaseBusy = false;
-      if ($("SectionModel")?.style?.display === "flex") sync();
+      if (modal()?.style?.display === "flex") sync();
     }
   }
 
   async function handleWaiting() {
     if (waitingBusy) return false;
+    restoreSize();
     const state = sync(), { product: p, size: s, color: c, stock, hasVariant, showWaiting } = state;
     if (!p || !hasVariant) { toast("Choose the size and color you want first."); return false; }
     if (stock > 0 || !showWaiting) { status("This option is available now. Use Buy instead.", "success"); sync(); return false; }
@@ -156,12 +178,12 @@
   }, true);
 
   function bind() {
-    const modal = $("SectionModel");
-    if (!modal || typeof root.MutationObserver !== "function" || observer) { sync(); return; }
+    const currentModal = modal();
+    if (!currentModal || typeof root.MutationObserver !== "function" || observer) { sync(); return; }
     observer = new root.MutationObserver(() => {
-      if (modal.style?.display === "flex" && !restoreSize()) sync();
+      if (currentModal.style?.display === "flex") { restoreSize(); sync(); }
     });
-    observer.observe(modal, { subtree: true, attributes: true, attributeFilter: ["class", "style"] });
+    observer.observe(currentModal, { subtree: true, attributes: true, attributeFilter: ["class", "style"] });
     sync();
   }
   if (root.document?.readyState === "loading") root.document.addEventListener("DOMContentLoaded", bind, { once: true });
@@ -170,6 +192,6 @@
 
   root.DartProductButtonState = Object.freeze({
     decide, sync, handleBuy, handleWaiting,
-    __resetForTests() { rememberedSize = reservedKey = ""; purchaseBusy = waitingBusy = false; }
+    __resetForTests() { rememberedSize = reservedKey = ""; purchaseBusy = waitingBusy = restoringSize = false; }
   });
 })(typeof window !== "undefined" ? window : globalThis);

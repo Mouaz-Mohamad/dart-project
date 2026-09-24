@@ -1,5 +1,5 @@
 batch=7
-purpose=single-click-buy-and-waiting-reservation
-frontend=buy-adding-lock-waiting-reservation
+purpose=waiting-variant-state-fix
+frontend=preserve-size-intent-waiting-browser-matrix
 backend=unchanged
 trigger=production-deploy
