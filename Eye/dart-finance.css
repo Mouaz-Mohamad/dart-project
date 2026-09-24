@@ -606,8 +606,6 @@
 
 .dart-finance-table tbody tr:last-child td {
   border-bottom: 0;
-  height: 600px;
-  overflow: scroll;
 }
 
 .dart-finance-empty-cell {
