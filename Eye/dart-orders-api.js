@@ -1,13 +1,3 @@
-// DART CODE GUIDE | Eye/dart-orders-api.js
-// الغرض: منطق Dart Eye Dashboard؛ يعرض/يدير البيانات عبر الـAPI مع احترام صلاحيات الموظف.
-// DART EYE | MODULE: dart-orders-api.js
-// Server-backed order hydration, writes, workflow mutations, and synchronization.
-// BEGIN MODULE
-
-// The shared catalog script is deferred in Dart Eye while dashboard modules below
-// are parser-blocking. Keep a stable reference for modules that capture DartCatalog
-// before the deferred catalog has executed; every property resolves against the
-// real catalog object once dart-catalog.js replaces window.DartCatalog.
 (function installDeferredCatalogBridge() {
   "use strict";
   if (window.DartCatalog) return;
@@ -24,11 +14,6 @@
   window.DartCatalog = bridge;
 })();
 
-// DartSiteSettings is also deferred in Dart Eye while dart-settings.js is
-// parser-blocking. Without this bridge dart-settings.js exits before binding its
-// submit handlers, so browser-native form submission reloads the dashboard and
-// no PUT /api/v1/admin/site-settings request is sent. The real settings module
-// replaces this proxy before DOMContentLoaded; captured references keep working.
 (function installDeferredSiteSettingsBridge() {
   "use strict";
   if (window.DartSiteSettings) return;
@@ -47,7 +32,6 @@
 
 (function () {
   "use strict";
-
   const API_BASE = String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
   const STORAGE_KEY = "dart_orders";
   let serverVersion = 0;
@@ -69,11 +53,9 @@
   function cache(orders, source = "orders") {
     const rows = Array.isArray(orders) ? orders : [];
     window.DartState?.write?.(STORAGE_KEY, rows, { source });
-    window.dispatchEvent(
-      new CustomEvent("dart:orders-hydrated", {
-        detail: { version: serverVersion, orders: rows },
-      }),
-    );
+    window.dispatchEvent(new CustomEvent("dart:orders-hydrated", {
+      detail: { version: serverVersion, orders: rows },
+    }));
   }
 
   function csrfToken() {
@@ -117,9 +99,7 @@
         (domain) => jobs.push(window.DartDomainState.hydrateDomain(domain, true)),
       );
     }
-    if (window.DartDomainState?.hydrateAudit) {
-      jobs.push(window.DartDomainState.hydrateAudit());
-    }
+    if (window.DartDomainState?.hydrateAudit) jobs.push(window.DartDomainState.hydrateAudit());
     if (jobs.length) await Promise.allSettled(jobs);
   }
 
@@ -129,7 +109,6 @@
 
   async function sync() {
     if (!serverVersion || !dirty || authoritativeMutations > 0) return readLocal();
-
     const revision = localRevision;
     const expectedVersion = serverVersion;
     const snapshot = readLocal().map((row) => ({ ...row }));
@@ -143,11 +122,9 @@
       if (revision === localRevision) {
         dirty = false;
         cache(payload.orders || [], "orders:sync-confirmed");
-        window.dispatchEvent(
-          new CustomEvent("dart:orders-synced", {
-            detail: { version: serverVersion },
-          }),
-        );
+        window.dispatchEvent(new CustomEvent("dart:orders-synced", {
+          detail: { version: serverVersion },
+        }));
       } else {
         dirty = true;
         scheduleSync();
@@ -169,16 +146,14 @@
     if (!serverVersion || authoritativeMutations > 0) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => {
-      syncChain = syncChain
-        .then(sync)
-        .catch(async (error) => {
-          console.error("Dart order sync failed", error);
-          if (error.status === 409) {
-            await rebaseVersionPreservingLocal();
-            dirty = true;
-            scheduleSync();
-          }
-        });
+      syncChain = syncChain.then(sync).catch(async (error) => {
+        console.error("Dart order sync failed", error);
+        if (error.status === 409) {
+          await rebaseVersionPreservingLocal();
+          dirty = true;
+          scheduleSync();
+        }
+      });
     }, 120);
   }
 
@@ -205,7 +180,6 @@
 
   async function runAuthoritativeMutation(path, body) {
     if (dirty) await flush();
-
     authoritativeMutations += 1;
     authoritativeEpoch += 1;
     const epoch = authoritativeEpoch;
@@ -275,10 +249,7 @@
     try {
       const payload = await api(
         `/api/v1/admin/orders/${encodeURIComponent(orderRef)}`,
-        {
-          method: "PATCH",
-          body: order,
-        },
+        { method: "PATCH", body: order },
       );
       if (epoch === authoritativeEpoch) {
         serverVersion = Number(payload.version || serverVersion || 1);
@@ -294,21 +265,16 @@
 
   async function hydrate(_force = false) {
     if (hasMutationBarrier()) return readLocal();
-
     const serial = ++hydrateSerial;
     const epoch = authoritativeEpoch;
     const revision = localRevision;
     const payload = await api("/api/v1/admin/orders-state");
-
     if (
       hasMutationBarrier() ||
       epoch !== authoritativeEpoch ||
       revision !== localRevision ||
       serial < lastAppliedHydrateSerial
-    ) {
-      return readLocal();
-    }
-
+    ) return readLocal();
     lastAppliedHydrateSerial = serial;
     serverVersion = Number(payload.version || 1);
     dirty = false;
@@ -317,8 +283,7 @@
   }
 
   async function check() {
-    if (!adminPollingEnabled || document.hidden) return;
-    if (authoritativeMutations > 0) return;
+    if (!adminPollingEnabled || document.hidden || authoritativeMutations > 0) return;
     try {
       if (!serverVersion) {
         await hydrate();
@@ -336,11 +301,8 @@
         revision !== localRevision ||
         hasMutationBarrier()
       ) return;
-
       const remoteVersion = Number(payload.version || 0);
-      if (remoteVersion && remoteVersion !== serverVersion) {
-        await hydrate(true);
-      }
+      if (remoteVersion && remoteVersion !== serverVersion) await hydrate(true);
     } catch (error) {
       if (error.status !== 401) console.warn("Dart order live refresh failed", error);
     }
@@ -354,7 +316,6 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) check();
   });
-  // Lightweight version check only; stale reads can never overwrite an active mutation.
   window.setInterval(check, 3000);
 
   window.DartOrdersApi = {
@@ -373,5 +334,3 @@
     serverVersion: () => serverVersion,
   };
 })();
-
-// END MODULE
