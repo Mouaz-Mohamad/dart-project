@@ -73,11 +73,16 @@
   function loadProductButtonStateWhenNeeded() {
     const document = root.document;
     if (!document?.getElementById?.("SectionModel")) return;
+    if (root.DartProductButtonState?.sync) {
+      root.DartProductButtonState.sync();
+      return;
+    }
     if (document.querySelector?.('script[data-dart-product-button-state="1"]')) return;
     const script = document.createElement("script");
-    script.src = "/Js/dart-product-button-state.js";
+    script.src = "/Js/dart-product-button-state.js?v=20260924-single-action-v4";
     script.async = false;
     script.dataset.dartProductButtonState = "1";
+    script.addEventListener("load", () => root.DartProductButtonState?.sync?.(), { once: true });
     script.addEventListener("error", () => {
       console.error("Dart product button-state controller failed to load.");
     }, { once: true });
@@ -87,9 +92,6 @@
   function scheduleProductButtonState() {
     const document = root.document;
     if (!document) return;
-    // dart-state.js is the first deferred storefront script. Wait until
-    // DOMContentLoaded so dart-ui, dart-storefront and dart-platform are ready
-    // before the Buy/Waiting controller attaches its handlers.
     if (document.readyState === "loading" || document.readyState === "interactive") {
       document.addEventListener("DOMContentLoaded", loadProductButtonStateWhenNeeded, { once: true });
       return;
