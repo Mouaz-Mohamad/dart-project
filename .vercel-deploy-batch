@@ -1,5 +1,5 @@
-batch=8
-purpose=restore-navbar-and-buy-waiting-state
-frontend=ad1a226-navbar-assets-buy-waiting-toggle
+batch=7
+purpose=single-click-buy-and-waiting-reservation
+frontend=buy-adding-lock-waiting-reservation
 backend=unchanged
 trigger=production-deploy

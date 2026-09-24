@@ -1,174 +1,175 @@
 // DART CODE GUIDE | Js/dart-product-button-state.js
-// الغرض: تبديل Buy / Waiting فقط حسب توفر اللون والمقاس، بدون اعتراض منطق الشراء أو الحجز.
-// DART | MODULE: dart-product-button-state.js
+// Buy/Waiting modal actions: fast optimistic Buy, duplicate-click lock, real Waiting reservation.
 (function (root) {
   "use strict";
 
-  let rememberedSize = "";
-  let observer = null;
+  let rememberedSize = "", observer = null, purchaseBusy = false, waitingBusy = false, reservedKey = "";
+  const $ = id => root.document?.getElementById?.(id) || null;
+  const product = () => typeof activeProduct === "undefined" ? null : activeProduct;
+  const size = () => typeof selectedSize === "undefined" ? null : selectedSize;
+  const color = () => typeof selectedColor === "undefined" ? null : selectedColor;
+  const quantity = () => Math.max(1, Number(typeof modalQuantity === "undefined" ? 1 : modalQuantity) || 1);
+  const key = (p, s, c) => [p?.id || "", s || "", c || ""].join("::");
+  const waitEnabled = () => root.DartSiteSettings?.get?.().waiting?.enabled !== false;
+  const available = (p, s, c) => !p || !s || !c || typeof getAvailableStock !== "function"
+    ? 0 : Math.max(0, Number(getAvailableStock(p, s, c)) || 0);
+  const toast = message => { if (typeof showToast === "function") showToast(message); };
+  const status = (message, state = "") => {
+    if (typeof setProductOptionStatus === "function") setProductOptionStatus(message, state);
+  };
 
   function decide({ hasColor, hasSize, stock, waitingEnabled }) {
     const hasVariant = Boolean(hasColor && hasSize);
     const showWaiting = Boolean(waitingEnabled && hasVariant && Number(stock) <= 0);
-    return Object.freeze({
-      hasVariant,
-      showWaiting,
-      showBuy: !showWaiting,
-    });
-  }
-
-  function modal() {
-    return root.document?.getElementById?.("SectionModel") || null;
-  }
-
-  function activeValue(selector, key) {
-    const button = modal()?.querySelector?.(`${selector}.active`);
-    return String(button?.dataset?.[key] || "").trim();
-  }
-
-  function selectedColor() {
-    return activeValue(".color-btn", "color");
-  }
-
-  function selectedSize() {
-    return activeValue(".size-btn", "size");
-  }
-
-  function currentModelCode() {
-    return String(
-      modal()?.querySelector?.(".model-product-code")?.textContent || "",
-    ).trim();
-  }
-
-  function availableStock(size, color) {
-    if (!size || !color) return 0;
-    const code = currentModelCode();
-    const model = root.DartCatalog?.model?.(code);
-    if (!model) return 0;
-    return Math.max(
-      0,
-      Number(
-        root.DartCatalog?.available?.(
-          model,
-          size,
-          color,
-          root.DartPlatform?.cartReservationId || "",
-        ),
-      ) || 0,
-    );
-  }
-
-  function waitingEnabled() {
-    return root.DartSiteSettings?.get?.().waiting?.enabled !== false;
-  }
-
-  function styleWaitingButton(button) {
-    if (!button) return;
-    button.style.background = "#2563eb";
-    button.style.borderColor = "#2563eb";
-    button.style.color = "#ffffff";
+    return Object.freeze({ hasVariant, showWaiting, showBuy: !showWaiting });
   }
 
   function sync() {
-    const currentModal = modal();
-    if (!currentModal) return null;
+    const p = product(), s = size(), c = color(), hasVariant = Boolean(p && s && c);
+    const stock = hasVariant ? available(p, s, c) : 0;
+    const state = decide({ hasColor: Boolean(c), hasSize: Boolean(s), stock, waitingEnabled: waitEnabled() });
+    const buy = $("modalBuyBtn"), wait = $("modalWaitBtn"), reserved = state.showWaiting && key(p, s, c) === reservedKey;
 
-    const color = selectedColor();
-    const size = selectedSize();
-    const stock = color && size ? availableStock(size, color) : 0;
-    const state = decide({
-      hasColor: Boolean(color),
-      hasSize: Boolean(size),
-      stock,
-      waitingEnabled: waitingEnabled(),
-    });
-
-    const buyButton = currentModal.querySelector("#modalBuyBtn");
-    const waitingButton = currentModal.querySelector("#modalWaitBtn");
-
-    if (buyButton) {
-      buyButton.hidden = state.showWaiting;
+    if (buy) {
+      buy.hidden = state.showWaiting;
+      buy.disabled = purchaseBusy || !state.hasVariant || stock <= 0;
+      buy.textContent = purchaseBusy ? "Adding…" : "Buy";
+      purchaseBusy ? buy.setAttribute?.("aria-busy", "true") : buy.removeAttribute?.("aria-busy");
     }
-
-    if (waitingButton) {
-      waitingButton.hidden = !state.showWaiting;
-      styleWaitingButton(waitingButton);
-      if (state.showWaiting && !waitingButton.disabled) {
-        waitingButton.textContent = "Waiting";
-      }
+    if (wait) {
+      wait.hidden = !state.showWaiting;
+      wait.style.background = wait.style.borderColor = "#2563eb";
+      wait.style.color = "#fff";
+      wait.dataset.modelId = p?.id || "";
+      wait.dataset.size = s || "";
+      wait.dataset.color = c || "";
+      wait.disabled = waitingBusy || reserved;
+      wait.textContent = waitingBusy ? "Reserving…" : reserved ? "Reserved in Waiting" : "Waiting";
+      waitingBusy ? wait.setAttribute?.("aria-busy", "true") : wait.removeAttribute?.("aria-busy");
     }
-
-    return state;
+    const qtyRow = $("modalQtyControl")?.closest?.(".modal-qty-row");
+    if (qtyRow) qtyRow.hidden = state.showWaiting;
+    return { product: p, size: s, color: c, stock, ...state };
   }
 
-  function restoreRememberedSize() {
-    const currentModal = modal();
-    if (!currentModal || !rememberedSize || !selectedColor() || selectedSize()) {
-      return false;
-    }
-    const sizeButton = Array.from(
-      currentModal.querySelectorAll?.(".size-btn") || [],
-    ).find((button) => String(button.dataset?.size || "") === rememberedSize);
-    if (!sizeButton) return false;
-    sizeButton.click();
+  function restoreSize() {
+    const modal = $("SectionModel");
+    if (!modal || !rememberedSize || !modal.querySelector?.(".color-btn.active") || modal.querySelector?.(".size-btn.active")) return false;
+    const button = Array.from(modal.querySelectorAll?.(".size-btn") || [])
+      .find(node => String(node.dataset?.size || "") === rememberedSize);
+    if (!button) return false;
+    button.click();
     return true;
   }
+  const settle = () => root.queueMicrotask?.(() => { if (!restoreSize()) sync(); });
 
-  function settle() {
-    root.queueMicrotask?.(() => {
-      if (!restoreRememberedSize()) sync();
-    });
+  async function handleBuy() {
+    if (purchaseBusy) return false;
+    const state = sync(), { product: p, size: s, color: c, stock, hasVariant } = state;
+    if (!p || !hasVariant) {
+      const message = !s ? "Choose a size first." : "Choose a color first.";
+      status(message, "error"); toast(message); return false;
+    }
+    if (stock <= 0) { status("This option is unavailable. Use Waiting to reserve it.", "info"); sync(); return false; }
+    if (typeof cartData === "undefined" || !Array.isArray(cartData)) { toast("Cart is not ready yet. Please try again."); return false; }
+
+    const qty = quantity();
+    const existing = cartData.find(line => String(line.id) === String(p.id) && String(line.size) === String(s) && String(line.color) === String(c));
+    const total = Number(existing?.quantity || 0) + qty;
+    if (total > stock) {
+      status("Adjust the quantity using the quantity selector before buying.", "error");
+      toast("Adjust the quantity with the quantity selector.");
+      return false;
+    }
+
+    purchaseBusy = true;
+    const buy = $("modalBuyBtn");
+    if (buy) { buy.disabled = true; buy.textContent = "Adding…"; buy.setAttribute?.("aria-busy", "true"); }
+    try {
+      if (existing) existing.quantity = total;
+      else cartData.push({
+        id: p.id, title: p.title, price: p.price, size: s, color: c, quantity: qty,
+        image: root.DartCatalog?.cover?.(root.DartCatalog?.model?.(p.id), c) || p.images?.[0] || p.image || ""
+      });
+      if (typeof cacheFastCartSnapshot === "function") cacheFastCartSnapshot(cartData);
+      if (typeof renderCart === "function") renderCart();
+      if (typeof updateCartCount === "function") updateCartCount();
+      if (typeof persistCartReservation !== "function") throw new Error("Cart reservation service is unavailable.");
+      if (!await persistCartReservation()) { if (typeof renderCart === "function") renderCart(); return false; }
+      toast("تم إضافة المنتج إلى السلة بنجاح!");
+      if (typeof showCartBanner === "function") showCartBanner(p.title);
+      if (typeof closeProductModal === "function") closeProductModal();
+      if (typeof renderCart === "function") renderCart();
+      return true;
+    } catch (error) {
+      toast(error?.message || "تعذر حجز القطعة. حاول مرة أخرى.");
+      return false;
+    } finally {
+      purchaseBusy = false;
+      if ($("SectionModel")?.style?.display === "flex") sync();
+    }
   }
 
-  root.document?.addEventListener?.("click", (event) => {
+  async function handleWaiting() {
+    if (waitingBusy) return false;
+    const state = sync(), { product: p, size: s, color: c, stock, hasVariant, showWaiting } = state;
+    if (!p || !hasVariant) { toast("Choose the size and color you want first."); return false; }
+    if (stock > 0 || !showWaiting) { status("This option is available now. Use Buy instead.", "success"); sync(); return false; }
+    if (!root.DartPlatform?.currentUser?.()) {
+      root.sessionStorage?.setItem?.("dart_internal_navigation", "1");
+      const next = root.location?.pathname?.split("/").pop() || "products.html";
+      root.location?.assign?.(`Sign Up modern.html?next=${encodeURIComponent(next)}`);
+      return false;
+    }
+
+    waitingBusy = true; sync();
+    try {
+      await root.DartPlatform.joinWaiting(String(p.id), String(s), String(c));
+      reservedKey = key(p, s, c);
+      const message = `تم تسجيل حجز القطعة في Waiting: ${p.title} — المقاس: ${s} — اللون: ${c}.`;
+      status(message, "success"); toast(message); return true;
+    } catch (error) {
+      if (error?.code === "WAITING_ALREADY_EXISTS") {
+        reservedKey = key(p, s, c);
+        const message = `حجز ${p.title} — ${s} — ${c} موجود بالفعل في Waiting.`;
+        status(message, "info"); toast(message); return true;
+      }
+      if (error?.code === "STOCK_AVAILABLE") {
+        status("The item became available now. Use Buy instead.", "success");
+        toast("القطعة أصبحت متاحة الآن. استخدم Buy لإضافتها للسلة.");
+        root.DartStorefront?.refresh?.(); return false;
+      }
+      toast(error?.message || "تعذر تسجيل حجز Waiting."); return false;
+    } finally { waitingBusy = false; sync(); }
+  }
+
+  const stop = event => { event.preventDefault?.(); event.stopImmediatePropagation?.(); };
+  root.document?.addEventListener?.("click", event => {
     const target = event.target;
     if (!target?.closest) return;
-
-    if (target.closest(".product-card, .cart-btn")) {
-      rememberedSize = "";
-      settle();
-      return;
-    }
-
+    if (target.closest("#modalBuyBtn")) { stop(event); void handleBuy().catch(error => { console.error("Dart Buy action failed", error); purchaseBusy = false; sync(); }); return; }
+    if (target.closest("#modalWaitBtn")) { stop(event); void handleWaiting().catch(error => { console.error("Dart Waiting action failed", error); waitingBusy = false; sync(); }); return; }
+    if (target.closest(".product-card, .cart-btn")) { rememberedSize = ""; settle(); return; }
     const sizeButton = target.closest("#SectionModel .size-btn");
-    if (sizeButton) {
-      rememberedSize = String(sizeButton.dataset?.size || "");
-      settle();
-      return;
-    }
+    if (sizeButton) { rememberedSize = String(sizeButton.dataset?.size || ""); settle(); return; }
+    if (target.closest("#SectionModel .color-btn")) settle();
+  }, true);
 
-    if (target.closest("#SectionModel .color-btn")) {
-      settle();
-    }
-  });
-
-  function bindObserver() {
-    const currentModal = modal();
-    if (!currentModal || typeof root.MutationObserver !== "function" || observer) {
-      sync();
-      return;
-    }
+  function bind() {
+    const modal = $("SectionModel");
+    if (!modal || typeof root.MutationObserver !== "function" || observer) { sync(); return; }
     observer = new root.MutationObserver(() => {
-      if (currentModal.style?.display !== "flex") return;
-      if (!restoreRememberedSize()) sync();
+      if (modal.style?.display === "flex" && !restoreSize()) sync();
     });
-    observer.observe(currentModal, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class"],
-    });
+    observer.observe(modal, { subtree: true, attributes: true, attributeFilter: ["class", "style"] });
     sync();
   }
+  if (root.document?.readyState === "loading") root.document.addEventListener("DOMContentLoaded", bind, { once: true });
+  else bind();
+  ["dart:catalog-hydrated", "dart:data-changed", "dart:site-settings-changed"].forEach(name => root.addEventListener?.(name, settle));
 
-  if (root.document?.readyState === "loading") {
-    root.document.addEventListener("DOMContentLoaded", bindObserver, { once: true });
-  } else {
-    bindObserver();
-  }
-
-  ["dart:catalog-hydrated", "dart:data-changed", "dart:site-settings-changed"].forEach(
-    (eventName) => root.addEventListener?.(eventName, settle),
-  );
-
-  root.DartProductButtonState = Object.freeze({ decide, sync });
+  root.DartProductButtonState = Object.freeze({
+    decide, sync, handleBuy, handleWaiting,
+    __resetForTests() { rememberedSize = reservedKey = ""; purchaseBusy = waitingBusy = false; }
+  });
 })(typeof window !== "undefined" ? window : globalThis);

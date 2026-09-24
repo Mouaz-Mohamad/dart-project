@@ -69,6 +69,7 @@
       root.localStorage?.setItem(marker, "1");
     } catch {}
   }
+
   function loadProductButtonStateWhenNeeded() {
     const document = root.document;
     if (!document?.getElementById?.("SectionModel")) return;
@@ -82,10 +83,24 @@
     }, { once: true });
     document.head?.appendChild(script);
   }
+
+  function scheduleProductButtonState() {
+    const document = root.document;
+    if (!document) return;
+    // dart-state.js is the first deferred storefront script. Wait until
+    // DOMContentLoaded so dart-ui, dart-storefront and dart-platform are ready
+    // before the Buy/Waiting controller attaches its handlers.
+    if (document.readyState === "loading" || document.readyState === "interactive") {
+      document.addEventListener("DOMContentLoaded", loadProductButtonStateWhenNeeded, { once: true });
+      return;
+    }
+    loadProductButtonStateWhenNeeded();
+  }
+
   purgeLegacyBrowserBusinessData();
   purgeStaleNavbarFragment();
   root.DartState = Object.freeze({ read, write, clone });
-  loadProductButtonStateWhenNeeded();
+  scheduleProductButtonState();
 })(typeof window !== "undefined" ? window : globalThis);
 
 
