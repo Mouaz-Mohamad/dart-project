@@ -1775,7 +1775,7 @@ section{
 .dart-waiting-action-danger{color:#3cffe8!important}
 .dart-waiting-priority{font-weight:800;color:#8c1d2c}
 .dart-waiting-empty{padding:35px;text-align:center;color:#64748b}
-.dart-waiting-dialog{ width:min(760px,92vw); max-height:82vh; border:0; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(15,23,42,.28); position: fixed; top: 50%; left: 50%; transform: translet(-50%,-50); -webkit-transform: translet(-50%,-50); -moz-transform: translet(-50%,-50); -ms-transform: translet(-50%,-50); -o-transform: translet(-50%,-50); }
+.dart-waiting-dialog{ width:min(760px,92vw); max-height:82vh; border:0; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(15,23,42,.28); position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); }
 .dart-waiting-dialog::backdrop{background:rgba(15,23,42,.55)}
 .dart-waiting-dialog-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid #e5e7eb}
 .dart-waiting-dialog-body{padding:18px;max-height:65vh;overflow:auto}
