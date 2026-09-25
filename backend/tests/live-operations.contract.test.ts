@@ -14,6 +14,11 @@ const migration = readFileSync(
   "utf8",
 );
 
+const dashboardLiveMap = readFileSync(
+  new URL("../../Eye/dart-live-operations.js", import.meta.url),
+  "utf8",
+);
+
 describe("live operations contracts", () => {
   it("enforces one current delivery stop per representative", () => {
     expect(migration).toContain("delivery_route_one_current_per_representative");
@@ -61,4 +66,10 @@ describe("live operations contracts", () => {
     expect(service).toContain("LIVE_ROUTE_STATE_CHANGED");
     expect(service).toContain("LIVE_ROUTE_REORDERED");
   });
+  it("uses the authenticated dashboard API client for live operations", () => {
+    expect(dashboardLiveMap).toContain("window.DartAdminApi.request");
+    expect(dashboardLiveMap).not.toContain("window.DartApi.request");
+    expect(dashboardLiveMap).toContain('api("/api/v1/admin/live-operations")');
+  });
+
 });
