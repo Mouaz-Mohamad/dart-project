@@ -17,6 +17,7 @@
     cancelled: "#ea580c",
     refused: "#ea580c",
   });
+  const ROUTABLE_STATES = new Set(["current", "upcoming", "waiting", "problem"]);
   const FILTER_GROUP = Object.freeze({
     current: "current",
     upcoming: "upcoming",
@@ -54,6 +55,7 @@
   let selectedRepresentativeId = "";
   let representativeFilterId = "";
   let selectedOrderId = "";
+  let panelOpen = false;
   let manualView = false;
   let repMarkers = new Map();
   let orderMarkers = new Map();
@@ -223,6 +225,7 @@
 
   function routeCoordinates(rep) {
     const stops = (rep.orders || [])
+      .filter((order) => ROUTABLE_STATES.has(String(order.routeState || "")))
       .filter((order) => filterEnabled(order.routeState))
       .filter((order) => orderCoordinates(order))
       .sort((a, b) => {
@@ -232,17 +235,18 @@
         const bv = Number(b.sequenceNumber || b.suggestedSequence || 9999);
         return av - bv;
       });
+    const coordinates = stops.map((stop) => orderCoordinates(stop));
     const hasRepresentativeLocation =
       rep.location &&
       Number.isFinite(Number(rep.location.lat)) &&
       Number.isFinite(Number(rep.location.lng));
-    if (!hasRepresentativeLocation) return { stops, coordinates: [] };
-    const coordinates = [[Number(rep.location.lat), Number(rep.location.lng)]];
-    for (const stop of stops) coordinates.push(orderCoordinates(stop));
-    return { stops, coordinates };
+    if (hasRepresentativeLocation) {
+      coordinates.unshift([Number(rep.location.lat), Number(rep.location.lng)]);
+    }
+    return { stops, coordinates, hasRepresentativeLocation };
   }
 
-  async function roadLegGeometries(rep, coordinates) {
+  async function roadRouteGeometry(rep, coordinates) {
     if (!coordinates || coordinates.length < 2) return null;
     const signature = coordinates
       .slice(0, 20)
@@ -250,8 +254,8 @@
       .join(";");
     const now = Date.now();
     const cached = routeFetchState.get(rep.id);
-    if (cached && now - cached.at < ROUTE_REFRESH_MS) {
-      return cached.legs;
+    if (cached && cached.signature === signature && now - cached.at < ROUTE_REFRESH_MS) {
+      return cached.geometry;
     }
     const points = coordinates
       .slice(0, 20)
@@ -262,31 +266,26 @@
       const controller = new AbortController();
       timeout = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${points}?overview=false&geometries=geojson&steps=true`,
+        `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false&continue_straight=true`,
         { signal: controller.signal },
       );
       if (!response.ok) throw new Error("Routing provider unavailable");
       const payload = await response.json();
-      const route = payload.routes?.[0];
-      const legs = Array.isArray(route?.legs)
-        ? route.legs.map((leg) => {
-            const geometry = [];
-            for (const step of leg.steps || []) {
-              for (const point of step.geometry?.coordinates || []) {
-                const lng = Number(point?.[0]);
-                const lat = Number(point?.[1]);
-                if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-                const previous = geometry.at(-1);
-                if (!previous || previous[0] !== lat || previous[1] !== lng) geometry.push([lat, lng]);
-              }
-            }
-            return geometry.length >= 2 ? geometry : null;
-          })
+      const coordinatesPayload = payload.routes?.[0]?.geometry?.coordinates;
+      const geometry = Array.isArray(coordinatesPayload)
+        ? coordinatesPayload
+            .map((point) => [Number(point?.[1]), Number(point?.[0])])
+            .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
         : null;
-      routeFetchState.set(rep.id, { at: now, signature, legs });
-      return legs;
+      if (!geometry || geometry.length < 2) throw new Error("Routing geometry unavailable");
+      routeFetchState.set(rep.id, { at: now, signature, geometry });
+      return geometry;
     } catch {
-      routeFetchState.set(rep.id, { at: now, signature, legs: null });
+      if (cached?.geometry) {
+        routeFetchState.set(rep.id, { ...cached, at: now });
+        return cached.geometry;
+      }
+      routeFetchState.set(rep.id, { at: now, signature, geometry: null });
       return null;
     } finally {
       if (timeout) clearTimeout(timeout);
@@ -298,28 +297,27 @@
     const desiredKeys = new Set();
     for (const rep of snapshot.representatives || []) {
       if (!visibleRep(rep)) continue;
-      const { stops, coordinates } = routeCoordinates(rep);
-      for (const target of stops) desiredKeys.add(`${rep.id}:${target.orderId}`);
+      const { coordinates } = routeCoordinates(rep);
       if (coordinates.length < 2) continue;
-      const legs = await roadLegGeometries(rep, coordinates);
-      if (!Array.isArray(legs)) continue;
-      for (let index = 0; index < Math.min(legs.length, stops.length); index += 1) {
-        const geometry = legs[index];
-        const target = stops[index];
-        if (!target || !Array.isArray(geometry) || geometry.length < 2) continue;
-        const key = `${rep.id}:${target.orderId}`;
-        const style = {
-          color: COLORS[target.routeState] || COLORS.upcoming,
-          weight: target.routeState === "current" ? 6 : 4,
-          opacity: target.routeState === "delivered" ? .55 : .82,
-        };
-        const existing = routeLayers.get(key);
-        if (existing) {
-          existing.setLatLngs(geometry);
-          existing.setStyle?.(style);
-        } else {
-          routeLayers.set(key, window.L.polyline(geometry, style).addTo(map));
-        }
+      const key = String(rep.id);
+      desiredKeys.add(key);
+      const geometry = await roadRouteGeometry(rep, coordinates);
+      if (!Array.isArray(geometry) || geometry.length < 2) continue;
+      const style = {
+        color: "#AB012B",
+        weight: 5,
+        opacity: .78,
+        lineCap: "round",
+        lineJoin: "round",
+      };
+      const existing = routeLayers.get(key);
+      if (existing) {
+        existing.setLatLngs(geometry);
+        existing.setStyle?.(style);
+      } else {
+        const layer = window.L.polyline(geometry, style).addTo(map);
+        layer.bringToBack?.();
+        routeLayers.set(key, layer);
       }
     }
     for (const [key, layer] of routeLayers) {
@@ -462,7 +460,7 @@
   }
 
   function renderRepresentativePanel(rep) {
-    if (!nodes.panel || !nodes.panelBody) return;
+    if (!nodes.panel || !nodes.panelBody || !panelOpen) return;
     const counts = repCounts(rep);
     const last = rep.lastLocationAt ? new Date(rep.lastLocationAt).toLocaleString() : "No location received";
     nodes.panelBody.innerHTML = `
@@ -485,7 +483,7 @@
   }
 
   function renderOrderPanel(rep, order) {
-    if (!nodes.panel || !nodes.panelBody) return;
+    if (!nodes.panel || !nodes.panelBody || !panelOpen) return;
     nodes.panelBody.innerHTML = `
       <div class="dart-live-panel-head"><div><small>${esc(rep.name)}</small><h2>Order #${esc(order.orderId)}</h2></div><button type="button" class="dart-live-panel-close" data-live-close><i class="fa-solid fa-xmark"></i></button></div>
       <div class="dart-live-panel-grid">
@@ -510,6 +508,7 @@
   }
 
   function selectRepresentative(id, focus = false, preserveFilter = false) {
+    panelOpen = true;
     if (!preserveFilter) {
       representativeFilterId = "";
       if (nodes.repSelect) nodes.repSelect.value = "";
@@ -529,6 +528,7 @@
   }
 
   function selectOrder(repId, orderId) {
+    panelOpen = true;
     representativeFilterId = "";
     if (nodes.repSelect) nodes.repSelect.value = "";
     selectedRepresentativeId = String(repId || "");
@@ -553,18 +553,31 @@
     if (rep && order) renderOrderPanel(rep, order);
   }
 
-  function routeOrderFromPanel() {
+  function activeRouteOrders(rep) {
+    return (rep?.orders || []).filter((order) => ROUTABLE_STATES.has(String(order.routeState || "")));
+  }
+
+  function routeOrderFromPanel(rep) {
+    const activeCodes = new Set(activeRouteOrders(rep).map((order) => String(order.orderId)));
     return [...(nodes.panelBody?.querySelectorAll("[data-route-order]") || [])]
-      .map((node) => node.getAttribute("data-route-order"))
-      .filter(Boolean);
+      .map((node) => String(node.getAttribute("data-route-order") || ""))
+      .filter((code) => activeCodes.has(code));
   }
 
   async function saveRouteOrder(rep, orderCodes) {
-    if (!rep || !canManage() || !orderCodes.length) return;
+    if (!rep) throw new Error("Representative route is unavailable.");
+    if (!canManage()) throw new Error("You do not have permission to manage routes.");
+    const activeCodes = activeRouteOrders(rep).map((order) => String(order.orderId));
+    if (!activeCodes.length) throw new Error("There are no active assigned orders to reorder.");
+    if (orderCodes.length !== activeCodes.length || new Set(orderCodes).size !== activeCodes.length) {
+      throw new Error("Route order must include every active assigned order exactly once.");
+    }
     snapshot = await api(
       `/api/v1/admin/live-operations/representatives/${encodeURIComponent(rep.id)}/reorder`,
       { method: "POST", body: { orderCodes } },
     );
+    routeFetchState.delete(rep.id);
+    setConnection("online", "Route order saved");
     renderAll(false);
     const fresh = (snapshot.representatives || []).find((row) => String(row.id) === String(rep.id));
     if (fresh) renderRepresentativePanel(fresh);
@@ -592,11 +605,11 @@
       snapshot = incoming || { capturedAt: null, totals: {}, representatives: [] };
       setConnection("online", `Live · every 3s · ${new Date(snapshot.capturedAt || Date.now()).toLocaleTimeString()}`);
       renderAll(!snapshot.capturedAt || !manualView);
-      if (selectedOrderId) {
+      if (panelOpen && selectedOrderId) {
         const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);
         const order = rep?.orders?.find((row) => String(row.orderId) === selectedOrderId);
         if (rep && order) renderOrderPanel(rep, order);
-      } else if (selectedRepresentativeId) {
+      } else if (panelOpen && selectedRepresentativeId) {
         const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);
         if (rep) renderRepresentativePanel(rep);
       }
@@ -627,6 +640,7 @@
       if (representativeFilterId) selectRepresentative(representativeFilterId, true, true);
       else {
         selectedRepresentativeId = "";
+        panelOpen = false;
         if (nodes.panel) nodes.panel.hidden = true;
         manualView = false;
         renderRepresentativeList();
@@ -648,6 +662,7 @@
     nodes.panel?.addEventListener("click", async (event) => {
       const close = event.target.closest("[data-live-close]");
       if (close) {
+        panelOpen = false;
         nodes.panel.hidden = true;
         selectedOrderId = "";
         return;
@@ -689,7 +704,7 @@
       const save = event.target.closest("[data-route-save]");
       if (save) {
         const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);
-        try { await saveRouteOrder(rep, routeOrderFromPanel()); }
+        try { await saveRouteOrder(rep, routeOrderFromPanel(rep)); }
         catch (error) { alert(error.message || "Route could not be saved."); }
         return;
       }
@@ -697,10 +712,13 @@
       if (suggested) {
         const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);
         if (!rep) return;
-        const active = (rep.orders || [])
-          .filter((order) => ["current","upcoming","waiting","problem"].includes(order.routeState))
-          .sort((a,b) => Number(a.suggestedSequence || 9999) - Number(b.suggestedSequence || 9999))
-          .map((order) => order.orderId);
+        const active = activeRouteOrders(rep)
+          .sort((a, b) => {
+            if (a.routeState === "current" && b.routeState !== "current") return -1;
+            if (b.routeState === "current" && a.routeState !== "current") return 1;
+            return Number(a.suggestedSequence || 9999) - Number(b.suggestedSequence || 9999);
+          })
+          .map((order) => String(order.orderId));
         try { await saveRouteOrder(rep, active); }
         catch (error) { alert(error.message || "Suggested route could not be saved."); }
       }
