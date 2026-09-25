@@ -3786,7 +3786,7 @@ function renderOrders(dataArray) {
   orderedRows.forEach((o) => {
     const meta = groupMeta.get(String(o.id));
     if (meta?.records.length > 1 && meta.index === 0)
-      dartAppendOperationGroupHeading(c, "Delivery", meta.records.length, "orders", o, "Each order and item remains independent.");
+      dartAppendOperationGroupHeading(c, "Delivery", meta.records.length, "orders", o, "Each order and item remains independent.", meta.key);
     const next = dartNextStatus(o.status),
       net = dartOrderNet(o),
       verificationStatus = String(
@@ -3853,10 +3853,15 @@ function renderOrders(dataArray) {
   updateOrderCards();
 }
 
-function dartAppendOperationGroupHeading(container, type, count, noun, record, note) {
+function dartAppendOperationGroupHeading(container, type, count, noun, record, note, groupKey = "") {
   const template = document.getElementById("dashboard-operation-group-template");
   if (!template) return;
   const fragment = template.content.cloneNode(true);
+  const heading = fragment.querySelector("[data-operation-group-heading]");
+  if (heading) {
+    heading.dataset.operationGroupCount = String(count);
+    if (groupKey) heading.dataset.operationGroupKey = String(groupKey);
+  }
   fragment.querySelector('[data-operation-group-field="title"]').textContent = `${type} group · ${count} ${noun}`;
   fragment.querySelector('[data-operation-group-field="route"]').textContent = `${record.clientName || record.clientId || "Customer"} · ${[record.street, record.area, record.governorate].filter(Boolean).join("، ")}`;
   fragment.querySelector('[data-operation-group-field="note"]').textContent = note;
@@ -3882,7 +3887,7 @@ function renderReturns(dataArray) {
   orderedRows.forEach((r) => {
       const meta = groupMeta.get(String(r.id));
       if (meta?.records.length > 1 && meta.index === 0) {
-        dartAppendOperationGroupHeading(c, "Pickup", meta.records.length, "requests", r, "Each return and physical item remains independent.");
+        dartAppendOperationGroupHeading(c, "Pickup", meta.records.length, "requests", r, "Each return and physical item remains independent.", meta.key);
       }
       const fragment = template.content.cloneNode(true);
       const row = fragment.querySelector("[data-return-row]");

@@ -4,6 +4,7 @@
   "use strict";
 
   const GROUP = "[data-operation-group-heading]";
+  const expandedGroups = new Set();
 
   function normalizeNewOrderActions() {
     document.querySelectorAll('[data-order-target="Accepted"]').forEach((accept) => {
@@ -23,30 +24,52 @@
   }
 
   function groupCount(heading) {
+    const declared = Number(heading.dataset.operationGroupCount || 0);
+    if (declared > 0) return declared;
     const title = heading.querySelector('[data-operation-group-field="title"]')?.textContent || "";
     const match = title.match(/group\s*[·:-]?\s*(\d+)/i) || title.match(/(\d+)\s+orders?/i);
     return Math.max(0, Number(match?.[1] || 0));
+  }
+
+  function groupKey(heading) {
+    const declared = String(heading.dataset.operationGroupKey || "").trim();
+    if (declared) return declared;
+    const title = heading.querySelector('[data-operation-group-field="title"]')?.textContent || "group";
+    const route = heading.querySelector('[data-operation-group-field="route"]')?.textContent || "";
+    return `${title.replace(/\d+/g, "#")}|${route}`;
   }
 
   function groupRows(heading) {
     const count = groupCount(heading);
     const rows = [];
     let node = heading.nextElementSibling;
-    while (node && rows.length < count) {
+    while (node && (!count || rows.length < count)) {
       if (node.matches?.(GROUP)) break;
-      rows.push(node);
+      if (node.matches?.(".model-row,[data-return-row]")) rows.push(node);
       node = node.nextElementSibling;
     }
     return rows;
   }
 
-  function applyState(heading, expanded) {
+  function applyState(heading, expanded, remember = true) {
+    const key = groupKey(heading);
+    if (remember) {
+      if (expanded) expandedGroups.add(key);
+      else expandedGroups.delete(key);
+    }
     heading.dataset.dartGroupExpanded = expanded ? "1" : "0";
     heading.setAttribute("aria-expanded", String(expanded));
-    groupRows(heading).forEach((row) => {
+    const rows = groupRows(heading);
+    rows.forEach((row) => {
       row.hidden = !expanded;
       row.dataset.dartGroupedOrderChild = "1";
+      row.dataset.dartOperationGroupKey = key;
     });
+    if (!rows.length && groupCount(heading) && heading.isConnected) {
+      root.requestAnimationFrame?.(() => {
+        if (heading.isConnected) applyState(heading, expanded, false);
+      });
+    }
     const note = heading.querySelector('[data-operation-group-field="note"]');
     if (!note) return;
     const base = note.dataset.dartBaseNote || note.textContent || "";
@@ -55,7 +78,12 @@
   }
 
   function enhanceHeading(heading) {
-    if (!heading || heading.dataset.dartGroupToggleBound === "1" || !groupCount(heading)) return;
+    if (!heading || !groupCount(heading)) return;
+    const expanded = expandedGroups.has(groupKey(heading));
+    if (heading.dataset.dartGroupToggleBound === "1") {
+      applyState(heading, expanded, false);
+      return;
+    }
     heading.dataset.dartGroupToggleBound = "1";
     heading.setAttribute("role", "button");
     heading.setAttribute("tabindex", "0");
@@ -68,7 +96,7 @@
       event.preventDefault();
       toggle();
     });
-    applyState(heading, false);
+    applyState(heading, expanded, false);
   }
 
   function enhanceAll() {
