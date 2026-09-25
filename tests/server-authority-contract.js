@@ -273,7 +273,7 @@ assert.match(
   "storefront visits and funnel events must be sent to the server analytics API",
 );
 assert.match(
-  platformRuntime,
+  storefrontRuntime,
   /trackCartIncrease\?\.\(previous, cartData\)/,
   "successful cart mutations must emit detailed add-to-cart analytics",
 );
