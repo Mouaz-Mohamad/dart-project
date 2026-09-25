@@ -2707,7 +2707,7 @@ export class CommerceService {
         `SELECT id::text, order_code
            FROM orders
           WHERE representative_user_id=$1
-            AND status IN ('Out With Representative','Representative On The Way')
+            AND status NOT IN ('Delivered','Cancelled','Refused','Returned')
             AND NOT is_deleted
             AND NOT is_archived
           FOR UPDATE`,
