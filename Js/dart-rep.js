@@ -674,12 +674,14 @@
       const courierLat = Number(courier?.lat);
       const courierLng = Number(courier?.lng);
       const map = window.L.map(element, {
-        attributionControl: false,
+        attributionControl: true,
         zoomControl: false,
       }).setView([destinationLat, destinationLng], 15);
+      map.attributionControl?.setPrefix(false);
       window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
         subdomains: "abcd",
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
       }).addTo(map);
       const destinationMarker = window.L.marker([destinationLat, destinationLng])
         .addTo(map)

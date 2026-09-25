@@ -47,4 +47,12 @@ assert(address.isSupportedDeliveryResult({lat:'28.3500', lon:'28.9000', address:
 assert(!address.isSupportedDeliveryResult({lat:'29.3000', lon:'30.8500', address:{state:'Faiyum Governorate'}}), 'A third governorate inside the broad map envelope must still be rejected');
 assert(!address.isSupportedDeliveryResult({lat:'31.2000', lon:'29.9187', address:{state:'Alexandria Governorate'}}), 'A result outside the delivery zone must be rejected');
 
+assert(address.addressParts({address:{state:'Cairo Governorate',road:'Example',house_number:'48'}}).building === '48', 'reverse geocoding must prefer the provider house number');
+assert(address.addressParts({category:'building',type:'apartments',name:'Tower A',address:{state:'Cairo Governorate',road:'Example'}}).building === 'Tower A', 'building-like provider names may fill the building field when no house number exists');
+assert(address.addressParts({category:'highway',type:'residential',name:'Example Street',address:{state:'Cairo Governorate',road:'Example Street'}}).building === '', 'street names must never be invented as building numbers');
+const addressSource = fs.readFileSync('Js/dart-address.js', 'utf8');
+assert(addressSource.includes("namedetails: '1'"), 'reverse lookup should request provider naming details for building fallback');
+assert(addressSource.includes('zoomControl: false'), 'address maps must not expose Leaflet zoom buttons');
+assert(addressSource.includes('setPrefix(false)'), 'address maps must remove Leaflet framework branding while provider attribution remains');
+
 console.log('PASS Cairo and Giza delivery-zone unit tests');

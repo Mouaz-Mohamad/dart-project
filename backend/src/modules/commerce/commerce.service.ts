@@ -4657,10 +4657,14 @@ export class CommerceService {
           }
           if (
             replacement.model_id !== originalItem.model_id ||
-            replacement.color !== originalItem.color ||
-            replacement.size !== originalItem.size
+            (record.requestedColor && replacement.color !== String(record.requestedColor)) ||
+            (record.requestedSize && replacement.size !== String(record.requestedSize))
           ) {
-            throw new AppError(409, "EXCHANGE_VARIANT_MISMATCH", "Replacement must match the original model, color and size");
+            throw new AppError(
+              409,
+              "EXCHANGE_VARIANT_MISMATCH",
+              "Replacement must use the original model and the color/size selected for this exchange",
+            );
           }
 
           await client.query(

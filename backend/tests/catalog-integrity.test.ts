@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 // DART CODE GUIDE | backend/tests/catalog-integrity.test.ts
 // الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
 import { describe, expect, it } from "vitest";
@@ -33,6 +34,8 @@ function expectCode(run: () => void, code: string): void {
     expect((error as AppError).code).toBe(code);
   }
 }
+
+const serviceSource = readFileSync(new URL("../src/modules/catalog/catalog.service.ts", import.meta.url), "utf8");
 
 describe("catalog replacement integrity", () => {
   it("accepts one valid model and physical item", () => {
@@ -74,4 +77,16 @@ describe("catalog replacement integrity", () => {
       "ITEM_VARIANT_INVALID",
     );
   });
+
+  it("hydrates sold item customer details in one joined catalogue query", () => {
+    expect(serviceSource).toContain("LEFT JOIN orders o ON o.order_code=i.order_id");
+    expect(serviceSource).toContain("LEFT JOIN customers c ON c.user_id=o.customer_user_id");
+    expect(serviceSource).toContain("AS client_name");
+    expect(serviceSource).toContain("clientName: row.client_name || undefined");
+    expect(serviceSource).toContain("clientId: row.client_code || undefined");
+    expect(serviceSource).toContain("phone1: row.phone1 || undefined");
+    expect(serviceSource).toContain("phone2: row.phone2 || undefined");
+    expect(serviceSource).toContain("email: row.email || undefined");
+  });
+
 });

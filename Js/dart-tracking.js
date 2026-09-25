@@ -427,11 +427,12 @@
 
     const map = L.map(container, {
       zoomControl: false,
-      attributionControl: false,
+      attributionControl: true,
     }).setView([destination.lat, destination.lng], 15);
+    map.attributionControl?.setPrefix(false);
     L.tileLayer(
       "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      { maxZoom: 19, subdomains: "abcd" },
+      { maxZoom: 19, subdomains: "abcd", attribution: "&copy; OpenStreetMap contributors &copy; CARTO" },
     ).addTo(map);
 
     const state = {

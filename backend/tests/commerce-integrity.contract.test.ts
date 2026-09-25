@@ -161,4 +161,13 @@ describe("commerce concurrency and representative safety contracts", () => {
     );
     expect(customerInteractions).toContain("readRelationalDashboardDomain(client, domain)");
   });
+
+  it("allows exchange color and size changes inside the original model", () => {
+    expect(service).not.toContain("Replacement must match the original model, color and size");
+    expect(service).toContain("replacement.model_id !== originalItem.model_id");
+    expect(service).toContain("record.requestedColor && replacement.color !== String(record.requestedColor)");
+    expect(service).toContain("record.requestedSize && replacement.size !== String(record.requestedSize)");
+    expect(service).toContain("original model and the color/size selected for this exchange");
+  });
+
 });

@@ -48,6 +48,11 @@ interface AdminInventoryItemRow {
   order_id: string | null;
   purchase_date: Date | string | null;
   cost_snapshot_minor: string | number;
+  client_name: string | null;
+  client_code: string | null;
+  phone1: string | null;
+  phone2: string | null;
+  email: string | null;
   legacy: Record<string, unknown>;
   version: string | number;
   created_at: Date | string;
@@ -439,10 +444,18 @@ export class CatalogService {
            FROM catalog_models ORDER BY created_at DESC`,
       );
       const items = await client.query<AdminInventoryItemRow>(
-        `SELECT id, item_code, model_id, color, size, status, active, is_archived, is_deleted,
-                cart_reservation_id, reservation_until, order_id, purchase_date,
-                cost_snapshot_minor, legacy, version, created_at, updated_at
-           FROM inventory_items ORDER BY created_at DESC`,
+        `SELECT i.id, i.item_code, i.model_id, i.color, i.size, i.status, i.active, i.is_archived, i.is_deleted,
+                i.cart_reservation_id, i.reservation_until, i.order_id, i.purchase_date,
+                i.cost_snapshot_minor, i.legacy, i.version, i.created_at, i.updated_at,
+                COALESCE(NULLIF(o.contact_snapshot->>'name',''), c.full_name) AS client_name,
+                c.client_code,
+                NULLIF(o.contact_snapshot->>'phone1','') AS phone1,
+                NULLIF(o.contact_snapshot->>'phone2','') AS phone2,
+                NULLIF(o.contact_snapshot->>'email','') AS email
+           FROM inventory_items i
+           LEFT JOIN orders o ON o.order_code=i.order_id
+           LEFT JOIN customers c ON c.user_id=o.customer_user_id
+          ORDER BY i.created_at DESC`,
       );
       const state = {
         version: Number(versionResult.rows[0]?.version || 1),
@@ -480,6 +493,11 @@ export class CatalogService {
           cartReservationId: row.cart_reservation_id || undefined,
           reservationUntil: row.reservation_until || undefined,
           orderId: row.order_id || undefined,
+          clientName: row.client_name || undefined,
+          clientId: row.client_code || undefined,
+          phone1: row.phone1 || undefined,
+          phone2: row.phone2 || undefined,
+          email: row.email || undefined,
           purchaseDate: row.purchase_date || undefined,
           costSnapshot: money(row.cost_snapshot_minor),
           version: Number(row.version),

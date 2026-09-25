@@ -142,10 +142,11 @@
   function ensureMap() {
     if (map || !nodes.map || typeof window.L === "undefined") return map;
     map = window.L.map(nodes.map, {
-      zoomControl: true,
+      zoomControl: false,
       attributionControl: true,
       preferCanvas: true,
     }).setView([30.0444, 31.2357], 11);
+    map.attributionControl?.setPrefix(false);
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap contributors",

@@ -1319,16 +1319,18 @@ function initAddressMap() {
 
         // Keep navigation around the two launch governorates.
         const map = L.map('map', { 
-            attributionControl: false,
+            attributionControl: true,
             zoomControl: false,
             maxBounds: CAIRO_GIZA_BOUNDS,
             maxBoundsViscosity: 1
         }).setView([30.0444, 31.2357], 11);
         
         window.orderMap = map;
+        map.attributionControl?.setPrefix(false);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
         }).addTo(map);
 
         setTimeout(() => map.invalidateSize(), 300);

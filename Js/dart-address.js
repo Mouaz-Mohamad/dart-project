@@ -44,6 +44,17 @@
     return response.json();
   }
 
+  function providerBuilding(result) {
+    const a = result?.address || {};
+    const direct = a.house_number || a.building || a.house_name || '';
+    if (String(direct).trim()) return String(direct).trim();
+    const category = String(result?.category || result?.class || '').trim().toLowerCase();
+    const type = String(result?.type || '').trim().toLowerCase();
+    const name = String(result?.name || '').trim();
+    const buildingLike = category === 'building' || ['house', 'apartments', 'commercial', 'office'].includes(type);
+    return buildingLike ? name : '';
+  }
+
   function addressParts(result) {
     const a = result?.address || {};
     const rawGovernorate = a.state || a.governorate || a.region || '';
@@ -52,7 +63,7 @@
       governorate: canonicalDeliveryGovernorate(rawGovernorate) || rawGovernorate,
       area: a.suburb || a.neighbourhood || a.city_district || a.town || a.village || a.city || a.county || '',
       street: a.road || a.pedestrian || a.residential || a.footway || '',
-      building: a.house_number || a.building || '',
+      building: providerBuilding(result),
       fullAddress: result?.display_name || ''
     };
   }
@@ -111,15 +122,17 @@
     };
 
     const map = L.map(mapElement, {
-      attributionControl: false,
+      attributionControl: true,
       zoomControl: false,
       maxBounds: DELIVERY_BOUNDS,
       maxBoundsViscosity: 1
     }).setView(DEFAULT_CENTER, 11);
 
+    map.attributionControl?.setPrefix(false);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
-      subdomains: 'abcd'
+      subdomains: 'abcd',
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
     }).addTo(map);
 
     const pin = L.divIcon({
@@ -185,7 +198,7 @@
       const version = ++requestVersion;
       status('Checking that this delivery location is inside Cairo or Giza…', 'loading');
       try {
-        const result = knownResult || await nominatim('reverse', { lat, lon: lng, zoom: '18' });
+        const result = knownResult || await nominatim('reverse', { lat, lon: lng, zoom: '18', namedetails: '1', extratags: '1' });
         if (version !== requestVersion) return;
         if (!isSupportedDeliveryResult(result)) {
           clearCoordinates();

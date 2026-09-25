@@ -45,6 +45,7 @@ localStorage.setItem('dart_returns', JSON.stringify([
 const trackingSource = fs.readFileSync('Js/dart-tracking.js','utf8');
 const representativeSource = fs.readFileSync('Js/dart-rep.js','utf8');
 const liveOperationsSource = fs.readFileSync('Eye/dart-live-operations.js','utf8');
+const mainCss = fs.readFileSync('CSS/main.css','utf8');
 vm.runInContext(trackingSource, context, {filename:'Js/dart-tracking.js'});
 assert(window.DartTracking.currentOrder().orderId === 'K-2', 'Tracking should use the signed-in customer latest order when no query is present');
 sessionStorage.setItem('dart_last_order_id','K-1');
@@ -70,4 +71,9 @@ assert(trackingSource.includes('function activeTrackingRecord(records = [])'), '
 assert(trackingSource.includes('router.project-osrm.org/route/v1/driving'), 'Customer live tracking must request a road-aware route while delivery is active');
 assert(liveOperationsSource.includes('let representativeFilterId = \"\";'), 'Live Operations must keep explicit filtering separate from focused representative state');
 assert(liveOperationsSource.includes('return !representativeFilterId || String(rep.id) === representativeFilterId;'), 'Focusing a representative must not hide other active representatives unless an explicit filter is applied');
+assert(liveOperationsSource.includes('zoomControl: false'), 'Live Operations map must disable Leaflet zoom controls at construction time');
+assert(liveOperationsSource.includes('setPrefix(false)'), 'Live Operations must remove Leaflet framework branding while keeping provider attribution');
+assert(mainCss.includes('.order-tracking-list .tracking-card { width:min(760px,100%); color:#000; }'), 'tracking cards must force readable black text');
+assert(mainCss.includes('.dart-tracked-order-unit { display:grid; gap:7px; padding:4px 0; background:transparent; }'), 'grouped tracked-order units must override the global section background');
+assert(!mainCss.includes('.leaflet-control-attribution {\n    display: none !important;'), 'required tile-provider attribution must not be globally hidden');
 console.log('PASS tracking order-resolution unit tests');

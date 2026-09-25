@@ -700,6 +700,9 @@
     if (apiUserCache)
       sessionStorage.setItem(API_USER_CACHE_KEY, JSON.stringify(apiUserCache));
     else sessionStorage.removeItem(API_USER_CACHE_KEY);
+    window.dispatchEvent?.(
+      new CustomEvent("dart:customer-session-changed", { detail: { user: apiUserCache } }),
+    );
     return apiUserCache;
   }
 
@@ -2039,13 +2042,82 @@
   let publicLeaderboardLoading = false;
   let publicLeaderboardFailed = false;
 
+  function localLeaderboardDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    const text = String(value).trim();
+    const dayFirst = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (dayFirst) return new Date(Number(dayFirst[3]), Number(dayFirst[2]) - 1, Number(dayFirst[1]), 12);
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function localLeaderboardRows() {
+    const cairo = cairoParts();
+    const cards = read(KEYS.cards, []);
+    const blocked = new Set(
+      cards
+        .filter((card) => {
+          if (String(card.status || "").toLowerCase() !== "active" || card.isArchived || card.isDeleted) return false;
+          const limit = Number(card.itemLimit || card.purchasedLimit || 10);
+          const used = Number(card.purchasedItems || 0);
+          const expiry = dartCardExpiry(card.expDate);
+          return used < limit && (!expiry || expiry >= new Date());
+        })
+        .map((card) => String(card.clientId || card.customerId || ""))
+        .filter(Boolean),
+    );
+    const refundedItems = new Set(
+      read(KEYS.returns, [])
+        .filter((record) => {
+          const status = String(record.status || "").toLowerCase();
+          const requestType = String(record.requestType || "").toLowerCase();
+          return !record.isDeleted && requestType !== "exchange" && Boolean(
+            record.completedAt || ["completed", "good", "damaged", "bad"].includes(status),
+          );
+        })
+        .map((record) => String(record.itemCode || ""))
+        .filter(Boolean),
+    );
+    const customers = new Map(
+      read(KEYS.customers, []).map((customer) => [String(customer.clientId || customer.customerId || ""), customer]),
+    );
+    const grouped = new Map();
+    read(KEYS.orders, []).forEach((order) => {
+      if (String(order.status || "") !== "Delivered" || order.isArchived || order.isDeleted) return;
+      const date = localLeaderboardDate(order.deliveredAt || order.updatedAt || order.createdAt || order.date);
+      if (!date || date.getFullYear() !== cairo.year || date.getMonth() + 1 !== cairo.month) return;
+      const clientId = String(order.clientId || order.customerId || "");
+      if (!clientId || blocked.has(clientId)) return;
+      const customer = customers.get(clientId);
+      const row = grouped.get(clientId) || {
+        name: order.clientName || customer?.clientName || customer?.name || "Dart Customer",
+        orders: 0,
+        items: 0,
+        spent: 0,
+      };
+      row.orders += 1;
+      row.items += (order.items || order.priceSnapshot || []).filter((entry) => {
+        const code = typeof entry === "string" ? entry : entry?.itemCode;
+        return code && !refundedItems.has(String(code));
+      }).length;
+      row.spent += orderNet(order);
+      grouped.set(clientId, row);
+    });
+    return [...grouped.values()]
+      .sort((left, right) => right.orders - left.orders || right.items - left.items || right.spent - left.spent)
+      .slice(0, 3)
+      .map((row, index) => ({ rank: index + 1, name: row.name, orders: row.orders, items: row.items }));
+  }
+
   async function hydratePublicLeaderboard() {
     if (!API_BASE || publicLeaderboardLoading) return publicLeaderboardRows || [];
     publicLeaderboardLoading = true;
     try {
       const payload = await apiRequest("/api/v1/leaderboard");
-      publicLeaderboardRows = Array.isArray(payload.rows) ? payload.rows : [];
-      publicLeaderboardPeriod = String(payload.period || "");
+      const serverRows = Array.isArray(payload.rows) ? payload.rows : [];
+      publicLeaderboardRows = serverRows.length ? serverRows : localLeaderboardRows();
+      publicLeaderboardPeriod = String(payload.period || "") + (serverRows.length ? "" : ":local-display");
       publicLeaderboardFailed = false;
       renderLeaderboard();
       return publicLeaderboardRows;
@@ -2483,17 +2555,24 @@
     form.dataset.dartReturnBound = "1";
     window.DartAddress?.initReturnRequest?.();
 
-    const user = currentUser();
-    const prefill = {
-      "return-full-name": user?.name,
-      "return-phone-1": user?.phone1 ? displayPhone(user.phone1) : "",
-      "return-phone-2": user?.phone2 ? displayPhone(user.phone2) : "",
-      "return-email": user?.email,
+    const prefillCustomer = () => {
+      const user = currentUser();
+      const prefill = {
+        "return-full-name": user?.name,
+        "return-phone-1": user?.phone1 ? displayPhone(user.phone1) : "",
+        "return-phone-2": user?.phone2 ? displayPhone(user.phone2) : "",
+        "return-email": user?.email,
+      };
+      Object.entries(prefill).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input && value && !input.value) input.value = value;
+      });
     };
-    Object.entries(prefill).forEach(([id, value]) => {
-      const input = document.getElementById(id);
-      if (input && value && !input.value) input.value = value;
-    });
+    prefillCustomer();
+    if (!form.dataset.dartCustomerPrefillBound) {
+      form.dataset.dartCustomerPrefillBound = "1";
+      window.addEventListener("dart:customer-session-changed", prefillCustomer);
+    }
 
     const type = document.getElementById("return-request-type");
     const code = document.getElementById("return-item-code");
@@ -3531,9 +3610,13 @@
         lng = Number(order.courierLocation?.lng || order.longitude || 31.2357);
       try {
         if (window.trackingMap) window.trackingMap.remove();
-        window.trackingMap = L.map("tracking-map").setView([lat, lng], 13);
+        window.trackingMap = L.map("tracking-map", {
+          zoomControl: false,
+          attributionControl: true,
+        }).setView([lat, lng], 13);
+        window.trackingMap.attributionControl?.setPrefix(false);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "© OpenStreetMap",
+          attribution: "&copy; OpenStreetMap contributors",
         }).addTo(window.trackingMap);
         L.marker([lat, lng]).addTo(window.trackingMap);
       } catch (error) {
