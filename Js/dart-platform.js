@@ -3133,7 +3133,7 @@
       const social = event.target.closest("[data-social-login]");
       if (social) {
         event.preventDefault();
-        alert("تسجيل الدخول الاجتماعي غير مفعّل حاليًا.");
+        window.DartDialog.alert("تسجيل الدخول الاجتماعي غير مفعّل حاليًا.");
       }
       const resend = event.target.closest("[data-resend-email-verification]");
       if (resend) {
@@ -3392,16 +3392,16 @@
       phone1 = normalizePhone(values.phone1),
       phone2 = normalizePhone(values.phone2);
     if (!values.name) {
-      alert("الاسم مطلوب.");
+      window.DartDialog.alert("الاسم مطلوب.");
       return;
     }
     const conflict = identityConflict({ email, phone1, phone2 }, user.id);
     if (conflict) {
-      alert(conflict);
+      window.DartDialog.alert(conflict);
       return;
     }
     if (!/^\S+@\S+\.\S+$/.test(email) || !/^\+201[0125]\d{8}$/.test(phone1)) {
-      alert("راجع البريد ورقم الهاتف.");
+      window.DartDialog.alert("راجع البريد ورقم الهاتف.");
       return;
     }
     if (API_BASE) {
@@ -3427,7 +3427,7 @@
         }
         renderProfile();
       } catch (error) {
-        alert(error.message);
+        window.DartDialog.alert(error.message);
       }
       return;
     }
@@ -3665,7 +3665,7 @@
           order.status,
         )
       ) {
-        alert("The order must be Out With Representative first.");
+        window.DartDialog.alert("The order must be Out With Representative first.");
         return;
       }
       order.status = "Representative On The Way";

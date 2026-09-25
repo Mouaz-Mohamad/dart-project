@@ -254,8 +254,8 @@
     return payload.entry;
   }
 
-  function reason(label) {
-    const value = root.prompt(`${label}\nReason is required:`);
+  async function reason(label) {
+    const value = await root.DartDialog.prompt(`${label}\nReason is required:`);
     return value === null ? null : String(value).trim();
   }
 
@@ -267,28 +267,28 @@
     if (action === "resend") return mutate(entry,action);
 
     if (action === "extend") {
-      const value = root.prompt("Extend by how many hours? (1–72)","4");
+      const value = await root.DartDialog.prompt("Extend by how many hours? (1–72)","4");
       if (value === null) return;
       const extensionHours = Math.min(72,Math.max(1,Number(value)||4));
-      const why = reason("Extend reservation");
+      const why = await reason("Extend reservation");
       if (!why) return;
       return mutate(entry,action,{ hours:extensionHours, reason:why });
     }
 
     if (action === "edit_request") {
-      const size = root.prompt("New size:",entry.size||"");
+      const size = await root.DartDialog.prompt("New size:",entry.size||"");
       if (size === null) return;
-      const color = root.prompt("New requested color:",entry.color||"");
+      const color = await root.DartDialog.prompt("New requested color:",entry.color||"");
       if (color === null) return;
-      const why = reason("Change Waiting request");
+      const why = await reason("Change Waiting request");
       if (!why) return;
       return mutate(entry,action,{ size:size.trim(), color:color.trim(), reason:why });
     }
 
     if (action === "offer_alternative") {
-      const color = root.prompt("Alternative color to reserve:");
+      const color = await root.DartDialog.prompt("Alternative color to reserve:");
       if (!color) return;
-      const why = reason("Offer alternative color");
+      const why = await reason("Offer alternative color");
       if (!why) return;
       return mutate(entry,action,{ color:color.trim(), reason:why });
     }
@@ -300,25 +300,25 @@
         row.modelId === entry.modelId &&
         row.size === entry.size
       );
-      if (!eligible.length) return root.alert("No eligible Waiting customer with the same design and size.");
+      if (!eligible.length) return root.DartDialog.alert("No eligible Waiting customer with the same design and size.");
       const choices = eligible.map((row,index) => `${index+1}) ${row.customerName} · ${row.clientCode} · ${row.color} · ${row.id}`).join("\n");
-      const selected = root.prompt(`Choose target by number or paste Waiting ID:\n${choices}`);
+      const selected = await root.DartDialog.prompt(`Choose target by number or paste Waiting ID:\n${choices}`);
       if (!selected) return;
       const index = Number(selected);
       const target = Number.isInteger(index) && index>=1 && index<=eligible.length
         ? eligible[index-1]
         : eligible.find((row) => row.id === selected.trim());
-      if (!target) return root.alert("Target Waiting entry not found.");
-      const why = reason("Reassign physical reservation");
+      if (!target) return root.DartDialog.alert("Target Waiting entry not found.");
+      const why = await reason("Reassign physical reservation");
       if (!why) return;
-      const cancelPrevious = root.confirm("OK = cancel previous Waiting request.\nCancel = keep previous customer in Waiting.");
+      const cancelPrevious = await root.DartDialog.confirm("OK = cancel previous Waiting request.\nCancel = keep previous customer in Waiting.");
       return mutate(entry,action,{ targetWaitlistId:target.id, cancelPrevious, reason:why });
     }
 
     const labels = { cancel:"Cancel Waiting", release:"Release reservation", move_top:"Move customer to top", reset_priority:"Reset FIFO priority" };
-    const why = reason(labels[action] || action);
+    const why = await reason(labels[action] || action);
     if (!why) return;
-    if ((action === "cancel" || action === "release") && !root.confirm(`${labels[action]}?`)) return;
+    if ((action === "cancel" || action === "release") && !await root.DartDialog.confirm(`${labels[action]}?`)) return;
     return mutate(entry,action,{ reason:why });
   }
 
@@ -340,7 +340,7 @@
       try {
         await handleAction(entry,actionButton.dataset.waitingAction);
       } catch (error) {
-        root.alert(error?.message || "Waiting action failed.");
+        root.DartDialog.alert(error?.message || "Waiting action failed.");
       } finally {
         actionButton.disabled = false;
       }
@@ -363,10 +363,10 @@
     if (!can("waiting.reassign")) return;
     try {
       const payload = await request("/api/v1/admin/waiting/reconcile",{ method:"POST", body:{} });
-      root.alert(`Matched ${Number(payload.allocated||0)} available piece(s).`);
+      root.DartDialog.alert(`Matched ${Number(payload.allocated||0)} available piece(s).`);
       await hydrate(true);
     } catch (error) {
-      root.alert(error?.message || "Waiting reconciliation failed.");
+      root.DartDialog.alert(error?.message || "Waiting reconciliation failed.");
     }
   });
 

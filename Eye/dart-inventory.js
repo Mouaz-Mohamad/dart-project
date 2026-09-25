@@ -386,11 +386,11 @@
           (m) => C.norm(m.modelId) === C.norm(code) && m.id !== id,
         )
       )
-        return alert("Model Code already exists.");
+        return window.DartDialog.alert("Model Code already exists.");
       if (!draft.sizes.some(C.active) || !draft.colors.some(C.active))
-        return alert("Add at least one active size and color.");
+        return window.DartDialog.alert("Add at least one active size and color.");
       const category = canonicalCategory($("modal-category").value);
-      if (!category) return alert("Category is required.");
+      if (!category) return window.DartDialog.alert("Category is required.");
       const payload = {
         modelId: code,
         name: $("modal-name").value.trim(),
@@ -446,7 +446,7 @@
     const name = $(id).value.trim();
     if (!name) return;
     if (draft[kind].some((x) => C.norm(x.name) === C.norm(name)))
-      return alert("Already added.");
+      return window.DartDialog.alert("Already added.");
     draft[kind].push({
       id: C.uid(),
       name,
@@ -504,13 +504,13 @@
         !C.colors(m).some((c) => C.active(c) && c.name === color) ||
         !C.sizes(m).some((s) => C.active(s) && s.name === size)
       )
-        return alert("Choose an active model, color and size.");
+        return window.DartDialog.alert("Choose an active model, color and size.");
       if (
         itemsData.some(
           (i) => C.norm(i.itemCode) === C.norm(itemCode) && i.id !== id,
         )
       )
-        return alert("Item Code already exists.");
+        return window.DartDialog.alert("Item Code already exists.");
       if (
         old &&
         (old.orderId || old.status === "Sold") &&
@@ -519,7 +519,7 @@
           old.size !== size ||
           old.itemCode !== itemCode)
       )
-        return alert(
+        return window.DartDialog.alert(
           "A piece linked to an order keeps its identity and options.",
         );
       const payload = {

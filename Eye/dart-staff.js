@@ -343,7 +343,7 @@
       } else if (action === "toggle-access") {
         const active = memberRow.dataset.staffActive === "true";
         const reason = active
-          ? window.prompt("Reason for disabling this employee:", "disabled_by_owner")
+          ? await window.DartDialog.prompt("Reason for disabling this employee:", "disabled_by_owner")
           : "reactivated_by_owner";
         if (active && reason === null) return;
         await window.DartAdminApi.request(

@@ -110,7 +110,7 @@
       return;
     }
 
-    const finalApproval = root.confirm("تحذير نهائي جدًا: سيتم الآن حذف كل بيانات Dart نهائيًا، ولا يمكن التراجع. هل أنت متأكد 100%؟");
+    const finalApproval = await root.DartDialog.confirm("تحذير نهائي جدًا: سيتم الآن حذف كل بيانات Dart نهائيًا، ولا يمكن التراجع. هل أنت متأكد 100%؟");
     if (!finalApproval) return;
 
     confirmButton.disabled = true;
@@ -470,13 +470,13 @@
     resetAnnouncementForm(); renderAnnouncements(next);
   });
 
-  $("settings-announcements-list")?.addEventListener("click", (event) => {
+  $("settings-announcements-list")?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-announcement-action]"), row = button?.closest("[data-announcement-row]");
     if (!button || !row) return;
     const settings = root.DartSiteSettings.get(), item = settings.announcements.find((entry) => entry.id === row.dataset.id);
     if (!item) return;
     if (button.dataset.announcementAction === "delete") {
-      if (!root.confirm("Delete this scheduled announcement?")) return;
+      if (!await root.DartDialog.confirm("Delete this scheduled announcement?")) return;
       settings.announcements = settings.announcements.filter((entry) => entry.id !== item.id);
       saveSettings(settings, "Announcement deleted"); renderAnnouncements(settings); return;
     }

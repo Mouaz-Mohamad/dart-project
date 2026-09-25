@@ -1559,7 +1559,7 @@
       const identifier =
         document.getElementById("repLoginForm")?.elements?.identifier?.value || "";
       if (!window.DartPlatform?.openPasswordReset) {
-        alert("Password recovery is unavailable until the secure account service loads.");
+        window.DartDialog.alert("Password recovery is unavailable until the secure account service loads.");
         return;
       }
       window.DartPlatform.openPasswordReset("representative", identifier);
@@ -1621,7 +1621,7 @@
             )
               throw new Error("Start delivery before confirming it.");
             if (!proximity.ok) throw new Error(proximity.reason);
-            if (!confirm(`Mark ${freshOrder.orderId} as delivered and paid?`))
+            if (!await window.DartDialog.confirm(`Mark ${freshOrder.orderId} as delivered and paid?`))
               return;
             await updateOrderStatus(freshOrder.id, "Delivered");
             renderOrders();
@@ -1633,7 +1633,7 @@
             renderOrders();
           }
           if (button.dataset.action === "problem") {
-            if (!confirm(`Report a delivery problem for ${order.orderId}?`)) return;
+            if (!await window.DartDialog.confirm(`Report a delivery problem for ${order.orderId}?`)) return;
             activeOrderIds.delete(order.id);
             await updateOrderStatus(order.id, "Problem");
             ensureLocationWatch();
@@ -1646,7 +1646,7 @@
             renderOrders();
           }
         } catch (error) {
-          alert(error.message);
+          window.DartDialog.alert(error.message);
         }
       });
     document
@@ -1679,18 +1679,18 @@
             const promptText = fee > 0
               ? `Confirm pickup and that ${money(fee)} was collected directly from the customer?`
               : `Confirm pickup for ${fresh.returnId}?`;
-            if (!confirm(promptText)) return;
+            if (!await window.DartDialog.confirm(promptText)) return;
             await completeReturnPickup(fresh.id);
             renderOrders();
           }
           if (button.dataset.returnAction === "cancel") {
-            if (!confirm("Record this pickup attempt as failed/cancelled?")) return;
+            if (!await window.DartDialog.confirm("Record this pickup attempt as failed/cancelled?")) return;
             await cancelReturnPickup(record.id);
             ensureLocationWatch();
             renderOrders();
           }
         } catch (error) {
-          alert(error.message);
+          window.DartDialog.alert(error.message);
         }
       });
   }

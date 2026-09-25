@@ -1794,10 +1794,10 @@
     renderAllFinance();
   }
 
-  function deleteFinanceRecord(resource, id) {
+  async function deleteFinanceRecord(resource, id) {
     const record = resourceRecord(resource, id);
     if (!record) return;
-    if (!root.confirm(`Archive this ${resource.slice(0, -1)} record? Its audit history will be kept.`)) return;
+    if (!await root.DartDialog.confirm(`Archive this ${resource.slice(0, -1)} record? Its audit history will be kept.`)) return;
     const before = { ...record };
     const archived = FinanceRepository.archive(resource, id);
     FinanceRepository.audit("ARCHIVE", resource, id, before, archived);
@@ -1832,7 +1832,7 @@
 
     const before = customer.dartCardDrawEligible !== false;
     const after = !before;
-    const reason = root.prompt(
+    const reason = await root.DartDialog.prompt(
       `${after ? "Include" : "Exclude"} ${customer.clientName} ${after ? "in" : "from"} the Dart Card draw. Optional reason:`,
       "",
     );
@@ -1840,7 +1840,7 @@
 
     if (customer.serverAuthoritative) {
       if (!root.DartAdminApi?.request) {
-        root.alert("Secure admin API is unavailable.");
+        root.DartDialog.alert("Secure admin API is unavailable.");
         return;
       }
       try {
@@ -1852,7 +1852,7 @@
           },
         );
       } catch (error) {
-        root.alert(error.message || "Could not update Dart Card draw eligibility.");
+        root.DartDialog.alert(error.message || "Could not update Dart Card draw eligibility.");
         return;
       }
     }
@@ -1963,7 +1963,7 @@
       const edit = event.target.closest("[data-finance-edit]");
       if (edit) { openResourceModal(edit.dataset.financeEdit, edit.dataset.id); return; }
       const remove = event.target.closest("[data-finance-delete]");
-      if (remove) { deleteFinanceRecord(remove.dataset.financeDelete, remove.dataset.id); return; }
+      if (remove) { await deleteFinanceRecord(remove.dataset.financeDelete, remove.dataset.id); return; }
       const settle = event.target.closest("[data-cod-settle]");
       if (settle) { openResourceModal("settlements", null, { orderId: settle.dataset.codSettle }); return; }
       const exportButton = event.target.closest("[data-finance-export]");

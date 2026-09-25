@@ -542,7 +542,7 @@
 
   async function mutateOrderState(state) {
     if (!selectedOrderId || !canManage()) return;
-    const note = state === "problem" ? (prompt("Problem note (optional):") || "") : "";
+    const note = state === "problem" ? (await window.DartDialog.prompt("Problem note (optional):") || "") : "";
     snapshot = await api(
       `/api/v1/admin/live-operations/orders/${encodeURIComponent(selectedOrderId)}/state`,
       { method: "POST", body: { state, ...(note ? { note } : {}) } },
@@ -675,7 +675,7 @@
       const stateButton = event.target.closest("[data-route-state]");
       if (stateButton) {
         try { await mutateOrderState(stateButton.dataset.routeState); }
-        catch (error) { alert(error.message || "Order state could not be changed."); }
+        catch (error) { window.DartDialog.alert(error.message || "Order state could not be changed."); }
         return;
       }
       const openOrder = event.target.closest("[data-open-order]");
@@ -705,7 +705,7 @@
       if (save) {
         const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);
         try { await saveRouteOrder(rep, routeOrderFromPanel(rep)); }
-        catch (error) { alert(error.message || "Route could not be saved."); }
+        catch (error) { window.DartDialog.alert(error.message || "Route could not be saved."); }
         return;
       }
       const suggested = event.target.closest("[data-route-suggested]");
@@ -720,7 +720,7 @@
           })
           .map((order) => String(order.orderId));
         try { await saveRouteOrder(rep, active); }
-        catch (error) { alert(error.message || "Suggested route could not be saved."); }
+        catch (error) { window.DartDialog.alert(error.message || "Suggested route could not be saved."); }
       }
     });
     nodes.fit?.addEventListener("click", () => {

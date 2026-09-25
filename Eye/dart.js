@@ -283,11 +283,11 @@ function setupCardModal() {
       purchasedItems = Number(
         document.getElementById("modal-card-purchased").value,
       );
-    if (!client) return alert("اختر العميل أولًا.");
+    if (!client) return window.DartDialog.alert("اختر العميل أولًا.");
     if (!issueDate || !expDate || new Date(expDate) <= new Date(issueDate))
-      return alert("تاريخ الانتهاء يجب أن يكون بعد تاريخ الإصدار.");
+      return window.DartDialog.alert("تاريخ الانتهاء يجب أن يكون بعد تاريخ الإصدار.");
     if (!Number.isInteger(purchasedItems) || purchasedItems < 0 || purchasedItems > 10)
-      return alert("عدد القطع المستخدمة يجب أن يكون من 0 إلى 10.");
+      return window.DartDialog.alert("عدد القطع المستخدمة يجب أن يكون من 0 إلى 10.");
     if (
       document.getElementById("modal-card-status").value === "Active" &&
       cardsData.some(
@@ -297,7 +297,7 @@ function setupCardModal() {
           dartCardIsCurrentlyActive(row),
       )
     )
-      return alert("هذا العميل لديه Dart Card نشط بالفعل.");
+      return window.DartDialog.alert("هذا العميل لديه Dart Card نشط بالفعل.");
 
     const cardPayload = {
       cardId: document.getElementById("modal-card-code-id").value,
@@ -1430,7 +1430,7 @@ async function dartCommitHardDelete(mode) {
   const linked = dartHardDeleteRelations(preview);
 
   if (serverMode && (mode === "cascade" || linked.length)) {
-    alert(
+    window.DartDialog.alert(
       "Permanent cascade delete is blocked in production for linked business records. Archive/soft-delete this record instead, or use Reset All Data when you intentionally need a full platform purge.",
     );
     return;
@@ -1441,7 +1441,7 @@ async function dartCommitHardDelete(mode) {
     target?.serverAuthoritative &&
     ["customers", "representative"].includes(sectionKey)
   ) {
-    alert("Secure customer and representative accounts must be deleted through the account API.");
+    window.DartDialog.alert("Secure customer and representative accounts must be deleted through the account API.");
     return;
   }
 
@@ -1498,7 +1498,7 @@ async function dartCommitHardDelete(mode) {
       await dartSyncHardDeleteSection(sectionKey);
     } catch (error) {
       await dartRollbackHardDeleteSection(sectionKey);
-      alert(error.message || "Permanent delete was not committed to the database.");
+      window.DartDialog.alert(error.message || "Permanent delete was not committed to the database.");
       return;
     }
   }
@@ -1515,7 +1515,7 @@ function deletePermanently(id, sectionKey) {
 
   const linked = dartHardDeleteRelations(preview);
   if (window.DartAdminApi?.request && linked.length) {
-    alert(
+    window.DartDialog.alert(
       `Permanent delete is blocked because this record has linked business history: ${linked
         .map((row) => `${row.label} (${row.count})`)
         .join(" · ")}. Use Archive/Soft Delete instead.`,
@@ -2164,7 +2164,7 @@ async function dartInspectReturn(record, condition) {
 async function dartRollbackReturn(record) {
   const rules = dartReturnRules();
   if (!record || !rules?.canRollback?.(record)) {
-    alert("لا توجد خطوة سابقة آمنة لهذا المرتجع.");
+    window.DartDialog.alert("لا توجد خطوة سابقة آمنة لهذا المرتجع.");
     return;
   }
   const warning = [
@@ -2172,12 +2172,12 @@ async function dartRollbackReturn(record) {
     "سيتم عكس الحالة التشغيلية الآمنة لهذه الخطوة، وسيُسجل الإجراء في سجل المراجعة.",
     "بعد استلام المرتجع تنتهي رحلة الاسترجاع/الاستبدال ولا يمكن الرجوع منها بهذه الأداة.",
   ].join("\n\n");
-  if (!confirm(warning)) return;
+  if (!await window.DartDialog.confirm(warning)) return;
   if (window.DartAdminApi?.request) {
     try {
       await dartAdminReturnAction(record, { action: "back" });
     } catch (error) {
-      alert(error.message || "تعذر إرجاع المرتجع خطوة واحدة.");
+      window.DartDialog.alert(error.message || "تعذر إرجاع المرتجع خطوة واحدة.");
     }
     return;
   }
@@ -2194,7 +2194,7 @@ async function dartRollbackReturn(record) {
     damage: damageData,
   }, dartNowISO());
   if (!result.ok) {
-    alert(result.message || "تعذر التراجع عن هذه الخطوة بأمان.");
+    window.DartDialog.alert(result.message || "تعذر التراجع عن هذه الخطوة بأمان.");
     return;
   }
   const after = {
@@ -2242,7 +2242,7 @@ function dartDecideReturn(record, decision) {
   }
   if (isExchange && !select?.options.length) {
     dartPendingReturnAction = null;
-    alert("No available physical item matches the requested model, color and size.");
+    window.DartDialog.alert("No available physical item matches the requested model, color and size.");
     return;
   }
   const summary = document.getElementById("return-approval-summary");
@@ -2646,7 +2646,7 @@ function setupHeaderBatchActions() {
       dartRefreshAll();
 
       if (result.failed.length) {
-        alert(
+        window.DartDialog.alert(
           `${result.archived} archived successfully. ${result.failed.length} failed:\n` +
             result.failed
               .map((row) => `${row.id}: ${row.message}`)
@@ -2826,7 +2826,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
         try {
           await window.DartOrdersApi.stateAction(record.orderId || record.id, action);
         } catch (error) {
-          alert(error.message || "Order state update failed.");
+          window.DartDialog.alert(error.message || "Order state update failed.");
         }
         return;
       }
@@ -2843,7 +2843,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
           record,
           suspended ? "activate" : "suspend",
         );
-        if (!result.ok) alert(result.message || "Account action failed.");
+        if (!result.ok) window.DartDialog.alert(result.message || "Account action failed.");
         return;
       }
       dartArchiveRecord(sectionKey, id);
@@ -2855,14 +2855,14 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       );
       if (sectionKey === "orders" && record && window.DartOrdersApi?.stateAction) {
         if (
-          !confirm(
+          !await window.DartDialog.confirm(
             "Soft-delete this order from operational views? Financial snapshots, item history and audit records will be preserved.",
           )
         ) return;
         try {
           await window.DartOrdersApi.stateAction(record.orderId || record.id, "delete");
         } catch (error) {
-          alert(error.message || "Order deletion failed.");
+          window.DartDialog.alert(error.message || "Order deletion failed.");
         }
         return;
       }
@@ -2871,12 +2871,12 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
         ["customers", "representative"].includes(sectionKey)
       ) {
         if (
-          !confirm(
+          !await window.DartDialog.confirm(
             "Delete this account? Login access will be permanently disabled, while orders and audit history stay preserved.",
           )
         ) return;
         const result = await dartAdminAccountState(sectionKey, record, "delete");
-        if (!result.ok) alert(result.message || "Account deletion failed.");
+        if (!result.ok) window.DartDialog.alert(result.message || "Account deletion failed.");
         return;
       }
       deletePermanently(id, sectionKey);
@@ -2893,14 +2893,14 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
         .orderCodDecision;
       if (codDecision) {
         if (!window.DartOrdersApi?.codVerification) {
-          alert("COD verification requires the secure server API.");
+          window.DartDialog.alert("COD verification requires the secure server API.");
           return;
         }
         const defaultReason =
           codDecision === "verify"
             ? "Customer/order COD details verified"
             : "COD verification failed";
-        const reason = prompt("ملاحظة التحقق من COD:", defaultReason);
+        const reason = await window.DartDialog.prompt("ملاحظة التحقق من COD:", defaultReason);
         if (reason === null) return;
         try {
           await window.DartOrdersApi.codVerification(o.orderId || o.id, {
@@ -2912,7 +2912,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
           if (error?.code === "ORDER_VERSION_CONFLICT") {
             await window.DartOrdersApi.hydrate(true).catch(() => {});
           }
-          alert(error?.message || "COD verification update failed.");
+          window.DartDialog.alert(error?.message || "COD verification update failed.");
         }
         return;
       }
@@ -2928,7 +2928,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
           actorRole: "Representative",
           reason: "Representative cancelled pickup",
         });
-        if (!result.ok) alert(result.message || "Order status update failed.");
+        if (!result.ok) window.DartDialog.alert(result.message || "Order status update failed.");
         return;
       }
       if (e.target.closest("[data-order-history]")) {
@@ -2956,7 +2956,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
         });
         if (!select?.options.length) {
           dartPendingReturnAction = null;
-          alert("لا يوجد مندوب Active وغير مشطوب.");
+          window.DartDialog.alert("لا يوجد مندوب Active وغير مشطوب.");
           return;
         }
         const summary = document.getElementById("return-rep-assignment-summary");
@@ -2965,25 +2965,25 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       }
       if (e.target.closest(".return-good-btn")) {
         const result = await dartInspectReturn(r, "Good");
-        if (result?.ok === false) alert(result.message || "Inspection failed");
+        if (result?.ok === false) window.DartDialog.alert(result.message || "Inspection failed");
       }
       if (e.target.closest(".return-bad-btn")) {
         const result = await dartInspectReturn(r, "Damaged");
-        if (result?.ok === false) alert(result.message || "Inspection failed");
+        if (result?.ok === false) window.DartDialog.alert(result.message || "Inspection failed");
       }
     }
     if (sectionKey === "damage") {
       const d = damageData.find((x) => String(x.id) === String(id));
       if (e.target.closest(".dart-repair-btn")) {
         const result = await dartSetDamageStatus(d, "Repaired");
-        if (result?.ok === false) alert(result.message || "Repair failed");
+        if (result?.ok === false) window.DartDialog.alert(result.message || "Repair failed");
       }
       if (
         e.target.closest(".dart-destroy-btn") &&
-        confirm("Mark this physical item as permanently Destroyed?")
+        await window.DartDialog.confirm("Mark this physical item as permanently Destroyed?")
       ) {
         const result = await dartSetDamageStatus(d, "Destroyed");
-        if (result?.ok === false) alert(result.message || "Destroy failed");
+        if (result?.ok === false) window.DartDialog.alert(result.message || "Destroy failed");
       }
     }
     if (sectionKey === "customers") {
@@ -2992,9 +2992,9 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
       if (e.target.closest(".dart-reset-password-btn")) {
         const result = await dartRequestCustomerPasswordReset(x);
         if (!result.ok) {
-          alert(result.message || "Password reset request failed.");
+          window.DartDialog.alert(result.message || "Password reset request failed.");
         } else {
-          alert("تم تسجيل طلب Reset Password في قاعدة البيانات.");
+          window.DartDialog.alert("تم تسجيل طلب Reset Password في قاعدة البيانات.");
         }
       }
     }
@@ -3012,7 +3012,7 @@ async function dartRequestOrderTransition(orders, target) {
   if (!orders.length) return;
   const invalid = orders.filter((o) => !dartCanTransition(o, target));
   if (invalid.length) {
-    alert(
+    window.DartDialog.alert(
       `الانتقال غير منطقي للأوردرات: ${invalid.map((o) => o.orderId).join(", ")}`,
     );
     return;
@@ -3027,7 +3027,7 @@ async function dartRequestOrderTransition(orders, target) {
       )
       .join("");
     if (!sel.options.length) {
-      alert("لا يوجد مندوب Active وغير مشطوب.");
+      window.DartDialog.alert("لا يوجد مندوب Active وغير مشطوب.");
       return;
     }
     openModal(document.getElementById("rep-assignment-modal"));
@@ -3071,7 +3071,7 @@ async function dartRequestOrderTransition(orders, target) {
     orders.length === 1
       ? await dartApplyTransition(orders[0], target)
       : await dartBatchTransition(orders, target);
-  if (!result.ok) alert(result.message || "Order status update failed.");
+  if (!result.ok) window.DartDialog.alert(result.message || "Order status update failed.");
 }
 function dartSetupOperationalModals() {
   document
@@ -3084,7 +3084,7 @@ function dartSetupOperationalModals() {
         document.getElementById("return-replacement-select")?.value || "",
       );
       if (!result.ok) {
-        alert(result.message || "Operation failed");
+        window.DartDialog.alert(result.message || "Operation failed");
         return;
       }
       dartPendingReturnAction = null;
@@ -3098,7 +3098,7 @@ function dartSetupOperationalModals() {
       const reason = document.getElementById("return-rejection-reason")?.value;
       const result = await dartRejectReturn(record, reason);
       if (!result.ok) {
-        alert(result.message || "Operation failed");
+        window.DartDialog.alert(result.message || "Operation failed");
         return;
       }
       dartPendingReturnAction = null;
@@ -3111,13 +3111,13 @@ function dartSetupOperationalModals() {
       if (!records.length || dartPendingReturnAction?.decision !== "assign") return;
       const representativeId = document.getElementById("return-rep-assignment-select")?.value;
       if (records.length > 1 && !window.DartGroups?.sameRoute?.(records)) {
-        alert("لا يمكن جمع إلا طلبات نفس العميل ونفس الدولة والمحافظة والمنطقة والشارع.");
+        window.DartDialog.alert("لا يمكن جمع إلا طلبات نفس العميل ونفس الدولة والمحافظة والمنطقة والشارع.");
         return;
       }
       const pickupGroupId = window.DartGroups?.newId?.("RPG") || `RPG-${Date.now()}`;
       for (const record of records) {
         const result = await dartAssignReturnRepresentative(record, representativeId, pickupGroupId);
-        if (!result.ok) { alert(result.message || "Operation failed"); return; }
+        if (!result.ok) { window.DartDialog.alert(result.message || "Operation failed"); return; }
       }
       dartPendingReturnAction = null;
       closeModal(document.getElementById("return-rep-assignment-modal"));
@@ -3126,11 +3126,11 @@ function dartSetupOperationalModals() {
   document.getElementById("assign-selected-returns")?.addEventListener("click", () => {
     const visibleIds = new Set(dartApplyFilters("returns", returnsData).map((row) => String(row.id)));
     const records = returnsData.filter((row) => row.isChecked && visibleIds.has(String(row.id)));
-    if (!records.length) return alert("حدد طلب استبدال أو استرجاع واحدًا على الأقل.");
+    if (!records.length) return window.DartDialog.alert("حدد طلب استبدال أو استرجاع واحدًا على الأقل.");
     if (records.some((row) => row.status !== "Approved - Awaiting Representative"))
-      return alert("كل الطلبات المحددة يجب أن تكون Approved وتنتظر تعيين المندوب.");
+      return window.DartDialog.alert("كل الطلبات المحددة يجب أن تكون Approved وتنتظر تعيين المندوب.");
     if (!window.DartGroups?.sameRoute?.(records))
-      return alert("حدد طلبات نفس العميل ونفس الدولة والمحافظة والمنطقة والشارع فقط.");
+      return window.DartDialog.alert("حدد طلبات نفس العميل ونفس الدولة والمحافظة والمنطقة والشارع فقط.");
     const select = document.getElementById("return-rep-assignment-select");
     select?.replaceChildren();
     dartActiveReps().forEach((representative) => {
@@ -3139,7 +3139,7 @@ function dartSetupOperationalModals() {
       option.textContent = `${representative.name} — ${representative.repId}`;
       select?.appendChild(option);
     });
-    if (!select?.options.length) return alert("لا يوجد مندوب Active وغير مشطوب.");
+    if (!select?.options.length) return window.DartDialog.alert("لا يوجد مندوب Active وغير مشطوب.");
     dartPendingReturnAction = { records, decision: "assign" };
     const summary = document.getElementById("return-rep-assignment-summary");
     if (summary) summary.textContent = `${records.length} selected request(s) · one pickup route · independent records`;
@@ -3159,7 +3159,7 @@ function dartSetupOperationalModals() {
             ? await dartApplyTransition(orders[0], target, { representativeId: rep })
             : await dartBatchTransition(orders, target, { representativeId: rep });
         if (!res.ok) {
-          alert(res.message || "Operation failed");
+          window.DartDialog.alert(res.message || "Operation failed");
           return;
         }
         dartPendingOrderAction = null;
@@ -3184,7 +3184,7 @@ function dartSetupOperationalModals() {
             ? await dartApplyTransition(orders[0], target, meta)
             : await dartBatchTransition(orders, target, meta);
         if (!res.ok) {
-          alert(res.message || "Operation failed");
+          window.DartDialog.alert(res.message || "Operation failed");
           return;
         }
         dartPendingOrderAction = null;
@@ -3206,7 +3206,7 @@ function dartSetupOperationalModals() {
         (o) => o.isChecked && visibleIds.has(String(o.id)),
       );
       if (!selected.length) {
-        alert("حدد أوردر واحد على الأقل من الصفوف الظاهرة.");
+        window.DartDialog.alert("حدد أوردر واحد على الأقل من الصفوف الظاهرة.");
         return;
       }
       await dartRequestOrderTransition(selected, target);
@@ -3314,7 +3314,7 @@ function dartSetupDamageModal() {
       code = document.getElementById("damage-item-code").value.trim(),
       it = dartFindItemByCode(code);
     if (!it) {
-      alert("Item Code غير موجود.");
+      window.DartDialog.alert("Item Code غير موجود.");
       return;
     }
     const p = {
@@ -3668,7 +3668,7 @@ async function dartRollbackOrderOneStep(order) {
     serverAuthoritative = Boolean(window.DartOrdersApi);
   if (!target) return { ok: false, message: "لا توجد خطوة سابقة." };
   if (
-    !confirm(
+    !await window.DartDialog.confirm(
       `رجوع ${order.orderId} من ${prevStatus} إلى ${target}؟ سيتم عكس أي تأثير مالي/مخزني مرتبط بهذه الخطوة.`,
     )
   )
@@ -4054,14 +4054,14 @@ document.addEventListener("click", async (event) => {
       throw new Error("Secure admin API is unavailable.");
     }
     if (approve) {
-      if (!confirm("Approve this representative account?")) return;
+      if (!await window.DartDialog.confirm("Approve this representative account?")) return;
       await window.DartAdminApi.request(
         `/api/v1/admin/representatives/${encodeURIComponent(representativeId)}/approve`,
         { method: "POST" },
       );
     }
     if (reject) {
-      const reason = prompt("Reason for rejecting this representative:");
+      const reason = await window.DartDialog.prompt("Reason for rejecting this representative:");
       if (!reason || reason.trim().length < 3) return;
       await window.DartAdminApi.request(
         `/api/v1/admin/representatives/${encodeURIComponent(representativeId)}/reject`,
@@ -4070,7 +4070,7 @@ document.addEventListener("click", async (event) => {
     }
     await dartRefreshRepresentativesFromServer();
   } catch (error) {
-    alert(error.message || "Representative action failed.");
+    window.DartDialog.alert(error.message || "Representative action failed.");
   }
 });
 
@@ -4439,7 +4439,7 @@ function setupBirthdayMessageActions() {
       .map((box) => box.closest("[data-client-id]"))
       .filter(Boolean);
     if (!selected.length) {
-      alert("Select at least one customer.");
+      window.DartDialog.alert("Select at least one customer.");
       return;
     }
 
@@ -4496,7 +4496,7 @@ function setupBirthdayMessageActions() {
     });
 
     if (!window.DartDomainState?.write) {
-      alert("Birthday messaging requires the secure server state.");
+      window.DartDialog.alert("Birthday messaging requires the secure server state.");
       return;
     }
 
@@ -4507,7 +4507,7 @@ function setupBirthdayMessageActions() {
       window.DartDomainState.syncDomain?.("birthday_messages"),
     ]);
     renderBirthdayWidget();
-    alert(
+    window.DartDialog.alert(
       `Birthday discount messages (${birthdayDiscountPercent}%) were queued for backend delivery.`,
     );
   });
@@ -4909,7 +4909,7 @@ function setupCustomerModal() {
       };
 
     if (dartCustomerConflict(p, id)) {
-      alert("Email or phone is already registered.");
+      window.DartDialog.alert("Email or phone is already registered.");
       return;
     }
 
@@ -4920,7 +4920,7 @@ function setupCustomerModal() {
 
       if (x.serverAuthoritative) {
         if (!window.DartAdminApi?.request) {
-          alert("Secure admin API is unavailable.");
+          window.DartDialog.alert("Secure admin API is unavailable.");
           return;
         }
         try {
@@ -4939,7 +4939,7 @@ function setupCustomerModal() {
             },
           );
         } catch (error) {
-          alert(error.message || "Customer update failed.");
+          window.DartDialog.alert(error.message || "Customer update failed.");
           return;
         }
       }
@@ -5033,11 +5033,11 @@ function setupRepresentativeModal() {
       .value.trim();
 
     if (serverAuthoritative && rawNationalId) {
-      alert("لا يمكن تغيير الرقم القومي للحساب المسجل من هذا المحرر.");
+      window.DartDialog.alert("لا يمكن تغيير الرقم القومي للحساب المسجل من هذا المحرر.");
       return;
     }
     if (!serverAuthoritative && rawNationalId && !/^\d{14}$/.test(rawNationalId)) {
-      alert("الرقم القومي يجب أن يكون 14 رقمًا.");
+      window.DartDialog.alert("الرقم القومي يجب أن يكون 14 رقمًا.");
       return;
     }
 
@@ -5048,7 +5048,7 @@ function setupRepresentativeModal() {
       requestedRepId &&
       requestedRepId !== String(existing.repId || "")
     ) {
-      alert("Rep ID للحساب المسجل ثابت ولا يمكن تغييره.");
+      window.DartDialog.alert("Rep ID للحساب المسجل ثابت ولا يمكن تغييره.");
       return;
     }
 
@@ -5079,7 +5079,7 @@ function setupRepresentativeModal() {
         (r) => r.repId === p.repId && String(r.id) !== String(id),
       )
     ) {
-      alert("Rep ID مستخدم بالفعل.");
+      window.DartDialog.alert("Rep ID مستخدم بالفعل.");
       return;
     }
 
@@ -5088,7 +5088,7 @@ function setupRepresentativeModal() {
 
       if (serverAuthoritative) {
         if (!window.DartAdminApi?.request) {
-          alert("Secure admin API is unavailable.");
+          window.DartDialog.alert("Secure admin API is unavailable.");
           return;
         }
         try {
@@ -5106,7 +5106,7 @@ function setupRepresentativeModal() {
             },
           );
         } catch (error) {
-          alert(error.message || "Representative update failed.");
+          window.DartDialog.alert(error.message || "Representative update failed.");
           return;
         }
       }
@@ -5355,7 +5355,7 @@ function setupPasswordResetRequests() {
       try {
         await dartLoadPasswordResetRequests(true);
       } catch (error) {
-        alert(error.message || "Could not load password reset requests.");
+        window.DartDialog.alert(error.message || "Could not load password reset requests.");
       }
     });
   }
@@ -5369,7 +5369,7 @@ function setupPasswordResetRequests() {
       const requestId = row.dataset.requestId;
 
       if (event.target.closest(".dart-cancel-reset-request")) {
-        if (!confirm("Cancel this password reset request?")) return;
+        if (!await window.DartDialog.confirm("Cancel this password reset request?")) return;
         try {
           await window.DartAdminApi.request(
             `/api/v1/admin/password-reset-requests/${encodeURIComponent(requestId)}/cancel`,
@@ -5377,7 +5377,7 @@ function setupPasswordResetRequests() {
           );
           await dartLoadPasswordResetRequests(false);
         } catch (error) {
-          alert(error.message || "Could not cancel the request.");
+          window.DartDialog.alert(error.message || "Could not cancel the request.");
         }
         return;
       }
@@ -5386,7 +5386,7 @@ function setupPasswordResetRequests() {
         const input = row.querySelector("[data-temporary-password]");
         const temporaryPassword = String(input?.value || "");
         if (temporaryPassword.length < 12) {
-          alert("Temporary password must be at least 12 characters.");
+          window.DartDialog.alert("Temporary password must be at least 12 characters.");
           input?.focus();
           return;
         }
@@ -5402,7 +5402,7 @@ function setupPasswordResetRequests() {
           await dartLoadPasswordResetRequests(false);
         } catch (error) {
           if (input) input.value = "";
-          alert(error.message || "Could not set the temporary password.");
+          window.DartDialog.alert(error.message || "Could not set the temporary password.");
         }
       }
     });
@@ -5440,7 +5440,7 @@ function setupAllDelegatedEvents() {
       try {
         const result = await dartRollbackOrderOneStep(o);
         if (!result.ok && result.message !== "cancelled") {
-          alert(result.message || "Order rollback failed.");
+          window.DartDialog.alert(result.message || "Order rollback failed.");
         }
       } finally {
         b.disabled = false;
@@ -5544,7 +5544,7 @@ function setupOrderModal() {
       dartIsArchived(it) ||
       String(it.status).toLowerCase() !== "in stock"
     ) {
-      alert("القطعة غير متاحة.");
+      window.DartDialog.alert("القطعة غير متاحة.");
       return;
     }
     if (!selected.includes(code)) selected.push(code);
@@ -5562,7 +5562,7 @@ function setupOrderModal() {
         selected,
       );
       if (!r.ok) {
-        alert(r.message);
+        window.DartDialog.alert(r.message);
         return;
       }
       selected.push(...r.codes);
@@ -5582,7 +5582,7 @@ function setupOrderModal() {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!selected.length) {
-      alert("أضف قطعة واحدة على الأقل.");
+      window.DartDialog.alert("أضف قطعة واحدة على الأقل.");
       return;
     }
     const editId = document.getElementById("modal-order-edit-id").value,
@@ -5591,7 +5591,7 @@ function setupOrderModal() {
       selectedClientId = document.getElementById("clientId").value || "-",
       selectedClient = dartFindCustomerByCode(selectedClientId);
     if (selectedClient && dartIsArchived(selectedClient)) {
-      alert("لا يمكن استخدام عميل مشطوب.");
+      window.DartDialog.alert("لا يمكن استخدام عميل مشطوب.");
       return;
     }
     const payload = {
@@ -5654,7 +5654,7 @@ function setupOrderModal() {
         renderSel();
         return;
       } catch (error) {
-        alert(error.message || "Manual order could not be created.");
+        window.DartDialog.alert(error.message || "Manual order could not be created.");
         return;
       }
     }
@@ -5695,7 +5695,7 @@ function setupOrderModal() {
         renderSel();
         return;
       } catch (error) {
-        alert(error.message || "Manual order could not be updated.");
+        window.DartDialog.alert(error.message || "Manual order could not be updated.");
         return;
       }
     }
@@ -5705,7 +5705,7 @@ function setupOrderModal() {
         newCodes = selected.filter((c) => !oldCodes.includes(c)),
         check = dartReserveItems(existing, newCodes);
       if (!check.ok) {
-        alert(check.message);
+        window.DartDialog.alert(check.message);
         return;
       }
       oldCodes
@@ -5744,7 +5744,7 @@ function setupOrderModal() {
       };
       const r = dartReserveItems(order, selected);
       if (!r.ok) {
-        alert(r.message);
+        window.DartDialog.alert(r.message);
         return;
       }
       order.priceSnapshot = dartPriceSnapshotForCodes(selected);
@@ -5895,7 +5895,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", (e) => {
     const b = e.target.closest(".dart-info-btn");
     if (!b) return;
-    alert(`${b.dataset.infoTitle}\n\n${b.dataset.infoText}`);
+    window.DartDialog.alert(`${b.dataset.infoTitle}\n\n${b.dataset.infoText}`);
   });
   renderBirthdayWidget();
   renderTopClients();
@@ -6101,7 +6101,7 @@ function setupReturnModal() {
       it = dartFindItemByCode(code);
 
     if (!it) {
-      alert("Item Code غير موجود.");
+      window.DartDialog.alert("Item Code غير موجود.");
       return;
     }
 
@@ -6109,7 +6109,7 @@ function setupReturnModal() {
       (o) => (o.items || []).includes(code) && o.status === "Delivered",
     );
     if (!order) {
-      alert("Manual return requires a delivered order containing this item.");
+      window.DartDialog.alert("Manual return requires a delivered order containing this item.");
       return;
     }
 
@@ -6126,11 +6126,11 @@ function setupReturnModal() {
         !["Rejected", "Closed"].includes(row.status),
     );
     if (duplicateReturn) {
-      alert("There is already an active return for this item.");
+      window.DartDialog.alert("There is already an active return for this item.");
       return;
     }
     if (refundAmount < 0 || refundAmount > remainingRefund) {
-      alert(`Maximum remaining refund is ${Math.trunc(remainingRefund)} EGP.`);
+      window.DartDialog.alert(`Maximum remaining refund is ${Math.trunc(remainingRefund)} EGP.`);
       return;
     }
 
@@ -6179,7 +6179,7 @@ function setupReturnModal() {
         closeModal(modal);
         form.reset();
       } catch (error) {
-        alert(error.message || "Manual return could not be saved.");
+        window.DartDialog.alert(error.message || "Manual return could not be saved.");
       }
       return;
     }

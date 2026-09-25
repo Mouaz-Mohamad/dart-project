@@ -151,7 +151,7 @@ if (typeof dartMoney === 'function') {
     field('addProductBtn')?.addEventListener('click', () => {
       const code = value('productsInputCode');
       const item = typeof dartFindItemByCode === 'function' ? dartFindItemByCode(code) : null;
-      if (!item || dartIsArchived(item) || String(item.status).toLowerCase() !== 'in stock') return alert('This physical item is not available.');
+      if (!item || dartIsArchived(item) || String(item.status).toLowerCase() !== 'in stock') return window.DartDialog.alert('This physical item is not available.');
       if (!selected.includes(code)) selected.push(code);
       if (codeInput) codeInput.value = '';
       renderSelected();
@@ -159,7 +159,7 @@ if (typeof dartMoney === 'function') {
 
     field('autoAllocateProductBtn')?.addEventListener('click', () => {
       const result = dartAutoAllocate(value('orderModelCode'), value('orderItemColor'), value('orderItemSize'), Math.max(1, Number(value('orderItemQty')) || 1), selected);
-      if (!result.ok) return alert(result.message);
+      if (!result.ok) return window.DartDialog.alert(result.message);
       selected.push(...result.codes); renderSelected();
     });
 
@@ -174,11 +174,11 @@ if (typeof dartMoney === 'function') {
 
     orderForm.addEventListener('submit', async event => {
       event.preventDefault();
-      if (!selected.length) return alert('Add at least one physical item.');
+      if (!selected.length) return window.DartDialog.alert('Add at least one physical item.');
 
       const address = initDashboardAddress()?.validate();
       if (!address?.ok) {
-        return alert(address?.message || 'Complete and locate the delivery address.');
+        return window.DartDialog.alert(address?.message || 'Complete and locate the delivery address.');
       }
 
       const prices = calculate();
@@ -187,7 +187,7 @@ if (typeof dartMoney === 'function') {
       const customerId = value('clientId') || '-';
       const customer = dartFindCustomerByCode(customerId);
       if (customer && dartIsArchived(customer)) {
-        return alert('An archived customer cannot be used.');
+        return window.DartDialog.alert('An archived customer cannot be used.');
       }
 
       let amountPaid = Math.max(0, Number(value('amountPaid')) || 0);
@@ -195,7 +195,7 @@ if (typeof dartMoney === 'function') {
       if (paymentStatus === 'Paid') amountPaid = prices.finalAmount;
       if (paymentStatus === 'Unpaid') amountPaid = 0;
       if (amountPaid > prices.finalAmount) {
-        return alert('Amount paid cannot exceed the final order total.');
+        return window.DartDialog.alert('Amount paid cannot exceed the final order total.');
       }
 
       const apiPayload = {
@@ -224,7 +224,7 @@ if (typeof dartMoney === 'function') {
       };
 
       if (apiPayload.amountRefunded > prices.finalAmount) {
-        return alert('Refund cannot exceed the final order total.');
+        return window.DartDialog.alert('Refund cannot exceed the final order total.');
       }
 
       if (window.DartOrdersApi?.createManual && window.DartOrdersApi?.updateManual) {
@@ -251,7 +251,7 @@ if (typeof dartMoney === 'function') {
           resetOrderAddress();
           renderSelected();
         } catch (error) {
-          alert(error.message || 'Order could not be saved to the database.');
+          window.DartDialog.alert(error.message || 'Order could not be saved to the database.');
         }
         return;
       }
@@ -292,7 +292,7 @@ if (typeof dartMoney === 'function') {
         const oldCodes = [...(existing.items || [])];
         const newlySelected = selected.filter(code => !oldCodes.includes(code));
         const reservation = dartReserveItems(existing, newlySelected);
-        if (!reservation.ok) return alert(reservation.message);
+        if (!reservation.ok) return window.DartDialog.alert(reservation.message);
         oldCodes.filter(code => !selected.includes(code)).forEach(code => {
           const item = dartFindItemByCode(code);
           if (item && item.status === 'Processing/Held') {
@@ -320,7 +320,7 @@ if (typeof dartMoney === 'function') {
           ...payload
         };
         const reservation = dartReserveItems(order, selected);
-        if (!reservation.ok) return alert(reservation.message);
+        if (!reservation.ok) return window.DartDialog.alert(reservation.message);
         dartLogOrder(order, 'ORDER_CREATED', null, 'New', {notes:'Manual dashboard order'});
         ordersData.push(order);
         dartAudit('CREATE', 'orders', order.id, {}, order);
@@ -372,7 +372,7 @@ if (typeof dartMoney === 'function') {
     const pairs = [['modal-rep-id-front','modal-rep-id-front-preview'],['modal-rep-id-back','modal-rep-id-back-preview'],['modal-rep-face','modal-rep-face-preview']];
     pairs.forEach(([inputId, previewId]) => field(inputId)?.addEventListener('change', async event => {
       try { previewImage(field(previewId), await compressImage(event.target.files[0])); }
-      catch (error) { event.target.value = ''; previewImage(field(previewId), ''); alert(error.message); }
+      catch (error) { event.target.value = ''; previewImage(field(previewId), ''); window.DartDialog.alert(error.message); }
     }));
   }
 
@@ -518,7 +518,7 @@ if (typeof dartMoney === 'function') {
       return;
     }
     if (current === 'Pending Approval' && target === 'Rejected') {
-      const reason = prompt('Rejection reason:')?.trim();
+      const reason = await window.DartDialog.prompt('Rejection reason:')?.trim();
       if (!reason || reason.length < 3) throw new Error('A rejection reason is required.');
       await request(`/api/v1/admin/representatives/${encodeURIComponent(rep.id)}/reject`, {
         method: 'POST',
@@ -630,7 +630,7 @@ if (typeof dartMoney === 'function') {
         closeModal(field('representative-modal'));
         repForm.reset();
       } catch (error) {
-        alert(error.message || 'Representative account could not be saved.');
+        window.DartDialog.alert(error.message || 'Representative account could not be saved.');
       }
     });
   }
@@ -683,7 +683,7 @@ if (typeof dartMoney === 'function') {
         await hydrateSecurePasswordRequests();
         openModal(field('password-requests-modal'));
       } catch (error) {
-        alert(error.message || 'Unable to load password reset requests.');
+        window.DartDialog.alert(error.message || 'Unable to load password reset requests.');
       }
     });
 
@@ -707,7 +707,7 @@ if (typeof dartMoney === 'function') {
           await hydrateSecurePasswordRequests();
           openModal(field('password-requests-modal'));
         } catch (error) {
-          alert(error.message || 'Unable to create password reset request.');
+          window.DartDialog.alert(error.message || 'Unable to create password reset request.');
         }
         return;
       }
@@ -727,9 +727,9 @@ if (typeof dartMoney === 'function') {
             { method: 'POST', body: { temporaryPassword: password } },
           );
           await hydrateSecurePasswordRequests();
-          alert('Temporary password saved securely. Existing sessions were revoked and the user must replace it at next login.');
+          window.DartDialog.alert('Temporary password saved securely. Existing sessions were revoked and the user must replace it at next login.');
         } catch (error) {
-          alert(error.message || 'Unable to set temporary password.');
+          window.DartDialog.alert(error.message || 'Unable to set temporary password.');
         }
         return;
       }
@@ -751,7 +751,7 @@ if (typeof dartMoney === 'function') {
           await hydrateSecureRepresentatives();
           dartRefreshAll();
         } catch (error) {
-          alert(error.message || 'Representative state could not be changed.');
+          window.DartDialog.alert(error.message || 'Representative state could not be changed.');
         }
         return;
       }
@@ -759,7 +759,7 @@ if (typeof dartMoney === 'function') {
       if (event.target.closest('.btn-hard-delete')) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (!confirm('Delete this representative account permanently? Active sessions will be revoked.')) return;
+        if (!await window.DartDialog.confirm('Delete this representative account permanently? Active sessions will be revoked.')) return;
         try {
           if (!UUID_RE.test(String(rep.id || ''))) throw new Error('Legacy representative must be migrated before deletion.');
           await requireAdminApi()(
@@ -769,7 +769,7 @@ if (typeof dartMoney === 'function') {
           await hydrateSecureRepresentatives();
           dartRefreshAll();
         } catch (error) {
-          alert(error.message || 'Representative account could not be deleted.');
+          window.DartDialog.alert(error.message || 'Representative account could not be deleted.');
         }
         return;
       }
@@ -785,7 +785,7 @@ if (typeof dartMoney === 'function') {
           await hydrateSecureRepresentatives();
           dartRefreshAll();
         } catch (error) {
-          alert(error.message || 'Representative could not be approved.');
+          window.DartDialog.alert(error.message || 'Representative could not be approved.');
         }
         return;
       }
@@ -793,8 +793,8 @@ if (typeof dartMoney === 'function') {
       if (event.target.closest('.dart-reject-rep')) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        const reason = prompt('Rejection reason:')?.trim();
-        if (!reason || reason.length < 3) return alert('A rejection reason is required.');
+        const reason = await window.DartDialog.prompt('Rejection reason:')?.trim();
+        if (!reason || reason.length < 3) return window.DartDialog.alert('A rejection reason is required.');
         try {
           await requireAdminApi()(
             `/api/v1/admin/representatives/${encodeURIComponent(rep.id)}/reject`,
@@ -803,7 +803,7 @@ if (typeof dartMoney === 'function') {
           await hydrateSecureRepresentatives();
           dartRefreshAll();
         } catch (error) {
-          alert(error.message || 'Representative could not be rejected.');
+          window.DartDialog.alert(error.message || 'Representative could not be rejected.');
         }
         return;
       }
@@ -811,13 +811,13 @@ if (typeof dartMoney === 'function') {
       if (event.target.closest('.dart-rep-reset')) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        const password = prompt('Set a temporary password (12+ characters):');
+        const password = await window.DartDialog.prompt('Set a temporary password (12+ characters):');
         if (!password) return;
         try {
           await setTemporaryPassword('representative', rep.id, password);
-          alert('Temporary password saved securely. Existing sessions were revoked.');
+          window.DartDialog.alert('Temporary password saved securely. Existing sessions were revoked.');
         } catch (error) {
-          alert(error.message || 'Unable to reset representative password.');
+          window.DartDialog.alert(error.message || 'Unable to reset representative password.');
         }
         return;
       }
@@ -837,7 +837,7 @@ if (typeof dartMoney === 'function') {
           field('full-item-image').alt = `${rep.name} — ${documentButton.textContent.trim()}`;
           openModal(field('image-preview-modal'));
         } catch (error) {
-          alert(error.message || 'Unable to load representative document.');
+          window.DartDialog.alert(error.message || 'Unable to load representative document.');
         }
       }
     }, true);

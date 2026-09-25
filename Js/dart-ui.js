@@ -1180,7 +1180,7 @@ function initCartAndCheckoutEvents() {
                                 )
                                 .join("\n")
                             : "One or more product prices changed.";
-                        const accepted = window.confirm(
+                        const accepted = await window.DartDialog.confirm(
                             `Prices changed while the items were reserved:\n\n${summary}\n\nReview and accept the current prices to place the order.`
                         );
                         if (!accepted) {
@@ -1366,7 +1366,7 @@ function initAddressMap() {
                 if (typeof showToast === 'function') {
                     showToast("Delivery is currently available in Cairo and Giza only.");
                 } else {
-                    alert("Delivery is currently available in Cairo and Giza only.");
+                    window.DartDialog.alert("Delivery is currently available in Cairo and Giza only.");
                 }
                 return false;
             }
@@ -1386,7 +1386,7 @@ function initAddressMap() {
             const governorate = fallbackGovernorate(result);
             if (!governorate) {
                 if (typeof showToast === 'function') showToast('Delivery is currently available in Cairo and Giza only.');
-                else alert('Delivery is currently available in Cairo and Giza only.');
+                else window.DartDialog.alert('Delivery is currently available in Cairo and Giza only.');
                 return false;
             }
 
