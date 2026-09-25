@@ -719,9 +719,17 @@
       const key = String(order.clientId || order.customerId || order.phone1 || order.orderId || order.id);
       customerOrders.set(key, (customerOrders.get(key) || 0) + 1);
     });
+    const orderCounts = [...customerOrders.values()];
     const uniqueCustomers = customerOrders.size;
-    const returningCustomers = [...customerOrders.values()].filter((count) => count >= 2).length;
-    const oneTimeCustomers = [...customerOrders.values()].filter((count) => count === 1).length;
+    const returningCustomers = orderCounts.filter((count) => count >= 2).length;
+    const oneTimeCustomers = orderCounts.filter((count) => count === 1).length;
+    const orderFrequencyBuckets = {
+      oneOrder: orderCounts.filter((count) => count === 1).length,
+      twoOrders: orderCounts.filter((count) => count === 2).length,
+      threeOrders: orderCounts.filter((count) => count === 3).length,
+      fourOrders: orderCounts.filter((count) => count === 4).length,
+      fivePlusOrders: orderCounts.filter((count) => count >= 5).length,
+    };
 
     const settledOrderIds = new Set(data.settlements.filter(active).map((entry) => String(entry.orderId)));
     let fallbackCODInflow = 0;
@@ -781,6 +789,7 @@
       uniqueCustomers,
       returningCustomers,
       oneTimeCustomers,
+      orderFrequencyBuckets,
       repeatRate: uniqueCustomers ? (returningCustomers / uniqueCustomers) * 100 : 0,
       cashIn: codCashIn,
       cashOut,
@@ -1331,7 +1340,9 @@
     renderBrandMetricCards(data, range, current, previous);
     document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(percent(current.repeatRate)));
     document.getElementById("dart-financial-period")?.replaceChildren(document.createTextNode(range.label));
-    renderReturningChart(current);
+    const currentFrequency = current.orderFrequencyBuckets ? current : calculateSummary(data, range);
+    const previousFrequency = previous.orderFrequencyBuckets ? previous : calculateSummary(data, range.previous);
+    renderReturningChart(currentFrequency, previousFrequency);
     renderGoalsChart(data, range);
     renderFinancialChart(data, range, current);
   }
@@ -1353,16 +1364,82 @@
     if (element) element.hidden = !empty;
   }
 
-  function renderReturningChart(summary) {
+  const RETURNING_ORDER_BUCKETS = Object.freeze([
+    { key: "oneOrder", label: "1 Order", color: "#F2E3E7" },
+    { key: "twoOrders", label: "2 Orders", color: "#E3B7C2" },
+    { key: "threeOrders", label: "3 Orders", color: "#D18498" },
+    { key: "fourOrders", label: "4 Orders", color: "#BF506D" },
+    { key: "fivePlusOrders", label: "5+ Orders", color: "#AB012B" },
+  ]);
+
+  function orderBucketComparison(current, previous) {
+    const now = Math.max(0, finiteNumber(current));
+    const before = Math.max(0, finiteNumber(previous));
+    if (before === 0) return now > 0 ? "New" : "No Change";
+    const change = ((now - before) / before) * 100;
+    if (Math.abs(change) < 0.05) return "No Change";
+    return `${change > 0 ? "+" : ""}${change.toFixed(1)}%`;
+  }
+
+  function renderReturningChart(summary, previousSummary) {
     const empty = summary.uniqueCustomers === 0;
     toggleChartEmpty("dart-returning-empty", empty);
     const canvas = document.getElementById("dart-returning-chart");
     if (canvas) canvas.hidden = empty;
     if (empty || !chartAvailable()) return;
+
+    const currentBuckets = summary.orderFrequencyBuckets || {};
+    const previousBuckets = previousSummary?.orderFrequencyBuckets || {};
+    const values = RETURNING_ORDER_BUCKETS.map((bucket) => Math.max(0, finiteNumber(currentBuckets[bucket.key])));
+    const previousValues = RETURNING_ORDER_BUCKETS.map((bucket) => Math.max(0, finiteNumber(previousBuckets[bucket.key])));
+    const total = values.reduce((sum, value) => sum + value, 0);
+    const percentages = values.map((value) => total ? (value / total) * 100 : 0);
+    const changes = values.map((value, index) => orderBucketComparison(value, previousValues[index]));
+
     replaceChart("returning", "dart-returning-chart", {
       type: "doughnut",
-      data: { labels: ["Returning", "One-time"], datasets: [{ data: [summary.returningCustomers, summary.oneTimeCustomers], backgroundColor: ["#AB012B", "#E8D8DC"], borderWidth: 0, hoverOffset: 3 }] },
-      options: { responsive: true, maintainAspectRatio: false, cutout: "72%", plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { callbacks: { label: (context) => `${context.label}: ${context.raw} customer(s)` } } } },
+      data: {
+        labels: RETURNING_ORDER_BUCKETS.map((bucket) => bucket.label),
+        datasets: [{
+          data: values,
+          backgroundColor: RETURNING_ORDER_BUCKETS.map((bucket) => bucket.color),
+          borderColor: "#FFFCF6",
+          borderWidth: 2,
+          hoverOffset: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "68%",
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              usePointStyle: true,
+              boxWidth: 9,
+              padding: 14,
+              generateLabels: (chart) =>
+                RETURNING_ORDER_BUCKETS.map((bucket, index) => ({
+                  text: `${bucket.label}: ${values[index]} · ${percentages[index].toFixed(1)}% · ${changes[index]}`,
+                  fillStyle: bucket.color,
+                  strokeStyle: bucket.color,
+                  lineWidth: 0,
+                  hidden: !chart.getDataVisibility(index),
+                  index,
+                })),
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) =>
+                `${context.label}: ${context.raw} customer(s) · ${percentages[context.dataIndex].toFixed(1)}%`,
+              afterLabel: (context) =>
+                `Previous: ${previousValues[context.dataIndex]} · Change: ${changes[context.dataIndex]}`,
+            },
+          },
+        },
+      },
     });
   }
 

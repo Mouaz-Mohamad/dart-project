@@ -95,6 +95,13 @@ describe("finance summary integrity", () => {
     expect(summary.refundCashOut).toBe(20);
     expect(summary.netCashFlow).toBe(30);
     expect(summary.uniqueCustomers).toBe(1);
+    expect(summary.orderFrequencyBuckets).toEqual({
+      oneOrder: 1,
+      twoOrders: 0,
+      threeOrders: 0,
+      fourOrders: 0,
+      fivePlusOrders: 0,
+    });
     expect(summary.averageOrderValue).toBe(65.01);
   });
 

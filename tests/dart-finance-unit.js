@@ -187,6 +187,29 @@ assert.strictEqual(repeatSummary.uniqueCustomers, 2);
 assert.strictEqual(repeatSummary.returningCustomers, 1);
 assert.strictEqual(repeatSummary.repeatRate, 50);
 
+const frequencyOrders = [1, 2, 3, 4, 6].flatMap((count, customerIndex) =>
+  Array.from({ length: count }, (_, orderIndex) => ({
+    ...deliveredOrder,
+    id: `FREQ-${customerIndex}-${orderIndex}`,
+    orderId: `K-FREQ-${customerIndex}-${orderIndex}`,
+    clientId: `DA-FREQ-${customerIndex}`,
+    deliveredAt: `2026-09-${String(2 + customerIndex * 3 + orderIndex).padStart(2, "0")}`,
+    priceSnapshot: [{
+      ...deliveredOrder.priceSnapshot[0],
+      itemCode: `I-FREQ-${customerIndex}-${orderIndex}`,
+    }],
+  })),
+);
+const frequencySummary = finance.calculateSummary(
+  baseData({ orders: frequencyOrders }),
+  range("2026-09-01", "2026-09-30"),
+);
+assert.deepStrictEqual(
+  frequencySummary.orderFrequencyBuckets,
+  { oneOrder: 1, twoOrders: 1, threeOrders: 1, fourOrders: 1, fivePlusOrders: 1 },
+  "Customer order-frequency analytics must expose exactly 1, 2, 3, 4 and 5+ delivered-order buckets.",
+);
+
 const modelRows = finance.modelProfitability(repeatData, range("2026-09-01", "2026-09-30"));
 assert.strictEqual(modelRows[0].modelCode, "M-1");
 assert.strictEqual(modelRows[0].revenue, 1800);

@@ -51,6 +51,13 @@ export interface FinanceSummary {
   uniqueCustomers: number;
   returningCustomers: number;
   oneTimeCustomers: number;
+  orderFrequencyBuckets: {
+    oneOrder: number;
+    twoOrders: number;
+    threeOrders: number;
+    fourOrders: number;
+    fivePlusOrders: number;
+  };
   repeatRate: number;
   cashIn: number;
   cashOut: number;
@@ -397,13 +404,17 @@ export class FinanceService {
           (customerOrders.get(order.customer_user_id) || 0) + 1,
         );
       }
+      const orderCounts = [...customerOrders.values()];
       const uniqueCustomers = customerOrders.size;
-      const returningCustomers = [...customerOrders.values()].filter(
-        (count) => count >= 2,
-      ).length;
-      const oneTimeCustomers = [...customerOrders.values()].filter(
-        (count) => count === 1,
-      ).length;
+      const returningCustomers = orderCounts.filter((count) => count >= 2).length;
+      const oneTimeCustomers = orderCounts.filter((count) => count === 1).length;
+      const orderFrequencyBuckets = {
+        oneOrder: orderCounts.filter((count) => count === 1).length,
+        twoOrders: orderCounts.filter((count) => count === 2).length,
+        threeOrders: orderCounts.filter((count) => count === 3).length,
+        fourOrders: orderCounts.filter((count) => count === 4).length,
+        fivePlusOrders: orderCounts.filter((count) => count >= 5).length,
+      };
 
       let fallbackCodCashInMinor = 0;
       for (const order of deliveredResult.rows) {
@@ -498,6 +509,7 @@ export class FinanceService {
         uniqueCustomers,
         returningCustomers,
         oneTimeCustomers,
+        orderFrequencyBuckets,
         repeatRate: uniqueCustomers > 0
           ? metric((returningCustomers / uniqueCustomers) * 100)
           : 0,

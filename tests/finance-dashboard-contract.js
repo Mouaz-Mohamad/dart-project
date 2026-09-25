@@ -55,6 +55,15 @@ for (const staticId of [
 ]) assert(html.includes(`id="${staticId}"`), `Static HTML structure is missing #${staticId}.`);
 
 assert(html.includes("Compared with the previous equivalent period"), "Unified period comparison copy is missing.");
+assert(html.includes("Customer Order Frequency"), "Brand must label the five-bucket customer frequency chart clearly.");
+for (const label of ["1 Order", "2 Orders", "3 Orders", "4 Orders", "5+ Orders"]) {
+  assert(finance.includes(`label: "${label}"`), `Returning-customer chart is missing ${label}.`);
+}
+for (const color of ["#F2E3E7", "#E3B7C2", "#D18498", "#BF506D", "#AB012B"]) {
+  assert(finance.includes(color), `Returning-customer chart is missing brand-compatible bucket color ${color}.`);
+}
+assert(finance.includes("renderReturningChart(currentFrequency, previousFrequency)"), "Returning-customer chart must compare each bucket with the previous equivalent period.");
+assert(finance.includes("orderFrequencyBuckets"), "Finance summary must expose five customer order-frequency buckets.");
 assert(!finance.includes("insertAdjacentHTML(\"beforeend\", '<li><a href=\"#\" data-target=\"finance\""), "Finance navigation must live in HTML.");
 assert(!finance.includes("document.body.insertAdjacentHTML"), "The Finance modal must live in HTML.");
 assert(!finance.includes("periodControlMarkup"), "Period-control structure must live in HTML.");
