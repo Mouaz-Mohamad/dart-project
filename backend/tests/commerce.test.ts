@@ -8,7 +8,7 @@ import {
 } from "../src/modules/commerce/commerce.service.js";
 
 describe("CommerceService public leaderboard", () => {
-  it("ranks every monthly buyer by net purchased pieces then net spend, subtracts completed refunds, and keeps exchanges", async () => {
+  it("ranks monthly buyers by net pieces, excludes only active Dart Card holders, and restores expired or consumed holders", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("FROM orders o") && sql.includes("JOIN customers c")) {
         expect(sql).toContain("LEFT JOIN customers c");
@@ -40,7 +40,7 @@ describe("CommerceService public leaderboard", () => {
             },
             {
               client_code: "DR-3",
-              full_name: "Card Holder Customer",
+              full_name: "Active Card Holder",
               order_code: "K-4",
               final_minor: "30000",
               amount_refunded_minor: "0",
@@ -56,7 +56,7 @@ describe("CommerceService public leaderboard", () => {
             },
             {
               client_code: "DR-5",
-              full_name: "Fourth Eligible Customer",
+              full_name: "Consumed Card Customer",
               order_code: "K-6",
               final_minor: "1000",
               amount_refunded_minor: "0",
@@ -105,7 +105,45 @@ describe("CommerceService public leaderboard", () => {
         };
       }
 
-
+      if (sql.includes("FROM loyalty_cards")) {
+        return {
+          rows: [
+            {
+              payload: {
+                clientId: "DR-3",
+                status: "Active",
+                purchasedItems: "4",
+                itemLimit: 10,
+                expDate: "31/12/2027",
+                isArchived: false,
+                isDeleted: false,
+              },
+            },
+            {
+              payload: {
+                clientId: "DR-4",
+                status: "Expired",
+                purchasedItems: "2",
+                itemLimit: 10,
+                expDate: "01/01/2026",
+                isArchived: false,
+                isDeleted: false,
+              },
+            },
+            {
+              payload: {
+                clientId: "DR-5",
+                status: "Active",
+                purchasedItems: "10",
+                itemLimit: 10,
+                expDate: "31/12/2027",
+                isArchived: false,
+                isDeleted: false,
+              },
+            },
+          ],
+        };
+      }
 
       throw new Error(`Unexpected query in leaderboard test: ${sql}`);
     });
@@ -128,36 +166,32 @@ describe("CommerceService public leaderboard", () => {
       },
       {
         rank: 2,
-        name: "Card Holder Customer",
-        orders: 1,
-        items: 4,
-      },
-      {
-        rank: 3,
         name: "Bob Example Customer",
         orders: 1,
         items: 3,
       },
       {
-        rank: 4,
+        rank: 3,
         name: "Alice Example Customer",
         orders: 2,
         items: 2,
       },
       {
-        rank: 5,
+        rank: 4,
         name: "Expired Card Customer",
         orders: 1,
         items: 1,
       },
       {
-        rank: 6,
-        name: "Fourth Eligible Customer",
+        rank: 5,
+        name: "Consumed Card Customer",
         orders: 1,
         items: 1,
       },
     ]);
-    expect(result.rows.some((row) => row.name.includes("Card Holder"))).toBe(true);
+    expect(result.rows.some((row) => row.name.includes("Active Card"))).toBe(false);
+    expect(result.rows.some((row) => row.name.includes("Expired Card"))).toBe(true);
+    expect(result.rows.some((row) => row.name.includes("Consumed Card"))).toBe(true);
     expect(release).toHaveBeenCalledOnce();
   });
 });

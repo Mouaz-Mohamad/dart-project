@@ -75,7 +75,7 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain('reward.status = String(reward.expiresAt || "") > cairoDateKey() ? "Active" : "Expired"');
   });
 
-  it("keeps leaderboard relational reads sequential and does not exclude active Dart Card holders", () => {
+  it("keeps leaderboard relational reads sequential and excludes only usable active Dart Cards", () => {
     const leaderboardStart = service.indexOf("public async publicLeaderboard");
     const leaderboardEnd = service.indexOf("public async validatePromotionCode", leaderboardStart);
     const leaderboardSource = service.slice(leaderboardStart, leaderboardEnd);
@@ -84,11 +84,14 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(leaderboardSource).toContain(
       'const returnRows = await readRelationalDashboardDomain(client, "returns");',
     );
-    expect(leaderboardSource).not.toContain(
-      'readRelationalDashboardDomain(client, "cards")',
+    expect(leaderboardSource).toContain(
+      'const cardRows = await readRelationalDashboardDomain(client, "cards");',
     );
-    expect(leaderboardSource).not.toContain("excludedClients");
-    expect(leaderboardSource).toContain(".filter((row) => row.items > 0)");
+    expect(leaderboardSource).toContain("activeDartCardClients");
+    expect(leaderboardSource).toContain('String(card.status || "").trim().toLowerCase() !== "active"');
+    expect(leaderboardSource).toContain("purchasedItems < limit");
+    expect(leaderboardSource).toContain("!expiry || expiry >= nowMs");
+    expect(leaderboardSource).toContain("!activeDartCardClients.has(clientCode)");
   });
 
   it("does not expose archived deliveries as active representative work", () => {

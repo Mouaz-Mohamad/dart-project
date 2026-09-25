@@ -724,6 +724,28 @@ export class CommerceService {
       // "client already executing a query" deprecation warning and can become
       // an error in pg@9, so keep these domain reads intentionally ordered.
       const returnRows = await readRelationalDashboardDomain(client, "returns");
+      const cardRows = await readRelationalDashboardDomain(client, "cards");
+
+      const nowMs = Date.now();
+      const activeDartCardClients = new Set(
+        cardRows
+          .map((raw) => raw as Record<string, unknown>)
+          .filter((card) => {
+            if (
+              String(card.status || "").trim().toLowerCase() !== "active" ||
+              Boolean(card.isArchived) ||
+              Boolean(card.isDeleted)
+            ) {
+              return false;
+            }
+            const limit = Math.max(1, Number(card.itemLimit || card.purchasedLimit || 10));
+            const purchasedItems = Math.max(0, Number(card.purchasedItems || 0));
+            const expiry = flexibleDateExpiry(card.expDate);
+            return purchasedItems < limit && (!expiry || expiry >= nowMs);
+          })
+          .map((card) => String(card.clientId || card.customerId || "").trim())
+          .filter(Boolean),
+      );
 
       const completedRefundItems = new Set(
         returnRows
@@ -797,15 +819,18 @@ export class CommerceService {
         return parts.length ? parts.join(" ") : "Dart Customer";
       };
 
-      const rows = [...byCustomer.values()]
-        .filter((row) => row.items > 0)
+      const rows = [...byCustomer.entries()]
+        .filter(
+          ([clientCode, row]) =>
+            row.items > 0 && !activeDartCardClients.has(clientCode),
+        )
         .sort(
-          (left, right) =>
+          ([, left], [, right]) =>
             right.items - left.items ||
             right.spentMinor - left.spentMinor ||
             right.orders - left.orders,
         )
-        .map((row, index) => ({
+        .map(([, row], index) => ({
           rank: index + 1,
           name: publicName(row.name),
           orders: row.orders,
