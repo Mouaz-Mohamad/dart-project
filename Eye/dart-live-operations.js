@@ -61,10 +61,10 @@
   let routeFetchState = new Map();
 
   function api(path, options) {
-    if (!window.DartApi?.request) {
-      return Promise.reject(new Error("Dart API is unavailable."));
+    if (!window.DartAdminApi?.request) {
+      return Promise.reject(new Error("Dart Admin API is unavailable."));
     }
-    return window.DartApi.request(path, options);
+    return window.DartAdminApi.request(path, options);
   }
 
   function can(permission) {
