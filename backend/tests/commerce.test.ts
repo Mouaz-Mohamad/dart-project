@@ -321,7 +321,7 @@ describe("CommerceService admin live operations", () => {
     const pool = { query } as unknown as Pool;
     const result = await new CommerceService(pool).adminLiveOperations();
     expect(result.representatives).toHaveLength(1);
-    const representative = result.representatives[0] as Record<string, any>;
+    const representative = result.representatives[0];
     expect(representative.repId).toBe("REP-1");
     expect(representative.orders).toHaveLength(1);
     expect(representative.orders[0].orderId).toBe("K-40");
