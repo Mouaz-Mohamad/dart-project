@@ -11,6 +11,7 @@ describe("CommerceService public leaderboard", () => {
   it("ranks by net purchased pieces then net spend, subtracts completed refunds, keeps exchanges, and excludes active Dart Card holders", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("FROM orders o") && sql.includes("JOIN customers c")) {
+        expect(sql).toContain("LEFT JOIN customers c");
         return {
           rows: [
             {
@@ -60,6 +61,18 @@ describe("CommerceService public leaderboard", () => {
               final_minor: "1000",
               amount_refunded_minor: "0",
               item_codes: ["E-1"],
+            },
+            {
+              client_code: "DR-6",
+              full_name: "Migrated Seven Piece Customer",
+              order_code: "K-7",
+              final_minor: "70000",
+              amount_refunded_minor: "0",
+              item_codes: [],
+              legacy: {
+                clientId: "DR-6",
+                items: ["G-1", "G-2", "G-3", "G-4", "G-5", "G-6", "G-7"],
+              },
             },
           ],
         };
@@ -131,24 +144,30 @@ describe("CommerceService public leaderboard", () => {
     expect(result.rows).toEqual([
       {
         rank: 1,
+        name: "Migrated Seven Piece Customer",
+        orders: 1,
+        items: 7,
+      },
+      {
+        rank: 2,
         name: "Bob Example Customer",
         orders: 1,
         items: 3,
       },
       {
-        rank: 2,
+        rank: 3,
         name: "Alice Example Customer",
         orders: 2,
         items: 2,
       },
       {
-        rank: 3,
+        rank: 4,
         name: "Expired Card Customer",
         orders: 1,
         items: 1,
       },
       {
-        rank: 4,
+        rank: 5,
         name: "Fourth Eligible Customer",
         orders: 1,
         items: 1,
@@ -288,7 +307,9 @@ describe("CommerceService admin live operations", () => {
     const now = new Date("2026-09-25T16:00:00.000Z");
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("WITH active_reps AS")) {
-        expect(sql).toContain("status NOT IN ('Delivered','Cancelled','Refused')");
+        expect(sql).toContain("status NOT IN ('Delivered','Cancelled','Refused','Returned')");
+        expect(sql).not.toContain("r.approval_status='approved'");
+        expect(sql).not.toContain("u.status='active'");
         return { rows: [{
           representative_user_id: "123e4567-e89b-12d3-a456-426614174111",
           representative_code: "REP-1",

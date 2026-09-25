@@ -682,9 +682,20 @@ export class CommerceService {
         final_minor: string;
         amount_refunded_minor: string;
         item_codes: string[];
+        legacy: Record<string, unknown> | null;
       }>(
-        `SELECT c.client_code,
-                c.full_name,
+        `SELECT COALESCE(
+                  NULLIF(c.client_code,''),
+                  NULLIF(o.legacy->>'clientId',''),
+                  o.customer_user_id::text,
+                  o.id::text
+                ) AS client_code,
+                COALESCE(
+                  NULLIF(c.full_name,''),
+                  NULLIF(o.contact_snapshot->>'name',''),
+                  NULLIF(o.legacy->>'clientName',''),
+                  'Dart Customer'
+                ) AS full_name,
                 o.order_code,
                 o.final_minor::text,
                 o.amount_refunded_minor::text,
@@ -692,9 +703,10 @@ export class CommerceService {
                   array_agg(oi.item_code ORDER BY oi.created_at, oi.id)
                     FILTER (WHERE oi.id IS NOT NULL),
                   ARRAY[]::text[]
-                ) AS item_codes
+                ) AS item_codes,
+                o.legacy
            FROM orders o
-           JOIN customers c ON c.user_id=o.customer_user_id
+           LEFT JOIN customers c ON c.user_id=o.customer_user_id
            LEFT JOIN order_items oi ON oi.order_id=o.id
           WHERE o.status='Delivered'
             AND NOT o.is_deleted
@@ -781,7 +793,21 @@ export class CommerceService {
           spentMinor: 0,
         };
         current.orders += 1;
-        current.items += (order.item_codes || []).filter(
+        const legacy = order.legacy && typeof order.legacy === "object" ? order.legacy : {};
+        const legacyItems = Array.isArray(legacy.items)
+          ? legacy.items.map((itemCode) => String(itemCode || "")).filter(Boolean)
+          : [];
+        const legacySnapshots = Array.isArray(legacy.priceSnapshot)
+          ? (legacy.priceSnapshot as Record<string, unknown>[])
+              .map((line) => String(line.itemCode || ""))
+              .filter(Boolean)
+          : [];
+        const itemCodes = (order.item_codes || []).length
+          ? order.item_codes
+          : legacyItems.length
+            ? legacyItems
+            : legacySnapshots;
+        current.items += itemCodes.filter(
           (itemCode) => !completedRefundItems.has(String(itemCode)),
         ).length;
         current.spentMinor += Math.max(
@@ -2350,7 +2376,7 @@ export class CommerceService {
                 MIN(updated_at) AS round_started_at
            FROM orders
           WHERE representative_user_id IS NOT NULL
-            AND status NOT IN ('Delivered','Cancelled','Refused')
+            AND status NOT IN ('Delivered','Cancelled','Refused','Returned')
             AND NOT is_deleted
             AND NOT is_archived
           GROUP BY representative_user_id
@@ -2365,11 +2391,8 @@ export class CommerceService {
               active_reps.round_started_at
          FROM active_reps
          JOIN representatives r ON r.user_id=active_reps.representative_user_id
-         JOIN users u ON u.id=r.user_id
          LEFT JOIN representative_locations rl
            ON rl.representative_user_id=r.user_id
-        WHERE r.approval_status='approved'
-          AND u.status='active'
         ORDER BY r.full_name`,
     );
 

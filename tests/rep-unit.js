@@ -13,6 +13,10 @@ const repSource=fs.readFileSync('Js/dart-rep.js','utf8');
 assert(repSource.includes('router.project-osrm.org/route/v1/driving'),'representative maps must use a real road router');
 assert(repSource.includes('window.L.polyline([], {'),'representative maps must keep the road layer empty until routing succeeds');
 assert(!/polyline\(\s*\[\s*\[courierLat, courierLng\],\s*\[destinationLat, destinationLng\]/.test(repSource),'representative maps must never draw a fake straight delivery route');
+assert(repSource.includes('LOCATION_SYNC_MS = 1000'),'representative GPS updates must use one-second cadence');
+assert(repSource.includes('ROAD_ROUTE_REFRESH_MS = 6000'),'representative road route updates must use six-second cadence');
+assert(repSource.includes('lastOrderRenderSignature === renderSignature'),'unchanged assigned work must keep existing Leaflet maps mounted');
+assert(repSource.includes('Keep the last valid road geometry visible'),'routing failure must keep the previous valid road line visible');
 (async()=>{
   const activeHash=await sha('password1'),pendingHash=await sha('password2');
   localStorage.setItem('dart_representatives',JSON.stringify([{id:'R1',repId:'Rep-1',name:'Active Rep',nationalId:'29901011234567',email:'active@example.com',phone1:'01011112222',phone2:'-',passwordHash:activeHash,status:'Active',isArchived:false,isDeleted:false},{id:'R2',repId:'Rep-2',name:'Pending Rep',nationalId:'29901011234568',email:'pending@example.com',phone1:'01011112223',phone2:'-',passwordHash:pendingHash,status:'Pending Approval',isArchived:false,isDeleted:false}]));

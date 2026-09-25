@@ -11,7 +11,7 @@
   const liveTrips = new Map();
   const LIVE_LOCATION_POLL_MS = 1000;
   const SNAPSHOT_REFRESH_MS = 3000;
-  const ROAD_ROUTE_REFRESH_MS = 5000;
+  const ROAD_ROUTE_REFRESH_MS = 6000;
   let lastViewSignature = "";
   let lastLiveTripSignature = "";
   let liveRefreshBusy = false;
@@ -290,10 +290,12 @@
       }
     } catch {
       if (state.roadRouteRequestId !== requestId) return;
-      state.hasRoadRoute = false;
-      state.route.setLatLngs([]);
+      const hasPreviousRoute = Boolean(state.route?.getLatLngs?.()?.length);
+      state.hasRoadRoute = state.hasRoadRoute || hasPreviousRoute;
       if (state.summary) {
-        state.summary.textContent = "Representative location is live. Road route is temporarily unavailable.";
+        state.summary.textContent = hasPreviousRoute
+          ? "Representative location is live. Keeping the last road route while it refreshes."
+          : "Representative location is live. Road route is temporarily unavailable.";
       }
     } finally {
       if (timeout) clearTimeout(timeout);
@@ -318,8 +320,6 @@
     }
 
     clearAnimation(state);
-    state.hasRoadRoute = false;
-    state.route?.setLatLngs([]);
     const startedAt = typeof performance !== "undefined" && performance.now
       ? performance.now()
       : Date.now();

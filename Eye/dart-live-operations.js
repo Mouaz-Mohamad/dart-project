@@ -7,7 +7,7 @@
   if (!section) return;
 
   const POLL_MS = 3000;
-  const ROUTE_REFRESH_MS = 15000;
+  const ROUTE_REFRESH_MS = 6000;
   const COLORS = Object.freeze({
     current: "#AB012B",
     upcoming: "#2563eb",
@@ -250,7 +250,7 @@
       .join(";");
     const now = Date.now();
     const cached = routeFetchState.get(rep.id);
-    if (cached && cached.signature === signature && now - cached.at < ROUTE_REFRESH_MS) {
+    if (cached && now - cached.at < ROUTE_REFRESH_MS) {
       return cached.legs;
     }
     const points = coordinates
@@ -295,10 +295,11 @@
 
   async function renderRoutes() {
     if (!map) return;
-    clearLayerMap(routeLayers);
+    const desiredKeys = new Set();
     for (const rep of snapshot.representatives || []) {
       if (!visibleRep(rep)) continue;
       const { stops, coordinates } = routeCoordinates(rep);
+      for (const target of stops) desiredKeys.add(`${rep.id}:${target.orderId}`);
       if (coordinates.length < 2) continue;
       const legs = await roadLegGeometries(rep, coordinates);
       if (!Array.isArray(legs)) continue;
@@ -306,49 +307,86 @@
         const geometry = legs[index];
         const target = stops[index];
         if (!target || !Array.isArray(geometry) || geometry.length < 2) continue;
-        const layer = window.L.polyline(geometry, {
+        const key = `${rep.id}:${target.orderId}`;
+        const style = {
           color: COLORS[target.routeState] || COLORS.upcoming,
           weight: target.routeState === "current" ? 6 : 4,
           opacity: target.routeState === "delivered" ? .55 : .82,
-        }).addTo(map);
-        routeLayers.set(`${rep.id}:${target.orderId}`, layer);
+        };
+        const existing = routeLayers.get(key);
+        if (existing) {
+          existing.setLatLngs(geometry);
+          existing.setStyle?.(style);
+        } else {
+          routeLayers.set(key, window.L.polyline(geometry, style).addTo(map));
+        }
       }
+    }
+    for (const [key, layer] of routeLayers) {
+      if (desiredKeys.has(key)) continue;
+      try { map.removeLayer(layer); } catch {}
+      routeLayers.delete(key);
     }
   }
 
   function renderMarkers() {
     ensureMap();
     if (!map) return;
-    clearLayerMap(repMarkers);
-    clearLayerMap(orderMarkers);
+    const desiredRepKeys = new Set();
+    const desiredOrderKeys = new Set();
 
     for (const rep of snapshot.representatives || []) {
       if (!visibleRep(rep)) continue;
       if (rep.location && Number.isFinite(Number(rep.location.lat)) && Number.isFinite(Number(rep.location.lng))) {
-        const marker = window.L.marker(
-          [Number(rep.location.lat), Number(rep.location.lng)],
-          { icon: repIcon(rep), zIndexOffset: 1000 },
-        )
-          .addTo(map)
-          .bindTooltip(esc(rep.name), { permanent: false, direction: "top", className: "dart-live-marker-label" });
-        marker.on("click", () => selectRepresentative(rep.id, true));
-        repMarkers.set(String(rep.id), marker);
+        const key = String(rep.id);
+        const point = [Number(rep.location.lat), Number(rep.location.lng)];
+        desiredRepKeys.add(key);
+        let marker = repMarkers.get(key);
+        if (marker) {
+          marker.setLatLng(point);
+          marker.setIcon?.(repIcon(rep));
+          marker.setTooltipContent?.(esc(rep.name));
+        } else {
+          marker = window.L.marker(point, { icon: repIcon(rep), zIndexOffset: 1000 })
+            .addTo(map)
+            .bindTooltip(esc(rep.name), { permanent: false, direction: "top", className: "dart-live-marker-label" });
+          marker.on("click", () => selectRepresentative(rep.id, true));
+          repMarkers.set(key, marker);
+        }
       }
 
       for (const order of rep.orders || []) {
         if (!filterEnabled(order.routeState)) continue;
         const point = orderCoordinates(order);
         if (!point) continue;
-        const marker = window.L.marker(point, {
-          icon: orderIcon(order),
-          zIndexOffset: order.routeState === "current" ? 800 : 100,
-        }).addTo(map);
-        marker.bindPopup(
-          `<div class="dart-live-order-popup"><strong>#${esc(order.orderId)}</strong><small>${esc(stateLabel(order.routeState))}</small><small>${esc(order.clientName || "")}</small></div>`,
-        );
-        marker.on("click", () => selectOrder(rep.id, order.orderId));
-        orderMarkers.set(String(order.orderId), marker);
+        const key = `${rep.id}:${order.orderId}`;
+        desiredOrderKeys.add(key);
+        let marker = orderMarkers.get(key);
+        const popup = `<div class="dart-live-order-popup"><strong>#${esc(order.orderId)}</strong><small>${esc(stateLabel(order.routeState))}</small><small>${esc(order.clientName || "")}</small></div>`;
+        if (marker) {
+          marker.setLatLng(point);
+          marker.setIcon?.(orderIcon(order));
+          marker.setPopupContent?.(popup);
+        } else {
+          marker = window.L.marker(point, {
+            icon: orderIcon(order),
+            zIndexOffset: order.routeState === "current" ? 800 : 100,
+          }).addTo(map);
+          marker.bindPopup(popup);
+          marker.on("click", () => selectOrder(rep.id, order.orderId));
+          orderMarkers.set(key, marker);
+        }
       }
+    }
+    for (const [key, marker] of repMarkers) {
+      if (desiredRepKeys.has(key)) continue;
+      try { map.removeLayer(marker); } catch {}
+      repMarkers.delete(key);
+    }
+    for (const [key, marker] of orderMarkers) {
+      if (desiredOrderKeys.has(key)) continue;
+      try { map.removeLayer(marker); } catch {}
+      orderMarkers.delete(key);
     }
     void renderRoutes();
     fitMap();
