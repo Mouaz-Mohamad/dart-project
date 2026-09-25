@@ -33,6 +33,7 @@ const catalogRoutes = read("backend/src/modules/catalog/catalog.routes.ts");
 const actionPermissionMigration = read("backend/migrations/0027_action_permissions.sql");
 const dashboardHtml = read("Eye/Dart Eye.html");
 const dashboardRuntime = read("Eye/dart.js");
+const trafficAnalyticsRuntime = read("Eye/dart-traffic-analytics.js");
 const storefrontRuntime = read("Js/dart-ui.js");
 const operationsRuntime = read("Eye/dart-operations.js");
 const ordersApiRuntime = read("Eye/dart-orders-api.js");
@@ -312,7 +313,7 @@ assert.match(
   "dashboard sales-year controls must be wired through external event listeners",
 );
 assert.match(
-  dashboardRuntime,
+  trafficAnalyticsRuntime,
   /querySelectorAll\("\[data-chart-period-tow\]"\)[\s\S]*addEventListener\("click"/,
   "dashboard chart-period controls must be wired through external event listeners",
 );
