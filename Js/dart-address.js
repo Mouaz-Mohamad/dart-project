@@ -61,8 +61,8 @@
     return {
       country: a.country || 'Egypt',
       governorate: canonicalDeliveryGovernorate(rawGovernorate) || rawGovernorate,
-      area: a.suburb || a.neighbourhood || a.city_district || a.town || a.village || a.city || a.county || '',
-      street: a.road || a.pedestrian || a.residential || a.footway || '',
+      area: a.suburb || a.neighbourhood || a.quarter || a.borough || a.city_district || a.state_district || a.town || a.village || a.city || a.county || '',
+      street: a.road || a.pedestrian || a.residential || a.footway || a.path || a.service || '',
       building: providerBuilding(result),
       fullAddress: result?.display_name || ''
     };
@@ -147,6 +147,7 @@
     let manualTimer = null;
     let requestVersion = 0;
     let lastValidLocation = null;
+    let userInteractedWithAddress = false;
 
     function status(message, state = '') {
       if (!fields.status) return;
@@ -195,6 +196,7 @@
     }
 
     async function selectLocation(lat, lng, knownResult = null) {
+      userInteractedWithAddress = true;
       const version = ++requestVersion;
       status('Checking that this delivery location is inside Cairo or Giza…', 'loading');
       try {
@@ -308,7 +310,7 @@
         navigator.geolocation.getCurrentPosition(
           position => selectLocation(position.coords.latitude, position.coords.longitude),
           () => status('Location permission was denied. Select the pin manually.', 'error'),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
       });
       return wrap;
@@ -352,14 +354,26 @@
     }
 
     const manualFields = [fields.country, fields.governorate, fields.area, fields.street, fields.building, fields.floor].filter(Boolean);
+    const hasVerifiedCoordinates = () => {
+      const lat = Number(value(fields.latitude));
+      const lng = Number(value(fields.longitude));
+      return Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0 &&
+        form.dataset.dartDeliveryZone === 'cairo-giza';
+    };
     const onManualAddressInput = () => {
       if (form.dataset.dartAddressApplying === 'true') return;
+      userInteractedWithAddress = true;
+      clearTimeout(manualTimer);
+      // Once the customer deliberately selects a map/GPS pin, text fields only
+      // describe that exact destination. They must never silently geocode a new pin.
+      if (hasVerifiedCoordinates()) {
+        form.dataset.dartAddressReady = 'true';
+        status('Exact map pin preserved. Address details updated without moving the destination.', 'success');
+        return;
+      }
       form.dataset.dartAddressSource = 'manual';
       form.dataset.dartAddressReady = 'false';
       form.dataset.dartDeliveryZone = '';
-      if (fields.latitude) fields.latitude.value = '';
-      if (fields.longitude) fields.longitude.value = '';
-      clearTimeout(manualTimer);
       manualTimer = setTimeout(() => {
         if (manualFields.every(input => value(input))) locateManualAddress(false);
       }, 1500);
@@ -370,11 +384,48 @@
     });
 
     const manualButton = document.querySelector(options.manualButton);
-    manualButton?.addEventListener('click', () => locateManualAddress(true));
+    manualButton?.addEventListener('click', () => {
+      userInteractedWithAddress = true;
+      locateManualAddress(true);
+    });
+
+    function applySavedAddress(saved) {
+      if (!saved || userInteractedWithAddress) return false;
+      const lat = Number(saved.lat ?? saved.latitude);
+      const lng = Number(saved.lng ?? saved.longitude);
+      const governorate = canonicalDeliveryGovernorate(saved.governorate);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat || !lng ||
+          !governorate || !isInsideDeliveryBounds(lat, lng)) return false;
+      form.dataset.dartAddressApplying = 'true';
+      try {
+        setValue(fields.country, saved.country || 'Egypt');
+        setValue(fields.governorate, governorate);
+        setValue(fields.area, saved.area || '');
+        setValue(fields.street, saved.street || '');
+        setValue(fields.building, saved.building || '');
+        setValue(fields.floor, saved.floor || '');
+        const savedText = String(saved.address || saved.fullAddress || '').trim();
+        if (fields.fullAddress && savedText) fields.fullAddress.value = savedText;
+        if (fields.search && savedText) fields.search.value = savedText;
+        setCoordinates(lat, lng, 'map');
+        lastValidLocation = { lat, lng };
+        setMarker(lat, lng, false);
+        status('Saved exact delivery pin restored. Review the address details before ordering.', 'success');
+      } finally {
+        form.dataset.dartAddressApplying = 'false';
+      }
+      return true;
+    }
+
+    const savedAddress = window.DartState?.read?.('user_last_address', null);
+    const restoredSavedAddress = applySavedAddress(savedAddress);
+    window.addEventListener('dart:saved-address-hydrated', event => {
+      applySavedAddress(event.detail?.address || null);
+    });
 
     const initialLat = Number(value(fields.latitude));
     const initialLng = Number(value(fields.longitude));
-    if (Number.isFinite(initialLat) && Number.isFinite(initialLng) && initialLat && initialLng) selectLocation(initialLat, initialLng);
+    if (!restoredSavedAddress && Number.isFinite(initialLat) && Number.isFinite(initialLng) && initialLat && initialLng) selectLocation(initialLat, initialLng);
 
     const controller = { map, selectLocation, locateManualAddress, validate, fields, invalidate: () => setTimeout(() => map.invalidateSize(), 50) };
     controllers.set(mapElement, controller);

@@ -359,7 +359,11 @@
       live?.deliveryStartedAt ||
       live?.pickupStartedAt ||
       record.deliveryStartedAt ||
-      record.pickupStartedAt
+      record.pickupStartedAt ||
+      live?.status === "Representative On The Way" ||
+      live?.status === "Pickup On The Way" ||
+      record.status === "Representative On The Way" ||
+      record.status === "Pickup On The Way"
     );
     const hasRep = Boolean(record.representativeId || record.representativeBusinessId);
     const hasCourier =
@@ -392,12 +396,16 @@
     }
 
     if (state.courierMarker || state.route) removeCourierLayers(state);
-    state.shell?.classList.add("is-disabled");
+    // A saved destination is useful before GPS arrives: keep the actual map and
+    // destination pin visible and only dim it while waiting for the courier.
+    state.shell?.classList.remove("is-disabled");
     if (state.overlay) {
       state.overlay.hidden = false;
-      state.overlay.textContent = hasRep
-        ? "Waiting for the representative to start"
-        : "Waiting for representative assignment";
+      state.overlay.textContent = started
+        ? "Waiting for representative location"
+        : hasRep
+          ? "Waiting for the representative to start delivery"
+          : "Waiting for representative assignment";
     }
     if (state.summary) {
       state.summary.textContent = `Saved destination: ${fullAddress(record) || "-"}`;

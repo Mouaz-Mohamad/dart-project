@@ -1492,6 +1492,21 @@
       write("dart_cart", []);
       setCartReservationId(uid("CART"));
       window.dartAppliedPromotion = null;
+      try {
+        await saveCustomerAddress({
+          address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
+          lat: Number(details.latitude),
+          lng: Number(details.longitude),
+          country: details.country,
+          governorate: details.governorate,
+          area: details.area,
+          street: details.street,
+          building: details.building,
+          floor: details.floor,
+        });
+      } catch {
+        // The order is already server-authoritative; address preference sync is best-effort.
+      }
       await Promise.all([
         window.DartCatalog?.checkForServerChanges?.(),
         hydrateCustomerCommerce(),

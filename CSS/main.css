@@ -3173,7 +3173,7 @@ button,
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(51, 65, 85, 0.30);
   color: #fff;
   text-align: center;
   font-weight: 800;

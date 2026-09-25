@@ -7042,7 +7042,6 @@ export class CommerceService {
            ON rl.representative_user_id=o.representative_user_id
         WHERE o.customer_user_id=$1
           AND o.status='Representative On The Way'
-          AND o.delivery_started_at IS NOT NULL
           AND NOT o.is_deleted
           AND NOT o.is_archived
         ORDER BY o.created_at DESC`,

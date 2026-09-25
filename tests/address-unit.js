@@ -50,9 +50,17 @@ assert(!address.isSupportedDeliveryResult({lat:'31.2000', lon:'29.9187', address
 assert(address.addressParts({address:{state:'Cairo Governorate',road:'Example',house_number:'48'}}).building === '48', 'reverse geocoding must prefer the provider house number');
 assert(address.addressParts({category:'building',type:'apartments',name:'Tower A',address:{state:'Cairo Governorate',road:'Example'}}).building === 'Tower A', 'building-like provider names may fill the building field when no house number exists');
 assert(address.addressParts({category:'highway',type:'residential',name:'Example Street',address:{state:'Cairo Governorate',road:'Example Street'}}).building === '', 'street names must never be invented as building numbers');
+const mobileParts = address.addressParts({address:{state:'Cairo Governorate',quarter:'El Manteqa',path:'Service Path'}});
+assert(mobileParts.area === 'El Manteqa', 'mobile reverse geocoding should accept quarter as a precise area fallback');
+assert(mobileParts.street === 'Service Path', 'mobile reverse geocoding should accept path when road is unavailable');
 const addressSource = fs.readFileSync('Js/dart-address.js', 'utf8');
 assert(addressSource.includes("namedetails: '1'"), 'reverse lookup should request provider naming details for building fallback');
 assert(addressSource.includes('zoomControl: false'), 'address maps must not expose Leaflet zoom buttons');
 assert(addressSource.includes('setPrefix(false)'), 'address maps must remove Leaflet framework branding while provider attribution remains');
+assert(addressSource.includes('Exact map pin preserved. Address details updated without moving the destination.'), 'editing address details after choosing a pin must preserve the exact coordinates');
+assert(addressSource.includes('maximumAge: 0'), 'mobile GPS selection must request a fresh high-accuracy position');
+assert(addressSource.includes("dart:saved-address-hydrated"), 'the primary address controller must accept late server saved-address hydration');
+assert(addressSource.includes('const restoredSavedAddress = applySavedAddress(savedAddress)'), 'server saved addresses must restore their exact stored pin without reverse-geocoding it');
+assert(addressSource.includes('if (!restoredSavedAddress && Number.isFinite(initialLat)'), 'a restored exact saved pin must not be reverse-geocoded again during initialization');
 
 console.log('PASS Cairo and Giza delivery-zone unit tests');

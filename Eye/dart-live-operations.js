@@ -458,7 +458,11 @@
     nodes.panel.hidden = false;
   }
 
-  function selectRepresentative(id, focus = false) {
+  function selectRepresentative(id, focus = false, preserveFilter = false) {
+    if (!preserveFilter) {
+      representativeFilterId = "";
+      if (nodes.repSelect) nodes.repSelect.value = "";
+    }
     selectedRepresentativeId = String(id || "");
     selectedOrderId = "";
     renderRepresentativeList();
@@ -474,9 +478,12 @@
   }
 
   function selectOrder(repId, orderId) {
+    representativeFilterId = "";
+    if (nodes.repSelect) nodes.repSelect.value = "";
     selectedRepresentativeId = String(repId || "");
     selectedOrderId = String(orderId || "");
     renderRepresentativeList();
+    renderMarkers();
     const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);
     const order = rep?.orders?.find((row) => String(row.orderId) === selectedOrderId);
     if (rep && order) renderOrderPanel(rep, order);
@@ -566,7 +573,7 @@
       representativeFilterId = String(nodes.repSelect.value || "");
       selectedRepresentativeId = representativeFilterId;
       selectedOrderId = "";
-      if (representativeFilterId) selectRepresentative(representativeFilterId, true);
+      if (representativeFilterId) selectRepresentative(representativeFilterId, true, true);
       else {
         selectedRepresentativeId = "";
         if (nodes.panel) nodes.panel.hidden = true;

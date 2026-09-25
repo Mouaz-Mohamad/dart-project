@@ -125,6 +125,10 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain("public async customerLiveTracking(");
     expect(service).toContain("payload->>'clientId'=$1");
     expect(service).toContain("status='Representative On The Way'");
+    const customerLiveStart = service.indexOf("public async customerLiveTracking(");
+    const customerLiveEnd = service.indexOf("public async customerSnapshot(", customerLiveStart);
+    const customerLiveSource = service.slice(customerLiveStart, customerLiveEnd);
+    expect(customerLiveSource).not.toContain("AND o.delivery_started_at IS NOT NULL");
     expect(service).toContain("payload->>'status'='Pickup On The Way'");
 
     const locationRoute = routes.indexOf('"/representatives/location"');

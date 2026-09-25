@@ -840,6 +840,52 @@
     );
   }
 
+  async function syncFreshRepresentativeLocation() {
+    if (!API_ENABLED || !navigator.geolocation) return false;
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 12000,
+        });
+      });
+      const payload = await window.DartApi.request("/api/v1/representatives/location", {
+        method: "PUT",
+        body: {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracyMeters: Number.isFinite(position.coords.accuracy)
+            ? position.coords.accuracy
+            : null,
+        },
+      });
+      lastLocationSyncAt = Date.now();
+      latestApiLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        heading: position.coords.heading,
+        speed: position.coords.speed,
+        updatedAt: payload.updatedAt || now(),
+      };
+      [...apiWork.orders, ...apiWork.returns].forEach((record) => {
+        if (record.status === "Representative On The Way" || record.status === "Pickup On The Way") {
+          record.courierLocation = latestApiLocation;
+        }
+      });
+      updateDeliveryMapsLocation(latestApiLocation);
+      setLocationStatus("Live location is being shared securely with Dart.", "success");
+      return true;
+    } catch (error) {
+      setLocationStatus(
+        `Waiting for a precise location: ${error?.message || "location unavailable"}`,
+        "error",
+      );
+      return false;
+    }
+  }
+
   async function updateOrderStatus(orderId, status) {
     if (API_ENABLED) {
       const order = (apiWork.orders || []).find(
@@ -863,6 +909,13 @@
         `/api/v1/representatives/orders/${encodeURIComponent(order.orderId)}/action`,
         { method: "POST", body: { action } },
       );
+      if (status === "Representative On The Way") {
+        activeOrderIds.add(order.id);
+        saveActiveIds();
+        // Publish one fresh position immediately after Start. watchPosition can
+        // otherwise wait for device movement before emitting another sample.
+        await syncFreshRepresentativeLocation();
+      }
       await refreshApiWork();
       if (status === "Delivered") activeOrderIds.delete(order.id);
       if (status === "Representative On The Way") activeOrderIds.add(order.id);
