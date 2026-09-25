@@ -431,9 +431,15 @@
       attributionControl: true,
     }).setView([destination.lat, destination.lng], 15);
     map.attributionControl?.setPrefix(false);
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      { maxZoom: 19, subdomains: "abcd", attribution: "&copy; OpenStreetMap contributors &copy; CARTO" },
+    const tileLayer = L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        subdomains: "abc",
+        attribution: "&copy; OpenStreetMap contributors",
+        updateWhenIdle: false,
+        keepBuffer: 4,
+      },
     ).addTo(map);
 
     const state = {
@@ -463,6 +469,8 @@
       programmaticViewChange: false,
       resetControl: null,
       resetButton: null,
+      tileLayer,
+      resizeObserver: null,
     };
 
     maps.set(container, state);
@@ -472,12 +480,23 @@
       if (!state.programmaticViewChange) markManualView(state);
     });
     updateMapState(state, record, liveRecord(kind, record));
-    setTimeout(() => map.invalidateSize(), 60);
+
+    const refreshMapSize = () => {
+      if (!container.isConnected) return;
+      map.invalidateSize({ animate: false, pan: false });
+    };
+    setTimeout(refreshMapSize, 0);
+    setTimeout(refreshMapSize, 180);
+    if (typeof ResizeObserver === "function") {
+      state.resizeObserver = new ResizeObserver(refreshMapSize);
+      state.resizeObserver.observe(container);
+    }
   }
 
   function disposeMaps() {
     for (const state of maps.values()) {
       clearAnimation(state);
+      try { state.resizeObserver?.disconnect(); } catch {}
       try { state.map.remove(); } catch {}
     }
     maps.clear();
