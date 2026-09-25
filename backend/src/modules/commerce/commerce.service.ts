@@ -3515,7 +3515,7 @@ export class CommerceService {
           record.dartCardUsageReversed = true;
           await client.query(
             `UPDATE dashboard_domain_state
-                SET data=$2::jsonb, version=$3, updated_at=now()
+                SET data=$1::jsonb, version=$2, updated_at=now()
               WHERE domain='cards'`,
             [
               JSON.stringify(cards),
@@ -3542,7 +3542,7 @@ export class CommerceService {
 
       await client.query(
         `UPDATE dashboard_domain_state
-            SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
+            SET data=$1::jsonb, version=$2, updated_by=$3, updated_at=now()
           WHERE domain='returns'`,
         [
           JSON.stringify(returnsRows),
@@ -3552,7 +3552,7 @@ export class CommerceService {
       );
       await client.query(
         `UPDATE dashboard_domain_state
-            SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
+            SET data=$1::jsonb, version=$2, updated_by=$3, updated_at=now()
           WHERE domain='damage'`,
         [
           JSON.stringify(damageRows),
@@ -3854,7 +3854,7 @@ export class CommerceService {
                   version=version+1,
                   updated_by=$3,
                   updated_at=now()
-            WHERE domain='damage' AND version=$4`,
+            WHERE domain=$1 AND version=$4`,
           ["damage", JSON.stringify(damageRows), actorId, damageVersion],
         );
         if (!damageUpdate.rowCount) {
@@ -3920,7 +3920,7 @@ export class CommerceService {
                 SET data=$2::jsonb,
                     version=version+1,
                     updated_at=now()
-              WHERE domain='cards' AND version=$3`,
+              WHERE domain=$1 AND version=$3`,
             ["cards", JSON.stringify(cards), Number(cardState?.version || 1)],
           );
         }
@@ -3933,7 +3933,7 @@ export class CommerceService {
                 version=version+1,
                 updated_by=$3,
                 updated_at=now()
-          WHERE domain='returns' AND version=$4`,
+          WHERE domain=$1 AND version=$4`,
         ["returns", JSON.stringify(returnsRows), actorId, returnsVersion],
       );
       if (!returnsUpdate.rowCount) {
@@ -4623,7 +4623,7 @@ export class CommerceService {
               record.dartCardUsageReversed = true;
               await client.query(
                 `UPDATE dashboard_domain_state
-                    SET data=$2::jsonb, version=$3, updated_at=now()
+                    SET data=$1::jsonb, version=$2, updated_at=now()
                   WHERE domain='cards'`,
                 [
                   JSON.stringify(cards),
@@ -6854,7 +6854,7 @@ export class CommerceService {
       if (returnsChanged) {
         await client.query(
           `UPDATE dashboard_domain_state
-              SET data=$2::jsonb, version=$3, updated_at=now()
+              SET data=$1::jsonb, version=$2, updated_at=now()
             WHERE domain='returns'`,
           [
             JSON.stringify(returnsRows),
@@ -6918,7 +6918,7 @@ export class CommerceService {
         }
         await client.query(
           `UPDATE dashboard_domain_state
-              SET data=$2::jsonb, version=$3, updated_at=now()
+              SET data=$1::jsonb, version=$2, updated_at=now()
             WHERE domain='birthday_rewards'`,
           [JSON.stringify(data), Number(state?.version || 1) + 1],
         );
@@ -6982,7 +6982,7 @@ export class CommerceService {
 
         await client.query(
           `UPDATE dashboard_domain_state
-              SET data=$2::jsonb, version=$3, updated_at=now()
+              SET data=$1::jsonb, version=$2, updated_at=now()
             WHERE domain='cards'`,
           [JSON.stringify(data), Number(state?.version || 1) + 1],
         );
