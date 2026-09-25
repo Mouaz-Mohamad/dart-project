@@ -235,18 +235,16 @@ export class FinanceService {
         "finance_settlements",
         "finance_marketing",
       ] as const;
-      const relationalRows = await Promise.all(
-        relationalDomains.map(async (domain) => [
+      // A single PoolClient must execute snapshot reads sequentially. Running
+      // these reads through Promise.all triggers pg's concurrent client.query()
+      // deprecation warning and will become invalid in pg@9.
+      const states = new Map<string, JsonRow[]>();
+      for (const domain of relationalDomains) {
+        states.set(
           domain,
-          await readRelationalDashboardDomain(client, domain),
-        ] as const),
-      );
-      const states = new Map(
-        relationalRows.map(([domain, rows]) => [
-          domain,
-          rows as JsonRow[],
-        ]),
-      );
+          (await readRelationalDashboardDomain(client, domain)) as JsonRow[],
+        );
+      }
 
       const returns = states.get("returns") || [];
       const periodReturns = uniqueCompletedReturns(returns, start, end);

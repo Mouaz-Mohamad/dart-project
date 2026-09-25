@@ -1,7 +1,13 @@
 // DART CODE GUIDE | backend/tests/finance.test.ts
 // الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { FinanceService } from "../src/modules/finance/finance.service.js";
+
+const financeSource = readFileSync(
+  new URL("../src/modules/finance/finance.service.ts", import.meta.url),
+  "utf8",
+);
 
 function financePool(options: { failDelivered?: boolean } = {}) {
   const queries: string[] = [];
@@ -90,6 +96,16 @@ describe("finance summary integrity", () => {
     expect(summary.netCashFlow).toBe(30);
     expect(summary.uniqueCustomers).toBe(1);
     expect(summary.averageOrderValue).toBe(65.01);
+  });
+
+  it("reads relational domains sequentially on one pg client", () => {
+    expect(financeSource).not.toMatch(
+      /relationalRows\s*=\s*await Promise\.all/,
+    );
+    expect(financeSource).toContain("for (const domain of relationalDomains)");
+    expect(financeSource).toContain(
+      "await readRelationalDashboardDomain(client, domain)",
+    );
   });
 
   it("rolls the read transaction back when a finance query fails", async () => {
