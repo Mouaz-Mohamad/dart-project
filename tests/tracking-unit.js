@@ -69,6 +69,7 @@ assert(representativeSource.includes('lastLocationSyncAt < 3000'), 'Active repre
 assert(representativeSource.includes('updateDeliveryMapsLocation(latestApiLocation)'), 'Representative GPS updates must move existing map layers instead of rerendering the whole work UI');
 assert(representativeSource.includes('async function syncFreshRepresentativeLocation()'), 'Starting a delivery must have an explicit fresh-GPS sync path');
 assert(representativeSource.includes('await syncFreshRepresentativeLocation();'), 'Starting a delivery must publish a GPS sample even when the courier remains stationary');
+assert(trackingSource.includes('const businessId = kind === \"order\" ? record?.orderId : record?.returnId;'), 'Live tracking must key trips by stable public order/return IDs before internal UUIDs');
 assert(representativeSource.includes('maximumAge: 0'), 'The first delivery GPS sample must not reuse a stale device location');
 assert(trackingSource.includes('function activeTrackingRecord(records = [])'), 'Grouped customer tracking must resolve the actively delivered order instead of binding the map to the first grouped order');
 assert(trackingSource.includes('router.project-osrm.org/route/v1/driving'), 'Customer live tracking must request a road-aware route while delivery is active');

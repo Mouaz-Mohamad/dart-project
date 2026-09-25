@@ -114,7 +114,11 @@
   }
 
   function tripKey(kind, record) {
-    const id = record?.id || (kind === "order" ? record?.orderId : record?.returnId);
+    // Live endpoints and hydrated commerce snapshots can use different internal
+    // UUIDs for the same business record. Match on the stable public business
+    // identifier first (K-40 / return code), then fall back to the internal id.
+    const businessId = kind === "order" ? record?.orderId : record?.returnId;
+    const id = businessId || record?.id;
     return `${kind}:${String(id || "")}`;
   }
 
