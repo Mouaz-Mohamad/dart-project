@@ -168,7 +168,7 @@ const server = http.createServer(async (request, response) => {
       return json(response, 200, {
         status: "ok",
         apiCompatibility: "dart-database-v1",
-        capabilities: ["dashboard-domain-state-v1"],
+        capabilities: ["staff-email-access-v1", "dashboard-domain-state-v1", "bulk-domain-state-v1"],
       });
     }
 
