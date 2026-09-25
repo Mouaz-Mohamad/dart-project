@@ -40,6 +40,32 @@ const platformRuntime = read("Js/dart-platform.js");
 const stateRuntime = read("Js/dart-state.js");
 
 assert.match(
+  platformRuntime,
+  /function orderContainsReturnItem[\s\S]*priceSnapshot[\s\S]*normalizeReturnLookupValue/,
+  "exchange lookup must recognize delivered items from relational order snapshots",
+);
+assert.match(
+  platformRuntime,
+  /line\?\.modelCode \?\? line\?\.modelId \?\? line\?\.model_id/,
+  "exchange lookup must accept current and migrated model identifiers",
+);
+assert.match(
+  platformRuntime,
+  /window\.addEventListener\("dart:catalog-hydrated", refresh\)/,
+  "exchange options must refresh when server catalogue stock finishes hydrating",
+);
+assert.match(
+  platformRuntime,
+  /window\.addEventListener\("dart:data-changed", refreshFromReturnSource\)/,
+  "exchange options must refresh when customer order or inventory state changes",
+);
+assert.match(
+  platformRuntime,
+  /normalizeReturnLookupValue\(item\.color\)[\s\S]*selectedColor/,
+  "exchange color matching must be normalized so casing does not hide valid stock",
+);
+
+assert.match(
   catalog,
   /if\s*\(\s*!IS_ADMIN\s*&&\s*remoteStock\s*\)/,
   "storefront availability must use server stock even when a cart reservation exists",

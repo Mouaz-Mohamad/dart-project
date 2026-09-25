@@ -125,6 +125,21 @@ export interface ReturnInput {
   };
 }
 
+export function resolveRequestedExchangeVariant(
+  input: Pick<ReturnInput, "requestedColor" | "requestedSize">,
+): { color: string; size: string } {
+  const color = String(input.requestedColor || "").trim();
+  const size = String(input.requestedSize || "").trim();
+  if (!color || !size) {
+    throw new AppError(
+      422,
+      "EXCHANGE_VARIANT_REQUIRED",
+      "Choose the replacement color and size",
+    );
+  }
+  return { color, size };
+}
+
 export class CustomerInteractionService {
   constructor(private readonly pool: Pool) {}
 
@@ -311,26 +326,37 @@ export class CustomerInteractionService {
       }
 
       let replacementCandidateCount = 0;
+      let requestedExchangeColor = "";
+      let requestedExchangeSize = "";
       if (input.requestType === "Exchange") {
-        if (input.requestedColor !== line.color || input.requestedSize !== line.size) {
+        const requestedVariant = resolveRequestedExchangeVariant(input);
+        const replacement = await client.query<{
+          color: string;
+          size: string;
+          count: string;
+        }>(
+          `SELECT color, size, count(*) OVER()::text AS count
+             FROM inventory_items
+            WHERE model_id=$1
+              AND lower(btrim(color))=lower(btrim($2::text))
+              AND lower(btrim(size))=lower(btrim($3::text))
+              AND active AND NOT is_archived AND NOT is_deleted
+              AND lower(status)='in stock'
+            ORDER BY created_at, id
+            LIMIT 1`,
+          [line.model_id, requestedVariant.color, requestedVariant.size],
+        );
+        const candidate = replacement.rows[0];
+        replacementCandidateCount = Number(candidate?.count || 0);
+        if (!candidate || !replacementCandidateCount) {
           throw new AppError(
-            422,
-            "EXCHANGE_VARIANT_MISMATCH",
-            "Exchange is only allowed for the same color and size",
+            409,
+            "EXCHANGE_STOCK_UNAVAILABLE",
+            "No replacement item is currently available for the selected color and size",
           );
         }
-        const replacement = await client.query<{ count: string }>(
-          `SELECT count(*)::text AS count
-             FROM inventory_items
-            WHERE model_id=$1 AND color=$2 AND size=$3
-              AND active AND NOT is_archived AND NOT is_deleted
-              AND lower(status)='in stock'`,
-          [line.model_id, line.color, line.size],
-        );
-        replacementCandidateCount = Number(replacement.rows[0]?.count || 0);
-        if (!replacementCandidateCount) {
-          throw new AppError(409, "EXCHANGE_STOCK_UNAVAILABLE", "No replacement item is currently available");
-        }
+        requestedExchangeColor = candidate.color;
+        requestedExchangeSize = candidate.size;
       }
 
       const {
@@ -385,8 +411,8 @@ export class CustomerInteractionService {
         exchangeValue: input.requestType === "Exchange" ? amount : 0,
         exchangeChainId,
         completedExchangesBeforeRequest,
-        requestedColor: input.requestType === "Exchange" ? line.color : "",
-        requestedSize: input.requestType === "Exchange" ? line.size : "",
+        requestedColor: input.requestType === "Exchange" ? requestedExchangeColor : "",
+        requestedSize: input.requestType === "Exchange" ? requestedExchangeSize : "",
         replacementCandidateCount,
         customerCourierFee: courierPolicy.customerFee,
         brandCourierFee: courierPolicy.brandFee,

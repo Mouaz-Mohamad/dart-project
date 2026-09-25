@@ -2464,13 +2464,29 @@
     return window.DartReturns || null;
   }
 
+  function normalizeReturnLookupValue(value) {
+    return String(value ?? "").trim().toLocaleLowerCase();
+  }
+
+  function orderContainsReturnItem(order, itemCode) {
+    const wanted = normalizeReturnLookupValue(itemCode);
+    if (!wanted) return false;
+    const directItems = Array.isArray(order?.items) ? order.items : [];
+    const snapshotItems = Array.isArray(order?.priceSnapshot)
+      ? order.priceSnapshot.map((line) => line?.itemCode ?? line?.item_code ?? "")
+      : [];
+    return [...directItems, ...snapshotItems].some(
+      (code) => normalizeReturnLookupValue(code) === wanted,
+    );
+  }
+
   function deliveredOrderForItem(itemCode, orders = read(KEYS.orders, [])) {
     return orders
       .filter(
         (order) =>
           order.status === "Delivered" &&
           !order.isDeleted &&
-          (order.items || []).some((code) => String(code) === String(itemCode)),
+          orderContainsReturnItem(order, itemCode),
       )
       .sort(
         (first, second) =>
@@ -2479,9 +2495,66 @@
       )[0] || null;
   }
 
+  function returnOrderLineForItem(order, itemCode) {
+    const wanted = normalizeReturnLookupValue(itemCode);
+    if (!wanted || !Array.isArray(order?.priceSnapshot)) return null;
+    return order.priceSnapshot.find(
+      (entry) =>
+        normalizeReturnLookupValue(entry?.itemCode ?? entry?.item_code) === wanted,
+    ) || null;
+  }
+
+  function returnModelIdFromLine(line) {
+    return String(
+      line?.modelCode ?? line?.modelId ?? line?.model_id ?? "",
+    ).trim();
+  }
+
+  function resolveReturnCatalogModel(modelId) {
+    const wanted = normalizeReturnLookupValue(modelId);
+    if (!wanted) return null;
+    const direct = window.DartCatalog?.model?.(modelId);
+    if (direct) return direct;
+    const models = window.DartCatalog?.models?.() || [];
+    return models.find(
+      (model) =>
+        normalizeReturnLookupValue(model?.modelId ?? model?.code) === wanted,
+    ) || null;
+  }
+
+  function activeReturnVariantValues(options, fallbackKey) {
+    return (Array.isArray(options) ? options : [])
+      .filter(
+        (entry) =>
+          typeof entry === "string" ||
+          (entry && entry.active !== false && !entry.isArchived && !entry.isDeleted),
+      )
+      .map((entry) =>
+        typeof entry === "string"
+          ? entry
+          : entry?.name ?? entry?.[fallbackKey],
+      )
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+  }
+
+  function uniqueReturnVariantValues(values) {
+    const seen = new Set();
+    return values
+      .filter((value) => {
+        const key = normalizeReturnLookupValue(value);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((first, second) =>
+        String(first).localeCompare(String(second), undefined, { sensitivity: "base" }),
+      );
+  }
+
   function replaceReturnOptions(select, values, placeholder) {
     if (!select) return;
-    const selected = select.value;
+    const selected = normalizeReturnLookupValue(select.value);
     select.replaceChildren();
     const first = document.createElement("option");
     first.value = "";
@@ -2493,7 +2566,10 @@
       option.textContent = value;
       select.appendChild(option);
     });
-    if (values.includes(selected)) select.value = selected;
+    const retained = values.find(
+      (value) => normalizeReturnLookupValue(value) === selected,
+    );
+    if (retained) select.value = retained;
   }
 
   function initializeReturnRequestForm() {
@@ -2530,34 +2606,27 @@
     const feeText = document.getElementById("return-fee-summary-text");
 
     const availableForRequest = () => {
-      const order = deliveredOrderForItem(code?.value.trim());
-      const line = order?.priceSnapshot?.find(
-        (entry) => String(entry.itemCode) === String(code?.value.trim()),
-      );
-      if (!line?.modelCode) return [];
-      const model = window.DartCatalog?.model?.(line.modelCode);
-      if (!model) return [];
+      const itemCode = String(code?.value || "").trim();
+      const order = deliveredOrderForItem(itemCode);
+      const line = returnOrderLineForItem(order, itemCode);
+      const modelId = returnModelIdFromLine(line);
+      const model = resolveReturnCatalogModel(modelId);
+      if (!model || !modelId) return [];
 
-      const sizes = (Array.isArray(model.sizeOptions) ? model.sizeOptions : [])
-        .map((entry) => typeof entry === "string" ? entry : entry?.name ?? entry?.size)
-        .map((value) => String(value || "").trim())
-        .filter(Boolean);
-      const colors = (Array.isArray(model.colorOptions) ? model.colorOptions : [])
-        .map((entry) => typeof entry === "string" ? entry : entry?.name ?? entry?.color)
-        .map((value) => String(value || "").trim())
-        .filter(Boolean);
+      const sizes = activeReturnVariantValues(model.sizeOptions, "size");
+      const colors = activeReturnVariantValues(model.colorOptions, "color");
       const available = [];
       for (const sizeValue of sizes) {
         for (const colorValue of colors) {
           const quantity = Number(
             window.DartCatalog?.available?.(model, sizeValue, colorValue) || 0,
           );
-          for (let index = 0; index < quantity; index += 1) {
+          if (quantity > 0) {
             available.push({
-              id: `server-stock-${line.modelCode}-${sizeValue}-${colorValue}-${index}`,
-              modelId: line.modelCode,
+              modelId: model.modelId || modelId,
               color: colorValue,
               size: sizeValue,
+              quantity,
               status: "In stock",
             });
           }
@@ -2567,12 +2636,15 @@
     };
 
     const refreshSizes = () => {
+      const selectedColor = normalizeReturnLookupValue(color?.value);
       const available = availableForRequest().filter(
-        (item) => !color?.value || String(item.color) === String(color.value),
+        (item) =>
+          !selectedColor ||
+          normalizeReturnLookupValue(item.color) === selectedColor,
       );
       replaceReturnOptions(
         size,
-        [...new Set(available.map((item) => String(item.size)))].sort(),
+        uniqueReturnVariantValues(available.map((item) => String(item.size))),
         available.length ? "Select new size" : "No available size",
       );
     };
@@ -2592,7 +2664,7 @@
         const available = availableForRequest();
         replaceReturnOptions(
           color,
-          [...new Set(available.map((item) => String(item.color)))].sort(),
+          uniqueReturnVariantValues(available.map((item) => String(item.color))),
           available.length ? "Select new color" : "No replacement is currently available",
         );
         refreshSizes();
@@ -2604,7 +2676,9 @@
       }
       const items = read(KEYS.items, []);
       const original = items.find(
-        (item) => String(item.itemCode) === String(code?.value.trim()),
+        (item) =>
+          normalizeReturnLookupValue(item.itemCode) ===
+          normalizeReturnLookupValue(code?.value),
       );
       const chainId = rules?.chainIdForItem(original, code?.value.trim()) || code?.value.trim();
       const completed = rules?.completedExchangeCount(read(KEYS.returns, []), chainId) || 0;
@@ -2613,12 +2687,20 @@
       if (feeBox) feeBox.hidden = !policy;
     };
 
+    const refreshFromReturnSource = (event) => {
+      const key = event?.detail?.key;
+      if (!key || [KEYS.orders, KEYS.items, KEYS.models].includes(key)) refresh();
+    };
+
     type?.addEventListener("change", refresh);
     code?.addEventListener("change", refresh);
     code?.addEventListener("blur", refresh);
     color?.addEventListener("change", refreshSizes);
+    window.addEventListener("dart:catalog-hydrated", refresh);
+    window.addEventListener("dart:data-changed", refreshFromReturnSource);
     refresh();
   }
+
 
   function bindAuth() {
     document.addEventListener(

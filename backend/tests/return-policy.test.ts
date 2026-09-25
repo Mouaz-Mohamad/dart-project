@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveExchangeChain,
+  resolveRequestedExchangeVariant,
   resolveReturnCourierPolicy,
 } from "../src/modules/commerce/customer-interaction.service.js";
 
@@ -25,6 +26,21 @@ describe("return courier policy snapshots", () => {
   it("treats an explicitly configured zero as valid rather than falling back", () => {
     expect(resolveReturnCourierPolicy({ refundCustomerFee: 0 }, "Refund", 0).customerFee).toBe(0);
     expect(resolveReturnCourierPolicy({ repeatExchangeCustomerFee: 0 }, "Exchange", 2).customerFee).toBe(0);
+  });
+
+  it("allows a different color and size for an exchange request", () => {
+    expect(
+      resolveRequestedExchangeVariant({
+        requestedColor: "Navy",
+        requestedSize: "XL",
+      }),
+    ).toEqual({ color: "Navy", size: "XL" });
+  });
+
+  it("requires both replacement color and size", () => {
+    expect(() =>
+      resolveRequestedExchangeVariant({ requestedColor: "Navy" }),
+    ).toThrow(/Choose the replacement color and size/);
   });
 
   it("keeps one exchange chain when the physical Item Code changes", () => {
