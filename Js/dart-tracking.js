@@ -11,6 +11,7 @@
   const liveTrips = new Map();
   const LIVE_LOCATION_POLL_MS = 1000;
   const SNAPSHOT_REFRESH_MS = 3000;
+  const ROAD_ROUTE_REFRESH_MS = 5000;
   let lastViewSignature = "";
   let lastLiveTripSignature = "";
   let liveRefreshBusy = false;
@@ -125,6 +126,20 @@
     return liveTrips.get(tripKey(kind, record)) || null;
   }
 
+  function activeTrackingRecord(records = []) {
+    if (!records.length) return null;
+    return records.find((record) => {
+      const live = liveRecord("order", record);
+      return Boolean(
+        live?.deliveryStartedAt &&
+        hasCoordinate(live?.courierLocation?.lat) &&
+        hasCoordinate(live?.courierLocation?.lng)
+      );
+    }) || records.find((record) => String(record.status || "") === "Representative On The Way")
+      || records.find((record) => Boolean(record.deliveryStartedAt))
+      || records[0];
+  }
+
   function clearAnimation(state) {
     if (state.animationFrame == null) return;
     if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(state.animationFrame);
@@ -235,8 +250,47 @@
       state.route = null;
     }
     state.courierPosition = null;
+    state.hasRoadRoute = false;
+    state.lastRoadRouteAt = 0;
+    state.roadRouteRequestId = Number(state.roadRouteRequestId || 0) + 1;
     state.manualView = false;
     showResetControl(state, false);
+  }
+
+  async function refreshRoadRoute(state, position, force = false) {
+    if (!state?.route || state.kind !== "order" || !position) return;
+    const now = Date.now();
+    if (!force && now - Number(state.lastRoadRouteAt || 0) < ROAD_ROUTE_REFRESH_MS) return;
+    state.lastRoadRouteAt = now;
+    const requestId = Number(state.roadRouteRequestId || 0) + 1;
+    state.roadRouteRequestId = requestId;
+    const points = `${position.lng},${position.lat};${state.destination.lng},${state.destination.lat}`;
+    let timeout = null;
+    try {
+      const controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), 4500);
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false`,
+        { signal: controller.signal },
+      );
+      if (!response.ok) throw new Error("Routing provider unavailable");
+      const payload = await response.json();
+      const raw = payload.routes?.[0]?.geometry?.coordinates;
+      if (!Array.isArray(raw) || raw.length < 2 || state.roadRouteRequestId !== requestId) return;
+      const geometry = raw.map(([lng, lat]) => [Number(lat), Number(lng)]);
+      if (geometry.some(([lat, lng]) => !Number.isFinite(lat) || !Number.isFinite(lng))) return;
+      state.hasRoadRoute = true;
+      state.route.setLatLngs(geometry);
+    } catch {
+      if (state.roadRouteRequestId !== requestId) return;
+      state.hasRoadRoute = false;
+      state.route.setLatLngs([
+        [position.lat, position.lng],
+        [state.destination.lat, state.destination.lng],
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   function animateCourier(state, nextPosition) {
@@ -250,11 +304,14 @@
       Math.abs(from.lat - nextPosition.lat) + Math.abs(from.lng - nextPosition.lng);
     if (!Number.isFinite(distance) || distance < 0.000001) {
       state.courierMarker.setLatLng([nextPosition.lat, nextPosition.lng]);
-      state.route.setLatLngs([
-        [state.destination.lat, state.destination.lng],
-        [nextPosition.lat, nextPosition.lng],
-      ]);
+      if (!state.hasRoadRoute) {
+        state.route.setLatLngs([
+          [nextPosition.lat, nextPosition.lng],
+          [state.destination.lat, state.destination.lng],
+        ]);
+      }
       state.courierPosition = nextPosition;
+      void refreshRoadRoute(state, nextPosition);
       if (!state.manualView) fitTrip(state, true);
       return;
     }
@@ -274,10 +331,12 @@
         lng: from.lng + (nextPosition.lng - from.lng) * eased,
       };
       state.courierMarker.setLatLng([position.lat, position.lng]);
-      state.route.setLatLngs([
-        [state.destination.lat, state.destination.lng],
-        [position.lat, position.lng],
-      ]);
+      if (!state.hasRoadRoute) {
+        state.route.setLatLngs([
+          [position.lat, position.lng],
+          [state.destination.lat, state.destination.lng],
+        ]);
+      }
       state.courierPosition = position;
       if (progress < 1) {
         state.animationFrame = scheduleAnimation(step);
@@ -285,6 +344,7 @@
       }
       state.animationFrame = null;
       state.courierPosition = nextPosition;
+      void refreshRoadRoute(state, nextPosition);
       if (!state.manualView) fitTrip(state, true);
     };
 
@@ -319,10 +379,11 @@
         ensureCourierLayers(state, nextPosition);
         state.courierMarker.setLatLng([nextPosition.lat, nextPosition.lng]);
         state.route.setLatLngs([
-          [state.destination.lat, state.destination.lng],
           [nextPosition.lat, nextPosition.lng],
+          [state.destination.lat, state.destination.lng],
         ]);
         state.courierPosition = nextPosition;
+        void refreshRoadRoute(state, nextPosition, true);
         fitTrip(state, false);
       } else {
         animateCourier(state, nextPosition);
@@ -393,6 +454,9 @@
       route: null,
       courierPosition: null,
       animationFrame: null,
+      hasRoadRoute: false,
+      lastRoadRouteAt: 0,
+      roadRouteRequestId: 0,
       manualView: false,
       programmaticViewChange: false,
       resetControl: null,
@@ -508,7 +572,7 @@
     }
     groups.forEach((group) => {
       const fragment = template.content.cloneNode(true), card = fragment.querySelector("[data-order-tracking-card]"), records = group.records;
-      const first = records[0], minimum = Math.min(...records.map(statusIndex));
+      const first = records[0], trackingRecord = activeTrackingRecord(records) || first, minimum = Math.min(...records.map(statusIndex));
       card.querySelector('[data-order-field="id"]').textContent = records.length > 1 ? `${records.length} orders in one delivery group` : `Order ID: #${first.orderId}`;
       card.querySelector('[data-order-field="date"]').textContent = records.length > 1 ? "Same customer, country, governorate, area and street" : `Date: ${first.date || "-"} ${first.time || ""}`;
       const items = card.querySelector("[data-order-items]");
@@ -524,13 +588,13 @@
       card.querySelector("[data-order-progress]").style.width = `${minimum * 25}%`;
       const representatives = new Set(records.map((record) => record.representativeId).filter(Boolean));
       const assigned = representatives.size === 1;
-      card.querySelector('[data-order-field="representative"]').textContent = assigned ? first.representativeName || "Dart representative" : "Representative not assigned yet";
-      card.querySelector('[data-order-field="representativeMeta"]').textContent = assigned ? `Courier ID: ${first.representativeBusinessId || first.representativeId}` : "Waiting for assignment";
-      const call = card.querySelector("[data-order-call]"); call.hidden = !assigned || !first.representativePhone; call.href = call.hidden ? "#" : `tel:${first.representativePhone}`;
-      card.querySelector("[data-order-eta]").textContent = first.deliveryStartedAt ? "Live trip" : "ETA: Not determined";
+      card.querySelector('[data-order-field="representative"]').textContent = assigned ? trackingRecord.representativeName || first.representativeName || "Dart representative" : "Representative not assigned yet";
+      card.querySelector('[data-order-field="representativeMeta"]').textContent = assigned ? `Courier ID: ${trackingRecord.representativeBusinessId || trackingRecord.representativeId || first.representativeBusinessId || first.representativeId}` : "Waiting for assignment";
+      const call = card.querySelector("[data-order-call]"); call.hidden = !assigned || !(trackingRecord.representativePhone || first.representativePhone); call.href = call.hidden ? "#" : `tel:${trackingRecord.representativePhone || first.representativePhone}`;
+      card.querySelector("[data-order-eta]").textContent = (liveRecord("order", trackingRecord)?.deliveryStartedAt || trackingRecord.deliveryStartedAt) ? "Live trip" : "ETA: Not determined";
       list.appendChild(fragment);
       const inserted = list.lastElementChild;
-      createMap(inserted.querySelector("[data-order-map]"), first, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"), "order");
+      createMap(inserted.querySelector("[data-order-map]"), trackingRecord, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"), "order");
     });
   }
 

@@ -44,6 +44,7 @@ localStorage.setItem('dart_returns', JSON.stringify([
 
 const trackingSource = fs.readFileSync('Js/dart-tracking.js','utf8');
 const representativeSource = fs.readFileSync('Js/dart-rep.js','utf8');
+const liveOperationsSource = fs.readFileSync('Eye/dart-live-operations.js','utf8');
 vm.runInContext(trackingSource, context, {filename:'Js/dart-tracking.js'});
 assert(window.DartTracking.currentOrder().orderId === 'K-2', 'Tracking should use the signed-in customer latest order when no query is present');
 sessionStorage.setItem('dart_last_order_id','K-1');
@@ -65,4 +66,8 @@ assert(trackingSource.includes('manualView'), 'Tracking must preserve customer-c
 assert(!trackingSource.includes('setInterval(() => void refreshServerTracking(), 3000)'), 'The old single three-second full-render tracking loop must stay removed');
 assert(representativeSource.includes('lastLocationSyncAt < 3000'), 'Active representative GPS sync must use the approved three-second cadence');
 assert(representativeSource.includes('updateDeliveryMapsLocation(latestApiLocation)'), 'Representative GPS updates must move existing map layers instead of rerendering the whole work UI');
+assert(trackingSource.includes('function activeTrackingRecord(records = [])'), 'Grouped customer tracking must resolve the actively delivered order instead of binding the map to the first grouped order');
+assert(trackingSource.includes('router.project-osrm.org/route/v1/driving'), 'Customer live tracking must request a road-aware route while delivery is active');
+assert(liveOperationsSource.includes('let representativeFilterId = \"\";'), 'Live Operations must keep explicit filtering separate from focused representative state');
+assert(liveOperationsSource.includes('return !representativeFilterId || String(rep.id) === representativeFilterId;'), 'Focusing a representative must not hide other active representatives unless an explicit filter is applied');
 console.log('PASS tracking order-resolution unit tests');

@@ -52,6 +52,7 @@
   let refreshTimer = null;
   let requestInFlight = false;
   let selectedRepresentativeId = "";
+  let representativeFilterId = "";
   let selectedOrderId = "";
   let manualView = false;
   let repMarkers = new Map();
@@ -118,7 +119,7 @@
   }
 
   function visibleRep(rep) {
-    return !selectedRepresentativeId || String(rep.id) === selectedRepresentativeId;
+    return !representativeFilterId || String(rep.id) === representativeFilterId;
   }
 
   function activeSection() {
@@ -364,11 +365,13 @@
   function renderRepresentativeList() {
     if (!nodes.repList || !nodes.repSelect) return;
     const reps = snapshot.representatives || [];
-    const currentSelection = selectedRepresentativeId;
+    if (representativeFilterId && !reps.some((rep) => String(rep.id) === representativeFilterId)) {
+      representativeFilterId = "";
+    }
     nodes.repSelect.innerHTML =
       '<option value="">All active representatives</option>' +
       reps.map((rep) => `<option value="${esc(rep.id)}">${esc(rep.name)} · ${esc(rep.repId)}</option>`).join("");
-    nodes.repSelect.value = currentSelection;
+    nodes.repSelect.value = representativeFilterId;
 
     nodes.repList.innerHTML = reps.map((rep) => {
       const counts = repCounts(rep);
@@ -457,7 +460,6 @@
   function selectRepresentative(id, focus = false) {
     selectedRepresentativeId = String(id || "");
     selectedOrderId = "";
-    if (nodes.repSelect) nodes.repSelect.value = selectedRepresentativeId;
     renderRepresentativeList();
     renderMarkers();
     const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);
@@ -560,10 +562,12 @@
 
   function bind() {
     nodes.repSelect?.addEventListener("change", () => {
-      selectedRepresentativeId = nodes.repSelect.value;
+      representativeFilterId = String(nodes.repSelect.value || "");
+      selectedRepresentativeId = representativeFilterId;
       selectedOrderId = "";
-      if (selectedRepresentativeId) selectRepresentative(selectedRepresentativeId, true);
+      if (representativeFilterId) selectRepresentative(representativeFilterId, true);
       else {
+        selectedRepresentativeId = "";
         if (nodes.panel) nodes.panel.hidden = true;
         manualView = false;
         renderRepresentativeList();
