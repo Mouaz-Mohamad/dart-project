@@ -1,6 +1,6 @@
-batch=8
-purpose=waiting-button-only-variant-fix
-frontend=preserve-variant-intent-single-owner-controller-fallback-production-matrix
-backend=unchanged
-scope=product-modal-action-buttons-only
+batch=19
+purpose=exact-delivery-pin-and-live-map-fixes
+frontend=checkout-pin-preservation-customer-tracking-representative-gps-admin-live-map
+backend=customer-live-tracking-status-activation
+scope=batch-19-production-release
 trigger=production-deploy
