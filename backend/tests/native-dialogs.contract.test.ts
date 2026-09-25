@@ -9,7 +9,7 @@ const nativeDialogPattern = /(?<![\w.$])(alert|confirm|prompt)\s*\(|(?:window|ro
 function browserFiles(dir: string): string[] {
   const output: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if ([".git", "backend", "node_modules"].includes(entry.name)) continue;
+    if ([".git", "backend", "node_modules", "tests"].includes(entry.name)) continue;
     const absolute = join(dir, entry.name);
     if (entry.isDirectory()) output.push(...browserFiles(absolute));
     else if (entry.name.endsWith(".js") || entry.name.endsWith(".html")) output.push(absolute);
