@@ -23,6 +23,8 @@ function compactUnhandledError(error: unknown): Record<string, unknown> {
     errorName: error instanceof Error ? error.name : typeof error,
     errorMessage: message.slice(0, 500),
     errorCode: errorProperty(error, "code") ?? null,
+    severity: errorProperty(error, "severity") ?? null,
+    schema: errorProperty(error, "schema") ?? null,
     constraint: errorProperty(error, "constraint") ?? null,
     table: errorProperty(error, "table") ?? null,
     column: errorProperty(error, "column") ?? null,
