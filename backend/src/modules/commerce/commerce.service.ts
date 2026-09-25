@@ -5884,12 +5884,12 @@ export class CommerceService {
                 END,
                 payment_status=CASE
                   WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Paid'
-                  WHEN $1='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Unpaid'
+                  WHEN $1::text='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Unpaid'
                   ELSE payment_status
                 END,
                 amount_paid_minor=CASE
                   WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN final_minor
-                  WHEN $1='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 0
+                  WHEN $1::text='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 0
                   ELSE amount_paid_minor
                 END,
                 legacy=$4::jsonb,
