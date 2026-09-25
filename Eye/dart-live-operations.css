@@ -28,15 +28,15 @@
 .dart-live-sidebar-head{padding:14px 14px 10px;border-bottom:1px solid #eee8df}
 .dart-live-sidebar-head strong{display:block;font-size:15px}
 .dart-live-sidebar-head small{color:#777}
-.dart-live-reps{overflow:auto;padding:8px;display:grid;gap:8px}
-.dart-live-rep-card{border:1px solid #e6dfd5;border-radius:14px;padding:11px;background:#fff;cursor:pointer;text-align:left;width:100%}
-.dart-live-rep-card:hover,.dart-live-rep-card.is-selected{border-color:#AB012B;box-shadow:0 0 0 2px rgba(171,1,43,.08)}
+.dart-live-reps{overflow-y:auto;overflow-x:hidden;padding:8px;display:grid;gap:7px;min-width:0;width:100%;box-sizing:border-box}
+.dart-live-rep-card{border:1px solid #e6dfd5;border-radius:12px;padding:9px;background:#fff;cursor:pointer;text-align:left;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden}
+.dart-live-rep-card:hover,.dart-live-rep-card.is-selected{border-color:#AB012B;box-shadow:0 0 0 2px rgba(171,1,43,.08);background:#eef7fb}
 .dart-live-rep-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .dart-live-rep-name{display:flex;align-items:center;gap:9px;min-width:0}
 .dart-live-rep-avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#f3ece5;color:#AB012B;flex:0 0 auto}
-.dart-live-rep-name strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dart-live-rep-name strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#AB012B!important}
 .dart-live-rep-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:11px;color:#6d6d6d}
-.dart-live-pill{border-radius:999px;padding:4px 7px;background:#f5f2ed}
+.dart-live-pill{border-radius:999px;padding:4px 7px;background:#f5f2ed;color:#AB012B!important;font-weight:800;white-space:nowrap}
 .dart-live-map-shell{position:relative;min-height:660px}
 #dart-live-operations-map{height:100%;min-height:660px;width:100%;background:#ece8e1}
 .dart-live-overlay{position:absolute;z-index:500;left:14px;right:14px;top:14px;display:flex;justify-content:space-between;pointer-events:none}
@@ -62,7 +62,8 @@
 .dart-live-stop-copy strong{display:block;font-size:12px}
 .dart-live-stop-copy small{display:block;color:#777;font-size:10px;margin-top:2px}
 .dart-live-stop-actions{display:flex;gap:4px}
-.dart-live-mini-btn{border:1px solid #ddd4ca;background:#fff;border-radius:8px;min-width:28px;height:28px;cursor:pointer}
+.dart-live-mini-btn{border:1px solid #ddd4ca;background:#fff;border-radius:8px;min-width:28px;height:28px;cursor:pointer;color:#111!important}
+.dart-live-mini-btn:hover{border-color:#AB012B;color:#AB012B!important}
 .dart-live-panel-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
 .dart-live-action{border:0;border-radius:10px;padding:9px 11px;font-weight:800;cursor:pointer;background:#f0ece7;color:#222}
 .dart-live-action.is-primary{background:#AB012B;color:#fff}
@@ -104,7 +105,7 @@
 .dart-live-marker,.dart-live-rep-marker{box-shadow:0 3px 10px rgba(20,28,35,.16)}
 /* END Calm white courier map. */
 
-.dart-live-rep-brief{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 8px;padding:9px 0;border-top:1px solid rgba(148,163,184,.2);border-bottom:1px solid rgba(148,163,184,.2);}
+.dart-live-rep-brief{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:8px 0 6px;padding:7px 0;border-top:1px solid rgba(148,163,184,.2);border-bottom:1px solid rgba(148,163,184,.2);}
 .dart-live-rep-brief span{display:grid;gap:2px;min-width:0;}
 .dart-live-rep-brief small{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.04em;}
 .dart-live-rep-brief strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#111827;font-size:12px;}
