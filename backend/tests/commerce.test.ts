@@ -144,7 +144,7 @@ describe("CommerceService public leaderboard", () => {
     expect(result.rows).toEqual([
       {
         rank: 1,
-        name: "Migrated Seven Piece Customer",
+        name: "Migrated Seven Piece",
         orders: 1,
         items: 7,
       },
