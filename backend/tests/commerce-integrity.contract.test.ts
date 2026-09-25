@@ -85,6 +85,10 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain(
       'const cardRows = await readRelationalDashboardDomain(client, "cards");',
     );
+    expect(service).toContain(
+      'const reserved = Math.max(0, Number(card.reservedItems || 0));',
+    );
+    expect(service).toContain('return used + reserved < limit');
   });
 
   it("does not expose archived deliveries as active representative work", () => {

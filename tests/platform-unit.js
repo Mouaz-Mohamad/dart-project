@@ -133,6 +133,7 @@ const platform = window.DartPlatform;
 assert(source.includes('dart:customer-session-changed'), 'customer session hydration must notify forms that can safely refill empty contact fields');
 assert(source.includes('publicLeaderboardRows = serverRows;'), 'successful server leaderboard responses, including empty lists, must remain authoritative');
 assert(!source.includes('serverRows.length ? serverRows : localLeaderboardRows()'), 'browser state must never replace a valid empty leaderboard returned by PostgreSQL');
+assert(!source.includes('function localLeaderboardRows()'), 'dead local leaderboard reconstruction must stay removed from production runtime');
 assert(source.includes('zoomControl: false'), 'legacy tracking map must not expose zoom controls');
 
 function assert(condition, message) {

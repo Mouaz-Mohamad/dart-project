@@ -729,10 +729,14 @@ export class CommerceService {
             ) {
               return false;
             }
-            const limit = Number(card.itemLimit || card.purchasedLimit || 10);
-            const used = Number(card.purchasedItems || 0);
+            const limit = Math.max(
+              1,
+              Number(card.itemLimit || card.purchasedLimit || 10),
+            );
+            const used = Math.max(0, Number(card.purchasedItems || 0));
+            const reserved = Math.max(0, Number(card.reservedItems || 0));
             const expiry = flexibleDateExpiry(card.expDate);
-            return used < limit && (!expiry || expiry >= Date.now());
+            return used + reserved < limit && (!expiry || expiry >= Date.now());
           })
           .map((card) => String(card.clientId || "")),
       );
