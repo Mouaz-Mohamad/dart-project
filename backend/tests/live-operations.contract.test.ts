@@ -18,6 +18,10 @@ const dashboardLiveMap = readFileSync(
   new URL("../../Eye/dart-live-operations.js", import.meta.url),
   "utf8",
 );
+const dashboardLiveCss = readFileSync(
+  new URL("../../Eye/dart-live-operations.css", import.meta.url),
+  "utf8",
+);
 
 describe("live operations contracts", () => {
   it("enforces one current delivery stop per representative", () => {
@@ -70,6 +74,21 @@ describe("live operations contracts", () => {
     expect(dashboardLiveMap).toContain("window.DartAdminApi.request");
     expect(dashboardLiveMap).not.toContain("window.DartApi.request");
     expect(dashboardLiveMap).toContain('api("/api/v1/admin/live-operations")');
+  });
+
+  it("keeps the live panel closed across polling and renders a real connected road route", () => {
+    expect(dashboardLiveMap).toContain("let panelOpen = false");
+    expect(dashboardLiveMap).toContain("if (panelOpen && selectedOrderId)");
+    expect(dashboardLiveMap).toContain("overview=full&geometries=geojson");
+    expect(dashboardLiveMap).toContain("window.L.polyline(geometry");
+  });
+
+  it("reorders every non-terminal assigned order and keeps route controls readable", () => {
+    expect(service).toContain("status NOT IN ('Delivered','Cancelled','Refused','Returned')");
+    expect(dashboardLiveMap).toContain("activeRouteOrders(rep)");
+    expect(dashboardLiveCss).toContain("overflow-x:hidden");
+    expect(dashboardLiveCss).toContain("color:#AB012B!important");
+    expect(dashboardLiveCss).toContain("color:#111!important");
   });
 
 });
