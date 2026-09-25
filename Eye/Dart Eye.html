@@ -376,18 +376,29 @@
             <div class="chart-box-tow">
                 <div class="chart-header-tow">
                     <div class="chart-title-tow">
-                        <h3><i class="fa-solid fa-chart-line" style="color: #ab012b;"></i> تحليلات الزوار والمبيعات</h3>
+                        <h3><i class="fa-solid fa-chart-line" style="color: #ab012b;"></i> Website Traffic & Conversion</h3>
+                        <small id="trafficPeriodLabelTow">Uses the Brand general period filter</small>
                     </div>
                     <div class="header-actions-tow">
                         <button id="exportChartTowBtn" type="button" class="export-btn-tow">
-                            <i class="fa-solid fa-download"></i> تصدير PNG
+                            <i class="fa-solid fa-download"></i> Export PNG
                         </button>
-                        <div class="filter-btns-tow">
-                            <button type="button" class="filter-btn-tow active-tow" data-chart-period-tow="daily">يومي</button>
-                            <button type="button" class="filter-btn-tow" data-chart-period-tow="weekly">أسبوعي</button>
-                            <button type="button" class="filter-btn-tow" data-chart-period-tow="monthly">شهري</button>
+                        <div class="filter-btns-tow" aria-label="Traffic chart aggregation">
+                            <button type="button" class="filter-btn-tow active-tow" data-chart-period-tow="daily">Daily</button>
+                            <button type="button" class="filter-btn-tow" data-chart-period-tow="weekly">Weekly</button>
+                            <button type="button" class="filter-btn-tow" data-chart-period-tow="monthly">Monthly</button>
+                            <button type="button" class="filter-btn-tow" data-chart-period-tow="yearly">Yearly</button>
                         </div>
                     </div>
+                </div>
+
+                <div class="traffic-kpi-grid-tow" aria-label="Website conversion funnel summary">
+                    <article class="traffic-kpi-card-tow"><span>Unique Visitors</span><strong id="trafficUniqueVisitorsTow">—</strong><small>Different people in the selected period</small></article>
+                    <article class="traffic-kpi-card-tow"><span>Total Visits</span><strong id="trafficVisitsTow">—</strong><small>Browser sessions / entries</small></article>
+                    <article class="traffic-kpi-card-tow"><span>Cart Visitors</span><strong id="trafficCartVisitorsTow">—</strong><small>Different people who added to cart</small></article>
+                    <article class="traffic-kpi-card-tow"><span>Add Events</span><strong id="trafficAddEventsTow">—</strong><small>Successful Add to Cart actions</small></article>
+                    <article class="traffic-kpi-card-tow"><span>Items Added</span><strong id="trafficItemsAddedTow">—</strong><small>Total quantity added to carts</small></article>
+                    <article class="traffic-kpi-card-tow"><span>Completed Orders</span><strong id="trafficOrdersTow">—</strong><small>Successful website checkouts</small></article>
                 </div>
 
                 <div class="chart-body-tow">
@@ -397,7 +408,20 @@
                 <div class="chart-notes-tow">
                     <div class="note-item-tow">
                         <i class="fa-solid fa-lightbulb" style="color: #f39c12;"></i>
-                        <span id="chartNoteTextTow">لا توجد بيانات زيارات مسجلة بعد.</span>
+                        <span id="chartNoteTextTow">Loading website analytics…</span>
+                    </div>
+                </div>
+
+                <div class="traffic-details-tow">
+                    <div class="traffic-details-head-tow">
+                        <div><strong>Visitor Details</strong><small>Customer accounts are named; anonymous people remain Guest visitors.</small></div>
+                        <span id="trafficDetailStatusTow">—</span>
+                    </div>
+                    <div class="traffic-table-wrap-tow">
+                        <table class="traffic-table-tow">
+                            <thead><tr><th>Visitor</th><th>Type</th><th>Visits</th><th>Cart Adds</th><th>Items Added</th><th>Orders</th><th>First Visit</th><th>Last Visit</th></tr></thead>
+                            <tbody id="trafficVisitorDetailsTow"><tr><td colspan="8">Loading…</td></tr></tbody>
+                        </table>
                     </div>
                 </div>
             </div>

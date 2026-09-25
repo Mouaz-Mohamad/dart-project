@@ -1080,6 +1080,95 @@ section{
     border-right: 3px solid #ab012b;
 }
 
+.chart-title-tow small {
+    display: block;
+    margin-top: 4px;
+    color: #7b7b7b;
+    font-size: 11px;
+}
+.traffic-kpi-grid-tow {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    margin: 10px 0 14px;
+}
+.traffic-kpi-card-tow {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid #eee3e6;
+    border-radius: 10px;
+    background: #fffaf8;
+}
+.traffic-kpi-card-tow span,
+.traffic-kpi-card-tow small {
+    display: block;
+    color: #777;
+    font-size: 10px;
+}
+.traffic-kpi-card-tow strong {
+    display: block;
+    margin: 4px 0;
+    color: #ab012b;
+    font-size: 20px;
+    line-height: 1.1;
+}
+.traffic-details-tow {
+    margin-top: 14px;
+    border-top: 1px solid #eee;
+    padding-top: 12px;
+}
+.traffic-details-head-tow {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.traffic-details-head-tow strong,
+.traffic-details-head-tow small { display: block; }
+.traffic-details-head-tow small { color: #777; font-size: 11px; margin-top: 3px; }
+#trafficDetailStatusTow { color: #777; font-size: 11px; white-space: nowrap; }
+.traffic-table-wrap-tow {
+    overflow: auto;
+    max-height: 360px;
+    border: 1px solid #eee;
+    border-radius: 9px;
+}
+.traffic-table-tow {
+    width: 100%;
+    min-width: 780px;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.traffic-table-tow th,
+.traffic-table-tow td {
+    padding: 9px 10px;
+    text-align: left;
+    border-bottom: 1px solid #f0f0f0;
+    white-space: nowrap;
+}
+.traffic-table-tow th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #fbf8f4;
+    color: #555;
+    font-size: 11px;
+}
+.traffic-table-tow tbody tr:last-child td { border-bottom: 0; }
+.traffic-table-tow tbody tr:hover { background: #fff8fa; }
+@media (max-width: 1100px) {
+    .traffic-kpi-grid-tow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+    .header-actions-tow { width: 100%; flex-wrap: wrap; justify-content: space-between; }
+    .filter-btns-tow { overflow-x: auto; max-width: 100%; }
+    .filter-btn-tow { white-space: nowrap; }
+    .traffic-kpi-grid-tow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .traffic-details-head-tow { flex-direction: column; }
+    .chart-body-tow { height: 280px; }
+}
+
 .nav-tow {
   display: none;
 }

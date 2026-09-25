@@ -14,6 +14,7 @@ tags:
   - name: Representative Auth
   - name: Sessions
   - name: Orders
+  - name: Analytics
   - name: Settings
   - name: Promotions
   - name: Dart Card
@@ -340,6 +341,38 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /analytics/events:
+    post:
+      tags: [Analytics]
+      summary: Record a first-party website visit, successful Add to Cart action, or completed order conversion.
+      operationId: recordTrafficAnalyticsEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrafficAnalyticsEvent" }
+      responses:
+        "202": { description: Analytics event accepted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/analytics/traffic:
+    get:
+      tags: [Analytics]
+      summary: Read authoritative website traffic and conversion funnel analytics for a selected Brand period.
+      operationId: getTrafficAnalytics
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { in: query, name: start, required: true, schema: { type: string, format: date } }
+        - { in: query, name: end, required: true, schema: { type: string, format: date } }
+        - { in: query, name: group, required: false, schema: { type: string, enum: [daily, weekly, monthly, yearly], default: daily } }
+      responses:
+        "200": { description: Unique visitors, visits, Add to Cart funnel, completed orders, grouped series and per-visitor details }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /site-settings:
     get:
       tags: [Settings]
@@ -508,6 +541,22 @@ components:
       required: true
       schema: { type: string, enum: [google, facebook] }
   schemas:
+    TrafficAnalyticsEvent:
+      type: object
+      additionalProperties: false
+      required: [eventType, visitorId, sessionId]
+      properties:
+        eventType: { type: string, enum: [visit, add_to_cart, order_completed] }
+        eventId: { type: string, format: uuid, description: Required for Add to Cart events; used for idempotency. }
+        visitorId: { type: string, format: uuid, description: First-party anonymous visitor identifier. }
+        sessionId: { type: string, format: uuid, description: Browser session identifier; visits are deduplicated per visitor/session. }
+        path: { type: string, maxLength: 500 }
+        modelId: { type: string, minLength: 1, maxLength: 160 }
+        color: { type: string, maxLength: 120 }
+        size: { type: string, maxLength: 80 }
+        quantity: { type: integer, minimum: 1, maximum: 100 }
+        orderCode: { type: string, minLength: 1, maxLength: 160, description: Required for order_completed and validated against the signed-in customer. }
+        reservationId: { type: string, minLength: 1, maxLength: 180, description: Required for add_to_cart and validated against the active reserved cart variant. }
     CustomerPassword:
       type: string
       minLength: 6

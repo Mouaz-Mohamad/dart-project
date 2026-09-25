@@ -26,6 +26,15 @@ describe("OpenAPI current Dart contracts", () => {
     expect(text).not.toContain("Sessions\\n");
   });
 
+  it("documents first-party traffic event ingestion and the permissioned Brand traffic report", async () => {
+    const text = await spec();
+    expect(text).toContain("/analytics/events:");
+    expect(text).toContain("/admin/analytics/traffic:");
+    expect(text).toContain("TrafficAnalyticsEvent:");
+    expect(text).toContain("reservationId:");
+    expect(text).toContain("enum: [daily, weekly, monthly, yearly]");
+  });
+
   it("documents Google/Facebook customer completion and the multi-winner Dart Card rule", async () => {
     const text = await spec();
     for (const path of [

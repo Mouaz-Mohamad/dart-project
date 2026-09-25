@@ -268,6 +268,27 @@ for (const [runtimeName, source] of [
   }
 }
 assert.match(
+  platformRuntime,
+  /\/api\/v1\/analytics\/events/,
+  "storefront visits and funnel events must be sent to the server analytics API",
+);
+assert.match(
+  platformRuntime,
+  /trackCartIncrease\?\.\(previous, cartData\)/,
+  "successful cart mutations must emit detailed add-to-cart analytics",
+);
+assert.match(
+  platformRuntime,
+  /trackAnalyticsEvent\("order_completed"/,
+  "successful website checkout must emit an order conversion event",
+);
+assert.ok(
+  !platformRuntime.includes('localStorage.setItem("dart_traffic') &&
+    !platformRuntime.includes("localStorage.setItem('dart_traffic"),
+  "traffic analytics must not persist authoritative counts in localStorage",
+);
+
+assert.match(
   stateRuntime,
   /typeof root\.structuredClone === "function"[\s\S]*JSON\.parse\(JSON\.stringify\(value\)\)/,
   "shared runtime cloning must fall back when structuredClone is unavailable",

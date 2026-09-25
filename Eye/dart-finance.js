@@ -979,6 +979,7 @@
     repository: FinanceRepository,
     parseDate,
     periodRange,
+    currentRangeSelection,
     calculateSummary,
     authoritativeSummary,
     hydrateAuthoritativeFinance,
@@ -1016,6 +1017,16 @@
   function currentRange() {
     if (!state.period) loadPeriodState();
     return periodRange(state.period.preset, state.period);
+  }
+
+  function currentRangeSelection() {
+    const range = currentRange();
+    return {
+      preset: range.preset,
+      start: dateInputValue(range.start),
+      end: dateInputValue(range.end),
+      label: range.label,
+    };
   }
 
   function financeRangeKey(range) {
@@ -1156,6 +1167,9 @@
     }
     savePeriodState();
     syncPeriodInputs();
+    root.dispatchEvent(new CustomEvent("dart:finance-period-changed", {
+      detail: currentRangeSelection(),
+    }));
     invalidateAuthoritativeFinance();
     renderAllFinance();
   }
@@ -2112,6 +2126,9 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     renderPeriodControls();
+    root.dispatchEvent(new CustomEvent("dart:finance-period-changed", {
+      detail: currentRangeSelection(),
+    }));
     renderAllFinance();
     const saved = getStorage()?.getItem("dart_active_section");
     if (requestedInitialSection === "finance" || saved === "finance") activateFinance();

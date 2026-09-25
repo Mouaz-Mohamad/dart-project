@@ -37,6 +37,8 @@ import { createPlatformAdminRouter } from "./modules/platform/platform-admin.rou
 import type { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
 import { createFinanceRouter } from "./modules/finance/finance.routes.js";
 import type { FinanceService } from "./modules/finance/finance.service.js";
+import { createTrafficAnalyticsRouter } from "./modules/analytics/traffic-analytics.routes.js";
+import type { TrafficAnalyticsService } from "./modules/analytics/traffic-analytics.service.js";
 import type { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { createOutboxRouter } from "./modules/outbox/outbox.routes.js";
 import type { OutboxService } from "./modules/outbox/outbox.service.js";
@@ -61,6 +63,7 @@ export interface AppDependencies extends HealthDependencies {
   customerInteractionService?: CustomerInteractionService;
   platformAdminService?: PlatformAdminService;
   financeService?: FinanceService;
+  trafficAnalyticsService?: TrafficAnalyticsService;
   outboxService?: OutboxService;
   waitingService?: WaitingService;
   operationalAlerts?: Pick<OperationalAlertService, "report">;
@@ -282,6 +285,16 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         "/api/v1",
         createFinanceRouter(
           dependencies.financeService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.trafficAnalyticsService) {
+      app.use(
+        "/api/v1",
+        createTrafficAnalyticsRouter(
+          dependencies.trafficAnalyticsService,
           dependencies.identityService,
           config,
         ),

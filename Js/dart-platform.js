@@ -95,6 +95,86 @@
     sessionStorage.getItem("dart_cart_reservation_id") || uid("CART");
   sessionStorage.setItem("dart_cart_reservation_id", CART_RESERVATION_ID);
 
+  // BEGIN Website analytics identity — first-party anonymous ID + browser-session ID.
+  // PostgreSQL remains authoritative; these IDs only let the server distinguish people/sessions.
+  const ANALYTICS_VISITOR_COOKIE = "dart_vid";
+  const ANALYTICS_SESSION_KEY = "dart_analytics_session_id";
+  const ANALYTICS_SESSION_SEEN_KEY = "dart_analytics_session_seen_at";
+  const ANALYTICS_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+  const uuidV4 = () => {
+    if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+  };
+  const validAnalyticsUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+  const analyticsCookieValue = () => {
+    const match = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${ANALYTICS_VISITOR_COOKIE}=`));
+    return match ? decodeURIComponent(match.slice(ANALYTICS_VISITOR_COOKIE.length + 1)) : "";
+  };
+  let ANALYTICS_VISITOR_ID = analyticsCookieValue();
+  if (!validAnalyticsUuid(ANALYTICS_VISITOR_ID)) {
+    ANALYTICS_VISITOR_ID = uuidV4();
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${ANALYTICS_VISITOR_COOKIE}=${encodeURIComponent(ANALYTICS_VISITOR_ID)}; Max-Age=31536000; Path=/; SameSite=Lax${secure}`;
+  }
+  let ANALYTICS_SESSION_ID = sessionStorage.getItem(ANALYTICS_SESSION_KEY) || "";
+  const analyticsLastSeen = Number(sessionStorage.getItem(ANALYTICS_SESSION_SEEN_KEY) || 0);
+  if (
+    !validAnalyticsUuid(ANALYTICS_SESSION_ID) ||
+    !analyticsLastSeen ||
+    Date.now() - analyticsLastSeen > ANALYTICS_SESSION_TIMEOUT_MS
+  ) {
+    ANALYTICS_SESSION_ID = uuidV4();
+    sessionStorage.setItem(ANALYTICS_SESSION_KEY, ANALYTICS_SESSION_ID);
+  }
+  sessionStorage.setItem(ANALYTICS_SESSION_SEEN_KEY, String(Date.now()));
+
+  async function trackAnalyticsEvent(eventType, detail = {}) {
+    try {
+      await apiRequest("/api/v1/analytics/events", {
+        method: "POST",
+        body: {
+          eventType,
+          eventId: detail.eventId || uuidV4(),
+          visitorId: ANALYTICS_VISITOR_ID,
+          sessionId: ANALYTICS_SESSION_ID,
+          path: location.pathname || "/",
+          ...(detail.modelId ? { modelId: String(detail.modelId) } : {}),
+          ...(detail.color ? { color: String(detail.color) } : {}),
+          ...(detail.size ? { size: String(detail.size) } : {}),
+          ...(Number(detail.quantity) > 0 ? { quantity: Math.trunc(Number(detail.quantity)) } : {}),
+          ...(detail.orderCode ? { orderCode: String(detail.orderCode) } : {}),
+          ...(detail.reservationId ? { reservationId: String(detail.reservationId) } : {}),
+        },
+      });
+    } catch {
+      // Analytics is best-effort and must never block navigation, cart or checkout.
+    }
+  }
+
+  function analyticsCartKey(line) {
+    return [line?.id, line?.color, line?.size].map((value) => String(value || "")).join("|");
+  }
+
+  function trackCartIncrease(previous, next) {
+    const before = new Map((Array.isArray(previous) ? previous : []).map((line) => [analyticsCartKey(line), Number(line.quantity) || 0]));
+    (Array.isArray(next) ? next : []).forEach((line) => {
+      const delta = (Number(line.quantity) || 0) - (before.get(analyticsCartKey(line)) || 0);
+      if (delta <= 0) return;
+      void trackAnalyticsEvent("add_to_cart", {
+        modelId: line.id,
+        color: line.color,
+        size: line.size,
+        quantity: delta,
+        reservationId: line.reservationId || CART_RESERVATION_ID,
+      });
+    });
+  }
+  // END Website analytics identity.
+
   function setCartReservationId(value) {
     const next = String(value || "").trim();
     if (!next) return CART_RESERVATION_ID;
@@ -1511,6 +1591,9 @@
         window.DartCatalog?.checkForServerChanges?.(),
         hydrateCustomerCommerce(),
       ]);
+      void trackAnalyticsEvent("order_completed", {
+        orderCode: response.order?.orderId || response.order?.orderCode,
+      });
       return response.order;
     }
 
@@ -3972,6 +4055,13 @@
     request: apiRequest,
     isConfigured: Boolean(API_BASE),
   };
+  window.DartAnalytics = Object.freeze({
+    visitorId: ANALYTICS_VISITOR_ID,
+    sessionId: ANALYTICS_SESSION_ID,
+    track: trackAnalyticsEvent,
+    trackCartIncrease,
+  });
+  queueMicrotask(() => void trackAnalyticsEvent("visit"));
 })();
 
 

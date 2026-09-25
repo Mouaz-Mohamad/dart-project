@@ -24,6 +24,7 @@ import { DashboardStateService } from "./modules/dashboard/dashboard-state.servi
 import { CustomerInteractionService } from "./modules/commerce/customer-interaction.service.js";
 import { PlatformAdminService } from "./modules/platform/platform-admin.service.js";
 import { FinanceService } from "./modules/finance/finance.service.js";
+import { TrafficAnalyticsService } from "./modules/analytics/traffic-analytics.service.js";
 import { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { OutboxService } from "./modules/outbox/outbox.service.js";
 import { WaitingService } from "./modules/waiting/waiting.service.js";
@@ -88,6 +89,7 @@ export function createRuntimeApplication(
   const customerInteractionService = new CustomerInteractionService(database);
   const platformAdminService = new PlatformAdminService(database);
   const financeService = new FinanceService(database);
+  const trafficAnalyticsService = new TrafficAnalyticsService(database);
   const outboxService = new OutboxService(
     database,
     config,
@@ -121,6 +123,7 @@ export function createRuntimeApplication(
     customerInteractionService,
     platformAdminService,
     financeService,
+    trafficAnalyticsService,
     outboxService,
     waitingService,
     operationalAlerts,

@@ -938,6 +938,7 @@ async function persistCartReservation() {
         cacheFastCartSnapshot(cartData);
         if (window.DartPlatform?.reserveCart) {
             await window.DartPlatform.reserveCart(cartData);
+            window.DartAnalytics?.trackCartIncrease?.(previous, cartData);
         } else {
             if (!DART_LOCAL_DEMO_MODE) {
                 throw new Error("تعذر الاتصال بخدمة حجز السلة. لم يتم حفظ التغيير.");

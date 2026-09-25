@@ -32,6 +32,9 @@ export class PlatformAdminService {
         deleted[key] = result.rowCount ?? 0;
       };
 
+      // Analytics references visitors, customers and orders, so clear it before business identities.
+      await remove("trafficAnalytics", "DELETE FROM traffic_analytics_events");
+
       // Commerce/inventory first so account foreign keys remain valid until the end.
       await remove("orderEvents", "DELETE FROM order_events");
       await remove("orderItems", "DELETE FROM order_items");

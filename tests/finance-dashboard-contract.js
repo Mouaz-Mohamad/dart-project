@@ -55,6 +55,21 @@ for (const staticId of [
 ]) assert(html.includes(`id="${staticId}"`), `Static HTML structure is missing #${staticId}.`);
 
 assert(html.includes("Compared with the previous equivalent period"), "Unified period comparison copy is missing.");
+
+assert(html.includes('id="trafficUniqueVisitorsTow"'), "Traffic analytics must expose a Unique Visitors card.");
+assert(html.includes('id="trafficVisitsTow"'), "Traffic analytics must expose total Visits.");
+assert(html.includes('id="trafficCartVisitorsTow"'), "Traffic analytics must expose unique cart visitors.");
+assert(html.includes('id="trafficAddEventsTow"'), "Traffic analytics must expose detailed Add to Cart events.");
+assert(html.includes('id="trafficItemsAddedTow"'), "Traffic analytics must expose the total quantity added to carts.");
+assert(html.includes('id="trafficOrdersTow"'), "Traffic analytics must expose successful website orders.");
+assert(html.includes('id="trafficVisitorDetailsTow"'), "Traffic analytics must keep per-visitor details in Brand.");
+for (const aggregation of ["daily", "weekly", "monthly", "yearly"]) {
+  assert(html.includes(`data-chart-period-tow="${aggregation}"`), `Traffic chart must support ${aggregation} aggregation.`);
+}
+assert(dashboard.includes("/api/v1/admin/analytics/traffic"), "Traffic chart must read authoritative analytics from the admin API.");
+assert(!dashboard.includes("dataStoreTow"), "Traffic chart must not retain static/demo visitor arrays.");
+assert(finance.includes("currentRangeSelection"), "The Brand general period must be exposed to the traffic chart.");
+assert(finance.includes('dart:finance-period-changed'), "Traffic chart must refresh when the Brand general period changes.");
 assert(html.includes("Customer Order Frequency"), "Brand must label the five-bucket customer frequency chart clearly.");
 for (const label of ["1 Order", "2 Orders", "3 Orders", "4 Orders", "5+ Orders"]) {
   assert(finance.includes(`label: "${label}"`), `Returning-customer chart is missing ${label}.`);
