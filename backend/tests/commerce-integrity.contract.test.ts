@@ -75,20 +75,20 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain('reward.status = String(reward.expiresAt || "") > cairoDateKey() ? "Active" : "Expired"');
   });
 
-  it("never runs relational leaderboard reads concurrently on one pg client", () => {
-    expect(service).not.toMatch(
-      /Promise\.all\(\[\s*readRelationalDashboardDomain\(client, "returns"\),\s*readRelationalDashboardDomain\(client, "cards"\)/,
-    );
-    expect(service).toContain(
+  it("keeps leaderboard relational reads sequential and does not exclude active Dart Card holders", () => {
+    const leaderboardStart = service.indexOf("public async publicLeaderboard");
+    const leaderboardEnd = service.indexOf("public async validatePromotionCode", leaderboardStart);
+    const leaderboardSource = service.slice(leaderboardStart, leaderboardEnd);
+
+    expect(leaderboardSource).not.toMatch(/Promise\.all\([\s\S]*readRelationalDashboardDomain\(client/);
+    expect(leaderboardSource).toContain(
       'const returnRows = await readRelationalDashboardDomain(client, "returns");',
     );
-    expect(service).toContain(
-      'const cardRows = await readRelationalDashboardDomain(client, "cards");',
+    expect(leaderboardSource).not.toContain(
+      'readRelationalDashboardDomain(client, "cards")',
     );
-    expect(service).toContain(
-      'const reserved = Math.max(0, Number(card.reservedItems || 0));',
-    );
-    expect(service).toContain('return used + reserved < limit');
+    expect(leaderboardSource).not.toContain("excludedClients");
+    expect(leaderboardSource).toContain(".filter((row) => row.items > 0)");
   });
 
   it("does not expose archived deliveries as active representative work", () => {
