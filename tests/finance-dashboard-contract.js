@@ -11,6 +11,7 @@ const html = fs.readFileSync(path.join(root, "Eye", "Dart Eye.html"), "utf8");
 const finance = fs.readFileSync(path.join(root, "Eye", "dart-finance.js"), "utf8");
 const financeStyles = fs.readFileSync(path.join(root, "Eye", "dart-finance.css"), "utf8");
 const dashboard = fs.readFileSync(path.join(root, "Eye", "dart.js"), "utf8");
+const trafficAnalytics = fs.readFileSync(path.join(root, "Eye", "dart-traffic-analytics.js"), "utf8");
 
 assert(html.includes('href="dart-finance.css"'), "Dashboard must load finance styles.");
 assert(html.includes('src="dart-finance.js"'), "Dashboard must load finance behavior.");
@@ -66,8 +67,10 @@ assert(html.includes('id="trafficVisitorDetailsTow"'), "Traffic analytics must k
 for (const aggregation of ["daily", "weekly", "monthly", "yearly"]) {
   assert(html.includes(`data-chart-period-tow="${aggregation}"`), `Traffic chart must support ${aggregation} aggregation.`);
 }
-assert(dashboard.includes("/api/v1/admin/analytics/traffic"), "Traffic chart must read authoritative analytics from the admin API.");
-assert(!dashboard.includes("dataStoreTow"), "Traffic chart must not retain static/demo visitor arrays.");
+assert(trafficAnalytics.includes("/api/v1/admin/analytics/traffic"), "Traffic chart must read authoritative analytics from the admin API.");
+assert(!trafficAnalytics.includes("dataStoreTow") && !dashboard.includes("dataStoreTow"), "Traffic chart must not retain static/demo visitor arrays.");
+assert(dashboard.includes('script.src = "dart-traffic-analytics.js"'), "Brand traffic analytics must remain lazy-loaded.");
+assert(!html.includes('src="dart-traffic-analytics.js"'), "Brand traffic analytics must not be eagerly loaded from HTML.");
 assert(finance.includes("currentRangeSelection"), "The Brand general period must be exposed to the traffic chart.");
 assert(finance.includes('dart:finance-period-changed'), "Traffic chart must refresh when the Brand general period changes.");
 assert(html.includes("Customer Order Frequency"), "Brand must label the five-bucket customer frequency chart clearly.");

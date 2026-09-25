@@ -50,6 +50,7 @@ const jsFiles = ["Js", "Eye"].flatMap(walk).filter((file) => file.endsWith(".js"
 const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
+  "Eye/dart-traffic-analytics.js",
   "Js/dart-rep.js",
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
@@ -61,6 +62,12 @@ if (/script[^>]+src=["']dart-live-operations\.js["']/i.test(dashboardHtml)) {
 }
 if (!dashboardRuntime.includes('script.src = "dart-live-operations.js"')) {
   failures.push("Eye/dart.js: Live Operations lazy loader is missing");
+}
+if (!dashboardRuntime.includes('script.src = "dart-traffic-analytics.js"')) {
+  failures.push("Eye/dart.js: Brand Traffic Analytics lazy loader is missing");
+}
+if (/script[^>]+src=["']dart-traffic-analytics\.js["']/i.test(dashboardHtml)) {
+  failures.push("Eye/Dart Eye.html: Brand Traffic Analytics must remain lazy-loaded");
 }
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
