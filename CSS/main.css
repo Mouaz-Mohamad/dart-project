@@ -113,7 +113,8 @@ header, .side-menu, .pge-que .pge, .que,
 header {
     justify-content: flex-end;
     align-content: flex-end;
-    z-index: 10;
+    position: relative;
+    z-index: 200000;
     margin-bottom: 2px;
 }
 
@@ -3156,6 +3157,8 @@ button,
 }
 .tracking-map-shell {
   position: relative;
+  z-index: 0;
+  isolation: isolate;
   width: 100%;
   min-height: 300px;
   overflow: hidden;
@@ -3163,6 +3166,8 @@ button,
 }
 #tracking-map,
 .tracking-order-map {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 300px;
   border-radius: 0;
