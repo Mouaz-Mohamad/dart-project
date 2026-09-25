@@ -322,10 +322,14 @@ describe("CommerceService admin live operations", () => {
     const result = await new CommerceService(pool).adminLiveOperations();
     expect(result.representatives).toHaveLength(1);
     const representative = result.representatives[0];
-    expect(representative.repId).toBe("REP-1");
-    expect(representative.orders).toHaveLength(1);
-    expect(representative.orders[0].orderId).toBe("K-40");
-    expect(representative.orders[0].routeState).toBe("upcoming");
+    expect(representative).toBeDefined();
+    expect(representative?.repId).toBe("REP-1");
+    const representativeOrders = Array.isArray(representative?.orders)
+      ? representative.orders as Array<Record<string, unknown>>
+      : [];
+    expect(representativeOrders).toHaveLength(1);
+    expect(representativeOrders[0]?.orderId).toBe("K-40");
+    expect(representativeOrders[0]?.routeState).toBe("upcoming");
     expect(result.totals.activeRepresentatives).toBe(1);
   });
 });
