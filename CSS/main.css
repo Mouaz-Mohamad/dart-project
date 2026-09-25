@@ -3775,7 +3775,7 @@ button,
 }
 .serial-product {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: 150px minmax(0, -1fr);
   gap: 5px;
   align-items: start;
   margin-top: 18px;
