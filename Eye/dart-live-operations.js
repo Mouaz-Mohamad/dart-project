@@ -232,41 +232,64 @@
         const bv = Number(b.sequenceNumber || b.suggestedSequence || 9999);
         return av - bv;
       });
-    const coordinates = [];
-    if (rep.location && Number.isFinite(Number(rep.location.lat)) && Number.isFinite(Number(rep.location.lng))) {
-      coordinates.push([Number(rep.location.lat), Number(rep.location.lng)]);
-    }
+    const hasRepresentativeLocation =
+      rep.location &&
+      Number.isFinite(Number(rep.location.lat)) &&
+      Number.isFinite(Number(rep.location.lng));
+    if (!hasRepresentativeLocation) return { stops, coordinates: [] };
+    const coordinates = [[Number(rep.location.lat), Number(rep.location.lng)]];
     for (const stop of stops) coordinates.push(orderCoordinates(stop));
     return { stops, coordinates };
   }
 
-  async function roadGeometry(rep, coordinates) {
-    if (!coordinates || coordinates.length < 2 || String(rep.id) !== selectedRepresentativeId) {
-      return null;
-    }
+  async function roadLegGeometries(rep, coordinates) {
+    if (!coordinates || coordinates.length < 2) return null;
+    const signature = coordinates
+      .slice(0, 20)
+      .map(([lat, lng]) => `${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`)
+      .join(";");
     const now = Date.now();
     const cached = routeFetchState.get(rep.id);
-    if (cached && now - cached.at < ROUTE_REFRESH_MS) return cached.geometry;
-    const points = coordinates.slice(0, 20).map(([lat, lng]) => `${lng},${lat}`).join(";");
+    if (cached && cached.signature === signature && now - cached.at < ROUTE_REFRESH_MS) {
+      return cached.legs;
+    }
+    const points = coordinates
+      .slice(0, 20)
+      .map(([lat, lng]) => `${lng},${lat}`)
+      .join(";");
+    let timeout = null;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      timeout = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false`,
+        `https://router.project-osrm.org/route/v1/driving/${points}?overview=false&geometries=geojson&steps=true`,
         { signal: controller.signal },
       );
-      clearTimeout(timeout);
       if (!response.ok) throw new Error("Routing provider unavailable");
       const payload = await response.json();
-      const raw = payload.routes?.[0]?.geometry?.coordinates;
-      const geometry = Array.isArray(raw)
-        ? raw.map(([lng, lat]) => [lat, lng])
+      const route = payload.routes?.[0];
+      const legs = Array.isArray(route?.legs)
+        ? route.legs.map((leg) => {
+            const geometry = [];
+            for (const step of leg.steps || []) {
+              for (const point of step.geometry?.coordinates || []) {
+                const lng = Number(point?.[0]);
+                const lat = Number(point?.[1]);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+                const previous = geometry.at(-1);
+                if (!previous || previous[0] !== lat || previous[1] !== lng) geometry.push([lat, lng]);
+              }
+            }
+            return geometry.length >= 2 ? geometry : null;
+          })
         : null;
-      routeFetchState.set(rep.id, { at: now, geometry });
-      return geometry;
+      routeFetchState.set(rep.id, { at: now, signature, legs });
+      return legs;
     } catch {
-      routeFetchState.set(rep.id, { at: now, geometry: null });
+      routeFetchState.set(rep.id, { at: now, signature, legs: null });
       return null;
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
   }
 
@@ -277,32 +300,17 @@
       if (!visibleRep(rep)) continue;
       const { stops, coordinates } = routeCoordinates(rep);
       if (coordinates.length < 2) continue;
-
-      const currentStop = stops.find((stop) => stop.routeState === "current") || null;
-      const road = currentStop ? await roadGeometry(rep, coordinates.slice(0, 2)) : null;
-      if (road?.length) {
-        const layer = window.L.polyline(road, {
-          color: COLORS.current,
-          weight: 6,
-          opacity: .82,
+      const legs = await roadLegGeometries(rep, coordinates);
+      if (!Array.isArray(legs)) continue;
+      for (let index = 0; index < Math.min(legs.length, stops.length); index += 1) {
+        const geometry = legs[index];
+        const target = stops[index];
+        if (!target || !Array.isArray(geometry) || geometry.length < 2) continue;
+        const layer = window.L.polyline(geometry, {
+          color: COLORS[target.routeState] || COLORS.upcoming,
+          weight: target.routeState === "current" ? 6 : 4,
+          opacity: target.routeState === "delivered" ? .55 : .82,
         }).addTo(map);
-        routeLayers.set(`${rep.id}:road-current`, layer);
-      }
-
-      // Keep the full operational route visible with its approved state colors.
-      // The selected representative additionally receives a road-aware current segment above.
-      for (let index = 1; index < coordinates.length; index += 1) {
-        const target = stops[Math.max(0, index - 1)];
-        if (!target) continue;
-        const layer = window.L.polyline(
-          [coordinates[index - 1], coordinates[index]],
-          {
-            color: COLORS[target.routeState] || COLORS.upcoming,
-            weight: target.routeState === "current" ? 5 : 3,
-            opacity: target.routeState === "delivered" ? .55 : .72,
-            dashArray: target.routeState === "upcoming" ? "8 8" : undefined,
-          },
-        ).addTo(map);
         routeLayers.set(`${rep.id}:${target.orderId}`, layer);
       }
     }
@@ -381,6 +389,11 @@
         <div class="dart-live-rep-row">
           <div class="dart-live-rep-name"><span class="dart-live-rep-avatar"><i class="fa-solid fa-motorcycle"></i></span><span><strong>${esc(rep.name)}</strong><small>${esc(rep.repId)}</small></span></div>
           <span class="dart-live-pill">${esc(rep.connectionStatus)}</span>
+        </div>
+        <div class="dart-live-rep-brief">
+          <span><small>Orders</small><strong>${(rep.orders || []).length}</strong></span>
+          <span><small>Current</small><strong>${esc(rep.currentOrderId || "-")}</strong></span>
+          <span><small>Next</small><strong>${esc(rep.nextOrderId || "-")}</strong></span>
         </div>
         <div class="dart-live-rep-meta">
           <span>${counts.current} current</span><span>${counts.upcoming} upcoming</span><span>${counts.delivered} delivered</span><span>${esc(last)}</span>

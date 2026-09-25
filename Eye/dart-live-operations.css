@@ -103,3 +103,8 @@
 .dart-live-legend{background:rgba(255,255,255,.92);border-color:#e7eaed;box-shadow:0 4px 14px rgba(25,32,38,.055);backdrop-filter:blur(8px)}
 .dart-live-marker,.dart-live-rep-marker{box-shadow:0 3px 10px rgba(20,28,35,.16)}
 /* END Calm white courier map. */
+
+.dart-live-rep-brief{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 8px;padding:9px 0;border-top:1px solid rgba(148,163,184,.2);border-bottom:1px solid rgba(148,163,184,.2);}
+.dart-live-rep-brief span{display:grid;gap:2px;min-width:0;}
+.dart-live-rep-brief small{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.04em;}
+.dart-live-rep-brief strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#111827;font-size:12px;}

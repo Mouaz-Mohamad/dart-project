@@ -692,11 +692,15 @@
         courierMarker = window.L.marker([courierLat, courierLng])
           .addTo(map)
           .bindPopup("You");
-        route = window.L.polyline(
+        route = window.L.polyline([], {
+          color: "#8c1d2c",
+          weight: 4,
+          opacity: 0.82,
+        }).addTo(map);
+        map.fitBounds(
           [[courierLat, courierLng], [destinationLat, destinationLng]],
-          { weight: 4, opacity: 0.7 },
-        ).addTo(map);
-        map.fitBounds(route.getBounds(), { padding: [28, 28], maxZoom: 16 });
+          { padding: [28, 28], maxZoom: 16 },
+        );
       } else {
         destinationMarker.openPopup();
       }
@@ -705,9 +709,52 @@
         destinationMarker,
         courierMarker,
         route,
+        lastRoadRouteAt: 0,
+        roadRouteRequestId: 0,
       });
+      if (courierMarker) {
+        void refreshDeliveryRoadRoute(
+          deliveryMaps.get(String(order.id)),
+          { lat: courierLat, lng: courierLng },
+          true,
+        );
+      }
       window.setTimeout(() => map.invalidateSize(), 80);
     });
+  }
+
+  async function refreshDeliveryRoadRoute(entry, location, force = false) {
+    if (!entry?.route || !entry.destinationMarker || !location) return;
+    const destination = entry.destinationMarker.getLatLng?.();
+    if (!destination) return;
+    const now = Date.now();
+    if (!force && now - Number(entry.lastRoadRouteAt || 0) < 5000) return;
+    entry.lastRoadRouteAt = now;
+    const requestId = Number(entry.roadRouteRequestId || 0) + 1;
+    entry.roadRouteRequestId = requestId;
+    const points = `${Number(location.lng)},${Number(location.lat)};${Number(destination.lng)},${Number(destination.lat)}`;
+    let timeout = null;
+    try {
+      const controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), 4500);
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false`,
+        { signal: controller.signal },
+      );
+      if (!response.ok) throw new Error("Routing provider unavailable");
+      const payload = await response.json();
+      const raw = payload.routes?.[0]?.geometry?.coordinates;
+      if (!Array.isArray(raw) || raw.length < 2 || entry.roadRouteRequestId !== requestId) return;
+      const geometry = raw.map(([lng, lat]) => [Number(lat), Number(lng)]);
+      if (geometry.some(([lat, lng]) => !Number.isFinite(lat) || !Number.isFinite(lng))) return;
+      entry.route.setLatLngs(geometry);
+    } catch {
+      if (entry.roadRouteRequestId !== requestId) return;
+      // Pins remain authoritative; no fake straight line is drawn when routing fails.
+      entry.route.setLatLngs([]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   function updateDeliveryMapsLocation(location) {
@@ -726,16 +773,13 @@
         entry.courierMarker.setLatLng([courierLat, courierLng]);
       }
       if (!entry.route) {
-        entry.route = window.L.polyline(
-          [[courierLat, courierLng], [destination.lat, destination.lng]],
-          { weight: 4, opacity: 0.7 },
-        ).addTo(entry.map);
-      } else {
-        entry.route.setLatLngs([
-          [courierLat, courierLng],
-          [destination.lat, destination.lng],
-        ]);
+        entry.route = window.L.polyline([], {
+          color: "#8c1d2c",
+          weight: 4,
+          opacity: 0.82,
+        }).addTo(entry.map);
       }
+      void refreshDeliveryRoadRoute(entry, { lat: courierLat, lng: courierLng });
     }
   }
 

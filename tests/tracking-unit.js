@@ -83,6 +83,18 @@ assert(liveOperationsSource.includes('setPrefix(false)'), 'Live Operations must 
 assert(mainCss.includes('.order-tracking-list .tracking-card { width:min(760px,100%); color:#000; }'), 'tracking cards must force readable black text');
 assert(mainCss.includes('.dart-tracked-order-unit { display:grid; gap:7px; padding:4px 0; background:transparent; }'), 'grouped tracked-order units must override the global section background');
 assert(mainCss.includes('background: rgba(51, 65, 85, 0.30);'), 'the waiting tracking overlay must be exactly 30% translucent gray');
+assert(/#tracking-map,\s*\n\.tracking-order-map\s*\{[\s\S]*?height:\s*300px;/.test(mainCss), 'every customer order map surface must have a real 300px Leaflet height under the 30% overlay');
+assert(trackingSource.includes('L.polyline([], {'), 'customer routing must start with an empty route until real road geometry arrives');
+assert(trackingSource.includes('state.route.setLatLngs([]);'), 'customer routing failure must remove the route instead of drawing a fake straight line');
+assert(!trackingSource.includes('[state.destination.lat, state.destination.lng],\n          [position.lat, position.lng]'), 'customer tracking must never seed a straight destination-to-courier route');
+assert(representativeSource.includes('router.project-osrm.org/route/v1/driving'), 'representative delivery maps must request road-aware OSRM geometry');
+assert(representativeSource.includes('entry.route.setLatLngs([]);'), 'representative routing failure must leave pins visible without a fake straight line');
+assert(!/polyline\(\s*\[\s*\[courierLat, courierLng\],\s*\[destinationLat, destinationLng\]/.test(representativeSource), 'representative delivery maps must not draw direct courier-to-customer polylines');
+assert(liveOperationsSource.includes('async function roadLegGeometries(rep, coordinates)'), 'Live Operations must road-route every visible representative rather than only a selected one');
+assert(liveOperationsSource.includes('steps=true'), 'Live Operations must request per-leg road geometry so current and upcoming stops keep their own colors');
+assert(!liveOperationsSource.includes('String(rep.id) !== selectedRepresentativeId'), 'Live Operations road routing must not be restricted to the selected representative');
+assert(!liveOperationsSource.includes('[coordinates[index - 1], coordinates[index]]'), 'Live Operations must not fall back to straight operational route segments');
+assert(liveOperationsSource.includes('dart-live-rep-brief'), 'dart-live-sidebar cards must show order count plus current and next stops');
 assert(trackingSource.includes('state.shell?.classList.remove("is-disabled");'), 'a saved destination map must stay visible while courier GPS is pending');
 assert(trackingSource.includes('Waiting for representative location'), 'a started delivery without GPS must explicitly wait for the first courier location');
 assert(trackingSource.includes('record.status === \"Representative On The Way\"'), 'authoritative delivery status must activate live tracking even when a legacy start timestamp is absent');

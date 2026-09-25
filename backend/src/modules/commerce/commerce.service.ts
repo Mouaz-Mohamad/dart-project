@@ -808,7 +808,6 @@ export class CommerceService {
             right.spentMinor - left.spentMinor ||
             right.orders - left.orders,
         )
-        .slice(0, 3)
         .map((row, index) => ({
           rank: index + 1,
           name: publicName(row.name),
@@ -2351,7 +2350,7 @@ export class CommerceService {
                 MIN(updated_at) AS round_started_at
            FROM orders
           WHERE representative_user_id IS NOT NULL
-            AND status IN ('Out With Representative','Representative On The Way')
+            AND status NOT IN ('Delivered','Cancelled','Refused')
             AND NOT is_deleted
             AND NOT is_archived
           GROUP BY representative_user_id
@@ -2432,12 +2431,11 @@ export class CommerceService {
       const roundStartedAt = representative.round_started_at.getTime();
       const visible = ordersResult.rows.filter((order) => {
         if (order.representative_user_id !== representative.representative_user_id) return false;
-        if (["Out With Representative", "Representative On The Way"].includes(order.status)) {
+        if (!["Delivered", "Refused", "Cancelled"].includes(order.status)) {
           return true;
         }
         const terminalAt = order.delivered_at?.getTime() ?? order.updated_at.getTime();
-        return terminalAt >= roundStartedAt &&
-          ["Delivered", "Refused", "Cancelled"].includes(order.status);
+        return terminalAt >= roundStartedAt;
       });
 
       const normalizedStops = visible.map((order) => {

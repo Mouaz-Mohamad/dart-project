@@ -53,6 +53,14 @@ describe("CommerceService public leaderboard", () => {
               amount_refunded_minor: "0",
               item_codes: ["D-1"],
             },
+            {
+              client_code: "DR-5",
+              full_name: "Fourth Eligible Customer",
+              order_code: "K-6",
+              final_minor: "1000",
+              amount_refunded_minor: "0",
+              item_codes: ["E-1"],
+            },
           ],
         };
       }
@@ -136,6 +144,12 @@ describe("CommerceService public leaderboard", () => {
       {
         rank: 3,
         name: "Expired Card Customer",
+        orders: 1,
+        items: 1,
+      },
+      {
+        rank: 4,
+        name: "Fourth Eligible Customer",
         orders: 1,
         items: 1,
       },
@@ -265,6 +279,54 @@ describe("CommerceService relational customer snapshot", () => {
     );
     expect(snapshot.reviewEligible).toBe(true);
     expect(snapshot.purchaseStats).toEqual({ totalPieces: 2, monthlyPieces: 2 });
+  });
+});
+
+
+describe("CommerceService admin live operations", () => {
+  it("shows an approved representative whenever at least one non-terminal order is assigned", async () => {
+    const now = new Date("2026-09-25T16:00:00.000Z");
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("WITH active_reps AS")) {
+        expect(sql).toContain("status NOT IN ('Delivered','Cancelled','Refused')");
+        return { rows: [{
+          representative_user_id: "123e4567-e89b-12d3-a456-426614174111",
+          representative_code: "REP-1",
+          representative_name: "Ahmed Representative",
+          latitude: 30.04,
+          longitude: 31.23,
+          accuracy_meters: 7,
+          location_updated_at: now,
+          round_started_at: now,
+        }] };
+      }
+      if (sql.includes("FROM orders o") && sql.includes("delivery_route_stops")) {
+        return { rows: [{
+          id: "123e4567-e89b-12d3-a456-426614174222",
+          order_code: "K-40",
+          representative_user_id: "123e4567-e89b-12d3-a456-426614174111",
+          status: "Accepted",
+          contact_snapshot: { name: "Customer" },
+          delivery_address: { latitude: "30.05", longitude: "31.24", fullAddress: "Cairo" },
+          final_minor: "38400",
+          updated_at: now,
+          delivered_at: null,
+          route_state: null,
+          sequence_number: 1,
+          route_note: null,
+        }] };
+      }
+      throw new Error(`Unexpected live operations query: ${sql}`);
+    });
+    const pool = { query } as unknown as Pool;
+    const result = await new CommerceService(pool).adminLiveOperations();
+    expect(result.representatives).toHaveLength(1);
+    const representative = result.representatives[0] as Record<string, any>;
+    expect(representative.repId).toBe("REP-1");
+    expect(representative.orders).toHaveLength(1);
+    expect(representative.orders[0].orderId).toBe("K-40");
+    expect(representative.orders[0].routeState).toBe("upcoming");
+    expect(result.totals.activeRepresentatives).toBe(1);
   });
 });
 

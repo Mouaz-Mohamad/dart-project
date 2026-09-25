@@ -233,13 +233,13 @@
       }).addTo(state.map).bindPopup("Dart representative");
     }
     if (!state.route) {
-      state.route = L.polyline(
-        [
-          [state.destination.lat, state.destination.lng],
-          [position.lat, position.lng],
-        ],
-        { color: "#8c1d2c", weight: 4, opacity: 0.82 },
-      ).addTo(state.map);
+      // Never imply a road with a straight fallback. The route is populated
+      // only after the routing provider returns real road geometry.
+      state.route = L.polyline([], {
+        color: "#8c1d2c",
+        weight: 4,
+        opacity: 0.82,
+      }).addTo(state.map);
     }
   }
 
@@ -285,13 +285,16 @@
       if (geometry.some(([lat, lng]) => !Number.isFinite(lat) || !Number.isFinite(lng))) return;
       state.hasRoadRoute = true;
       state.route.setLatLngs(geometry);
+      if (state.summary) {
+        state.summary.textContent = "The representative location is updating live.";
+      }
     } catch {
       if (state.roadRouteRequestId !== requestId) return;
       state.hasRoadRoute = false;
-      state.route.setLatLngs([
-        [position.lat, position.lng],
-        [state.destination.lat, state.destination.lng],
-      ]);
+      state.route.setLatLngs([]);
+      if (state.summary) {
+        state.summary.textContent = "Representative location is live. Road route is temporarily unavailable.";
+      }
     } finally {
       if (timeout) clearTimeout(timeout);
     }
@@ -308,12 +311,6 @@
       Math.abs(from.lat - nextPosition.lat) + Math.abs(from.lng - nextPosition.lng);
     if (!Number.isFinite(distance) || distance < 0.000001) {
       state.courierMarker.setLatLng([nextPosition.lat, nextPosition.lng]);
-      if (!state.hasRoadRoute) {
-        state.route.setLatLngs([
-          [nextPosition.lat, nextPosition.lng],
-          [state.destination.lat, state.destination.lng],
-        ]);
-      }
       state.courierPosition = nextPosition;
       void refreshRoadRoute(state, nextPosition);
       if (!state.manualView) fitTrip(state, true);
@@ -321,6 +318,8 @@
     }
 
     clearAnimation(state);
+    state.hasRoadRoute = false;
+    state.route?.setLatLngs([]);
     const startedAt = typeof performance !== "undefined" && performance.now
       ? performance.now()
       : Date.now();
@@ -335,12 +334,6 @@
         lng: from.lng + (nextPosition.lng - from.lng) * eased,
       };
       state.courierMarker.setLatLng([position.lat, position.lng]);
-      if (!state.hasRoadRoute) {
-        state.route.setLatLngs([
-          [position.lat, position.lng],
-          [state.destination.lat, state.destination.lng],
-        ]);
-      }
       state.courierPosition = position;
       if (progress < 1) {
         state.animationFrame = scheduleAnimation(step);
@@ -386,10 +379,6 @@
       if (!state.courierPosition) {
         ensureCourierLayers(state, nextPosition);
         state.courierMarker.setLatLng([nextPosition.lat, nextPosition.lng]);
-        state.route.setLatLngs([
-          [nextPosition.lat, nextPosition.lng],
-          [state.destination.lat, state.destination.lng],
-        ]);
         state.courierPosition = nextPosition;
         void refreshRoadRoute(state, nextPosition, true);
         fitTrip(state, false);
