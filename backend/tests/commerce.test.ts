@@ -8,7 +8,7 @@ import {
 } from "../src/modules/commerce/commerce.service.js";
 
 describe("CommerceService public leaderboard", () => {
-  it("ranks delivered orders, subtracts completed refunds, keeps exchanges, and excludes active Dart Card holders", async () => {
+  it("ranks by net purchased pieces then net spend, subtracts completed refunds, keeps exchanges, and excludes active Dart Card holders", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("FROM orders o") && sql.includes("JOIN customers c")) {
         return {
@@ -18,6 +18,7 @@ describe("CommerceService public leaderboard", () => {
               full_name: "Alice Example Customer",
               order_code: "K-1",
               final_minor: "10000",
+              amount_refunded_minor: "5000",
               item_codes: ["A-1", "A-2"],
             },
             {
@@ -25,6 +26,7 @@ describe("CommerceService public leaderboard", () => {
               full_name: "Alice Example Customer",
               order_code: "K-2",
               final_minor: "5000",
+              amount_refunded_minor: "0",
               item_codes: ["A-3"],
             },
             {
@@ -32,6 +34,7 @@ describe("CommerceService public leaderboard", () => {
               full_name: "Bob Example Customer",
               order_code: "K-3",
               final_minor: "20000",
+              amount_refunded_minor: "0",
               item_codes: ["B-1", "B-2", "B-3"],
             },
             {
@@ -39,6 +42,7 @@ describe("CommerceService public leaderboard", () => {
               full_name: "Card Holder Customer",
               order_code: "K-4",
               final_minor: "30000",
+              amount_refunded_minor: "0",
               item_codes: ["C-1", "C-2", "C-3", "C-4"],
             },
             {
@@ -46,6 +50,7 @@ describe("CommerceService public leaderboard", () => {
               full_name: "Expired Card Customer",
               order_code: "K-5",
               final_minor: "40000",
+              amount_refunded_minor: "0",
               item_codes: ["D-1"],
             },
           ],
@@ -118,15 +123,15 @@ describe("CommerceService public leaderboard", () => {
     expect(result.rows).toEqual([
       {
         rank: 1,
-        name: "Alice Example Customer",
-        orders: 2,
-        items: 2,
-      },
-      {
-        rank: 2,
         name: "Bob Example Customer",
         orders: 1,
         items: 3,
+      },
+      {
+        rank: 2,
+        name: "Alice Example Customer",
+        orders: 2,
+        items: 2,
       },
       {
         rank: 3,

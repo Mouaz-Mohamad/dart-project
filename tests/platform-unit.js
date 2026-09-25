@@ -131,8 +131,8 @@ const source = fs.readFileSync("Js/dart-platform.js", "utf8");
 vm.runInContext(source, context, { filename: "Js/dart-platform.js" });
 const platform = window.DartPlatform;
 assert(source.includes('dart:customer-session-changed'), 'customer session hydration must notify forms that can safely refill empty contact fields');
-assert(source.includes('function localLeaderboardRows()'), 'leaderboard must have a display-only fallback for legacy/local delivered orders while relational data is migrating');
-assert(source.includes('serverRows.length ? serverRows : localLeaderboardRows()'), 'server leaderboard remains primary and local rows are fallback-only');
+assert(source.includes('publicLeaderboardRows = serverRows;'), 'successful server leaderboard responses, including empty lists, must remain authoritative');
+assert(!source.includes('serverRows.length ? serverRows : localLeaderboardRows()'), 'browser state must never replace a valid empty leaderboard returned by PostgreSQL');
 assert(source.includes('zoomControl: false'), 'legacy tracking map must not expose zoom controls');
 
 function assert(condition, message) {

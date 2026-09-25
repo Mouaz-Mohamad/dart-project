@@ -680,12 +680,14 @@ export class CommerceService {
         full_name: string;
         order_code: string;
         final_minor: string;
+        amount_refunded_minor: string;
         item_codes: string[];
       }>(
         `SELECT c.client_code,
                 c.full_name,
                 o.order_code,
                 o.final_minor::text,
+                o.amount_refunded_minor::text,
                 COALESCE(
                   array_agg(oi.item_code ORDER BY oi.created_at, oi.id)
                     FILTER (WHERE oi.id IS NOT NULL),
@@ -778,7 +780,10 @@ export class CommerceService {
         current.items += (order.item_codes || []).filter(
           (itemCode) => !completedRefundItems.has(String(itemCode)),
         ).length;
-        current.spentMinor += Number(order.final_minor || 0);
+        current.spentMinor += Math.max(
+          0,
+          Number(order.final_minor || 0) - Number(order.amount_refunded_minor || 0),
+        );
         byCustomer.set(order.client_code, current);
       }
 
@@ -792,12 +797,12 @@ export class CommerceService {
       };
 
       const rows = [...byCustomer.values()]
-        .filter((row) => row.orders > 0)
+        .filter((row) => row.items > 0)
         .sort(
           (left, right) =>
-            right.orders - left.orders ||
             right.items - left.items ||
-            right.spentMinor - left.spentMinor,
+            right.spentMinor - left.spentMinor ||
+            right.orders - left.orders,
         )
         .slice(0, 3)
         .map((row, index) => ({

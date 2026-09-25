@@ -2131,8 +2131,8 @@
     try {
       const payload = await apiRequest("/api/v1/leaderboard");
       const serverRows = Array.isArray(payload.rows) ? payload.rows : [];
-      publicLeaderboardRows = serverRows.length ? serverRows : localLeaderboardRows();
-      publicLeaderboardPeriod = String(payload.period || "") + (serverRows.length ? "" : ":local-display");
+      publicLeaderboardRows = serverRows;
+      publicLeaderboardPeriod = String(payload.period || "");
       publicLeaderboardFailed = false;
       renderLeaderboard();
       return publicLeaderboardRows;
