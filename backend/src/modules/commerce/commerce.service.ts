@@ -724,37 +724,9 @@ export class CommerceService {
       // "client already executing a query" deprecation warning and can become
       // an error in pg@9, so keep these domain reads intentionally ordered.
       const returnRows = await readRelationalDashboardDomain(client, "returns");
-      const cardRows = await readRelationalDashboardDomain(client, "cards");
-      const states = new Map<string, unknown[]>([
-        ["returns", returnRows],
-        ["cards", cardRows],
-      ]);
-
-      const excludedClients = new Set(
-        (states.get("cards") || [])
-          .map((raw) => raw as Record<string, unknown>)
-          .filter((card) => {
-            if (
-              String(card.status || "").toLowerCase() !== "active" ||
-              card.isArchived ||
-              card.isDeleted
-            ) {
-              return false;
-            }
-            const limit = Math.max(
-              1,
-              Number(card.itemLimit || card.purchasedLimit || 10),
-            );
-            const used = Math.max(0, Number(card.purchasedItems || 0));
-            const reserved = Math.max(0, Number(card.reservedItems || 0));
-            const expiry = flexibleDateExpiry(card.expDate);
-            return used + reserved < limit && (!expiry || expiry >= Date.now());
-          })
-          .map((card) => String(card.clientId || "")),
-      );
 
       const completedRefundItems = new Set(
-        (states.get("returns") || [])
+        returnRows
           .map((raw) => raw as Record<string, unknown>)
           .filter((record) => {
             const status = String(record.status || "").trim().toLowerCase();
@@ -785,7 +757,6 @@ export class CommerceService {
       >();
 
       for (const order of deliveredResult.rows) {
-        if (excludedClients.has(order.client_code)) continue;
         const current = byCustomer.get(order.client_code) || {
           name: order.full_name,
           orders: 0,

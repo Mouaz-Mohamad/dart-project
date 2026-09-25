@@ -8,7 +8,7 @@ import {
 } from "../src/modules/commerce/commerce.service.js";
 
 describe("CommerceService public leaderboard", () => {
-  it("ranks by net purchased pieces then net spend, subtracts completed refunds, keeps exchanges, and excludes active Dart Card holders", async () => {
+  it("ranks every monthly buyer by net purchased pieces then net spend, subtracts completed refunds, and keeps exchanges", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("FROM orders o") && sql.includes("JOIN customers c")) {
         expect(sql).toContain("LEFT JOIN customers c");
@@ -105,29 +105,7 @@ describe("CommerceService public leaderboard", () => {
         };
       }
 
-      if (sql.includes("FROM loyalty_cards")) {
-        return {
-          rows: [
-            {
-              payload: {
-                clientId: "DR-3",
-                status: "Active",
-                isArchived: false,
-                isDeleted: false,
-              },
-            },
-            {
-              payload: {
-                clientId: "DR-4",
-                status: "Active",
-                expDate: "2020-01-01",
-                isArchived: false,
-                isDeleted: false,
-              },
-            },
-          ],
-        };
-      }
+
 
       throw new Error(`Unexpected query in leaderboard test: ${sql}`);
     });
@@ -150,30 +128,36 @@ describe("CommerceService public leaderboard", () => {
       },
       {
         rank: 2,
+        name: "Card Holder Customer",
+        orders: 1,
+        items: 4,
+      },
+      {
+        rank: 3,
         name: "Bob Example Customer",
         orders: 1,
         items: 3,
       },
       {
-        rank: 3,
+        rank: 4,
         name: "Alice Example Customer",
         orders: 2,
         items: 2,
       },
       {
-        rank: 4,
+        rank: 5,
         name: "Expired Card Customer",
         orders: 1,
         items: 1,
       },
       {
-        rank: 5,
+        rank: 6,
         name: "Fourth Eligible Customer",
         orders: 1,
         items: 1,
       },
     ]);
-    expect(result.rows.some((row) => row.name.includes("Card Holder"))).toBe(false);
+    expect(result.rows.some((row) => row.name.includes("Card Holder"))).toBe(true);
     expect(release).toHaveBeenCalledOnce();
   });
 });
