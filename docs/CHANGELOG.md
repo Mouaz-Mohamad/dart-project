@@ -1,5 +1,15 @@
 # Dart Project changelog
 
+## Live Map route ownership and road routing — 2026-09-26
+
+- Separated Live Map ownership so the Reps layer owns each representative, their assigned order pins and their delivery route, while the Orders layer now contains unassigned orders only.
+- Kept UI status filters display-only; hiding order states no longer removes assigned stops from route calculation or changes a representative route.
+- Moved road-following route resolution behind the authenticated Dart Backend routing adapter instead of calling the public routing provider directly from the browser.
+- Added segmented route styling: Current is Burgundy, upcoming legs are Gray, unassigned pins are Light Gray, Delivered is Green and Problem states are Red.
+- Added an explicit Route Provider Unavailable state that preserves live representatives/stops and can reuse cached route geometry instead of silently hiding operational data.
+- Added Live Map regression contracts and OpenAPI/environment documentation for the routing adapter.
+- This is a CI-only Live Map batch; no `[deploy]` marker is included.
+
 ## Finance correctness and permission hardening — 2026-09-26
 
 - Fixed cross-period refunds so completed Good returns reverse their immutable COGS in the actual return period, including negative net COGS and net units when appropriate.
