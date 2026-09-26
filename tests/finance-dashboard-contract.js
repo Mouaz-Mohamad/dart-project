@@ -118,6 +118,13 @@ assert(!finance.includes("returnCourierCosts + deliveryCosts"), "Courier allocat
 assert(html.includes('id="settings-delivery-cost"'), "Settings must expose the per-order courier fee used for future order snapshots.");
 assert(html.includes("Courier fee per order"), "Settings must clearly label the courier fee as per-order.");
 assert(finance.includes("inStockCost"), "Brand must calculate the filtered In Stock Cost Value.");
+assert(finance.includes("P&L Total Cost"), "Finance must distinguish accrual P&L Total Cost from owner investment cost.");
+assert(finance.includes("Owner Total Cost"), "Brand owner view must label Owner Total Cost explicitly.");
+assert(finance.includes("Inventory Investment"), "Finance overview must expose inventory investment separately from P&L COGS.");
+assert(finance.includes("Return adjustment period · margin N/A"), "Refund-only periods must not show a misleading positive margin.");
+assert(finance.includes("authoritativeSummary(bucketRange)"), "Financial chart buckets must use authoritative server summaries.");
+assert(finance.includes("let summary = authoritativeSummary(range)"), "Goal actuals must start from the authoritative server summary.");
+assert(finance.includes("needsAuthoritativeSummary"), "P&L and Cash Flow exports must use the authoritative server summary.");
 assert(dashboard.includes("dartAssignReturnRepresentative"), "Dashboard return requests must support representative assignment.");
 
 for (const page of ["index.html", "products.html", "cart-checkout.html", "profile.html", "track.html", "about.html", "Contact us.html"]) {

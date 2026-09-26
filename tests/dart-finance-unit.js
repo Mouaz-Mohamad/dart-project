@@ -82,6 +82,9 @@ assert.strictEqual(laterReturnSummary.grossRevenue, 0, "An older delivery must n
 assert.strictEqual(laterReturnSummary.netRevenue, -1000, "A later-period refund must reduce that later period's revenue.");
 assert.strictEqual(laterReturnSummary.netCogs, -400, "A later Good return must reverse COGS in its actual return period.");
 assert.strictEqual(laterReturnSummary.netProfit, -600);
+assert.strictEqual(laterReturnSummary.soldUnits, -1, "A return-only period must show negative net units instead of clamping to zero.");
+assert.strictEqual(laterReturnSummary.margin, 0, "A return-adjustment period must not display a misleading positive margin.");
+assert.strictEqual(laterReturnSummary.cashOut, 1000, "A later refund must leave cash once and must not be double-deducted from COD inflow.");
 
 const cashData = baseData({
   orders: [{ ...deliveredOrder, paymentStatus: "Unpaid" }],

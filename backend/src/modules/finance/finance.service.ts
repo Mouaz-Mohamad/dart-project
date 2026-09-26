@@ -43,6 +43,7 @@ export interface FinanceSummary {
   brandNetProfit: number;
   margin: number;
   grossMargin: number;
+  marginApplicable: boolean;
   deliveredOrders: number;
   grossSoldUnits: number;
   returnedUnits: number;
@@ -372,7 +373,7 @@ export class FinanceService {
       );
 
       const netRevenueMinor = grossRevenueMinor - refundsMinor;
-      const netCogsMinor = Math.max(0, grossCogsMinor - cogsReversalMinor);
+      const netCogsMinor = grossCogsMinor - cogsReversalMinor;
       // Representative delivery allocation is already embedded in item cost.
       const totalOperatingMinor =
         operatingExpenseMinor +
@@ -467,7 +468,7 @@ export class FinanceService {
       );
 
       const returnedUnits = refundsRows.length;
-      const soldUnits = Math.max(0, grossSoldUnits - returnedUnits);
+      const soldUnits = grossSoldUnits - returnedUnits;
       const marketingSpend = money(marketingMinor.spend);
       const marketingRevenue = money(marketingMinor.revenue);
 
@@ -492,12 +493,13 @@ export class FinanceService {
         incrementalDamage: money(incrementalDamageMinor),
         brandTotalCost: money(brandTotalCostMinor),
         brandNetProfit: money(brandNetProfitMinor),
-        margin: netRevenueMinor !== 0
+        margin: netRevenueMinor > 0
           ? metric((netProfitMinor / netRevenueMinor) * 100)
           : 0,
-        grossMargin: netRevenueMinor !== 0
+        grossMargin: netRevenueMinor > 0
           ? metric((grossProfitMinor / netRevenueMinor) * 100)
           : 0,
+        marginApplicable: netRevenueMinor > 0,
         deliveredOrders: deliveredResult.rows.length,
         grossSoldUnits,
         returnedUnits,

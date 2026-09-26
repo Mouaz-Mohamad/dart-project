@@ -742,7 +742,7 @@
       .filter((order) => within(order.paymentReceivedAt || order.paidAt || order.deliveredAt, range))
       .forEach((order) => {
         const paidAmount = finiteNumber(order.amountPaid) > 0 ? finiteNumber(order.amountPaid) : orderAmount(order);
-        const grossCollected = Math.max(0, paidAmount - finiteNumber(order.amountRefunded));
+        const grossCollected = Math.max(0, paidAmount);
         fallbackCODInflow += Math.max(
           0,
           grossCollected - Math.min(grossCollected, deliveryCostForOrder(order)),
@@ -779,8 +779,9 @@
       incrementalDamage,
       brandTotalCost,
       brandNetProfit,
-      margin: netRevenue ? (netProfit / netRevenue) * 100 : 0,
-      grossMargin: netRevenue ? (grossProfit / netRevenue) * 100 : 0,
+      margin: netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0,
+      grossMargin: netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0,
+      marginApplicable: netRevenue > 0,
       deliveredOrders: delivered.length,
       grossSoldUnits,
       returnedUnits,
@@ -845,7 +846,14 @@
 
   function goalActual(goal, data) {
     const range = { start: startOfDay(goal.startDate), end: endOfDay(goal.endDate) };
-    const summary = calculateSummary(data, range);
+    let summary = authoritativeSummary(range);
+    if (!summary && typeof document === "undefined") summary = calculateSummary(data, range);
+    if (!summary) {
+      void hydrateServerFinanceSummary(range)
+        .then(() => renderAllFinance())
+        .catch(() => undefined);
+      return null;
+    }
     const values = {
       revenue: summary.netRevenue,
       units: summary.soldUnits,
@@ -861,14 +869,17 @@
   function goalRows(data, referenceRange) {
     return data.goals.filter(active).map((goal) => {
       const metric = GOAL_METRICS[goal.metric] || GOAL_METRICS.revenue;
-      const actual = goalActual(goal, data);
+      const rawActual = goalActual(goal, data);
+      const loading = rawActual === null;
+      const actual = loading ? 0 : rawActual;
       const target = Math.max(0, finiteNumber(goal.target));
-      const rawProgress = target ? (actual / target) * 100 : 0;
-      const achieved = metric.direction === "max" ? actual <= target : actual >= target;
+      const rawProgress = target && !loading ? (actual / target) * 100 : 0;
+      const achieved = !loading && (metric.direction === "max" ? actual <= target : actual >= target);
       return {
         ...goal,
         metricDefinition: metric,
         actual,
+        loading,
         progress: rawProgress,
         achieved,
         visible:
@@ -1340,8 +1351,8 @@
     });
     [
       [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
-      [".cost-cont", "Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage from older stock. Regular courier allocation is already included inside item cost and is not added again."],
-      [".profit-cont", "Total Profit", "Total Selling minus the complete Brand Total Cost for the selected period."],
+      [".cost-cont", "Owner Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage from older stock. Regular courier allocation is already included inside item cost and is not added again."],
+      [".profit-cont", "Owner Net Result", "Total Selling minus Owner Total Cost for the selected period. This is an owner cash-investment view, not the accrual P&L net profit."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
       if (info) {
@@ -1350,7 +1361,7 @@
       }
     });
     const costTitle = document.querySelector("#brand .cost-cont h4");
-    if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Total Cost';
+    if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Owner Total Cost';
     renderBrandMetricCards(data, range, current, previous);
     document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(percent(current.repeatRate)));
     document.getElementById("dart-financial-period")?.replaceChildren(document.createTextNode(range.label));
@@ -1477,24 +1488,38 @@
   }
 
   function financialBuckets(data, range) {
+    void data;
     const totalDays = daysInclusive(range.start, range.end);
     const step = Math.max(1, Math.ceil(totalDays / 12));
     const buckets = [];
+    const missing = [];
     let cursor = startOfDay(range.start);
     while (cursor <= range.end) {
       const bucketStart = startOfDay(cursor);
       const bucketEnd = endOfDay(addDays(bucketStart, step - 1));
       if (bucketEnd > range.end) bucketEnd.setTime(range.end.getTime());
-      const summary = calculateSummary(data, { start: bucketStart, end: bucketEnd });
-      buckets.push({
-        label: step === 1
-          ? bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })
-          : `${bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}–${bucketEnd.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
-        revenue: summary.netRevenue,
-        cost: summary.brandTotalCost,
-        profit: summary.brandNetProfit,
-      });
+      const bucketRange = { start: bucketStart, end: bucketEnd };
+      const summary = authoritativeSummary(bucketRange);
+      if (!summary) {
+        missing.push(hydrateServerFinanceSummary(bucketRange));
+      } else {
+        buckets.push({
+          label: step === 1
+            ? bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })
+            : `${bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}–${bucketEnd.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
+          revenue: summary.netRevenue,
+          cost: summary.brandTotalCost,
+          profit: summary.brandNetProfit,
+        });
+      }
       cursor = startOfDay(addDays(bucketEnd, 1));
+    }
+    if (missing.length) {
+      void Promise.allSettled(missing).then(() => {
+        renderBrandFinance();
+        if (state.financeTab === "overview") renderFinanceSection();
+      });
+      return null;
     }
     return buckets;
   }
@@ -1506,14 +1531,25 @@
     if (canvas) canvas.hidden = empty;
     if (empty || !chartAvailable()) return;
     const buckets = financialBuckets(data, range);
+    if (!buckets) {
+      if (canvas) canvas.hidden = true;
+      const loading = document.getElementById("dart-financial-empty");
+      if (loading) {
+        loading.hidden = false;
+        loading.textContent = "Loading authoritative finance series…";
+      }
+      return;
+    }
+    const emptyState = document.getElementById("dart-financial-empty");
+    if (emptyState) emptyState.textContent = "No financial activity in this period.";
     replaceChart("financial", "dart-financial-chart", {
       type: "bar",
       data: {
         labels: buckets.map((bucket) => bucket.label),
         datasets: [
           { label: "Revenue", data: buckets.map((bucket) => bucket.revenue), backgroundColor: "rgba(23,130,91,.78)", borderRadius: 5 },
-          { label: "Total Cost", data: buckets.map((bucket) => bucket.cost), backgroundColor: "rgba(171,1,43,.22)", borderRadius: 5 },
-          { type: "line", label: "Net Profit", data: buckets.map((bucket) => bucket.profit), borderColor: "#AB012B", backgroundColor: "#AB012B", tension: .32, pointRadius: 2, borderWidth: 2 },
+          { label: "Owner Total Cost", data: buckets.map((bucket) => bucket.cost), backgroundColor: "rgba(171,1,43,.22)", borderRadius: 5 },
+          { type: "line", label: "Owner Net Result", data: buckets.map((bucket) => bucket.profit), borderColor: "#AB012B", backgroundColor: "#AB012B", tension: .32, pointRadius: 2, borderWidth: 2 },
         ],
       },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: "rgba(15,23,42,.06)" }, ticks: { callback: (value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value } } }, plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8 } } } },
@@ -1545,12 +1581,18 @@
   function renderFinanceOverview(data, range, current, previous) {
     const budgets = budgetRows(data, range).filter((row) => row.visible);
     const alerts = operationalAlerts(data, range, current);
+    const marginText = current.marginApplicable !== false && current.netRevenue > 0
+      ? `${percent(current.margin)} net margin`
+      : current.refunds > 0
+        ? "Return adjustment period · margin N/A"
+        : "Margin N/A";
     return `${sectionToolbar("Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
       <div class="dart-finance-kpi-grid">
         ${kpiCard("Net Revenue", money(current.netRevenue), "Delivered sales less period refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue })}
-        ${kpiCard("Total Cost", money(current.totalCost), "Sold-piece cost + all period costs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true)}
-        ${kpiCard("Net Profit", money(current.netProfit), `${percent(current.margin)} net margin`, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit })}
+        ${kpiCard("P&L Total Cost", money(current.totalCost), "Net COGS + recognized period operating costs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true)}
+        ${kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit })}
         ${kpiCard("Net Cash Flow", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
+        ${kpiCard("Inventory Investment", money(current.physicalItemCost), "Cost snapshot of physical items entered in the selected period", "fa-solid fa-boxes-stacked", "neutral", { current: current.physicalItemCost, previous: previous.physicalItemCost }, true)}
         ${kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue")}
         ${kpiCard("Marketing ROAS", `${decimal(current.marketing.roas)}x`, `${money(current.marketing.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral")}
       </div>
@@ -1587,7 +1629,7 @@
   function renderGoals(data, range) {
     const goals = goalRows(data, range).filter((goal) => goal.visible);
     return `${sectionToolbar("Goals", "Add, edit or archive measurable goals. Actual values always come from saved dashboard and finance records.", `<button type="button" class="dart-finance-secondary" data-finance-export="goals">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="goals"><i class="fa-solid fa-plus"></i> Add Goal</button>`)}
-      <div class="dart-goal-grid">${goals.length ? goals.map((goal) => `<article class="dart-goal-card ${goal.achieved ? "is-achieved" : ""}"><div class="dart-goal-card-head"><div><span>${escapeHTML(goal.metricDefinition.label)}</span><h3>${escapeHTML(goal.name)}</h3></div>${actionButtons("goals", goal.id)}</div><div class="dart-goal-values"><strong>${formatMetric(goal.actual, goal.metricDefinition)}</strong><span>of ${formatMetric(goal.target, goal.metricDefinition)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, goal.progress))}%"></span></div><div class="dart-goal-meta"><span>${percent(goal.progress)} progress</span><span>${escapeHTML(goal.startDate)} → ${escapeHTML(goal.endDate)}</span></div></article>`).join("") : '<div class="dart-finance-empty dart-finance-empty-large">No goals overlap the selected period. Add the first goal when you have a real target.</div>'}</div>`;
+      <div class="dart-goal-grid">${goals.length ? goals.map((goal) => `<article class="dart-goal-card ${goal.achieved ? "is-achieved" : ""}"><div class="dart-goal-card-head"><div><span>${escapeHTML(goal.metricDefinition.label)}</span><h3>${escapeHTML(goal.name)}</h3></div>${actionButtons("goals", goal.id)}</div><div class="dart-goal-values"><strong>${goal.loading ? "Loading…" : formatMetric(goal.actual, goal.metricDefinition)}</strong><span>of ${formatMetric(goal.target, goal.metricDefinition)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, goal.progress))}%"></span></div><div class="dart-goal-meta"><span>${goal.loading ? "Loading authoritative actual…" : `${percent(goal.progress)} progress`}</span><span>${escapeHTML(goal.startDate)} → ${escapeHTML(goal.endDate)}</span></div></article>`).join("") : '<div class="dart-finance-empty dart-finance-empty-large">No goals overlap the selected period. Add the first goal when you have a real target.</div>'}</div>`;
   }
 
   function renderPnL(current, previous, range) {
@@ -1609,13 +1651,13 @@
   }
 
   function renderCashFlow(current, previous, range) {
-    return `${sectionToolbar("Cash Flow", "Cash basis: collected order cash less paid expenses, completed refunds and Dart-paid representative fees.", '<button type="button" class="dart-finance-secondary" data-finance-export="cashflow">Export CSV</button>')}
+    return `${sectionToolbar("Cash Flow", "Cash basis: collected order cash less recorded paid expenses, completed refunds and Dart-paid representative fees. Inventory investment is shown separately until its payment is explicitly recorded.", '<button type="button" class="dart-finance-secondary" data-finance-export="cashflow">Export CSV</button>')}
       <div class="dart-finance-kpi-grid dart-finance-kpi-grid-three">
         ${kpiCard("Cash In", money(current.cashIn), "Recorded COD receipts", "fa-solid fa-arrow-down", "green", { current: current.cashIn, previous: previous.cashIn })}
-        ${kpiCard("Cash Out", money(current.cashOut), "Paid expenses + refunds + delivery + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
+        ${kpiCard("Cash Out", money(current.cashOut), "Recorded paid expenses + refunds + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
         ${kpiCard("Net Cash Change", money(current.netCashFlow), range.label, "fa-solid fa-scale-balanced", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
       </div>
-      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow.</p></article>`;
+      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow. Inventory Investment is not treated as cash paid unless a paid expense/payment record exists, preventing invented cash movements.</p></article>`;
   }
 
   function codRows(data, range) {
@@ -2007,7 +2049,6 @@
   function exportReport(report) {
     const data = dashboardData();
     const range = currentRange();
-    const summary = calculateSummary(data, range);
     const stamp = `${dateInputValue(range.start)}_${dateInputValue(range.end)}`;
     if (COLLECTIONS.includes(report)) {
       let rows = FinanceRepository.list(report).filter(active);
@@ -2019,6 +2060,14 @@
       else if (report === "goals") rows = rows.filter((row) => startOfDay(row.startDate) <= range.end && endOfDay(row.endDate) >= range.start);
       const headers = EXPORT_FIELDS[report];
       downloadCSV(`dart-${report}-${stamp}.csv`, headers, rows.map((row) => headers.map((key) => row[key] ?? "")));
+      return;
+    }
+    const needsAuthoritativeSummary = report === "pnl" || report === "cashflow";
+    const summary = needsAuthoritativeSummary ? authoritativeSummary(range) : null;
+    if (needsAuthoritativeSummary && !summary) {
+      void hydrateServerFinanceSummary(range)
+        .then(() => exportReport(report))
+        .catch(() => undefined);
       return;
     }
     if (report === "pnl") downloadCSV(`dart-pnl-${stamp}.csv`, ["Account", "Amount EGP"], [["Gross Revenue", summary.grossRevenue], ["Refunds", -summary.refunds], ["Total Selling", summary.netRevenue], ["Sold-piece Cost (includes courier allocation)", -summary.netCogs], ["Operating Expenses", -summary.operatingExpenses], ["Courier Allocation (informational)", summary.deliveryCosts], ["Settlement Fees", -summary.codFees], ["Representative Exchange Fees", -summary.returnCourierCosts], ["Damage Write-offs", -summary.damageLoss], ["Total Profit", summary.netProfit]]);

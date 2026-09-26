@@ -9,7 +9,12 @@ const financeSource = readFileSync(
   "utf8",
 );
 
-function financePool(options: { failDelivered?: boolean } = {}) {
+function financePool(options: {
+  failDelivered?: boolean;
+  deliveredRows?: Array<Record<string, unknown>>;
+  returnPayloads?: Array<Record<string, unknown>>;
+  itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string }>;
+} = {}) {
   const queries: string[] = [];
   const client = {
     query: vi.fn(async (sql: string, values: unknown[] = []) => {
@@ -20,7 +25,7 @@ function financePool(options: { failDelivered?: boolean } = {}) {
       if (sql.includes("FROM orders o") && sql.includes("sum(oi.cost_snapshot_minor)")) {
         if (options.failDelivered) throw new Error("database unavailable");
         return {
-          rows: [
+          rows: options.deliveredRows ?? [
             {
               id: "1", order_code: "K-1", customer_user_id: null,
               final_minor: "10001", delivery_cost_minor: "0",
@@ -39,19 +44,16 @@ function financePool(options: { failDelivered?: boolean } = {}) {
         };
       }
       if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: [] };
-      if (sql.includes("FROM inventory_items")) return { rows: [] };
+      if (sql.includes("FROM inventory_items")) return { rows: options.itemCosts ?? [] };
       if (sql.includes("SELECT DISTINCT oi.item_code")) return { rows: [] };
       if (sql.includes("FROM return_requests")) {
-        return {
-          rows: [{
-            payload: {
-              id: "return-1", orderId: "K-2", itemCode: "I-2",
-              requestType: "Refund", status: "Completed",
-              isPostDeliveryReturn: true, completedAt: "2026-09-12T10:00:00Z",
-              refundAmount: 20, inspectionStatus: "Damaged",
-            },
-          }],
-        };
+        const payloads = options.returnPayloads ?? [{
+          id: "return-1", orderId: "K-2", itemCode: "I-2",
+          requestType: "Refund", status: "Completed",
+          isPostDeliveryReturn: true, completedAt: "2026-09-12T10:00:00Z",
+          refundAmount: 20, inspectionStatus: "Damaged",
+        }];
+        return { rows: payloads.map((payload) => ({ payload })) };
       }
       if (sql.includes("FROM damage_records")) return { rows: [] };
       if (sql.includes("FROM finance_records")) {
@@ -103,6 +105,32 @@ describe("finance summary integrity", () => {
       fivePlusOrders: 0,
     });
     expect(summary.averageOrderValue).toBe(65.01);
+  });
+
+  it("books a good refund in its actual later period, including negative COGS and units", async () => {
+    const fixture = financePool({
+      deliveredRows: [],
+      itemCosts: [{ item_code: "I-LATE", cost_snapshot_minor: "40000" }],
+      returnPayloads: [{
+        id: "return-late", orderId: "K-OLD", itemCode: "I-LATE",
+        requestType: "Refund", status: "Completed",
+        isPostDeliveryReturn: true, completedAt: "2026-09-12T10:00:00Z",
+        refundAmount: 1000, inspectionStatus: "Good",
+        originalLineSnapshot: { costSnapshot: 400 },
+      }],
+    });
+    const summary = await new FinanceService(fixture.pool as never).summary(
+      "2026-09-01",
+      "2026-09-30",
+    );
+
+    expect(summary.grossRevenue).toBe(0);
+    expect(summary.netRevenue).toBe(-1000);
+    expect(summary.netCogs).toBe(-400);
+    expect(summary.netProfit).toBe(-600);
+    expect(summary.soldUnits).toBe(-1);
+    expect(summary.margin).toBe(0);
+    expect(summary.marginApplicable).toBe(false);
   });
 
   it("reads relational domains sequentially on one pg client", () => {
