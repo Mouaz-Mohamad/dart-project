@@ -2426,6 +2426,7 @@ export class CommerceService {
       delivered_at: Date | null;
       route_state: string | null;
       sequence_number: number | null;
+      manually_ordered: boolean;
       route_note: string | null;
     }>(
       `SELECT o.id::text,
@@ -2439,6 +2440,7 @@ export class CommerceService {
               o.delivered_at,
               drs.route_state,
               drs.sequence_number,
+              COALESCE(drs.manually_ordered, false) AS manually_ordered,
               drs.note AS route_note
          FROM orders o
          LEFT JOIN delivery_route_stops drs
@@ -2555,6 +2557,7 @@ export class CommerceService {
           status: order.status,
           routeState: routeStateFor(order.status, order.route_state),
           sequenceNumber: Number(order.sequence_number ?? 0),
+          manuallyOrdered: Boolean(order.manually_ordered),
           suggestedSequence: 0,
           note: order.route_note || "",
           clientName: String(order.contact_snapshot?.name || "Customer"),
@@ -2603,6 +2606,12 @@ export class CommerceService {
         const firstActive = ["upcoming", "waiting", "problem"].includes(first.routeState);
         const secondActive = ["upcoming", "waiting", "problem"].includes(second.routeState);
         if (firstActive !== secondActive) return firstActive ? -1 : 1;
+        if (firstActive && secondActive) {
+          const firstSaved = first.manuallyOrdered && first.sequenceNumber > 0;
+          const secondSaved = second.manuallyOrdered && second.sequenceNumber > 0;
+          if (firstSaved !== secondSaved) return firstSaved ? -1 : 1;
+          if (firstSaved && secondSaved) return first.sequenceNumber - second.sequenceNumber;
+        }
         return Number(first.suggestedSequence || 9999) - Number(second.suggestedSequence || 9999);
       });
 
@@ -2640,9 +2649,9 @@ export class CommerceService {
     return {
       capturedAt: new Date().toISOString(),
       totals: {
-        totalOrders: mapOrders.length,
-        deliveredOrders: mapOrders.filter((order) => order.routeState === "delivered").length,
-        deliveringNow: mapOrders.filter((order) => order.routeState === "current").length,
+        totalOrders: mapOrdersResult.rows.length,
+        deliveredOrders: mapOrdersResult.rows.filter((order) => order.status === "Delivered").length,
+        deliveringNow: mapOrdersResult.rows.filter((order) => order.status === "Representative On The Way").length,
         activeRepresentatives: representatives.length,
       },
       representatives,
@@ -2860,12 +2869,13 @@ export class CommerceService {
       delivery_started_at: Date | null;
       route_state: string | null;
       sequence_number: number | null;
+      manually_ordered: boolean;
       item_rows: Array<Record<string, unknown>>;
     }>(
       `SELECT o.id::text, o.order_code, o.status, o.payment_method, o.payment_status,
               o.final_minor::text, o.contact_snapshot, o.delivery_address,
               o.delivery_notes, o.created_at, o.delivery_started_at,
-              drs.route_state, drs.sequence_number,
+              drs.route_state, drs.sequence_number, COALESCE(drs.manually_ordered, false) AS manually_ordered,
               COALESCE((
                 SELECT jsonb_agg(
                   jsonb_build_object(
@@ -2982,6 +2992,7 @@ export class CommerceService {
                 ? String(row.route_state)
                 : "upcoming",
           routeSequence: Number(row.sequence_number || 0),
+          manuallyOrdered: Boolean(row.manually_ordered),
           suggestedSequence: suggestedSequence.get(row.order_code) || 0,
           priceSnapshot: row.item_rows || [],
           items: (row.item_rows || []).map((item) => item.itemCode),

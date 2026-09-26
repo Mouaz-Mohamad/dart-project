@@ -804,8 +804,11 @@
         const firstCurrent = first.routeState === "current" || first.status === "Representative On The Way";
         const secondCurrent = second.routeState === "current" || second.status === "Representative On The Way";
         if (firstCurrent !== secondCurrent) return firstCurrent ? -1 : 1;
-        const firstSequence = Number(first.suggestedSequence || first.routeSequence || 9999);
-        const secondSequence = Number(second.suggestedSequence || second.routeSequence || 9999);
+        const firstSaved = first.manuallyOrdered && Number(first.routeSequence || 0) > 0;
+        const secondSaved = second.manuallyOrdered && Number(second.routeSequence || 0) > 0;
+        if (firstSaved !== secondSaved) return firstSaved ? -1 : 1;
+        const firstSequence = Number(firstSaved ? first.routeSequence : (first.suggestedSequence || first.routeSequence || 9999));
+        const secondSequence = Number(secondSaved ? second.routeSequence : (second.suggestedSequence || second.routeSequence || 9999));
         return firstSequence - secondSequence;
       }),
       list = document.getElementById("repOrdersList");
@@ -815,6 +818,7 @@
       String(order.deliveryStartedAt || ""),
       String(order.routeState || ""),
       Number(order.routeSequence || 0),
+      Boolean(order.manuallyOrdered),
       Number(order.suggestedSequence || 0),
       String(order.latitude || ""),
       String(order.longitude || ""),
@@ -868,7 +872,7 @@
                   : "Upcoming"
           )}</span>
           ${Number(order.suggestedSequence) > 0 ? `<span>Suggested stop #${esc(order.suggestedSequence)}</span>` : ""}
-          ${Number(order.routeSequence) > 0 ? `<span>Saved route #${esc(order.routeSequence)}</span>` : ""}
+          ${order.manuallyOrdered && Number(order.routeSequence) > 0 ? `<span>Saved route #${esc(order.routeSequence)}</span>` : ""}
         </div>
         <div class="rep-info-box"><div class="rep-info-title">Customer &amp; address</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "Address missing")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
         <div class="rep-info-box"><div class="rep-info-title">Items &amp; cash collection</div>${items}<div class="dart-rep-total"><span>Collect cash</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>

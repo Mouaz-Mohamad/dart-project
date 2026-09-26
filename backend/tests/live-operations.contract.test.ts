@@ -107,6 +107,28 @@ describe("live operations contracts", () => {
     expect(service).toContain("o.status NOT IN ('Refused','Cancelled','Returned')");
   });
 
+  it("honors saved route order without overriding the current delivery", () => {
+    expect(service).toContain("COALESCE(drs.manually_ordered, false) AS manually_ordered");
+    expect(service).toContain("manuallyOrdered: Boolean(order.manually_ordered)");
+    expect(dashboardLiveMap).toContain("function plannedStops(startPoint, stops)");
+    expect(dashboardLiveMap).toContain("order.manuallyOrdered && Number(order.sequenceNumber || 0) > 0");
+    expect(dashboardLiveMap).toContain("return [current, ...plannedStops(orderCoordinates(current), remaining)]");
+  });
+
+  it("refreshes order-pin assignment handlers and filters fit bounds consistently", () => {
+    expect(dashboardLiveMap).toContain("marker.__dartOrderClickHandler");
+    expect(dashboardLiveMap).toContain('marker.off("click", marker.__dartOrderClickHandler)');
+    const boundsStart = dashboardLiveMap.indexOf("function allBoundsPoints()");
+    const boundsEnd = dashboardLiveMap.indexOf("function fitMap", boundsStart);
+    expect(dashboardLiveMap.slice(boundsStart, boundsEnd)).toContain("if (!filterEnabled(order.routeState)) continue;");
+  });
+
+  it("counts map-eligible orders even when a pin has no coordinates", () => {
+    expect(service).toContain("totalOrders: mapOrdersResult.rows.length");
+    expect(service).toContain('order.status === "Delivered"');
+    expect(service).toContain('order.status === "Representative On The Way"');
+  });
+
   it("reorders every non-terminal assigned order and keeps route controls readable", () => {
     expect(service).toContain("status NOT IN ('Delivered','Cancelled','Refused','Returned')");
     expect(dashboardLiveMap).toContain("activeRouteOrders(rep)");

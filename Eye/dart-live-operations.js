@@ -207,6 +207,7 @@
         }
         for (const order of rep.orders || []) {
           if (!ROUTABLE_STATES.has(String(order.routeState || ""))) continue;
+          if (!filterEnabled(order.routeState)) continue;
           const point = orderCoordinates(order);
           if (point) points.push(point);
         }
@@ -282,6 +283,18 @@
     return ordered;
   }
 
+  function plannedStops(startPoint, stops) {
+    const saved = stops
+      .filter((order) => order.manuallyOrdered && Number(order.sequenceNumber || 0) > 0)
+      .sort((a, b) => Number(a.sequenceNumber) - Number(b.sequenceNumber));
+    if (!saved.length) return nearestStops(startPoint, stops);
+
+    const savedSet = new Set(saved);
+    const automatic = stops.filter((order) => !savedSet.has(order));
+    const cursor = orderCoordinates(saved[saved.length - 1]) || startPoint;
+    return [...saved, ...nearestStops(cursor, automatic)];
+  }
+
   function adaptiveRouteStops(rep) {
     const stops = (rep.orders || [])
       .filter((order) => ROUTABLE_STATES.has(String(order.routeState || "")))
@@ -290,13 +303,13 @@
     const current = stops.find((order) => order.routeState === "current") || null;
     if (current) {
       const remaining = stops.filter((order) => order !== current);
-      return [current, ...nearestStops(orderCoordinates(current), remaining)];
+      return [current, ...plannedStops(orderCoordinates(current), remaining)];
     }
     const repPoint =
       rep.location && Number.isFinite(Number(rep.location.lat)) && Number.isFinite(Number(rep.location.lng))
         ? [Number(rep.location.lat), Number(rep.location.lng)]
         : null;
-    return nearestStops(repPoint, stops);
+    return plannedStops(repPoint, stops);
   }
 
   function routeCoordinates(rep) {
@@ -469,21 +482,28 @@
           marker.setLatLng(point);
           marker.setIcon?.(orderIcon(order));
           marker.setPopupContent?.(popup);
+          marker.setZIndexOffset?.(order.routeState === "current" ? 800 : order.routeState === "delivered" ? 200 : 100);
         } else {
           marker = window.L.marker(point, {
             icon: orderIcon(order),
             zIndexOffset: order.routeState === "current" ? 800 : order.routeState === "delivered" ? 200 : 100,
           }).addTo(map);
           marker.bindPopup(popup);
-          if (order.representativeId) {
-            marker.on("click", () => {
-              const rep = (snapshot.representatives || []).find((row) => String(row.id) === String(order.representativeId));
-              if (rep?.orders?.some((row) => String(row.orderId) === String(order.orderId))) {
-                selectOrder(order.representativeId, order.orderId);
-              }
-            });
-          }
           orderMarkers.set(key, marker);
+        }
+        if (marker.__dartOrderClickHandler) {
+          marker.off("click", marker.__dartOrderClickHandler);
+          marker.__dartOrderClickHandler = null;
+        }
+        if (order.representativeId) {
+          const orderClickHandler = () => {
+            const rep = (snapshot.representatives || []).find((row) => String(row.id) === String(order.representativeId));
+            if (rep?.orders?.some((row) => String(row.orderId) === String(order.orderId))) {
+              selectOrder(order.representativeId, order.orderId);
+            }
+          };
+          marker.__dartOrderClickHandler = orderClickHandler;
+          marker.on("click", orderClickHandler);
         }
       }
     }
@@ -554,6 +574,10 @@
     const orders = [...(rep.orders || [])].sort((a, b) => {
       if (a.routeState === "current" && b.routeState !== "current") return -1;
       if (b.routeState === "current" && a.routeState !== "current") return 1;
+      const aSaved = a.manuallyOrdered && Number(a.sequenceNumber || 0) > 0;
+      const bSaved = b.manuallyOrdered && Number(b.sequenceNumber || 0) > 0;
+      if (aSaved !== bSaved) return aSaved ? -1 : 1;
+      if (aSaved && bSaved) return Number(a.sequenceNumber) - Number(b.sequenceNumber);
       return Number(a.suggestedSequence || a.sequenceNumber || 9999) - Number(b.suggestedSequence || b.sequenceNumber || 9999);
     });
     return orders.map((order, index) => `
