@@ -497,6 +497,31 @@ function dartLoadLiveOperations() {
   return dartLiveOperationsLoadPromise;
 }
 
+let dartFinanceLoadPromise = null;
+function dartLoadFinance() {
+  if (window.DartFinance) return Promise.resolve(window.DartFinance);
+  if (dartFinanceLoadPromise) return dartFinanceLoadPromise;
+  dartFinanceLoadPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-dart-finance]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.DartFinance), { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "dart-finance.js";
+    script.defer = true;
+    script.dataset.dartFinance = "1";
+    script.onload = () => resolve(window.DartFinance);
+    script.onerror = () => {
+      dartFinanceLoadPromise = null;
+      reject(new Error("Finance module could not be loaded."));
+    };
+    document.body.appendChild(script);
+  });
+  return dartFinanceLoadPromise;
+}
+
 let dartTrafficAnalyticsLoadPromise = null;
 function dartLoadTrafficAnalytics() {
   if (window.DartTrafficAnalyticsLoaded) return Promise.resolve();
@@ -546,6 +571,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // حفظ القسم النشط
     localStorage.setItem("dart_active_section", targetId);
     if (targetId === "live-operations") void dartLoadLiveOperations();
+    if (targetId === "brand" || targetId === "finance") void dartLoadFinance();
   }
 
   // تفعيل القسم المخزن أو الافتراضي عند التحميل
@@ -3330,6 +3356,7 @@ document.addEventListener("DOMContentLoaded", () => {
     links.forEach((l) => l.classList.toggle("active", l.dataset.target === id));
     localStorage.setItem("dart_active_section", id);
     if (id === "live-operations") void dartLoadLiveOperations();
+    if (id === "brand" || id === "finance") void dartLoadFinance();
     if (id === "brand") void dartLoadTrafficAnalytics();
     if (sectionsMap[id]) dartRenderSection(id);
   }

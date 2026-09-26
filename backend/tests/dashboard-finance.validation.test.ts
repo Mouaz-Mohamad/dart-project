@@ -16,6 +16,8 @@ describe("dashboard finance server validation", () => {
       injectedAdminFlag: true,
     }]) as Array<Record<string, unknown>>;
 
+    expect(row).toBeDefined();
+    if (!row) throw new Error("Expected validated finance expense row");
     expect(row.category).toBe("Inventory Acquisition");
     expect(row.amount).toBe(400);
     expect(row.injectedAdminFlag).toBeUndefined();

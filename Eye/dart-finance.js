@@ -172,7 +172,7 @@
   const serverFinanceErrors = new Map();
   let serverFinanceDenied = false;
   let serverFinanceRefreshTimer = 0;
-  let adminAuthenticated = false;
+  let adminAuthenticated = Boolean(root.DartAdminAccess?.list?.().length);
   let financeBackoffMs = 5_000;
   let financeLastAttemptAt = 0;
   let financeWarnedBackoffMs = 0;
@@ -2430,7 +2430,7 @@
   wrapDashboardRefresh();
   wrapCustomerRenderer();
 
-  document.addEventListener("DOMContentLoaded", () => {
+  function initializeFinanceDom() {
     renderPeriodControls();
     root.dispatchEvent(new CustomEvent("dart:finance-period-changed", {
       detail: currentRangeSelection(),
@@ -2438,7 +2438,14 @@
     renderAllFinance();
     const saved = getStorage()?.getItem("dart_active_section");
     if (requestedInitialSection === "finance" || saved === "finance") activateFinance();
-  });
+    if (adminAuthenticated) void refreshFinanceFromServer(true);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeFinanceDom, { once: true });
+  } else {
+    initializeFinanceDom();
+  }
   root.addEventListener("dart:admin-authenticated", () => {
     adminAuthenticated = true;
     serverFinanceDenied = false;

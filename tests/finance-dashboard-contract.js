@@ -15,7 +15,9 @@ const adminAuth = fs.readFileSync(path.join(root, "Eye", "dart-admin-auth.js"), 
 const trafficAnalytics = fs.readFileSync(path.join(root, "Eye", "dart-traffic-analytics.js"), "utf8");
 
 assert(html.includes('href="dart-finance.css"'), "Dashboard must load finance styles.");
-assert(html.includes('src="dart-finance.js"'), "Dashboard must load finance behavior.");
+assert(!html.includes('src="dart-finance.js"'), "Finance must not be eagerly loaded from dashboard HTML.");
+assert(dashboard.includes('script.src = "dart-finance.js"'), "Dashboard must lazy-load Finance when Brand or Finance is opened.");
+assert(finance.includes('document.readyState === "loading"'), "Lazy Finance must initialize correctly even after DOMContentLoaded.");
 assert.strictEqual((html.match(/id="myChart"/g) || []).length, 1, "The original Brand chart must remain singular.");
 assert(!finance.includes("myChart"), "Finance code must not address or replace the original Brand chart.");
 for (const protectedId of ["updates-feed", "birthday-feed", "top-clients-feed", "analyticsChartTow"]) {

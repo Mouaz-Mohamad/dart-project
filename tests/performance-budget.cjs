@@ -51,6 +51,7 @@ const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
   "Eye/dart-traffic-analytics.js",
+  "Eye/dart-finance.js",
   "Js/dart-rep.js",
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
@@ -68,6 +69,12 @@ if (!dashboardRuntime.includes('script.src = "dart-traffic-analytics.js"')) {
 }
 if (/script[^>]+src=["']dart-traffic-analytics\.js["']/i.test(dashboardHtml)) {
   failures.push("Eye/Dart Eye.html: Brand Traffic Analytics must remain lazy-loaded");
+}
+if (/script[^>]+src=["']dart-finance\.js["']/i.test(dashboardHtml)) {
+  failures.push("Eye/Dart Eye.html: Finance must remain lazy-loaded");
+}
+if (!dashboardRuntime.includes('script.src = "dart-finance.js"')) {
+  failures.push("Eye/dart.js: Finance lazy loader is missing");
 }
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
