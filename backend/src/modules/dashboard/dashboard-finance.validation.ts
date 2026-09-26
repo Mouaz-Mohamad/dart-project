@@ -3,18 +3,54 @@
 import { z } from "zod";
 import type { DashboardDomain } from "./dashboard-state.service.js";
 
-const idSchema = z.string().trim().min(1).max(200).optional();
+const OPERATING_EXPENSE_CATEGORIES = [
+  "Marketing",
+  "Delivery",
+  "Packaging",
+  "Salaries",
+  "Rent",
+  "Utilities",
+  "Software",
+  "Professional Services",
+  "Taxes & Fees",
+  "Other",
+] as const;
+
+const EXPENSE_CATEGORIES = [
+  ...OPERATING_EXPENSE_CATEGORIES,
+  "Inventory Acquisition",
+] as const;
+
+const BUDGET_CATEGORIES = [
+  "All",
+  ...OPERATING_EXPENSE_CATEGORIES,
+] as const;
+
 const textSchema = z.string().trim().max(500);
 const optionalText = textSchema.optional();
 const dateSchema = z.iso.date();
 const optionalDate = z.union([dateSchema, z.literal("")]).optional();
+const optionalTimestamp = z.union([
+  z.string().trim().min(1).max(100),
+  z.literal(""),
+  z.null(),
+]).optional();
 const moneyPositive = z.number().finite().positive();
 const moneyNonNegative = z.number().finite().nonnegative();
 
+const recordMetadata = {
+  id: z.string().trim().min(1).max(200).optional(),
+  createdAt: optionalTimestamp,
+  updatedAt: optionalTimestamp,
+  archivedAt: optionalTimestamp,
+  isDeleted: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
+};
+
 const expenseSchema = z.object({
-  id: idSchema,
+  ...recordMetadata,
   date: dateSchema,
-  category: z.string().trim().min(1).max(120),
+  category: z.enum(EXPENSE_CATEGORIES),
   vendor: optionalText,
   description: z.string().max(4000).optional(),
   status: z.enum(["Unpaid", "Paid", "Void"]),
@@ -23,7 +59,7 @@ const expenseSchema = z.object({
   paymentMethod: optionalText,
   invoiceNumber: optionalText,
   notes: z.string().max(4000).optional(),
-}).passthrough().superRefine((row, context) => {
+}).superRefine((row, context) => {
   if (row.status === "Paid" && !row.paidAt) {
     context.addIssue({
       code: "custom",
@@ -34,20 +70,20 @@ const expenseSchema = z.object({
 });
 
 const budgetSchema = z.object({
-  id: idSchema,
+  ...recordMetadata,
   name: z.string().trim().min(1).max(200),
-  category: z.string().trim().min(1).max(120),
+  category: z.enum(BUDGET_CATEGORIES),
   amount: moneyPositive,
   warningPercent: z.number().finite().min(1).max(100),
   startDate: dateSchema,
   endDate: dateSchema,
-}).passthrough().refine((row) => row.startDate <= row.endDate, {
+}).refine((row) => row.startDate <= row.endDate, {
   message: "Budget endDate must be on or after startDate",
   path: ["endDate"],
 });
 
 const invoiceSchema = z.object({
-  id: idSchema,
+  ...recordMetadata,
   number: z.string().trim().min(1).max(200),
   type: z.enum(["Supplier", "Customer"]),
   issueDate: dateSchema,
@@ -57,7 +93,7 @@ const invoiceSchema = z.object({
   amountPaid: moneyNonNegative,
   status: optionalText,
   notes: z.string().max(4000).optional(),
-}).passthrough()
+})
   .refine((row) => row.issueDate <= row.dueDate, {
     message: "Invoice dueDate must be on or after issueDate",
     path: ["dueDate"],
@@ -68,7 +104,7 @@ const invoiceSchema = z.object({
   });
 
 const goalSchema = z.object({
-  id: idSchema,
+  ...recordMetadata,
   name: z.string().trim().min(1).max(200),
   metric: z.enum([
     "revenue",
@@ -83,13 +119,13 @@ const goalSchema = z.object({
   startDate: dateSchema,
   endDate: dateSchema,
   status: z.enum(["Active", "Paused"]),
-}).passthrough().refine((row) => row.startDate <= row.endDate, {
+}).refine((row) => row.startDate <= row.endDate, {
   message: "Goal endDate must be on or after startDate",
   path: ["endDate"],
 });
 
 const marketingSchema = z.object({
-  id: idSchema,
+  ...recordMetadata,
   date: dateSchema,
   channel: z.string().trim().min(1).max(120),
   campaign: z.string().max(500),
@@ -99,13 +135,13 @@ const marketingSchema = z.object({
   orders: z.number().int().nonnegative(),
   attributedRevenue: moneyNonNegative,
   linkedExpenseId: optionalText,
-}).passthrough().refine(
+}).refine(
   (row) => row.impressions === 0 || row.clicks <= row.impressions,
   { message: "Marketing clicks cannot exceed impressions", path: ["clicks"] },
 );
 
 const settlementSchema = z.object({
-  id: idSchema,
+  ...recordMetadata,
   orderId: z.string().trim().min(1).max(200),
   settlementDate: dateSchema,
   amountReceived: moneyPositive,
@@ -113,7 +149,7 @@ const settlementSchema = z.object({
   reference: optionalText,
   status: z.enum(["Received"]).optional(),
   notes: z.string().max(4000).optional(),
-}).passthrough().refine((row) => row.fee <= row.amountReceived, {
+}).refine((row) => row.fee <= row.amountReceived, {
   message: "Settlement fee cannot exceed amountReceived",
   path: ["fee"],
 });
@@ -127,11 +163,51 @@ const FINANCE_DOMAIN_SCHEMAS: Partial<Record<DashboardDomain, z.ZodType>> = {
   finance_settlements: settlementSchema,
 };
 
+function financeArraySchema(domain: DashboardDomain, schema: z.ZodType) {
+  return z.array(schema).max(20_000).superRefine((rows, context) => {
+    const seenIds = new Map<string, number>();
+    const seenInvoiceNumbers = new Map<string, number>();
+
+    rows.forEach((value, index) => {
+      const row = value as Record<string, unknown>;
+      const id = String(row.id || "").trim();
+      if (id) {
+        const previous = seenIds.get(id);
+        if (previous !== undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [index, "id"],
+            message: `Duplicate finance record id also used at index ${previous}`,
+          });
+        } else {
+          seenIds.set(id, index);
+        }
+      }
+
+      if (domain === "finance_invoices") {
+        const number = String(row.number || "").trim().toLowerCase();
+        if (number) {
+          const previous = seenInvoiceNumbers.get(number);
+          if (previous !== undefined) {
+            context.addIssue({
+              code: "custom",
+              path: [index, "number"],
+              message: `Duplicate invoice number also used at index ${previous}`,
+            });
+          } else {
+            seenInvoiceNumbers.set(number, index);
+          }
+        }
+      }
+    });
+  });
+}
+
 export function validateFinanceDomainData(
   domain: DashboardDomain,
   data: unknown[],
 ): unknown[] {
   const schema = FINANCE_DOMAIN_SCHEMAS[domain];
   if (!schema) return data;
-  return z.array(schema).max(20_000).parse(data);
+  return financeArraySchema(domain, schema).parse(data);
 }

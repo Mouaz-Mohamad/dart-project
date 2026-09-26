@@ -233,6 +233,13 @@
   async function unlock() {
     const can = (permission) =>
       window.DartAdminAccess?.can?.(permission) === true;
+    const permissions = window.DartAdminAccess?.list?.() || [];
+    const canHydrateFinanceDomains = permissions.some((permission) =>
+      permission === "finance.read" ||
+      permission === "finance.manage" ||
+      permission.startsWith("finance.view_") ||
+      permission.startsWith("finance.manage_"),
+    );
     try {
       if (window.DartSiteSettings?.hydrate) {
         await hydrateStage(
@@ -251,7 +258,7 @@
       } else {
         window.DartState?.remove?.("dart_orders");
       }
-      if (can("dashboard_state.read") && window.DartDomainState?.hydrateAll) {
+      if ((can("dashboard_state.read") || canHydrateFinanceDomains) && window.DartDomainState?.hydrateAll) {
         await hydrateStage(
           "dashboard-state",
           () => window.DartDomainState.hydrateAll(),

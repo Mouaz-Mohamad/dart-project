@@ -65,12 +65,13 @@ function application(permissions: string[]) {
   } as unknown as IdentityService;
 
   const state = {
-    read: vi.fn().mockResolvedValue({
-      domain: "contacts",
+    read: vi.fn(async (domain: string) => ({
+      domain,
       version: 2,
-      data: [{ id: "contact-1", message: "Private customer message" }],
-    }),
-    versions: vi.fn().mockResolvedValue({ contacts: 2 }),
+      data: [{ id: `${domain}-1` }],
+    })),
+    readMany: vi.fn(async (domains: string[]) => domains.map((domain) => ({ domain, version: 2, data: [] }))),
+    versions: vi.fn().mockResolvedValue({ contacts: 2, finance_expenses: 4, customers: 7 }),
     publicReviews: vi.fn().mockResolvedValue([]),
     audit: vi.fn().mockResolvedValue([]),
   } as unknown as DashboardStateService;
@@ -115,6 +116,32 @@ describe("dashboard domain permissions", () => {
     expect(response.body.domain).toBe("contacts");
     expect(state.read).toHaveBeenCalledWith("contacts");
   });
+
+  it("lets a Finance cost viewer read only the Finance domains granted by that permission", async () => {
+    const { app, state } = application(["finance.view_cost"]);
+
+    const allowed = await request(app)
+      .get("/api/v1/admin/domain-state/finance_expenses")
+      .set("Cookie", `dart_session=${sessionToken}`);
+    expect(allowed.status).toBe(200);
+    expect(state.read).toHaveBeenCalledWith("finance_expenses");
+
+    const denied = await request(app)
+      .get("/api/v1/admin/domain-state/customers")
+      .set("Cookie", `dart_session=${sessionToken}`);
+    expect(denied.status).toBe(403);
+  });
+
+  it("filters version polling to domains readable by a granular Finance account", async () => {
+    const { app } = application(["finance.view_cost"]);
+    const response = await request(app)
+      .get("/api/v1/admin/domain-state-versions")
+      .set("Cookie", `dart_session=${sessionToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.versions).toHaveProperty("finance_expenses", 4);
+    expect(response.body.versions).not.toHaveProperty("customers");
+  });
 });
 
 
@@ -129,4 +156,7 @@ it("keeps granular Finance domain permissions explicit in the route policy", () 
   expect(source).toContain('"finance.manage_settlements"');
   expect(source).toContain('"finance.view_cashflow"');
   expect(source).toContain('"finance.view_marketing"');
+  expect(source).toContain("FINANCE_DOMAIN_READ_GATE_PERMISSIONS");
+  expect(source).toContain("FINANCE_DOMAIN_WRITE_GATE_PERMISSIONS");
+  expect(source).toContain("readableDomains(request.auth!.permissions)");
 });

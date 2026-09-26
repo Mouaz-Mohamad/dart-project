@@ -9,6 +9,7 @@ import {
   csrfProtection,
   requireAccountType,
   requireMfa,
+  requireAnyPermission,
   requirePermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
@@ -45,12 +46,41 @@ const SENSITIVE_DOMAIN_PERMISSIONS: Partial<
   finance_expenses: { read: ["finance.read", "finance.view_cost", "finance.manage_expenses"], write: ["finance.manage", "finance.manage_expenses"] },
   finance_budgets: { read: ["finance.read", "finance.view_cost", "finance.manage_budgets"], write: ["finance.manage", "finance.manage_budgets"] },
   finance_invoices: { read: ["finance.read", "finance.manage_invoices"], write: ["finance.manage", "finance.manage_invoices"] },
-  finance_goals: { read: ["finance.read", "finance.view_revenue", "finance.view_profit", "finance.manage_goals"], write: ["finance.manage", "finance.manage_goals"] },
+  finance_goals: { read: ["finance.read", "finance.view_revenue", "finance.view_cost", "finance.view_profit", "finance.view_marketing", "finance.manage_goals"], write: ["finance.manage", "finance.manage_goals"] },
   finance_marketing: { read: ["finance.read", "finance.view_marketing", "finance.manage_marketing"], write: ["finance.manage", "finance.manage_marketing"] },
   finance_settlements: { read: ["finance.read", "finance.view_cashflow", "finance.manage_settlements"], write: ["finance.manage", "finance.manage_settlements"] },
   finance_audit: { read: "finance.read", write: "finance.manage" },
   draw_audit: { read: "loyalty.read", write: "loyalty.manage" },
 };
+
+const FINANCE_DOMAIN_READ_GATE_PERMISSIONS = [
+  "dashboard_state.read",
+  "finance.read",
+  "finance.manage",
+  "finance.view_revenue",
+  "finance.view_cost",
+  "finance.view_profit",
+  "finance.view_cashflow",
+  "finance.view_inventory_value",
+  "finance.view_marketing",
+  "finance.manage_expenses",
+  "finance.manage_budgets",
+  "finance.manage_invoices",
+  "finance.manage_goals",
+  "finance.manage_marketing",
+  "finance.manage_settlements",
+] as const;
+
+const FINANCE_DOMAIN_WRITE_GATE_PERMISSIONS = [
+  "dashboard_state.manage",
+  "finance.manage",
+  "finance.manage_expenses",
+  "finance.manage_budgets",
+  "finance.manage_invoices",
+  "finance.manage_goals",
+  "finance.manage_marketing",
+  "finance.manage_settlements",
+] as const;
 
 function permissionList(
   configured: string | readonly string[] | undefined,
@@ -59,13 +89,26 @@ function permissionList(
   return typeof configured === "string" ? [configured] : configured;
 }
 
+function hasDomainPermission(
+  domain: DashboardDomain,
+  mode: "read" | "write",
+  permissions: string[],
+): boolean {
+  const accepted = permissionList(SENSITIVE_DOMAIN_PERMISSIONS[domain]?.[mode]);
+  if (accepted.length) {
+    return accepted.some((permission) => permissions.includes(permission));
+  }
+  return permissions.includes(
+    mode === "read" ? "dashboard_state.read" : "dashboard_state.manage",
+  );
+}
+
 function requireSensitiveDomainPermission(
   domain: DashboardDomain,
   mode: "read" | "write",
   permissions: string[],
 ): void {
-  const accepted = permissionList(SENSITIVE_DOMAIN_PERMISSIONS[domain]?.[mode]);
-  if (accepted.length && !accepted.some((permission) => permissions.includes(permission))) {
+  if (!hasDomainPermission(domain, mode, permissions)) {
     throw new AppError(
       403,
       "FORBIDDEN",
@@ -73,6 +116,13 @@ function requireSensitiveDomainPermission(
     );
   }
 }
+
+function readableDomains(permissions: string[]): DashboardDomain[] {
+  return DASHBOARD_DOMAINS.filter((domain) =>
+    hasDomainPermission(domain, "read", permissions),
+  );
+}
+
 const writeSchema = z.object({
   expectedVersion: z.number().int().positive(),
   data: z.array(z.unknown()).max(20000),
@@ -122,10 +172,16 @@ export function createDashboardStateRouter(
     signedIn,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("dashboard_state.read"),
-    async (_request, response) => {
+    requireAnyPermission(...FINANCE_DOMAIN_READ_GATE_PERMISSIONS),
+    async (request, response) => {
+      const allowed = new Set(readableDomains(request.auth!.permissions));
+      const versions = await state.versions();
       response.setHeader("Cache-Control", "no-store");
-      response.status(200).json({ versions: await state.versions() });
+      response.status(200).json({
+        versions: Object.fromEntries(
+          Object.entries(versions).filter(([domain]) => allowed.has(domain as DashboardDomain)),
+        ),
+      });
     },
   );
 
@@ -134,12 +190,9 @@ export function createDashboardStateRouter(
     signedIn,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("dashboard_state.read"),
+    requireAnyPermission(...FINANCE_DOMAIN_READ_GATE_PERMISSIONS),
     async (request, response) => {
-      const readable = DASHBOARD_DOMAINS.filter((domain) => {
-        const accepted = permissionList(SENSITIVE_DOMAIN_PERMISSIONS[domain]?.read);
-        return accepted.length === 0 || accepted.some((permission) => request.auth!.permissions.includes(permission));
-      });
+      const readable = readableDomains(request.auth!.permissions);
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json({ domains: await state.readMany(readable) });
     },
@@ -150,7 +203,7 @@ export function createDashboardStateRouter(
     signedIn,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("dashboard_state.read"),
+    requireAnyPermission(...FINANCE_DOMAIN_READ_GATE_PERMISSIONS),
     async (request, response) => {
       const domain = domainSchema.parse(request.params.domain) as DashboardDomain;
       requireSensitiveDomainPermission(
@@ -169,7 +222,7 @@ export function createDashboardStateRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requirePermission("dashboard_state.manage"),
+    requireAnyPermission(...FINANCE_DOMAIN_WRITE_GATE_PERMISSIONS),
     async (request, response) => {
       const domain = domainSchema.parse(request.params.domain) as DashboardDomain;
       requireSensitiveDomainPermission(

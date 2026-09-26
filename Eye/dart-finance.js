@@ -44,6 +44,121 @@
     marketing: ["id", "date", "channel", "campaign", "spend", "impressions", "clicks", "orders", "attributedRevenue", "linkedExpenseId"],
     settlements: ["id", "orderId", "settlementDate", "amountReceived", "fee", "reference", "status", "notes"],
   });
+  const FINANCE_VIEW_PERMISSIONS = Object.freeze({
+    revenue: "finance.view_revenue",
+    cost: "finance.view_cost",
+    profit: "finance.view_profit",
+    cashflow: "finance.view_cashflow",
+    inventory: "finance.view_inventory_value",
+    marketing: "finance.view_marketing",
+  });
+  const FINANCE_ALL_VIEW_SECTIONS = Object.freeze(Object.keys(FINANCE_VIEW_PERMISSIONS));
+  const FINANCE_MANAGE_PERMISSIONS = Object.freeze({
+    expenses: "finance.manage_expenses",
+    budgets: "finance.manage_budgets",
+    invoices: "finance.manage_invoices",
+    goals: "finance.manage_goals",
+    marketing: "finance.manage_marketing",
+    settlements: "finance.manage_settlements",
+  });
+  const GOAL_FINANCE_SECTIONS = Object.freeze({
+    revenue: "revenue",
+    units: "revenue",
+    orders: "revenue",
+    repeat_rate: "revenue",
+    net_profit: "profit",
+    marketing_roas: "marketing",
+    expense_limit: "cost",
+  });
+
+  function hasAdminPermission(permission) {
+    return root.DartAdminAccess?.can?.(permission) === true;
+  }
+
+  function financeViewSections() {
+    if (hasAdminPermission("finance.read")) return [...FINANCE_ALL_VIEW_SECTIONS];
+    return FINANCE_ALL_VIEW_SECTIONS.filter((section) =>
+      hasAdminPermission(FINANCE_VIEW_PERMISSIONS[section]),
+    );
+  }
+
+  function financeCanView(section) {
+    if (typeof document === "undefined") return true;
+    return hasAdminPermission("finance.read") ||
+      hasAdminPermission(FINANCE_VIEW_PERMISSIONS[section]);
+  }
+
+  function financeCanManage(resource) {
+    const permission = FINANCE_MANAGE_PERMISSIONS[resource];
+    return hasAdminPermission("finance.manage") || Boolean(permission && hasAdminPermission(permission));
+  }
+
+  function financeCanExport() {
+    return hasAdminPermission("finance.export");
+  }
+
+  function financeCanReadResource(resource) {
+    if (hasAdminPermission("finance.read")) return true;
+    if (resource === "expenses") return financeCanView("cost") || financeCanManage("expenses");
+    if (resource === "budgets") return financeCanView("cost") || financeCanManage("budgets");
+    if (resource === "invoices") return financeCanManage("invoices");
+    if (resource === "goals") return financeCanManage("goals") || financeCanView("revenue") || financeCanView("cost") || financeCanView("profit") || financeCanView("marketing");
+    if (resource === "marketing") return financeCanView("marketing") || financeCanManage("marketing");
+    if (resource === "settlements") return financeCanView("cashflow") || financeCanManage("settlements");
+    return false;
+  }
+
+  function financeExportButton(report) {
+    return financeCanExport()
+      ? `<button type="button" class="dart-finance-secondary" data-finance-export="${escapeHTML(report)}">Export CSV</button>`
+      : "";
+  }
+
+  function financeAddButton(resource, label) {
+    return financeCanManage(resource)
+      ? `<button type="button" class="dart-finance-primary" data-finance-add="${escapeHTML(resource)}"><i class="fa-solid fa-plus"></i> ${escapeHTML(label)}</button>`
+      : "";
+  }
+
+  function financeTabAllowed(tab) {
+    if (tab === "overview") return financeViewSections().length > 0;
+    if (tab === "expenses") return hasAdminPermission("finance.read") || financeCanView("cost") || financeCanManage("expenses");
+    if (tab === "budgets") return hasAdminPermission("finance.read") || financeCanView("cost") || financeCanManage("budgets");
+    if (tab === "invoices") return hasAdminPermission("finance.read") || financeCanManage("invoices");
+    if (tab === "goals") return hasAdminPermission("finance.read") || financeCanManage("goals") || financeCanView("revenue") || financeCanView("cost") || financeCanView("profit") || financeCanView("marketing");
+    if (tab === "pnl") return financeCanView("revenue") && financeCanView("cost") && financeCanView("profit");
+    if (tab === "cashflow" || tab === "cod") return financeCanView("cashflow") || financeCanManage("settlements");
+    if (tab === "models") return financeCanView("revenue") && financeCanView("cost");
+    if (tab === "marketing") return financeCanView("marketing") || financeCanManage("marketing");
+    if (tab === "alerts") return hasAdminPermission("finance.read");
+    if (tab === "drawlog") return hasAdminPermission("loyalty.read");
+    return false;
+  }
+
+  function syncFinancePermissionUi() {
+    document.querySelectorAll("[data-finance-tab]").forEach((button) => {
+      button.hidden = !financeTabAllowed(button.dataset.financeTab);
+    });
+    if (!financeTabAllowed(state.financeTab)) {
+      const first = [...document.querySelectorAll("[data-finance-tab]")].find((button) => !button.hidden);
+      state.financeTab = first?.dataset.financeTab || "overview";
+    }
+  }
+
+  function summaryAllows(summary, section) {
+    if (!summary) return false;
+    const allowed = summary.__allowedSections;
+    return !Array.isArray(allowed) || allowed.includes(section);
+  }
+
+  function summaryAllowsAll(summary, sections) {
+    return sections.every((section) => summaryAllows(summary, section));
+  }
+
+  function restrictedFinanceMarkup(message = "This Finance view is not enabled for your Staff account.") {
+    return `<div class="dart-finance-empty">${escapeHTML(message)}</div>`;
+  }
+
   const state = {
     period: null,
     financeTab: "overview",
@@ -865,6 +980,8 @@
   }
 
   function goalActual(goal, data) {
+    const requiredSection = GOAL_FINANCE_SECTIONS[goal.metric] || "revenue";
+    if (!financeCanView(requiredSection)) return undefined;
     const range = { start: startOfDay(goal.startDate), end: endOfDay(goal.endDate) };
     let summary = authoritativeSummary(range);
     if (!summary && typeof document === "undefined") summary = calculateSummary(data, range);
@@ -874,13 +991,14 @@
         .catch(() => undefined);
       return null;
     }
+    if (!summaryAllows(summary, requiredSection)) return undefined;
     const values = {
       revenue: summary.netRevenue,
       units: summary.soldUnits,
       orders: summary.deliveredOrders,
       net_profit: summary.netProfit,
       repeat_rate: summary.repeatRate,
-      marketing_roas: summary.marketing.roas,
+      marketing_roas: summary.marketing?.roas,
       expense_limit: summary.totalOperatingExpenses,
     };
     return finiteNumber(values[goal.metric]);
@@ -890,16 +1008,18 @@
     return data.goals.filter(active).map((goal) => {
       const metric = GOAL_METRICS[goal.metric] || GOAL_METRICS.revenue;
       const rawActual = goalActual(goal, data);
+      const restricted = rawActual === undefined;
       const loading = rawActual === null;
-      const actual = loading ? 0 : rawActual;
+      const actual = restricted || loading ? 0 : rawActual;
       const target = Math.max(0, finiteNumber(goal.target));
-      const rawProgress = target && !loading ? (actual / target) * 100 : 0;
-      const achieved = !loading && (metric.direction === "max" ? actual <= target : actual >= target);
+      const rawProgress = target && !loading && !restricted ? (actual / target) * 100 : 0;
+      const achieved = !loading && !restricted && (metric.direction === "max" ? actual <= target : actual >= target);
       return {
         ...goal,
         metricDefinition: metric,
         actual,
         loading,
+        restricted,
         progress: rawProgress,
         achieved,
         visible:
@@ -1072,6 +1192,40 @@
     return serverFinanceErrors.get(financeRangeKey(range)) || null;
   }
 
+  async function fetchFinanceSummaryForRange(range) {
+    const start = encodeURIComponent(dateInputValue(range.start));
+    const end = encodeURIComponent(dateInputValue(range.end));
+    const allowedSections = financeViewSections();
+    if (!allowedSections.length) {
+      const error = new Error("Finance summary access is not enabled for this account.");
+      error.status = 403;
+      error.code = "FINANCE_ACCESS_DENIED";
+      throw error;
+    }
+
+    if (hasAdminPermission("finance.read")) {
+      const payload = await root.DartAdminApi.request(
+        `/api/v1/admin/finance/summary?start=${start}&end=${end}`,
+      );
+      const summary = payload?.summary || null;
+      if (!summary) throw new Error("Finance summary response is incomplete.");
+      summary.__allowedSections = [...FINANCE_ALL_VIEW_SECTIONS];
+      return summary;
+    }
+
+    const payloads = await Promise.all(allowedSections.map((section) =>
+      root.DartAdminApi.request(
+        `/api/v1/admin/finance/section/${encodeURIComponent(section)}?start=${start}&end=${end}`,
+      ),
+    ));
+    const summary = { __allowedSections: [...allowedSections] };
+    payloads.forEach((payload) => {
+      if (!payload?.summary) throw new Error("Finance section response is incomplete.");
+      Object.assign(summary, payload.summary);
+    });
+    return summary;
+  }
+
   async function hydrateServerFinanceSummary(range, force = false) {
     if (!root.DartAdminApi?.request || serverFinanceDenied) return null;
     const key = financeRangeKey(range);
@@ -1080,12 +1234,8 @@
     }
     if (serverFinancePending.has(key)) return serverFinancePending.get(key);
 
-    const promise = root.DartAdminApi.request(
-      `/api/v1/admin/finance/summary?start=${encodeURIComponent(dateInputValue(range.start))}&end=${encodeURIComponent(dateInputValue(range.end))}`,
-    )
-      .then((payload) => {
-        const summary = payload?.summary || null;
-        if (!summary) throw new Error("Finance summary response is incomplete.");
+    const promise = fetchFinanceSummaryForRange(range)
+      .then((summary) => {
         serverFinanceSummaries.set(key, summary);
         serverFinanceErrors.delete(key);
         return summary;
@@ -1301,13 +1451,16 @@
     const metrics = brandMetrics(data, range, current);
     const prior = brandMetrics(data, range.previous, previous);
     const numberFormat = new Intl.NumberFormat("en-EG", { maximumFractionDigits: 1 });
+    const revenueAllowed = summaryAllows(current, "revenue") && summaryAllows(previous, "revenue");
+    const inventoryAllowed = summaryAllows(current, "inventory") && summaryAllows(previous, "inventory");
+    const profitAllowed = summaryAllows(current, "profit") && summaryAllows(previous, "profit");
 
     const mainCards = [
       ["#brand .customar-card .numebr", metrics.customers],
       ["#brand .orders-card .numebr", metrics.orders],
       ["#brand .card-inf-2:nth-child(3) .numebr", metrics.rating ? metrics.rating.toFixed(1) : "0"],
       ["#brand .stock-card .numebr", metrics.stockCount],
-      ["#brand .sold-card .numebr", metrics.soldCount],
+      ["#brand .sold-card .numebr", revenueAllowed ? metrics.soldCount : "Restricted"],
     ];
     mainCards.forEach(([selector, value]) => {
       const element = document.querySelector(selector);
@@ -1315,13 +1468,24 @@
     });
 
     setBrandMetric("brand-in-stock-selling-value", money(metrics.inStockSelling), metrics.inStockSelling, prior.inStockSelling);
-    setBrandMetric("brand-in-stock-cost-value", money(metrics.inStockCost), metrics.inStockCost, prior.inStockCost, true);
-    setBrandMetric("brand-damage-loss-value", money(metrics.damageValue), metrics.damageValue, prior.damageValue, true);
-    setBrandMetric("brand-gross-margin-value", percent(metrics.grossMargin), metrics.grossMargin, prior.grossMargin);
-    setBrandMetric("brand-aov-value", money(metrics.aov), metrics.aov, prior.aov);
+    if (inventoryAllowed) {
+      setBrandMetric("brand-in-stock-cost-value", money(metrics.inStockCost), metrics.inStockCost, prior.inStockCost, true);
+      setBrandMetric("brand-damage-loss-value", money(metrics.damageValue), metrics.damageValue, prior.damageValue, true);
+    } else {
+      setBrandMetric("brand-in-stock-cost-value", "Restricted", 0, 0, true);
+      setBrandMetric("brand-damage-loss-value", "Restricted", 0, 0, true);
+    }
+    if (profitAllowed) setBrandMetric("brand-gross-margin-value", percent(metrics.grossMargin), metrics.grossMargin, prior.grossMargin);
+    else setBrandMetric("brand-gross-margin-value", "Restricted", 0, 0);
+    if (revenueAllowed) {
+      setBrandMetric("brand-aov-value", money(metrics.aov), metrics.aov, prior.aov);
+      setBrandMetric("brand-return-rate-value", percent(metrics.returnRate), metrics.returnRate, prior.returnRate, true);
+    } else {
+      setBrandMetric("brand-aov-value", "Restricted", 0, 0);
+      setBrandMetric("brand-return-rate-value", "Restricted", 0, 0, true);
+    }
     setBrandMetric("brand-delivery-rate-value", percent(metrics.deliveryRate), metrics.deliveryRate, prior.deliveryRate);
     setBrandMetric("brand-refusal-rate-value", percent(metrics.refusalRate), metrics.refusalRate, prior.refusalRate, true);
-    setBrandMetric("brand-return-rate-value", percent(metrics.returnRate), metrics.returnRate, prior.returnRate, true);
     setBrandMetric("brand-low-stock-value", numberFormat.format(metrics.lowStock), metrics.lowStock, prior.lowStock, true);
     setBrandMetric("brand-dead-stock-value", numberFormat.format(metrics.deadStock), metrics.deadStock, prior.deadStock, true);
 
@@ -1358,16 +1522,22 @@
     }
 
     const mappings = [
-      [".sales-cont", current.netRevenue, previous.netRevenue, false],
-      [".cost-cont", current.brandTotalCost, previous.brandTotalCost, true],
-      [".profit-cont", current.brandNetProfit, previous.brandNetProfit, false],
+      [".sales-cont", "revenue", current.netRevenue, previous.netRevenue, false],
+      [".cost-cont", "cost", current.brandTotalCost, previous.brandTotalCost, true],
+      [".profit-cont", "profit", current.brandNetProfit, previous.brandNetProfit, false],
     ];
-    mappings.forEach(([selector, value, prior, inverse]) => {
+    mappings.forEach(([selector, section, value, prior, inverse]) => {
       const card = document.querySelector(`#brand ${selector}`);
       if (!card) return;
       const amount = card.querySelector(".sales");
+      const variance = card.querySelector(".variance");
+      if (!summaryAllows(current, section) || !summaryAllows(previous, section)) {
+        if (amount) amount.textContent = "Restricted";
+        if (variance) variance.textContent = "";
+        return;
+      }
       if (amount) amount.textContent = money(value);
-      setComparisonBadge(card.querySelector(".variance"), value, prior, inverse);
+      setComparisonBadge(variance, value, prior, inverse);
     });
     [
       [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
@@ -1383,11 +1553,18 @@
     const costTitle = document.querySelector("#brand .cost-cont h4");
     if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Owner Total Cost';
     renderBrandMetricCards(data, range, current, previous);
-    document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(percent(current.repeatRate)));
+    document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(
+      summaryAllows(current, "revenue") ? percent(current.repeatRate) : "Restricted",
+    ));
     document.getElementById("dart-financial-period")?.replaceChildren(document.createTextNode(range.label));
-    const currentFrequency = current.orderFrequencyBuckets ? current : calculateSummary(data, range);
-    const previousFrequency = previous.orderFrequencyBuckets ? previous : calculateSummary(data, range.previous);
-    renderReturningChart(currentFrequency, previousFrequency);
+    if (summaryAllowsAll(current, ["revenue"]) && summaryAllowsAll(previous, ["revenue"])) {
+      renderReturningChart(current, previous);
+    } else {
+      const canvas = document.getElementById("dart-returning-chart");
+      if (canvas) canvas.hidden = true;
+      const empty = document.getElementById("dart-returning-empty");
+      if (empty) { empty.hidden = false; empty.textContent = "Revenue access is required for customer frequency."; }
+    }
     renderGoalsChart(data, range);
     renderFinancialChart(data, range, current);
   }
@@ -1545,6 +1722,16 @@
   }
 
   function renderFinancialChart(data, range, summary) {
+    if (!summaryAllowsAll(summary, ["revenue", "cost", "profit"])) {
+      const canvas = document.getElementById("dart-financial-chart");
+      if (canvas) canvas.hidden = true;
+      const restricted = document.getElementById("dart-financial-empty");
+      if (restricted) {
+        restricted.hidden = false;
+        restricted.textContent = "Revenue, Cost and Profit access are required for this financial chart.";
+      }
+      return;
+    }
     const empty = summary.netRevenue === 0 && summary.brandTotalCost === 0;
     toggleChartEmpty("dart-financial-empty", empty);
     const canvas = document.getElementById("dart-financial-chart");
@@ -1595,64 +1782,83 @@
   }
 
   function actionButtons(resource, id) {
+    if (!financeCanManage(resource)) return "—";
     return `<div class="dart-row-actions"><button type="button" data-finance-edit="${resource}" data-id="${escapeHTML(id)}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button><button type="button" data-finance-delete="${resource}" data-id="${escapeHTML(id)}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button></div>`;
   }
 
   function renderFinanceOverview(data, range, current, previous) {
     const budgets = budgetRows(data, range).filter((row) => row.visible);
-    const alerts = operationalAlerts(data, range, current);
-    const marginText = current.marginApplicable !== false && current.netRevenue > 0
-      ? `${percent(current.margin)} net margin`
-      : current.refunds > 0
-        ? "Return adjustment period · margin N/A"
-        : "Margin N/A";
+    const alerts = hasAdminPermission("finance.read") ? operationalAlerts(data, range, current) : [];
+    const cards = [];
+    if (summaryAllowsAll(current, ["revenue"]) && summaryAllowsAll(previous, ["revenue"])) {
+      cards.push(kpiCard("Net Revenue", money(current.netRevenue), "Delivered sales less period refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue }));
+      cards.push(kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue"));
+    }
+    if (summaryAllowsAll(current, ["cost"]) && summaryAllowsAll(previous, ["cost"])) {
+      cards.push(kpiCard("P&L Total Cost", money(current.totalCost), "Net COGS + recognized period operating costs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true));
+    }
+    if (summaryAllowsAll(current, ["profit"]) && summaryAllowsAll(previous, ["profit"])) {
+      const marginText = current.marginApplicable !== false && finiteNumber(current.netRevenue) > 0
+        ? `${percent(current.margin)} net margin`
+        : "Margin N/A for this period";
+      cards.push(kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit }));
+    }
+    if (summaryAllowsAll(current, ["cashflow"]) && summaryAllowsAll(previous, ["cashflow"])) {
+      cards.push(kpiCard("Net Cash Flow", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow }));
+    }
+    if (summaryAllowsAll(current, ["inventory"]) && summaryAllowsAll(previous, ["inventory"])) {
+      cards.push(kpiCard("Inventory Investment", money(current.physicalItemCost), "Cost snapshot of physical items entered in the selected period", "fa-solid fa-boxes-stacked", "neutral", { current: current.physicalItemCost, previous: previous.physicalItemCost }, true));
+    }
+    if (summaryAllowsAll(current, ["marketing"]) && summaryAllowsAll(previous, ["marketing"])) {
+      cards.push(kpiCard("Marketing ROAS", `${decimal(current.marketing?.roas)}x`, `${money(current.marketing?.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral"));
+    }
+
+    const pnlAllowed = summaryAllowsAll(current, ["revenue", "cost", "profit"]) &&
+      summaryAllowsAll(previous, ["revenue", "cost", "profit"]);
+    const pnlPanel = pnlAllowed
+      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
+      : `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue + Cost + Profit permissions are required.")}${restrictedFinanceMarkup("P&L is restricted for this Staff account.")}</article>`;
+
     return `${sectionToolbar("Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
-      <div class="dart-finance-kpi-grid">
-        ${kpiCard("Net Revenue", money(current.netRevenue), "Delivered sales less period refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue })}
-        ${kpiCard("P&L Total Cost", money(current.totalCost), "Net COGS + recognized period operating costs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true)}
-        ${kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit })}
-        ${kpiCard("Net Cash Flow", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
-        ${kpiCard("Inventory Investment", money(current.physicalItemCost), "Cost snapshot of physical items entered in the selected period", "fa-solid fa-boxes-stacked", "neutral", { current: current.physicalItemCost, previous: previous.physicalItemCost }, true)}
-        ${kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue")}
-        ${kpiCard("Marketing ROAS", `${decimal(current.marketing.roas)}x`, `${money(current.marketing.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral")}
-      </div>
+      <div class="dart-finance-kpi-grid">${cards.length ? cards.join("") : restrictedFinanceMarkup()}</div>
       <div class="dart-finance-two-col">
-        <article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}
-          <dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl>
-        </article>
-        <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Actual recognized expenses against active budgets.", '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>')}
-          <div class="dart-budget-stack">${budgets.length ? budgets.slice(0, 5).map((budget) => `<div class="dart-budget-line"><div><strong>${escapeHTML(budget.name)}</strong><span>${money(budget.actual)} / ${money(budget.amount)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, budget.utilization))}%" class="${budget.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(budget.utilization)} used · ${money(budget.remaining)} remaining</small></div>`).join("") : '<div class="dart-finance-empty">No budgets have been added.</div>'}</div>
+        ${pnlPanel}
+        <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Actual recognized expenses against active budgets.", financeTabAllowed("budgets") ? '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>' : "")}
+          <div class="dart-budget-stack">${financeTabAllowed("budgets") ? (budgets.length ? budgets.slice(0, 5).map((budget) => `<div class="dart-budget-line"><div><strong>${escapeHTML(budget.name)}</strong><span>${money(budget.actual)} / ${money(budget.amount)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, budget.utilization))}%" class="${budget.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(budget.utilization)} used · ${money(budget.remaining)} remaining</small></div>`).join("") : '<div class="dart-finance-empty">No budgets have been added.</div>') : restrictedFinanceMarkup("Budget data requires Cost or Budget management permission.")}</div>
         </article>
       </div>
-      <article class="dart-finance-panel">${sectionToolbar("Priority Alerts", "Operational and financial exceptions only; no synthetic alerts.", '<button type="button" class="dart-link-btn" data-finance-tab="alerts">View all</button>')}<div class="dart-alert-list">${renderAlertRows(alerts.slice(0, 6))}</div></article>`;
+      <article class="dart-finance-panel">${sectionToolbar("Priority Alerts", "Operational and financial exceptions visible to this account.", financeTabAllowed("alerts") ? '<button type="button" class="dart-link-btn" data-finance-tab="alerts">View all</button>' : "")}<div class="dart-alert-list">${financeTabAllowed("alerts") ? renderAlertRows(alerts.slice(0, 6)) : restrictedFinanceMarkup("Full Finance read access is required for combined alerts.")}</div></article>`;
   }
 
   function renderExpenses(data, range) {
     const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition is cash-only here and stays outside operating P&L to avoid double counting. Void records are excluded.", `<button type="button" class="dart-finance-secondary" data-finance-export="expenses">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="expenses"><i class="fa-solid fa-plus"></i> Add Expense</button>`)}
+    return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition is cash-only here and stays outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
       ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.")}`;
   }
 
   function renderBudgets(data, range) {
     const budgets = budgetRows(data, range).filter((row) => row.visible);
-    return `${sectionToolbar("Budgets", "Flexible category budgets with live utilization and warning thresholds.", `<button type="button" class="dart-finance-secondary" data-finance-export="budgets">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="budgets"><i class="fa-solid fa-plus"></i> Add Budget</button>`)}
+    return `${sectionToolbar("Budgets", "Flexible category budgets with live utilization and warning thresholds.", `${financeExportButton("budgets")}${financeAddButton("budgets", "Add Budget")}`)}
       ${tableShell(["Budget", "Category", "Period", "Limit", "Actual", "Remaining", "Used", "Actions"], budgets.map((row) => `<tr><td><strong>${escapeHTML(row.name)}</strong></td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.startDate)} → ${escapeHTML(row.endDate)}</td><td>${money(row.amount)}</td><td>${money(row.actual)}</td><td class="${row.remaining < 0 ? "is-negative" : ""}">${money(row.remaining)}</td><td><div class="dart-table-progress"><span style="width:${Math.min(100, Math.max(0, row.utilization))}%" class="${row.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(row.utilization)}</small></td><td>${actionButtons("budgets", row.id)}</td></tr>`).join(""), "No budgets overlap the selected period.")}`;
   }
 
   function renderInvoices(data, range) {
     const rows = data.invoices.filter(active).filter((invoice) => within(invoice.issueDate, range)).sort((a, b) => String(b.issueDate).localeCompare(String(a.issueDate)));
-    return `${sectionToolbar("Invoices", "Document control only. Sales stay linked to delivered orders and supplier invoices to expense records, preventing double counting.", `<button type="button" class="dart-finance-secondary" data-finance-export="invoices">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="invoices"><i class="fa-solid fa-plus"></i> Add Invoice</button>`)}
+    return `${sectionToolbar("Invoices", "Document control only. Sales stay linked to delivered orders and supplier invoices to expense records, preventing double counting.", `${financeExportButton("invoices")}${financeAddButton("invoices", "Add Invoice")}`)}
       ${tableShell(["Invoice", "Type", "Issue", "Due", "Linked Record", "Total", "Paid", "Status", "Actions"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.number)}</strong></td><td>${escapeHTML(row.type)}</td><td>${escapeHTML(row.issueDate)}</td><td>${escapeHTML(row.dueDate)}</td><td>${escapeHTML(row.linkedId || "-")}</td><td>${money(row.total)}</td><td>${money(row.amountPaid)}</td><td><span class="dart-status-chip">${escapeHTML(invoiceStatus(row))}</span></td><td>${actionButtons("invoices", row.id)}</td></tr>`).join(""), "No invoices were issued in the selected period.")}`;
   }
 
   function renderGoals(data, range) {
     const goals = goalRows(data, range).filter((goal) => goal.visible);
-    return `${sectionToolbar("Goals", "Add, edit or archive measurable goals. Actual values always come from saved dashboard and finance records.", `<button type="button" class="dart-finance-secondary" data-finance-export="goals">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="goals"><i class="fa-solid fa-plus"></i> Add Goal</button>`)}
-      <div class="dart-goal-grid">${goals.length ? goals.map((goal) => `<article class="dart-goal-card ${goal.achieved ? "is-achieved" : ""}"><div class="dart-goal-card-head"><div><span>${escapeHTML(goal.metricDefinition.label)}</span><h3>${escapeHTML(goal.name)}</h3></div>${actionButtons("goals", goal.id)}</div><div class="dart-goal-values"><strong>${goal.loading ? "Loading…" : formatMetric(goal.actual, goal.metricDefinition)}</strong><span>of ${formatMetric(goal.target, goal.metricDefinition)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, goal.progress))}%"></span></div><div class="dart-goal-meta"><span>${goal.loading ? "Loading authoritative actual…" : `${percent(goal.progress)} progress`}</span><span>${escapeHTML(goal.startDate)} → ${escapeHTML(goal.endDate)}</span></div></article>`).join("") : '<div class="dart-finance-empty dart-finance-empty-large">No goals overlap the selected period. Add the first goal when you have a real target.</div>'}</div>`;
+    return `${sectionToolbar("Goals", "Add, edit or archive measurable goals. Actual values always come from saved dashboard and finance records.", `${financeExportButton("goals")}${financeAddButton("goals", "Add Goal")}`)}
+      <div class="dart-goal-grid">${goals.length ? goals.map((goal) => `<article class="dart-goal-card ${goal.achieved ? "is-achieved" : ""}"><div class="dart-goal-card-head"><div><span>${escapeHTML(goal.metricDefinition.label)}</span><h3>${escapeHTML(goal.name)}</h3></div>${actionButtons("goals", goal.id)}</div><div class="dart-goal-values"><strong>${goal.restricted ? "Restricted" : goal.loading ? "Loading…" : formatMetric(goal.actual, goal.metricDefinition)}</strong><span>of ${formatMetric(goal.target, goal.metricDefinition)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, goal.progress))}%"></span></div><div class="dart-goal-meta"><span>${goal.restricted ? "Metric access not granted" : goal.loading ? "Loading authoritative actual…" : `${percent(goal.progress)} progress`}</span><span>${escapeHTML(goal.startDate)} → ${escapeHTML(goal.endDate)}</span></div></article>`).join("") : '<div class="dart-finance-empty dart-finance-empty-large">No goals overlap the selected period. Add the first goal when you have a real target.</div>'}</div>`;
   }
 
   function renderPnL(current, previous, range) {
+    if (!summaryAllowsAll(current, ["revenue", "cost", "profit"]) || !summaryAllowsAll(previous, ["revenue", "cost", "profit"])) {
+      return restrictedFinanceMarkup("Profit & Loss requires Revenue, Cost and Profit permissions.");
+    }
     const lines = [
       ["Gross delivered revenue", current.grossRevenue, previous.grossRevenue],
       ["Less: period refunds", -current.refunds, -previous.refunds],
@@ -1666,12 +1872,15 @@
       ["Pre-sale damage write-offs", -current.damageLoss, -previous.damageLoss],
       ["Net profit", current.netProfit, previous.netProfit, "total"],
     ];
-    return `${sectionToolbar("Profit & Loss", `${range.label} compared with ${range.previous.label}.`, '<button type="button" class="dart-finance-secondary" data-finance-export="pnl">Export CSV</button>')}
-      <article class="dart-finance-panel dart-statement-panel"><div class="dart-statement-header"><span>Account</span><span>Current</span><span>Previous</span><span>Change</span></div>${lines.map(([label, value, prior, type]) => { const delta = comparison(value, prior); return `<div class="dart-statement-row ${type ? `is-${type}` : ""}"><span>${escapeHTML(label)}</span><strong>${money(value)}</strong><span>${money(prior)}</span><span class="dart-kpi-change is-${delta.direction}">${escapeHTML(delta.text)}</span></div>`; }).join("")}<div class="dart-statement-foot">Gross margin ${percent(current.grossMargin)} · Net margin ${percent(current.margin)}</div></article>`;
+    return `${sectionToolbar("Profit & Loss", `${range.label} compared with ${range.previous.label}.`, financeExportButton("pnl"))}
+      <article class="dart-finance-panel dart-statement-panel"><div class="dart-statement-header"><span>Account</span><span>Current</span><span>Previous</span><span>Change</span></div>${lines.map(([label, value, prior, type]) => { const delta = comparison(value, prior); return `<div class="dart-statement-row ${type ? `is-${type}` : ""}"><span>${escapeHTML(label)}</span><strong>${money(value)}</strong><span>${money(prior)}</span><span class="dart-kpi-change is-${delta.direction}">${escapeHTML(delta.text)}</span></div>`; }).join("")}<div class="dart-statement-foot">Gross margin ${current.marginApplicable ? percent(current.grossMargin) : "N/A"} · Net margin ${current.marginApplicable ? percent(current.margin) : "N/A"}</div></article>`;
   }
 
   function renderCashFlow(current, previous, range) {
-    return `${sectionToolbar("Cash Flow", "Cash basis: collected order cash less recorded paid expenses, completed refunds and Dart-paid representative fees. Inventory investment is shown separately until its payment is explicitly recorded.", '<button type="button" class="dart-finance-secondary" data-finance-export="cashflow">Export CSV</button>')}
+    if (!summaryAllowsAll(current, ["cashflow"]) || !summaryAllowsAll(previous, ["cashflow"])) {
+      return restrictedFinanceMarkup("Cash Flow permission is required for this report.");
+    }
+    return `${sectionToolbar("Cash Flow", "Cash basis: collected order cash less recorded paid expenses, completed refunds and Dart-paid representative fees. Inventory investment is shown separately until its payment is explicitly recorded.", financeExportButton("cashflow"))}
       <div class="dart-finance-kpi-grid dart-finance-kpi-grid-three">
         ${kpiCard("Cash In", money(current.cashIn), "Recorded COD receipts", "fa-solid fa-arrow-down", "green", { current: current.cashIn, previous: previous.cashIn })}
         ${kpiCard("Cash Out", money(current.cashOut), "Recorded paid expenses + refunds + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
@@ -1692,19 +1901,22 @@
 
   function renderCOD(data, range) {
     const rows = codRows(data, range);
-    return `${sectionToolbar("Cash on Delivery", "Courier fee is retained once per order. It is shown for reconciliation only because it is already included inside item cost and must not reduce profit twice.", '<button type="button" class="dart-finance-secondary" data-finance-export="cod">Export CSV</button>')}
-      ${tableShell(["Order", "Delivery Date", "Order Status", "Order Total", "Courier Due", "Due to Dart", "Received", "Remaining", "Settlement", "Action"], rows.map(({ order, orderTotal, courierDue, due, received, remaining, status }) => `<tr><td><strong>${escapeHTML(order.orderId || order.id)}</strong></td><td>${escapeHTML(dateInputValue(orderEventDate(order)) || "-")}</td><td>${escapeHTML(order.status || "-")}</td><td>${money(orderTotal)}</td><td>${money(courierDue)}</td><td><strong>${money(due)}</strong></td><td>${money(received)}</td><td class="${remaining > 0 ? "is-negative" : ""}">${money(remaining)}</td><td><span class="dart-status-chip">${escapeHTML(status)}</span></td><td>${String(order.status).toLowerCase() === "delivered" && remaining > 0.009 ? `<button type="button" class="dart-table-primary" data-cod-settle="${escapeHTML(order.orderId || order.id)}">Record receipt</button>` : "—"}</td></tr>`).join(""), "No COD orders fall in the selected period.")}`;
+    return `${sectionToolbar("Cash on Delivery", "Courier fee is retained once per order. It is shown for reconciliation only because it is already included inside item cost and must not reduce profit twice.", financeExportButton("cod"))}
+      ${tableShell(["Order", "Delivery Date", "Order Status", "Order Total", "Courier Due", "Due to Dart", "Received", "Remaining", "Settlement", "Action"], rows.map(({ order, orderTotal, courierDue, due, received, remaining, status }) => `<tr><td><strong>${escapeHTML(order.orderId || order.id)}</strong></td><td>${escapeHTML(dateInputValue(orderEventDate(order)) || "-")}</td><td>${escapeHTML(order.status || "-")}</td><td>${money(orderTotal)}</td><td>${money(courierDue)}</td><td><strong>${money(due)}</strong></td><td>${money(received)}</td><td class="${remaining > 0 ? "is-negative" : ""}">${money(remaining)}</td><td><span class="dart-status-chip">${escapeHTML(status)}</span></td><td>${String(order.status).toLowerCase() === "delivered" && remaining > 0.009 && financeCanManage("settlements") ? `<button type="button" class="dart-table-primary" data-cod-settle="${escapeHTML(order.orderId || order.id)}">Record receipt</button>` : "—"}</td></tr>`).join(""), "No COD orders fall in the selected period.")}`;
   }
 
   function renderModels(data, range) {
     const rows = modelProfitability(data, range);
-    return `${sectionToolbar("Model Profitability", "Gross contribution by model. Shared operating expenses are intentionally not allocated without a defined allocation rule.", '<button type="button" class="dart-finance-secondary" data-finance-export="models">Export CSV</button>')}
+    return `${sectionToolbar("Model Profitability", "Gross contribution by model. Shared operating expenses are intentionally not allocated without a defined allocation rule.", financeExportButton("models"))}
       ${tableShell(["Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.modelName)}</strong><small class="dart-table-sub">${escapeHTML(row.modelCode)}</small></td><td>${row.units}</td><td>${money(row.revenue)}</td><td>${money(row.cogs)}</td><td class="${row.profit < 0 ? "is-negative" : "is-positive"}">${money(row.profit)}</td><td>${percent(row.margin)}</td></tr>`).join(""), "No delivered model lines exist in the selected period.")}`;
   }
 
   function renderMarketing(data, range, summary) {
-    const rows = summary.marketing.rows.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    return `${sectionToolbar("Marketing Analytics", "Manual or backend-imported campaign facts. Link spend to an expense to include it in P&L without duplication.", `<button type="button" class="dart-finance-secondary" data-finance-export="marketing">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="marketing"><i class="fa-solid fa-plus"></i> Add Marketing Record</button>`)}
+    if (!summaryAllowsAll(summary, ["marketing"]) || !summary.marketing) {
+      return restrictedFinanceMarkup("Marketing Finance permission is required for this report.");
+    }
+    const rows = (summary.marketing.rows || data.marketing.filter(active).filter((entry) => within(entry.date, range))).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    return `${sectionToolbar("Marketing Analytics", "Manual or backend-imported campaign facts. Link spend to an expense to include it in P&L without duplication.", `${financeExportButton("marketing")}${financeAddButton("marketing", "Add Marketing Record")}`)}
       <div class="dart-finance-kpi-grid">
         ${kpiCard("Tracked Spend", money(summary.marketing.spend), "Marketing analytics source", "fa-solid fa-wallet", "burgundy")}
         ${kpiCard("Attributed Revenue", money(summary.marketing.revenue), "Not additional accounting revenue", "fa-solid fa-sack-dollar", "green")}
@@ -1728,13 +1940,14 @@
 
   function renderDrawLog() {
     const rows = readJSON(STORAGE_KEYS.drawAudit, []);
-    return `${sectionToolbar("Dart Card Draw Eligibility Log", "Every inclusion or exclusion change is recorded with its previous value, new value, reason and timestamp.", '<button type="button" class="dart-finance-secondary" data-finance-export="drawlog">Export CSV</button>')}
+    return `${sectionToolbar("Dart Card Draw Eligibility Log", "Every inclusion or exclusion change is recorded with its previous value, new value, reason and timestamp.", financeExportButton("drawlog"))}
       ${tableShell(["Timestamp", "Client", "Previous", "New", "Reason", "Actor"], rows.map((row) => `<tr><td>${escapeHTML(new Date(row.timestamp).toLocaleString("en-EG"))}</td><td><strong>${escapeHTML(row.clientName || "-")}</strong><small class="dart-table-sub">${escapeHTML(row.clientId || "-")}</small></td><td>${row.before ? "Eligible" : "Excluded"}</td><td>${row.after ? "Eligible" : "Excluded"}</td><td>${escapeHTML(row.reason || "-")}</td><td>${escapeHTML(row.actorRole || "Admin")}</td></tr>`).join(""), "No draw eligibility changes have been recorded.")}`;
   }
 
   function renderFinanceSection() {
     const content = document.getElementById("dart-finance-content");
     if (!content) return;
+    syncFinancePermissionUi();
     const data = dashboardData();
     const range = currentRange();
     const current = authoritativeSummary(range);
@@ -1924,6 +2137,7 @@
 
   function saveFinanceForm(form) {
     const resource = form.dataset.resource;
+    if (!financeCanManage(resource)) return;
     const id = form.dataset.id;
     const payload = formValues(form);
     const error = validateRecord(resource, payload, id);
@@ -2066,11 +2280,41 @@
     URL.revokeObjectURL(url);
   }
 
+  async function downloadAuthoritativeFinanceCsv(section, filename) {
+    if (!hasAdminPermission("finance.export")) {
+      console.warn("Finance export permission is required.");
+      return;
+    }
+    const range = currentRange();
+    const base = String(root.DartAdminApi?.baseUrl || location.origin).replace(/\/$/, "");
+    const url = `${base}/api/v1/admin/finance/export?start=${encodeURIComponent(dateInputValue(range.start))}&end=${encodeURIComponent(dateInputValue(range.end))}&section=${encodeURIComponent(section)}`;
+    const response = await fetch(url, { credentials: "include", cache: "no-store", headers: { Accept: "text/csv" } });
+    if (!response.ok) throw new Error(`Finance export failed (${response.status}).`);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
   function exportReport(report) {
     const data = dashboardData();
     const range = currentRange();
     const stamp = `${dateInputValue(range.start)}_${dateInputValue(range.end)}`;
+    if (report === "pnl" || report === "cashflow") {
+      void downloadAuthoritativeFinanceCsv(report, `dart-${report}-${stamp}.csv`)
+        .catch((error) => console.error("Dart finance export failed", error));
+      return;
+    }
     if (COLLECTIONS.includes(report)) {
+      if (!hasAdminPermission("finance.export") || !financeCanReadResource(report)) {
+        console.warn("Finance export and resource view permission are required.");
+        return;
+      }
       let rows = FinanceRepository.list(report).filter(active);
       if (report === "expenses") rows = rows.filter((row) => within(row.date, range));
       else if (report === "invoices") rows = rows.filter((row) => within(row.issueDate, range));
@@ -2082,19 +2326,9 @@
       downloadCSV(`dart-${report}-${stamp}.csv`, headers, rows.map((row) => headers.map((key) => row[key] ?? "")));
       return;
     }
-    const needsAuthoritativeSummary = report === "pnl" || report === "cashflow";
-    const summary = needsAuthoritativeSummary ? authoritativeSummary(range) : null;
-    if (needsAuthoritativeSummary && !summary) {
-      void hydrateServerFinanceSummary(range)
-        .then(() => exportReport(report))
-        .catch(() => undefined);
-      return;
-    }
-    if (report === "pnl") downloadCSV(`dart-pnl-${stamp}.csv`, ["Account", "Amount EGP"], [["Gross Revenue", summary.grossRevenue], ["Refunds", -summary.refunds], ["Total Selling", summary.netRevenue], ["Sold-piece Cost (includes courier allocation)", -summary.netCogs], ["Operating Expenses", -summary.operatingExpenses], ["Courier Allocation (informational)", summary.deliveryCosts], ["Settlement Fees", -summary.codFees], ["Representative Exchange Fees", -summary.returnCourierCosts], ["Damage Write-offs", -summary.damageLoss], ["Total Profit", summary.netProfit]]);
-    else if (report === "cashflow") downloadCSV(`dart-cash-flow-${stamp}.csv`, ["Cash Flow", "Amount EGP"], [["Cash In to Dart", summary.cashIn], ["Paid Operating Expenses", -summary.paidExpenseCashOut], ["Paid Inventory Acquisitions", -(summary.inventoryPurchaseCashOut || 0)], ["Courier Allocation (retained before Dart receipt)", summary.deliveryCosts], ["Completed Refunds", -summary.refundCashOut], ["Dart-paid Representative Fees", -summary.returnCourierCosts], ["Settlement Fees", -summary.codFees], ["Net Cash Flow", summary.netCashFlow]]);
-    else if (report === "cod") downloadCSV(`dart-cod-${stamp}.csv`, ["Order", "Order Total", "Courier Due", "Due to Dart", "Received", "Remaining", "Status"], codRows(data, range).map((row) => [row.order.orderId || row.order.id, row.orderTotal, row.courierDue, row.due, row.received, row.remaining, row.status]));
-    else if (report === "models") downloadCSV(`dart-model-profitability-${stamp}.csv`, ["Model Code", "Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin %"], modelProfitability(data, range).map((row) => [row.modelCode, row.modelName, row.units, row.revenue, row.cogs, row.profit, decimal(row.margin)]));
-    else if (report === "drawlog") {
+    if (report === "cod" && financeCanExport() && financeTabAllowed("cod")) downloadCSV(`dart-cod-${stamp}.csv`, ["Order", "Order Total", "Courier Due", "Due to Dart", "Received", "Remaining", "Status"], codRows(data, range).map((row) => [row.order.orderId || row.order.id, row.orderTotal, row.courierDue, row.due, row.received, row.remaining, row.status]));
+    else if (report === "models" && financeCanExport() && financeTabAllowed("models")) downloadCSV(`dart-model-profitability-${stamp}.csv`, ["Model Code", "Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin %"], modelProfitability(data, range).map((row) => [row.modelCode, row.modelName, row.units, row.revenue, row.cogs, row.profit, decimal(row.margin)]));
+    else if (report === "drawlog" && financeCanExport() && financeTabAllowed("drawlog")) {
       const rows = readJSON(STORAGE_KEYS.drawAudit, []);
       downloadCSV(`dart-draw-eligibility-log-${stamp}.csv`, ["Timestamp", "Client ID", "Client", "Previous", "New", "Reason", "Actor"], rows.map((row) => [row.timestamp, row.clientId, row.clientName, row.before ? "Eligible" : "Excluded", row.after ? "Eligible" : "Excluded", row.reason, row.actorRole]));
     }
@@ -2115,17 +2349,20 @@
       const financeLink = event.target.closest('[data-target="finance"]');
       if (financeLink) { event.preventDefault(); activateFinance(); return; }
       const tab = event.target.closest("[data-finance-tab]");
-      if (tab) { state.financeTab = tab.dataset.financeTab; renderFinanceSection(); return; }
+      if (tab) {
+        if (!financeTabAllowed(tab.dataset.financeTab)) return;
+        state.financeTab = tab.dataset.financeTab; renderFinanceSection(); return;
+      }
       const openTab = event.target.closest("[data-open-finance-tab]");
       if (openTab) { activateFinance(openTab.dataset.openFinanceTab); return; }
       const add = event.target.closest("[data-finance-add]");
-      if (add) { openResourceModal(add.dataset.financeAdd); return; }
+      if (add) { if (financeCanManage(add.dataset.financeAdd)) openResourceModal(add.dataset.financeAdd); return; }
       const edit = event.target.closest("[data-finance-edit]");
-      if (edit) { openResourceModal(edit.dataset.financeEdit, edit.dataset.id); return; }
+      if (edit) { if (financeCanManage(edit.dataset.financeEdit)) openResourceModal(edit.dataset.financeEdit, edit.dataset.id); return; }
       const remove = event.target.closest("[data-finance-delete]");
-      if (remove) { await deleteFinanceRecord(remove.dataset.financeDelete, remove.dataset.id); return; }
+      if (remove) { if (financeCanManage(remove.dataset.financeDelete)) await deleteFinanceRecord(remove.dataset.financeDelete, remove.dataset.id); return; }
       const settle = event.target.closest("[data-cod-settle]");
-      if (settle) { openResourceModal("settlements", null, { orderId: settle.dataset.codSettle }); return; }
+      if (settle) { if (financeCanManage("settlements")) openResourceModal("settlements", null, { orderId: settle.dataset.codSettle }); return; }
       const exportButton = event.target.closest("[data-finance-export]");
       if (exportButton) { exportReport(exportButton.dataset.financeExport); return; }
       const draw = event.target.closest("[data-dart-draw-toggle]");
