@@ -278,10 +278,10 @@ assert.match(
   /trackCartIncrease\?\.\(previous, cartData\)/,
   "successful cart mutations must emit detailed add-to-cart analytics",
 );
-assert.match(
+assert.doesNotMatch(
   platformRuntime,
   /trackAnalyticsEvent\("order_completed"/,
-  "successful website checkout must emit an order conversion event",
+  "website order conversions must stay server-authoritative instead of trusting a browser event",
 );
 assert.ok(
   !platformRuntime.includes('localStorage.setItem("dart_traffic') &&

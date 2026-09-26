@@ -2916,9 +2916,6 @@
           try {
             const order = await checkout(form);
             completed = true;
-            void trackAnalyticsEvent("order_completed", {
-              orderCode: order?.orderId || order?.orderCode || order?.id,
-            });
             if (typeof showToast === "function")
               showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
             setTimeout(() => {
