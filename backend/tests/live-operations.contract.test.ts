@@ -22,6 +22,10 @@ const dashboardLiveCss = readFileSync(
   new URL("../../Eye/dart-live-operations.css", import.meta.url),
   "utf8",
 );
+const dashboardHtml = readFileSync(
+  new URL("../../Eye/Dart Eye.html", import.meta.url),
+  "utf8",
+);
 
 describe("live operations contracts", () => {
   it("enforces one current delivery stop per representative", () => {
@@ -81,6 +85,26 @@ describe("live operations contracts", () => {
     expect(dashboardLiveMap).toContain("if (panelOpen && selectedOrderId)");
     expect(dashboardLiveMap).toContain("overview=full&geometries=geojson");
     expect(dashboardLiveMap).toContain("window.L.polyline(geometry");
+  });
+
+  it("builds adaptive routes from the current stop and live representative location", () => {
+    expect(service).toContain("adaptiveSuggestedStopOrder");
+    expect(service).toContain('stop.routeState === "current"');
+    expect(dashboardLiveMap).toContain("adaptiveRouteStops(rep)");
+    expect(dashboardLiveMap).toContain("nearestStops(orderCoordinates(current), remaining)");
+    expect(dashboardLiveMap).toContain("cached?.signature === signature");
+    expect(dashboardLiveMap).not.toContain("window.L.polyline(coordinates");
+  });
+
+  it("exposes independent Reps and Orders layers with unassigned and delivered order pins", () => {
+    expect(dashboardHtml).toContain('data-live-layer="reps"');
+    expect(dashboardHtml).toContain('data-live-layer="orders"');
+    expect(dashboardLiveMap).toContain("snapshot.orders || []");
+    expect(dashboardLiveMap).toContain('isUnassigned ? "#111111"');
+    expect(dashboardLiveMap).toContain('state === "delivered" ? COLORS.delivered');
+    expect(dashboardLiveMap).toContain("Assigned Rep:");
+    expect(service).toContain("orders: Record<string, unknown>[];");
+    expect(service).toContain("o.status NOT IN ('Refused','Cancelled','Returned')");
   });
 
   it("reorders every non-terminal assigned order and keeps route controls readable", () => {

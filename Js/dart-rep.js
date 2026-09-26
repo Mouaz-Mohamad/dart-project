@@ -804,8 +804,8 @@
         const firstCurrent = first.routeState === "current" || first.status === "Representative On The Way";
         const secondCurrent = second.routeState === "current" || second.status === "Representative On The Way";
         if (firstCurrent !== secondCurrent) return firstCurrent ? -1 : 1;
-        const firstSequence = Number(first.routeSequence || first.suggestedSequence || 9999);
-        const secondSequence = Number(second.routeSequence || second.suggestedSequence || 9999);
+        const firstSequence = Number(first.suggestedSequence || first.routeSequence || 9999);
+        const secondSequence = Number(second.suggestedSequence || second.routeSequence || 9999);
         return firstSequence - secondSequence;
       }),
       list = document.getElementById("repOrdersList");

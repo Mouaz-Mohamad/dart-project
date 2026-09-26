@@ -1137,6 +1137,10 @@
                 <select id="live-map-representative-filter" aria-label="Representative filter">
                     <option value="">All active representatives</option>
                 </select>
+                <div class="dart-live-layer-group" aria-label="Map layer filters">
+                    <label class="dart-live-filter dart-live-layer-filter" style="--status-color:#151515"><input type="checkbox" data-live-layer="reps" checked><span class="dart-live-filter-bullet"></span>Reps</label>
+                    <label class="dart-live-filter dart-live-layer-filter" style="--status-color:#111111"><input type="checkbox" data-live-layer="orders" checked><span class="dart-live-filter-bullet"></span>Orders</label>
+                </div>
                 <div class="dart-live-filter-group" aria-label="Route status filters">
                     <label class="dart-live-filter" style="--status-color:#AB012B"><input type="checkbox" data-live-filter="current" checked><span class="dart-live-filter-bullet"></span>Delivering</label>
                     <label class="dart-live-filter" style="--status-color:#2563eb"><input type="checkbox" data-live-filter="upcoming" checked><span class="dart-live-filter-bullet"></span>Upcoming</label>
@@ -1161,8 +1165,9 @@
                             <span><i class="dart-live-state" style="background:#AB012B"></i>Delivering</span>
                             <span><i class="dart-live-state" style="background:#2563eb"></i>Upcoming</span>
                             <span><i class="dart-live-state" style="background:#16a34a"></i>Delivered</span>
+                            <span><i class="dart-live-state" style="background:#111111"></i>Unassigned order</span>
                             <span><i class="dart-live-state" style="background:#eab308"></i>Waiting</span>
-                            <span><i class="dart-live-state" style="background:#ea580c"></i>Problem / Cancelled / Refused</span>
+                            <span><i class="dart-live-state" style="background:#ea580c"></i>Problem</span>
                         </div>
                     </div>
                     <div id="live-map-loading" class="dart-live-loading">Loading live operations…</div>

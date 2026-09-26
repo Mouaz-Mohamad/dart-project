@@ -182,6 +182,24 @@ function suggestedStopOrder<T extends { latitude: number; longitude: number }>(
   return ordered;
 }
 
+export function adaptiveSuggestedStopOrder<T extends { latitude: number; longitude: number; routeState?: string }>(
+  startLatitude: number | null,
+  startLongitude: number | null,
+  stops: T[],
+): T[] {
+  const currentIndex = stops.findIndex((stop) => stop.routeState === "current");
+  if (currentIndex < 0) {
+    return suggestedStopOrder(startLatitude, startLongitude, stops);
+  }
+
+  const current = stops[currentIndex]!;
+  const remaining = stops.filter((_, index) => index !== currentIndex);
+  return [
+    current,
+    ...suggestedStopOrder(current.latitude, current.longitude, remaining),
+  ];
+}
+
 function finalModelPriceMinor(sellingMinor: number, discountPercent: number): number {
   return Math.max(0, Math.round(sellingMinor * (1 - Math.min(100, Math.max(0, discountPercent)) / 100)));
 }
@@ -2356,6 +2374,7 @@ export class CommerceService {
       activeRepresentatives: number;
     };
     representatives: Record<string, unknown>[];
+    orders: Record<string, unknown>[];
   }> {
     const representativeResult = await this.pool.query<{
       representative_user_id: string;
@@ -2391,19 +2410,6 @@ export class CommerceService {
            ON rl.representative_user_id=r.user_id
         ORDER BY r.full_name`,
     );
-
-    if (!representativeResult.rows.length) {
-      return {
-        capturedAt: new Date().toISOString(),
-        totals: {
-          totalOrders: 0,
-          deliveredOrders: 0,
-          deliveringNow: 0,
-          activeRepresentatives: 0,
-        },
-        representatives: [],
-      };
-    }
 
     const representativeIds = representativeResult.rows.map(
       (row) => row.representative_user_id,
@@ -2445,14 +2451,96 @@ export class CommerceService {
       [representativeIds],
     );
 
+    const mapOrdersResult = await this.pool.query<{
+      id: string;
+      order_code: string;
+      representative_user_id: string | null;
+      representative_code: string | null;
+      representative_name: string | null;
+      status: string;
+      contact_snapshot: Record<string, unknown>;
+      delivery_address: Record<string, unknown>;
+      final_minor: string;
+      delivered_at: Date | null;
+      route_state: string | null;
+    }>(
+      `SELECT o.id::text,
+              o.order_code,
+              o.representative_user_id::text,
+              r.representative_code,
+              r.full_name AS representative_name,
+              o.status,
+              o.contact_snapshot,
+              o.delivery_address,
+              o.final_minor::text,
+              o.delivered_at,
+              drs.route_state
+         FROM orders o
+         LEFT JOIN representatives r ON r.user_id=o.representative_user_id
+         LEFT JOIN delivery_route_stops drs
+           ON drs.order_id=o.id
+          AND drs.representative_user_id=o.representative_user_id
+        WHERE NOT o.is_deleted
+          AND NOT o.is_archived
+          AND o.status NOT IN ('Refused','Cancelled','Returned')
+          AND (
+            o.status <> 'Delivered'
+            OR (o.delivered_at AT TIME ZONE 'Africa/Cairo')::date =
+               (now() AT TIME ZONE 'Africa/Cairo')::date
+          )
+        ORDER BY o.created_at`,
+    );
+
+    const routeStateFor = (status: string, savedState: string | null): string =>
+      status === "Delivered"
+        ? "delivered"
+        : status === "Representative On The Way"
+          ? "current"
+          : ["waiting", "problem"].includes(String(savedState || ""))
+            ? String(savedState)
+            : "upcoming";
+
+    const mapOrders = mapOrdersResult.rows.flatMap((order) => {
+      const address = order.delivery_address || {};
+      const latitude = Number(address.latitude);
+      const longitude = Number(address.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+      const assigned = Boolean(order.representative_user_id);
+      return [{
+        id: order.id,
+        orderId: order.order_code,
+        status: order.status,
+        routeState: routeStateFor(order.status, order.route_state),
+        clientName: String(order.contact_snapshot?.name || "Customer"),
+        country: String(address.country || ""),
+        governorate: String(address.governorate || ""),
+        area: String(address.area || ""),
+        street: String(address.street || ""),
+        building: String(address.building || ""),
+        fullAddress: String(
+          address.fullAddress ||
+          [address.building, address.street, address.area, address.governorate, address.country]
+            .filter(Boolean)
+            .join(", "),
+        ),
+        latitude,
+        longitude,
+        finalAmount: Number(order.final_minor) / 100,
+        deliveredAt: order.delivered_at?.toISOString() || null,
+        assigned,
+        representativeId: order.representative_user_id,
+        representativeCode: order.representative_code,
+        representativeName: order.representative_name,
+      }];
+    });
+
     const nowMs = Date.now();
     const representatives = representativeResult.rows.map((representative) => {
       const roundStartedAt = representative.round_started_at.getTime();
       const visible = ordersResult.rows.filter((order) => {
         if (order.representative_user_id !== representative.representative_user_id) return false;
-        if (!["Delivered", "Refused", "Cancelled"].includes(order.status)) {
-          return true;
-        }
+        if (["Refused", "Cancelled", "Returned"].includes(order.status)) return false;
+        if (order.status !== "Delivered") return true;
         const terminalAt = order.delivered_at?.getTime() ?? order.updated_at.getTime();
         return terminalAt >= roundStartedAt;
       });
@@ -2461,27 +2549,20 @@ export class CommerceService {
         const address = order.delivery_address || {};
         const latitude = Number(address.latitude);
         const longitude = Number(address.longitude);
-        const routeState =
-          order.status === "Delivered"
-            ? "delivered"
-            : order.status === "Cancelled"
-              ? "cancelled"
-              : order.status === "Refused"
-                ? "refused"
-                : order.status === "Representative On The Way"
-                  ? "current"
-                  : ["waiting", "problem"].includes(String(order.route_state || ""))
-                    ? String(order.route_state)
-                    : "upcoming";
         return {
           id: order.id,
           orderId: order.order_code,
           status: order.status,
-          routeState,
+          routeState: routeStateFor(order.status, order.route_state),
           sequenceNumber: Number(order.sequence_number ?? 0),
           suggestedSequence: 0,
           note: order.route_note || "",
           clientName: String(order.contact_snapshot?.name || "Customer"),
+          country: String(address.country || ""),
+          governorate: String(address.governorate || ""),
+          area: String(address.area || ""),
+          street: String(address.street || ""),
+          building: String(address.building || ""),
           fullAddress: String(
             address.fullAddress ||
             [address.building, address.street, address.area, address.governorate, address.country]
@@ -2492,6 +2573,10 @@ export class CommerceService {
           longitude: Number.isFinite(longitude) ? longitude : null,
           finalAmount: Number(order.final_minor) / 100,
           deliveredAt: order.delivered_at?.toISOString() || null,
+          assigned: true,
+          representativeId: representative.representative_user_id,
+          representativeCode: representative.representative_code,
+          representativeName: representative.representative_name,
         };
       });
 
@@ -2501,7 +2586,7 @@ export class CommerceService {
           stop.latitude !== null &&
           stop.longitude !== null,
       ) as Array<(typeof normalizedStops)[number] & { latitude: number; longitude: number }>;
-      const suggested = suggestedStopOrder(
+      const suggested = adaptiveSuggestedStopOrder(
         representative.latitude,
         representative.longitude,
         routable,
@@ -2515,9 +2600,10 @@ export class CommerceService {
       normalizedStops.sort((first, second) => {
         if (first.routeState === "current" && second.routeState !== "current") return -1;
         if (second.routeState === "current" && first.routeState !== "current") return 1;
-        const firstSequence = first.sequenceNumber || first.suggestedSequence || 9999;
-        const secondSequence = second.sequenceNumber || second.suggestedSequence || 9999;
-        return firstSequence - secondSequence;
+        const firstActive = ["upcoming", "waiting", "problem"].includes(first.routeState);
+        const secondActive = ["upcoming", "waiting", "problem"].includes(second.routeState);
+        if (firstActive !== secondActive) return firstActive ? -1 : 1;
+        return Number(first.suggestedSequence || 9999) - Number(second.suggestedSequence || 9999);
       });
 
       const locationAgeMs = representative.location_updated_at
@@ -2551,18 +2637,16 @@ export class CommerceService {
       };
     });
 
-    const allOrders = representatives.flatMap(
-      (representative) => (representative.orders as Record<string, unknown>[]) || [],
-    );
     return {
       capturedAt: new Date().toISOString(),
       totals: {
-        totalOrders: allOrders.length,
-        deliveredOrders: allOrders.filter((order) => order.routeState === "delivered").length,
-        deliveringNow: allOrders.filter((order) => order.routeState === "current").length,
+        totalOrders: mapOrders.length,
+        deliveredOrders: mapOrders.filter((order) => order.routeState === "delivered").length,
+        deliveringNow: mapOrders.filter((order) => order.routeState === "current").length,
         activeRepresentatives: representatives.length,
       },
       representatives,
+      orders: mapOrders,
     };
   }
 
@@ -2842,15 +2926,21 @@ export class CommerceService {
       );
     }) as Record<string, unknown>[];
 
-    const suggested = suggestedStopOrder(
+    const suggested = adaptiveSuggestedStopOrder(
       representativeLocation.latitude,
       representativeLocation.longitude,
       ordersResult.rows.flatMap((row) => {
         const address = row.delivery_address || {};
         const latitude = Number(address.latitude);
         const longitude = Number(address.longitude);
+        const routeState =
+          row.status === "Representative On The Way"
+            ? "current"
+            : ["waiting", "problem"].includes(String(row.route_state || ""))
+              ? String(row.route_state)
+              : "upcoming";
         return Number.isFinite(latitude) && Number.isFinite(longitude)
-          ? [{ orderId: row.order_code, latitude, longitude }]
+          ? [{ orderId: row.order_code, latitude, longitude, routeState }]
           : [];
       }),
     );

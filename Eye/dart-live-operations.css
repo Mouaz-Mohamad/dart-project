@@ -18,8 +18,10 @@
 .dart-live-toolbar select,.dart-live-toolbar button{min-height:42px;border:1px solid #d9d2c8;border-radius:11px;background:#fff;padding:0 12px;font:inherit;color:#222}
 .dart-live-toolbar button{cursor:pointer;font-weight:700}
 .dart-live-toolbar button:hover{border-color:#AB012B;color:#AB012B}
-.dart-live-filter-group{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.dart-live-filter-group,.dart-live-layer-group{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.dart-live-layer-group{padding-right:8px;border-right:1px solid #e5dfd7}
 .dart-live-filter{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #e0d9d0;border-radius:999px;background:#fbfaf8;font-size:12px;font-weight:700;cursor:pointer}
+.dart-live-layer-filter{background:#fff;font-weight:800}
 .dart-live-filter input{accent-color:#AB012B}
 .dart-live-filter-bullet{width:8px;height:8px;border-radius:50%;background:var(--status-color)}
 .dart-live-layout{display:grid;grid-template-columns:minmax(250px,310px) minmax(0,1fr);gap:12px;min-height:660px}
@@ -71,8 +73,10 @@
 .dart-live-action.is-problem{background:#ea580c;color:#fff}
 .dart-live-empty,.dart-live-error,.dart-live-loading{padding:24px;text-align:center;color:#6d6d6d}
 .dart-live-error{color:#9a3412}
-.dart-live-order-popup strong{display:block}
-.dart-live-order-popup small{display:block;margin-top:3px}
+.dart-live-order-popup{min-width:190px}
+.dart-live-order-popup strong{display:block;margin-bottom:5px;color:#111}
+.dart-live-order-popup small{display:block;margin-top:3px;color:#4b5563}
+.dart-live-order-popup b{color:#111}
 .dart-live-operations:fullscreen{background:#f7f4ef;padding:12px;overflow:auto}
 .dart-live-operations:fullscreen .dart-live-layout{min-height:calc(100vh - 190px)}
 .dart-live-operations:fullscreen #dart-live-operations-map{min-height:calc(100vh - 190px)}
@@ -90,7 +94,8 @@
  .dart-live-card strong{font-size:24px}
  .dart-live-toolbar{align-items:stretch}
  .dart-live-toolbar select,.dart-live-toolbar button{flex:1 1 140px}
- .dart-live-filter-group{width:100%}
+ .dart-live-filter-group,.dart-live-layer-group{width:100%}
+ .dart-live-layer-group{padding-right:0;border-right:0}
  .dart-live-map-shell,#dart-live-operations-map{min-height:540px}
  .dart-live-panel{top:auto;bottom:8px;left:8px;right:8px;width:auto;max-height:72%}
 }
