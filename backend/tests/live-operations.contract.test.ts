@@ -91,7 +91,7 @@ describe("live operations contracts", () => {
     expect(service).toContain("adaptiveSuggestedStopOrder");
     expect(service).toContain('stop.routeState === "current"');
     expect(dashboardLiveMap).toContain("adaptiveRouteStops(rep)");
-    expect(dashboardLiveMap).toContain("nearestStops(orderCoordinates(current), remaining)");
+    expect(dashboardLiveMap).toContain("plannedStops(orderCoordinates(current), remaining)");
     expect(dashboardLiveMap).toContain("cached?.signature === signature");
     expect(dashboardLiveMap).not.toContain("window.L.polyline(coordinates");
   });
