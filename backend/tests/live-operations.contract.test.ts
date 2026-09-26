@@ -125,6 +125,12 @@ describe("live operations contracts", () => {
     expect(dashboardLiveMap).toContain("return [current, ...plannedStops(orderCoordinates(current), remaining)]");
   });
 
+  it("keeps Leaflet road rendering independent from the dashboard global canvas reset", () => {
+    expect(dashboardLiveMap).toContain("preferCanvas: false");
+    expect(dashboardLiveMap).not.toContain("preferCanvas: true");
+    expect(dashboardLiveCss).toContain("#dart-live-operations-map .leaflet-pane > canvas{max-width:none!important;max-height:none!important}");
+  });
+
   it("keeps Orders independent from assigned-status filters and protects layer ownership", () => {
     expect(dashboardLiveMap).toContain("marker.__dartOrderClickHandler");
     expect(dashboardLiveMap).toContain('marker.off("click", marker.__dartOrderClickHandler)');

@@ -41,6 +41,8 @@
 .dart-live-pill{border-radius:999px;padding:4px 7px;background:#f5f2ed;color:#AB012B!important;font-weight:800;white-space:nowrap}
 .dart-live-map-shell{position:relative;min-height:660px}
 #dart-live-operations-map{height:100%;min-height:660px;width:100%;background:#ece8e1}
+/* Leaflet Canvas must keep its intrinsic renderer size. The dashboard global media reset applies max-width:100% to canvas elements, which scales Leaflet's oversized drawing surface and can move road polylines outside the visible map. */
+#dart-live-operations-map .leaflet-pane > canvas{max-width:none!important;max-height:none!important}
 .dart-live-overlay{position:absolute;z-index:500;left:14px;right:14px;top:14px;display:flex;justify-content:space-between;pointer-events:none}
 .dart-live-legend{pointer-events:auto;background:rgba(255,255,255,.95);border:1px solid #ded8cf;border-radius:12px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px;font-size:11px;box-shadow:0 6px 16px rgba(0,0,0,.08)}
 .dart-live-legend span{display:inline-flex;gap:5px;align-items:center}
