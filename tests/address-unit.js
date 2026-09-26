@@ -56,7 +56,7 @@ assert(mobileParts.street === 'Service Path', 'mobile reverse geocoding should a
 const addressSource = fs.readFileSync('Js/dart-address.js', 'utf8');
 assert(addressSource.includes("namedetails: '1'"), 'reverse lookup should request provider naming details for building fallback');
 assert(addressSource.includes('zoomControl: false'), 'address maps must not expose Leaflet zoom buttons');
-assert(addressSource.includes('basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'), 'address maps must use the calm CARTO Voyager road layer without an API key');
+assert(addressSource.includes('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'), 'address maps must use the normal OpenStreetMap road layer without an API key');
 assert(addressSource.includes('setPrefix(false)'), 'address maps must remove Leaflet framework branding while provider attribution remains');
 assert(addressSource.includes('Exact map pin preserved. Address details updated without moving the destination.'), 'editing address details after choosing a pin must preserve the exact coordinates');
 assert(addressSource.includes('maximumAge: 0'), 'mobile GPS selection must request a fresh high-accuracy position');

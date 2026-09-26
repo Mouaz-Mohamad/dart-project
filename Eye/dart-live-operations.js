@@ -160,9 +160,9 @@
       preferCanvas: false,
     }).setView([30.0444, 31.2357], 11);
     map.attributionControl?.setPrefix(false);
-    window.L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+      attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
     map.on("dragstart zoomstart", () => {
       manualView = true;
