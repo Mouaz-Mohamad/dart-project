@@ -1,5 +1,6 @@
 // DART CODE GUIDE | backend/tests/dashboard-state.routes.test.ts
 // الغرض: اختبار آلي للـBackend يحمي سلوكًا مهمًا من الرجوع أو الكسر.
+import { readFileSync } from "node:fs";
 import pino from "pino";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -114,4 +115,18 @@ describe("dashboard domain permissions", () => {
     expect(response.body.domain).toBe("contacts");
     expect(state.read).toHaveBeenCalledWith("contacts");
   });
+});
+
+
+it("keeps granular Finance domain permissions explicit in the route policy", () => {
+  const source = readFileSync(
+    new URL("../src/modules/dashboard/dashboard-state.routes.ts", import.meta.url),
+    "utf8",
+  );
+  expect(source).toContain('"finance.manage_expenses"');
+  expect(source).toContain('"finance.manage_budgets"');
+  expect(source).toContain('"finance.manage_invoices"');
+  expect(source).toContain('"finance.manage_settlements"');
+  expect(source).toContain('"finance.view_cashflow"');
+  expect(source).toContain('"finance.view_marketing"');
 });

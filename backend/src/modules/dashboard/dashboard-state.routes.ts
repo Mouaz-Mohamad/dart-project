@@ -22,7 +22,7 @@ import {
 const domainSchema = z.enum(DASHBOARD_DOMAINS);
 
 const SENSITIVE_DOMAIN_PERMISSIONS: Partial<
-  Record<DashboardDomain, { read: string; write: string }>
+  Record<DashboardDomain, { read: string | readonly string[]; write: string | readonly string[] }>
 > = {
   customers: { read: "customers.read", write: "customers.manage" },
   returns: { read: "returns.read", write: "returns.manage" },
@@ -42,23 +42,30 @@ const SENSITIVE_DOMAIN_PERMISSIONS: Partial<
     write: "notifications.manage",
   },
   promotions: { read: "promotions.read", write: "promotions.manage" },
-  finance_expenses: { read: "finance.read", write: "finance.manage" },
-  finance_budgets: { read: "finance.read", write: "finance.manage" },
-  finance_invoices: { read: "finance.read", write: "finance.manage" },
-  finance_goals: { read: "finance.read", write: "finance.manage" },
-  finance_marketing: { read: "finance.read", write: "finance.manage" },
-  finance_settlements: { read: "finance.read", write: "finance.manage" },
+  finance_expenses: { read: ["finance.read", "finance.view_cost", "finance.manage_expenses"], write: ["finance.manage", "finance.manage_expenses"] },
+  finance_budgets: { read: ["finance.read", "finance.view_cost", "finance.manage_budgets"], write: ["finance.manage", "finance.manage_budgets"] },
+  finance_invoices: { read: ["finance.read", "finance.manage_invoices"], write: ["finance.manage", "finance.manage_invoices"] },
+  finance_goals: { read: ["finance.read", "finance.view_revenue", "finance.view_profit", "finance.manage_goals"], write: ["finance.manage", "finance.manage_goals"] },
+  finance_marketing: { read: ["finance.read", "finance.view_marketing", "finance.manage_marketing"], write: ["finance.manage", "finance.manage_marketing"] },
+  finance_settlements: { read: ["finance.read", "finance.view_cashflow", "finance.manage_settlements"], write: ["finance.manage", "finance.manage_settlements"] },
   finance_audit: { read: "finance.read", write: "finance.manage" },
   draw_audit: { read: "loyalty.read", write: "loyalty.manage" },
 };
+
+function permissionList(
+  configured: string | readonly string[] | undefined,
+): readonly string[] {
+  if (!configured) return [];
+  return typeof configured === "string" ? [configured] : configured;
+}
 
 function requireSensitiveDomainPermission(
   domain: DashboardDomain,
   mode: "read" | "write",
   permissions: string[],
 ): void {
-  const permission = SENSITIVE_DOMAIN_PERMISSIONS[domain]?.[mode];
-  if (permission && !permissions.includes(permission)) {
+  const accepted = permissionList(SENSITIVE_DOMAIN_PERMISSIONS[domain]?.[mode]);
+  if (accepted.length && !accepted.some((permission) => permissions.includes(permission))) {
     throw new AppError(
       403,
       "FORBIDDEN",
@@ -130,8 +137,8 @@ export function createDashboardStateRouter(
     requirePermission("dashboard_state.read"),
     async (request, response) => {
       const readable = DASHBOARD_DOMAINS.filter((domain) => {
-        const permission = SENSITIVE_DOMAIN_PERMISSIONS[domain]?.read;
-        return !permission || request.auth!.permissions.includes(permission);
+        const accepted = permissionList(SENSITIVE_DOMAIN_PERMISSIONS[domain]?.read);
+        return accepted.length === 0 || accepted.some((permission) => request.auth!.permissions.includes(permission));
       });
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json({ domains: await state.readMany(readable) });
