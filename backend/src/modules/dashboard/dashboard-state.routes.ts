@@ -12,6 +12,7 @@ import {
   requirePermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
+import { validateFinanceDomainData } from "./dashboard-finance.validation.js";
 import {
   DASHBOARD_DOMAINS,
   type DashboardDomain,
@@ -170,8 +171,9 @@ export function createDashboardStateRouter(
         request.auth!.permissions,
       );
       const body = writeSchema.parse(request.body);
+      const data = validateFinanceDomainData(domain, body.data);
       response.status(200).json(
-        await state.write(domain, body.expectedVersion, body.data, request.auth!.userId, String(request.id)),
+        await state.write(domain, body.expectedVersion, data, request.auth!.userId, String(request.id)),
       );
     },
   );
