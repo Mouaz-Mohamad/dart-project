@@ -75,7 +75,7 @@ describe("traffic analytics", () => {
     expect(serviceSource).toContain("INSERT INTO traffic_analytics_events");
     expect(serviceSource).toContain("FROM cart_reservations reservation");
     expect(serviceSource).toContain("items.cart_reservation_id=reservation.id");
-    expect(serviceSource).toContain("COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)");
+    expect(serviceSource).toContain("COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)");
     expect(serviceSource).toContain("WHERE visitor_id=$1::uuid");
     expect(serviceSource).toContain("Guest ${row.visitor_id.slice(0, 8)}");
   });
