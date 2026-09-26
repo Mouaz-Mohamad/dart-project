@@ -32,7 +32,7 @@ describe("OpenAPI current Dart contracts", () => {
     expect(text).toContain("/admin/analytics/traffic:");
     expect(text).toContain("TrafficAnalyticsEvent:");
     expect(text).toContain("reservationId:");
-    expect(text).toContain("enum: [daily, weekly, monthly, yearly]");
+    expect(text).toContain("enum: [hourly, daily, weekly, monthly, yearly]");
   });
 
   it("documents Google/Facebook customer completion and the multi-winner Dart Card rule", async () => {
