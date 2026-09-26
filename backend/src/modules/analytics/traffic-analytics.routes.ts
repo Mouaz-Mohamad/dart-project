@@ -40,7 +40,7 @@ const reportSchema = z
   .object({
     start: z.iso.date(),
     end: z.iso.date(),
-    group: z.enum(["daily", "weekly", "monthly", "yearly"]).default("daily"),
+    group: z.enum(["hourly", "daily", "weekly", "monthly", "yearly"]).default("daily"),
   })
   .refine((value) => value.start <= value.end, {
     message: "start must be on or before end",

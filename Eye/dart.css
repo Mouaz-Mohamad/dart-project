@@ -1016,6 +1016,8 @@ section{
 .header-actions-tow {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 10px;
 }
 .export-btn-tow {
@@ -1039,6 +1041,8 @@ section{
 .filter-btns-tow {
     display: flex;
     gap: 4px;
+    max-width: 100%;
+    overflow-x: auto;
     background: #f4f4f5;
     padding: 4px;
     border-radius: 8px;
@@ -1057,6 +1061,29 @@ section{
 .filter-btn-tow.active-tow {
     background: #ab012b;
     color: #fff;
+}
+
+.traffic-hour-window-tow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    border: 1px solid #ead9dd;
+    border-radius: 8px;
+    background: #fffaf8;
+    color: #666;
+    font-size: 11px;
+    font-weight: 600;
+}
+.traffic-hour-window-tow[hidden] { display: none !important; }
+.traffic-hour-window-tow select {
+    min-width: 104px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #ab012b;
+    font: inherit;
+    cursor: pointer;
 }
 .chart-body-tow {
     position: relative;

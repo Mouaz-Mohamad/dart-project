@@ -2,7 +2,7 @@
 // الغرض: حماية تجميع Traffic Analytics وحدود الخصوصية وربط الـfunnel بقاعدة البيانات.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildTrafficSeries } from "../src/modules/analytics/traffic-analytics.service.js";
+import { buildHourlyTrafficSeries, buildTrafficSeries } from "../src/modules/analytics/traffic-analytics.service.js";
 
 const serviceSource = readFileSync(
   new URL("../src/modules/analytics/traffic-analytics.service.ts", import.meta.url),
@@ -44,6 +44,19 @@ describe("traffic analytics", () => {
     expect(years).toEqual([
       expect.objectContaining({ key: "2026", visits: 15, addToCartEvents: 6, itemsAdded: 10, orders: 3 }),
     ]);
+  });
+
+  it("builds a complete 24-hour Cairo audience pattern", () => {
+    const hours = buildHourlyTrafficSeries([
+      { hour: 18, uniqueVisitors: 12, visits: 17, addToCartVisitors: 5, addEvents: 7, itemsAdded: 9, orders: 2 },
+      { hour: 21, uniqueVisitors: 20, visits: 28, addToCartVisitors: 8, addEvents: 11, itemsAdded: 14, orders: 4 },
+    ]);
+    expect(hours).toHaveLength(24);
+    expect(hours[0]).toMatchObject({ key: "hour-00", label: "12 AM", uniqueVisitors: 0, addToCartVisitors: 0 });
+    expect(hours[18]).toMatchObject({ key: "hour-18", label: "6 PM", uniqueVisitors: 12, visits: 17, addToCartVisitors: 5, orders: 2 });
+    expect(hours[21]).toMatchObject({ key: "hour-21", label: "9 PM", uniqueVisitors: 20, addToCartVisitors: 8, orders: 4 });
+    expect(routesSource).toContain('["hourly", "daily", "weekly", "monthly", "yearly"]');
+    expect(serviceSource).toContain("EXTRACT(HOUR FROM occurred_at AT TIME ZONE 'Africa/Cairo')");
   });
 
   it("uses PostgreSQL, explicit visitor/session IDs and no IP analytics storage", () => {

@@ -7,6 +7,7 @@
 
 const ctxTow = document.getElementById("analyticsChartTow")?.getContext("2d") || null;
 let trafficAggregationTow = "daily";
+let trafficHourlyWindowTow = 7;
 let trafficRequestGenerationTow = 0;
 let trafficReportTow = null;
 
@@ -90,6 +91,38 @@ function trafficNumberTow(value) {
   return new Intl.NumberFormat("en-EG").format(Math.max(0, Number(value) || 0));
 }
 
+function trafficCairoTodayTow() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function trafficShiftDateTow(date, days) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function trafficHourlyRangeTow() {
+  const end = trafficCairoTodayTow();
+  const days = [1, 7, 30].includes(Number(trafficHourlyWindowTow)) ? Number(trafficHourlyWindowTow) : 7;
+  return { start: trafficShiftDateTow(end, -(days - 1)), end };
+}
+
+function effectiveTrafficRangeTow(range = trafficRangeTow()) {
+  return trafficAggregationTow === "hourly" ? trafficHourlyRangeTow() : range;
+}
+
+function syncTrafficHourlyControlsTow() {
+  const wrapper = document.getElementById("trafficHourWindowWrapTow");
+  if (wrapper) wrapper.hidden = trafficAggregationTow !== "hourly";
+}
+
 function setTrafficKpiTow(id, value) {
   const element = document.getElementById(id);
   if (element) element.textContent = trafficNumberTow(value);
@@ -161,17 +194,31 @@ function renderTrafficReportTow(report) {
   setTrafficKpiTow("trafficOrdersTow", summary.completedOrders);
 
   const period = document.getElementById("trafficPeriodLabelTow");
-  if (period) period.textContent = `${report.start} → ${report.end} · grouped ${report.group}`;
-  const note = document.getElementById("chartNoteTextTow");
-  if (note) {
-    note.textContent = `${trafficNumberTow(summary.uniqueVisitors)} unique visitors · ${trafficNumberTow(summary.visits)} visits · Add-to-cart rate ${Number(summary.addToCartRate || 0).toFixed(1)}% · Conversion rate ${Number(summary.conversionRate || 0).toFixed(1)}%`;
+  if (period) {
+    period.textContent = report.group === "hourly"
+      ? `${report.start} → ${report.end} · hourly audience pattern · Cairo time`
+      : `${report.start} → ${report.end} · grouped ${report.group}`;
   }
 
   const series = Array.isArray(report?.series) ? report.series : [];
+  const note = document.getElementById("chartNoteTextTow");
+  if (note) {
+    if (report.group === "hourly" && series.length) {
+      const peak = [...series].sort((a, b) => Number(b.uniqueVisitors || 0) - Number(a.uniqueVisitors || 0))[0];
+      note.textContent = `Peak audience: ${peak?.label || "—"} · ${trafficNumberTow(peak?.uniqueVisitors)} unique visitors · ${trafficNumberTow(peak?.addToCartVisitors)} added to cart · ${trafficNumberTow(peak?.orders)} completed orders`;
+    } else {
+      note.textContent = `${trafficNumberTow(summary.uniqueVisitors)} unique visitors · ${trafficNumberTow(summary.visits)} visits · Add-to-cart rate ${Number(summary.addToCartRate || 0).toFixed(1)}% · Conversion rate ${Number(summary.conversionRate || 0).toFixed(1)}%`;
+    }
+  }
+
   if (analyticsChartTow) {
+    const hourly = report.group === "hourly";
     analyticsChartTow.data.labels = series.map((row) => row.label);
-    analyticsChartTow.data.datasets[0].data = series.map((row) => Number(row.visits) || 0);
-    analyticsChartTow.data.datasets[1].data = series.map((row) => Number(row.addToCartEvents) || 0);
+    analyticsChartTow.data.datasets[0].label = hourly ? "Unique Visitors" : "Visits";
+    analyticsChartTow.data.datasets[1].label = hourly ? "Added to Cart Visitors" : "Add to Cart";
+    analyticsChartTow.data.datasets[2].label = "Completed Orders";
+    analyticsChartTow.data.datasets[0].data = series.map((row) => Number(hourly ? row.uniqueVisitors : row.visits) || 0);
+    analyticsChartTow.data.datasets[1].data = series.map((row) => Number(hourly ? row.addToCartVisitors : row.addToCartEvents) || 0);
     analyticsChartTow.data.datasets[2].data = series.map((row) => Number(row.orders) || 0);
     analyticsChartTow.update();
   }
@@ -184,12 +231,13 @@ function renderTrafficLoadingTow(message = "Loading website analytics…") {
 }
 
 async function refreshTrafficAnalyticsTow(range = trafficRangeTow()) {
-  if (!range?.start || !range?.end || !window.DartAdminApi?.request) return;
+  const selectedRange = effectiveTrafficRangeTow(range);
+  if (!selectedRange?.start || !selectedRange?.end || !window.DartAdminApi?.request) return;
   const generation = ++trafficRequestGenerationTow;
   renderTrafficLoadingTow();
   try {
     const report = await window.DartAdminApi.request(
-      `/api/v1/admin/analytics/traffic?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}&group=${encodeURIComponent(trafficAggregationTow)}`,
+      `/api/v1/admin/analytics/traffic?start=${encodeURIComponent(selectedRange.start)}&end=${encodeURIComponent(selectedRange.end)}&group=${encodeURIComponent(trafficAggregationTow)}`,
     );
     if (generation !== trafficRequestGenerationTow) return;
     renderTrafficReportTow(report);
@@ -201,11 +249,12 @@ async function refreshTrafficAnalyticsTow(range = trafficRangeTow()) {
 }
 
 function updateChartTow(period, btn) {
-  if (!["daily", "weekly", "monthly", "yearly"].includes(period)) return;
+  if (!["hourly", "daily", "weekly", "monthly", "yearly"].includes(period)) return;
   trafficAggregationTow = period;
   document.querySelectorAll(".filter-btn-tow").forEach((button) => {
     button.classList.toggle("active-tow", button === btn);
   });
+  syncTrafficHourlyControlsTow();
   void refreshTrafficAnalyticsTow();
 }
 
@@ -226,6 +275,12 @@ document.querySelectorAll("[data-chart-period-tow]").forEach((button) => {
     updateChartTow(String(button.dataset.chartPeriodTow || "daily"), button);
   });
 });
+document.getElementById("trafficHourWindowTow")?.addEventListener("change", (event) => {
+  const days = Number(event.target?.value || 7);
+  trafficHourlyWindowTow = [1, 7, 30].includes(days) ? days : 7;
+  if (trafficAggregationTow === "hourly") void refreshTrafficAnalyticsTow();
+});
+syncTrafficHourlyControlsTow();
 document.getElementById("exportChartTowBtn")?.addEventListener("click", exportChartPNGTow);
 window.addEventListener("dart:finance-period-changed", (event) => {
   void refreshTrafficAnalyticsTow(event.detail || trafficRangeTow());

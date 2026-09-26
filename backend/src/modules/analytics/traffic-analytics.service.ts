@@ -4,7 +4,7 @@ import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 
 export type TrafficEventType = "visit" | "add_to_cart" | "order_completed";
-export type TrafficGroup = "daily" | "weekly" | "monthly" | "yearly";
+export type TrafficGroup = "hourly" | "daily" | "weekly" | "monthly" | "yearly";
 
 export interface TrafficEventInput {
   eventType: TrafficEventType;
@@ -23,6 +23,16 @@ export interface TrafficEventInput {
 interface DailyRow {
   day: string | Date;
   visits: string;
+  add_events: string;
+  items_added: string;
+  orders: string;
+}
+
+interface HourlyRow {
+  hour_of_day: string | number;
+  unique_visitors: string;
+  visits: string;
+  add_to_cart_visitors: string;
   add_events: string;
   items_added: string;
   orders: string;
@@ -150,6 +160,52 @@ export function buildTrafficSeries(
     guard += 1;
   }
   return [...buckets.values()];
+}
+
+export function buildHourlyTrafficSeries(
+  rows: Array<{
+    hour: number;
+    uniqueVisitors: number;
+    visits: number;
+    addToCartVisitors: number;
+    addEvents: number;
+    itemsAdded: number;
+    orders: number;
+  }>,
+): Array<{
+  key: string;
+  label: string;
+  uniqueVisitors: number;
+  visits: number;
+  addToCartVisitors: number;
+  addToCartEvents: number;
+  itemsAdded: number;
+  orders: number;
+}> {
+  const byHour = new Map(rows.map((row) => [row.hour, row]));
+  return Array.from({ length: 24 }, (_, hour) => {
+    const row = byHour.get(hour) || {
+      hour,
+      uniqueVisitors: 0,
+      visits: 0,
+      addToCartVisitors: 0,
+      addEvents: 0,
+      itemsAdded: 0,
+      orders: 0,
+    };
+    const suffix = hour < 12 ? "AM" : "PM";
+    const displayHour = hour % 12 || 12;
+    return {
+      key: `hour-${String(hour).padStart(2, "0")}`,
+      label: `${displayHour} ${suffix}`,
+      uniqueVisitors: row.uniqueVisitors,
+      visits: row.visits,
+      addToCartVisitors: row.addToCartVisitors,
+      addToCartEvents: row.addEvents,
+      itemsAdded: row.itemsAdded,
+      orders: row.orders,
+    };
+  });
 }
 
 export class TrafficAnalyticsService {
@@ -286,18 +342,37 @@ export class TrafficAnalyticsService {
         params,
       );
 
-      const dailyResult = await client.query<DailyRow>(
-        `SELECT (occurred_at AT TIME ZONE 'Africa/Cairo')::date AS day,
-           count(*) FILTER (WHERE event_type='visit')::text AS visits,
-           count(*) FILTER (WHERE event_type='add_to_cart')::text AS add_events,
-           COALESCE(sum(quantity) FILTER (WHERE event_type='add_to_cart'),0)::text AS items_added,
-           count(*) FILTER (WHERE event_type='order_completed')::text AS orders
-         FROM traffic_analytics_events
-         WHERE ${periodWhere}
-         GROUP BY 1
-         ORDER BY 1`,
-        params,
-      );
+      const dailyResult = group === "hourly"
+        ? { rows: [] as DailyRow[] }
+        : await client.query<DailyRow>(
+          `SELECT (occurred_at AT TIME ZONE 'Africa/Cairo')::date AS day,
+             count(*) FILTER (WHERE event_type='visit')::text AS visits,
+             count(*) FILTER (WHERE event_type='add_to_cart')::text AS add_events,
+             COALESCE(sum(quantity) FILTER (WHERE event_type='add_to_cart'),0)::text AS items_added,
+             count(*) FILTER (WHERE event_type='order_completed')::text AS orders
+           FROM traffic_analytics_events
+           WHERE ${periodWhere}
+           GROUP BY 1
+           ORDER BY 1`,
+          params,
+        );
+
+      const hourlyResult = group === "hourly"
+        ? await client.query<HourlyRow>(
+          `SELECT EXTRACT(HOUR FROM occurred_at AT TIME ZONE 'Africa/Cairo')::int AS hour_of_day,
+             count(DISTINCT COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)) FILTER (WHERE event_type='visit')::text AS unique_visitors,
+             count(*) FILTER (WHERE event_type='visit')::text AS visits,
+             count(DISTINCT COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)) FILTER (WHERE event_type='add_to_cart')::text AS add_to_cart_visitors,
+             count(*) FILTER (WHERE event_type='add_to_cart')::text AS add_events,
+             COALESCE(sum(quantity) FILTER (WHERE event_type='add_to_cart'),0)::text AS items_added,
+             count(*) FILTER (WHERE event_type='order_completed')::text AS orders
+           FROM traffic_analytics_events
+           WHERE ${periodWhere}
+           GROUP BY 1
+           ORDER BY 1`,
+          params,
+        )
+        : { rows: [] as HourlyRow[] };
 
       const visitorsResult = await client.query<VisitorRow>(
         `WITH period_events AS (
@@ -345,6 +420,15 @@ export class TrafficAnalyticsService {
         itemsAdded: count(row.items_added),
         orders: count(row.orders),
       }));
+      const hourly = hourlyResult.rows.map((row) => ({
+        hour: count(row.hour_of_day),
+        uniqueVisitors: count(row.unique_visitors),
+        visits: count(row.visits),
+        addToCartVisitors: count(row.add_to_cart_visitors),
+        addEvents: count(row.add_events),
+        itemsAdded: count(row.items_added),
+        orders: count(row.orders),
+      }));
       return {
         start,
         end,
@@ -359,7 +443,9 @@ export class TrafficAnalyticsService {
           addToCartRate: percent(addToCartVisitors, uniqueVisitors),
           conversionRate: percent(orderVisitors, uniqueVisitors),
         },
-        series: buildTrafficSeries(daily, start, end, group),
+        series: group === "hourly"
+          ? buildHourlyTrafficSeries(hourly)
+          : buildTrafficSeries(daily, start, end, group),
         visitors: visitorsResult.rows.map((row) => ({
           visitorId: row.visitor_id,
           customerUserId: row.customer_user_id,

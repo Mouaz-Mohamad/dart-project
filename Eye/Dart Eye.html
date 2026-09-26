@@ -384,11 +384,20 @@
                             <i class="fa-solid fa-download"></i> Export PNG
                         </button>
                         <div class="filter-btns-tow" aria-label="Traffic chart aggregation">
+                            <button type="button" class="filter-btn-tow" data-chart-period-tow="hourly">Hours</button>
                             <button type="button" class="filter-btn-tow active-tow" data-chart-period-tow="daily">Daily</button>
                             <button type="button" class="filter-btn-tow" data-chart-period-tow="weekly">Weekly</button>
                             <button type="button" class="filter-btn-tow" data-chart-period-tow="monthly">Monthly</button>
                             <button type="button" class="filter-btn-tow" data-chart-period-tow="yearly">Yearly</button>
                         </div>
+                        <label id="trafficHourWindowWrapTow" class="traffic-hour-window-tow" for="trafficHourWindowTow" hidden>
+                            <span>Hourly window</span>
+                            <select id="trafficHourWindowTow">
+                                <option value="1">Today</option>
+                                <option value="7" selected>Last 7 Days</option>
+                                <option value="30">Last 30 Days</option>
+                            </select>
+                        </label>
                     </div>
                 </div>
 
