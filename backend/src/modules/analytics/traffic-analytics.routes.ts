@@ -10,13 +10,14 @@ import {
   requireMfa,
   requirePermission,
 } from "../../middleware/authentication.js";
+import { GUEST_CART_COOKIE, hashGuestCartToken } from "../../security/guest-cart-owner.js";
 import { parseSessionToken } from "../../security/session-token.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { TrafficAnalyticsService } from "./traffic-analytics.service.js";
 
 const eventSchema = z
   .object({
-    eventType: z.enum(["visit", "add_to_cart", "order_completed"]),
+    eventType: z.enum(["visit", "add_to_cart"]),
     eventId: z.uuid().optional(),
     visitorId: z.uuid(),
     sessionId: z.uuid(),
@@ -25,15 +26,11 @@ const eventSchema = z
     color: z.string().trim().max(120).optional(),
     size: z.string().trim().max(80).optional(),
     quantity: z.number().int().min(1).max(100).optional(),
-    orderCode: z.string().trim().min(1).max(160).optional(),
     reservationId: z.string().trim().min(1).max(180).optional(),
   })
   .superRefine((value, context) => {
     if (value.eventType === "add_to_cart" && (!value.eventId || !value.reservationId || !value.modelId || !value.quantity)) {
       context.addIssue({ code: "custom", message: "add_to_cart requires eventId, reservationId, modelId and quantity" });
-    }
-    if (value.eventType === "order_completed" && !value.orderCode) {
-      context.addIssue({ code: "custom", message: "order_completed requires orderCode" });
     }
   });
 
@@ -73,7 +70,8 @@ export function createTrafficAnalyticsRouter(
   router.post("/analytics/events", analyticsEventLimiter, async (request, response) => {
     const input = eventSchema.parse(request.body);
     const customerUserId = await optionalCustomerId(request.cookies?.[config.sessionCookieName]);
-    await analytics.recordEvent(input, customerUserId);
+    const guestOwnerHash = hashGuestCartToken(request.cookies?.[GUEST_CART_COOKIE], config.authPepper);
+    await analytics.recordEvent(input, customerUserId, guestOwnerHash);
     response.status(202).json({ accepted: true });
   });
 

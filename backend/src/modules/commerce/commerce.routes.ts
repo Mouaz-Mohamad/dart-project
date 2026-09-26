@@ -1,10 +1,11 @@
 // DART CODE GUIDE | backend/src/modules/commerce/commerce.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
+import { GUEST_CART_COOKIE, hashGuestCartToken } from "../../security/guest-cart-owner.js";
 import {
   authenticate,
   csrfProtection,
@@ -83,8 +84,6 @@ const checkoutSchema = z.object({
   acceptPriceChanges: z.boolean().optional(),
 });
 
-const GUEST_CART_COOKIE = "dart_guest_cart";
-
 function guestCartOwnerHash(
   request: Request,
   response: Response,
@@ -106,9 +105,7 @@ function guestCartOwnerHash(
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
   }
-  return createHmac("sha256", config.authPepper)
-    .update(`guest-cart:${token}`)
-    .digest("hex");
+  return hashGuestCartToken(token, config.authPepper);
 }
 
 export function createCommerceRouter(

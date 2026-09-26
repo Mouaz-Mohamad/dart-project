@@ -205,15 +205,20 @@ function renderTrafficReportTow(report) {
   const note = document.getElementById("chartNoteTextTow");
   if (note) {
     if (report.group === "hourly" && series.length) {
-      const peak = [...series].sort((a, b) => Number(b.uniqueVisitors || 0) - Number(a.uniqueVisitors || 0))[0];
-      const hasHourlyActivity = series.some((row) =>
-        Number(row.uniqueVisitors || 0) > 0 ||
-        Number(row.addToCartVisitors || 0) > 0 ||
-        Number(row.orderedPieces || 0) > 0
+      const audienceRows = series.filter((row) => Number(row.uniqueVisitors || 0) > 0);
+      const peak = [...audienceRows].sort((a, b) =>
+        Number(b.uniqueVisitors || 0) - Number(a.uniqueVisitors || 0) ||
+        Number(b.addToCartVisitors || 0) - Number(a.addToCartVisitors || 0) ||
+        Number(b.orderedPieces || 0) - Number(a.orderedPieces || 0)
+      )[0];
+      const hasCommerceActivity = series.some((row) =>
+        Number(row.addToCartVisitors || 0) > 0 || Number(row.orderedPieces || 0) > 0
       );
-      note.textContent = hasHourlyActivity
-        ? `Peak audience: ${peak?.label || "—"} · ${trafficNumberTow(peak?.uniqueVisitors)} unique visitors · ${trafficNumberTow(peak?.addToCartVisitors)} added to cart · ${trafficNumberTow(peak?.orderedPieces)} ordered pieces`
-        : "No hourly audience activity was recorded in this window.";
+      note.textContent = peak
+        ? `Peak audience: ${peak.label} · ${trafficNumberTow(peak.uniqueVisitors)} unique visitors · ${trafficNumberTow(peak.addToCartVisitors)} added to cart · ${trafficNumberTow(peak.orderedPieces)} ordered pieces`
+        : hasCommerceActivity
+          ? "No visitor sessions were recorded in this hourly window; cart/order activity exists but cannot identify a reliable audience peak."
+          : "No hourly audience activity was recorded in this window.";
     } else {
       note.textContent = `${trafficNumberTow(summary.uniqueVisitors)} unique visitors · ${trafficNumberTow(summary.visits)} visits · Add-to-cart rate ${Number(summary.addToCartRate || 0).toFixed(1)}% · Conversion rate ${Number(summary.conversionRate || 0).toFixed(1)}%`;
     }
@@ -237,6 +242,25 @@ function renderTrafficLoadingTow(message = "Loading website analytics…") {
   if (note) note.textContent = message;
 }
 
+function renderTrafficErrorTow(message) {
+  [
+    "trafficUniqueVisitorsTow", "trafficVisitsTow", "trafficCartVisitorsTow",
+    "trafficAddEventsTow", "trafficItemsAddedTow", "trafficOrdersTow", "trafficOrderedPiecesTow",
+  ].forEach((id) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = "—";
+  });
+  const period = document.getElementById("trafficPeriodLabelTow");
+  if (period) period.textContent = "Analytics unavailable";
+  if (analyticsChartTow) {
+    analyticsChartTow.data.labels = [];
+    analyticsChartTow.data.datasets.forEach((dataset) => { dataset.data = []; });
+    analyticsChartTow.update();
+  }
+  renderTrafficVisitorsTow([]);
+  renderTrafficLoadingTow(message);
+}
+
 async function refreshTrafficAnalyticsTow(range = trafficRangeTow()) {
   const selectedRange = effectiveTrafficRangeTow(range);
   if (!selectedRange?.start || !selectedRange?.end || !window.DartAdminApi?.request) return;
@@ -250,8 +274,7 @@ async function refreshTrafficAnalyticsTow(range = trafficRangeTow()) {
     renderTrafficReportTow(report);
   } catch (error) {
     if (generation !== trafficRequestGenerationTow) return;
-    renderTrafficLoadingTow(error?.message || "Website analytics are temporarily unavailable.");
-    renderTrafficVisitorsTow([]);
+    renderTrafficErrorTow(error?.message || "Website analytics are temporarily unavailable.");
   }
 }
 
@@ -290,7 +313,9 @@ document.getElementById("trafficHourWindowTow")?.addEventListener("change", (eve
 syncTrafficHourlyControlsTow();
 document.getElementById("exportChartTowBtn")?.addEventListener("click", exportChartPNGTow);
 window.addEventListener("dart:finance-period-changed", (event) => {
-  void refreshTrafficAnalyticsTow(event.detail || trafficRangeTow());
+  if (trafficAggregationTow !== "hourly") {
+    void refreshTrafficAnalyticsTow(event.detail || trafficRangeTow());
+  }
 });
 window.addEventListener("dart:admin-authenticated", () => {
   window.setTimeout(() => void refreshTrafficAnalyticsTow(), 0);

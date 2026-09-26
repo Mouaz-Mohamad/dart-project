@@ -24,6 +24,10 @@ const dashboardSource = readFileSync(
   new URL("../../Eye/dart-traffic-analytics.js", import.meta.url),
   "utf8",
 );
+const queryIndexMigrationSource = readFileSync(
+  new URL("../migrations/0047_traffic_analytics_query_indexes.sql", import.meta.url),
+  "utf8",
+);
 
 const grouped = [
   { key: "2026-09-01", uniqueVisitors: 2, visits: 3, addToCartVisitors: 1, addToCartEvents: 2, itemsAdded: 4, orders: 1, orderedPieces: 2 },
@@ -80,17 +84,29 @@ describe("traffic analytics", () => {
     expect(storefrontSource).toContain("function ensureAnalyticsSession()");
     expect(storefrontSource).toContain('session.started && eventType !== "visit"');
     expect(storefrontSource).not.toContain('trackAnalyticsEvent("order_completed"');
+    expect(routesSource).not.toContain('z.enum(["visit", "add_to_cart", "order_completed"])');
     expect(dashboardSource).toContain("No hourly audience activity was recorded in this window.");
     expect(dashboardSource).toContain('datasets[2].label = "Ordered Pieces"');
   });
 
-  it("requires staff analytics permission and validates order ownership", () => {
+  it("requires staff analytics permission and enforces signed-in or guest cart ownership", () => {
     expect(routesSource).toContain('requirePermission("analytics.read")');
     expect(routesSource).toContain('router.post("/analytics/events"');
     expect(routesSource).toContain('"/admin/analytics/traffic"');
-    expect(serviceSource).toContain("This order does not belong to the signed-in customer");
-    expect(serviceSource).toContain('eventType === "order_completed"');
+    expect(routesSource).toContain("hashGuestCartToken");
+    expect(serviceSource).toContain("This guest cart reservation does not belong to this browser");
+    expect(serviceSource).toContain("row.customer_user_id !== customerUserId");
+    expect(serviceSource).not.toContain('eventType === "order_completed"');
     expect(serviceSource).toContain("count(DISTINCT orders.id)::text AS orders");
     expect(routesSource).toContain("analyticsEventLimiter");
+  });
+
+  it("caps hourly analytics, clears stale dashboard data and indexes website order time queries", () => {
+    expect(serviceSource).toContain('group === "hourly" && spanDays > 31');
+    expect(dashboardSource).toContain("function renderTrafficErrorTow(message)");
+    expect(dashboardSource).toContain('trafficAggregationTow !== "hourly"');
+    expect(dashboardSource).toContain("audienceRows");
+    expect(queryIndexMigrationSource).toContain("orders_website_created_idx");
+    expect(queryIndexMigrationSource).toContain("order_source='Website'");
   });
 });

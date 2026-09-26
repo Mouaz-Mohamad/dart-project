@@ -3,7 +3,7 @@
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 
-export type TrafficEventType = "visit" | "add_to_cart" | "order_completed";
+export type TrafficEventType = "visit" | "add_to_cart";
 export type TrafficGroup = "hourly" | "daily" | "weekly" | "monthly" | "yearly";
 
 export interface TrafficEventInput {
@@ -16,7 +16,6 @@ export interface TrafficEventInput {
   color?: string | undefined;
   size?: string | undefined;
   quantity?: number | undefined;
-  orderCode?: string | undefined;
   reservationId?: string | undefined;
 }
 
@@ -215,7 +214,7 @@ function bucketExpression(group: Exclude<TrafficGroup, "hourly">, column: string
 export class TrafficAnalyticsService {
   public constructor(private readonly pool: Pool) {}
 
-  public async recordEvent(input: TrafficEventInput, customerUserId: string | null): Promise<void> {
+  public async recordEvent(input: TrafficEventInput, customerUserId: string | null, guestOwnerHash: string | null = null): Promise<void> {
     if (
       input.eventType === "add_to_cart" &&
       (!input.eventId || !input.reservationId || !input.modelId || !input.quantity)
@@ -225,11 +224,11 @@ export class TrafficAnalyticsService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      let orderCode: string | null = null;
       if (input.eventType === "add_to_cart") {
-        const reservation = await client.query<{ reserved_count: string; customer_user_id: string | null }>(
+        const reservation = await client.query<{ reserved_count: string; customer_user_id: string | null; guest_owner_hash: string | null }>(
           `SELECT count(items.id)::text AS reserved_count,
-                  reservation.customer_user_id::text
+                  reservation.customer_user_id::text,
+                  reservation.guest_owner_hash
              FROM cart_reservations reservation
              JOIN inventory_items items
                ON items.cart_reservation_id=reservation.id
@@ -239,42 +238,25 @@ export class TrafficAnalyticsService {
               AND items.model_id=$2
               AND items.color=$3
               AND items.size=$4
-            GROUP BY reservation.id, reservation.customer_user_id`,
+            GROUP BY reservation.id, reservation.customer_user_id, reservation.guest_owner_hash`,
           [input.reservationId, input.modelId, input.color || "", input.size || ""],
         );
         const row = reservation.rows[0];
         if (!row || count(row.reserved_count) < Number(input.quantity || 0)) {
           throw new AppError(409, "ANALYTICS_CART_RESERVATION_INVALID", "The Add to Cart event does not match an active reserved cart variant");
         }
-        if (customerUserId && row.customer_user_id && row.customer_user_id !== customerUserId) {
-          throw new AppError(403, "ANALYTICS_CART_FORBIDDEN", "This cart reservation does not belong to the signed-in customer");
-        }
-      }
-      if (input.eventType === "order_completed") {
-        orderCode = String(input.orderCode || "").trim();
-        if (!orderCode || !customerUserId) {
-          throw new AppError(401, "ANALYTICS_ORDER_AUTH_REQUIRED", "Sign in before recording an order conversion");
-        }
-        const order = await client.query<{ customer_user_id: string | null }>(
-          `SELECT customer_user_id::text
-             FROM orders
-            WHERE order_code=$1 AND NOT is_deleted
-            LIMIT 1`,
-          [orderCode],
-        );
-        const row = order.rows[0];
-        if (!row) throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
-        if (row.customer_user_id && row.customer_user_id !== customerUserId) {
-          throw new AppError(403, "ANALYTICS_ORDER_FORBIDDEN", "This order does not belong to the signed-in customer");
+        if (row.customer_user_id) {
+          if (!customerUserId || row.customer_user_id !== customerUserId) {
+            throw new AppError(403, "ANALYTICS_CART_FORBIDDEN", "This cart reservation does not belong to the signed-in customer");
+          }
+        } else if (!row.guest_owner_hash || !guestOwnerHash || row.guest_owner_hash !== guestOwnerHash) {
+          throw new AppError(403, "ANALYTICS_CART_FORBIDDEN", "This guest cart reservation does not belong to this browser");
         }
       }
 
-      const eventKey =
-        input.eventType === "visit"
-          ? `visit:${input.visitorId}:${input.sessionId}`
-          : input.eventType === "order_completed"
-            ? `order:${orderCode}`
-            : `add:${input.eventId}`;
+      const eventKey = input.eventType === "visit"
+        ? `visit:${input.visitorId}:${input.sessionId}`
+        : `add:${input.eventId}`;
 
       await client.query(
         `INSERT INTO traffic_analytics_events (
@@ -288,7 +270,7 @@ export class TrafficAnalyticsService {
           input.visitorId,
           input.sessionId,
           customerUserId,
-          orderCode,
+          null,
           input.reservationId || null,
           input.path || null,
           input.modelId || null,
@@ -323,6 +305,9 @@ export class TrafficAnalyticsService {
     const spanDays = Math.floor((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
     if (!Number.isFinite(spanDays) || spanDays < 1 || spanDays > 3660) {
       throw new AppError(422, "ANALYTICS_RANGE_TOO_LARGE", "Analytics range must be 10 years or less");
+    }
+    if (group === "hourly" && spanDays > 31) {
+      throw new AppError(422, "ANALYTICS_HOURLY_RANGE_TOO_LARGE", "Hourly analytics are limited to 31 days");
     }
 
     const client = await this.pool.connect();
