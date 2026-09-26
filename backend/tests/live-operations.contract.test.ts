@@ -125,16 +125,42 @@ describe("live operations contracts", () => {
     expect(dashboardLiveMap).toContain("return [current, ...plannedStops(orderCoordinates(current), remaining)]");
   });
 
-  it("keeps display filters separate from route calculation and protects layer ownership", () => {
+  it("keeps Orders independent from assigned-status filters and protects layer ownership", () => {
     expect(dashboardLiveMap).toContain("marker.__dartOrderClickHandler");
     expect(dashboardLiveMap).toContain('marker.off("click", marker.__dartOrderClickHandler)');
+    expect(dashboardLiveMap).toContain("let assignedOrderMarkers = new Map()");
+    expect(dashboardLiveMap).toContain("let unassignedOrderMarkers = new Map()");
+    expect(dashboardLiveMap).not.toContain("let orderMarkers = new Map()");
+
     const boundsStart = dashboardLiveMap.indexOf("function allBoundsPoints()");
     const boundsEnd = dashboardLiveMap.indexOf("function fitMap", boundsStart);
     const boundsBlock = dashboardLiveMap.slice(boundsStart, boundsEnd);
-    expect(boundsBlock).toContain("if (!filterEnabled(order.routeState)) continue;");
-    expect(boundsBlock).toContain("if (order.assigned !== false || order.representativeId) continue;");
-    expect(dashboardLiveMap).toContain('if (layerEnabled("reps"))');
-    expect(dashboardLiveMap).toContain('if (layerEnabled("orders"))');
+    const boundsOrdersStart = boundsBlock.indexOf('if (layerEnabled("orders"))');
+    const boundsOrdersBlock = boundsBlock.slice(boundsOrdersStart);
+    expect(boundsBlock.slice(0, boundsOrdersStart)).toContain("if (!filterEnabled(order.routeState)) continue;");
+    expect(boundsOrdersBlock).toContain("if (order.assigned !== false || order.representativeId) continue;");
+    expect(boundsOrdersBlock).not.toContain("filterEnabled(order.routeState)");
+
+    const markersStart = dashboardLiveMap.indexOf("function renderMarkers()");
+    const markersEnd = dashboardLiveMap.indexOf("function renderCards", markersStart);
+    const markersBlock = dashboardLiveMap.slice(markersStart, markersEnd);
+    const unassignedStart = markersBlock.indexOf('if (layerEnabled("orders"))');
+    const unassignedBlock = markersBlock.slice(unassignedStart);
+    expect(markersBlock.slice(0, unassignedStart)).toContain("if (!filterEnabled(order.routeState)) continue;");
+    expect(unassignedBlock).toContain("unassignedOrderMarkers");
+    expect(unassignedBlock).not.toContain("filterEnabled(order.routeState)");
+  });
+
+  it("serializes route renders, fetches representative routes concurrently, and keeps prior roads on provider gaps", () => {
+    expect(dashboardLiveMap).toContain("let routeRenderRunning = false");
+    expect(dashboardLiveMap).toContain("let routeRenderPending = false");
+    expect(dashboardLiveMap).toContain("function scheduleRouteRender()");
+    expect(dashboardLiveMap).toContain("async function runRouteRenderQueue()");
+    expect(dashboardLiveMap).toContain("await Promise.all(candidates.map(async (candidate)");
+    expect(dashboardLiveMap).not.toContain("routeRenderVersion");
+    expect(dashboardLiveMap).toContain('routeStatusByRep.set(repId, "unavailable")');
+    expect(dashboardLiveMap).toContain("keeping the last road route where available");
+    expect(dashboardLiveMap).toContain("Road route active");
   });
 
   it("counts map-eligible orders even when a pin has no coordinates", () => {

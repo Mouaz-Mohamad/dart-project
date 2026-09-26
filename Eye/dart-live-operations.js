@@ -59,10 +59,13 @@
   let panelOpen = false;
   let manualView = false;
   let repMarkers = new Map();
-  let orderMarkers = new Map();
+  let assignedOrderMarkers = new Map();
+  let unassignedOrderMarkers = new Map();
   let routeLayers = new Map();
   let routeFetchState = new Map();
-  let routeRenderVersion = 0;
+  let routeStatusByRep = new Map();
+  let routeRenderRunning = false;
+  let routeRenderPending = false;
   let routeProviderUnavailable = false;
 
   function api(path, options) {
@@ -224,7 +227,6 @@
       for (const order of snapshot.orders || []) {
         if (order.assigned !== false || order.representativeId) continue;
         if (["refused", "cancelled"].includes(String(order.routeState || ""))) continue;
-        if (!filterEnabled(order.routeState)) continue;
         const point = orderCoordinates(order);
         if (point) points.push(point);
       }
@@ -347,7 +349,7 @@
       .join(";");
     const now = Date.now();
     const cached = routeFetchState.get(rep.id);
-    if (cached?.route && cached.destinationSignature === destinationSignature && now - cached.at < ROUTE_REFRESH_MS) {
+    if (cached?.route && cached.signature === signature && now - cached.at < ROUTE_REFRESH_MS) {
       return { ...cached.route, providerUnavailable: false };
     }
 
@@ -389,30 +391,67 @@
     }
   }
 
-  async function renderRoutes() {
+  function removeRepresentativeRouteLayers(repId) {
+    const prefix = `${String(repId)}:`;
+    for (const [key, layer] of routeLayers) {
+      if (!key.startsWith(prefix)) continue;
+      try { map?.removeLayer(layer); } catch {}
+      routeLayers.delete(key);
+    }
+  }
+
+  function routeStatusLabel(repId) {
+    const status = routeStatusByRep.get(String(repId));
+    if (status === "active") return "Road route active";
+    if (status === "unavailable") return "Route unavailable";
+    return "Route waiting";
+  }
+
+  async function renderRoutesOnce() {
     if (!map) return;
-    const renderVersion = ++routeRenderVersion;
     if (!layerEnabled("reps")) {
       clearLayerMap(routeLayers);
+      routeStatusByRep.clear();
       routeProviderUnavailable = false;
       return;
     }
-    const desiredKeys = new Set();
-    let providerUnavailable = false;
-    for (const rep of snapshot.representatives || []) {
-      if (!visibleRep(rep)) continue;
-      const { stops, coordinates, hasRepresentativeLocation } = routeCoordinates(rep);
-      if (coordinates.length < 2) continue;
-      const route = await roadRouteGeometry(rep, coordinates);
-      if (renderVersion !== routeRenderVersion) return;
-      providerUnavailable = providerUnavailable || Boolean(route?.providerUnavailable);
-      if (!Array.isArray(route?.segments) || !route.segments.length) continue;
 
+    const reps = (snapshot.representatives || []).filter((rep) => visibleRep(rep));
+    const visibleRepIds = new Set(reps.map((rep) => String(rep.id)));
+    const candidates = [];
+
+    for (const rep of reps) {
+      const routeInput = routeCoordinates(rep);
+      if (routeInput.coordinates.length < 2) {
+        routeStatusByRep.set(String(rep.id), "waiting");
+        removeRepresentativeRouteLayers(rep.id);
+        continue;
+      }
+      candidates.push({ rep, ...routeInput });
+    }
+
+    const results = await Promise.all(candidates.map(async (candidate) => ({
+      ...candidate,
+      route: await roadRouteGeometry(candidate.rep, candidate.coordinates),
+    })));
+
+    let providerUnavailable = false;
+    for (const result of results) {
+      const repId = String(result.rep.id);
+      const route = result.route;
+      providerUnavailable = providerUnavailable || Boolean(route?.providerUnavailable);
+
+      if (!Array.isArray(route?.segments) || !route.segments.length) {
+        routeStatusByRep.set(repId, "unavailable");
+        continue;
+      }
+
+      const desiredKeys = new Set();
       for (const segment of route.segments) {
         if (!Array.isArray(segment.geometry) || segment.geometry.length < 2) continue;
-        const targetStopIndex = hasRepresentativeLocation ? segment.toIndex - 1 : segment.toIndex;
-        const targetStop = stops[targetStopIndex] || null;
-        const key = `${String(rep.id)}:${segment.fromIndex}-${segment.toIndex}`;
+        const targetStopIndex = result.hasRepresentativeLocation ? segment.toIndex - 1 : segment.toIndex;
+        const targetStop = result.stops[targetStopIndex] || null;
+        const key = `${repId}:${segment.fromIndex}-${segment.toIndex}`;
         desiredKeys.add(key);
         const style = {
           color: targetStop?.routeState === "current" ? COLORS.current : COLORS.upcoming,
@@ -431,19 +470,52 @@
           routeLayers.set(key, layer);
         }
       }
+
+      const prefix = `${repId}:`;
+      for (const [key, layer] of routeLayers) {
+        if (!key.startsWith(prefix) || desiredKeys.has(key)) continue;
+        try { map.removeLayer(layer); } catch {}
+        routeLayers.delete(key);
+      }
+      routeStatusByRep.set(repId, "active");
     }
-    if (renderVersion !== routeRenderVersion) return;
+
     for (const [key, layer] of routeLayers) {
-      if (desiredKeys.has(key)) continue;
+      const repId = key.split(":", 1)[0];
+      if (visibleRepIds.has(repId)) continue;
       try { map.removeLayer(layer); } catch {}
       routeLayers.delete(key);
     }
+    for (const repId of [...routeStatusByRep.keys()]) {
+      if (!visibleRepIds.has(repId)) routeStatusByRep.delete(repId);
+    }
+
     routeProviderUnavailable = providerUnavailable;
+    renderRepresentativeList();
     if (routeProviderUnavailable) {
-      setConnection("stale", "Route Provider Unavailable · live stops are still visible");
+      setConnection("stale", "Route Provider Unavailable · keeping the last road route where available");
     } else if (snapshot.capturedAt) {
       setConnection("online", liveConnectionText());
     }
+  }
+
+  async function runRouteRenderQueue() {
+    if (routeRenderRunning) return;
+    routeRenderRunning = true;
+    try {
+      while (routeRenderPending) {
+        routeRenderPending = false;
+        await renderRoutesOnce();
+      }
+    } finally {
+      routeRenderRunning = false;
+      if (routeRenderPending) void runRouteRenderQueue();
+    }
+  }
+
+  function scheduleRouteRender() {
+    routeRenderPending = true;
+    void runRouteRenderQueue();
   }
 
   function orderPopup(order) {
@@ -458,12 +530,12 @@
     </div>`;
   }
 
-  function upsertOrderMarker(order, desiredOrderKeys) {
+  function upsertOrderMarker(order, markerMap, desiredOrderKeys) {
     const point = orderCoordinates(order);
     if (!point) return;
     const key = String(order.orderId);
     desiredOrderKeys.add(key);
-    let marker = orderMarkers.get(key);
+    let marker = markerMap.get(key);
     const popup = orderPopup(order);
     if (marker) {
       marker.setLatLng(point);
@@ -476,7 +548,7 @@
         zIndexOffset: order.routeState === "current" ? 800 : order.routeState === "delivered" ? 200 : 100,
       }).addTo(map);
       marker.bindPopup(popup);
-      orderMarkers.set(key, marker);
+      markerMap.set(key, marker);
     }
     if (marker.__dartOrderClickHandler) {
       marker.off("click", marker.__dartOrderClickHandler);
@@ -498,7 +570,8 @@
     ensureMap();
     if (!map) return;
     const desiredRepKeys = new Set();
-    const desiredOrderKeys = new Set();
+    const desiredAssignedOrderKeys = new Set();
+    const desiredUnassignedOrderKeys = new Set();
 
     if (layerEnabled("reps")) {
       for (const rep of snapshot.representatives || []) {
@@ -523,7 +596,7 @@
         for (const order of rep.orders || []) {
           if (["refused", "cancelled"].includes(String(order.routeState || ""))) continue;
           if (!filterEnabled(order.routeState)) continue;
-          upsertOrderMarker(order, desiredOrderKeys);
+          upsertOrderMarker(order, assignedOrderMarkers, desiredAssignedOrderKeys);
         }
       }
     }
@@ -532,8 +605,7 @@
       for (const order of snapshot.orders || []) {
         if (order.assigned !== false || order.representativeId) continue;
         if (["refused", "cancelled"].includes(String(order.routeState || ""))) continue;
-        if (!filterEnabled(order.routeState)) continue;
-        upsertOrderMarker(order, desiredOrderKeys);
+        upsertOrderMarker(order, unassignedOrderMarkers, desiredUnassignedOrderKeys);
       }
     }
 
@@ -542,12 +614,17 @@
       try { map.removeLayer(marker); } catch {}
       repMarkers.delete(key);
     }
-    for (const [key, marker] of orderMarkers) {
-      if (desiredOrderKeys.has(key)) continue;
+    for (const [key, marker] of assignedOrderMarkers) {
+      if (desiredAssignedOrderKeys.has(key)) continue;
       try { map.removeLayer(marker); } catch {}
-      orderMarkers.delete(key);
+      assignedOrderMarkers.delete(key);
     }
-    void renderRoutes();
+    for (const [key, marker] of unassignedOrderMarkers) {
+      if (desiredUnassignedOrderKeys.has(key)) continue;
+      try { map.removeLayer(marker); } catch {}
+      unassignedOrderMarkers.delete(key);
+    }
+    scheduleRouteRender();
     fitMap();
   }
 
@@ -593,7 +670,7 @@
           <span><small>Next</small><strong>${esc(rep.nextOrderId || "-")}</strong></span>
         </div>
         <div class="dart-live-rep-meta">
-          <span>${counts.current} current</span><span>${counts.upcoming} upcoming</span><span>${counts.delivered} delivered</span><span>${esc(last)}</span>
+          <span>${counts.current} current</span><span>${counts.upcoming} upcoming</span><span>${counts.delivered} delivered</span><span>${esc(routeStatusLabel(rep.id))}</span><span>${esc(last)}</span>
         </div>
       </button>`;
     }).join("") || '<div class="dart-live-empty">No active representatives.</div>';

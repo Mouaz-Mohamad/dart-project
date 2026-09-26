@@ -45,6 +45,7 @@ localStorage.setItem('dart_returns', JSON.stringify([
 const trackingSource = fs.readFileSync('Js/dart-tracking.js','utf8');
 const representativeSource = fs.readFileSync('Js/dart-rep.js','utf8');
 const liveOperationsSource = fs.readFileSync('Eye/dart-live-operations.js','utf8');
+const roadRoutingProviderSource = fs.readFileSync('backend/src/modules/commerce/road-routing-provider.ts','utf8');
 const mainCss = fs.readFileSync('CSS/main.css','utf8');
 vm.runInContext(trackingSource, context, {filename:'Js/dart-tracking.js'});
 assert(window.DartTracking.currentOrder().orderId === 'K-2', 'Tracking should use the signed-in customer latest order when no query is present');
@@ -93,10 +94,13 @@ assert(!trackingSource.includes('[state.destination.lat, state.destination.lng],
 assert(representativeSource.includes('router.project-osrm.org/route/v1/driving'), 'representative delivery maps must request road-aware OSRM geometry');
 assert(representativeSource.includes('Keep the last valid road geometry visible'), 'representative routing failure must preserve the last valid route instead of blanking it');
 assert(!/polyline\(\s*\[\s*\[courierLat, courierLng\],\s*\[destinationLat, destinationLng\]/.test(representativeSource), 'representative delivery maps must not draw direct courier-to-customer polylines');
-assert(liveOperationsSource.includes('async function roadLegGeometries(rep, coordinates)'), 'Live Operations must road-route every visible representative rather than only a selected one');
-assert(liveOperationsSource.includes('steps=true'), 'Live Operations must request per-leg road geometry so current and upcoming stops keep their own colors');
+assert(liveOperationsSource.includes('async function roadRouteGeometry(rep, coordinates)'), 'Live Operations must road-route every visible representative through the backend adapter');
+assert(liveOperationsSource.includes('await Promise.all(candidates.map(async (candidate)'), 'Live Operations must resolve visible representative road routes concurrently');
+assert(roadRoutingProviderSource.includes('url.searchParams.set(\"steps\", \"true\")'), 'The backend road adapter must request per-leg geometry so current and upcoming stops keep their own colors');
 assert(liveOperationsSource.includes('ROUTE_REFRESH_MS = 6000'), 'Live Operations routes must refresh on the approved six-second cadence');
-assert(liveOperationsSource.includes('existing.setLatLngs(geometry)'), 'Live Operations must update existing route layers without clearing the old road first');
+assert(liveOperationsSource.includes('existing.setLatLngs(segment.geometry)'), 'Live Operations must update existing route layers without clearing the old road first');
+assert(liveOperationsSource.includes('function scheduleRouteRender()'), 'Live Operations must serialize route rendering instead of canceling in-flight roads on every poll');
+assert(!liveOperationsSource.includes('routeRenderVersion'), 'Live Operations must not cancel an in-flight road render just because another three-second poll arrived');
 assert(!liveOperationsSource.includes('String(rep.id) !== selectedRepresentativeId'), 'Live Operations road routing must not be restricted to the selected representative');
 assert(!liveOperationsSource.includes('[coordinates[index - 1], coordinates[index]]'), 'Live Operations must not fall back to straight operational route segments');
 assert(liveOperationsSource.includes('dart-live-rep-brief'), 'dart-live-sidebar cards must show order count plus current and next stops');
