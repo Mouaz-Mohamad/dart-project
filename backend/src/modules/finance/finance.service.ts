@@ -64,6 +64,7 @@ export interface FinanceSummary {
   cashOut: number;
   netCashFlow: number;
   paidExpenseCashOut: number;
+  inventoryPurchaseCashOut: number;
   refundCashOut: number;
   marketing: {
     spend: number;
@@ -94,6 +95,10 @@ function toMinor(value: unknown): number {
 
 function active(row: JsonRow): boolean {
   return !row.isDeleted && !row.isArchived;
+}
+
+function isInventoryAcquisitionExpense(row: JsonRow): boolean {
+  return String(row.category || "").trim().toLowerCase() === "inventory acquisition";
 }
 
 function dateKey(value: unknown): string | null {
@@ -280,10 +285,17 @@ export class FinanceService {
       const expenses = (states.get("finance_expenses") || []).filter(active);
       const operatingExpenseMinor = expenses
         .filter((row) => String(row.status || "").toLowerCase() !== "void")
+        .filter((row) => !isInventoryAcquisitionExpense(row))
         .filter((row) => inRange(row.date, start, end))
         .reduce((sum, row) => sum + toMinor(row.amount), 0);
       const paidExpenseMinor = expenses
         .filter((row) => String(row.status || "").toLowerCase() === "paid")
+        .filter((row) => !isInventoryAcquisitionExpense(row))
+        .filter((row) => inRange(row.paidAt || row.date, start, end))
+        .reduce((sum, row) => sum + toMinor(row.amount), 0);
+      const inventoryPurchaseCashOutMinor = expenses
+        .filter((row) => String(row.status || "").toLowerCase() === "paid")
+        .filter(isInventoryAcquisitionExpense)
         .filter((row) => inRange(row.paidAt || row.date, start, end))
         .reduce((sum, row) => sum + toMinor(row.amount), 0);
 
@@ -442,6 +454,7 @@ export class FinanceService {
         settlementCashInMinor + fallbackCodCashInMinor;
       const cashOutMinor =
         paidExpenseMinor +
+        inventoryPurchaseCashOutMinor +
         codFeesMinor +
         returnCourierMinor +
         refundsMinor;
@@ -519,6 +532,7 @@ export class FinanceService {
         cashOut: money(cashOutMinor),
         netCashFlow: money(cashInMinor - cashOutMinor),
         paidExpenseCashOut: money(paidExpenseMinor),
+        inventoryPurchaseCashOut: money(inventoryPurchaseCashOutMinor),
         refundCashOut: money(refundsMinor),
         marketing: {
           spend: marketingSpend,

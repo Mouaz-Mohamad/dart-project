@@ -14,6 +14,8 @@ function financePool(options: {
   deliveredRows?: Array<Record<string, unknown>>;
   returnPayloads?: Array<Record<string, unknown>>;
   itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string }>;
+  acquiredItems?: Array<{ item_code: string; cost_snapshot_minor: string }>;
+  expensePayloads?: Array<Record<string, unknown>>;
 } = {}) {
   const queries: string[] = [];
   const client = {
@@ -43,7 +45,7 @@ function financePool(options: {
           ],
         };
       }
-      if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: [] };
+      if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: options.acquiredItems ?? [] };
       if (sql.includes("FROM inventory_items")) return { rows: options.itemCosts ?? [] };
       if (sql.includes("SELECT DISTINCT oi.item_code")) return { rows: [] };
       if (sql.includes("FROM return_requests")) {
@@ -68,9 +70,10 @@ function financePool(options: {
             }],
           };
         }
-        if (["finance_expenses", "finance_marketing"].includes(domain)) {
-          return { rows: [] };
+        if (domain === "finance_expenses") {
+          return { rows: (options.expensePayloads ?? []).map((payload) => ({ payload })) };
         }
+        if (domain === "finance_marketing") return { rows: [] };
       }
       throw new Error(`Unexpected finance query: ${sql}`);
     }),
@@ -131,6 +134,28 @@ describe("finance summary integrity", () => {
     expect(summary.soldUnits).toBe(-1);
     expect(summary.margin).toBe(0);
     expect(summary.marginApplicable).toBe(false);
+  });
+
+  it("keeps paid inventory acquisition out of P&L while recording the real cash payment once", async () => {
+    const fixture = financePool({
+      deliveredRows: [],
+      returnPayloads: [],
+      acquiredItems: [{ item_code: "INV-1", cost_snapshot_minor: "40000" }],
+      itemCosts: [{ item_code: "INV-1", cost_snapshot_minor: "40000" }],
+      expensePayloads: [{
+        id: "expense-inventory", date: "2026-09-03", paidAt: "2026-09-03",
+        category: "Inventory Acquisition", amount: 400, status: "Paid",
+      }],
+    });
+    const summary = await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30");
+
+    expect(summary.physicalItemCost).toBe(400);
+    expect(summary.operatingExpenses).toBe(0);
+    expect(summary.totalCost).toBe(0);
+    expect(summary.brandTotalCost).toBe(400);
+    expect(summary.inventoryPurchaseCashOut).toBe(400);
+    expect(summary.cashOut).toBe(400);
+    expect(summary.netCashFlow).toBe(-400);
   });
 
   it("reads relational domains sequentially on one pg client", () => {

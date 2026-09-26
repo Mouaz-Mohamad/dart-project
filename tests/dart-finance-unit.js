@@ -178,6 +178,19 @@ const stockMetrics = finance.brandMetrics(stockData, stockRange, finance.calcula
 assert.strictEqual(stockMetrics.inStockCost, 400, "In Stock Cost Value must use item-entry cost and the unified period.");
 assert.strictEqual(stockMetrics.inStockSelling, 600);
 
+
+const inventoryAcquisitionSummary = finance.calculateSummary(baseData({
+  items: [{ id: "INV-1", itemCode: "INV-1", modelId: "M-INV", status: "In stock", costSnapshot: 400, createdAt: "2026-09-03" }],
+  models: [{ modelId: "M-INV", cost: 400, selling: 600 }],
+  expenses: [{ id: "E-INV", date: "2026-09-03", paidAt: "2026-09-03", category: "Inventory Acquisition", amount: 400, status: "Paid" }],
+}), range("2026-09-01", "2026-09-30"));
+assert.strictEqual(inventoryAcquisitionSummary.physicalItemCost, 400, "Inventory investment must come from the immutable item cost snapshot.");
+assert.strictEqual(inventoryAcquisitionSummary.operatingExpenses, 0, "Inventory Acquisition must not be expensed again through operating P&L.");
+assert.strictEqual(inventoryAcquisitionSummary.brandTotalCost, 400, "Owner Total Cost must not double-count the inventory payment record.");
+assert.strictEqual(inventoryAcquisitionSummary.inventoryPurchaseCashOut, 400, "A paid inventory acquisition must enter cash flow exactly once.");
+assert.strictEqual(inventoryAcquisitionSummary.cashOut, 400);
+assert.strictEqual(inventoryAcquisitionSummary.netCashFlow, -400);
+
 const repeatData = baseData({
   orders: [
     deliveredOrder,

@@ -508,14 +508,31 @@
     );
   }
 
+  function isInventoryAcquisitionExpense(expense) {
+    return String(expense?.category || "").trim().toLowerCase() === "inventory acquisition";
+  }
+
   function recognizedExpenses(data, range) {
-    return data.expenses.filter(active).filter((expense) => String(expense.status || "").toLowerCase() !== "void").filter((expense) => within(expense.date, range));
+    return data.expenses
+      .filter(active)
+      .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
+      .filter((expense) => !isInventoryAcquisitionExpense(expense))
+      .filter((expense) => within(expense.date, range));
   }
 
   function paidExpenses(data, range) {
     return data.expenses
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
+      .filter((expense) => !isInventoryAcquisitionExpense(expense))
+      .filter((expense) => within(expense.paidAt || expense.date, range));
+  }
+
+  function paidInventoryAcquisitions(data, range) {
+    return data.expenses
+      .filter(active)
+      .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
+      .filter(isInventoryAcquisitionExpense)
       .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
@@ -752,9 +769,10 @@
       settlementsInPeriod.reduce((sum, entry) => sum + Math.max(0, finiteNumber(entry.amountReceived)), 0) + fallbackCODInflow,
     );
     const paidExpenseCashOut = roundMoney(paidExpenses(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
+    const inventoryPurchaseCashOut = roundMoney(paidInventoryAcquisitions(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
     const refundCashOut = refunds;
     const cashOut = roundMoney(
-      paidExpenseCashOut + codFees + returnCourierCosts + refundCashOut,
+      paidExpenseCashOut + inventoryPurchaseCashOut + codFees + returnCourierCosts + refundCashOut,
     );
 
     const marketing = marketingStats(data, range);
@@ -796,6 +814,7 @@
       cashOut,
       netCashFlow: roundMoney(codCashIn - cashOut),
       paidExpenseCashOut,
+      inventoryPurchaseCashOut,
       refundCashOut,
       marketing,
     };
@@ -830,6 +849,7 @@
       const actual = data.expenses
         .filter(active)
         .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
+        .filter((expense) => !isInventoryAcquisitionExpense(expense))
         .filter((expense) => budget.category === "All" || expense.category === budget.category)
         .filter((expense) => within(expense.date, range))
         .reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0);
@@ -1609,8 +1629,8 @@
 
   function renderExpenses(data, range) {
     const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    return `${sectionToolbar("Expenses", "Accrual view: Paid and Unpaid records affect P&L on the expense date. Void records are excluded.", `<button type="button" class="dart-finance-secondary" data-finance-export="expenses">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="expenses"><i class="fa-solid fa-plus"></i> Add Expense</button>`)}
-      <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Do not re-enter the physical product cost here when it already exists in the model/order cost snapshot; that would double-count COGS.</span></div>
+    return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition is cash-only here and stays outside operating P&L to avoid double counting. Void records are excluded.", `<button type="button" class="dart-finance-secondary" data-finance-export="expenses">Export CSV</button><button type="button" class="dart-finance-primary" data-finance-add="expenses"><i class="fa-solid fa-plus"></i> Add Expense</button>`)}
+      <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
       ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.")}`;
   }
 
@@ -1657,7 +1677,7 @@
         ${kpiCard("Cash Out", money(current.cashOut), "Recorded paid expenses + refunds + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
         ${kpiCard("Net Cash Change", money(current.netCashFlow), range.label, "fa-solid fa-scale-balanced", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
       </div>
-      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow. Inventory Investment is not treated as cash paid unless a paid expense/payment record exists, preventing invented cash movements.</p></article>`;
+      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Paid inventory acquisitions</dt><dd>(${money(current.inventoryPurchaseCashOut || 0)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow. Inventory Investment is not treated as cash paid unless a paid expense/payment record exists, preventing invented cash movements.</p></article>`;
   }
 
   function codRows(data, range) {
@@ -2071,7 +2091,7 @@
       return;
     }
     if (report === "pnl") downloadCSV(`dart-pnl-${stamp}.csv`, ["Account", "Amount EGP"], [["Gross Revenue", summary.grossRevenue], ["Refunds", -summary.refunds], ["Total Selling", summary.netRevenue], ["Sold-piece Cost (includes courier allocation)", -summary.netCogs], ["Operating Expenses", -summary.operatingExpenses], ["Courier Allocation (informational)", summary.deliveryCosts], ["Settlement Fees", -summary.codFees], ["Representative Exchange Fees", -summary.returnCourierCosts], ["Damage Write-offs", -summary.damageLoss], ["Total Profit", summary.netProfit]]);
-    else if (report === "cashflow") downloadCSV(`dart-cash-flow-${stamp}.csv`, ["Cash Flow", "Amount EGP"], [["Cash In to Dart", summary.cashIn], ["Paid Expenses", -summary.paidExpenseCashOut], ["Courier Allocation (retained before Dart receipt)", summary.deliveryCosts], ["Completed Refunds", -summary.refundCashOut], ["Dart-paid Representative Fees", -summary.returnCourierCosts], ["Settlement Fees", -summary.codFees], ["Net Cash Flow", summary.netCashFlow]]);
+    else if (report === "cashflow") downloadCSV(`dart-cash-flow-${stamp}.csv`, ["Cash Flow", "Amount EGP"], [["Cash In to Dart", summary.cashIn], ["Paid Operating Expenses", -summary.paidExpenseCashOut], ["Paid Inventory Acquisitions", -(summary.inventoryPurchaseCashOut || 0)], ["Courier Allocation (retained before Dart receipt)", summary.deliveryCosts], ["Completed Refunds", -summary.refundCashOut], ["Dart-paid Representative Fees", -summary.returnCourierCosts], ["Settlement Fees", -summary.codFees], ["Net Cash Flow", summary.netCashFlow]]);
     else if (report === "cod") downloadCSV(`dart-cod-${stamp}.csv`, ["Order", "Order Total", "Courier Due", "Due to Dart", "Received", "Remaining", "Status"], codRows(data, range).map((row) => [row.order.orderId || row.order.id, row.orderTotal, row.courierDue, row.due, row.received, row.remaining, row.status]));
     else if (report === "models") downloadCSV(`dart-model-profitability-${stamp}.csv`, ["Model Code", "Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin %"], modelProfitability(data, range).map((row) => [row.modelCode, row.modelName, row.units, row.revenue, row.cogs, row.profit, decimal(row.margin)]));
     else if (report === "drawlog") {

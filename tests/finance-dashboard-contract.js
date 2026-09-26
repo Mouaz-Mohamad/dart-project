@@ -121,6 +121,8 @@ assert(finance.includes("inStockCost"), "Brand must calculate the filtered In St
 assert(finance.includes("P&L Total Cost"), "Finance must distinguish accrual P&L Total Cost from owner investment cost.");
 assert(finance.includes("Owner Total Cost"), "Brand owner view must label Owner Total Cost explicitly.");
 assert(finance.includes("Inventory Investment"), "Finance overview must expose inventory investment separately from P&L COGS.");
+assert(finance.includes("Inventory Acquisition"), "Finance must support paid inventory acquisition as a cash-flow-only category without double-counting P&L.");
+assert(finance.includes("inventoryPurchaseCashOut"), "Cash Flow must expose paid inventory acquisition separately from operating expenses.");
 assert(finance.includes("Return adjustment period · margin N/A"), "Refund-only periods must not show a misleading positive margin.");
 assert(finance.includes("authoritativeSummary(bucketRange)"), "Financial chart buckets must use authoritative server summaries.");
 assert(finance.includes("let summary = authoritativeSummary(range)"), "Goal actuals must start from the authoritative server summary.");
