@@ -120,40 +120,54 @@
     const secure = location.protocol === "https:" ? "; Secure" : "";
     document.cookie = `${ANALYTICS_VISITOR_COOKIE}=${encodeURIComponent(ANALYTICS_VISITOR_ID)}; Max-Age=31536000; Path=/; SameSite=Lax${secure}`;
   }
-  let ANALYTICS_SESSION_ID = sessionStorage.getItem(ANALYTICS_SESSION_KEY) || "";
-  const analyticsLastSeen = Number(sessionStorage.getItem(ANALYTICS_SESSION_SEEN_KEY) || 0);
-  if (
-    !validAnalyticsUuid(ANALYTICS_SESSION_ID) ||
-    !analyticsLastSeen ||
-    Date.now() - analyticsLastSeen > ANALYTICS_SESSION_TIMEOUT_MS
-  ) {
-    ANALYTICS_SESSION_ID = uuidV4();
-    sessionStorage.setItem(ANALYTICS_SESSION_KEY, ANALYTICS_SESSION_ID);
+  let ANALYTICS_SESSION_ID = "";
+
+  function ensureAnalyticsSession() {
+    const storedSessionId = sessionStorage.getItem(ANALYTICS_SESSION_KEY) || "";
+    const lastSeen = Number(sessionStorage.getItem(ANALYTICS_SESSION_SEEN_KEY) || 0);
+    const currentTime = Date.now();
+    const started =
+      !validAnalyticsUuid(storedSessionId) ||
+      !lastSeen ||
+      currentTime - lastSeen > ANALYTICS_SESSION_TIMEOUT_MS;
+    ANALYTICS_SESSION_ID = started ? uuidV4() : storedSessionId;
+    if (started) sessionStorage.setItem(ANALYTICS_SESSION_KEY, ANALYTICS_SESSION_ID);
+    sessionStorage.setItem(ANALYTICS_SESSION_SEEN_KEY, String(currentTime));
+    return { sessionId: ANALYTICS_SESSION_ID, started };
   }
-  sessionStorage.setItem(ANALYTICS_SESSION_SEEN_KEY, String(Date.now()));
+
+  async function sendAnalyticsEvent(eventType, detail, sessionId) {
+    await apiRequest("/api/v1/analytics/events", {
+      method: "POST",
+      body: {
+        eventType,
+        eventId: detail.eventId || uuidV4(),
+        visitorId: ANALYTICS_VISITOR_ID,
+        sessionId,
+        path: location.pathname || "/",
+        ...(detail.modelId ? { modelId: String(detail.modelId) } : {}),
+        ...(detail.color ? { color: String(detail.color) } : {}),
+        ...(detail.size ? { size: String(detail.size) } : {}),
+        ...(Number(detail.quantity) > 0 ? { quantity: Math.trunc(Number(detail.quantity)) } : {}),
+        ...(detail.orderCode ? { orderCode: String(detail.orderCode) } : {}),
+        ...(detail.reservationId ? { reservationId: String(detail.reservationId) } : {}),
+      },
+    });
+  }
 
   async function trackAnalyticsEvent(eventType, detail = {}) {
     try {
-      await apiRequest("/api/v1/analytics/events", {
-        method: "POST",
-        body: {
-          eventType,
-          eventId: detail.eventId || uuidV4(),
-          visitorId: ANALYTICS_VISITOR_ID,
-          sessionId: ANALYTICS_SESSION_ID,
-          path: location.pathname || "/",
-          ...(detail.modelId ? { modelId: String(detail.modelId) } : {}),
-          ...(detail.color ? { color: String(detail.color) } : {}),
-          ...(detail.size ? { size: String(detail.size) } : {}),
-          ...(Number(detail.quantity) > 0 ? { quantity: Math.trunc(Number(detail.quantity)) } : {}),
-          ...(detail.orderCode ? { orderCode: String(detail.orderCode) } : {}),
-          ...(detail.reservationId ? { reservationId: String(detail.reservationId) } : {}),
-        },
-      });
+      const session = ensureAnalyticsSession();
+      if (session.started && eventType !== "visit") {
+        await sendAnalyticsEvent("visit", {}, session.sessionId);
+      }
+      await sendAnalyticsEvent(eventType, detail, session.sessionId);
     } catch {
       // Analytics is best-effort and must never block navigation, cart or checkout.
     }
   }
+
+  ensureAnalyticsSession();
 
   function analyticsCartKey(line) {
     return [line?.id, line?.color, line?.size].map((value) => String(value || "")).join("|");
@@ -1591,9 +1605,6 @@
         window.DartCatalog?.checkForServerChanges?.(),
         hydrateCustomerCommerce(),
       ]);
-      void trackAnalyticsEvent("order_completed", {
-        orderCode: response.order?.orderId || response.order?.orderCode,
-      });
       return response.order;
     }
 
@@ -4057,7 +4068,9 @@
   };
   window.DartAnalytics = Object.freeze({
     visitorId: ANALYTICS_VISITOR_ID,
-    sessionId: ANALYTICS_SESSION_ID,
+    get sessionId() {
+      return ANALYTICS_SESSION_ID;
+    },
     track: trackAnalyticsEvent,
     trackCartIncrease,
   });

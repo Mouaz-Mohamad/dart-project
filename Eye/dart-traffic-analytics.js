@@ -28,7 +28,7 @@ const analyticsChartTow = ctxTow
         datasets: [
           {
             type: "line",
-            label: "Visits",
+            label: "Unique Visitors",
             data: [],
             borderColor: "#ab012b",
             backgroundColor: "rgba(171, 1, 43, 0.12)",
@@ -39,7 +39,7 @@ const analyticsChartTow = ctxTow
           },
           {
             type: "line",
-            label: "Add to Cart",
+            label: "Cart Visitors",
             data: [],
             borderColor: "#bf506d",
             backgroundColor: "rgba(191, 80, 109, 0.08)",
@@ -51,7 +51,7 @@ const analyticsChartTow = ctxTow
           },
           {
             type: "bar",
-            label: "Completed Orders",
+            label: "Ordered Pieces",
             data: [],
             backgroundColor: "#1abc9c",
             borderRadius: 5,
@@ -75,7 +75,7 @@ const analyticsChartTow = ctxTow
             position: "left",
             beginAtZero: true,
             ticks: { precision: 0 },
-            title: { display: true, text: "Events" },
+            title: { display: true, text: "Count" },
             grid: { color: "#f0f0f0" },
           },
         },
@@ -191,7 +191,8 @@ function renderTrafficReportTow(report) {
   setTrafficKpiTow("trafficCartVisitorsTow", summary.addToCartVisitors);
   setTrafficKpiTow("trafficAddEventsTow", summary.addToCartEvents);
   setTrafficKpiTow("trafficItemsAddedTow", summary.itemsAdded);
-  setTrafficKpiTow("trafficOrdersTow", summary.completedOrders);
+  setTrafficKpiTow("trafficOrdersTow", summary.ordersPlaced ?? summary.completedOrders);
+  setTrafficKpiTow("trafficOrderedPiecesTow", summary.orderedPieces);
 
   const period = document.getElementById("trafficPeriodLabelTow");
   if (period) {
@@ -205,21 +206,27 @@ function renderTrafficReportTow(report) {
   if (note) {
     if (report.group === "hourly" && series.length) {
       const peak = [...series].sort((a, b) => Number(b.uniqueVisitors || 0) - Number(a.uniqueVisitors || 0))[0];
-      note.textContent = `Peak audience: ${peak?.label || "—"} · ${trafficNumberTow(peak?.uniqueVisitors)} unique visitors · ${trafficNumberTow(peak?.addToCartVisitors)} added to cart · ${trafficNumberTow(peak?.orders)} completed orders`;
+      const hasHourlyActivity = series.some((row) =>
+        Number(row.uniqueVisitors || 0) > 0 ||
+        Number(row.addToCartVisitors || 0) > 0 ||
+        Number(row.orderedPieces || 0) > 0
+      );
+      note.textContent = hasHourlyActivity
+        ? `Peak audience: ${peak?.label || "—"} · ${trafficNumberTow(peak?.uniqueVisitors)} unique visitors · ${trafficNumberTow(peak?.addToCartVisitors)} added to cart · ${trafficNumberTow(peak?.orderedPieces)} ordered pieces`
+        : "No hourly audience activity was recorded in this window.";
     } else {
       note.textContent = `${trafficNumberTow(summary.uniqueVisitors)} unique visitors · ${trafficNumberTow(summary.visits)} visits · Add-to-cart rate ${Number(summary.addToCartRate || 0).toFixed(1)}% · Conversion rate ${Number(summary.conversionRate || 0).toFixed(1)}%`;
     }
   }
 
   if (analyticsChartTow) {
-    const hourly = report.group === "hourly";
     analyticsChartTow.data.labels = series.map((row) => row.label);
-    analyticsChartTow.data.datasets[0].label = hourly ? "Unique Visitors" : "Visits";
-    analyticsChartTow.data.datasets[1].label = hourly ? "Added to Cart Visitors" : "Add to Cart";
-    analyticsChartTow.data.datasets[2].label = "Completed Orders";
-    analyticsChartTow.data.datasets[0].data = series.map((row) => Number(hourly ? row.uniqueVisitors : row.visits) || 0);
-    analyticsChartTow.data.datasets[1].data = series.map((row) => Number(hourly ? row.addToCartVisitors : row.addToCartEvents) || 0);
-    analyticsChartTow.data.datasets[2].data = series.map((row) => Number(row.orders) || 0);
+    analyticsChartTow.data.datasets[0].label = "Unique Visitors";
+    analyticsChartTow.data.datasets[1].label = "Cart Visitors";
+    analyticsChartTow.data.datasets[2].label = "Ordered Pieces";
+    analyticsChartTow.data.datasets[0].data = series.map((row) => Number(row.uniqueVisitors) || 0);
+    analyticsChartTow.data.datasets[1].data = series.map((row) => Number(row.addToCartVisitors) || 0);
+    analyticsChartTow.data.datasets[2].data = series.map((row) => Number(row.orderedPieces) || 0);
     analyticsChartTow.update();
   }
   renderTrafficVisitorsTow(report?.visitors || [], Number(report?.detailsLimit) || 250);

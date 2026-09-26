@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/analytics/traffic-analytics.routes.ts
 // الغرض: HTTP routes لتسجيل أحداث الزوار وعرض Analytics المصرح بها للداشبورد.
 import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import {
@@ -54,6 +55,13 @@ export function createTrafficAnalyticsRouter(
 ): Router {
   const router = Router();
   const signedIn = authenticate(identity, config);
+  const analyticsEventLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    limit: 120,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: { code: "RATE_LIMITED", message: "Too many analytics events" } },
+  });
 
   async function optionalCustomerId(cookieValue: string | undefined): Promise<string | null> {
     const token = parseSessionToken(cookieValue);
@@ -62,7 +70,7 @@ export function createTrafficAnalyticsRouter(
     return account?.accountType === "customer" ? account.userId : null;
   }
 
-  router.post("/analytics/events", async (request, response) => {
+  router.post("/analytics/events", analyticsEventLimiter, async (request, response) => {
     const input = eventSchema.parse(request.body);
     const customerUserId = await optionalCustomerId(request.cookies?.[config.sessionCookieName]);
     await analytics.recordEvent(input, customerUserId);

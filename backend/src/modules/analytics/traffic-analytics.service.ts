@@ -20,22 +20,15 @@ export interface TrafficEventInput {
   reservationId?: string | undefined;
 }
 
-interface DailyRow {
-  day: string | Date;
-  visits: string;
-  add_events: string;
-  items_added: string;
-  orders: string;
-}
-
-interface HourlyRow {
-  hour_of_day: string | number;
+interface GroupedRow {
+  bucket_key: string | number;
   unique_visitors: string;
   visits: string;
   add_to_cart_visitors: string;
   add_events: string;
   items_added: string;
   orders: string;
+  ordered_pieces: string;
 }
 
 interface TotalsRow {
@@ -44,8 +37,12 @@ interface TotalsRow {
   add_to_cart_visitors: string;
   add_events: string;
   items_added: string;
+}
+
+interface OrderTotalsRow {
   order_visitors: string;
   orders: string;
+  ordered_pieces: string;
 }
 
 interface VisitorRow {
@@ -68,12 +65,7 @@ function count(value: unknown): number {
 
 function percent(part: number, total: number): number {
   if (total <= 0) return 0;
-  return Math.round((part / total) * 10_000) / 100;
-}
-
-function dateOnly(value: string | Date): string {
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
+  return Math.min(100, Math.round((part / total) * 10_000) / 100);
 }
 
 function utcDate(date: string): Date {
@@ -114,19 +106,43 @@ function formatMonth(key: string): string {
   });
 }
 
+export interface TrafficSeriesPoint {
+  key: string;
+  label: string;
+  uniqueVisitors: number;
+  visits: number;
+  addToCartVisitors: number;
+  addToCartEvents: number;
+  itemsAdded: number;
+  orders: number;
+  orderedPieces: number;
+}
+
+function emptySeriesPoint(key: string, label: string): TrafficSeriesPoint {
+  return {
+    key,
+    label,
+    uniqueVisitors: 0,
+    visits: 0,
+    addToCartVisitors: 0,
+    addToCartEvents: 0,
+    itemsAdded: 0,
+    orders: 0,
+    orderedPieces: 0,
+  };
+}
+
 export function buildTrafficSeries(
-  dailyRows: Array<{ day: string; visits: number; addEvents: number; itemsAdded: number; orders: number }>,
+  rows: Array<Omit<TrafficSeriesPoint, "label">>,
   start: string,
   end: string,
-  group: TrafficGroup,
-): Array<{ key: string; label: string; visits: number; addToCartEvents: number; itemsAdded: number; orders: number }> {
-  const byDay = new Map(dailyRows.map((row) => [row.day, row]));
-  const buckets = new Map<string, { key: string; label: string; visits: number; addToCartEvents: number; itemsAdded: number; orders: number }>();
+  group: Exclude<TrafficGroup, "hourly">,
+): TrafficSeriesPoint[] {
+  const buckets = new Map<string, TrafficSeriesPoint>();
   const startTime = utcDate(start).getTime();
   let day = start;
   let guard = 0;
   while (day <= end && guard < 3660) {
-    const row = byDay.get(day) || { day, visits: 0, addEvents: 0, itemsAdded: 0, orders: 0 };
     let key = day;
     let label = formatDay(day);
     if (group === "weekly") {
@@ -143,22 +159,15 @@ export function buildTrafficSeries(
       key = yearKey(day);
       label = key;
     }
-    const current = buckets.get(key) || {
-      key,
-      label,
-      visits: 0,
-      addToCartEvents: 0,
-      itemsAdded: 0,
-      orders: 0,
-    };
-    current.visits += row.visits;
-    current.addToCartEvents += row.addEvents;
-    current.itemsAdded += row.itemsAdded;
-    current.orders += row.orders;
-    buckets.set(key, current);
+    if (!buckets.has(key)) buckets.set(key, emptySeriesPoint(key, label));
     day = addDays(day, 1);
     guard += 1;
   }
+  rows.forEach((row) => {
+    const current = buckets.get(row.key);
+    if (!current) return;
+    Object.assign(current, row);
+  });
   return [...buckets.values()];
 }
 
@@ -171,41 +180,36 @@ export function buildHourlyTrafficSeries(
     addEvents: number;
     itemsAdded: number;
     orders: number;
+    orderedPieces: number;
   }>,
-): Array<{
-  key: string;
-  label: string;
-  uniqueVisitors: number;
-  visits: number;
-  addToCartVisitors: number;
-  addToCartEvents: number;
-  itemsAdded: number;
-  orders: number;
-}> {
+): TrafficSeriesPoint[] {
   const byHour = new Map(rows.map((row) => [row.hour, row]));
   return Array.from({ length: 24 }, (_, hour) => {
-    const row = byHour.get(hour) || {
-      hour,
-      uniqueVisitors: 0,
-      visits: 0,
-      addToCartVisitors: 0,
-      addEvents: 0,
-      itemsAdded: 0,
-      orders: 0,
-    };
+    const row = byHour.get(hour);
     const suffix = hour < 12 ? "AM" : "PM";
     const displayHour = hour % 12 || 12;
     return {
       key: `hour-${String(hour).padStart(2, "0")}`,
       label: `${displayHour} ${suffix}`,
-      uniqueVisitors: row.uniqueVisitors,
-      visits: row.visits,
-      addToCartVisitors: row.addToCartVisitors,
-      addToCartEvents: row.addEvents,
-      itemsAdded: row.itemsAdded,
-      orders: row.orders,
+      uniqueVisitors: row?.uniqueVisitors || 0,
+      visits: row?.visits || 0,
+      addToCartVisitors: row?.addToCartVisitors || 0,
+      addToCartEvents: row?.addEvents || 0,
+      itemsAdded: row?.itemsAdded || 0,
+      orders: row?.orders || 0,
+      orderedPieces: row?.orderedPieces || 0,
     };
   });
+}
+
+function bucketExpression(group: Exclude<TrafficGroup, "hourly">, column: string): string {
+  const local = `(${column} AT TIME ZONE 'Africa/Cairo')`;
+  if (group === "daily") return `to_char(${local}::date, 'YYYY-MM-DD')`;
+  if (group === "weekly") {
+    return `'week-' || (floor(((${local}::date - $1::date) / 7.0))::int + 1)::text`;
+  }
+  if (group === "monthly") return `to_char(${local}, 'YYYY-MM')`;
+  return `to_char(${local}, 'YYYY')`;
 }
 
 export class TrafficAnalyticsService {
@@ -325,60 +329,120 @@ export class TrafficAnalyticsService {
     try {
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       const params = [start, end];
-      const periodWhere = `occurred_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
-        AND occurred_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')`;
+      const eventPeriodWhere = `event.occurred_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
+        AND event.occurred_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')`;
+      const orderPeriodWhere = `orders.created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
+        AND orders.created_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')`;
 
       const totalsResult = await client.query<TotalsRow>(
         `SELECT
-           count(DISTINCT COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)) FILTER (WHERE event_type='visit')::text AS unique_visitors,
-           count(*) FILTER (WHERE event_type='visit')::text AS visits,
-           count(DISTINCT COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)) FILTER (WHERE event_type='add_to_cart')::text AS add_to_cart_visitors,
-           count(*) FILTER (WHERE event_type='add_to_cart')::text AS add_events,
-           COALESCE(sum(quantity) FILTER (WHERE event_type='add_to_cart'),0)::text AS items_added,
-           count(DISTINCT COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)) FILTER (WHERE event_type='order_completed')::text AS order_visitors,
-           count(*) FILTER (WHERE event_type='order_completed')::text AS orders
-         FROM traffic_analytics_events
-         WHERE ${periodWhere}`,
+           count(DISTINCT COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)) FILTER (WHERE event.event_type='visit')::text AS unique_visitors,
+           count(*) FILTER (WHERE event.event_type='visit')::text AS visits,
+           count(DISTINCT COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)) FILTER (WHERE event.event_type='add_to_cart')::text AS add_to_cart_visitors,
+           count(*) FILTER (WHERE event.event_type='add_to_cart')::text AS add_events,
+           COALESCE(sum(event.quantity) FILTER (WHERE event.event_type='add_to_cart'),0)::text AS items_added
+         FROM traffic_analytics_events event
+         WHERE ${eventPeriodWhere}`,
         params,
       );
 
-      const dailyResult = group === "hourly"
-        ? { rows: [] as DailyRow[] }
-        : await client.query<DailyRow>(
-          `SELECT (occurred_at AT TIME ZONE 'Africa/Cairo')::date AS day,
-             count(*) FILTER (WHERE event_type='visit')::text AS visits,
-             count(*) FILTER (WHERE event_type='add_to_cart')::text AS add_events,
-             COALESCE(sum(quantity) FILTER (WHERE event_type='add_to_cart'),0)::text AS items_added,
-             count(*) FILTER (WHERE event_type='order_completed')::text AS orders
-           FROM traffic_analytics_events
-           WHERE ${periodWhere}
-           GROUP BY 1
-           ORDER BY 1`,
+      const orderTotalsResult = await client.query<OrderTotalsRow>(
+        `SELECT
+           count(DISTINCT orders.customer_user_id)::text AS order_visitors,
+           count(DISTINCT orders.id)::text AS orders,
+           count(order_items.id)::text AS ordered_pieces
+         FROM orders
+         LEFT JOIN order_items ON order_items.order_id=orders.id
+         WHERE NOT orders.is_deleted
+           AND orders.order_source='Website'
+           AND ${orderPeriodWhere}`,
+        params,
+      );
+
+      let groupedRows: GroupedRow[] = [];
+      if (group === "hourly") {
+        const groupedResult = await client.query<GroupedRow>(
+          `WITH event_stats AS (
+             SELECT EXTRACT(HOUR FROM event.occurred_at AT TIME ZONE 'Africa/Cairo')::int::text AS bucket_key,
+               count(DISTINCT COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)) FILTER (WHERE event.event_type='visit')::text AS unique_visitors,
+               count(*) FILTER (WHERE event.event_type='visit')::text AS visits,
+               count(DISTINCT COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)) FILTER (WHERE event.event_type='add_to_cart')::text AS add_to_cart_visitors,
+               count(*) FILTER (WHERE event.event_type='add_to_cart')::text AS add_events,
+               COALESCE(sum(event.quantity) FILTER (WHERE event.event_type='add_to_cart'),0)::text AS items_added
+             FROM traffic_analytics_events event
+             WHERE ${eventPeriodWhere}
+             GROUP BY 1
+           ), order_stats AS (
+             SELECT EXTRACT(HOUR FROM orders.created_at AT TIME ZONE 'Africa/Cairo')::int::text AS bucket_key,
+               count(DISTINCT orders.id)::text AS orders,
+               count(order_items.id)::text AS ordered_pieces
+             FROM orders
+             LEFT JOIN order_items ON order_items.order_id=orders.id
+             WHERE NOT orders.is_deleted
+               AND orders.order_source='Website'
+               AND ${orderPeriodWhere}
+             GROUP BY 1
+           )
+           SELECT COALESCE(event_stats.bucket_key, order_stats.bucket_key) AS bucket_key,
+             COALESCE(event_stats.unique_visitors,'0') AS unique_visitors,
+             COALESCE(event_stats.visits,'0') AS visits,
+             COALESCE(event_stats.add_to_cart_visitors,'0') AS add_to_cart_visitors,
+             COALESCE(event_stats.add_events,'0') AS add_events,
+             COALESCE(event_stats.items_added,'0') AS items_added,
+             COALESCE(order_stats.orders,'0') AS orders,
+             COALESCE(order_stats.ordered_pieces,'0') AS ordered_pieces
+           FROM event_stats
+           FULL OUTER JOIN order_stats USING (bucket_key)
+           ORDER BY COALESCE(event_stats.bucket_key, order_stats.bucket_key)::int`,
           params,
         );
-
-      const hourlyResult = group === "hourly"
-        ? await client.query<HourlyRow>(
-          `SELECT EXTRACT(HOUR FROM occurred_at AT TIME ZONE 'Africa/Cairo')::int AS hour_of_day,
-             count(DISTINCT COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)) FILTER (WHERE event_type='visit')::text AS unique_visitors,
-             count(*) FILTER (WHERE event_type='visit')::text AS visits,
-             count(DISTINCT COALESCE(customer_user_id::text, 'guest:' || visitor_id::text)) FILTER (WHERE event_type='add_to_cart')::text AS add_to_cart_visitors,
-             count(*) FILTER (WHERE event_type='add_to_cart')::text AS add_events,
-             COALESCE(sum(quantity) FILTER (WHERE event_type='add_to_cart'),0)::text AS items_added,
-             count(*) FILTER (WHERE event_type='order_completed')::text AS orders
-           FROM traffic_analytics_events
-           WHERE ${periodWhere}
-           GROUP BY 1
-           ORDER BY 1`,
+        groupedRows = groupedResult.rows;
+      } else {
+        const eventBucket = bucketExpression(group, "event.occurred_at");
+        const orderBucket = bucketExpression(group, "orders.created_at");
+        const groupedResult = await client.query<GroupedRow>(
+          `WITH event_stats AS (
+             SELECT ${eventBucket} AS bucket_key,
+               count(DISTINCT COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)) FILTER (WHERE event.event_type='visit')::text AS unique_visitors,
+               count(*) FILTER (WHERE event.event_type='visit')::text AS visits,
+               count(DISTINCT COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)) FILTER (WHERE event.event_type='add_to_cart')::text AS add_to_cart_visitors,
+               count(*) FILTER (WHERE event.event_type='add_to_cart')::text AS add_events,
+               COALESCE(sum(event.quantity) FILTER (WHERE event.event_type='add_to_cart'),0)::text AS items_added
+             FROM traffic_analytics_events event
+             WHERE ${eventPeriodWhere}
+             GROUP BY 1
+           ), order_stats AS (
+             SELECT ${orderBucket} AS bucket_key,
+               count(DISTINCT orders.id)::text AS orders,
+               count(order_items.id)::text AS ordered_pieces
+             FROM orders
+             LEFT JOIN order_items ON order_items.order_id=orders.id
+             WHERE NOT orders.is_deleted
+               AND orders.order_source='Website'
+               AND ${orderPeriodWhere}
+             GROUP BY 1
+           )
+           SELECT COALESCE(event_stats.bucket_key, order_stats.bucket_key) AS bucket_key,
+             COALESCE(event_stats.unique_visitors,'0') AS unique_visitors,
+             COALESCE(event_stats.visits,'0') AS visits,
+             COALESCE(event_stats.add_to_cart_visitors,'0') AS add_to_cart_visitors,
+             COALESCE(event_stats.add_events,'0') AS add_events,
+             COALESCE(event_stats.items_added,'0') AS items_added,
+             COALESCE(order_stats.orders,'0') AS orders,
+             COALESCE(order_stats.ordered_pieces,'0') AS ordered_pieces
+           FROM event_stats
+           FULL OUTER JOIN order_stats USING (bucket_key)
+           ORDER BY COALESCE(event_stats.bucket_key, order_stats.bucket_key)`,
           params,
-        )
-        : { rows: [] as HourlyRow[] };
+        );
+        groupedRows = groupedResult.rows;
+      }
 
       const visitorsResult = await client.query<VisitorRow>(
         `WITH period_events AS (
-           SELECT *, COALESCE(customer_user_id::text, 'guest:' || visitor_id::text) AS identity_key
-           FROM traffic_analytics_events
-           WHERE ${periodWhere}
+           SELECT event.*, COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text) AS identity_key
+           FROM traffic_analytics_events event
+           WHERE ${eventPeriodWhere}
          ), visitor_stats AS (
            SELECT identity_key,
              min(visitor_id::text) AS visitor_id,
@@ -386,20 +450,25 @@ export class TrafficAnalyticsService {
              count(*) FILTER (WHERE event_type='visit')::text AS visits,
              count(*) FILTER (WHERE event_type='add_to_cart')::text AS add_events,
              COALESCE(sum(quantity) FILTER (WHERE event_type='add_to_cart'),0)::text AS items_added,
-             count(*) FILTER (WHERE event_type='order_completed')::text AS orders,
              min(occurred_at) FILTER (WHERE event_type='visit') AS first_visit,
              max(occurred_at) FILTER (WHERE event_type='visit') AS last_visit
            FROM period_events
            GROUP BY identity_key
+         ), order_stats AS (
+           SELECT orders.customer_user_id::text AS customer_user_id, count(*)::text AS orders
+           FROM orders
+           WHERE orders.customer_user_id IS NOT NULL
+             AND NOT orders.is_deleted
+             AND orders.order_source='Website'
+             AND ${orderPeriodWhere}
+           GROUP BY orders.customer_user_id
          )
-         SELECT stats.visitor_id,
-           stats.customer_user_id,
-           customers.full_name,
-           customers.client_code,
-           stats.visits, stats.add_events, stats.items_added, stats.orders,
+         SELECT stats.visitor_id, stats.customer_user_id, customers.full_name, customers.client_code,
+           stats.visits, stats.add_events, stats.items_added, COALESCE(order_stats.orders,'0') AS orders,
            stats.first_visit, stats.last_visit
          FROM visitor_stats stats
          LEFT JOIN customers ON customers.user_id=stats.customer_user_id::uuid
+         LEFT JOIN order_stats ON order_stats.customer_user_id=stats.customer_user_id
          ORDER BY stats.visits::bigint DESC, stats.add_events::bigint DESC, stats.last_visit DESC NULLS LAST
          LIMIT 250`,
         params,
@@ -407,28 +476,35 @@ export class TrafficAnalyticsService {
 
       await client.query("COMMIT");
       const totals = totalsResult.rows[0] || {
-        unique_visitors: "0", visits: "0", add_to_cart_visitors: "0",
-        add_events: "0", items_added: "0", order_visitors: "0", orders: "0",
+        unique_visitors: "0", visits: "0", add_to_cart_visitors: "0", add_events: "0", items_added: "0",
       };
+      const orderTotals = orderTotalsResult.rows[0] || { order_visitors: "0", orders: "0", ordered_pieces: "0" };
       const uniqueVisitors = count(totals.unique_visitors);
       const addToCartVisitors = count(totals.add_to_cart_visitors);
-      const orderVisitors = count(totals.order_visitors);
-      const daily = dailyResult.rows.map((row) => ({
-        day: dateOnly(row.day),
-        visits: count(row.visits),
-        addEvents: count(row.add_events),
-        itemsAdded: count(row.items_added),
-        orders: count(row.orders),
-      }));
-      const hourly = hourlyResult.rows.map((row) => ({
-        hour: count(row.hour_of_day),
+      const orderVisitors = count(orderTotals.order_visitors);
+      const normalizedRows = groupedRows.map((row) => ({
+        key: String(row.bucket_key),
         uniqueVisitors: count(row.unique_visitors),
         visits: count(row.visits),
         addToCartVisitors: count(row.add_to_cart_visitors),
-        addEvents: count(row.add_events),
+        addToCartEvents: count(row.add_events),
         itemsAdded: count(row.items_added),
         orders: count(row.orders),
+        orderedPieces: count(row.ordered_pieces),
       }));
+      const series = group === "hourly"
+        ? buildHourlyTrafficSeries(normalizedRows.map((row) => ({
+          hour: count(row.key),
+          uniqueVisitors: row.uniqueVisitors,
+          visits: row.visits,
+          addToCartVisitors: row.addToCartVisitors,
+          addEvents: row.addToCartEvents,
+          itemsAdded: row.itemsAdded,
+          orders: row.orders,
+          orderedPieces: row.orderedPieces,
+        })))
+        : buildTrafficSeries(normalizedRows, start, end, group);
+
       return {
         start,
         end,
@@ -439,13 +515,13 @@ export class TrafficAnalyticsService {
           addToCartVisitors,
           addToCartEvents: count(totals.add_events),
           itemsAdded: count(totals.items_added),
-          completedOrders: count(totals.orders),
+          completedOrders: count(orderTotals.orders),
+          ordersPlaced: count(orderTotals.orders),
+          orderedPieces: count(orderTotals.ordered_pieces),
           addToCartRate: percent(addToCartVisitors, uniqueVisitors),
           conversionRate: percent(orderVisitors, uniqueVisitors),
         },
-        series: group === "hourly"
-          ? buildHourlyTrafficSeries(hourly)
-          : buildTrafficSeries(daily, start, end, group),
+        series,
         visitors: visitorsResult.rows.map((row) => ({
           visitorId: row.visitor_id,
           customerUserId: row.customer_user_id,
@@ -468,4 +544,5 @@ export class TrafficAnalyticsService {
       client.release();
     }
   }
+
 }
