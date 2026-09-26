@@ -83,6 +83,9 @@ assert(liveOperationsSource.includes('function selectRepresentative(id, focus = 
 assert(liveOperationsSource.includes('representativeFilterId = "";'), 'normal representative focus must clear stale filters so all couriers remain visible');
 assert(liveOperationsSource.includes('selectRepresentative(representativeFilterId, true, true)'), 'only the explicit representative dropdown may preserve map filtering');
 assert(liveOperationsSource.includes('zoomControl: false'), 'Live Operations map must disable Leaflet zoom controls at construction time');
+assert(liveOperationsSource.includes('upcoming: \"#2563eb\"'), 'Live Operations upcoming road route must be blue');
+assert(liveOperationsSource.includes('orderPin: \"#2563eb\"'), 'Live Operations order pins must be blue');
+assert(!liveOperationsSource.includes('filter:grayscale(1)'), 'Live Operations map must keep normal colored road tiles');
 assert(liveOperationsSource.includes('setPrefix(false)'), 'Live Operations must remove Leaflet framework branding while keeping provider attribution');
 assert(mainCss.includes('.order-tracking-list .tracking-card { width:min(760px,100%); color:#000; }'), 'tracking cards must force readable black text');
 assert(mainCss.includes('.dart-tracked-order-unit { display:grid; gap:7px; padding:4px 0; background:transparent; }'), 'grouped tracked-order units must override the global section background');
@@ -109,4 +112,19 @@ assert(trackingSource.includes('Waiting for representative location'), 'a starte
 assert(trackingSource.includes('record.status === \"Representative On The Way\"'), 'authoritative delivery status must activate live tracking even when a legacy start timestamp is absent');
 assert(liveOperationsSource.includes('renderRepresentativeList();\n    renderMarkers();'), 'clearing an order-focus filter must repaint all representative markers immediately');
 assert(!mainCss.includes('.leaflet-control-attribution {\n    display: none !important;'), 'required tile-provider attribution must not be globally hidden');
+
+const repMapSource = fs.readFileSync('Js/dart-rep.js', 'utf8');
+const addressMapSource = fs.readFileSync('Js/dart-address.js', 'utf8');
+const checkoutMapSource = fs.readFileSync('Js/dart-ui.js', 'utf8');
+for (const [label, mapSource] of [
+  ['representative', repMapSource],
+  ['address', addressMapSource],
+  ['checkout', checkoutMapSource],
+]) {
+  assert(mapSource.includes('zoomControl: false'), `${label} map must not expose Leaflet zoom controls`);
+  assert(mapSource.includes('tile.openstreetmap.org/{z}/{x}/{y}.png'), `${label} map must use the normal OpenStreetMap road layer`);
+  assert(!mapSource.includes('basemaps.cartocdn.com/light_all'), `${label} map must not use the washed-out CARTO light layer`);
+  assert(!/api[ _-]?key/i.test(mapSource), `${label} map UI must not expose API-key wording`);
+}
+
 console.log('PASS tracking order-resolution unit tests');

@@ -110,8 +110,8 @@ describe("live operations contracts", () => {
     expect(dashboardHtml).toContain('data-live-layer="orders"');
     expect(dashboardLiveMap).toContain("for (const order of rep.orders || [])");
     expect(dashboardLiveMap).toContain("if (order.assigned !== false || order.representativeId) continue;");
-    expect(dashboardLiveMap).toContain("COLORS.unassigned");
-    expect(dashboardLiveMap).toContain('state === "delivered" ? COLORS.delivered');
+    expect(dashboardLiveMap).toContain("COLORS.orderPin");
+    expect(dashboardLiveMap).toContain("const color = COLORS.orderPin");
     expect(dashboardLiveMap).toContain("Assigned Rep:");
     expect(service).toContain(".filter((order) => !order.representative_user_id)");
     expect(service).toContain("orders: Record<string, unknown>[];");
@@ -179,8 +179,9 @@ describe("live operations contracts", () => {
     expect(service).toContain("status NOT IN ('Delivered','Cancelled','Refused','Returned')");
     expect(dashboardLiveMap).toContain("activeRouteOrders(rep)");
     expect(dashboardLiveCss).toContain("overflow-x:hidden");
-    expect(dashboardLiveMap).toContain('upcoming: "#6b7280"');
-    expect(dashboardLiveMap).toContain('unassigned: "#d1d5db"');
+    expect(dashboardLiveMap).toContain('upcoming: "#2563eb"');
+    expect(dashboardLiveMap).toContain('orderPin: "#2563eb"');
+    expect(dashboardLiveMap).toContain('const color = COLORS.orderPin');
     expect(dashboardLiveMap).toContain('targetStop?.routeState === "current" ? COLORS.current : COLORS.upcoming');
     expect(dashboardLiveMap).toContain("Route Provider Unavailable · live stops are still visible");
   });

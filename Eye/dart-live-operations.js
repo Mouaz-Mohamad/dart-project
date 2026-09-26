@@ -10,8 +10,9 @@
   const ROUTE_REFRESH_MS = 6000;
   const COLORS = Object.freeze({
     current: "#AB012B",
-    upcoming: "#6b7280",
-    unassigned: "#d1d5db",
+    upcoming: "#2563eb",
+    orderPin: "#2563eb",
+    unassigned: "#2563eb",
     delivered: "#16a34a",
     waiting: "#9ca3af",
     problem: "#dc2626",
@@ -185,9 +186,9 @@
   function orderIcon(order) {
     const state = String(order.routeState || "upcoming");
     const isUnassigned = order.assigned === false || !order.representativeId;
-    const color = state === "delivered" ? COLORS.delivered : isUnassigned ? COLORS.unassigned : (COLORS[state] || COLORS.upcoming);
-    const icon = isUnassigned && state !== "delivered" ? "fa-location-dot" : stateIcon(state);
-    const foreground = isUnassigned && state !== "delivered" ? "#111111" : "#ffffff";
+    const color = COLORS.orderPin;
+    const icon = isUnassigned ? "fa-location-dot" : stateIcon(state);
+    const foreground = "#ffffff";
     return window.L.divIcon({
       className: "",
       html: `<div class="dart-live-marker" style="background:${color};color:${foreground}" aria-label="${esc(order.orderId)} ${esc(isUnassigned ? "Unassigned" : stateLabel(state))}"><i class="fa-solid ${icon}"></i></div>`,
