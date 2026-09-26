@@ -1,5 +1,16 @@
 # Dart Project changelog
 
+## Finance correctness and permission hardening — 2026-09-26
+
+- Fixed cross-period refunds so completed Good returns reverse their immutable COGS in the actual return period, including negative net COGS and net units when appropriate.
+- Separated accrual P&L Total Cost from Owner Total Cost / Inventory Investment to remove ambiguous finance reporting.
+- Moved financial chart buckets, goal actuals and P&L/Cash Flow exports onto server-authoritative Finance summaries.
+- Added explicit Inventory Acquisition cash-out tracking without double-counting the item snapshot in operating P&L or Owner Total Cost.
+- Added server-side Finance domain validation for expenses, budgets, invoices, goals, marketing records and COD settlements.
+- Added granular Finance view/manage/export permissions with section-scoped API responses that do not expose unrelated financial fields.
+- Added regression coverage for return-only periods, inventory acquisition cash flow, validation and permission redaction.
+- This is a CI-only Finance batch; no production deploy marker is included.
+
 ## COD Risk & Verification — 2026-09-23
 
 - Added server-authoritative Low / Medium / High / Restricted COD risk evaluation using first-order, verified-phone, refusal-history, rapid-repeat and order-value signals.
