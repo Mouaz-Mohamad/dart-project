@@ -432,11 +432,11 @@
     }).setView([destination.lat, destination.lng], 15);
     map.attributionControl?.setPrefix(false);
     const tileLayer = L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
       {
         maxZoom: 19,
-        subdomains: "abc",
-        attribution: "&copy; OpenStreetMap contributors",
+        subdomains: "abcd",
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         updateWhenIdle: false,
         keepBuffer: 4,
       },

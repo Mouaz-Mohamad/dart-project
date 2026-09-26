@@ -122,8 +122,9 @@ for (const [label, mapSource] of [
   ['checkout', checkoutMapSource],
 ]) {
   assert(mapSource.includes('zoomControl: false'), `${label} map must not expose Leaflet zoom controls`);
-  assert(mapSource.includes('tile.openstreetmap.org/{z}/{x}/{y}.png'), `${label} map must use the normal OpenStreetMap road layer`);
+  assert(mapSource.includes('basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'), `${label} map must use the calm CARTO Voyager road layer`);
   assert(!mapSource.includes('basemaps.cartocdn.com/light_all'), `${label} map must not use the washed-out CARTO light layer`);
+  assert(!/api[ _-]?key/i.test(mapSource), `${label} map must not expose API-key wording`);
   assert(!/api[ _-]?key/i.test(mapSource), `${label} map UI must not expose API-key wording`);
 }
 

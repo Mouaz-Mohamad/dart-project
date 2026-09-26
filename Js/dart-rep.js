@@ -681,9 +681,9 @@
         zoomControl: false,
       }).setView([destinationLat, destinationLng], 15);
       map.attributionControl?.setPrefix(false);
-      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      window.L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors",
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
       }).addTo(map);
       const destinationMarker = window.L.marker([destinationLat, destinationLng])
         .addTo(map)

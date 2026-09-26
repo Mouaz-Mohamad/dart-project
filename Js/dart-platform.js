@@ -3738,8 +3738,8 @@
           attributionControl: true,
         }).setView([lat, lng], 13);
         window.trackingMap.attributionControl?.setPrefix(false);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors",
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         }).addTo(window.trackingMap);
         L.marker([lat, lng]).addTo(window.trackingMap);
       } catch (error) {
