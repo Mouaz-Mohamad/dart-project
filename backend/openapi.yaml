@@ -341,6 +341,48 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /admin/live-operations:
+    get:
+      tags: [Orders]
+      summary: Read active representatives, assigned delivery stops, and unassigned map orders.
+      operationId: getAdminLiveOperations
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Live operations snapshot }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/live-operations/route:
+    post:
+      tags: [Orders]
+      summary: Resolve a real road-following route through the server-side routing provider adapter.
+      operationId: getAdminLiveRoadRoute
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [points]
+              properties:
+                points:
+                  type: array
+                  minItems: 2
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [latitude, longitude]
+                    properties:
+                      latitude: { type: number, minimum: -90, maximum: 90 }
+                      longitude: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        "200": { description: Road geometry split into consecutive route segments }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { description: Route provider unavailable }
+
   /analytics/events:
     post:
       tags: [Analytics]

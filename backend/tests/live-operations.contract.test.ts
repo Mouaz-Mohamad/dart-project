@@ -26,6 +26,10 @@ const dashboardHtml = readFileSync(
   new URL("../../Eye/Dart Eye.html", import.meta.url),
   "utf8",
 );
+const roadRoutingProvider = readFileSync(
+  new URL("../src/modules/commerce/road-routing-provider.ts", import.meta.url),
+  "utf8",
+);
 
 describe("live operations contracts", () => {
   it("enforces one current delivery stop per representative", () => {
@@ -80,31 +84,37 @@ describe("live operations contracts", () => {
     expect(dashboardLiveMap).toContain('api("/api/v1/admin/live-operations")');
   });
 
-  it("keeps the live panel closed across polling and renders a real connected road route", () => {
+  it("keeps the live panel closed across polling and resolves real road routes through the backend adapter", () => {
     expect(dashboardLiveMap).toContain("let panelOpen = false");
     expect(dashboardLiveMap).toContain("if (panelOpen && selectedOrderId)");
-    expect(dashboardLiveMap).toContain("overview=full&geometries=geojson");
-    expect(dashboardLiveMap).toContain("window.L.polyline(geometry");
+    expect(dashboardLiveMap).toContain('api("/api/v1/admin/live-operations/route"');
+    expect(dashboardLiveMap).not.toContain("router.project-osrm.org");
+    expect(routes).toContain('"/admin/live-operations/route"');
+    expect(roadRoutingProvider).toContain("/route/v1/driving/");
+    expect(roadRoutingProvider).toContain('url.searchParams.set("steps", "true")');
   });
 
-  it("builds adaptive routes from the current stop and live representative location", () => {
+  it("builds adaptive routes from every assigned active stop regardless of UI visibility filters", () => {
     expect(service).toContain("adaptiveSuggestedStopOrder");
     expect(service).toContain('stop.routeState === "current"');
     expect(dashboardLiveMap).toContain("adaptiveRouteStops(rep)");
     expect(dashboardLiveMap).toContain("plannedStops(orderCoordinates(current), remaining)");
+    const adaptiveStart = dashboardLiveMap.indexOf("function adaptiveRouteStops(rep)");
+    const adaptiveEnd = dashboardLiveMap.indexOf("function routeCoordinates", adaptiveStart);
+    expect(dashboardLiveMap.slice(adaptiveStart, adaptiveEnd)).not.toContain("filterEnabled");
     expect(dashboardLiveMap).toContain("cached?.signature === signature");
-    expect(dashboardLiveMap).not.toContain("window.L.polyline(coordinates");
   });
 
-  it("exposes independent Reps and Orders layers with unassigned and delivered order pins", () => {
+  it("makes Reps own assigned order pins while Orders contains only unassigned pins", () => {
     expect(dashboardHtml).toContain('data-live-layer="reps"');
     expect(dashboardHtml).toContain('data-live-layer="orders"');
-    expect(dashboardLiveMap).toContain("snapshot.orders || []");
-    expect(dashboardLiveMap).toContain('isUnassigned ? "#111111"');
+    expect(dashboardLiveMap).toContain("for (const order of rep.orders || [])");
+    expect(dashboardLiveMap).toContain("if (order.assigned !== false || order.representativeId) continue;");
+    expect(dashboardLiveMap).toContain("COLORS.unassigned");
     expect(dashboardLiveMap).toContain('state === "delivered" ? COLORS.delivered');
     expect(dashboardLiveMap).toContain("Assigned Rep:");
+    expect(service).toContain(".filter((order) => !order.representative_user_id)");
     expect(service).toContain("orders: Record<string, unknown>[];");
-    expect(service).toContain("o.status NOT IN ('Refused','Cancelled','Returned')");
   });
 
   it("honors saved route order without overriding the current delivery", () => {
@@ -115,12 +125,16 @@ describe("live operations contracts", () => {
     expect(dashboardLiveMap).toContain("return [current, ...plannedStops(orderCoordinates(current), remaining)]");
   });
 
-  it("refreshes order-pin assignment handlers and filters fit bounds consistently", () => {
+  it("keeps display filters separate from route calculation and protects layer ownership", () => {
     expect(dashboardLiveMap).toContain("marker.__dartOrderClickHandler");
     expect(dashboardLiveMap).toContain('marker.off("click", marker.__dartOrderClickHandler)');
     const boundsStart = dashboardLiveMap.indexOf("function allBoundsPoints()");
     const boundsEnd = dashboardLiveMap.indexOf("function fitMap", boundsStart);
-    expect(dashboardLiveMap.slice(boundsStart, boundsEnd)).toContain("if (!filterEnabled(order.routeState)) continue;");
+    const boundsBlock = dashboardLiveMap.slice(boundsStart, boundsEnd);
+    expect(boundsBlock).toContain("if (!filterEnabled(order.routeState)) continue;");
+    expect(boundsBlock).toContain("if (order.assigned !== false || order.representativeId) continue;");
+    expect(dashboardLiveMap).toContain('if (layerEnabled("reps"))');
+    expect(dashboardLiveMap).toContain('if (layerEnabled("orders"))');
   });
 
   it("counts map-eligible orders even when a pin has no coordinates", () => {
@@ -133,8 +147,10 @@ describe("live operations contracts", () => {
     expect(service).toContain("status NOT IN ('Delivered','Cancelled','Refused','Returned')");
     expect(dashboardLiveMap).toContain("activeRouteOrders(rep)");
     expect(dashboardLiveCss).toContain("overflow-x:hidden");
-    expect(dashboardLiveCss).toContain("color:#AB012B!important");
-    expect(dashboardLiveCss).toContain("color:#111!important");
+    expect(dashboardLiveMap).toContain('upcoming: "#6b7280"');
+    expect(dashboardLiveMap).toContain('unassigned: "#d1d5db"');
+    expect(dashboardLiveMap).toContain('targetStop?.routeState === "current" ? COLORS.current : COLORS.upcoming');
+    expect(dashboardLiveMap).toContain("Route Provider Unavailable · live stops are still visible");
   });
 
 });

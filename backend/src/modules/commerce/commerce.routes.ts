@@ -17,6 +17,7 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CommerceService } from "./commerce.service.js";
+import { fetchRoadRoute } from "./road-routing-provider.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
 const reservationId = z.string().trim().min(16).max(160).regex(/^[A-Za-z0-9_-]+$/);
@@ -45,6 +46,13 @@ const reserveSchema = z.object({
 const adminOrderStateSchema = z.object({
   expectedVersion: z.number().int().positive(),
   orders: z.array(z.record(z.string(), z.unknown())).max(10000),
+});
+
+const liveRoadRouteSchema = z.object({
+  points: z.array(z.object({
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180),
+  })).min(2).max(100),
 });
 
 const savedAddressSchema = z.object({
@@ -552,6 +560,30 @@ export function createCommerceRouter(
     async (_request, response) => {
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json(await commerce.adminLiveOperations());
+    },
+  );
+
+  router.post(
+    "/admin/live-operations/route",
+    rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requireAnyPermission("live_map.read", "orders.read"),
+    async (request, response) => {
+      const body = liveRoadRouteSchema.parse(request.body);
+      try {
+        response.setHeader("Cache-Control", "private, max-age=5");
+        response.status(200).json(await fetchRoadRoute(body.points));
+      } catch {
+        response.status(503).json({
+          error: {
+            code: "ROUTING_PROVIDER_UNAVAILABLE",
+            message: "Route Provider Unavailable",
+          },
+        });
+      }
     },
   );
 

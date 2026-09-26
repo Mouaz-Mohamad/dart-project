@@ -10,12 +10,13 @@
   const ROUTE_REFRESH_MS = 6000;
   const COLORS = Object.freeze({
     current: "#AB012B",
-    upcoming: "#2563eb",
+    upcoming: "#6b7280",
+    unassigned: "#d1d5db",
     delivered: "#16a34a",
-    waiting: "#eab308",
-    problem: "#ea580c",
-    cancelled: "#ea580c",
-    refused: "#ea580c",
+    waiting: "#9ca3af",
+    problem: "#dc2626",
+    cancelled: "#dc2626",
+    refused: "#dc2626",
   });
   const ROUTABLE_STATES = new Set(["current", "upcoming", "waiting", "problem"]);
   const FILTER_GROUP = Object.freeze({
@@ -62,6 +63,7 @@
   let routeLayers = new Map();
   let routeFetchState = new Map();
   let routeRenderVersion = 0;
+  let routeProviderUnavailable = false;
 
   function api(path, options) {
     if (!window.DartAdminApi?.request) {
@@ -136,6 +138,10 @@
     nodes.statusText.textContent = text;
   }
 
+  function liveConnectionText() {
+    return `Live · every 3s · ${new Date(snapshot.capturedAt || Date.now()).toLocaleTimeString()}`;
+  }
+
   function setState(name) {
     if (nodes.loading) nodes.loading.hidden = name !== "loading";
     if (nodes.empty) nodes.empty.hidden = name !== "empty";
@@ -176,11 +182,12 @@
   function orderIcon(order) {
     const state = String(order.routeState || "upcoming");
     const isUnassigned = order.assigned === false || !order.representativeId;
-    const color = state === "delivered" ? COLORS.delivered : isUnassigned ? "#111111" : (COLORS[state] || COLORS.upcoming);
+    const color = state === "delivered" ? COLORS.delivered : isUnassigned ? COLORS.unassigned : (COLORS[state] || COLORS.upcoming);
     const icon = isUnassigned && state !== "delivered" ? "fa-location-dot" : stateIcon(state);
+    const foreground = isUnassigned && state !== "delivered" ? "#111111" : "#ffffff";
     return window.L.divIcon({
       className: "",
-      html: `<div class="dart-live-marker" style="background:${color}" aria-label="${esc(order.orderId)} ${esc(isUnassigned ? "Unassigned" : stateLabel(state))}"><i class="fa-solid ${icon}"></i></div>`,
+      html: `<div class="dart-live-marker" style="background:${color};color:${foreground}" aria-label="${esc(order.orderId)} ${esc(isUnassigned ? "Unassigned" : stateLabel(state))}"><i class="fa-solid ${icon}"></i></div>`,
       iconSize: [36, 36],
       iconAnchor: [9, 31],
     });
@@ -206,7 +213,7 @@
           points.push([Number(rep.location.lat), Number(rep.location.lng)]);
         }
         for (const order of rep.orders || []) {
-          if (!ROUTABLE_STATES.has(String(order.routeState || ""))) continue;
+          if (["refused", "cancelled"].includes(String(order.routeState || ""))) continue;
           if (!filterEnabled(order.routeState)) continue;
           const point = orderCoordinates(order);
           if (point) points.push(point);
@@ -215,6 +222,7 @@
     }
     if (layerEnabled("orders")) {
       for (const order of snapshot.orders || []) {
+        if (order.assigned !== false || order.representativeId) continue;
         if (["refused", "cancelled"].includes(String(order.routeState || ""))) continue;
         if (!filterEnabled(order.routeState)) continue;
         const point = orderCoordinates(order);
@@ -298,7 +306,6 @@
   function adaptiveRouteStops(rep) {
     const stops = (rep.orders || [])
       .filter((order) => ROUTABLE_STATES.has(String(order.routeState || "")))
-      .filter((order) => filterEnabled(order.routeState))
       .filter((order) => orderCoordinates(order));
     const current = stops.find((order) => order.routeState === "current") || null;
     if (current) {
@@ -326,7 +333,9 @@
   }
 
   async function roadRouteGeometry(rep, coordinates) {
-    if (!coordinates || coordinates.length < 2) return null;
+    if (!coordinates || coordinates.length < 2) {
+      return { geometry: null, segments: [], providerUnavailable: false };
+    }
     const signature = coordinates
       .map(([lat, lng]) => `${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`)
       .join(";");
@@ -338,43 +347,45 @@
       .join(";");
     const now = Date.now();
     const cached = routeFetchState.get(rep.id);
-    if (cached?.geometry && cached.destinationSignature === destinationSignature && now - cached.at < ROUTE_REFRESH_MS) {
-      return cached.geometry;
+    if (cached?.route && cached.destinationSignature === destinationSignature && now - cached.at < ROUTE_REFRESH_MS) {
+      return { ...cached.route, providerUnavailable: false };
     }
 
-    let timeout = null;
     try {
-      const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), 8000);
-      const geometry = [];
-      for (let start = 0; start < coordinates.length - 1; start += 19) {
-        const chunk = coordinates.slice(start, Math.min(start + 20, coordinates.length));
-        if (chunk.length < 2) break;
-        const points = chunk.map(([lat, lng]) => `${lng},${lat}`).join(";");
-        const response = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false&continue_straight=true`,
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error("Routing provider unavailable");
-        const payload = await response.json();
-        const segment = Array.isArray(payload.routes?.[0]?.geometry?.coordinates)
-          ? payload.routes[0].geometry.coordinates
-              .map((point) => [Number(point?.[1]), Number(point?.[0])])
-              .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
-          : [];
-        if (segment.length < 2) throw new Error("Routing geometry unavailable");
-        if (geometry.length && segment.length) segment.shift();
-        geometry.push(...segment);
+      const payload = await api("/api/v1/admin/live-operations/route", {
+        method: "POST",
+        body: {
+          points: coordinates.map(([latitude, longitude]) => ({ latitude, longitude })),
+        },
+      });
+      const segments = Array.isArray(payload?.segments)
+        ? payload.segments.map((segment) => ({
+            fromIndex: Number(segment?.fromIndex),
+            toIndex: Number(segment?.toIndex),
+            geometry: Array.isArray(segment?.geometry)
+              ? segment.geometry
+                  .map((point) => [Number(point?.[0]), Number(point?.[1])])
+                  .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+              : [],
+          })).filter((segment) => Number.isInteger(segment.fromIndex) && Number.isInteger(segment.toIndex) && segment.geometry.length >= 2)
+        : [];
+      const geometry = Array.isArray(payload?.geometry)
+        ? payload.geometry
+            .map((point) => [Number(point?.[0]), Number(point?.[1])])
+            .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+        : [];
+      if (segments.length !== coordinates.length - 1 || geometry.length < 2) {
+        throw new Error("Routing geometry unavailable");
       }
-      if (geometry.length < 2) throw new Error("Routing geometry unavailable");
-      routeFetchState.set(rep.id, { at: now, signature, destinationSignature, geometry });
-      return geometry;
+      const route = { geometry, segments };
+      routeFetchState.set(rep.id, { at: now, signature, destinationSignature, route });
+      return { ...route, providerUnavailable: false };
     } catch {
-      if (cached?.signature === signature && Array.isArray(cached.geometry)) return cached.geometry;
-      routeFetchState.set(rep.id, { at: now, signature, destinationSignature, geometry: null });
-      return null;
-    } finally {
-      if (timeout) clearTimeout(timeout);
+      if (cached?.signature === signature && cached.route) {
+        return { ...cached.route, providerUnavailable: true };
+      }
+      routeFetchState.set(rep.id, { at: now, signature, destinationSignature, route: null });
+      return { geometry: null, segments: [], providerUnavailable: true };
     }
   }
 
@@ -383,40 +394,42 @@
     const renderVersion = ++routeRenderVersion;
     if (!layerEnabled("reps")) {
       clearLayerMap(routeLayers);
+      routeProviderUnavailable = false;
       return;
     }
     const desiredKeys = new Set();
+    let providerUnavailable = false;
     for (const rep of snapshot.representatives || []) {
       if (!visibleRep(rep)) continue;
-      const { coordinates } = routeCoordinates(rep);
+      const { stops, coordinates, hasRepresentativeLocation } = routeCoordinates(rep);
       if (coordinates.length < 2) continue;
-      const key = String(rep.id);
-      desiredKeys.add(key);
-      const geometry = await roadRouteGeometry(rep, coordinates);
+      const route = await roadRouteGeometry(rep, coordinates);
       if (renderVersion !== routeRenderVersion) return;
-      if (!Array.isArray(geometry) || geometry.length < 2) {
-        const staleLayer = routeLayers.get(key);
-        if (staleLayer) {
-          try { map.removeLayer(staleLayer); } catch {}
-          routeLayers.delete(key);
+      providerUnavailable = providerUnavailable || Boolean(route?.providerUnavailable);
+      if (!Array.isArray(route?.segments) || !route.segments.length) continue;
+
+      for (const segment of route.segments) {
+        if (!Array.isArray(segment.geometry) || segment.geometry.length < 2) continue;
+        const targetStopIndex = hasRepresentativeLocation ? segment.toIndex - 1 : segment.toIndex;
+        const targetStop = stops[targetStopIndex] || null;
+        const key = `${String(rep.id)}:${segment.fromIndex}-${segment.toIndex}`;
+        desiredKeys.add(key);
+        const style = {
+          color: targetStop?.routeState === "current" ? COLORS.current : COLORS.upcoming,
+          weight: targetStop?.routeState === "current" ? 6 : 4,
+          opacity: targetStop?.routeState === "current" ? .9 : .7,
+          lineCap: "round",
+          lineJoin: "round",
+        };
+        const existing = routeLayers.get(key);
+        if (existing) {
+          existing.setLatLngs(segment.geometry);
+          existing.setStyle?.(style);
+        } else {
+          const layer = window.L.polyline(segment.geometry, style).addTo(map);
+          layer.bringToBack?.();
+          routeLayers.set(key, layer);
         }
-        continue;
-      }
-      const style = {
-        color: "#AB012B",
-        weight: 5,
-        opacity: .78,
-        lineCap: "round",
-        lineJoin: "round",
-      };
-      const existing = routeLayers.get(key);
-      if (existing) {
-        existing.setLatLngs(geometry);
-        existing.setStyle?.(style);
-      } else {
-        const layer = window.L.polyline(geometry, style).addTo(map);
-        layer.bringToBack?.();
-        routeLayers.set(key, layer);
       }
     }
     if (renderVersion !== routeRenderVersion) return;
@@ -424,6 +437,12 @@
       if (desiredKeys.has(key)) continue;
       try { map.removeLayer(layer); } catch {}
       routeLayers.delete(key);
+    }
+    routeProviderUnavailable = providerUnavailable;
+    if (routeProviderUnavailable) {
+      setConnection("stale", "Route Provider Unavailable · live stops are still visible");
+    } else if (snapshot.capturedAt) {
+      setConnection("online", liveConnectionText());
     }
   }
 
@@ -437,6 +456,42 @@
       <small><b>Status:</b> ${esc(order.status || stateLabel(order.routeState))}</small>
       <small><b>Assigned Rep:</b> ${esc(assignedTo)}</small>
     </div>`;
+  }
+
+  function upsertOrderMarker(order, desiredOrderKeys) {
+    const point = orderCoordinates(order);
+    if (!point) return;
+    const key = String(order.orderId);
+    desiredOrderKeys.add(key);
+    let marker = orderMarkers.get(key);
+    const popup = orderPopup(order);
+    if (marker) {
+      marker.setLatLng(point);
+      marker.setIcon?.(orderIcon(order));
+      marker.setPopupContent?.(popup);
+      marker.setZIndexOffset?.(order.routeState === "current" ? 800 : order.routeState === "delivered" ? 200 : 100);
+    } else {
+      marker = window.L.marker(point, {
+        icon: orderIcon(order),
+        zIndexOffset: order.routeState === "current" ? 800 : order.routeState === "delivered" ? 200 : 100,
+      }).addTo(map);
+      marker.bindPopup(popup);
+      orderMarkers.set(key, marker);
+    }
+    if (marker.__dartOrderClickHandler) {
+      marker.off("click", marker.__dartOrderClickHandler);
+      marker.__dartOrderClickHandler = null;
+    }
+    if (order.representativeId) {
+      const orderClickHandler = () => {
+        const rep = (snapshot.representatives || []).find((row) => String(row.id) === String(order.representativeId));
+        if (rep?.orders?.some((row) => String(row.orderId) === String(order.orderId))) {
+          selectOrder(order.representativeId, order.orderId);
+        }
+      };
+      marker.__dartOrderClickHandler = orderClickHandler;
+      marker.on("click", orderClickHandler);
+    }
   }
 
   function renderMarkers() {
@@ -465,46 +520,20 @@
             repMarkers.set(key, marker);
           }
         }
+        for (const order of rep.orders || []) {
+          if (["refused", "cancelled"].includes(String(order.routeState || ""))) continue;
+          if (!filterEnabled(order.routeState)) continue;
+          upsertOrderMarker(order, desiredOrderKeys);
+        }
       }
     }
 
     if (layerEnabled("orders")) {
       for (const order of snapshot.orders || []) {
+        if (order.assigned !== false || order.representativeId) continue;
         if (["refused", "cancelled"].includes(String(order.routeState || ""))) continue;
         if (!filterEnabled(order.routeState)) continue;
-        const point = orderCoordinates(order);
-        if (!point) continue;
-        const key = String(order.orderId);
-        desiredOrderKeys.add(key);
-        let marker = orderMarkers.get(key);
-        const popup = orderPopup(order);
-        if (marker) {
-          marker.setLatLng(point);
-          marker.setIcon?.(orderIcon(order));
-          marker.setPopupContent?.(popup);
-          marker.setZIndexOffset?.(order.routeState === "current" ? 800 : order.routeState === "delivered" ? 200 : 100);
-        } else {
-          marker = window.L.marker(point, {
-            icon: orderIcon(order),
-            zIndexOffset: order.routeState === "current" ? 800 : order.routeState === "delivered" ? 200 : 100,
-          }).addTo(map);
-          marker.bindPopup(popup);
-          orderMarkers.set(key, marker);
-        }
-        if (marker.__dartOrderClickHandler) {
-          marker.off("click", marker.__dartOrderClickHandler);
-          marker.__dartOrderClickHandler = null;
-        }
-        if (order.representativeId) {
-          const orderClickHandler = () => {
-            const rep = (snapshot.representatives || []).find((row) => String(row.id) === String(order.representativeId));
-            if (rep?.orders?.some((row) => String(row.orderId) === String(order.orderId))) {
-              selectOrder(order.representativeId, order.orderId);
-            }
-          };
-          marker.__dartOrderClickHandler = orderClickHandler;
-          marker.on("click", orderClickHandler);
-        }
+        upsertOrderMarker(order, desiredOrderKeys);
       }
     }
 
@@ -739,7 +768,8 @@
     try {
       const incoming = await api("/api/v1/admin/live-operations");
       snapshot = incoming || { capturedAt: null, totals: {}, representatives: [], orders: [] };
-      setConnection("online", `Live · every 3s · ${new Date(snapshot.capturedAt || Date.now()).toLocaleTimeString()}`);
+      if (routeProviderUnavailable) setConnection("stale", "Route Provider Unavailable · live stops are still visible");
+      else setConnection("online", liveConnectionText());
       renderAll(!snapshot.capturedAt || !manualView);
       if (panelOpen && selectedOrderId) {
         const rep = (snapshot.representatives || []).find((row) => String(row.id) === selectedRepresentativeId);

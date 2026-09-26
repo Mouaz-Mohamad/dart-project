@@ -2502,7 +2502,9 @@ export class CommerceService {
             ? String(savedState)
             : "upcoming";
 
-    const mapOrders = mapOrdersResult.rows.flatMap((order) => {
+    const mapOrders = mapOrdersResult.rows
+      .filter((order) => !order.representative_user_id)
+      .flatMap((order) => {
       const address = order.delivery_address || {};
       const latitude = Number(address.latitude);
       const longitude = Number(address.longitude);
@@ -2534,7 +2536,7 @@ export class CommerceService {
         representativeCode: order.representative_code,
         representativeName: order.representative_name,
       }];
-    });
+      });
 
     const nowMs = Date.now();
     const representatives = representativeResult.rows.map((representative) => {
