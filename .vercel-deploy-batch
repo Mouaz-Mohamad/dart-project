@@ -1,6 +1,6 @@
-batch=19
-purpose=exact-delivery-pin-and-live-map-fixes
-frontend=checkout-pin-preservation-customer-tracking-representative-gps-admin-live-map
-backend=customer-live-tracking-status-activation
-scope=batch-19-production-release
+batch=20
+purpose=about-page-media-restoration
+frontend=story-founder-image-dart-card-image-birthday-image-responsive-layout-cache-recovery
+backend=none
+scope=batch-20-production-release
 trigger=production-deploy
