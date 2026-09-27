@@ -12,6 +12,15 @@ BEGIN
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
+       AND pg_get_userbyid(p.proowner) = current_user
+       AND NOT EXISTS (
+         SELECT 1
+           FROM pg_depend dependency
+           JOIN pg_extension extension_record ON extension_record.oid = dependency.refobjid
+          WHERE dependency.classid = 'pg_proc'::regclass
+            AND dependency.objid = p.oid
+            AND dependency.deptype = 'e'
+       )
   LOOP
     EXECUTE format(
       'ALTER FUNCTION %I.%I(%s) SET search_path = pg_catalog, public',
