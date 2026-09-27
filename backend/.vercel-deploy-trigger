@@ -1,3 +1,3 @@
-batch=29
-source_sha=185b9ad26a317019a0ad85503b0198697af98f5e
-triggered_at=2026-09-26T05:33:00Z
+purpose=smtp-credential-refresh
+triggered_at=2026-09-27T21:30:00Z
+source=manual-vercel-env-update
