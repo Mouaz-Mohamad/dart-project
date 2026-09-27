@@ -43,6 +43,18 @@ assert.strictEqual(assigned.length, 2, "Assigned group IDs remain fixed while la
 assert(groups.sameRoute([base, { ...base, id: "O5" }]), "Matching hierarchy must share a route");
 assert(!groups.sameRoute([base, { ...base, street: "Another street" }]), "A different street must never be grouped");
 
+const dashboardGroups = groups.groupOrdersForDashboard([
+  { ...base, id: "DG-1", orderId: "K-101", clientId: "DA-1", status: "New", createdAt: "2026-11-10T22:30:00.000Z" },
+  { ...base, id: "DG-2", orderId: "K-102", clientId: "DA-2", status: "Preparing", street: "Different street", createdAt: "2026-11-11T08:00:00+02:00" },
+  { ...base, id: "DG-3", orderId: "K-103", status: "New", date: "12-11-2026" },
+  { ...base, id: "DG-4", orderId: "K-104", status: "Accepted", area: "", date: "11-11-2026" },
+]);
+assert.strictEqual(dashboardGroups.length, 3, "Dashboard groups use Cairo creation date plus country, governorate and area");
+const cairoGroup = dashboardGroups.find((group) => group.dateKey === "2026-11-11" && group.location.classified);
+assert.deepStrictEqual(cairoGroup.orderRefs, ["K-101", "K-102"], "Customer and street must not split a dashboard order group");
+assert.deepStrictEqual({ ...cairoGroup.statusCounts }, { New: 1, Preparing: 1 }, "Mixed statuses must be summarized inside one group");
+assert(dashboardGroups.some((group) => !group.location.classified), "Missing location data must appear in Unclassified");
+
 const returns = groups.groupReturns([
   { ...base, id: "R1", status: "Approved - Awaiting Representative" },
   { ...base, id: "R2", status: "Approved - Awaiting Representative" },

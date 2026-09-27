@@ -118,6 +118,26 @@ assert.match(
 );
 assert.match(
   ordersApiRuntime,
+  /\/api\/v1\/admin\/orders\/bulk-workflow/,
+  "dashboard bulk order transitions must use one server-authoritative request",
+);
+assert.match(
+  commerceRoutes,
+  /"\/admin\/orders\/bulk-workflow"[\s\S]*requirePermission\("orders\.bulk_manage"\)/,
+  "bulk order workflow must require its dedicated permission",
+);
+assert.match(
+  dashboardRuntime,
+  /DartOrdersApi\.bulkWorkflow\([\s\S]*expectedStatus/,
+  "bulk order actions must preserve the common starting state for stale-write protection",
+);
+assert.match(
+  dashboardHtml,
+  /data-orders-view-toggle[\s\S]*<span>Groups<\/span>/,
+  "orders second toolbar must expose the Groups view toggle",
+);
+assert.match(
+  ordersApiRuntime,
   /authoritativeEpoch[\s\S]*hasMutationBarrier\(\)[\s\S]*return readLocal\(\)/,
   "stale order hydration must be blocked while an authoritative mutation is active",
 );

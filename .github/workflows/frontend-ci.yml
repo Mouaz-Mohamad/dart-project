@@ -65,6 +65,7 @@ jobs:
           node tests/finance-dashboard-contract.js
           node tests/finance-persistence-contract.js
           node tests/server-authority-contract.js
+          node tests/settings-and-groups-unit.js
           node tests/product-button-state-contract.cjs
 
   browser-smoke:

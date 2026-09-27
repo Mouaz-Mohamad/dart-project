@@ -75,6 +75,64 @@
     return group((records || []).filter((record) => !record.isDeleted && !record.isArchived && !FINAL_ORDERS.has(record.status)), "order");
   }
 
+  function cairoCreationDate(record) {
+    const raw = record?.createdAt || record?.created_at || record?.date || "";
+    const legacy = String(raw).trim().match(/^(\d{1,2})[-\/]([0-1]?\d)[-\/](\d{4})$/);
+    if (legacy) {
+      return `${legacy[3]}-${String(legacy[2]).padStart(2, "0")}-${String(legacy[1]).padStart(2, "0")}`;
+    }
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return "unknown-date";
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Cairo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(parsed);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  }
+
+  function dashboardOrderLocation(record) {
+    const country = normalize(record?.country || "Egypt");
+    const governorate = normalize(record?.governorate);
+    const area = normalize(record?.area);
+    const classified = Boolean(country && governorate && area);
+    return { country, governorate, area, classified };
+  }
+
+  function groupOrdersForDashboard(records) {
+    const buckets = new Map();
+    (records || [])
+      .filter((record) => !record?.isDeleted && !record?.isArchived)
+      .forEach((record) => {
+        const dateKey = cairoCreationDate(record);
+        const location = dashboardOrderLocation(record);
+        const locationKey = location.classified
+          ? `${location.country}|${location.governorate}|${location.area}`
+          : "unclassified";
+        const key = `${dateKey}|${locationKey}`;
+        if (!buckets.has(key)) {
+          buckets.set(key, {
+            key,
+            dateKey,
+            location,
+            records: [],
+            statusCounts: Object.create(null),
+            orderRefs: [],
+          });
+        }
+        const bucket = buckets.get(key);
+        bucket.records.push(record);
+        const status = String(record?.status || "Unknown");
+        bucket.statusCounts[status] = (bucket.statusCounts[status] || 0) + 1;
+        bucket.orderRefs.push(String(record?.orderId || record?.id || "-"));
+      });
+    return [...buckets.values()].sort((a, b) =>
+      b.dateKey.localeCompare(a.dateKey) || a.key.localeCompare(b.key),
+    );
+  }
+
   function groupReturns(records) {
     return group((records || []).filter((record) => !record.isDeleted && !record.isArchived && record.status !== "Completed"), "return");
   }
@@ -86,7 +144,18 @@
     return `${prefix}-${Date.now().toString(36)}-${random}`;
   }
 
-  const api = { normalize, customerKey, routeKey, validRoute, sameRoute, groupOrders, groupReturns, newId };
+  const api = {
+    normalize,
+    customerKey,
+    routeKey,
+    validRoute,
+    sameRoute,
+    groupOrders,
+    groupOrdersForDashboard,
+    cairoCreationDate,
+    groupReturns,
+    newId,
+  };
   root.DartGroups = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

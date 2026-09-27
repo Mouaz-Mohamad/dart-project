@@ -178,7 +178,7 @@
     return await syncChain;
   }
 
-  async function runAuthoritativeMutation(path, body) {
+  async function runAuthoritativeMutation(path, body, returnPayload = false) {
     if (dirty) await flush();
     authoritativeMutations += 1;
     authoritativeEpoch += 1;
@@ -192,7 +192,7 @@
         cache(payload.orders || [], "orders:authoritative");
       }
       await refreshRelatedServerState();
-      return payload.orders || [];
+      return returnPayload ? payload : payload.orders || [];
     } finally {
       authoritativeMutations = Math.max(0, authoritativeMutations - 1);
     }
@@ -202,6 +202,14 @@
     return await runAuthoritativeMutation(
       `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/workflow`,
       input,
+    );
+  }
+
+  async function bulkWorkflow(input) {
+    return await runAuthoritativeMutation(
+      "/api/v1/admin/orders/bulk-workflow",
+      input,
+      true,
     );
   }
 
@@ -324,6 +332,7 @@
     createManual,
     updateManual,
     workflow,
+    bulkWorkflow,
     codVerification,
     stateAction,
     sync,

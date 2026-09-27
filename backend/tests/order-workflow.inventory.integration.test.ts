@@ -167,4 +167,44 @@ describe.skipIf(!databaseUrl)("order workflow with physical inventory", () => {
     });
     expect(audit.rows.map((row) => row.action)).toContain("INVENTORY_ITEM_CHANGED");
   });
+
+  it("updates valid orders in one bulk request and reports stale orders without rolling back successes", async () => {
+    const actorId = randomUUID();
+    const first = await createPhysicalOrder("BULK-FIRST");
+    const stale = await createPhysicalOrder("BULK-STALE");
+    const commerce = new CommerceService(testPool!);
+
+    await commerce.adminOrderWorkflowAction(
+      actorId,
+      stale.orderCode,
+      { expectedStatus: "New", target: "Accepted" },
+      `pre-bulk-${stale.orderCode}`,
+      false,
+    );
+
+    const response = await commerce.adminBulkOrderWorkflowAction(
+      actorId,
+      {
+        orderRefs: [first.orderCode, stale.orderCode],
+        expectedStatus: "New",
+        target: "Accepted",
+      },
+      `bulk-${first.orderCode}`,
+    );
+
+    expect(response.result).toEqual({
+      requested: 2,
+      succeeded: [{ orderRef: first.orderCode }],
+      failed: [{
+        orderRef: stale.orderCode,
+        code: "ORDER_STATE_STALE",
+        message: expect.stringContaining("changed"),
+      }],
+    });
+    const rows = await testPool!.query<{ order_code: string; status: string }>(
+      "SELECT order_code, status FROM orders WHERE order_code=ANY($1::text[]) ORDER BY order_code",
+      [[first.orderCode, stale.orderCode]],
+    );
+    expect(rows.rows.every((row) => row.status === "Accepted")).toBe(true);
+  });
 });
