@@ -56,6 +56,13 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Provision Supabase compatibility roles
+        run: |
+          psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          SQL
+
       - name: Run backend unit, contract, integration and security tests
         run: npm test
 
