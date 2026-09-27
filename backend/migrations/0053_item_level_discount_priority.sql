@@ -154,7 +154,7 @@ LANGUAGE plpgsql
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  target_order orders%ROWTYPE;
+  target_order RECORD;
   reward_id TEXT;
   expiry_text TEXT;
   remaining_count INTEGER;

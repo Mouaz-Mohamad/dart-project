@@ -29,7 +29,8 @@ describe("reward database integrity migrations", () => {
     expect(sql).toContain("PROMOTION_CUSTOMER_USAGE_LIMIT_REACHED");
     expect(sql).toContain("status='Released'");
     expect(itemPriority).toContain("campaign RECORD;");
-    expect(itemPriority).not.toContain("campaign promotion_records%ROWTYPE;");
+    expect(itemPriority).toContain("target_order RECORD;");
+    expect(itemPriority).not.toContain("%ROWTYPE;");
   });
 
   it("keeps draw history compatibility and serializes active-card decisions", async () => {
