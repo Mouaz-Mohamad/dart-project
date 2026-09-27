@@ -141,6 +141,62 @@
     return payload.data || [];
   }
 
+  function syncNow(domain) {
+    clearTimeout(timers.get(domain));
+    const chain = queues.get(domain) || Promise.resolve();
+    const next = chain.then(() => syncDomain(domain));
+    queues.set(domain, next.catch(() => undefined));
+    return next;
+  }
+
+  async function writeAndSync(storageKey, data) {
+    const domain = DOMAIN_BY_STORAGE[storageKey];
+    if (!domain) {
+      window.DartState?.write?.(storageKey, data, { source: "dashboard" });
+      return Array.isArray(data) ? data : [];
+    }
+    if (deniedDomains.has(domain)) {
+      const error = new Error("You do not have permission to update this dashboard domain");
+      error.status = 403;
+      error.code = "FORBIDDEN";
+      throw error;
+    }
+    if (!versions.get(domain)) await hydrateDomain(domain);
+    const previous = readLocal(storageKey);
+    window.DartState?.write?.(
+      storageKey,
+      Array.isArray(data) ? data : [],
+      { source: `domain:${domain}:confirmed-edit` },
+    );
+    dirty.add(domain);
+    try {
+      return await syncNow(domain);
+    } catch (error) {
+      dirty.delete(domain);
+      if (error.status === 409) {
+        await hydrateDomain(domain, true).catch(() => cache(storageKey, previous, domain));
+      } else {
+        cache(storageKey, previous, domain);
+      }
+      window.dispatchEvent(new CustomEvent("dart:domain-sync-failed", {
+        detail: { domain, storageKey, code: error.code || "SYNC_FAILED" },
+      }));
+      throw error;
+    }
+  }
+
+  async function createFinanceSettlement(data) {
+    const payload = await api("/api/v1/admin/finance/settlements", {
+      method: "POST",
+      body: data,
+    });
+    if (Number(payload?.version) > 0) {
+      versions.set("finance_settlements", Number(payload.version));
+    }
+    await hydrateDomain("finance_settlements", true);
+    return payload?.settlement || null;
+  }
+
   function schedule(domain) {
     if (!versions.get(domain)) return;
     clearTimeout(timers.get(domain));
@@ -296,6 +352,9 @@
     hydrateAll,
     hydrateDomain,
     syncDomain,
+    syncNow,
+    writeAndSync,
+    createFinanceSettlement,
     checkAll,
     hydrateAudit,
     auditFor,

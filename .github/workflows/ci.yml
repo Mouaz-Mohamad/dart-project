@@ -66,3 +66,7 @@ jobs:
       - name: Enforce database-authoritative browser storage
         working-directory: .
         run: node tests/database-authoritative-storage.cjs
+
+      - name: Verify Finance persistence and settlement route contracts
+        working-directory: .
+        run: node tests/finance-persistence-contract.js

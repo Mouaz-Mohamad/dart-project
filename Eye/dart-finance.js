@@ -418,6 +418,19 @@
     },
   };
 
+  async function persistFinanceRecord(resource, record) {
+    const rows = FinanceRepository.list(resource).map((row) => ({ ...row }));
+    const index = rows.findIndex((row) => String(row.id) === String(record.id));
+    if (index >= 0) rows[index] = record;
+    else rows.unshift(record);
+    if (root.DartDomainState?.writeAndSync) {
+      await root.DartDomainState.writeAndSync(STORAGE_KEYS[resource], rows);
+    } else {
+      FinanceRepository.replace(resource, rows);
+    }
+    return record;
+  }
+
   function uid(prefix) {
     if (root.crypto?.randomUUID) return `${prefix}-${root.crypto.randomUUID()}`;
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -1783,6 +1796,7 @@
 
   function actionButtons(resource, id) {
     if (!financeCanManage(resource)) return "—";
+    if (resource === "settlements") return "—";
     return `<div class="dart-row-actions"><button type="button" data-finance-edit="${resource}" data-id="${escapeHTML(id)}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button><button type="button" data-finance-delete="${resource}" data-id="${escapeHTML(id)}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button></div>`;
   }
 
@@ -2061,6 +2075,7 @@
     });
     form.dataset.resource = resource;
     form.dataset.id = id || "";
+    form.dataset.pendingId = "";
     document.getElementById("finance-record-id").value = id || "";
     document.getElementById("dart-finance-modal-title").textContent = title;
     document.getElementById("dart-finance-modal-note").textContent = note;
@@ -2135,7 +2150,7 @@
     return normalized;
   }
 
-  function saveFinanceForm(form) {
+  async function saveFinanceForm(form) {
     const resource = form.dataset.resource;
     if (!financeCanManage(resource)) return;
     const id = form.dataset.id;
@@ -2149,16 +2164,39 @@
     }
     const existing = id ? resourceRecord(resource, id) : null;
     const normalized = normalizeRecord(resource, payload, existing);
-    FinanceRepository.upsert(resource, normalized);
-    FinanceRepository.audit(existing ? "UPDATE" : "CREATE", resource, normalized.id, existing, normalized);
+    if (!existing && form.dataset.pendingId) normalized.id = form.dataset.pendingId;
+    if (!existing) form.dataset.pendingId = normalized.id;
+    const submit = form.querySelector('[type="submit"]');
+    const previousLabel = submit?.textContent || "Save Record";
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = "Saving...";
+    }
+    errorBox.textContent = "";
+    errorBox.classList.remove("is-visible");
     try {
+      if (resource === "settlements") {
+        if (!root.DartDomainState?.createFinanceSettlement) {
+          throw new Error("The secure settlement service is unavailable");
+        }
+        await root.DartDomainState.createFinanceSettlement(normalized);
+      } else {
+        await persistFinanceRecord(resource, normalized);
+      }
+      FinanceRepository.audit(existing ? "UPDATE" : "CREATE", resource, normalized.id, existing, normalized);
       if (typeof dartNotify === "function") dartNotify("payment", `${resource.slice(0, -1)} ${existing ? "updated" : "created"}`, normalized.name || normalized.number || normalized.description || normalized.id, `finance:${resource}`, normalized.id);
       if (typeof dartSaveAll === "function") dartSaveAll();
-    } catch {
-      // Standalone mode has no dashboard notification layer.
+      closeFinanceModal();
+      renderAllFinance();
+    } catch (saveError) {
+      errorBox.textContent = saveError?.message || "The record could not be saved. Refresh and try again.";
+      errorBox.classList.add("is-visible");
+    } finally {
+      if (submit) {
+        submit.disabled = false;
+        submit.textContent = previousLabel;
+      }
     }
-    closeFinanceModal();
-    renderAllFinance();
   }
 
   async function deleteFinanceRecord(resource, id) {
@@ -2343,7 +2381,7 @@
     document.addEventListener("submit", (event) => {
       if (!event.target.matches("#dart-finance-form")) return;
       event.preventDefault();
-      saveFinanceForm(event.target);
+      void saveFinanceForm(event.target);
     });
     document.addEventListener("click", async (event) => {
       const financeLink = event.target.closest('[data-target="finance"]');

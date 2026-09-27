@@ -20,6 +20,16 @@ interface AppliedMigration {
   checksum: string;
 }
 
+export function selectSupabaseHistoryBackfill(
+  files: MigrationFile[],
+  appliedNames: string[],
+): MigrationFile[] {
+  const normalized = new Set(
+    appliedNames.map((name) => name.endsWith(".sql") ? name : `${name}.sql`),
+  );
+  return files.filter((file) => normalized.has(file.name));
+}
+
 const MIGRATION_LOCK_NAME = "dart_backend_schema_migrations";
 const MIGRATION_NAME_PATTERN = /^\d{4}_[a-z0-9_]+\.sql$/;
 const DART_CODE_GUIDE_HEADER_PATTERN =
@@ -186,6 +196,41 @@ async function ensureMigrationTable(client: PoolClient): Promise<void> {
   `);
 }
 
+async function backfillSupabaseMigrationHistory(
+  client: PoolClient,
+  files: MigrationFile[],
+): Promise<void> {
+  const relation = await client.query<{ relation: string | null }>(
+    "SELECT to_regclass('supabase_migrations.schema_migrations')::text AS relation",
+  );
+  if (!relation.rows[0]?.relation) return;
+
+  const history = await client.query<{ name: string }>(
+    "SELECT name FROM supabase_migrations.schema_migrations ORDER BY version",
+  );
+  const matched = selectSupabaseHistoryBackfill(
+    files,
+    history.rows.map((row) => row.name),
+  );
+  if (!matched.length) return;
+
+  await client.query("BEGIN");
+  try {
+    for (const migration of matched) {
+      await client.query(
+        `INSERT INTO dart_schema_migrations(name, checksum)
+         VALUES ($1,$2)
+         ON CONFLICT(name) DO NOTHING`,
+        [migration.name, migration.checksum],
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
+}
+
 export async function runMigrations(
   pool: Pool,
   directory: string,
@@ -197,10 +242,16 @@ export async function runMigrations(
     await client.query("SELECT pg_advisory_lock(hashtext($1))", [MIGRATION_LOCK_NAME]);
     lockAcquired = true;
     await ensureMigrationTable(client);
-    const appliedResult = await client.query<AppliedMigration>(
+    const files = await readMigrationFiles(directory);
+    let appliedResult = await client.query<AppliedMigration>(
       "SELECT name, checksum FROM dart_schema_migrations ORDER BY name",
     );
-    const files = await readMigrationFiles(directory);
+    if (appliedResult.rows.length === 0) {
+      await backfillSupabaseMigrationHistory(client, files);
+      appliedResult = await client.query<AppliedMigration>(
+        "SELECT name, checksum FROM dart_schema_migrations ORDER BY name",
+      );
+    }
     const pending = selectMigrationsToApply(files, appliedResult.rows, requestedOne);
     const appliedNames: string[] = [];
 

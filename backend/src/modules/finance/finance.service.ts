@@ -1,9 +1,26 @@
 // DART CODE GUIDE | backend/src/modules/finance/finance.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
+import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 
 type JsonRow = Record<string, unknown>;
+
+export interface CreateCodSettlementInput {
+  id: string;
+  orderId: string;
+  settlementDate: string;
+  amountReceived: number;
+  fee: number;
+  reference?: string | undefined;
+  notes?: string | undefined;
+}
+
+export interface CodSettlementResult {
+  settlement: Record<string, unknown>;
+  version: number;
+  outstandingMinor: number;
+}
 
 interface DeliveredOrderRow {
   id: string;
@@ -173,6 +190,221 @@ function uniqueCompletedReturns(
 
 export class FinanceService {
   public constructor(private readonly pool: Pool) {}
+
+  public async createCodSettlement(
+    actorId: string,
+    input: CreateCodSettlementInput,
+    requestId: string,
+  ): Promise<CodSettlementResult> {
+    const client = await this.pool.connect();
+    const amountReceivedMinor = Math.round(input.amountReceived * 100);
+    const feeMinor = Math.round(input.fee * 100);
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('dart:finance:cod-settlements'))",
+      );
+      const orderResult = await client.query<{
+        id: string;
+        order_code: string;
+        status: string;
+        payment_method: string;
+        final_minor: string;
+        amount_refunded_minor: string;
+        delivery_cost_minor: string;
+        cod_settled_minor: string;
+        representative_user_id: string | null;
+      }>(
+        `SELECT id::text, order_code, status, payment_method,
+                final_minor::text, amount_refunded_minor::text,
+                delivery_cost_minor::text, cod_settled_minor::text,
+                representative_user_id::text
+           FROM orders
+          WHERE id::text=$1::text OR order_code=$1::text
+          LIMIT 1
+          FOR UPDATE`,
+        [input.orderId],
+      );
+      const order = orderResult.rows[0];
+      if (!order) {
+        throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+      }
+
+      const existing = await client.query<{ payload: Record<string, unknown> }>(
+        `SELECT payload
+           FROM finance_records
+          WHERE domain='finance_settlements' AND record_id=$1
+          FOR UPDATE`,
+        [input.id],
+      );
+      if (existing.rows[0]) {
+        const payload = existing.rows[0].payload;
+        const sameRequest =
+          String(payload.orderId || "") === order.order_code &&
+          Number(payload.amountReceivedMinor || 0) === amountReceivedMinor &&
+          Number(payload.feeMinor || 0) === feeMinor;
+        if (!sameRequest) {
+          throw new AppError(
+            409,
+            "IDEMPOTENCY_CONFLICT",
+            "This receipt id was already used for different settlement data",
+          );
+        }
+        const versionResult = await client.query<{ version: string }>(
+          "SELECT version::text FROM dashboard_domain_state WHERE domain='finance_settlements'",
+        );
+        await client.query("COMMIT");
+        return {
+          settlement: payload,
+          version: Number(versionResult.rows[0]?.version || 1),
+          outstandingMinor: Math.max(
+            0,
+            Number(order.final_minor) -
+              Number(order.amount_refunded_minor) -
+              Number(order.delivery_cost_minor) -
+              Number(order.cod_settled_minor),
+          ),
+        };
+      }
+
+      const paymentMethod = order.payment_method.toLowerCase();
+      const isCod =
+        paymentMethod === "cod" || paymentMethod === "cash" || paymentMethod.includes("cash on");
+      if (order.status !== "Delivered" || !isCod) {
+        throw new AppError(
+          409,
+          "COD_SETTLEMENT_NOT_ALLOWED",
+          "Only a delivered Cash on Delivery order can be settled",
+        );
+      }
+      if (!order.representative_user_id) {
+        throw new AppError(
+          409,
+          "REPRESENTATIVE_REQUIRED",
+          "The delivered order is not assigned to a representative",
+        );
+      }
+      if (amountReceivedMinor <= 0 || feeMinor < 0 || feeMinor > amountReceivedMinor) {
+        throw new AppError(422, "SETTLEMENT_AMOUNT_INVALID", "Invalid settlement amount or fee");
+      }
+
+      const dueToDartMinor = Math.max(
+        0,
+        Number(order.final_minor) -
+          Number(order.amount_refunded_minor) -
+          Math.min(
+            Math.max(0, Number(order.final_minor) - Number(order.amount_refunded_minor)),
+            Number(order.delivery_cost_minor),
+          ),
+      );
+      const previousSettledMinor = Number(order.cod_settled_minor || 0);
+      const outstandingMinor = Math.max(0, dueToDartMinor - previousSettledMinor);
+      if (amountReceivedMinor > outstandingMinor) {
+        throw new AppError(
+          409,
+          "SETTLEMENT_EXCEEDS_OUTSTANDING",
+          "Receipt amount exceeds the outstanding amount due to Dart",
+          { outstandingMinor },
+        );
+      }
+
+      const reference = String(input.reference || "").trim();
+      if (reference) {
+        const referenceResult = await client.query(
+          `SELECT 1
+             FROM finance_records
+            WHERE domain='finance_settlements'
+              AND lower(payload->>'reference')=lower($1::text)
+              AND NULLIF(payload->>'archivedAt','') IS NULL
+            LIMIT 1`,
+          [reference],
+        );
+        if (referenceResult.rows[0]) {
+          throw new AppError(
+            409,
+            "SETTLEMENT_REFERENCE_EXISTS",
+            "This settlement reference was already recorded",
+          );
+        }
+      }
+
+      const now = new Date().toISOString();
+      const nextSettledMinor = previousSettledMinor + amountReceivedMinor;
+      const settlement = {
+        id: input.id,
+        orderId: order.order_code,
+        representativeId: order.representative_user_id,
+        settlementDate: input.settlementDate,
+        amountReceived: amountReceivedMinor / 100,
+        amountReceivedMinor,
+        fee: feeMinor / 100,
+        feeMinor,
+        currency: "EGP",
+        reference,
+        notes: String(input.notes || "").trim(),
+        status: "Received",
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+      };
+      await client.query(
+        `INSERT INTO finance_records(domain,record_id,position,payload)
+         SELECT 'finance_settlements',$1,COALESCE(max(position),0)+1,$2::jsonb
+           FROM finance_records
+          WHERE domain='finance_settlements'`,
+        [input.id, JSON.stringify(settlement)],
+      );
+      await client.query(
+        `UPDATE orders
+            SET cod_settled_minor=$2,
+                cod_settled_at=CASE WHEN $2 >= $3 THEN now() ELSE NULL END,
+                version=version+1,
+                updated_at=now()
+          WHERE id=$1::uuid`,
+        [order.id, nextSettledMinor, dueToDartMinor],
+      );
+      const versionResult = await client.query<{ version: string }>(
+        `UPDATE dashboard_domain_state
+            SET version=version+1, updated_by=$1::uuid, updated_at=now()
+          WHERE domain='finance_settlements'
+          RETURNING version::text`,
+        [actorId],
+      );
+      await client.query(
+        `INSERT INTO audit_logs(
+           actor_type,actor_id,action,entity_type,entity_id,request_id,
+           old_values,new_values,metadata
+         ) VALUES ('staff',$1::uuid,'COD_SETTLEMENT_RECEIVED','orders',$2,$3,
+                   $4::jsonb,$5::jsonb,$6::jsonb)`,
+        [
+          actorId,
+          order.id,
+          requestId,
+          JSON.stringify({ codSettledMinor: previousSettledMinor }),
+          JSON.stringify({ codSettledMinor: nextSettledMinor }),
+          JSON.stringify({
+            settlementId: input.id,
+            orderCode: order.order_code,
+            representativeId: order.representative_user_id,
+            amountReceivedMinor,
+            feeMinor,
+            currency: "EGP",
+          }),
+        ],
+      );
+      await client.query("COMMIT");
+      return {
+        settlement,
+        version: Number(versionResult.rows[0]?.version || 1),
+        outstandingMinor: Math.max(0, dueToDartMinor - nextSettledMinor),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 
   public async summary(start: string, end: string): Promise<FinanceSummary> {
     const client = await this.pool.connect();

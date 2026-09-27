@@ -519,6 +519,9 @@ export class CatalogService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('dart:admin-state-bulk-write'))",
+      );
       validateCatalogReplacement(models, items);
       const versionSnapshot = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory' FOR UPDATE",

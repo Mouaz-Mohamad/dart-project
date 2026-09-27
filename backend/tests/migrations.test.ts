@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  selectSupabaseHistoryBackfill,
   selectMigrationsToApply,
   type MigrationFile,
 } from "../src/database/migrate.js";
@@ -17,6 +18,12 @@ function checksum(sql: string): string {
 }
 
 describe("migration ordering", () => {
+  it("reconciles Supabase migration names with local SQL filenames", () => {
+    expect(selectSupabaseHistoryBackfill(files, ["0001_first", "0002_second"]))
+      .toEqual(files);
+    expect(selectSupabaseHistoryBackfill(files, ["0001_first"]))
+      .toEqual([files[0]]);
+  });
   it("returns pending migrations in their canonical order", () => {
     expect(selectMigrationsToApply(files, [])).toEqual(files);
   });

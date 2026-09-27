@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import {
   authenticate,
+  csrfProtection,
   requireAccountType,
   requireAnyPermission,
   requireMfa,
@@ -177,6 +178,37 @@ export function createFinanceRouter(
 ): Router {
   const router = Router();
   const signedIn = authenticate(identity, config);
+  const csrf = csrfProtection(config);
+
+  router.post(
+    "/admin/finance/settlements",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    requireMfa,
+    requireAnyPermission("finance.manage", "finance.manage_settlements"),
+    async (request, response) => {
+      const body = z.object({
+        id: z.string().trim().min(1).max(200),
+        orderId: z.string().trim().min(1).max(200),
+        settlementDate: z.iso.date(),
+        amountReceived: z.number().finite().positive().max(1_000_000_000),
+        fee: z.number().finite().nonnegative().max(1_000_000_000),
+        reference: z.string().trim().max(500).optional(),
+        notes: z.string().trim().max(4000).optional(),
+      }).strict().refine((value) => value.fee <= value.amountReceived, {
+        message: "Settlement fee cannot exceed amount received",
+        path: ["fee"],
+      }).parse(request.body);
+      response.status(201).json(
+        await finance.createCodSettlement(
+          request.auth!.userId,
+          body,
+          String(request.id),
+        ),
+      );
+    },
+  );
 
   // Compatibility endpoint for Owner/legacy roles that already have the complete Finance view.
   router.get(

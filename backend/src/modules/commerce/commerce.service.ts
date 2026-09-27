@@ -5801,6 +5801,9 @@ export class CommerceService {
     try {
       await client.query("BEGIN");
       transactionOpen = true;
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('dart:admin-state-bulk-write'))",
+      );
       const orderResult = await client.query<{
         id: string;
         order_code: string;
@@ -5819,7 +5822,7 @@ export class CommerceService {
                 payment_method, representative_user_id::text, customer_user_id::text,
                 final_minor::text, cod_verification_status, legacy
            FROM orders
-          WHERE id::text=$1 OR order_code=$1
+          WHERE id::text=$1::text OR order_code=$1::text
           LIMIT 1
           FOR UPDATE`,
         [orderRef],
@@ -5935,7 +5938,7 @@ export class CommerceService {
           `SELECT r.user_id::text
              FROM representatives r
              JOIN users u ON u.id=r.user_id
-            WHERE (r.user_id::text=$1 OR r.representative_code=$1)
+            WHERE (r.user_id::text=$1::text OR r.representative_code=$1::text)
               AND r.approval_status='approved'
               AND u.status='active'
             LIMIT 1`,
@@ -6312,6 +6315,9 @@ export class CommerceService {
     ]);
     try {
       await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('dart:admin-state-bulk-write'))",
+      );
       const versionSnapshot = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
       );
@@ -7538,7 +7544,7 @@ export class CommerceService {
       await client.query(
         `INSERT INTO customer_preferences (
            customer_user_id, last_address, updated_at
-         ) VALUES ($1,$2::jsonb,now())
+         ) VALUES ($1::uuid,$2::jsonb,now())
          ON CONFLICT (customer_user_id) DO UPDATE SET
            last_address=EXCLUDED.last_address,
            updated_at=now()`,
@@ -7547,7 +7553,7 @@ export class CommerceService {
       await client.query(
         `INSERT INTO audit_logs (
            actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
-         ) VALUES ('customer',$1,$2,'customer_preferences',$1::text,$3,$4::jsonb)`,
+         ) VALUES ('customer',$1::uuid,$2::text,'customer_preferences',$1::uuid::text,$3::text,$4::jsonb)`,
         [
           customerUserId,
           address ? "CUSTOMER_ADDRESS_SAVED" : "CUSTOMER_ADDRESS_CLEARED",

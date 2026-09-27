@@ -177,3 +177,87 @@ describe("finance summary integrity", () => {
     expect(fixture.client.release).toHaveBeenCalledOnce();
   });
 });
+
+function settlementPool(options: { outstandingMinor?: number } = {}) {
+  const queries: string[] = [];
+  const finalMinor = 100_000;
+  const deliveryMinor = 10_000;
+  const settledMinor = 90_000 - (options.outstandingMinor ?? 90_000);
+  const client = {
+    query: vi.fn(async (sql: string) => {
+      queries.push(sql);
+      if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [{}] };
+      if (sql.includes("FROM orders") && sql.includes("cod_settled_minor")) {
+        return { rows: [{
+          id: "11111111-1111-4111-8111-111111111111",
+          order_code: "K-39",
+          status: "Delivered",
+          payment_method: "Cash on Delivery",
+          final_minor: String(finalMinor),
+          amount_refunded_minor: "0",
+          delivery_cost_minor: String(deliveryMinor),
+          cod_settled_minor: String(settledMinor),
+          representative_user_id: "22222222-2222-4222-8222-222222222222",
+        }] };
+      }
+      if (sql.includes("record_id=$1") && sql.includes("finance_records")) return { rows: [] };
+      if (sql.includes("lower(payload->>'reference')")) return { rows: [] };
+      if (sql.includes("INSERT INTO finance_records")) return { rows: [], rowCount: 1 };
+      if (sql.includes("UPDATE orders")) return { rows: [], rowCount: 1 };
+      if (sql.includes("UPDATE dashboard_domain_state")) return { rows: [{ version: "2" }] };
+      if (sql.includes("INSERT INTO audit_logs")) return { rows: [], rowCount: 1 };
+      throw new Error(`Unexpected settlement query: ${sql}`);
+    }),
+    release: vi.fn(),
+  };
+  return { pool: { connect: vi.fn(async () => client) }, client, queries };
+}
+
+describe("COD settlement accounting", () => {
+  it("records a server-validated receipt in one transaction using minor units", async () => {
+    const fixture = settlementPool();
+    const result = await new FinanceService(fixture.pool as never).createCodSettlement(
+      "33333333-3333-4333-8333-333333333333",
+      {
+        id: "SET-39",
+        orderId: "K-39",
+        settlementDate: "2026-09-27",
+        amountReceived: 900,
+        fee: 10,
+        reference: "REP-RECEIPT-39",
+      },
+      "request-39",
+    );
+
+    expect(result.settlement).toMatchObject({
+      orderId: "K-39",
+      amountReceivedMinor: 90_000,
+      feeMinor: 1_000,
+      currency: "EGP",
+    });
+    expect(result.outstandingMinor).toBe(0);
+    expect(fixture.queries[0]).toBe("BEGIN");
+    expect(fixture.queries.at(-1)).toBe("COMMIT");
+    expect(fixture.queries.some((sql) => sql.includes("INSERT INTO audit_logs"))).toBe(true);
+  });
+
+  it("rejects an over-collection and rolls back without inserting a receipt", async () => {
+    const fixture = settlementPool({ outstandingMinor: 5_000 });
+    await expect(
+      new FinanceService(fixture.pool as never).createCodSettlement(
+        "33333333-3333-4333-8333-333333333333",
+        {
+          id: "SET-OVER",
+          orderId: "K-39",
+          settlementDate: "2026-09-27",
+          amountReceived: 60,
+          fee: 0,
+        },
+        "request-over",
+      ),
+    ).rejects.toMatchObject({ code: "SETTLEMENT_EXCEEDS_OUTSTANDING", statusCode: 409 });
+    expect(fixture.queries.at(-1)).toBe("ROLLBACK");
+    expect(fixture.queries.some((sql) => sql.includes("INSERT INTO finance_records"))).toBe(false);
+  });
+});

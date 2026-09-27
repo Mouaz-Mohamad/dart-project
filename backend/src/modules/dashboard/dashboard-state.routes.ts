@@ -230,6 +230,13 @@ export function createDashboardStateRouter(
         "write",
         request.auth!.permissions,
       );
+      if (domain === "finance_settlements") {
+        throw new AppError(
+          405,
+          "SETTLEMENT_ENDPOINT_REQUIRED",
+          "COD receipts must use the transactional Finance settlement endpoint",
+        );
+      }
       const body = writeSchema.parse(request.body);
       const data = validateFinanceDomainData(domain, body.data);
       response.status(200).json(
