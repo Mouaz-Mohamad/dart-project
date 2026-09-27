@@ -224,10 +224,6 @@
     $("settings-card-discount").value = settings.dartCardDiscountPercent;
     $("settings-refund-fee").value = settings.refundCustomerFee;
     $("settings-repeat-exchange-fee").value = settings.repeatExchangeCustomerFee;
-    $("settings-site-discount-enabled").checked = Boolean(settings.siteDiscount.enabled);
-    $("settings-site-discount-percent").value = settings.siteDiscount.percent;
-    $("settings-site-discount-start").value = settings.siteDiscount.startsAt || "";
-    $("settings-site-discount-end").value = settings.siteDiscount.endsAt || "";
     const codRisk = settings.codRisk || {};
     $("settings-cod-risk-version").value = Math.max(1, Number(codRisk.version) || 1);
     $("settings-cod-refusal-window").value = Math.max(1, Number(codRisk.refusalWindowDays) || 90);
@@ -360,6 +356,111 @@
     $("cancel-announcement-edit").hidden = true;
   }
 
+  let promotionRows = [];
+
+  function promotionMessage(message, error = false) {
+    const node = $("settings-promotion-status-message");
+    if (!node) return;
+    node.textContent = message || "";
+    node.dataset.state = error ? "error" : "success";
+  }
+
+  function resetPromotionForm() {
+    $("settings-promotion-form")?.reset();
+    $("settings-promotion-id").value = "";
+    $("settings-promotion-version").value = "";
+    $("settings-promotion-priority").value = "100";
+    $("settings-promotion-total-limit").value = "0";
+    $("settings-promotion-customer-limit").value = "1";
+    $("settings-promotion-rule-value").value = "1";
+    $("settings-promotion-min-order").value = "0";
+    $("settings-promotion-min-quantity").value = "1";
+    $("save-promotion").textContent = "Create campaign";
+    $("cancel-promotion-edit").hidden = true;
+  }
+
+  function campaignPayloadFromForm() {
+    const audience = $("settings-promotion-audience").value;
+    const scopeMode = $("settings-promotion-scope").value;
+    const scopeValues = $("settings-promotion-scope-values").value
+      .split(",").map((value) => value.trim()).filter(Boolean);
+    return {
+      name: $("settings-promotion-name").value.trim(),
+      code: $("settings-promotion-code").value.trim().toUpperCase(),
+      status: $("settings-promotion-status").value,
+      discountPercent: number("settings-promotion-percent", 0),
+      ...($("settings-promotion-start").value ? { startsAt: $("settings-promotion-start").value } : {}),
+      ...($("settings-promotion-end").value ? { endsAt: $("settings-promotion-end").value } : {}),
+      automatic: $("settings-promotion-automatic").checked,
+      priority: Math.round(number("settings-promotion-priority", 100)),
+      minOrderMinor: Math.round(Math.max(0, number("settings-promotion-min-order", 0)) * 100),
+      minQuantity: Math.max(1, Math.round(number("settings-promotion-min-quantity", 1))),
+      totalUsageLimit: Math.max(0, Math.round(number("settings-promotion-total-limit", 0))),
+      perCustomerUsageLimit: Math.max(0, Math.round(number("settings-promotion-customer-limit", 1))),
+      limitBasis: $("settings-promotion-limit-basis").value,
+      audience,
+      ...(audience === "advanced" ? { customerRules: {
+        field: $("settings-promotion-rule-field").value,
+        operator: $("settings-promotion-rule-operator").value,
+        value: Math.max(0, number("settings-promotion-rule-value", 1)),
+      } } : {}),
+      productScope: { mode: scopeMode, values: scopeMode === "all" ? [] : scopeValues },
+      stacking: "none",
+    };
+  }
+
+  function renderPromotions(rows = promotionRows) {
+    const list = $("settings-promotions-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "dart-settings-empty";
+      empty.textContent = "No promotion campaigns yet.";
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach((campaign) => {
+      const row = document.createElement("div");
+      row.className = "dart-settings-list-row dart-promotion-row";
+      row.dataset.promotionId = campaign.id;
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = `${campaign.name} · ${campaign.discountPercent}%`;
+      const details = document.createElement("small");
+      const basis = campaign.limitBasis === "customers" ? "customers" : "orders";
+      const limit = Number(campaign.totalUsageLimit || 0);
+      const analytics = campaign.analytics || {};
+      details.textContent = `${campaign.code} · ${campaign.status} · ${campaign.audience} · ${limit ? `first ${limit} ${basis}` : `unlimited ${basis}`} · reserved ${Number(analytics.reservations || 0)} · used ${Number(analytics.usages || 0)} · remaining ${analytics.remaining ?? "∞"}`;
+      copy.append(title, details);
+      const status = document.createElement("span");
+      status.textContent = campaign.automatic ? "Automatic" : "Code";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.dataset.promotionAction = "edit";
+      edit.textContent = "Edit";
+      row.append(copy, status, edit);
+      list.appendChild(row);
+    });
+  }
+
+  async function loadPromotions() {
+    if (!root.DartAdminApi?.request || root.DartAdminAccess?.can?.("promotions.read") !== true) return;
+    try {
+      const payload = await root.DartAdminApi.request("/api/v1/admin/promotions");
+      const rows = Array.isArray(payload.promotions) ? payload.promotions : [];
+      promotionRows = await Promise.all(rows.map(async (campaign) => {
+        try {
+          const analytics = await root.DartAdminApi.request(`/api/v1/admin/promotions/${encodeURIComponent(campaign.id)}/analytics`);
+          return { ...campaign, analytics };
+        } catch { return campaign; }
+      }));
+      renderPromotions();
+    } catch (error) {
+      promotionMessage(error.message || "Unable to load promotion campaigns.", true);
+    }
+  }
+
   $("settings-commerce-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const next = root.DartSiteSettings.get();
@@ -420,17 +521,68 @@
     saveSettings(next, "Waiting reservation settings updated");
   });
 
-  $("settings-site-discount-form")?.addEventListener("submit", (event) => {
+  $("settings-promotion-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const start = $("settings-site-discount-start").value, end = $("settings-site-discount-end").value;
-    if (start && end && end < start) return announce("تاريخ نهاية الخصم يجب أن يكون بعد تاريخ البداية.", true);
-    const next = root.DartSiteSettings.get();
-    next.siteDiscount = {
-      enabled: $("settings-site-discount-enabled").checked,
-      percent: Math.min(100, Math.max(0, number("settings-site-discount-percent", 0))),
-      startsAt: start, endsAt: end,
-    };
-    saveSettings(next, "Site-wide discount updated");
+    const button = $("save-promotion");
+    const start = $("settings-promotion-start").value;
+    const end = $("settings-promotion-end").value;
+    if (start && end && end < start) return promotionMessage("End date must be on or after start date.", true);
+    if ($("settings-promotion-scope").value !== "all" && !$("settings-promotion-scope-values").value.trim()) {
+      return promotionMessage("Enter at least one category, model, or item code for this scope.", true);
+    }
+    const id = $("settings-promotion-id").value;
+    button.disabled = true;
+    promotionMessage("Saving campaign…");
+    try {
+      const promotion = campaignPayloadFromForm();
+      if (id) {
+        await root.DartAdminApi.request(`/api/v1/admin/promotions/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          body: { expectedVersion: Number($("settings-promotion-version").value), promotion },
+        });
+      } else {
+        await root.DartAdminApi.request("/api/v1/admin/promotions", { method: "POST", body: promotion });
+      }
+      resetPromotionForm();
+      promotionMessage(id ? "Campaign updated." : "Campaign created.");
+      await loadPromotions();
+    } catch (error) {
+      promotionMessage(error.message || "Unable to save campaign.", true);
+    } finally { button.disabled = false; }
+  });
+
+  $("cancel-promotion-edit")?.addEventListener("click", resetPromotionForm);
+  $("settings-promotions-list")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-promotion-action='edit']");
+    const id = button?.closest("[data-promotion-id]")?.dataset.promotionId;
+    const campaign = promotionRows.find((row) => row.id === id);
+    if (!campaign) return;
+    $("settings-promotion-id").value = campaign.id;
+    $("settings-promotion-version").value = campaign.version;
+    $("settings-promotion-name").value = campaign.name;
+    $("settings-promotion-code").value = campaign.code;
+    $("settings-promotion-percent").value = campaign.discountPercent;
+    $("settings-promotion-status").value = campaign.status;
+    $("settings-promotion-start").value = campaign.startsAt || "";
+    $("settings-promotion-end").value = campaign.endsAt || "";
+    $("settings-promotion-automatic").checked = Boolean(campaign.automatic);
+    $("settings-promotion-priority").value = campaign.priority;
+    $("settings-promotion-limit-basis").value = campaign.limitBasis || "orders";
+    $("settings-promotion-total-limit").value = campaign.totalUsageLimit || 0;
+    $("settings-promotion-customer-limit").value = campaign.perCustomerUsageLimit || 0;
+    $("settings-promotion-audience").value = campaign.audience || "all";
+    if (campaign.customerRules && !campaign.customerRules.rules) {
+      $("settings-promotion-rule-field").value = campaign.customerRules.field || "ordersCount";
+      $("settings-promotion-rule-operator").value = campaign.customerRules.operator || "gte";
+      $("settings-promotion-rule-value").value = campaign.customerRules.value ?? 1;
+    }
+    $("settings-promotion-min-order").value = Number(campaign.minOrderMinor || 0) / 100;
+    $("settings-promotion-min-quantity").value = campaign.minQuantity || 1;
+    $("settings-promotion-scope").value = campaign.productScope?.mode || "all";
+    $("settings-promotion-scope-values").value = (campaign.productScope?.values || []).join(", ");
+    $("save-promotion").textContent = "Save campaign";
+    $("cancel-promotion-edit").hidden = false;
+    $("settings-promotion-name").focus();
   });
 
   $("settings-media-form")?.addEventListener("submit", async (event) => {
@@ -541,6 +693,7 @@
     renderSettings(settings);
   }
   document.addEventListener("DOMContentLoaded", () => { void init(); });
+  root.addEventListener("dart:admin-authenticated", () => { void loadPromotions(); });
   root.addEventListener("dart:site-settings-changed", (event) => {
     renderSettings(event.detail || root.DartSiteSettings.get());
   });

@@ -7,6 +7,7 @@ import { AppError } from "../../http/app-error.js";
 
 const conditionField = z.enum([
   "ordersCount",
+  "ordersCountBeforeCampaign",
   "purchasedPieces",
   "totalSpendingMinor",
   "lastOrderDaysAgo",
@@ -44,6 +45,8 @@ export const promotionCampaignInputSchema = z.object({
   minQuantity: z.number().int().min(1).max(100).default(1),
   totalUsageLimit: z.number().int().min(0).max(10_000_000).default(0),
   perCustomerUsageLimit: z.number().int().min(0).max(100_000).default(0),
+  limitBasis: z.enum(["orders","customers"]).default("orders"),
+  audience: z.enum(["all","noPreviousOrders","previousCustomers","advanced"]).default("all"),
   customerRules: ruleSchema.optional(),
   productScope: z.object({
     mode: z.enum(["all","categories","models","products"]),
@@ -70,6 +73,7 @@ type CustomerFacts = {
   purchasedPieces: number;
   totalSpendingMinor: number;
   lastOrderAt: Date | null;
+  firstDeliveredAt: Date | null;
 };
 
 type CartFact = {
@@ -130,6 +134,7 @@ function evaluateRule(rule: unknown, facts: CustomerFacts, reference = new Date(
   const field = String(current.field);
   let actual: string | number | boolean | null = null;
   if (field === "ordersCount") actual = facts.ordersCount;
+  if (field === "ordersCountBeforeCampaign") actual = facts.ordersCount;
   if (field === "purchasedPieces") actual = facts.purchasedPieces;
   if (field === "totalSpendingMinor") actual = facts.totalSpendingMinor;
   if (field === "lastOrderDaysAgo") actual = facts.lastOrderAt ? daysBetween(facts.lastOrderAt, reference) : 1_000_000;
@@ -164,6 +169,8 @@ function normalizedCampaign(row: { record_id: string; version: string | number; 
     minQuantity: Number(legacy.minQuantity || 1),
     totalUsageLimit: Number(legacy.totalUsageLimit || 0),
     perCustomerUsageLimit: Number(legacy.perCustomerUsageLimit || 0),
+    limitBasis: legacy.limitBasis || "orders",
+    audience: legacy.audience || "all",
     customerRules: legacy.customerRules,
     productScope: legacy.productScope || { mode: "all", values: [] },
     stacking: "none",
@@ -195,11 +202,12 @@ export class PromotionService {
     const row = customer.rows[0];
     if (!row) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
     const orders = await client.query<{
-      orders_count: string; total_spending_minor: string; last_order_at: Date | null;
+      orders_count: string; total_spending_minor: string; last_order_at: Date | null; first_delivered_at: Date | null;
     }>(
       `SELECT count(*)::text AS orders_count,
               COALESCE(sum(GREATEST(final_minor-amount_refunded_minor,0)),0)::text AS total_spending_minor,
-              max(delivered_at) AS last_order_at
+              max(delivered_at) AS last_order_at,
+              min(delivered_at) AS first_delivered_at
          FROM orders
         WHERE customer_user_id=$1 AND status='Delivered' AND NOT is_deleted`,
       [customerUserId],
@@ -226,6 +234,7 @@ export class PromotionService {
       purchasedPieces: Number(pieces.rows[0]?.purchased_pieces || 0),
       totalSpendingMinor: Number(orders.rows[0]?.total_spending_minor || 0),
       lastOrderAt: orders.rows[0]?.last_order_at || null,
+      firstDeliveredAt: orders.rows[0]?.first_delivered_at || null,
     };
   }
 
@@ -255,15 +264,27 @@ export class PromotionService {
   private async campaignUsageAllowed(client: PoolClient, campaign: PromotionCampaignInput & { id: string }, customerUserId: string): Promise<boolean> {
     const result = await client.query<{ total: string; customer: string }>(
       `SELECT
-         count(*) FILTER (WHERE status IN ('Reserved','Used'))::text AS total,
+         CASE WHEN $3='customers'
+           THEN count(DISTINCT customer_user_id) FILTER (WHERE status IN ('Reserved','Used'))::text
+           ELSE count(*) FILTER (WHERE status IN ('Reserved','Used'))::text END AS total,
          count(*) FILTER (WHERE customer_user_id=$2 AND status IN ('Reserved','Used'))::text AS customer
        FROM promotion_usages WHERE promotion_record_id=$1`,
-      [campaign.id, customerUserId],
+      [campaign.id, customerUserId, campaign.limitBasis],
     );
     const total = Number(result.rows[0]?.total || 0);
     const customer = Number(result.rows[0]?.customer || 0);
     return (!campaign.totalUsageLimit || total < campaign.totalUsageLimit)
       && (!campaign.perCustomerUsageLimit || customer < campaign.perCustomerUsageLimit);
+  }
+
+  private audienceEligible(campaign: PromotionCampaignInput, facts: CustomerFacts): boolean {
+    if (campaign.audience === "all" || campaign.audience === "advanced") return true;
+    const firstDeliveredDate = facts.firstDeliveredAt ? cairoDateKey(facts.firstDeliveredAt) : null;
+    const cutoff = campaign.startsAt || cairoDateKey();
+    const purchasedBeforeCampaign = Boolean(firstDeliveredDate && firstDeliveredDate < cutoff);
+    return campaign.audience === "previousCustomers"
+      ? purchasedBeforeCampaign
+      : !purchasedBeforeCampaign;
   }
 
   private campaignActive(campaign: PromotionCampaignInput, reference = new Date()): boolean {
@@ -273,20 +294,18 @@ export class PromotionService {
   }
 
   private cartEligible(campaign: PromotionCampaignInput, cart: CartFact[]): boolean {
-    if (!cart.length || cart.length < campaign.minQuantity) return false;
-    const subtotal = cart.reduce((sum, item) => {
-      const rate = Math.min(100, Math.max(0, item.modelDiscountPercent));
-      return sum + Math.round(item.sellingMinor * (1 - rate / 100));
-    }, 0);
+    const undiscounted = cart.filter((item) => item.modelDiscountPercent <= 0);
+    if (!undiscounted.length || undiscounted.length < campaign.minQuantity) return false;
+    const subtotal = undiscounted.reduce((sum, item) => sum + item.sellingMinor, 0);
     if (subtotal < campaign.minOrderMinor) return false;
     const scope = campaign.productScope;
     if (scope.mode === "all") return true;
     const allowed = new Set(scope.values.map((value) => value.toLowerCase()));
     // Commerce currently applies one order-level percentage. Requiring every line to be in
     // the configured scope prevents an out-of-scope line from receiving the campaign.
-    if (scope.mode === "categories") return cart.every((item) => allowed.has(item.category.toLowerCase()));
-    if (scope.mode === "models") return cart.every((item) => allowed.has(item.modelId.toLowerCase()));
-    return cart.every((item) => allowed.has(item.itemCode.toLowerCase()));
+    if (scope.mode === "categories") return undiscounted.every((item) => allowed.has(item.category.toLowerCase()));
+    if (scope.mode === "models") return undiscounted.every((item) => allowed.has(item.modelId.toLowerCase()));
+    return undiscounted.every((item) => allowed.has(item.itemCode.toLowerCase()));
   }
 
   private async loadCampaigns(client: PoolClient): Promise<Array<PromotionCampaignInput & { id: string; version: number }>> {
@@ -310,13 +329,14 @@ export class PromotionService {
         : campaigns.filter((campaign) => campaign.automatic).sort((a,b) => b.priority - a.priority || b.discountPercent - a.discountPercent);
       for (const campaign of candidates) {
         if (!this.campaignActive(campaign)) continue;
+        if (!this.audienceEligible(campaign, facts)) continue;
         if (!evaluateRule(campaign.customerRules, facts)) continue;
         if (!this.cartEligible(campaign, cart)) continue;
         if (!await this.campaignUsageAllowed(client, campaign, customerUserId)) continue;
         await client.query("COMMIT");
         return {
           code: campaign.code,
-          campaign: { id: campaign.id, name: campaign.name, code: campaign.code, discountPercent: campaign.discountPercent },
+          campaign: { id: campaign.id, name: campaign.name, code: campaign.code, discountPercent: campaign.discountPercent, automatic: campaign.automatic },
         };
       }
       if (normalizedCode) {
@@ -340,6 +360,7 @@ export class PromotionService {
       const campaign = campaigns.find((row) => row.code === code.trim().toUpperCase());
       const eligible = Boolean(campaign)
         && this.campaignActive(campaign!)
+        && this.audienceEligible(campaign!, facts)
         && evaluateRule(campaign!.customerRules, facts)
         && await this.campaignUsageAllowed(client, campaign!, customerUserId);
       return {
@@ -431,12 +452,13 @@ export class PromotionService {
     const campaign = campaignResult.rows[0] ? normalizedCampaign(campaignResult.rows[0]) : null;
     if (!campaign) throw new AppError(404, "PROMOTION_NOT_FOUND", "Promotion not found");
     const usage = await this.pool.query<{
-      reservations: string; used: string; customers: string; revenue_minor: string; discount_minor: string; pieces: string;
+      reservations: string; used: string; customers: string; consumed_customers: string; revenue_minor: string; discount_minor: string; pieces: string;
     }>(
       `SELECT
          count(*) FILTER (WHERE pu.status='Reserved')::text AS reservations,
          count(*) FILTER (WHERE pu.status='Used')::text AS used,
          count(DISTINCT pu.customer_user_id) FILTER (WHERE pu.status='Used')::text AS customers,
+         count(DISTINCT pu.customer_user_id) FILTER (WHERE pu.status IN ('Reserved','Used'))::text AS consumed_customers,
          COALESCE(sum(o.final_minor) FILTER (WHERE pu.status='Used'),0)::text AS revenue_minor,
          COALESCE(sum(pu.discount_minor) FILTER (WHERE pu.status='Used'),0)::text AS discount_minor,
          COALESCE(sum((SELECT count(*) FROM order_items oi WHERE oi.order_id=o.id)) FILTER (WHERE pu.status='Used'),0)::text AS pieces
@@ -449,6 +471,9 @@ export class PromotionService {
     const used = Number(row?.used || 0);
     const reservations = Number(row?.reservations || 0);
     const revenueMinor = Number(row?.revenue_minor || 0);
+    const consumed = campaign.limitBasis === "customers"
+      ? Number(row?.consumed_customers || 0)
+      : used + reservations;
     return {
       campaign,
       reservations,
@@ -460,6 +485,9 @@ export class PromotionService {
       discountMinor: Number(row?.discount_minor || 0),
       averageOrderValueMinor: used ? Math.round(revenueMinor / used) : 0,
       conversionPercent: used + reservations ? Math.round((used / (used + reservations)) * 10000) / 100 : 0,
+      limitBasis: campaign.limitBasis,
+      totalUsageLimit: campaign.totalUsageLimit,
+      remaining: campaign.totalUsageLimit ? Math.max(0, campaign.totalUsageLimit - consumed) : null,
     };
   }
 }

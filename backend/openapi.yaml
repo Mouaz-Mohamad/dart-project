@@ -455,6 +455,17 @@ paths:
         - { in: query, name: code, required: true, schema: { type: string, minLength: 1, maxLength: 60 } }
       responses:
         "200": { description: Dynamic customer campaign eligibility result }
+  /me/promotions/resolve:
+    get:
+      tags: [Promotions]
+      operationId: resolveAutomaticPromotion
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { in: query, name: reservationId, required: true, schema: { type: string, minLength: 16, maxLength: 160 } }
+        - { in: query, name: code, required: false, schema: { type: string, minLength: 1, maxLength: 60 } }
+      responses:
+        "200": { description: Highest-priority automatic campaign eligible for the reserved cart, or null }
+        "409": { $ref: "#/components/responses/Conflict" }
   /admin/promotions:
     get:
       tags: [Promotions]
@@ -722,6 +733,8 @@ components:
         minQuantity: { type: integer, minimum: 1, maximum: 100, default: 1 }
         totalUsageLimit: { type: integer, minimum: 0 }
         perCustomerUsageLimit: { type: integer, minimum: 0 }
+        limitBasis: { type: string, enum: [orders, customers], default: orders }
+        audience: { type: string, enum: [all, noPreviousOrders, previousCustomers, advanced], default: all }
         customerRules: { $ref: "#/components/schemas/PromotionRule" }
         productScope:
           type: object

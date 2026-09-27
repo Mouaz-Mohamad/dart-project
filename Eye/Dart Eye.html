@@ -1380,20 +1380,39 @@
                     </form>
                 </article>
 
-                <article id="settings-site-discount-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                <article id="settings-site-discount-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-percent"></i></div>
                     <div class="dart-settings-card-copy">
-                        <span>STORE PROMOTION</span>
-                        <h2>Site-wide discount</h2>
-                        <p>الأولوية: عيد الميلاد، ثم خصم الموقع، ثم Dart Card. لا يتم جمع خصمين.</p>
+                        <span>PROMOTION CAMPAIGNS</span>
+                        <h2>Discount campaign manager</h2>
+                        <p>الأولوية لكل قطعة: خصم القطعة، ثم الحملة، ثم عيد الميلاد، ثم Dart Card. لا يتم جمع خصمين على القطعة نفسها.</p>
                     </div>
-                    <form id="settings-site-discount-form" class="dart-settings-fields">
-                        <label class="dart-settings-check" for="settings-site-discount-enabled"><input id="settings-site-discount-enabled" type="checkbox"> Enable site-wide discount</label>
-                        <label for="settings-site-discount-percent">Discount %<input id="settings-site-discount-percent" type="number" min="0" max="100" step="1"></label>
-                        <label for="settings-site-discount-start">Start date<input id="settings-site-discount-start" type="date"></label>
-                        <label for="settings-site-discount-end">End date<input id="settings-site-discount-end" type="date"></label>
-                        <button id="save-site-discount-settings" type="submit" class="dart-settings-save">Save store discount</button>
+                    <form id="settings-promotion-form" class="dart-settings-fields">
+                        <input id="settings-promotion-id" type="hidden"><input id="settings-promotion-version" type="hidden">
+                        <label>Campaign name<input id="settings-promotion-name" type="text" maxlength="160" required></label>
+                        <label>Code<input id="settings-promotion-code" type="text" maxlength="60" pattern="[A-Za-z0-9_-]+" required></label>
+                        <label>Discount %<input id="settings-promotion-percent" type="number" min="0.01" max="100" step="0.01" required></label>
+                        <label>Status<select id="settings-promotion-status"><option>Draft</option><option>Scheduled</option><option>Active</option><option>Paused</option><option>Expired</option></select></label>
+                        <label>Start date<input id="settings-promotion-start" type="date"></label>
+                        <label>End date<input id="settings-promotion-end" type="date"></label>
+                        <label class="dart-settings-check"><input id="settings-promotion-automatic" type="checkbox"> Apply automatically</label>
+                        <label>Priority<input id="settings-promotion-priority" type="number" min="0" max="10000" step="1" value="100" required></label>
+                        <label>Limit counts<select id="settings-promotion-limit-basis"><option value="orders">First orders</option><option value="customers">First unique customers</option></select></label>
+                        <label>Total limit (0 = unlimited)<input id="settings-promotion-total-limit" type="number" min="0" max="10000000" step="1" value="0" required></label>
+                        <label>Uses per customer (0 = unlimited)<input id="settings-promotion-customer-limit" type="number" min="0" max="100000" step="1" value="1" required></label>
+                        <label>Audience<select id="settings-promotion-audience"><option value="all">All customers</option><option value="noPreviousOrders">No delivered orders before campaign</option><option value="previousCustomers">Delivered before campaign</option><option value="advanced">Advanced purchase rule</option></select></label>
+                        <label>Advanced rule<select id="settings-promotion-rule-field"><option value="ordersCount">Delivered orders</option><option value="purchasedPieces">Purchased pieces</option><option value="totalSpendingMinor">Total spending (piastres)</option></select></label>
+                        <label>Operator<select id="settings-promotion-rule-operator"><option value="gte">At least</option><option value="eq">Exactly</option><option value="lte">At most</option></select></label>
+                        <label>Rule value<input id="settings-promotion-rule-value" type="number" min="0" step="1" value="1"></label>
+                        <label>Minimum order (EGP)<input id="settings-promotion-min-order" type="number" min="0" step="0.01" value="0"></label>
+                        <label>Minimum eligible pieces<input id="settings-promotion-min-quantity" type="number" min="1" max="100" step="1" value="1"></label>
+                        <label>Product scope<select id="settings-promotion-scope"><option value="all">Whole store</option><option value="categories">Categories</option><option value="models">Models</option><option value="products">Physical item codes</option></select></label>
+                        <label class="dart-settings-field-wide">Scope values (comma separated)<input id="settings-promotion-scope-values" type="text" maxlength="4000" placeholder="Leave empty for Whole store"></label>
+                        <button id="save-promotion" type="submit" class="dart-settings-save">Create campaign</button>
+                        <button id="cancel-promotion-edit" type="button" class="dart-settings-secondary" hidden>Cancel edit</button>
                     </form>
+                    <p id="settings-promotion-status-message" class="dart-settings-status" role="status" aria-live="polite"></p>
+                    <div id="settings-promotions-list" class="dart-settings-list"></div>
                 </article>
 
                 <article id="settings-media-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">

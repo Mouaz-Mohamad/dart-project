@@ -12,6 +12,17 @@
 - Admin permissions deny-by-default وStaff actions الحساسة تحتاج الصلاحية المناسبة.
 - العمليات الحساسة تستخدم Transactions/locks/idempotency حيث يلزم.
 
+## Promotion campaigns
+
+- `GET /api/v1/me/promotions/resolve?reservationId=...` يحسم أعلى حملة تلقائية مؤهلة للسلة المحجوزة دون استهلاكها.
+- `GET /api/v1/me/promotions/validate-v2?code=...` يتحقق من أهلية العميل لكود الحملة.
+- `GET /api/v1/admin/promotions` يعرض الحملات.
+- `POST /api/v1/admin/promotions` ينشئ حملة بصلاحية `promotions.manage`.
+- `PUT /api/v1/admin/promotions/:id` يحدّث الحملة باستخدام `expectedVersion` لمنع الكتابة فوق تعديل أحدث.
+- `GET /api/v1/admin/promotions/:id/analytics` يعرض المحجوز والمستخدم والعملاء والإيراد وتكلفة الخصم والمتبقي.
+
+حد الحملة يدعم `limitBasis: "orders" | "customers"`. ويطبق Checkout خصمًا واحدًا فقط لكل قطعة بالترتيب: Model ثم Campaign ثم Birthday ثم Dart Card.
+
 ## Customer authentication
 
 `POST /api/v1/auth/register` ينشئ Customer + session مباشرة ويرجع `201`. تسجيل العميل الجديد ليس gated بـEmail OTP. OTP ما زال موجودًا للتدفقات الصريحة مثل password recovery / verification flows.

@@ -755,17 +755,45 @@ function updateCartCount() {
 }
 
 function syncBirthdayCheckoutDiscount(showNotice = false) {
-    const birthdayReward = window.DartPlatform?.activeBirthdayReward?.();
-    const sitePromotion = birthdayReward ? null : window.DartSiteSettings?.activeSiteDiscount?.();
+    const hasUndiscountedPiece = cartData.some((line) => {
+        const model = window.DartCatalog?.model?.(line.id);
+        return Number(model?.discount || 0) <= 0 && Number(line.quantity || 0) > 0;
+    });
+    if (!hasUndiscountedPiece && window.dartAppliedPromotion?.type === 'Promotion') {
+        window.dartAppliedPromotion = null;
+        appliedDiscountRate = 0;
+    }
+    const activeCampaign = hasUndiscountedPiece && window.dartAppliedPromotion?.type === 'Promotion'
+        ? window.dartAppliedPromotion
+        : null;
+    const birthdayReward = hasUndiscountedPiece ? window.DartPlatform?.activeBirthdayReward?.() : null;
     const customer = window.DartPlatform?.currentUser?.();
-    const cartQuantity = cartData.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
-    const dartCard = birthdayReward || sitePromotion
+    const dartCard = !hasUndiscountedPiece || activeCampaign || birthdayReward
         ? null
-        : window.DartPlatform?.activeDartCard?.(customer, cartQuantity);
+        : window.DartPlatform?.activeDartCard?.(customer, 0);
     const discountInput = document.getElementById('discountInput');
     const discountBtn = document.getElementById('applyDiscountBtn');
     const discountBox = discountInput?.closest('.discount-box');
     let note = document.querySelector('.birthday-auto-discount-note');
+
+    if (activeCampaign) {
+        appliedDiscountRate = Math.max(0, Math.min(1, Number(activeCampaign.discountPercent ?? activeCampaign.percent ?? 0) / 100));
+        if (discountInput) {
+            discountInput.value = `${activeCampaign.code} · ${Math.round(appliedDiscountRate * 100)}%`;
+            discountInput.disabled = Boolean(activeCampaign.automatic);
+        }
+        if (discountBtn) {
+            discountBtn.disabled = Boolean(activeCampaign.automatic);
+            discountBtn.textContent = 'Applied';
+        }
+        if (discountBox && !note) {
+            note = document.createElement('p');
+            note.className = 'birthday-auto-discount-note';
+            discountBox.insertAdjacentElement('afterend', note);
+        }
+        if (note) note.textContent = 'Campaign discount applies only to items without their own item discount.';
+        return true;
+    }
 
     if (birthdayReward) {
         window.dartAppliedPromotion = { ...birthdayReward, type: 'Birthday' };
@@ -783,29 +811,8 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
             note.className = 'birthday-auto-discount-note';
             discountBox.insertAdjacentElement('afterend', note);
         }
-        if (note) note.textContent = 'Your birthday discount is applied automatically and takes priority over other discounts.';
+        if (note) note.textContent = 'Birthday discount applies to items without an item or campaign discount.';
         if (showNotice) showToast(`تم تطبيق خصم عيد الميلاد ${Math.round(appliedDiscountRate * 100)}% تلقائيًا.`);
-        return true;
-    }
-
-    if (sitePromotion) {
-        window.dartAppliedPromotion = { ...sitePromotion, type: 'Site' };
-        appliedDiscountRate = Math.max(0, Math.min(1, Number(sitePromotion.percent || 0) / 100));
-        if (discountInput) {
-            discountInput.value = `SITE ${Math.round(appliedDiscountRate * 100)}% — AUTO`;
-            discountInput.disabled = true;
-        }
-        if (discountBtn) {
-            discountBtn.disabled = true;
-            discountBtn.textContent = 'Applied';
-        }
-        if (discountBox && !note) {
-            note = document.createElement('p');
-            note.className = 'birthday-auto-discount-note';
-            discountBox.insertAdjacentElement('afterend', note);
-        }
-        if (note) note.textContent = 'The active site-wide discount is applied automatically. Discounts are not combined.';
-        if (showNotice) showToast(`تم تطبيق خصم الموقع ${Math.round(appliedDiscountRate * 100)}% تلقائيًا.`);
         return true;
     }
 
@@ -831,7 +838,7 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         return true;
     }
 
-    if (['Birthday', 'Site', 'Dart Card'].includes(window.dartAppliedPromotion?.type)) {
+    if (['Birthday', 'Dart Card'].includes(window.dartAppliedPromotion?.type)) {
         window.dartAppliedPromotion = null;
         appliedDiscountRate = 0;
     }
@@ -853,14 +860,25 @@ function updateCartTotals() {
     const totalEl = document.getElementById('totalVal');
     const discountEl = document.getElementById('discountVal');
 
-    const hasOrderPromotion = Boolean(window.dartAppliedPromotion && appliedDiscountRate > 0);
-    let subtotal = cartData.reduce((sum, item) => {
+    let subtotal = 0;
+    let finalTotal = 0;
+    let remainingCardItems = window.dartAppliedPromotion?.type === 'Dart Card'
+        ? Math.max(0, Number(window.dartAppliedPromotion.itemLimit || window.dartAppliedPromotion.purchasedLimit || 10) - Number(window.dartAppliedPromotion.purchasedItems || 0))
+        : Number.POSITIVE_INFINITY;
+    cartData.forEach((item) => {
         const model = DartCatalog.model(item.id);
-        const price = hasOrderPromotion ? Number(model?.selling || item.price) : Number(item.price || 0);
-        return sum + price * Number(item.quantity || 0);
-    }, 0);
-    let discountAmount = subtotal * appliedDiscountRate;
-    let finalTotal = subtotal - discountAmount;
+        const original = Number(model?.selling || item.price || 0);
+        const modelDiscount = Math.max(0, Math.min(100, Number(model?.discount || 0)));
+        const quantity = Number(item.quantity || 0);
+        subtotal += original * quantity;
+        for (let index = 0; index < quantity; index += 1) {
+            const canUseFallback = modelDiscount <= 0 && remainingCardItems > 0;
+            const rate = modelDiscount > 0 ? modelDiscount / 100 : canUseFallback ? appliedDiscountRate : 0;
+            finalTotal += original * (1 - rate);
+            if (canUseFallback && window.dartAppliedPromotion?.type === 'Dart Card') remainingCardItems -= 1;
+        }
+    });
+    const discountAmount = Math.max(0, subtotal - finalTotal);
 
     if (subtotalEl) subtotalEl.textContent = `${Math.trunc(subtotal)} EGP`;
     if (discountEl) discountEl.textContent = `${Math.trunc(discountAmount)} EGP`;
@@ -939,15 +957,12 @@ async function persistCartReservation() {
         if (window.DartPlatform?.reserveCart) {
             await window.DartPlatform.reserveCart(cartData);
             window.DartAnalytics?.trackCartIncrease?.(previous, cartData);
+            await resolveAutomaticCampaign();
         } else {
             if (!DART_LOCAL_DEMO_MODE) {
                 throw new Error("تعذر الاتصال بخدمة حجز السلة. لم يتم حفظ التغيير.");
             }
             throw new Error("خدمة السلة متاحة من خلال قاعدة البيانات فقط.");
-        }
-        if (window.dartAppliedPromotion?.cardId) {
-            const used=Number(window.dartAppliedPromotion.purchasedItems||0),limit=Number(window.dartAppliedPromotion.itemLimit||window.dartAppliedPromotion.purchasedLimit||10),count=cartData.reduce((sum,line)=>sum+Number(line.quantity||0),0);
-            if(count>limit-used){window.dartAppliedPromotion=null;appliedDiscountRate=0;showToast(`تم إلغاء Dart Card: المتبقي في الكارت ${Math.max(0,limit-used)} قطع.`);}
         }
         return true;
     } catch (error) {
@@ -958,6 +973,32 @@ async function persistCartReservation() {
         return false;
     }
 }
+
+async function resolveAutomaticCampaign() {
+    if (!cartData.length || !window.DartPlatform?.currentUser?.() || !window.DartPlatform?.apiRequest) return;
+    if (window.dartAppliedPromotion?.type === 'Promotion' && !window.dartAppliedPromotion?.automatic) return;
+    try {
+        const reservationId = window.DartPlatform.cartReservationId;
+        const payload = await window.DartPlatform.apiRequest(
+            `/api/v1/me/promotions/resolve?reservationId=${encodeURIComponent(reservationId)}`
+        );
+        if (payload.campaign) {
+            window.dartAppliedPromotion = { ...payload.campaign, type: 'Promotion', automatic: true };
+            appliedDiscountRate = Math.max(0, Math.min(1, Number(payload.campaign.discountPercent || 0) / 100));
+        } else if (window.dartAppliedPromotion?.automatic) {
+            window.dartAppliedPromotion = null;
+            appliedDiscountRate = 0;
+        }
+        updateCartTotals();
+    } catch (error) {
+        if (error?.status !== 401) console.warn('Automatic promotion resolution failed', error);
+    }
+}
+
+window.addEventListener('dart:customer-session-changed', () => { void resolveAutomaticCampaign(); });
+document.addEventListener('DOMContentLoaded', () => {
+    window.setTimeout(() => { void resolveAutomaticCampaign(); }, 0);
+});
 
 function initCartAndCheckoutEvents() {
     const cartView = document.getElementById('cartView');
@@ -1086,11 +1127,12 @@ function initCartAndCheckoutEvents() {
                     return;
                 }
                 try {
+                    const reservationId = window.DartPlatform.cartReservationId;
                     const payload = await window.DartPlatform.apiRequest(
-                        `/api/v1/me/promotions/validate?code=${encodeURIComponent(code)}`
+                        `/api/v1/me/promotions/resolve?reservationId=${encodeURIComponent(reservationId)}&code=${encodeURIComponent(code)}`
                     );
-                    if (payload.valid && payload.promotion) {
-                        promotion = payload.promotion;
+                    if (payload.campaign) {
+                        promotion = payload.campaign;
                     }
                 } catch (error) {
                     console.warn('Promotion validation failed', error);

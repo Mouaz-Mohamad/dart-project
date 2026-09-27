@@ -193,17 +193,12 @@
     Math.max(0, Number(m?.selling || 0) * (1 - discountPercent(m?.discount) / 100));
   const pricing = (m) => {
     const originalPrice = Math.max(0, Number(m?.selling || 0));
-    const siteDiscount = window.DartSiteSettings?.activeSiteDiscount?.();
-    const effectiveDiscountPercent = siteDiscount
-      ? discountPercent(siteDiscount.percent)
-      : discountPercent(m?.discount);
+    const effectiveDiscountPercent = discountPercent(m?.discount);
     return {
       originalPrice,
       finalPrice: Math.max(0, originalPrice * (1 - effectiveDiscountPercent / 100)),
       effectiveDiscountPercent,
-      discountSource: effectiveDiscountPercent
-        ? siteDiscount ? "Site" : "Model"
-        : "",
+      discountSource: effectiveDiscountPercent ? "Model" : "",
     };
   };
   const price = (m) => pricing(m).finalPrice;

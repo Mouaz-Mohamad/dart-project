@@ -255,3 +255,12 @@ Implementation notes and backend boundaries are in `README.md` and `API_CONTRACT
 - Added a responsive dashboard-only Settings section as a stable place for future preferences.
 - Added a guarded “Reset All Dart Data” action with a detailed destructive warning, typed `DELETE DART` confirmation, acknowledgement checkbox and final browser confirmation.
 - Reset removes only Dart-owned local/session storage plus saved catalogue images in IndexedDB; unrelated origin storage is preserved and no public-site interface file was changed.
+# Promotion campaigns and item-level priority — 2026-09-27
+
+- Replaced the legacy site-wide discount editor with a server-backed campaign manager for first orders, first unique customers, prior/new customers, advanced purchase rules, schedules, codes, automatic campaigns and product scope.
+- Applied one discount per physical item in the fixed order: Model, Campaign, Birthday, Dart Card.
+- Added atomic order/customer campaign limits with Reserved, Used and Released lifecycle handling under PostgreSQL row locks.
+- Stored discount source, percentage, amount and reference on every new order-item snapshot.
+- Restored Birthday eligibility only after every Birthday-discounted item in the order is returned while the reward window remains open; campaign returns never restore campaign usage.
+- Counted and restored only the physical pieces that actually consumed Dart Card quota.
+- Added campaign analytics, cart preflight, API/OpenAPI documentation and regression tests for priority, limits and dashboard controls.

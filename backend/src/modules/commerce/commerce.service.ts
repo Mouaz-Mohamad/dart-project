@@ -66,6 +66,8 @@ interface AdminOrderSnapshot {
   originalUnitPrice?: number;
   discountPercent?: number;
   discountAmount?: number;
+  discountSource?: string;
+  discountReference?: string;
   finalUnitPrice?: number;
   costSnapshot?: number;
 }
@@ -204,6 +206,30 @@ function finalModelPriceMinor(sellingMinor: number, discountPercent: number): nu
   return Math.max(0, Math.round(sellingMinor * (1 - Math.min(100, Math.max(0, discountPercent)) / 100)));
 }
 
+export function resolveItemDiscount(
+  modelDiscountPercent: number,
+  benefit: Record<string, unknown> | null,
+  dartCardSlotsRemaining = Number.POSITIVE_INFINITY,
+): { percent: number; source: string; reference: string; consumesDartCardSlot: boolean } {
+  const modelPercent = Math.min(100, Math.max(0, Number(modelDiscountPercent) || 0));
+  if (modelPercent > 0) {
+    return { percent: modelPercent, source: "Model", reference: "", consumesDartCardSlot: false };
+  }
+  if (!benefit) return { percent: 0, source: "None", reference: "", consumesDartCardSlot: false };
+  const type = String(benefit.type || "");
+  if (type === "Dart Card" && dartCardSlotsRemaining <= 0) {
+    return { percent: 0, source: "None", reference: "", consumesDartCardSlot: false };
+  }
+  const percent = Math.min(100, Math.max(0, Number(benefit.percent) || 0));
+  if (!percent) return { percent: 0, source: "None", reference: "", consumesDartCardSlot: false };
+  return {
+    percent,
+    source: type === "Promotion" ? "Campaign" : type,
+    reference: String(benefit.code || benefit.rewardId || benefit.cardId || ""),
+    consumesDartCardSlot: type === "Dart Card",
+  };
+}
+
 export function detectCartPriceChanges(
   reservedPricing: Array<Record<string, unknown>>,
   items: Array<Pick<LockedItem, "model_id" | "color" | "size" | "selling_minor" | "discount_percent">>,
@@ -262,21 +288,6 @@ function cairoDateKey(value = new Date()): string {
     parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
   );
   return `${map.year}-${map.month}-${map.day}`;
-}
-
-function activeSiteDiscountPercent(settings: Record<string, unknown>): number {
-  const raw = settings.siteDiscount;
-  if (!raw || typeof raw !== "object") return 0;
-  const discount = raw as Record<string, unknown>;
-  if (discount.enabled !== true) return 0;
-  const percent = Math.min(100, Math.max(0, Number(discount.percent) || 0));
-  if (!percent) return 0;
-  const today = cairoDateKey();
-  const startsAt = String(discount.startsAt || "");
-  const endsAt = String(discount.endsAt || "");
-  if (startsAt && today < startsAt) return 0;
-  if (endsAt && today > endsAt) return 0;
-  return percent;
 }
 
 function birthdayWindow(
@@ -1054,12 +1065,6 @@ export class CommerceService {
         "SELECT now() + interval '15 minutes' AS expires_at",
       );
       const expiresAt = expiresResult.rows[0]!.expires_at;
-      const settingsResult = await client.query<{ data: Record<string, unknown> }>(
-        "SELECT data FROM site_settings WHERE id='main'",
-      );
-      const reservationSiteDiscountPercent = activeSiteDiscountPercent(
-        settingsResult.rows[0]?.data || {},
-      );
       const pricingSnapshot: Array<Record<string, unknown>> = [];
 
       await client.query(
@@ -1110,8 +1115,7 @@ export class CommerceService {
 
         const sellingMinor = Number(model.selling_minor || 0);
         const modelDiscountPercent = Number(model.discount_percent || 0);
-        const effectiveCatalogDiscountPercent =
-          reservationSiteDiscountPercent || modelDiscountPercent;
+        const effectiveCatalogDiscountPercent = modelDiscountPercent;
         pricingSnapshot.push({
           modelId,
           color,
@@ -1879,15 +1883,13 @@ export class CommerceService {
             : 100,
         ) * 100,
       );
-      const siteDiscountPercent = activeSiteDiscountPercent(settings);
-
       const reservedPricing = Array.isArray(reservation.pricing_snapshot)
         ? reservation.pricing_snapshot
         : [];
       const priceChanges = detectCartPriceChanges(
         reservedPricing,
         itemResult.rows,
-        siteDiscountPercent,
+        0,
       );
       if (priceChanges.length && !input.acceptPriceChanges) {
         throw new AppError(
@@ -1940,83 +1942,14 @@ export class CommerceService {
       let promotionPercent = 0;
       let birthdayReward: Record<string, unknown> | null = null;
       let appliedCard: Record<string, unknown> | null = null;
+      let cardRemainingItems = 0;
+      const hasUndiscountedItems = itemResult.rows.some(
+        (row) => Number(row.discount_percent || 0) <= 0,
+      );
 
-      const birthday = birthdayWindow(customerPromotion.birthday);
-      if (birthday) {
-        const rewardId = `BDAY-${customerPromotion.client_code}-${birthday.year}`;
-        birthdayReward = (birthdayState.data as Record<string, unknown>[]).find(
-          (row) => String(row.id || "") === rewardId,
-        ) || null;
-        if (!birthdayReward) {
-          birthdayReward = {
-            id: rewardId,
-            customerId: customerPromotion.client_code,
-            type: "Birthday",
-            discountPercent: Math.min(
-              100,
-              Math.max(0, Number(settings.birthdayDiscountPercent) || 30),
-            ),
-            startsAt: birthday.startsAt,
-            expiresAt: birthday.expiresAt,
-            status: "Active",
-            usedCount: 0,
-            createdAt: new Date().toISOString(),
-          };
-          birthdayState.data.unshift(birthdayReward);
-        }
-        if (String(birthdayReward.status || "Active") === "Active") {
-          promotionPercent = Math.min(
-            100,
-            Math.max(0, Number(birthdayReward.discountPercent) || 30),
-          );
-          promotion = {
-            type: "Birthday",
-            percent: promotionPercent,
-            rewardId,
-          };
-        }
-      }
-
-      if (!promotion && siteDiscountPercent > 0) {
-        promotionPercent = siteDiscountPercent;
-        promotion = { type: "Site", percent: promotionPercent };
-      }
-
-      if (!promotion) {
-        const nowMs = Date.now();
-        appliedCard = (cardState.data as Record<string, unknown>[]).find((row) => {
-          if (
-            String(row.clientId || "") !== customerPromotion.client_code ||
-            String(row.status || "") !== "Active" ||
-            Boolean(row.isArchived) ||
-            Boolean(row.isDeleted)
-          ) return false;
-          const limit = Number(row.itemLimit || row.purchasedLimit || 10);
-          const used = Number(row.purchasedItems || 0);
-          const reserved = Number(row.reservedItems || 0);
-          const expiry = flexibleDateExpiry(row.expDate);
-          return (
-            limit - used - reserved >= itemResult.rows.length &&
-            (!expiry || expiry >= nowMs)
-          );
-        }) || null;
-        if (appliedCard) {
-          promotionPercent = Math.min(
-            100,
-            Math.max(
-              0,
-              Number(appliedCard.discountPercent ?? settings.dartCardDiscountPercent) || 40,
-            ),
-          );
-          promotion = {
-            type: "Dart Card",
-            percent: promotionPercent,
-            cardId: String(appliedCard.cardId || appliedCard.id || ""),
-          };
-        }
-      }
-
-      if (!promotion && input.promotionCode) {
+      // Priority for every undiscounted item: Campaign, Birthday, then Dart Card.
+      // Model/item discount is evaluated first per line below and never stacks.
+      if (hasUndiscountedItems && input.promotionCode) {
         const normalizedCode = String(input.promotionCode).trim().toUpperCase();
         const codePromotion = (promotionsState.data as Record<string, unknown>[]).find(
           (row) =>
@@ -2053,12 +1986,93 @@ export class CommerceService {
         };
       }
 
+      const birthday = birthdayWindow(customerPromotion.birthday);
+      if (!promotion && hasUndiscountedItems && birthday) {
+        const rewardId = `BDAY-${customerPromotion.client_code}-${birthday.year}`;
+        birthdayReward = (birthdayState.data as Record<string, unknown>[]).find(
+          (row) => String(row.id || "") === rewardId,
+        ) || null;
+        if (!birthdayReward) {
+          birthdayReward = {
+            id: rewardId,
+            customerId: customerPromotion.client_code,
+            type: "Birthday",
+            discountPercent: Math.min(
+              100,
+              Math.max(0, Number(settings.birthdayDiscountPercent) || 30),
+            ),
+            startsAt: birthday.startsAt,
+            expiresAt: birthday.expiresAt,
+            status: "Active",
+            usedCount: 0,
+            createdAt: new Date().toISOString(),
+          };
+          birthdayState.data.unshift(birthdayReward);
+        }
+        if (String(birthdayReward.status || "Active") === "Active") {
+          promotionPercent = Math.min(
+            100,
+            Math.max(0, Number(birthdayReward.discountPercent) || 30),
+          );
+          promotion = {
+            type: "Birthday",
+            percent: promotionPercent,
+            rewardId,
+          };
+        }
+      }
+
+      if (!promotion && hasUndiscountedItems) {
+        const nowMs = Date.now();
+        appliedCard = (cardState.data as Record<string, unknown>[]).find((row) => {
+          if (
+            String(row.clientId || "") !== customerPromotion.client_code ||
+            String(row.status || "") !== "Active" ||
+            Boolean(row.isArchived) ||
+            Boolean(row.isDeleted)
+          ) return false;
+          const limit = Number(row.itemLimit || row.purchasedLimit || 10);
+          const used = Number(row.purchasedItems || 0);
+          const reserved = Number(row.reservedItems || 0);
+          const expiry = flexibleDateExpiry(row.expDate);
+          return limit - used - reserved > 0 && (!expiry || expiry >= nowMs);
+        }) || null;
+        if (appliedCard) {
+          const limit = Number(appliedCard.itemLimit || appliedCard.purchasedLimit || 10);
+          cardRemainingItems = Math.max(
+            0,
+            limit - Number(appliedCard.purchasedItems || 0) - Number(appliedCard.reservedItems || 0),
+          );
+          promotionPercent = Math.min(
+            100,
+            Math.max(
+              0,
+              Number(appliedCard.discountPercent ?? settings.dartCardDiscountPercent) || 40,
+            ),
+          );
+          promotion = {
+            type: "Dart Card",
+            percent: promotionPercent,
+            cardId: String(appliedCard.cardId || appliedCard.id || ""),
+          };
+        }
+      }
+
       let subtotalMinor = 0;
       let finalMinor = 0;
+      let cardAppliedItems = 0;
       const itemSnapshots = itemResult.rows.map((row) => {
         const sellingMinor = Number(row.selling_minor);
         const modelDiscountPercent = Number(row.discount_percent || 0);
-        const effectiveDiscountPercent = promotionPercent || modelDiscountPercent;
+        const resolvedDiscount = resolveItemDiscount(
+          modelDiscountPercent,
+          promotion,
+          cardRemainingItems - cardAppliedItems,
+        );
+        const effectiveDiscountPercent = resolvedDiscount.percent;
+        const discountSource = resolvedDiscount.source;
+        const discountReference = resolvedDiscount.reference || (discountSource === "Model" ? row.model_id : "");
+        if (resolvedDiscount.consumesDartCardSlot) cardAppliedItems += 1;
         const finalUnitMinor = finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
         subtotalMinor += sellingMinor;
         finalMinor += finalUnitMinor;
@@ -2067,11 +2081,18 @@ export class CommerceService {
           sellingMinor,
           modelDiscountPercent,
           effectiveDiscountPercent,
+          discountSource,
+          discountReference,
+          discountMinor: Math.max(0, sellingMinor - finalUnitMinor),
           finalUnitMinor,
           costMinor: Number(row.cost_snapshot_minor),
         };
       });
       const orderDiscountMinor = Math.max(0, subtotalMinor - finalMinor);
+      const benefitDiscountMinor = itemSnapshots
+        .filter((snapshot) => snapshot.discountSource !== "Model" && snapshot.discountSource !== "None")
+        .reduce((sum, snapshot) => sum + snapshot.discountMinor, 0);
+      if (promotion) promotion.discountMinor = benefitDiscountMinor;
       // The representative is paid once per order, not once per item.
       // Item cost already includes this allocation, so Finance must not add it again.
       const deliveryCostMinor = courierFeePerOrderMinor;
@@ -2134,15 +2155,18 @@ export class CommerceService {
       }
 
       if (promotion?.type === "Dart Card" && appliedCard) {
-        const reservedItems = Number(appliedCard.reservedItems || 0) + itemResult.rows.length;
+        const dartCardSnapshots = itemSnapshots.filter(
+          (snapshot) => snapshot.discountSource === "Dart Card",
+        );
+        const reservedItems = Number(appliedCard.reservedItems || 0) + dartCardSnapshots.length;
         appliedCard.reservedItems = reservedItems;
         const reservedOrders = Array.isArray(appliedCard.reservedOrders)
           ? appliedCard.reservedOrders as Record<string, unknown>[]
           : [];
         reservedOrders.push({
           orderId: order.order_code,
-          itemCount: itemResult.rows.length,
-          itemCodes: itemResult.rows.map((row) => row.item_code),
+          itemCount: dartCardSnapshots.length,
+          itemCodes: dartCardSnapshots.map((snapshot) => snapshot.row.item_code),
           reservedAt: new Date().toISOString(),
         });
         appliedCard.reservedOrders = reservedOrders;
@@ -2163,8 +2187,9 @@ export class CommerceService {
         await client.query(
           `INSERT INTO order_items (
              order_id, inventory_item_id, item_code, model_id, model_name, color, size,
-             original_unit_minor, model_discount_percent, final_unit_minor, cost_snapshot_minor
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+             original_unit_minor, model_discount_percent, final_unit_minor, cost_snapshot_minor,
+             discount_source, discount_percent, discount_minor, discount_reference
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [
             order.id,
             row.id,
@@ -2174,9 +2199,13 @@ export class CommerceService {
             row.color,
             row.size,
             snapshot.sellingMinor,
-            snapshot.effectiveDiscountPercent,
+            snapshot.modelDiscountPercent,
             snapshot.finalUnitMinor,
             snapshot.costMinor,
+            snapshot.discountSource,
+            snapshot.effectiveDiscountPercent,
+            snapshot.discountMinor,
+            snapshot.discountReference || null,
           ],
         );
       }
@@ -2342,6 +2371,8 @@ export class CommerceService {
           originalUnitPrice: snapshot.sellingMinor / 100,
           discountPercent: snapshot.effectiveDiscountPercent,
           discountAmount: (snapshot.sellingMinor - snapshot.finalUnitMinor) / 100,
+          discountSource: snapshot.discountSource,
+          discountReference: snapshot.discountReference,
           finalUnitPrice: snapshot.finalUnitMinor / 100,
           costSnapshot: snapshot.costMinor / 100,
         })),
@@ -3360,13 +3391,14 @@ export class CommerceService {
         color: string;
         size: string;
         final_unit_minor: string;
+        discount_source: string;
       }>(
         `SELECT o.id::text AS order_id, o.order_code, o.status AS order_status,
                 o.final_minor::text, o.amount_refunded_minor::text, o.promotion,
                 o.customer_user_id::text, c.client_code, c.full_name AS customer_name,
                 u.email, o.contact_snapshot,
                 oi.inventory_item_id, oi.item_code, oi.model_id, oi.model_name,
-                oi.color, oi.size, oi.final_unit_minor::text
+                oi.color, oi.size, oi.final_unit_minor::text, oi.discount_source
            FROM orders o
            JOIN order_items oi ON oi.order_id=o.id
            LEFT JOIN customers c ON c.user_id=o.customer_user_id
@@ -3608,8 +3640,8 @@ export class CommerceService {
       if (
         line.promotion?.type === "Dart Card" &&
         line.promotion?.cardId &&
-        !existing &&
-        requestedRefundMinor > 0
+        line.discount_source === "Dart Card" &&
+        !record.dartCardUsageReversed
       ) {
         const cardStateResult = await client.query<{ version: string }>(
           "SELECT version::text FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
@@ -3695,6 +3727,7 @@ export class CommerceService {
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
       );
+      await client.query("SELECT dart_restore_birthday_discount_after_return($1::uuid)", [line.order_id]);
 
       await client.query(
         `INSERT INTO audit_logs (
@@ -3761,13 +3794,15 @@ export class CommerceService {
         contact_snapshot: Record<string, unknown>;
         client_code: string | null;
         line_final_minor: string;
+        discount_source: string;
       }>(
         `SELECT i.id AS item_id, i.item_code, i.model_id, i.color, i.size,
                 i.status AS item_status,
                 o.id::text AS order_db_id, o.order_code, o.customer_user_id::text,
                 o.final_minor::text, o.amount_refunded_minor::text,
                 o.payment_status, o.promotion, o.contact_snapshot,
-                c.client_code, oi.final_unit_minor::text AS line_final_minor
+                c.client_code, oi.final_unit_minor::text AS line_final_minor,
+                oi.discount_source
            FROM inventory_items i
            JOIN order_items oi ON oi.inventory_item_id=i.id
            JOIN orders o ON o.id=oi.order_id
@@ -4014,6 +4049,7 @@ export class CommerceService {
       if (
         item.promotion?.type === "Dart Card" &&
         item.promotion?.cardId &&
+        item.discount_source === "Dart Card" &&
         !record.dartCardUsageReversed
       ) {
         const cardStateResult = await client.query<{ version: string }>(
@@ -4079,6 +4115,7 @@ export class CommerceService {
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
       );
+      await client.query("SELECT dart_restore_birthday_discount_after_return($1::uuid)", [item.order_db_id]);
       await client.query(
         `INSERT INTO audit_logs (
            actor_type, actor_id, action, entity_type, entity_id, request_id,
@@ -4576,6 +4613,7 @@ export class CommerceService {
 
       const previousStatus = String(record.status || "");
       const now = new Date().toISOString();
+      let completedOrderId = "";
 
       if (action === "start") {
         if (!["Representative Assigned", "Pickup On The Way"].includes(previousStatus)) {
@@ -4685,6 +4723,12 @@ export class CommerceService {
         if (!order) {
           throw new AppError(409, "RETURN_ORDER_NOT_FOUND", "The original delivered order could not be found");
         }
+        completedOrderId = order.id;
+        const discountLineResult = await client.query<{ discount_source: string }>(
+          "SELECT discount_source FROM order_items WHERE order_id=$1 AND item_code=$2 FOR UPDATE",
+          [order.id, itemCode],
+        );
+        const returnedDiscountSource = discountLineResult.rows[0]?.discount_source || "None";
 
         const requestType = String(record.requestType || "");
         await client.query(
@@ -4723,7 +4767,11 @@ export class CommerceService {
           record.refundAmount = refundMinor / 100;
           record.financialCompletionApplied = true;
 
-          if (order.promotion?.type === "Dart Card" && order.promotion?.cardId) {
+          if (
+            order.promotion?.type === "Dart Card" &&
+            order.promotion?.cardId &&
+            returnedDiscountSource === "Dart Card"
+          ) {
             const cardStateResult = await client.query<{ version: string }>(
               "SELECT version::text FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
             );
@@ -4901,6 +4949,10 @@ export class CommerceService {
         );
       }
 
+      if (action === "complete" && completedOrderId) {
+        await client.query("SELECT dart_restore_birthday_discount_after_return($1::uuid)", [completedOrderId]);
+      }
+
       await client.query(
         `INSERT INTO audit_logs (
            actor_type, actor_id, action, entity_type, entity_id, metadata
@@ -5004,8 +5056,10 @@ export class CommerceService {
                 'size', oi.size,
                 'qty', 1,
                 'originalUnitPrice', oi.original_unit_minor / 100.0,
-                'discountPercent', oi.model_discount_percent,
+                'discountPercent', oi.discount_percent,
                 'discountAmount', (oi.original_unit_minor - oi.final_unit_minor) / 100.0,
+                'discountSource', oi.discount_source,
+                'discountReference', oi.discount_reference,
                 'finalUnitPrice', oi.final_unit_minor / 100.0,
                 'costSnapshot', oi.cost_snapshot_minor / 100.0
               )
@@ -6976,8 +7030,9 @@ export class CommerceService {
       model_id: string;
       color: string;
       size: string;
+      discount_source: string;
     }>(
-      "SELECT item_code, model_id, color, size FROM order_items WHERE order_id=$1 ORDER BY created_at, id",
+      "SELECT item_code, model_id, color, size, discount_source FROM order_items WHERE order_id=$1 ORDER BY created_at, id",
       [orderId],
     );
     const itemCodes = itemRows.rows.map((row) => row.item_code);
@@ -7190,7 +7245,11 @@ export class CommerceService {
           ? card.reservedOrders as Record<string, unknown>[]
           : [];
         const reservation = reservations.find((row) => String(row.orderId || "") === orderCode);
-        const reservedCount = Number(reservation?.itemCount || itemCount || 0);
+        const discountedItemRows = itemRows.rows.filter(
+          (row) => row.discount_source === "Dart Card",
+        );
+        const discountedItemCodes = discountedItemRows.map((row) => row.item_code);
+        const reservedCount = Number(reservation?.itemCount || discountedItemRows.length || 0);
         const removeReservation = () => {
           card.reservedOrders = reservations.filter((row) => String(row.orderId || "") !== orderCode);
           card.reservedItems = Math.max(0, Number(card.reservedItems || 0) - reservedCount);
@@ -7200,20 +7259,20 @@ export class CommerceService {
           removeReservation();
           card.purchasedItems = String(Number(card.purchasedItems || 0) + reservedCount);
           card.requestedProducts = [
-            ...new Set([...(Array.isArray(card.requestedProducts) ? card.requestedProducts : []), ...itemCodes]),
+            ...new Set([...(Array.isArray(card.requestedProducts) ? card.requestedProducts : []), ...discountedItemCodes]),
           ];
         } else if (["Cancelled", "Refused"].includes(nextStatus)) {
           removeReservation();
           if (previousStatus === "Delivered") {
-            card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - itemCount));
+            card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - discountedItemRows.length));
           }
         } else if (previousStatus === "Delivered" && nextStatus !== "Delivered") {
-          card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - itemCount));
+          card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - discountedItemRows.length));
           if (!reservations.some((row) => String(row.orderId || "") === orderCode)) {
             reservations.push({
               orderId: orderCode,
-              itemCount,
-              itemCodes,
+              itemCount: discountedItemRows.length,
+              itemCodes: discountedItemCodes,
               reservedAt: new Date().toISOString(),
             });
             card.reservedOrders = reservations;
@@ -7468,8 +7527,10 @@ export class CommerceService {
                     'size', oi.size,
                     'qty', 1,
                     'originalUnitPrice', oi.original_unit_minor / 100.0,
-                    'discountPercent', oi.model_discount_percent,
+                    'discountPercent', oi.discount_percent,
                     'discountAmount', (oi.original_unit_minor - oi.final_unit_minor) / 100.0,
+                    'discountSource', oi.discount_source,
+                    'discountReference', oi.discount_reference,
                     'finalUnitPrice', oi.final_unit_minor / 100.0,
                     'costSnapshot', oi.cost_snapshot_minor / 100.0
                   ) ORDER BY oi.created_at, oi.id

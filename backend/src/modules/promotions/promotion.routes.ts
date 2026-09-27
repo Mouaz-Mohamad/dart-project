@@ -62,6 +62,20 @@ export function createPromotionRouter(
   );
 
   router.get(
+    "/me/promotions/resolve",
+    signedIn,
+    requireAccountType("customer"),
+    async (request, response) => {
+      const targetReservation = reservationId.parse(request.query.reservationId);
+      const code = z.string().trim().min(1).max(60).optional().parse(request.query.code);
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(
+        await promotions.resolveForCheckout(request.auth!.userId, targetReservation, code),
+      );
+    },
+  );
+
+  router.get(
     "/admin/promotions",
     signedIn,
     requireAccountType("staff"),

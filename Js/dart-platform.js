@@ -1708,26 +1708,37 @@
         );
       }
     }
-    const sitePromotion = window.DartSiteSettings?.activeSiteDiscount?.() || null;
-    if (sitePromotion) {
-      appliedCard = null;
-      discountRate = Math.max(0, Math.min(1, Number(sitePromotion.percent || 0) / 100));
-    }
-    // Birthday always takes priority and never consumes Dart Card quota.
-    // Full priority is Birthday, then site-wide promotion, then Dart Card. Never stack.
-    if (birthdayReward) {
-      appliedCard = null;
-      discountRate = Math.max(
-        0,
-        Math.min(1, Number(birthdayReward.discountPercent ?? 30) / 100),
-      );
-    }
-    const orderLevelPromotion = birthdayReward || sitePromotion || appliedCard ||
-      (discountRate > 0 ? window.dartAppliedPromotion : null);
-    if (orderLevelPromotion)
-      subtotal = snapshots.reduce((sum, line) => sum + Number(line.originalUnitPrice || line.finalUnitPrice || 0), 0);
-    const discountAmount = subtotal * discountRate;
-    const finalAmount = Math.max(0, subtotal - discountAmount);
+    const campaign = discountRate > 0 ? window.dartAppliedPromotion : null;
+    const fallbackPromotion = campaign || birthdayReward || appliedCard || null;
+    const fallbackRate = campaign
+      ? discountRate
+      : birthdayReward
+        ? Math.max(0, Math.min(1, Number(birthdayReward.discountPercent ?? 30) / 100))
+        : appliedCard
+          ? Math.max(0, Math.min(1, Number(appliedCard.discountPercent ?? 40) / 100))
+          : 0;
+    let cardRemaining = appliedCard
+      ? Math.max(0, Number(appliedCard.itemLimit || appliedCard.purchasedLimit || 10) - Number(appliedCard.purchasedItems || 0))
+      : 0;
+    snapshots.forEach((line) => {
+      const original = Number(line.originalUnitPrice || line.finalUnitPrice || 0);
+      const modelRate = Math.max(0, Math.min(1, Number(line.discountPercent || 0) / 100));
+      let rate = modelRate;
+      let source = modelRate ? "Model" : "None";
+      if (!modelRate && fallbackPromotion && (!appliedCard || cardRemaining > 0)) {
+        rate = fallbackRate;
+        source = campaign ? "Campaign" : birthdayReward ? "Birthday" : "Dart Card";
+        if (source === "Dart Card") cardRemaining -= 1;
+      }
+      line.discountPercent = rate * 100;
+      line.discountSource = source;
+      line.discountAmount = original * rate;
+      line.finalUnitPrice = Math.max(0, original - line.discountAmount);
+    });
+    subtotal = snapshots.reduce((sum, line) => sum + Number(line.originalUnitPrice || 0), 0);
+    const finalAmount = snapshots.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0), 0);
+    const discountAmount = Math.max(0, subtotal - finalAmount);
+    const orderLevelPromotion = fallbackPromotion;
     const order = {
       id: uid("ODB"),
       orderId,
@@ -1753,8 +1764,8 @@
       finalAmount,
       reasonDeduction: birthdayReward
         ? "Birthday gift"
-        : sitePromotion
-          ? "Site-wide discount"
+        : campaign
+          ? "Promotion campaign"
         : appliedCard
           ? "Dart Card"
         : discountRate
@@ -1764,14 +1775,13 @@
       birthdayRewardId: birthdayReward?.id || "",
       promotionType: birthdayReward
         ? "Birthday"
-        : sitePromotion
-          ? "Site"
+        : campaign
+          ? "Promotion"
         : appliedCard
           ? "Dart Card"
           : discountRate
             ? "Promotion"
             : "",
-      siteDiscountPercent: sitePromotion ? Number(sitePromotion.percent) || 0 : 0,
       paymentMethod: "Cash on Delivery",
       paymentStatus: "Unpaid",
       amountPaid: 0,
