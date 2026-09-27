@@ -22,11 +22,14 @@ describe("reward database integrity migrations", () => {
 
   it("serializes Promotion limits and releases cancelled/refused reservations", async () => {
     const sql = await migration("0040_rewards_promotions_draw_integrity.sql");
+    const itemPriority = await migration("0053_item_level_discount_priority.sql");
     expect(sql).toContain("FROM promotion_records");
     expect(sql).toContain("FOR UPDATE");
     expect(sql).toContain("PROMOTION_TOTAL_USAGE_LIMIT_REACHED");
     expect(sql).toContain("PROMOTION_CUSTOMER_USAGE_LIMIT_REACHED");
     expect(sql).toContain("status='Released'");
+    expect(itemPriority).toContain("campaign RECORD;");
+    expect(itemPriority).not.toContain("campaign promotion_records%ROWTYPE;");
   });
 
   it("keeps draw history compatibility and serializes active-card decisions", async () => {

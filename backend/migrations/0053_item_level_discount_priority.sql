@@ -45,7 +45,9 @@ DECLARE
   existing_order UUID;
   customer_birthday DATE;
   reward_record TEXT;
-  campaign promotion_records%ROWTYPE;
+  -- RECORD keeps function creation safe while integration workers rebuild domain tables.
+  -- The SELECT below still resolves and locks the authoritative campaign row at runtime.
+  campaign RECORD;
   total_limit INTEGER;
   customer_limit INTEGER;
   current_total INTEGER;
