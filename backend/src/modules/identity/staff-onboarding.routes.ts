@@ -18,6 +18,31 @@ function limiter() {
   });
 }
 
+function maskEmail(email: string): string {
+  const [local = "", domain = ""] = email.trim().toLowerCase().split("@");
+  return domain ? `${local.slice(0, 1) || "*"}***@${domain}` : "***";
+}
+
+async function recentStaffEmailFailure(
+  outbox: OutboxService,
+  email: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const recipient = maskEmail(email);
+    const events = await outbox.recentEvents(20);
+    return (
+      events.find(
+        (event) =>
+          String(event.eventType || "") === "STAFF_EMAIL_ACCESS_CODE_REQUESTED" &&
+          String(event.recipient || "") === recipient &&
+          String(event.status || "") === "failed",
+      ) || null
+    );
+  } catch {
+    return null;
+  }
+}
+
 function setCookies(
   response: Response,
   config: Pick<AppConfig, "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite">,
@@ -74,16 +99,25 @@ export function createStaffOnboardingRouter(
       try {
         const delivery = await outbox.processBatch(1, eventKey);
         if (delivery.published !== 1) {
+          const failedEvent = await recentStaffEmailFailure(outbox, body.email);
           logger?.warn(
-            { eventKey },
+            {
+              eventKey,
+              claimed: delivery.claimed,
+              published: delivery.published,
+              failed: delivery.failed,
+              lastError: failedEvent?.lastError || null,
+            },
             "Staff access email was not delivered immediately and remains queued",
           );
         }
       } catch (error) {
+        const failedEvent = await recentStaffEmailFailure(outbox, body.email);
         logger?.warn(
           {
             eventKey,
             errorName: error instanceof Error ? error.name : "Error",
+            lastError: failedEvent?.lastError || null,
           },
           "Staff access email dispatch failed and remains queued",
         );
@@ -93,7 +127,8 @@ export function createStaffOnboardingRouter(
     response.status(202).json({
       challengeId: result.challengeId,
       expiresAt: result.expiresAt.toISOString(),
-      message: "If this email is allowed, a verification code has been sent.",
+      message:
+        "If this email is allowed, the verification request was accepted. Delivery may take a moment.",
     });
   }
 

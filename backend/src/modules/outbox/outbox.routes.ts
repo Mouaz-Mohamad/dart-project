@@ -35,6 +35,9 @@ export function createOutboxRouter(
     response.status(200).json(await outbox.processBatch());
   }
 
+  // Vercel Cron invokes routes with GET and automatically supplies CRON_SECRET
+  // as a Bearer token. Keep POST for manual/operational retries.
+  router.get("/internal/outbox/process", process);
   router.post("/internal/outbox/process", process);
 
   return router;
