@@ -207,5 +207,14 @@ END
 $$;
 
 REVOKE ALL ON FUNCTION dart_restore_birthday_discount_after_return(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION dart_restore_birthday_discount_after_return(UUID) FROM anon;
-REVOKE ALL ON FUNCTION dart_restore_birthday_discount_after_return(UUID) FROM authenticated;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION dart_restore_birthday_discount_after_return(UUID) FROM anon';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION dart_restore_birthday_discount_after_return(UUID) FROM authenticated';
+  END IF;
+END
+$$;
