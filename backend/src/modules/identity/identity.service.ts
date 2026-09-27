@@ -1159,18 +1159,6 @@ export class IdentityService {
         return fallback;
       }
 
-      const recent = await client.query<{ count: string }>(
-        `SELECT count(*)::text AS count
-           FROM staff_email_login_challenges
-          WHERE email_normalized=$1
-            AND created_at >= now() - interval '1 hour'`,
-        [emailNormalized],
-      );
-      if (Number(recent.rows[0]?.count || 0) >= 4) {
-        await client.query("COMMIT");
-        return fallback;
-      }
-
       await client.query(
         `UPDATE staff_email_login_challenges
             SET consumed_at=COALESCE(consumed_at, now())
