@@ -127,8 +127,7 @@ export function createStaffOnboardingRouter(
     response.status(202).json({
       challengeId: result.challengeId,
       expiresAt: result.expiresAt.toISOString(),
-      message:
-        "If this email is allowed, the verification request was accepted. Delivery may take a moment.",
+      message: "If this email is allowed, a verification code has been sent.",
     });
   }
 

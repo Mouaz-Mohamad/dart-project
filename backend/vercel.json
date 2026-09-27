@@ -6,11 +6,5 @@
       "includeFiles": "migrations/**"
     }
   },
-  "buildCommand": "npm run build",
-  "crons": [
-    {
-      "path": "/api/v1/internal/outbox/process",
-      "schedule": "17 3 * * *"
-    }
-  ]
+  "buildCommand": "npm run build"
 }
