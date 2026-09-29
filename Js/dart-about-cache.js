@@ -3,7 +3,7 @@
 (function initDartAboutMediaGuard() {
   'use strict';
 
-  const ABOUT_FRAGMENT_CACHE_RESET_KEY = 'dart_about_fragment_cache_reset_v6';
+  const ABOUT_FRAGMENT_CACHE_RESET_KEY = 'dart_about_fragment_cache_reset_v7';
   const ABOUT_FRAGMENT_CACHE_KEYS = [
     'dart_fragment_v2:sections/story.html',
     'dart_fragment_v2:sections/card.html',
@@ -11,7 +11,7 @@
   ];
   const STORY_FRAGMENT_CACHE_KEY = 'dart_fragment_v2:sections/story.html';
   // Versioned URL bypasses any historical HTTP/media cache that held the old WebP source.
-  const FOUNDER_SRC = '/Photos/me.png?v=founder-png-v6';
+  const FOUNDER_SRC = '/Photos/me.png?v=founder-png-v7';
 
   function enforceFounderPng() {
     const founder = document.getElementById('dart-founder-image');
