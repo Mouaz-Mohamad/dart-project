@@ -1,6 +1,6 @@
-batch=23
-purpose=about-png-reflow-cache-fix
-frontend=about-png-media-repaint-service-worker-cache-refresh
+batch=24
+purpose=about-fragment-localstorage-cache-reset
+frontend=about-story-card-birthday-fragment-cache-invalidation
 backend=none
-scope=batch-23-production-release
+scope=batch-24-production-release
 trigger=production-deploy
