@@ -1,6 +1,6 @@
-batch=24
-purpose=about-fragment-localstorage-cache-reset
-frontend=about-story-card-birthday-fragment-cache-invalidation
+batch=25
+purpose=about-chrome-android-image-paint-fix
+frontend=disable-content-visibility-on-about-media-remove-repaint-workaround-preserve-fragment-cache-reset
 backend=none
-scope=batch-24-production-release
+scope=batch-25-production-release
 trigger=production-deploy
