@@ -1,6 +1,6 @@
-batch=22
-purpose=about-original-layout-restoration
-frontend=about-main-css-layout-responsive-override-removal-webp-images
+batch=23
+purpose=about-png-reflow-cache-fix
+frontend=about-png-media-repaint-service-worker-cache-refresh
 backend=none
-scope=batch-22-production-release
+scope=batch-23-production-release
 trigger=production-deploy
