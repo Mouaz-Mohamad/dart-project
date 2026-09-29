@@ -1,7 +1,7 @@
 // DART CODE GUIDE | sw.js
 // الغرض: Service Worker للموقع؛ يدير التخزين المؤقت وسلوك الشبكة دون أن يصبح مصدر بيانات تجاري.
 // Dart storefront cache: network-first for documents/code, cache-first fallback for media.
-const CACHE = 'dart-static-v22-founder-png-only';
+const CACHE = 'dart-static-v23-founder-png-only';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
@@ -13,7 +13,24 @@ self.addEventListener('activate', event => event.waitUntil(
         .filter(key => key.startsWith('dart-static-') && key !== CACHE)
         .map(key => caches.delete(key))
     ))
-    .then(() => self.clients.claim())
+    .then(async () => {
+      // Defensive cleanup in case a legacy founder WebP was stored in a
+      // non-versioned cache by an older worker.
+      const keys = await caches.keys();
+      await Promise.all(keys.map(async key => {
+        const cache = await caches.open(key);
+        const requests = await cache.keys();
+        await Promise.all(
+          requests
+            .filter(request => {
+              try { return new URL(request.url).pathname === '/Photos/me.webp'; }
+              catch { return false; }
+            })
+            .map(request => cache.delete(request))
+        );
+      }));
+      return self.clients.claim();
+    })
 ));
 
 self.addEventListener('fetch', event => {
@@ -27,23 +44,26 @@ self.addEventListener('fetch', event => {
     url.pathname.startsWith('/api/')
   ) return;
 
-  // Public About pages must never resolve the founder photo through the old
-  // WebP asset. Keep the dashboard fallback untouched, but make stale public
-  // <picture><source> requests fail so the browser falls back to me.png.
+  // The legacy founder WebP no longer exists in the repository. Older
+  // dashboard code may still request it as a preview fallback; preserve that
+  // preview by redirecting only Eye-originated requests to the PNG. Public
+  // requests deliberately fail so stale <picture><source> markup cannot win.
   if (url.pathname === '/Photos/me.webp') {
     let referrerPath = '';
     try {
       referrerPath = request.referrer ? new URL(request.referrer).pathname : '';
     } catch {}
 
-    if (!referrerPath.startsWith('/Eye/')) {
+    if (referrerPath.startsWith('/Eye/')) {
+      event.respondWith(Promise.resolve(Response.redirect('/Photos/me.png?v=founder-png-v8', 302)));
+    } else {
       event.respondWith(Promise.resolve(new Response('', {
         status: 404,
         statusText: 'Founder PNG only',
         headers: { 'Cache-Control': 'no-store' }
       })));
-      return;
     }
+    return;
   }
 
   // Always revalidate the founder PNG instead of serving a historical media
