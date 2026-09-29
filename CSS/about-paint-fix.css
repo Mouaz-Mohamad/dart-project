@@ -1,0 +1,11 @@
+/* DART CODE GUIDE | CSS/about-paint-fix.css
+   الغرض: تثبيت رسم صور صفحة About على Chrome/Android بدون تغيير التصميم أو مواضع الصور. */
+
+@supports (content-visibility: auto) {
+  #story,
+  #card-details,
+  #birthday-details {
+    content-visibility: visible;
+    contain-intrinsic-size: auto;
+  }
+}
