@@ -1,6 +1,6 @@
-batch=21
-purpose=about-page-media-restoration
-frontend=story-founder-image-dart-card-image-birthday-image-responsive-layout-cache-recovery
+batch=22
+purpose=about-original-layout-restoration
+frontend=about-main-css-layout-responsive-override-removal-webp-images
 backend=none
-scope=batch-20-production-release
+scope=batch-22-production-release
 trigger=production-deploy
