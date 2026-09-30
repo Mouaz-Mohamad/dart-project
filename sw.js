@@ -1,7 +1,7 @@
 // DART CODE GUIDE | sw.js
 // الغرض: Service Worker للموقع؛ يدير التخزين المؤقت وسلوك الشبكة دون أن يصبح مصدر بيانات تجاري.
 // Dart storefront cache: network-first for documents/code, cache-first fallback for media.
-const CACHE = 'dart-static-v24-founder-png-v8';
+const CACHE = 'dart-static-v25-founder-png-v9';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
@@ -23,8 +23,10 @@ self.addEventListener('activate', event => event.waitUntil(
         await Promise.all(
           requests
             .filter(request => {
-              try { return new URL(request.url).pathname === '/Photos/me.webp'; }
-              catch { return false; }
+              try {
+                const pathname = new URL(request.url).pathname;
+                return pathname === '/Photos/me.webp' || pathname === '/Photos/me.png';
+              } catch { return false; }
             })
             .map(request => cache.delete(request))
         );
@@ -44,25 +46,11 @@ self.addEventListener('fetch', event => {
     url.pathname.startsWith('/api/')
   ) return;
 
-  // The legacy founder WebP no longer exists in the repository. Older
-  // dashboard code may still request it as a preview fallback; preserve that
-  // preview by redirecting only Eye-originated requests to the PNG. Public
-  // requests deliberately fail so stale <picture><source> markup cannot win.
+  // Any historical request for the removed founder WebP must resolve to the
+  // canonical PNG. This also protects users still running an old cached About
+  // fragment or dashboard preview without ever serving a WebP founder image.
   if (url.pathname === '/Photos/me.webp') {
-    let referrerPath = '';
-    try {
-      referrerPath = request.referrer ? new URL(request.referrer).pathname : '';
-    } catch {}
-
-    if (referrerPath.startsWith('/Eye/')) {
-      event.respondWith(Promise.resolve(Response.redirect('/Photos/me.png?v=founder-png-v8', 302)));
-    } else {
-      event.respondWith(Promise.resolve(new Response('', {
-        status: 404,
-        statusText: 'Founder PNG only',
-        headers: { 'Cache-Control': 'no-store' }
-      })));
-    }
+    event.respondWith(Promise.resolve(Response.redirect('/Photos/me.png?v=founder-png-v9', 302)));
     return;
   }
 
