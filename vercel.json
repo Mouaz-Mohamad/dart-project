@@ -27,6 +27,19 @@
       ]
     },
     {
+      "source": "/Photos/me.png",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
@@ -68,6 +81,13 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/Photos/me.webp",
+      "destination": "/Photos/me.png?v=founder-png-v9",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -76,4 +96,3 @@
   ],
   "ignoreCommand": "bash scripts/vercel-ignore-frontend.sh"
 }
-
