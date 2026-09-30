@@ -432,11 +432,11 @@
     }).setView([destination.lat, destination.lng], 15);
     map.attributionControl?.setPrefix(false);
     const tileLayer = L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4571_1_f3f5f58e8a8808e98e8b6df9",
       {
         maxZoom: 19,
-        subdomains: "abc",
-        attribution: "&copy; OpenStreetMap contributors",
+        subdomains: "abcd",
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         updateWhenIdle: false,
         keepBuffer: 4,
       },
