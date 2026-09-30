@@ -35,7 +35,16 @@
         },
         {
           "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/Photos/me.webp",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
         }
       ]
     },
@@ -84,7 +93,7 @@
   "redirects": [
     {
       "source": "/Photos/me.webp",
-      "destination": "/Photos/me.png?v=founder-png-v9",
+      "destination": "/Photos/me.png?v=founder-png-v10",
       "permanent": false
     }
   ],

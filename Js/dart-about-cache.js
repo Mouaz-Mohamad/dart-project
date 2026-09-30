@@ -3,7 +3,7 @@
 (function initDartAboutMediaGuard() {
   'use strict';
 
-  const ABOUT_FRAGMENT_CACHE_RESET_KEY = 'dart_about_fragment_cache_reset_v9';
+  const ABOUT_FRAGMENT_CACHE_RESET_KEY = 'dart_about_fragment_cache_reset_v10';
   const ABOUT_FRAGMENT_CACHE_KEYS = [
     'dart_fragment_v2:sections/story.html',
     'dart_fragment_v2:sections/card.html',
@@ -11,7 +11,7 @@
   ];
   const STORY_FRAGMENT_CACHE_KEY = 'dart_fragment_v2:sections/story.html';
   // Versioned URL bypasses every historical HTTP/media cache entry for this image.
-  const FOUNDER_SRC = '/Photos/me.png?v=founder-png-v9';
+  const FOUNDER_SRC = '/Photos/me.png?v=founder-png-v10';
 
   function enforceFounderPng() {
     const founder = document.getElementById('dart-founder-image');

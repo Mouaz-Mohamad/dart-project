@@ -1,8 +1,9 @@
 // DART CODE GUIDE | sw.js
 // الغرض: Service Worker للموقع؛ يدير التخزين المؤقت وسلوك الشبكة دون أن يصبح مصدر بيانات تجاري.
 // Dart storefront cache: network-first for documents/code, cache-first fallback for media.
-const CACHE = 'dart-static-v25-founder-png-v9';
+const CACHE = 'dart-static-v26-founder-png-v10';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
+const FOUNDER_PNG_URL = '/Photos/me.png?v=founder-png-v10';
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
 
@@ -46,27 +47,18 @@ self.addEventListener('fetch', event => {
     url.pathname.startsWith('/api/')
   ) return;
 
-  // Any historical request for the removed founder WebP must resolve to the
-  // canonical PNG. This also protects users still running an old cached About
-  // fragment or dashboard preview without ever serving a WebP founder image.
-  if (url.pathname === '/Photos/me.webp') {
-    event.respondWith(Promise.resolve(Response.redirect('/Photos/me.png?v=founder-png-v9', 302)));
-    return;
-  }
-
-  // Always revalidate the founder PNG instead of serving a historical media
-  // cache entry. A fresh successful PNG is still saved for offline fallback.
-  if (url.pathname === '/Photos/me.png') {
+  // Any historical founder URL always resolves to the canonical PNG. Do not
+  // persist this image in CacheStorage so stale WebP/PNG responses cannot win.
+  if (url.pathname === '/Photos/me.webp' || url.pathname === '/Photos/me.png') {
     event.respondWith(
-      fetch(request, { cache: 'reload' })
-        .then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
+      fetch(new Request(FOUNDER_PNG_URL, {
+        method: 'GET',
+        headers: request.headers,
+        mode: 'same-origin',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        redirect: 'follow'
+      }))
     );
     return;
   }
