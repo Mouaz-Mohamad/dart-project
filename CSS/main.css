@@ -3150,7 +3150,7 @@ button,
 
 /* Size Chart: the page stays fixed; only the measurement viewport scrolls. */
 .product-size-chart-dialog {
-  width: min(900px, calc(100vw - 24px));
+  width: min(310px, calc(100vw - 24px));
   max-height: calc(100dvh - 32px);
   overflow: hidden;
   display: flex;
