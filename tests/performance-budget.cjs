@@ -105,6 +105,33 @@ if (homeInitialJsBytes > 350 * 1024) {
   failures.push(`Homepage direct JavaScript is ${Math.ceil(homeInitialJsBytes / 1024)}KB; budget is 350KB`);
 }
 
+const homeCssSources = ["CSS/main.css", "CSS/base.css", "CSS/responsive.css"];
+const expectedHomeCss =
+  "/* DART HOME CSS BUNDLE\n" +
+  "   Generated from CSS/main.css + CSS/base.css + CSS/responsive.css\n" +
+  "   Keep source files authoritative; this bundle is home-page delivery only. */\n\n" +
+  fs.readFileSync(homeCssSources[0], "utf8").trimEnd() +
+  "\n\n/* === CSS/base.css === */\n" +
+  fs.readFileSync(homeCssSources[1], "utf8").trimEnd() +
+  "\n\n/* === CSS/responsive.css === */\n" +
+  fs.readFileSync(homeCssSources[2], "utf8").trimEnd() +
+  "\n";
+if (!fs.existsSync("CSS/home.css")) {
+  failures.push("CSS/home.css: homepage stylesheet bundle is missing");
+} else if (fs.readFileSync("CSS/home.css", "utf8") !== expectedHomeCss) {
+  failures.push("CSS/home.css: bundle is stale; rebuild it from main.css + base.css + responsive.css in that order");
+}
+if (!/<link\b[^>]*href=["']CSS\/home\.css["'][^>]*>/i.test(homeHtml)) {
+  failures.push("index.html: homepage must load CSS/home.css");
+}
+for (const source of homeCssSources) {
+  const sourceName = source.replace("CSS/", "");
+  const directPattern = new RegExp(`<link\\b[^>]*href=[\"']CSS\\/${sourceName.replace(".", "\\.")}[\"'][^>]*>`, "i");
+  if (directPattern.test(homeHtml)) {
+    failures.push(`index.html: ${source} must not load separately from CSS/home.css`);
+  }
+}
+
 const imageFiles = walk("Photos").filter((file) => /\.(?:png|jpe?g|webp)$/i.test(file));
 const maxImageBytes = 2500 * 1024;
 for (const file of imageFiles) {
