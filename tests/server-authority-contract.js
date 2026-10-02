@@ -349,14 +349,19 @@ assert.ok(
 
 assert.match(
   serviceWorker,
-  /\(\?:js\|css\)/,
-  "service worker must recognize JavaScript and CSS requests",
+  /new Request\(request, \{ cache: 'no-cache' \}\)/,
+  "service worker must explicitly revalidate public requests while online",
 );
-const codeBranch = serviceWorker.slice(serviceWorker.indexOf("js|css"));
+const networkFirstBranch = serviceWorker.slice(serviceWorker.indexOf("async function networkFirst"));
 assert.match(
-  codeBranch,
-  /fetch\(request\)[\s\S]*caches\.match\(request\)/,
-  "JavaScript and CSS must try the network before cached fallback so devices do not run stale business logic",
+  networkFirstBranch,
+  /fetch\(refreshRequest\)[\s\S]*caches\.match\(request\)/,
+  "public assets must try a revalidated network request before cached fallback so devices do not run stale content",
+);
+assert.match(
+  serviceWorker,
+  /event\.respondWith\(networkFirst\(request\)\)/,
+  "all same-origin public GET assets must use the shared network-first cache policy",
 );
 
 console.log("PASS server-authority contract");
