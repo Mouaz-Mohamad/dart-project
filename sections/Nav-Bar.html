@@ -3,11 +3,11 @@
 <header class="hedar-nav" aria-label="Main Navigation | القائمة الرئيسية">
     <div class="top djasb">
         <div class='logo'>
-            <img src="/Photos/Logos/01_Dart_original_transparent 2.png" alt="Dart wordmark with a burgundy bird forming the letter r">
+            <img src="/Photos/Logos/01_Dart_original_transparent 2.png" alt="Dart wordmark with a burgundy bird forming the letter r" decoding="async">
         </div>
-        <aside class='icon-menu dja'>
-            <img class="fa-bars " src="/Icons/Menu.svg" alt="Open navigation menu" style="height: 40px; width: 40px;">
-        </aside>
+        <button type="button" class="icon-menu dja" aria-label="Open navigation menu" aria-expanded="false" aria-controls="dartSideMenu">
+            <img class="fa-bars" src="/Icons/Menu.svg" alt="" aria-hidden="true" width="40" height="40">
+        </button>
     </div>
     
     <div class="under-nav djasb">
@@ -19,21 +19,20 @@
         <aside class="icon-shop dja">
             <span id="cartCount" class="cart-count" style="display: none;">0</span>
             <a href="/cart-checkout.html" aria-label="Open shopping cart">
-            <img class="fa-cart-shopping dart-nav-icon" src="/Icons/Shipping.svg" alt="Open shopping cart"></a>
+            <img class="fa-cart-shopping dart-nav-icon" src="/Icons/Shipping.svg" alt="" aria-hidden="true"></a>
         </aside>
     </div>
-         <div class="menu-facke"></div>
-    <nav class="side-menu">
+    <div class="menu-facke" aria-hidden="true"></div>
+    <nav class="side-menu" id="dartSideMenu" aria-label="Primary navigation" aria-hidden="true">
         <ul class="menu-list">
-            <li><a class="djasb" href="/index.html">Home <span>&#9656;</span></a></li>
-            <li><a class="djasb" href="/about.html">About <span>&#9656;</span></a></li>
-            <li><a class="djasb" href="/products.html">Product <span>&#9656;</span></a></li>
-            <li><a class="djasb" href="/Contact%20us.html">Contact Us <span>&#9656;</span></a></li>
-            <li><a class="djasb" href="/track.html">Track Your Order <span>&#9656</span></a></li>
-            <li><a class="djasb" href="/form-return.html">Returns & Exchanges<span>&#9656</span></a></li>
-            <li><a class="djasb" href="/search-serial.html">Track Your Item<span>&#9656</span></a></li>
+            <li><a class="djasb" href="/index.html">Home <span aria-hidden="true">&#9656;</span></a></li>
+            <li><a class="djasb" href="/about.html">About <span aria-hidden="true">&#9656;</span></a></li>
+            <li><a class="djasb" href="/products.html">Product <span aria-hidden="true">&#9656;</span></a></li>
+            <li><a class="djasb" href="/Contact%20us.html">Contact Us <span aria-hidden="true">&#9656;</span></a></li>
+            <li><a class="djasb" href="/track.html">Track Your Order <span aria-hidden="true">&#9656;</span></a></li>
+            <li><a class="djasb" href="/form-return.html">Returns &amp; Exchanges<span aria-hidden="true">&#9656;</span></a></li>
+            <li><a class="djasb" href="/search-serial.html">Track Your Item<span aria-hidden="true">&#9656;</span></a></li>
         </ul>
-   
 
         <!-- قسم أيقونات التواصل الاجتماعي -->
         <div class="social-icons dja" aria-label="Dart social media">
