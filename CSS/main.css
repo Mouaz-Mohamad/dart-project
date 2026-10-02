@@ -973,7 +973,7 @@ header {
 .model-carousel {
     position: relative;
     width: 100%;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 3 / 4;
     border-radius: 20px;
     overflow: hidden;
     flex-shrink: 0;
