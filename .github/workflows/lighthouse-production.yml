@@ -1,0 +1,85 @@
+# DART CODE GUIDE | .github/workflows/lighthouse-production.yml
+# الغرض: قياس PageSpeed/Lighthouse للموقع الحقيقي بعد نجاح Production checks.
+name: Lighthouse Production Audit
+
+on:
+  workflow_run:
+    workflows: ["Production checks"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lighthouse-production-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout audited commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Resolve Chrome
+        id: chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_PATH" ]; then
+            echo "No system Chrome found; installing Playwright Chromium fallback."
+            npm install --no-save --package-lock=false playwright@1.55.0
+            npx playwright install --with-deps chromium
+            CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
+          fi
+          echo "path=$CHROME_PATH" >> "$GITHUB_OUTPUT"
+          "$CHROME_PATH" --version || true
+
+      - name: Run Mobile Lighthouse
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.path }}
+        run: |
+          npx --yes lighthouse@latest "https://dart-project-psi.vercel.app/" \
+            --quiet \
+            --chrome-path="$CHROME_PATH" \
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+            --only-categories=performance,accessibility,best-practices,seo \
+            --output=json \
+            --output-path=./lighthouse-mobile.json
+
+      - name: Run Desktop Lighthouse
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.path }}
+        run: |
+          npx --yes lighthouse@latest "https://dart-project-psi.vercel.app/" \
+            --quiet \
+            --chrome-path="$CHROME_PATH" \
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+            --preset=desktop \
+            --only-categories=performance,accessibility,best-practices,seo \
+            --output=json \
+            --output-path=./lighthouse-desktop.json
+
+      - name: Print Dart Lighthouse summary
+        run: node scripts/lighthouse-summary.mjs lighthouse-mobile.json lighthouse-desktop.json
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-lighthouse-${{ github.event.workflow_run.head_sha }}
+          path: |
+            lighthouse-mobile.json
+            lighthouse-desktop.json
+          retention-days: 7
