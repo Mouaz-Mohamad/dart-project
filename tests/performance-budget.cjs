@@ -83,6 +83,7 @@ if (/script[^>]+src=["']dart-finance\.js["']/i.test(dashboardHtml)) {
 if (!dashboardRuntime.includes('script.src = "dart-finance.js"')) {
   failures.push("Eye/dart.js: Finance lazy loader is missing");
 }
+
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
 let coreJsBytes = 0;
@@ -97,33 +98,62 @@ for (const file of jsFiles) {
 if (coreJsBytes > 900 * 1024) {
   failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 900KB`);
 }
-
-// Repository total is a maintainability ceiling, not a page-load metric. Keep it
-// bounded, but also budget the scripts the public homepage actually requests.
 if (totalJsBytes > 1150 * 1024) {
   failures.push(`Repository browser JavaScript is ${Math.ceil(totalJsBytes / 1024)}KB; budget is 1150KB`);
 }
-const homeGeneratedScripts = [
-  ["Js/dart-ui.js", "Js/dart-ui.home.min.js"],
-  ["Js/dart-platform.js", "Js/dart-platform.home.min.js"],
-];
-for (const [sourceFile, generatedFile] of homeGeneratedScripts) {
+
+// Platform delivery is still an exact minified derivative of dart-platform.js.
+const generatedPlatformRuntime = ["Js/dart-platform.js", "Js/dart-platform.home.min.js"];
+{
+  const [sourceFile, generatedFile] = generatedPlatformRuntime;
   if (!fs.existsSync(generatedFile)) {
     failures.push(`${generatedFile}: generated homepage runtime is missing`);
-    continue;
+  } else {
+    const sourceHash = crypto
+      .createHash("sha256")
+      .update(fs.readFileSync(sourceFile, "utf8"), "utf8")
+      .digest("hex");
+    const banner = `/* source-sha256:${sourceHash}; terser:5.44.0 */`;
+    if (!fs.readFileSync(generatedFile, "utf8").startsWith(banner)) {
+      failures.push(`${generatedFile}: stale minified runtime; rebuild from ${sourceFile} with Terser 5.44.0`);
+    }
   }
-  const sourceHash = crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(sourceFile, "utf8"), "utf8")
-    .digest("hex");
-  const banner = `/* source-sha256:${sourceHash}; terser:5.44.0 */`;
-  if (!fs.readFileSync(generatedFile, "utf8").startsWith(banner)) {
-    failures.push(`${generatedFile}: stale minified runtime; rebuild from ${sourceFile} with Terser 5.44.0`);
+}
+
+// Homepage UI is now a curated page-scoped runtime, not a minified copy of dart-ui.js.
+const curatedHomeUi = "Js/dart-ui.home.min.js";
+if (!fs.existsSync(curatedHomeUi)) {
+  failures.push(`${curatedHomeUi}: curated homepage UI runtime is missing`);
+} else {
+  const source = fs.readFileSync(curatedHomeUi, "utf8");
+  if (!source.includes("Homepage-only storefront runtime")) {
+    failures.push(`${curatedHomeUi}: missing curated homepage runtime marker`);
+  }
+  for (const [label, pattern] of [
+    ["checkout", /\bcheckoutForm\b/],
+    ["tracking", /\btracking-card\b/],
+    ["returns", /\breturnRequestForm\b/],
+    ["maps", /\bdartCheckoutAddress\b/],
+  ]) {
+    if (pattern.test(source)) {
+      failures.push(`${curatedHomeUi}: ${label} code must stay out of the homepage runtime`);
+    }
+  }
+  const size = fs.statSync(curatedHomeUi).size;
+  if (size > 40 * 1024) {
+    failures.push(`${curatedHomeUi}: ${Math.ceil(size / 1024)}KB exceeds the 40KB curated UI budget`);
   }
 }
 
 const homeHtml = fs.readFileSync("index.html", "utf8");
-for (const [sourceFile, generatedFile] of homeGeneratedScripts) {
+if (!homeHtml.includes(`src="${curatedHomeUi}"`)) {
+  failures.push(`index.html: homepage must load ${curatedHomeUi}`);
+}
+if (homeHtml.includes('src="Js/dart-ui.js"')) {
+  failures.push("index.html: homepage must not load Js/dart-ui.js directly");
+}
+{
+  const [sourceFile, generatedFile] = generatedPlatformRuntime;
   if (!homeHtml.includes(`src="${generatedFile}"`)) {
     failures.push(`index.html: homepage must load ${generatedFile}`);
   }
@@ -131,12 +161,13 @@ for (const [sourceFile, generatedFile] of homeGeneratedScripts) {
     failures.push(`index.html: homepage must not load ${sourceFile} directly`);
   }
 }
+
 const homeScriptSources = [...homeHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+\.js(?:\?[^"']*)?)["'][^>]*>/gi)]
   .map((match) => match[1].replace(/^\//, "").replace(/\?.*$/, ""))
   .filter((file, index, list) => list.indexOf(file) === index && fs.existsSync(file));
 const homeInitialJsBytes = homeScriptSources.reduce((sum, file) => sum + fs.statSync(file).size, 0);
-if (homeInitialJsBytes > 350 * 1024) {
-  failures.push(`Homepage direct JavaScript is ${Math.ceil(homeInitialJsBytes / 1024)}KB; budget is 350KB`);
+if (homeInitialJsBytes > 225 * 1024) {
+  failures.push(`Homepage direct JavaScript is ${Math.ceil(homeInitialJsBytes / 1024)}KB; budget is 225KB`);
 }
 
 const homeCssSources = ["CSS/main.css", "CSS/base.css", "CSS/responsive.css"];
@@ -170,7 +201,7 @@ if (/<link\b[^>]*href=["']CSS\/home\.css["'][^>]*>/i.test(homeHtml)) {
 }
 for (const source of homeCssSources) {
   const sourceName = source.replace("CSS/", "");
-  const directPattern = new RegExp(`<link\\b[^>]*href=[\"']CSS\\/${sourceName.replace(".", "\\.")}[\"'][^>]*>`, "i");
+  const directPattern = new RegExp(`<link\\b[^>]*href=[\\"']CSS\\/${sourceName.replace(".", "\\.")}[\\"'][^>]*>`, "i");
   if (directPattern.test(homeHtml)) {
     failures.push(`index.html: ${source} must not load separately from CSS/home.css`);
   }
