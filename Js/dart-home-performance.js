@@ -20,6 +20,16 @@
   // reviews request while the hero/LCP resources are still competing for network/CPU.
   prepareLazyReviews();
 
+  function activateBrandFontsAfterFirstPaint() {
+    const stylesheet = document.getElementById("dart-brand-fonts");
+    if (!stylesheet || stylesheet.media === "all") return;
+    root.requestAnimationFrame(() => {
+      root.requestAnimationFrame(() => {
+        stylesheet.media = "all";
+      });
+    });
+  }
+
   function loadFontAwesome() {
     if (fontAwesomeRequested || document.querySelector(`link[href="${FONT_AWESOME_URL}"]`)) return;
     fontAwesomeRequested = true;
@@ -162,6 +172,7 @@
   }
 
   function init() {
+    activateBrandFontsAfterFirstPaint();
     scheduleNonCriticalAssets();
     bindMenuAccessibility();
     bindProductModalAccessibility();
