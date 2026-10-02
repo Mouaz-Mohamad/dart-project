@@ -93,7 +93,7 @@ jobs:
       - name: Rebuild homepage CSS delivery bundle
         run: node scripts/build-home-css.cjs
       - name: Cache Playwright Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-1.55.0-chromium-v1
