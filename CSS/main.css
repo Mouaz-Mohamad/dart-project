@@ -954,6 +954,7 @@ header {
     transition: 0.2s;
     height: 10px;
     flex-shrink: 0;
+    z-index: 10;
 }
 
 .model i.fa-x:hover {
@@ -978,6 +979,7 @@ header {
     overflow: hidden;
     flex-shrink: 0;
     background-color: #f1f1f1;
+    margin-top: -40px;
 }
 
 .carousel-track {
