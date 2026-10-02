@@ -322,11 +322,15 @@
       const selected = isDay
         ? settings.heroDayImage || settings.heroNightImage
         : settings.heroNightImage || settings.heroDayImage;
-      hero.dataset.dartMediaReady = "false";
-      hero.src = await resolveImage(
-        selected,
-        hero.getAttribute("src") || "/Photos/hero 2.png",
-      );
+      const currentSource = hero.getAttribute("src") || "/Photos/hero 2.png";
+      const nextSource = await resolveImage(selected, currentSource);
+      const currentUrl = hero.src;
+      let nextUrl = nextSource;
+      try { nextUrl = new URL(nextSource, root.location?.href || "http://localhost/").href; } catch {}
+      if (nextSource && nextUrl !== currentUrl) {
+        hero.dataset.dartMediaReady = "false";
+        hero.src = nextSource;
+      }
       hero.dataset.timeMode = isDay ? "day" : "night";
       hero.dataset.dartMediaReady = "true";
     }
@@ -352,13 +356,8 @@
       hasCachedPublicSettings = Boolean(root.localStorage?.getItem(PUBLIC_CACHE_KEY));
     } catch {}
     const hero = root.document?.querySelector(".hero > img[data-dart-hero]");
-    if (hasCachedPublicSettings) {
-      void applyPublicMedia();
-    } else if (hero) {
-      // On a brand-new browser, keep the default hero hidden until the
-      // authoritative site settings arrive. This prevents old/default media flash.
-      hero.dataset.dartMediaReady = "false";
-    }
+    if (hero) hero.dataset.dartMediaReady = "true";
+    if (hasCachedPublicSettings) void applyPublicMedia();
     hydrate()
       .then(applyPublicMedia)
       .catch((error) => {
