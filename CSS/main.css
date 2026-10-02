@@ -78,12 +78,19 @@ header, .side-menu, .pge-que .pge, .que,
 
 .dart-hero-title {
     margin: 0;
+    width: 70%;
+    max-width: 70%;
+    min-height: 126px;
     font-size: 30px;
     line-height: 1.05;
     position: absolute;
     top: 30px;
     left: 10px;
-    max-width: 70%;
+}
+
+#dartTyping {
+    display: block;
+    min-height: 126px;
 }
 
 .dart-word {
@@ -93,9 +100,15 @@ header, .side-menu, .pge-que .pge, .que,
 }
 
 .dart-cursor {
+    position: absolute;
+    top: 0;
+    left: 0;
     color: var(--bragnte);
     font-size: 60px;
     font-weight: 300;
+    pointer-events: none;
+    will-change: transform, opacity;
+    transform: translate3d(0, 0, 0);
     animation: cursorBlink 1s infinite;
     -webkit-animation: cursorBlink 1s infinite;
 }
@@ -119,6 +132,10 @@ header {
     position: relative;
     z-index: 200000;
     margin-bottom: 2px;
+}
+
+#header-container {
+    min-height: 90px;
 }
 
 .top {
