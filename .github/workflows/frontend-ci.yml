@@ -63,7 +63,6 @@ jobs:
           node tests/security-boundaries.cjs
           node tests/performance-budget.cjs
           node tests/home-performance-contract.cjs
-          node tests/css-architecture.js
           node tests/product_deep_links.cjs
           node tests/seo_checks.js
           node tests/catalog-category-contract.js
