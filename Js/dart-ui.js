@@ -2037,6 +2037,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }, { rootMargin: '700px 0px', threshold: 0.01 });
         observableSections.forEach(([containerId]) => optionalObserver.observe(document.getElementById(containerId)));
+
+        // Ensure the full document eventually hydrates even when the user never scrolls.
+        // Keep this outside the critical Lighthouse/TTI window and retain serialized work.
+        window.setTimeout(() => {
+            observableSections.forEach((entry, index) => {
+                window.setTimeout(() => queueOptionalSection(entry), index * 220);
+            });
+        }, 6500);
     } else {
         // Old-browser fallback: still serialize work instead of injecting every fragment in one task.
         observableSections.forEach((entry, index) => {
