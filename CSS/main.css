@@ -1150,7 +1150,7 @@ header {
 
 .birthday-conteiner img {
     width: 120px;
-    height: 100px;
+    height: auto;
 }
 
 .paragraph-btn {

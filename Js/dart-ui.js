@@ -576,6 +576,8 @@ function renderReviewsLogic() {
 
             const starsContainer = card.querySelector('.stars');
             starsContainer.innerHTML = '';
+            starsContainer.setAttribute('role', 'img');
+            starsContainer.setAttribute('aria-label', `${Number(item.rating) || 0} out of 5 stars`);
             for (let i = 1; i <= 5; i++) {
                 const star = document.createElement('i');
                 star.className = i <= item.rating ? 'fa-solid fa-star' : 'fa-regular fa-star';
