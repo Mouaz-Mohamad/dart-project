@@ -5,6 +5,8 @@
 
   const FONT_AWESOME_URL = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css";
   let fontAwesomeRequested = false;
+  let reviewsActivated = false;
+  let reviewsRefreshTimer = 0;
 
   function loadFontAwesome() {
     if (fontAwesomeRequested || document.querySelector(`link[href="${FONT_AWESOME_URL}"]`)) return;
@@ -97,12 +99,63 @@
     });
   }
 
+  function refreshReviews() {
+    if (!reviewsActivated || document.hidden) return;
+    if (typeof root.hydratePublicReviews === "function") {
+      void root.hydratePublicReviews();
+    }
+  }
+
+  function activateReviews() {
+    if (reviewsActivated) return;
+    const container = document.querySelector("[data-dart-lazy-reviews]");
+    if (!container) return;
+
+    reviewsActivated = true;
+    container.id = "reviewsContainer";
+    container.removeAttribute("data-dart-lazy-reviews");
+    loadFontAwesome();
+
+    if (typeof root.renderReviewsLogic === "function") root.renderReviewsLogic();
+    refreshReviews();
+
+    if (!reviewsRefreshTimer) {
+      reviewsRefreshTimer = root.setInterval(refreshReviews, 30000);
+      root.addEventListener("focus", refreshReviews, { passive: true });
+    }
+  }
+
+  function bindLazyReviews() {
+    const container = document.querySelector("[data-dart-lazy-reviews]");
+    if (!container) return;
+
+    if (!("IntersectionObserver" in root)) {
+      if ("requestIdleCallback" in root) {
+        root.requestIdleCallback(activateReviews, { timeout: 3000 });
+      } else {
+        root.setTimeout(activateReviews, 2000);
+      }
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        activateReviews();
+      },
+      { rootMargin: "700px 0px", threshold: 0.01 },
+    );
+    observer.observe(container);
+  }
+
   function init() {
     scheduleNonCriticalAssets();
     bindMenuAccessibility();
     bindProductModalAccessibility();
     bindCspSafeNavigation();
     bindEscapeKey();
+    bindLazyReviews();
 
     document.addEventListener("dart:section-loaded", (event) => {
       if (event.detail?.containerId === "header-container") bindMenuAccessibility();
