@@ -919,6 +919,10 @@
 
   async function hydrateApiSession() {
     if (!API_BASE) return null;
+    const hasSessionHint = document.cookie
+      .split(";")
+      .some((part) => part.trim().startsWith("dart_csrf="));
+    if (!hasSessionHint) return cacheApiUser(null);
     try {
       const payload = await apiRequest("/api/v1/me");
       const user = cacheApiUser(payload.user);
@@ -2187,20 +2191,14 @@
     const list = document.querySelector(".leaderboard-list");
     if (!list) return;
 
-    const heading =
-      list.querySelector("h1")?.outerHTML ||
-      "<h1>Contenders for the DART card</h1>";
-
     if (!API_BASE) {
       list.innerHTML =
-        heading +
         '<li class="leaderboard-empty">Leaderboard requires the Dart API.</li>';
       return;
     }
 
     if (publicLeaderboardRows === null && !publicLeaderboardFailed) {
       list.innerHTML =
-        heading +
         '<li class="leaderboard-empty" role="status">Loading current contenders…</li>';
       void hydratePublicLeaderboard();
       return;
@@ -2208,7 +2206,6 @@
 
     if (publicLeaderboardFailed) {
       list.innerHTML =
-        heading +
         '<li class="leaderboard-empty"><span>Leaderboard is temporarily unavailable.</span> <button type="button" class="dart-leaderboard-retry">Retry</button></li>';
       list
         .querySelector(".dart-leaderboard-retry")
@@ -2226,14 +2223,12 @@
 
     if (!rows.length) {
       list.innerHTML =
-        heading +
         '<li class="leaderboard-empty">No eligible candidates this month yet.</li>';
       list.dataset.dartLeaderboardSignature = signature;
       return;
     }
 
     list.innerHTML =
-      heading +
       rows
         .map(
           (row, index) =>

@@ -12,6 +12,12 @@ import {
   requirePermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
+import {
+  CATALOG_ASSET_IMMUTABLE_CACHE,
+  CATALOG_ASSET_REDIRECT_CACHE,
+  catalogAssetUrl,
+  catalogAssetVersionMatches,
+} from "./catalog.asset.cache.js";
 import type { CatalogAssetService } from "./catalog.asset.service.js";
 
 const assetIdSchema = z.string().trim().regex(/^[A-Za-z0-9_-]{8,120}$/);
@@ -55,10 +61,20 @@ export function createCatalogAssetRouter(
       response.status(404).json({ error: { code: "ASSET_NOT_FOUND", message: "Image not found" } });
       return;
     }
+
+    // Old/unversioned links remain valid, but are redirected to the exact content
+    // hash. This upgrades existing catalogue data without a database migration and
+    // prevents a replaced asset from being cached forever under stale bytes.
+    if (!catalogAssetVersionMatches(request.query.v, asset.sha256)) {
+      response.setHeader("Cache-Control", CATALOG_ASSET_REDIRECT_CACHE);
+      response.redirect(307, catalogAssetUrl(assetId, asset.sha256));
+      return;
+    }
+
     const etag = `"${asset.sha256}"`;
     response.setHeader("Content-Type", asset.contentType);
     response.setHeader("ETag", etag);
-    response.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    response.setHeader("Cache-Control", CATALOG_ASSET_IMMUTABLE_CACHE);
     if (request.headers["if-none-match"] === etag) {
       response.status(304).end();
       return;

@@ -59,16 +59,22 @@ jobs:
           node tests/database-authoritative-storage.cjs
           node tests/cache-revalidation-contract.cjs
           node tests/auth-contract.js
+          node tests/address-unit.js
           node tests/security-boundaries.cjs
           node tests/performance-budget.cjs
+          node tests/home-performance-contract.cjs
+          node tests/product_deep_links.cjs
+          node tests/seo_checks.js
           node tests/catalog-category-contract.js
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js
           node tests/finance-persistence-contract.js
           node tests/server-authority-contract.js
           node tests/settings-and-groups-unit.js
+          node tests/settings-reset-unit.js
           node tests/promotion-settings-contract.js
           node tests/product-button-state-contract.cjs
+          node tests/test-inventory-contract.cjs
 
   browser-smoke:
     runs-on: ubuntu-latest
@@ -94,3 +100,4 @@ jobs:
           node tests/full-site-browser.js
           node tests/storefront-settings-regression.js
           node tests/product-waiting-browser.js
+          node tests/home-storefront-browser.js

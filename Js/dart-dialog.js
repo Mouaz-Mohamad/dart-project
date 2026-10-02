@@ -178,3 +178,22 @@
     prompt: showPrompt,
   });
 })(window);
+
+// Product links are needed anywhere the shared storefront product modal exists,
+// including Home, Products and Best Products. Versioned URLs force old tabs/caches
+// to fetch the current routing code after a normal page reload.
+(function loadDartProductRouting(root) {
+  if (!document.getElementById("SectionModel")) return;
+
+  function addScript(src, marker) {
+    if (document.querySelector(`script[data-${marker}="1"]`)) return;
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = false;
+    script.dataset[marker] = "1";
+    (document.head || document.documentElement).appendChild(script);
+  }
+
+  addScript("/Js/dart-product-links.js?v=2", "dartProductLinks");
+  addScript("/Js/dart-product-route-fix.js?v=1", "dartProductRouteFix");
+})(window);

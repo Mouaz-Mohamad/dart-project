@@ -576,9 +576,13 @@ function renderReviewsLogic() {
 
             const starsContainer = card.querySelector('.stars');
             starsContainer.innerHTML = '';
+            starsContainer.setAttribute('role', 'img');
+            starsContainer.setAttribute('aria-label', `${Number(item.rating) || 0} out of 5 stars`);
             for (let i = 1; i <= 5; i++) {
-                const star = document.createElement('i');
-                star.className = i <= item.rating ? 'fa-solid fa-star' : 'fa-regular fa-star';
+                const star = document.createElement('span');
+                star.className = 'dart-review-star';
+                star.textContent = i <= item.rating ? '★' : '☆';
+                star.setAttribute('aria-hidden', 'true');
                 starsContainer.appendChild(star);
             }
 
@@ -1971,15 +1975,81 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCartCount();
     if (!navigator.onLine) updateConnectivityBanner();
 
-    const loadOptionalSections = () => {
-        void Promise.allSettled(
-            optionalSections.map(([containerId, filePath]) => loadSection(containerId, filePath))
-        ).then(() => document.dispatchEvent(new CustomEvent('dart:sections-loaded')));
+    const optionalQueue = [];
+    const queuedOptionalIds = new Set();
+    const completedOptionalIds = new Set();
+    let optionalQueueBusy = false;
+    let optionalSectionsFinished = false;
+
+    const finishOptionalSections = () => {
+        if (optionalSectionsFinished || completedOptionalIds.size < optionalSections.length) return;
+        optionalSectionsFinished = true;
+        document.dispatchEvent(new CustomEvent('dart:sections-loaded'));
     };
-    if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(loadOptionalSections, { timeout: 1200 });
+
+    const scheduleOptionalQueue = () => {
+        if (optionalQueueBusy || !optionalQueue.length) return;
+        const run = async () => {
+            if (optionalQueueBusy || !optionalQueue.length) return;
+            optionalQueueBusy = true;
+            const [containerId, filePath] = optionalQueue.shift();
+            try {
+                await loadSection(containerId, filePath);
+            } finally {
+                completedOptionalIds.add(containerId);
+                optionalQueueBusy = false;
+                finishOptionalSections();
+                if (optionalQueue.length) {
+                    window.requestAnimationFrame(() => window.setTimeout(scheduleOptionalQueue, 0));
+                }
+            }
+        };
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(() => { void run(); }, { timeout: 1000 });
+        } else {
+            window.setTimeout(() => { void run(); }, 60);
+        }
+    };
+
+    const queueOptionalSection = (entry) => {
+        const [containerId] = entry;
+        if (queuedOptionalIds.has(containerId) || completedOptionalIds.has(containerId)) return;
+        queuedOptionalIds.add(containerId);
+        optionalQueue.push(entry);
+        scheduleOptionalQueue();
+    };
+
+    const observableSections = optionalSections.filter(([containerId]) => {
+        if (document.getElementById(containerId)) return true;
+        completedOptionalIds.add(containerId);
+        return false;
+    });
+    finishOptionalSections();
+
+    if ('IntersectionObserver' in window) {
+        const optionalObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const match = optionalSections.find(([containerId]) => containerId === entry.target.id);
+                if (!match) return;
+                optionalObserver.unobserve(entry.target);
+                queueOptionalSection(match);
+            });
+        }, { rootMargin: '700px 0px', threshold: 0.01 });
+        observableSections.forEach(([containerId]) => optionalObserver.observe(document.getElementById(containerId)));
+
+        // Ensure the full document eventually hydrates even when the user never scrolls.
+        // Keep this outside the critical Lighthouse/TTI window and retain serialized work.
+        window.setTimeout(() => {
+            observableSections.forEach((entry, index) => {
+                window.setTimeout(() => queueOptionalSection(entry), index * 220);
+            });
+        }, 6500);
     } else {
-        window.setTimeout(loadOptionalSections, 120);
+        // Old-browser fallback: still serialize work instead of injecting every fragment in one task.
+        observableSections.forEach((entry, index) => {
+            window.setTimeout(() => queueOptionalSection(entry), index * 180);
+        });
     }
 });
 
@@ -2196,6 +2266,25 @@ let sceneIndex = 0;
 let wordIndex = 0;
 let charIndex = 0;
 let typingRunId = 0;
+let heroCursorFrame = 0;
+
+function syncHeroCursor() {
+    heroCursorFrame = 0;
+    if (!typingContainer) return;
+    const title = typingContainer.closest('.dart-hero-title');
+    const cursor = title?.querySelector('.dart-cursor');
+    if (!title || !cursor) return;
+    const words = typingContainer.querySelectorAll('.dart-word');
+    const lastWord = words[words.length - 1];
+    const x = lastWord ? lastWord.offsetLeft + lastWord.offsetWidth : 0;
+    const y = lastWord ? lastWord.offsetTop : 0;
+    cursor.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
+}
+
+function scheduleHeroCursorSync() {
+    if (heroCursorFrame) return;
+    heroCursorFrame = window.requestAnimationFrame(syncHeroCursor);
+}
 
 function capitalizeWords(text) {
     return String(text || '').replace(
@@ -2245,11 +2334,13 @@ function typeScene(runId = typingRunId) {
     span.style.display = "inline-block";
     typingContainer.appendChild(span);
     charIndex = 0;
+    scheduleHeroCursorSync();
 
     const typeCharacter = () => {
         if (runId !== typingRunId || !span.isConnected) return;
         charIndex += 1;
         span.textContent = formattedText.substring(0, charIndex);
+        scheduleHeroCursorSync();
         if (charIndex < formattedText.length) {
             scheduleTyping(typeCharacter, typingSpeed, runId);
             return;
@@ -2268,6 +2359,7 @@ function deleteScene(runId = typingRunId) {
 
     if (!lastWord) {
         typingContainer.innerHTML = "";
+        scheduleHeroCursorSync();
         nextScene(runId);
         return;
     }
@@ -2275,17 +2367,20 @@ function deleteScene(runId = typingRunId) {
     const currentText = lastWord.textContent || "";
     if (currentText.length > 0) {
         lastWord.textContent = currentText.substring(0, currentText.length - 1);
+        scheduleHeroCursorSync();
         scheduleTyping(deleteScene, deletingSpeed, runId);
         return;
     }
 
     lastWord.remove();
+    scheduleHeroCursorSync();
     scheduleTyping(deleteScene, deletingSpeed, runId);
 }
 
 function nextScene(runId = typingRunId) {
     if (!typingContainer || runId !== typingRunId || !scenes.length) return;
     typingContainer.innerHTML = "";
+    scheduleHeroCursorSync();
     wordIndex = 0;
     charIndex = 0;
     sceneIndex = (sceneIndex + 1) % scenes.length;
@@ -2305,6 +2400,7 @@ function restartHeroTyping() {
     typingRunId += 1;
     if (!typingContainer) return;
     typingContainer.innerHTML = "";
+    scheduleHeroCursorSync();
     if (scenes.length) typeScene(typingRunId);
 }
 

@@ -70,6 +70,21 @@
     } catch {}
   }
 
+  function scheduleLegacyCleanup() {
+    let ran = false;
+    const run = () => {
+      if (ran) return;
+      ran = true;
+      purgeLegacyBrowserBusinessData();
+      purgeStaleNavbarFragment();
+    };
+    if (typeof root.requestIdleCallback === "function") {
+      root.requestIdleCallback(run, { timeout: 8000 });
+    } else {
+      root.setTimeout?.(run, 4500);
+    }
+  }
+
   function loadProductButtonStateWhenNeeded() {
     const document = root.document;
     if (!document?.getElementById?.("SectionModel")) return;
@@ -92,11 +107,31 @@
   function scheduleProductButtonState() {
     const document = root.document;
     if (!document) return;
-    if (document.readyState === "loading" || document.readyState === "interactive") {
-      document.addEventListener("DOMContentLoaded", loadProductButtonStateWhenNeeded, { once: true });
+    const pathname = String(root.location?.pathname || "").toLowerCase();
+    const isHomePage = pathname === "/" || pathname.endsWith("/index.html") || pathname === "index.html";
+    if (!isHomePage) {
+      if (document.readyState === "loading" || document.readyState === "interactive") {
+        document.addEventListener("DOMContentLoaded", loadProductButtonStateWhenNeeded, { once: true });
+      } else {
+        loadProductButtonStateWhenNeeded();
+      }
       return;
     }
-    loadProductButtonStateWhenNeeded();
+    const selector = ".product-card, .cart-btn, #SectionModel";
+    const cleanup = () => {
+      document.removeEventListener("pointerdown", onIntent, true);
+      document.removeEventListener("click", onIntent, true);
+      document.removeEventListener("focusin", onIntent, true);
+    };
+    const onIntent = (event) => {
+      const target = event.target;
+      if (!target?.closest?.(selector)) return;
+      cleanup();
+      loadProductButtonStateWhenNeeded();
+    };
+    document.addEventListener("pointerdown", onIntent, { capture: true, passive: true });
+    document.addEventListener("click", onIntent, true);
+    document.addEventListener("focusin", onIntent, true);
   }
 
   function loadCheckoutStabilityWhenNeeded() {
@@ -147,8 +182,9 @@
     loadDashboardOrderGroupsWhenNeeded();
   }
 
-  purgeLegacyBrowserBusinessData();
-  purgeStaleNavbarFragment();
+  // Legacy cleanup is maintenance work, not render-critical work. Deferring it
+  // keeps localStorage/IndexedDB scans out of the mobile first-interaction window.
+  scheduleLegacyCleanup();
   root.DartState = Object.freeze({ read, write, clone });
   scheduleProductButtonState();
   scheduleCheckoutStability();
