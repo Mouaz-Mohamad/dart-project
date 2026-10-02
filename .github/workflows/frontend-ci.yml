@@ -10,6 +10,7 @@ on:
       - "Eye/**"
       - "Js/**"
       - "CSS/**"
+      - "scripts/**"
       - "sections/**"
       - "sw.js"
       - "manifest.json"
@@ -25,6 +26,7 @@ on:
       - "Eye/**"
       - "Js/**"
       - "CSS/**"
+      - "scripts/**"
       - "sections/**"
       - "sw.js"
       - "manifest.json"
@@ -48,6 +50,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Rebuild homepage CSS delivery bundle
+        run: node scripts/build-home-css.cjs
       - name: Check browser JavaScript syntax
         shell: bash
         run: |
@@ -86,6 +90,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Rebuild homepage CSS delivery bundle
+        run: node scripts/build-home-css.cjs
       - name: Cache Playwright Chromium
         uses: actions/cache@v4
         with:

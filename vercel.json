@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node scripts/build-home-css.cjs --versioned",
   "headers": [
     {
       "source": "/Eye/(.*)",

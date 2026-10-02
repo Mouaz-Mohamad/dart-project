@@ -11,7 +11,8 @@ Codex reads this file automatically before every task, so the rules below apply 
 ## Commands
 
 - Install: `cd backend && npm install`
-- Run storefront dev server: `python3 -m http.server 4173`
+- Build storefront CSS delivery bundle: `node scripts/build-home-css.cjs`
+- Run storefront dev server: run the CSS build command after storefront CSS changes, then `python3 -m http.server 4173`
 - Run backend dev server: `cd backend && npm run dev`
 - Run backend checks: `cd backend && npm run check`
 - Run existing frontend checks: use the individual Node.js/Python commands listed under `docs/README.md` → **Checks**.
@@ -50,7 +51,6 @@ Refer to `Codex_Master_Prompt.md` for the full phased roadmap (Phase 1–5) and 
 - Inspect the current implementation before adding anything so the project does not gain duplicate flows, screens, state, or logic.
 - Ask before proceeding whenever the existing implementation and the requested behavior are unclear or contradictory.
 
-
 ## GitHub + Vercel batching discipline
 
 - Do **not** push one commit per small fix to `main`.
@@ -62,7 +62,6 @@ Refer to `Codex_Master_Prompt.md` for the full phased roadmap (Phase 1–5) and 
 - Vercel must build an affected project at most once per approved batch. Frontend-only batches skip API builds; backend-only batches skip storefront builds; mixed batches build each affected project once.
 - A non-batch commit reaching GitHub must be treated as non-deployable by Vercel. Only an explicit user instruction to deploy before seven changes may override the normal batching rule.
 - After every batch push, verify GitHub status plus the production aliases for both `dart-project` and `dart-api` before calling the batch live.
-
 
 ## Database-only browser-state rule
 
