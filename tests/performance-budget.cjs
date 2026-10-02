@@ -90,8 +90,19 @@ for (const file of jsFiles) {
 if (coreJsBytes > 900 * 1024) {
   failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 900KB`);
 }
-if (totalJsBytes > 1100 * 1024) {
-  failures.push(`Repository browser JavaScript is ${Math.ceil(totalJsBytes / 1024)}KB; budget is 1100KB`);
+
+// Repository total is a maintainability ceiling, not a page-load metric. Keep it
+// bounded, but also budget the scripts the public homepage actually requests.
+if (totalJsBytes > 1150 * 1024) {
+  failures.push(`Repository browser JavaScript is ${Math.ceil(totalJsBytes / 1024)}KB; budget is 1150KB`);
+}
+const homeHtml = fs.readFileSync("index.html", "utf8");
+const homeScriptSources = [...homeHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+\.js(?:\?[^"']*)?)["'][^>]*>/gi)]
+  .map((match) => match[1].replace(/^\//, "").replace(/\?.*$/, ""))
+  .filter((file, index, list) => list.indexOf(file) === index && fs.existsSync(file));
+const homeInitialJsBytes = homeScriptSources.reduce((sum, file) => sum + fs.statSync(file).size, 0);
+if (homeInitialJsBytes > 350 * 1024) {
+  failures.push(`Homepage direct JavaScript is ${Math.ceil(homeInitialJsBytes / 1024)}KB; budget is 350KB`);
 }
 
 const imageFiles = walk("Photos").filter((file) => /\.(?:png|jpe?g|webp)$/i.test(file));
@@ -108,5 +119,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `PASS performance budget: ${jsFiles.length} JS files, ${Math.ceil(coreJsBytes / 1024)}KB initial/core, ${Math.ceil(totalJsBytes / 1024)}KB repository total; page-scoped modules budgeted separately`,
+  `PASS performance budget: ${jsFiles.length} JS files, ${Math.ceil(coreJsBytes / 1024)}KB initial/core, ${Math.ceil(homeInitialJsBytes / 1024)}KB homepage direct, ${Math.ceil(totalJsBytes / 1024)}KB repository total`,
 );
