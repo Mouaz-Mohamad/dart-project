@@ -46,10 +46,35 @@ assert.strictEqual(
 const rewriteSources = (vercel.rewrites || []).map((entry) => entry.source);
 assert(rewriteSources.includes('/products'), 'Vercel must rewrite /products to the product collection');
 assert(rewriteSources.includes('/products/:slug'), 'Vercel must rewrite model deep links to products.html');
+assert(rewriteSources.includes('/product-sitemap.xml'), 'Vercel must expose the server-authoritative product sitemap');
+const legacyProductsRedirect = (vercel.redirects || []).find((entry) => entry.source === '/products.html');
+assert(legacyProductsRedirect?.destination === '/products' && legacyProductsRedirect.permanent === true,
+  'Legacy products.html must permanently redirect to the canonical /products URL');
 assert(dialog.includes('/Js/dart-product-links.js'), 'Products route must load the deep-link helper');
 assert(source.includes('history.replaceState'), 'Modal route changes must use History API without navigation');
 assert(!/location\.(?:reload|assign|replace)\s*\(/.test(source), 'Valid product routing must not trigger a page navigation');
-assert(source.includes('application/ld+json'), 'Model route must expose Product structured data');
-assert(source.includes('alternateName: BRAND_ALT_NAME'), 'Product schema must preserve Dart Wear as alternative brand name');
+assert(source.includes('application/ld+json'), 'Model route must expose product structured data');
+assert(source.includes('ProductGroup'), 'Variant models must expose ProductGroup structured data');
+assert(source.includes('BreadcrumbList'), 'Product routes must expose breadcrumb structured data');
+assert(source.includes('Dart Wear'), 'SEO discovery must preserve Dart Wear as an alternative brand name');
+assert(source.includes('لبس رجالي') && source.includes('لبس شبابي'), 'Collection discovery metadata must cover natural Arabic menswear queries');
+assert(source.includes('imageNode.alt'), 'Rendered product images must receive descriptive alt text');
 
-console.log('PASS product deep links: slugs, stable resolution, rewrites, no-reload routing, SEO schema');
+const schema = links.productStructuredData({
+  ...original,
+  category: 'Jeans',
+  price: 799,
+  sizeOptions: [{ name: 'M', active: true }, { name: 'L', active: true }],
+  colorOptions: [{ name: 'Black', active: true }],
+  stock: { M: { Black: 2 }, L: { Black: 0 } },
+  gallery: [{ color: 'Black', src: '/Photos/products/black.webp' }],
+}, 'https://dart.example/products/cairo-wide-leg-jeans--dw-101', 'Wide leg jeans', 'https://dart.example/Photos/products/black.webp');
+const graph = JSON.parse(JSON.stringify(schema))['@graph'];
+const group = graph.find((node) => node['@type'] === 'ProductGroup');
+assert(group, 'Variant product schema must contain a ProductGroup');
+assert.deepStrictEqual(group.variesBy, ['https://schema.org/color', 'https://schema.org/size']);
+assert.strictEqual(group.hasVariant.length, 2);
+assert.strictEqual(group.hasVariant[0].offers.availability, 'https://schema.org/InStock');
+assert.strictEqual(group.hasVariant[1].offers.availability, 'https://schema.org/OutOfStock');
+
+console.log('PASS product deep links: stable URLs, canonical redirect, discovery metadata, ProductGroup variants, sitemap and no-reload routing');

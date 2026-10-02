@@ -152,19 +152,44 @@ for (const name of sectionNames) {
     errors.push(`sections/${name}: fragment duplicates a stylesheet or script`);
 }
 
-const sitemap = read("sitemap.xml");
+const sitemapIndex = read("sitemap.xml");
+const pageSitemap = read("sitemap-pages.xml");
+const robots = read("robots.txt");
+if (!/<sitemapindex\b/i.test(sitemapIndex))
+  errors.push("sitemap.xml: root sitemap must be a sitemap index");
+for (const child of ["sitemap-pages.xml", "product-sitemap.xml"])
+  if (!sitemapIndex.includes(`https://dart-project-psi.vercel.app/${child}`))
+    errors.push(`sitemap.xml: missing child sitemap ${child}`);
+if (!robots.includes("https://dart-project-psi.vercel.app/sitemap.xml"))
+  errors.push("robots.txt: must advertise the root sitemap index");
+
 for (const page of publicPages) {
   const canonical = read(page).match(/rel="canonical"\s+href="([^"]+)"/i)?.[1];
-  if (!canonical || !sitemap.includes(canonical))
-    errors.push(`${page}: canonical missing from sitemap`);
+  if (!canonical || !pageSitemap.includes(canonical))
+    errors.push(`${page}: canonical missing from static page sitemap`);
 }
 for (const page of privatePages)
-  if (sitemap.includes(encodeURI(page)))
+  if (pageSitemap.includes(encodeURI(page)))
     errors.push(`${page}: private page must not appear in sitemap`);
+
+const sitemapRewrite = (vercelConfig.rewrites || []).find((entry) => entry.source === "/product-sitemap.xml");
+if (!sitemapRewrite || !/\/api\/v1\/catalog\/sitemap\.xml$/.test(sitemapRewrite.destination || ""))
+  errors.push("vercel.json: product sitemap must proxy the server-authoritative catalog sitemap");
+const productsRedirect = (vercelConfig.redirects || []).find((entry) => entry.source === "/products.html");
+if (!productsRedirect || productsRedirect.destination !== "/products" || productsRedirect.permanent !== true)
+  errors.push("vercel.json: products.html must permanently redirect to /products");
+
+const home = read("index.html");
+const products = read("products.html");
+for (const term of ["Dart for you", "دارت", "لبس رجالي", "لبس شبابي"])
+  if (!home.includes(term) && !products.includes(term))
+    errors.push(`SEO discovery: missing natural brand/query term ${term}`);
+if (!products.includes('rel="canonical" href="https://dart-project-psi.vercel.app/products"'))
+  errors.push("products.html: canonical must use clean /products URL");
 
 if (errors.length) {
   console.error(errors.map((error) => `FAIL ${error}`).join("\n"));
   process.exit(1);
 }
-console.log("PASS SEO metadata, JSON-LD, sitemap, noindex and unique structure checks");
+console.log("PASS SEO metadata, discovery terms, JSON-LD, sitemap index, noindex and canonical structure checks");
 /* END SEO and structure checks. */

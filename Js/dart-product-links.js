@@ -6,6 +6,7 @@
 
   const BRAND_NAME = "Dart | for you";
   const BRAND_ALT_NAME = "Dart Wear";
+  const BRAND_ARABIC_NAME = "دارت";
   const LIST_PATH = "/products";
   const PRODUCT_PREFIX = "/products/";
   const PRODUCT_JSONLD_ID = "dart-product-jsonld";
@@ -80,6 +81,11 @@
     );
   }
 
+  function stockForVariant(product, size, color) {
+    if (size && color) return Math.max(0, Number(product?.stock?.[size]?.[color]) || 0);
+    return hasStock(product) ? 1 : 0;
+  }
+
   function generatedDescription(product) {
     const source = String(product?.description || "").replace(/\s+/g, " ").trim();
     if (source) return source.slice(0, 158);
@@ -114,6 +120,9 @@
       ['property', 'og:description'],
       ['property', 'og:url'],
       ['property', 'og:image'],
+      ['property', 'product:price:amount'],
+      ['property', 'product:price:currency'],
+      ['property', 'product:availability'],
       ['name', 'twitter:title'],
       ['name', 'twitter:description'],
       ['name', 'twitter:image'],
@@ -128,6 +137,150 @@
     };
   }
 
+  function collectionKind(pathname = root.location?.pathname || "") {
+    const clean = String(pathname || "").replace(/\/+$/, "") || "/";
+    if (clean === "/" || clean === "/index.html") return "home";
+    if (clean === "/products" || clean === "/products.html") return "products";
+    return "";
+  }
+
+  function applyCollectionDiscoverySeo() {
+    const kind = collectionKind();
+    if (!kind || slugFromPath()) return;
+    const isHome = kind === "home";
+    const title = isHome
+      ? "Dart for you (دارت) | لبس رجالي وشبابي في مصر"
+      : "ملابس رجالي وشبابي | منتجات Dart for you - Dart Wear";
+    const description = isHome
+      ? "Dart for you أو Dart Wear (دارت) براند ملابس رجالي وشبابي في مصر. اكتشف موديلات وموضة رجالي عصرية، أسعار واضحة، مقاسات وألوان ومخزون حقيقي."
+      : "تسوق منتجات Dart for you وDart Wear: لبس رجالي ولبس شبابي وموضة رجالي عصرية في مصر، مع عرض السعر والمقاس واللون والتوفر لكل موديل.";
+    const canonicalUrl = isHome ? `${root.location.origin}/` : `${root.location.origin}${LIST_PATH}`;
+
+    document.documentElement?.setAttribute("lang", "ar");
+    document.title = title;
+    setMeta("name", "description", description);
+    setMeta("property", "og:title", title);
+    setMeta("property", "og:description", description);
+    setMeta("property", "og:url", canonicalUrl);
+    setMeta("name", "twitter:title", title);
+    setMeta("name", "twitter:description", description);
+
+    const canonical = document.head.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = canonicalUrl;
+
+    const heading = document.querySelector("main > h1.sr-only");
+    if (heading) {
+      heading.textContent = isHome
+        ? `${BRAND_NAME} (${BRAND_ARABIC_NAME}) - لبس رجالي وشبابي في مصر`
+        : `منتجات ${BRAND_NAME} - ملابس رجالي وشبابي`;
+    }
+  }
+
+  function activeOptionNames(options) {
+    return (Array.isArray(options) ? options : [])
+      .filter((option) => option && (typeof option !== "object" || option.active !== false))
+      .map((option) => String(typeof option === "object" ? option.name || "" : option).trim())
+      .filter(Boolean);
+  }
+
+  function imageForColor(product, color, fallback) {
+    const gallery = Array.isArray(product?.gallery) ? product.gallery : [];
+    const match = gallery.find((entry) =>
+      String(entry?.color || "").trim().toLocaleLowerCase() === String(color || "").trim().toLocaleLowerCase(),
+    );
+    return absolute(match?.src || fallback || "");
+  }
+
+  function offerFor(product, canonicalUrl, available) {
+    return {
+      "@type": "Offer",
+      url: canonicalUrl,
+      priceCurrency: "EGP",
+      price: Math.max(0, Number(product.price) || 0).toFixed(2),
+      availability: available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
+      seller: { "@id": `${root.location.origin}/#organization` },
+    };
+  }
+
+  function productStructuredData(product, canonicalUrl, description, image) {
+    const sizes = activeOptionNames(product?.sizeOptions);
+    const colors = activeOptionNames(product?.colorOptions);
+    const baseCode = String(product.code || product.id || "").trim();
+    const variesBy = [];
+    if (colors.length) variesBy.push("https://schema.org/color");
+    if (sizes.length) variesBy.push("https://schema.org/size");
+
+    const sizeAxis = sizes.length ? sizes : [""];
+    const colorAxis = colors.length ? colors : [""];
+    const variants = [];
+    for (const color of colorAxis) {
+      for (const size of sizeAxis) {
+        if (variants.length >= 100) break;
+        const variantSuffix = [color, size].filter(Boolean).map(slugPart).filter(Boolean).join("-") || "default";
+        const variantImage = imageForColor(product, color, image);
+        const available = color && size ? stockForVariant(product, size, color) > 0 : hasStock(product);
+        variants.push({
+          "@type": "Product",
+          "@id": `${canonicalUrl}#variant-${variantSuffix}`,
+          name: [product.title, color, size].filter(Boolean).join(" - "),
+          sku: [baseCode, color, size].filter(Boolean).join("-") || baseCode,
+          ...(color ? { color } : {}),
+          ...(size ? { size } : {}),
+          ...(variantImage ? { image: [variantImage] } : {}),
+          url: canonicalUrl,
+          brand: { "@type": "Brand", name: BRAND_NAME, alternateName: [BRAND_ALT_NAME, BRAND_ARABIC_NAME] },
+          isVariantOf: { "@id": `${canonicalUrl}#product-group` },
+          offers: offerFor(product, canonicalUrl, available),
+        });
+      }
+      if (variants.length >= 100) break;
+    }
+
+    const productNode = variesBy.length
+      ? {
+          "@type": "ProductGroup",
+          "@id": `${canonicalUrl}#product-group`,
+          name: product.title,
+          description,
+          ...(image ? { image: [image] } : {}),
+          url: canonicalUrl,
+          productGroupID: baseCode,
+          ...(product.category ? { category: String(product.category) } : {}),
+          brand: { "@type": "Brand", name: BRAND_NAME, alternateName: [BRAND_ALT_NAME, BRAND_ARABIC_NAME] },
+          variesBy,
+          hasVariant: variants,
+        }
+      : {
+          "@type": "Product",
+          "@id": `${canonicalUrl}#product`,
+          name: product.title,
+          description,
+          ...(image ? { image: [image] } : {}),
+          sku: baseCode,
+          ...(product.category ? { category: String(product.category) } : {}),
+          url: canonicalUrl,
+          brand: { "@type": "Brand", name: BRAND_NAME, alternateName: [BRAND_ALT_NAME, BRAND_ARABIC_NAME] },
+          offers: offerFor(product, canonicalUrl, hasStock(product)),
+        };
+
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        productNode,
+        {
+          "@type": "BreadcrumbList",
+          "@id": `${canonicalUrl}#breadcrumbs`,
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: BRAND_NAME, item: `${root.location.origin}/` },
+            { "@type": "ListItem", position: 2, name: "منتجات Dart", item: `${root.location.origin}${LIST_PATH}` },
+            { "@type": "ListItem", position: 3, name: product.title, item: canonicalUrl },
+          ],
+        },
+      ],
+    };
+  }
+
   function applyProductSeo(product) {
     if (!product) return;
     snapshotHead();
@@ -139,6 +292,7 @@
     const title = `${product.title} | ${BRAND_NAME}`;
     const description = generatedDescription(product);
     const image = absolute(product.images?.[0] || product.gallery?.[0]?.src || "");
+    const inStock = hasStock(product);
 
     document.title = title;
     let canonical = document.head.querySelector('link[rel="canonical"]');
@@ -156,6 +310,9 @@
     setMeta("property", "og:description", description);
     setMeta("property", "og:url", canonicalUrl);
     if (image) setMeta("property", "og:image", image);
+    setMeta("property", "product:price:amount", Math.max(0, Number(product.price) || 0).toFixed(2));
+    setMeta("property", "product:price:currency", "EGP");
+    setMeta("property", "product:availability", inStock ? "in stock" : "out of stock");
     setMeta("name", "twitter:title", title);
     setMeta("name", "twitter:description", description);
     if (image) setMeta("name", "twitter:image", image);
@@ -164,27 +321,7 @@
     const jsonLd = document.createElement("script");
     jsonLd.id = PRODUCT_JSONLD_ID;
     jsonLd.type = "application/ld+json";
-    jsonLd.textContent = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "Product",
-      "@id": `${canonicalUrl}#product`,
-      name: product.title,
-      description,
-      ...(image ? { image: [image] } : {}),
-      sku: String(product.code || product.id || ""),
-      url: canonicalUrl,
-      brand: { "@type": "Brand", name: BRAND_NAME, alternateName: BRAND_ALT_NAME },
-      offers: {
-        "@type": "Offer",
-        url: canonicalUrl,
-        priceCurrency: "EGP",
-        price: Math.max(0, Number(product.price) || 0).toFixed(2),
-        availability: hasStock(product)
-          ? "https://schema.org/InStock"
-          : "https://schema.org/OutOfStock",
-        itemCondition: "https://schema.org/NewCondition",
-      },
-    });
+    jsonLd.textContent = JSON.stringify(productStructuredData(product, canonicalUrl, description, image));
     document.head.appendChild(jsonLd);
   }
 
@@ -205,6 +342,7 @@
       }
     }
     document.getElementById(PRODUCT_JSONLD_ID)?.remove();
+    applyCollectionDiscoverySeo();
   }
 
   function routeState(product) {
@@ -276,6 +414,11 @@
       const product = map.get(String(card.getAttribute("data-id") || ""));
       if (!product) return;
       card.dataset.productPath = pathFor(product);
+      const imageNode = card.querySelector("img.product-img");
+      if (imageNode) {
+        const category = String(product.category || "ملابس رجالية").trim();
+        imageNode.alt = `${product.title} - ${category} من ${BRAND_NAME}`;
+      }
       const titleNode = card.querySelector(".product-title");
       if (!titleNode) return;
       let link = titleNode.querySelector(`a.${PRODUCT_LINK_CLASS}`);
@@ -289,7 +432,7 @@
         titleNode.appendChild(link);
       }
       link.href = pathFor(product);
-      link.setAttribute("aria-label", `Open ${product.title}`);
+      link.setAttribute("aria-label", `عرض ${product.title} من ${BRAND_NAME}`);
     });
   }
 
@@ -300,7 +443,7 @@
 
   function observeCardContainers() {
     if (linkObserver || typeof MutationObserver !== "function") return;
-    const containers = ["productsPart1", "productsPart2", "bestProductsContainer"]
+    const containers = ["productsPart1", "productsPart2", "bestProductsContainer", "productsContainer"]
       .map((id) => document.getElementById(id))
       .filter(Boolean);
     if (!containers.length) return;
@@ -349,6 +492,7 @@
 
   function init() {
     snapshotHead();
+    applyCollectionDiscoverySeo();
     ensureLinkStyle();
     observeCardContainers();
     scheduleCardLinks();
@@ -369,7 +513,7 @@
   }
 
   root.DartProductLinks = Object.freeze({
-    version: "1.0.0",
+    version: "2.0.0",
     slugPart,
     slugFor,
     pathFor,
@@ -377,7 +521,9 @@
     resolveSlug,
     normalizeRouteSlug,
     syncCardLinks,
+    applyCollectionDiscoverySeo,
     applyProductSeo,
+    productStructuredData,
     restoreCollectionSeo,
     syncRouteFromLocation,
   });

@@ -12,6 +12,7 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
+import { buildProductSitemap } from "./catalog.seo.js";
 import type { CatalogService } from "./catalog.service.js";
 
 const stateSchema = z.object({
@@ -44,6 +45,13 @@ export function createCatalogRouter(
   router.get("/catalog", async (_request, response) => {
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json(await catalog.publicCatalog());
+  });
+
+  router.get("/catalog/sitemap.xml", async (_request, response) => {
+    const catalogState = await catalog.publicCatalog();
+    response.setHeader("Content-Type", "application/xml; charset=utf-8");
+    response.setHeader("Cache-Control", "public, max-age=300, s-maxage=900, stale-while-revalidate=3600");
+    response.status(200).send(buildProductSitemap(catalogState));
   });
 
   router.post(
