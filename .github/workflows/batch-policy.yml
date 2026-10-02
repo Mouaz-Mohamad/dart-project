@@ -23,6 +23,7 @@ jobs:
           node tests/cache-revalidation-contract.cjs
           node tests/seo_checks.js
           node tests/product_deep_links.cjs
+          node tests/product_ssr_seo.cjs
       - name: Check browser JavaScript syntax
         run: |
           find Js Eye -type f -name '*.js' -print0 | xargs -0 -n1 node --check
