@@ -107,11 +107,17 @@ const server = http.createServer((request, response) => {
 
   const page = await context.newPage();
   const localFailures = [];
-  page.on("pageerror", (error) => localFailures.push(error.message));
+  page.on("pageerror", (error) => localFailures.push(`pageerror: ${error.message}`));
+  page.on("response", (response) => {
+    if (response.status() < 400 || !response.url().startsWith(origin)) return;
+    const url = new URL(response.url());
+    localFailures.push(`HTTP ${response.status()} ${url.pathname}${url.search}`);
+  });
   page.on("console", (message) => {
     if (message.type() !== "error") return;
+    if (message.text().startsWith("Failed to load resource:")) return;
     const source = String(message.location()?.url || "");
-    if (source.startsWith(origin)) localFailures.push(message.text());
+    if (source.startsWith(origin)) localFailures.push(`console: ${message.text()}`);
   });
 
   await page.goto(`${origin}/index.html`, { waitUntil: "domcontentloaded" });
