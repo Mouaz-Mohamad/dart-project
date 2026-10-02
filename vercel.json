@@ -1,5 +1,6 @@
 {
-  "buildCommand": "node scripts/build-home-css.cjs --versioned",
+  "buildCommand": "node scripts/build-home-css.cjs --versioned && node scripts/stage-vercel-public.cjs",
+  "outputDirectory": "public",
   "headers": [
     {
       "source": "/Eye/(.*)",
