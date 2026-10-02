@@ -8,6 +8,18 @@
   let reviewsActivated = false;
   let reviewsRefreshTimer = 0;
 
+  function prepareLazyReviews() {
+    const container = document.getElementById("reviewsContainer");
+    if (!container || container.hasAttribute("data-dart-lazy-reviews")) return;
+    container.setAttribute("data-dart-lazy-reviews", "");
+    container.removeAttribute("id");
+  }
+
+  // This script is intentionally loaded before dart-ui.js on the homepage.
+  // Hiding the reviews id here prevents the UI bootstrap from starting the
+  // reviews request while the hero/LCP resources are still competing for network/CPU.
+  prepareLazyReviews();
+
   function loadFontAwesome() {
     if (fontAwesomeRequested || document.querySelector(`link[href="${FONT_AWESOME_URL}"]`)) return;
     fontAwesomeRequested = true;
