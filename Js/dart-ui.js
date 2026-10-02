@@ -279,7 +279,16 @@ window.addEventListener('pagehide', () => {
     dartPageUnloading = true;
 }, { once: true });
 
-const DART_FRAGMENT_CACHE_PREFIX = 'dart_fragment_v2:';
+const DART_FRAGMENT_CACHE_PREFIX = 'dart_fragment_v3:';
+
+function purgeLegacyFragmentCaches() {
+    try {
+        Object.keys(localStorage)
+            .filter(key => key.startsWith('dart_fragment_') && !key.startsWith(DART_FRAGMENT_CACHE_PREFIX))
+            .forEach(key => localStorage.removeItem(key));
+    } catch {}
+}
+purgeLegacyFragmentCaches();
 
 function fragmentCacheKey(filePath) {
     return DART_FRAGMENT_CACHE_PREFIX + String(filePath || '');
@@ -307,7 +316,7 @@ async function fetchStaticFragment(filePath, timeoutMs = 8000) {
     try {
         const response = await fetch(filePath, {
             signal: controller.signal,
-            cache: 'force-cache',
+            cache: 'no-cache',
             credentials: 'same-origin'
         });
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
@@ -327,8 +336,15 @@ async function loadSection(containerId, filePath, timeoutMs = 8000) {
     if (cached) {
         container.innerHTML = cached;
         emitSectionLoaded(containerId, filePath, true);
-        // Revalidate only for the next navigation so active DOM/listeners do not jump.
-        void fetchStaticFragment(filePath, timeoutMs).catch(() => {});
+        try {
+            const html = await fetchStaticFragment(filePath, timeoutMs);
+            if (html !== cached && !dartPageUnloading && container.isConnected) {
+                container.innerHTML = html;
+                emitSectionLoaded(containerId, filePath, false);
+            }
+        } catch {
+            // Stay on the cached fragment only when the network is unavailable.
+        }
         return true;
     }
 
@@ -1989,7 +2005,7 @@ function warmInternalPageCache() {
                 ['/profile.html','/cart-checkout.html','/track.html','/rep.html','/Sign%20Up%20modern.html'].includes(url.pathname)) return;
             if (!/\.html$|\/$/i.test(url.pathname) || seen.has(url.href)) return;
             seen.add(url.href);
-            void fetch(url.href, { credentials: 'same-origin', cache: 'force-cache' }).catch(() => {});
+            void fetch(url.href, { credentials: 'same-origin', cache: 'no-cache' }).catch(() => {});
         } catch {}
     };
     document.querySelectorAll('a[href]').forEach(link => {
@@ -2007,9 +2023,11 @@ function registerDartServiceWorker() {
         location.protocol === 'https:' ||
         ['localhost', '127.0.0.1'].includes(location.hostname);
     if (!allowedProtocol) return;
-    navigator.serviceWorker.register('/sw.js').catch((error) => {
-        console.warn('Dart service worker registration failed.', error);
-    });
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+        .then((registration) => registration.update())
+        .catch((error) => {
+            console.warn('Dart service worker registration failed.', error);
+        });
 }
 
 document.addEventListener('DOMContentLoaded', () => {

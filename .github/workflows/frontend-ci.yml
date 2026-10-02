@@ -57,6 +57,7 @@ jobs:
       - name: Frontend regression contracts
         run: |
           node tests/database-authoritative-storage.cjs
+          node tests/cache-revalidation-contract.cjs
           node tests/auth-contract.js
           node tests/security-boundaries.cjs
           node tests/performance-budget.cjs

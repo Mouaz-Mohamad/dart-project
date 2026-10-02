@@ -1,7 +1,7 @@
 // DART CODE GUIDE | sw.js
 // الغرض: Service Worker للموقع؛ يدير التخزين المؤقت وسلوك الشبكة دون أن يصبح مصدر بيانات تجاري.
-// Dart storefront cache: network-first for documents/code, cache-first fallback for media.
-const CACHE = 'dart-static-v26-founder-png-v10';
+// Dart storefront cache policy: always revalidate online; use CacheStorage only as an offline fallback.
+const CACHE = 'dart-static-v27-revalidate-all';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
 const FOUNDER_PNG_URL = '/Photos/me.png?v=founder-png-v10';
 
@@ -14,27 +14,24 @@ self.addEventListener('activate', event => event.waitUntil(
         .filter(key => key.startsWith('dart-static-') && key !== CACHE)
         .map(key => caches.delete(key))
     ))
-    .then(async () => {
-      // Defensive cleanup in case a legacy founder WebP was stored in a
-      // non-versioned cache by an older worker.
-      const keys = await caches.keys();
-      await Promise.all(keys.map(async key => {
-        const cache = await caches.open(key);
-        const requests = await cache.keys();
-        await Promise.all(
-          requests
-            .filter(request => {
-              try {
-                const pathname = new URL(request.url).pathname;
-                return pathname === '/Photos/me.webp' || pathname === '/Photos/me.png';
-              } catch { return false; }
-            })
-            .map(request => cache.delete(request))
-        );
-      }));
-      return self.clients.claim();
-    })
+    .then(() => self.clients.claim())
 ));
+
+async function networkFirst(request) {
+  const refreshRequest = new Request(request, { cache: 'no-cache' });
+  try {
+    const response = await fetch(refreshRequest);
+    if (response.ok) {
+      const clone = response.clone();
+      void caches.open(CACHE).then(cache => cache.put(request, clone));
+    }
+    return response;
+  } catch (error) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+}
 
 self.addEventListener('fetch', event => {
   const request = event.request;
@@ -47,8 +44,8 @@ self.addEventListener('fetch', event => {
     url.pathname.startsWith('/api/')
   ) return;
 
-  // Any historical founder URL always resolves to the canonical PNG. Do not
-  // persist this image in CacheStorage so stale WebP/PNG responses cannot win.
+  // Keep the founder image fully uncached because this asset historically had
+  // multiple filenames and formats. This guarantees the canonical PNG wins.
   if (url.pathname === '/Photos/me.webp' || url.pathname === '/Photos/me.png') {
     event.respondWith(
       fetch(new Request(FOUNDER_PNG_URL, {
@@ -63,52 +60,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (request.mode === 'navigate' || /\.html$/i.test(url.pathname) || url.pathname.startsWith('/sections/')) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(async error => {
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          throw error;
-        })
-    );
-    return;
-  }
-
-  if (/\.(?:js|css)$/i.test(url.pathname)) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  if (/\.(?:png|jpe?g|jfif|svg|ico|webp)$/i.test(url.pathname)) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, clone));
-          }
-          return response;
-        });
-      })
-    );
-  }
+  // Every same-origin public GET request is revalidated while online.
+  // CacheStorage is only used when the network request fails.
+  event.respondWith(networkFirst(request));
 });
