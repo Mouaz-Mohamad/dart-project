@@ -70,6 +70,21 @@
     } catch {}
   }
 
+  function scheduleLegacyCleanup() {
+    let ran = false;
+    const run = () => {
+      if (ran) return;
+      ran = true;
+      purgeLegacyBrowserBusinessData();
+      purgeStaleNavbarFragment();
+    };
+    if (typeof root.requestIdleCallback === "function") {
+      root.requestIdleCallback(run, { timeout: 8000 });
+    } else {
+      root.setTimeout?.(run, 4500);
+    }
+  }
+
   function loadProductButtonStateWhenNeeded() {
     const document = root.document;
     if (!document?.getElementById?.("SectionModel")) return;
@@ -167,8 +182,9 @@
     loadDashboardOrderGroupsWhenNeeded();
   }
 
-  purgeLegacyBrowserBusinessData();
-  purgeStaleNavbarFragment();
+  // Legacy cleanup is maintenance work, not render-critical work. Deferring it
+  // keeps localStorage/IndexedDB scans out of the mobile first-interaction window.
+  scheduleLegacyCleanup();
   root.DartState = Object.freeze({ read, write, clone });
   scheduleProductButtonState();
   scheduleCheckoutStability();

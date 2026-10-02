@@ -15,11 +15,6 @@
       .some((part) => part.startsWith("dart_csrf="));
   }
 
-  // The secure session cookie is HttpOnly, while dart_csrf is created and cleared
-  // with the same authenticated session. On a fresh guest visit there is no value
-  // in issuing /api/v1/me only to receive an expected 401 (and a Lighthouse console error).
-  // This only short-circuits that exact read-only probe; every protected API route
-  // continues to use the real backend and its normal authentication middleware.
   function installGuestSessionProbe() {
     if (root.__dartGuestSessionProbeInstalled || typeof root.fetch !== "function") return;
     root.__dartGuestSessionProbeInstalled = true;
@@ -49,9 +44,7 @@
               ),
             );
           }
-        } catch {
-          // Invalid URL inputs fall through to the native fetch implementation.
-        }
+        } catch {}
       }
 
       return nativeFetch(input, init);
@@ -77,19 +70,25 @@
     container.removeAttribute("id");
   }
 
-  // This script is intentionally loaded before dart-ui.js on the homepage.
-  // Hiding the reviews id here prevents the UI bootstrap from starting the
-  // reviews request while the hero/LCP resources are still competing for network/CPU.
   prepareLazyReviews();
 
-  function activateBrandFontsAfterFirstPaint() {
+  function activateBrandFontsAfterCriticalLoad() {
     const stylesheet = document.getElementById("dart-brand-fonts");
     if (!stylesheet || stylesheet.media === "all") return;
-    root.requestAnimationFrame(() => {
-      root.requestAnimationFrame(() => {
-        stylesheet.media = "all";
-      });
-    });
+
+    const activate = () => {
+      if (stylesheet.media !== "all") stylesheet.media = "all";
+    };
+    const schedule = () => {
+      if ("requestIdleCallback" in root) {
+        root.requestIdleCallback(activate, { timeout: 2000 });
+      } else {
+        root.setTimeout(activate, 1000);
+      }
+    };
+
+    if (document.readyState === "complete") schedule();
+    else root.addEventListener("load", schedule, { once: true });
   }
 
   function loadFontAwesome() {
@@ -253,8 +252,56 @@
     observer.observe(container);
   }
 
+  function productRenderSignature() {
+    const cards = root.DartStorefront?.cards?.();
+    if (!Array.isArray(cards)) return "";
+    try {
+      return JSON.stringify(
+        cards.map((product) => ({
+          id: String(product?.id || product?.code || ""),
+          color: String(product?.cardColor || ""),
+          title: String(product?.title || ""),
+          category: String(product?.category || ""),
+          price: Number(product?.price) || 0,
+          originalPrice: Number(product?.originalPrice) || 0,
+          discount: Number(product?.effectiveDiscountPercent) || 0,
+          image: String(product?.images?.[0] || product?.image || ""),
+          stock: product?.stock && typeof product.stock === "object" ? product.stock : {},
+        })),
+      );
+    } catch {
+      return "";
+    }
+  }
+
+  function installProductRenderGuard() {
+    const original = root.renderProductsLogic;
+    if (typeof original !== "function" || original.__dartHomeRenderGuard) return false;
+
+    let lastSignature = "";
+    function guardedRenderProductsLogic(force = false) {
+      const signature = productRenderSignature();
+      if (!force && signature && signature === lastSignature) return false;
+      const result = original.apply(this, arguments);
+      if (signature) lastSignature = signature;
+      return result;
+    }
+
+    Object.defineProperty(guardedRenderProductsLogic, "__dartHomeRenderGuard", {
+      value: true,
+      configurable: false,
+      enumerable: false,
+    });
+    guardedRenderProductsLogic.invalidate = () => {
+      lastSignature = "";
+    };
+
+    root.renderProductsLogic = guardedRenderProductsLogic;
+    return true;
+  }
+
   function init() {
-    activateBrandFontsAfterFirstPaint();
+    activateBrandFontsAfterCriticalLoad();
     scheduleNonCriticalAssets();
     bindMenuAccessibility();
     bindProductModalAccessibility();
@@ -263,12 +310,22 @@
     bindLeaderboardStructure();
     bindReviewAccessibility();
     bindLazyReviews();
+    installProductRenderGuard();
 
     document.addEventListener("dart:section-loaded", (event) => {
       if (event.detail?.containerId === "header-container") bindMenuAccessibility();
       if (event.detail?.containerId === "leaderboard-card") normalizeLeaderboardStructure();
     });
   }
+
+  root.DartHomePerformance = Object.freeze({
+    version: "1.1.0",
+    productRenderSignature,
+    installProductRenderGuard,
+    invalidateProductRender() {
+      root.renderProductsLogic?.invalidate?.();
+    },
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init, { once: true });

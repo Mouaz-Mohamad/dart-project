@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { catalogAssetUrl } from "./catalog.asset.cache.js";
 
 const ALLOWED = new Set(["image/jpeg","image/png","image/webp"]);
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -95,6 +96,6 @@ export class CatalogAssetService {
         input.actorId,
       ],
     );
-    return { id: input.assetId, urlPath: `/api/v1/catalog/assets/${encodeURIComponent(input.assetId)}` };
+    return { id: input.assetId, urlPath: catalogAssetUrl(input.assetId, digest) };
   }
 }
