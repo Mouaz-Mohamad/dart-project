@@ -92,6 +92,16 @@
   function scheduleProductButtonState() {
     const document = root.document;
     if (!document) return;
+    const pathname = String(root.location?.pathname || "").toLowerCase();
+    const isHomePage = pathname === "/" || pathname.endsWith("/index.html") || pathname === "index.html";
+    if (!isHomePage) {
+      if (document.readyState === "loading" || document.readyState === "interactive") {
+        document.addEventListener("DOMContentLoaded", loadProductButtonStateWhenNeeded, { once: true });
+      } else {
+        loadProductButtonStateWhenNeeded();
+      }
+      return;
+    }
     const selector = ".product-card, .cart-btn, #SectionModel";
     const cleanup = () => {
       document.removeEventListener("pointerdown", onIntent, true);
