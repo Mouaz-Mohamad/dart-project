@@ -944,10 +944,10 @@ header {
 }
 
 .model i.fa-x {
-    font-size: 20px;
+    font-size: 30px;
     width: 100%;
     position:static;
-    color: var(--bg-dark);
+    color: var(--bragnte);
     cursor: pointer;
     align-self: flex-end;
     text-align: right;
@@ -955,6 +955,7 @@ header {
     height: 10px;
     flex-shrink: 0;
     z-index: 10;
+    margin-right: 10px;
 }
 
 .model i.fa-x:hover {
