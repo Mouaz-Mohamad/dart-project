@@ -155,8 +155,18 @@ if (!fs.existsSync("CSS/home.css")) {
 } else if (fs.readFileSync("CSS/home.css", "utf8") !== expectedHomeCss) {
   failures.push("CSS/home.css: bundle is stale; rebuild it from main.css + base.css + responsive.css in that order");
 }
-if (!/<link\b[^>]*href=["']CSS\/home\.css["'][^>]*>/i.test(homeHtml)) {
-  failures.push("index.html: homepage must load CSS/home.css");
+const homeCssHash = crypto.createHash("sha256").update(expectedHomeCss, "utf8").digest("hex");
+const homeMinCssBanner = `/* source-sha256:${homeCssHash}; clean-css:5.6.3; level:1 */`;
+if (!fs.existsSync("CSS/home.min.css")) {
+  failures.push("CSS/home.min.css: minified homepage stylesheet is missing");
+} else if (!fs.readFileSync("CSS/home.min.css", "utf8").startsWith(homeMinCssBanner)) {
+  failures.push("CSS/home.min.css: stale minified stylesheet; rebuild from CSS/home.css with CleanCSS 5.6.3 -O1");
+}
+if (!/<link\b[^>]*href=["']CSS\/home\.min\.css["'][^>]*>/i.test(homeHtml)) {
+  failures.push("index.html: homepage must load CSS/home.min.css");
+}
+if (/<link\b[^>]*href=["']CSS\/home\.css["'][^>]*>/i.test(homeHtml)) {
+  failures.push("index.html: homepage must not load CSS/home.css directly");
 }
 for (const source of homeCssSources) {
   const sourceName = source.replace("CSS/", "");
