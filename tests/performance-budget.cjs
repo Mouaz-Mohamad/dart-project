@@ -2,6 +2,7 @@
 // الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 
 const failures = [];
 const rootHtml = fs.readdirSync(".").filter((name) => name.endsWith(".html"));
@@ -46,7 +47,13 @@ function walk(root) {
   return files;
 }
 
-const jsFiles = ["Js", "Eye"].flatMap(walk).filter((file) => file.endsWith(".js"));
+const generatedDeliveryFiles = new Set([
+  "Js/dart-ui.home.min.js",
+  "Js/dart-platform.home.min.js",
+]);
+const jsFiles = ["Js", "Eye"]
+  .flatMap(walk)
+  .filter((file) => file.endsWith(".js") && !generatedDeliveryFiles.has(file));
 const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
@@ -96,7 +103,34 @@ if (coreJsBytes > 900 * 1024) {
 if (totalJsBytes > 1150 * 1024) {
   failures.push(`Repository browser JavaScript is ${Math.ceil(totalJsBytes / 1024)}KB; budget is 1150KB`);
 }
+const homeGeneratedScripts = [
+  ["Js/dart-ui.js", "Js/dart-ui.home.min.js"],
+  ["Js/dart-platform.js", "Js/dart-platform.home.min.js"],
+];
+for (const [sourceFile, generatedFile] of homeGeneratedScripts) {
+  if (!fs.existsSync(generatedFile)) {
+    failures.push(`${generatedFile}: generated homepage runtime is missing`);
+    continue;
+  }
+  const sourceHash = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(sourceFile, "utf8"), "utf8")
+    .digest("hex");
+  const banner = `/* source-sha256:${sourceHash}; terser:5.44.0 */`;
+  if (!fs.readFileSync(generatedFile, "utf8").startsWith(banner)) {
+    failures.push(`${generatedFile}: stale minified runtime; rebuild from ${sourceFile} with Terser 5.44.0`);
+  }
+}
+
 const homeHtml = fs.readFileSync("index.html", "utf8");
+for (const [sourceFile, generatedFile] of homeGeneratedScripts) {
+  if (!homeHtml.includes(`src="${generatedFile}"`)) {
+    failures.push(`index.html: homepage must load ${generatedFile}`);
+  }
+  if (homeHtml.includes(`src="${sourceFile}"`)) {
+    failures.push(`index.html: homepage must not load ${sourceFile} directly`);
+  }
+}
 const homeScriptSources = [...homeHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+\.js(?:\?[^"']*)?)["'][^>]*>/gi)]
   .map((match) => match[1].replace(/^\//, "").replace(/\?.*$/, ""))
   .filter((file, index, list) => list.indexOf(file) === index && fs.existsSync(file));
