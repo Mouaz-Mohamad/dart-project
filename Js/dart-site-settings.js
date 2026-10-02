@@ -242,7 +242,7 @@
     heroWordSize,
   });
 
-  root.addEventListener("DOMContentLoaded", () => {
+  root.addEventListener?.("DOMContentLoaded", () => {
     const hero = firstExisting(["[data-dart-hero-image]", ".hero img"]);
     const markHeroReady = () => {
       if (hero) hero.dataset.dartMediaReady = "true";
@@ -271,11 +271,11 @@
         }
       });
   });
-  root.document.addEventListener("dart:section-loaded", applyPublicMedia);
-  root.document.addEventListener("dart:sections-loaded", applyPublicMedia);
-  root.addEventListener("dart:site-settings-changed", applyPublicMedia);
-  root.addEventListener("focus", checkForChanges);
-  root.document.addEventListener("visibilitychange", () => {
+  root.document?.addEventListener?.("dart:section-loaded", applyPublicMedia);
+  root.document?.addEventListener?.("dart:sections-loaded", applyPublicMedia);
+  root.addEventListener?.("dart:site-settings-changed", applyPublicMedia);
+  root.addEventListener?.("focus", checkForChanges);
+  root.document?.addEventListener?.("visibilitychange", () => {
     if (!root.document.hidden) checkForChanges();
   });
   root.setInterval?.(checkForChanges, SETTINGS_POLL_MS);
