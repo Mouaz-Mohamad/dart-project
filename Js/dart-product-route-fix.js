@@ -33,16 +33,16 @@
   function routeProduct(product) {
     if (!product) return;
     const nextPath = pathFor(product);
-    history.replaceState(
-      {
-        ...(history.state || {}),
-        modalOpen: true,
-        dartProduct: true,
-        dartProductId: String(product.id ?? product.code ?? ""),
-      },
-      "",
-      nextPath,
-    );
+    const nextState = {
+      ...(history.state || {}),
+      modalOpen: true,
+      dartProduct: true,
+      dartProductId: String(product.id ?? product.code ?? ""),
+    };
+    const alreadyOnProduct =
+      root.location?.pathname === nextPath && history.state?.dartProduct;
+    if (alreadyOnProduct) history.replaceState(nextState, "", nextPath);
+    else history.pushState(nextState, "", nextPath);
     try {
       root.DartProductLinks?.applyProductSeo?.(product);
     } catch (error) {
