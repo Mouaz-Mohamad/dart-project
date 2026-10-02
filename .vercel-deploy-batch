@@ -1,6 +1,6 @@
-batch=25
-purpose=about-chrome-android-image-paint-fix
-frontend=disable-content-visibility-on-about-media-remove-repaint-workaround-preserve-fragment-cache-reset
+batch=42
+purpose=keyed-carto-positron-basemap
+frontend=publish-carto-positron-raster-tiles-with-project-api-key
 backend=none
-scope=batch-25-production-release
+scope=batch-42-production-release
 trigger=production-deploy

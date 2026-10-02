@@ -1,8 +1,9 @@
 // DART CODE GUIDE | sw.js
 // الغرض: Service Worker للموقع؛ يدير التخزين المؤقت وسلوك الشبكة دون أن يصبح مصدر بيانات تجاري.
 // Dart storefront cache: network-first for documents/code, cache-first fallback for media.
-const CACHE = 'dart-static-v20-about-png-reflow';
+const CACHE = 'dart-static-v26-founder-png-v10';
 const PRIVATE_PATHS = ['/Eye/', '/profile.html', '/cart-checkout.html', '/track.html', '/rep.html', '/Sign%20Up%20modern.html'];
+const FOUNDER_PNG_URL = '/Photos/me.png?v=founder-png-v10';
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
 
@@ -13,7 +14,26 @@ self.addEventListener('activate', event => event.waitUntil(
         .filter(key => key.startsWith('dart-static-') && key !== CACHE)
         .map(key => caches.delete(key))
     ))
-    .then(() => self.clients.claim())
+    .then(async () => {
+      // Defensive cleanup in case a legacy founder WebP was stored in a
+      // non-versioned cache by an older worker.
+      const keys = await caches.keys();
+      await Promise.all(keys.map(async key => {
+        const cache = await caches.open(key);
+        const requests = await cache.keys();
+        await Promise.all(
+          requests
+            .filter(request => {
+              try {
+                const pathname = new URL(request.url).pathname;
+                return pathname === '/Photos/me.webp' || pathname === '/Photos/me.png';
+              } catch { return false; }
+            })
+            .map(request => cache.delete(request))
+        );
+      }));
+      return self.clients.claim();
+    })
 ));
 
 self.addEventListener('fetch', event => {
@@ -26,6 +46,22 @@ self.addEventListener('fetch', event => {
     PRIVATE_PATHS.some(path => url.pathname.startsWith(path)) ||
     url.pathname.startsWith('/api/')
   ) return;
+
+  // Any historical founder URL always resolves to the canonical PNG. Do not
+  // persist this image in CacheStorage so stale WebP/PNG responses cannot win.
+  if (url.pathname === '/Photos/me.webp' || url.pathname === '/Photos/me.png') {
+    event.respondWith(
+      fetch(new Request(FOUNDER_PNG_URL, {
+        method: 'GET',
+        headers: request.headers,
+        mode: 'same-origin',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        redirect: 'follow'
+      }))
+    );
+    return;
+  }
 
   if (request.mode === 'navigate' || /\.html$/i.test(url.pathname) || url.pathname.startsWith('/sections/')) {
     event.respondWith(

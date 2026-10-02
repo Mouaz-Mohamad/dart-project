@@ -3748,8 +3748,8 @@
           attributionControl: true,
         }).setView([lat, lng], 13);
         window.trackingMap.attributionControl?.setPrefix(false);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors",
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4571_1_f3f5f58e8a8808e98e8b6df9", {
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         }).addTo(window.trackingMap);
         L.marker([lat, lng]).addTo(window.trackingMap);
       } catch (error) {

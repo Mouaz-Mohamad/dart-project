@@ -8,8 +8,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const configPath = join(here, "..", "vercel.json");
 const config = JSON.parse(readFileSync(configPath, "utf8"));
 
-if (config.ignoreCommand !== "bash scripts/vercel-ignore-backend.sh") {
-  throw new Error("backend/vercel.json must keep the guarded batch ignoreCommand");
+if ("ignoreCommand" in config) {
+  throw new Error("backend/vercel.json must not gate deployments behind a numbered batch");
 }
 
 const expectedBuildCommand = "npm run build";

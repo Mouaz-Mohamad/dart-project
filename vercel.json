@@ -27,6 +27,28 @@
       ]
     },
     {
+      "source": "/Photos/me.png",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/Photos/me.webp",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
@@ -68,12 +90,17 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/Photos/me.webp",
+      "destination": "/Photos/me.png?v=founder-png-v10",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
       "destination": "https://dart-api-dusky.vercel.app/api/:path*"
     }
-  ],
-  "ignoreCommand": "bash scripts/vercel-ignore-frontend.sh"
+  ]
 }
-
