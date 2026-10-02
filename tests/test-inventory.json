@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "policy": "Every root tests/*.js, *.cjs or *.py file must be either wired into Frontend CI or explicitly classified as legacy with a rewrite/retire reason.",
+  "ciStatic": [
+    "address-unit.js",
+    "auth-contract.js",
+    "cache-revalidation-contract.cjs",
+    "catalog-category-contract.js",
+    "css-architecture.js",
+    "dart-finance-unit.js",
+    "database-authoritative-storage.cjs",
+    "finance-dashboard-contract.js",
+    "finance-persistence-contract.js",
+    "home-performance-contract.cjs",
+    "performance-budget.cjs",
+    "product-button-state-contract.cjs",
+    "product_deep_links.cjs",
+    "promotion-settings-contract.js",
+    "security-boundaries.cjs",
+    "seo_checks.js",
+    "server-authority-contract.js",
+    "settings-and-groups-unit.js",
+    "settings-reset-unit.js",
+    "test-inventory-contract.cjs"
+  ],
+  "ciBrowser": [
+    "full-site-browser.js",
+    "home-storefront-browser.js",
+    "product-waiting-browser.js",
+    "storefront-settings-regression.js"
+  ],
+  "legacyRewrite": {
+    "catalog-browser.js": "V7 browser-authoritative acceptance flow; rewrite useful scenarios around API fixtures and server-authoritative state before enabling.",
+    "dashboard-v9-unit.js": "Mixes useful birthday date logic with browser-local hard-delete/domain mutation; split pure rules from server-authoritative operations.",
+    "platform-unit.js": "Mixes current source contracts with legacy local register/checkout/reward state; business flows belong to backend/API tests.",
+    "rep-unit.js": "Routing assertions are useful, but representative auth/orders/returns are browser-local; extract routing contracts and keep business state server-authoritative.",
+    "returns-accounting-unit.js": "Exercises browser-side return accounting/rollback including proportional order discounts; authoritative return and reward accounting must be tested on the backend.",
+    "static_checks.py": "Large brittle V7/V8 static bundle with duplicate and historical assertions; migrate still-useful generic HTML checks into focused current contracts.",
+    "tracking-unit.js": "Contains valuable routing/map source contracts but resolves orders/returns from localStorage; split static route contracts from server-backed tracking tests.",
+    "v8-features-browser.js": "V8 acceptance suite mutates dashboard arrays/localStorage directly; rewrite selected flows with API fixtures.",
+    "v9-requested-features.js": "Historical source-marker suite includes pre-current discount-priority assumptions; replace with focused current contracts and backend reward tests."
+  },
+  "legacyRetire": {
+    "catalog-pricing-unit.js": "Asserts Site discount overrides Model/item discount, which conflicts with current per-item priority: item discount, campaign, birthday, Dart Card."
+  }
+}
