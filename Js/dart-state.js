@@ -92,11 +92,21 @@
   function scheduleProductButtonState() {
     const document = root.document;
     if (!document) return;
-    if (document.readyState === "loading" || document.readyState === "interactive") {
-      document.addEventListener("DOMContentLoaded", loadProductButtonStateWhenNeeded, { once: true });
-      return;
-    }
-    loadProductButtonStateWhenNeeded();
+    const selector = ".product-card, .cart-btn, #SectionModel";
+    const cleanup = () => {
+      document.removeEventListener("pointerdown", onIntent, true);
+      document.removeEventListener("click", onIntent, true);
+      document.removeEventListener("focusin", onIntent, true);
+    };
+    const onIntent = (event) => {
+      const target = event.target;
+      if (!target?.closest?.(selector)) return;
+      cleanup();
+      loadProductButtonStateWhenNeeded();
+    };
+    document.addEventListener("pointerdown", onIntent, { capture: true, passive: true });
+    document.addEventListener("click", onIntent, true);
+    document.addEventListener("focusin", onIntent, true);
   }
 
   function loadCheckoutStabilityWhenNeeded() {

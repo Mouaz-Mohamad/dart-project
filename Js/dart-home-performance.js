@@ -131,7 +131,6 @@
     reviewsActivated = true;
     container.id = "reviewsContainer";
     container.removeAttribute("data-dart-lazy-reviews");
-    loadFontAwesome();
 
     if (typeof root.renderReviewsLogic === "function") root.renderReviewsLogic();
     refreshReviews();

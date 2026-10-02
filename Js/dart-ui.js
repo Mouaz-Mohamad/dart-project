@@ -579,8 +579,10 @@ function renderReviewsLogic() {
             starsContainer.setAttribute('role', 'img');
             starsContainer.setAttribute('aria-label', `${Number(item.rating) || 0} out of 5 stars`);
             for (let i = 1; i <= 5; i++) {
-                const star = document.createElement('i');
-                star.className = i <= item.rating ? 'fa-solid fa-star' : 'fa-regular fa-star';
+                const star = document.createElement('span');
+                star.className = 'dart-review-star';
+                star.textContent = i <= item.rating ? '★' : '☆';
+                star.setAttribute('aria-hidden', 'true');
                 starsContainer.appendChild(star);
             }
 
@@ -1973,15 +1975,73 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCartCount();
     if (!navigator.onLine) updateConnectivityBanner();
 
-    const loadOptionalSections = () => {
-        void Promise.allSettled(
-            optionalSections.map(([containerId, filePath]) => loadSection(containerId, filePath))
-        ).then(() => document.dispatchEvent(new CustomEvent('dart:sections-loaded')));
+    const optionalQueue = [];
+    const queuedOptionalIds = new Set();
+    const completedOptionalIds = new Set();
+    let optionalQueueBusy = false;
+    let optionalSectionsFinished = false;
+
+    const finishOptionalSections = () => {
+        if (optionalSectionsFinished || completedOptionalIds.size < optionalSections.length) return;
+        optionalSectionsFinished = true;
+        document.dispatchEvent(new CustomEvent('dart:sections-loaded'));
     };
-    if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(loadOptionalSections, { timeout: 1200 });
+
+    const scheduleOptionalQueue = () => {
+        if (optionalQueueBusy || !optionalQueue.length) return;
+        const run = async () => {
+            if (optionalQueueBusy || !optionalQueue.length) return;
+            optionalQueueBusy = true;
+            const [containerId, filePath] = optionalQueue.shift();
+            try {
+                await loadSection(containerId, filePath);
+            } finally {
+                completedOptionalIds.add(containerId);
+                optionalQueueBusy = false;
+                finishOptionalSections();
+                if (optionalQueue.length) {
+                    window.requestAnimationFrame(() => window.setTimeout(scheduleOptionalQueue, 0));
+                }
+            }
+        };
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(() => { void run(); }, { timeout: 1000 });
+        } else {
+            window.setTimeout(() => { void run(); }, 60);
+        }
+    };
+
+    const queueOptionalSection = (entry) => {
+        const [containerId] = entry;
+        if (queuedOptionalIds.has(containerId) || completedOptionalIds.has(containerId)) return;
+        queuedOptionalIds.add(containerId);
+        optionalQueue.push(entry);
+        scheduleOptionalQueue();
+    };
+
+    const observableSections = optionalSections.filter(([containerId]) => {
+        if (document.getElementById(containerId)) return true;
+        completedOptionalIds.add(containerId);
+        return false;
+    });
+    finishOptionalSections();
+
+    if ('IntersectionObserver' in window) {
+        const optionalObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const match = optionalSections.find(([containerId]) => containerId === entry.target.id);
+                if (!match) return;
+                optionalObserver.unobserve(entry.target);
+                queueOptionalSection(match);
+            });
+        }, { rootMargin: '700px 0px', threshold: 0.01 });
+        observableSections.forEach(([containerId]) => optionalObserver.observe(document.getElementById(containerId)));
     } else {
-        window.setTimeout(loadOptionalSections, 120);
+        // Old-browser fallback: still serialize work instead of injecting every fragment in one task.
+        observableSections.forEach((entry, index) => {
+            window.setTimeout(() => queueOptionalSection(entry), index * 180);
+        });
     }
 });
 

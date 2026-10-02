@@ -375,6 +375,7 @@
       });
   });
   root.document.addEventListener("dart:section-loaded", applyPublicMedia);
+  root.document.addEventListener("dart:section-loaded", applyPublicMedia);
   root.document.addEventListener("dart:sections-loaded", applyPublicMedia);
   root.addEventListener("dart:site-settings-changed", applyPublicMedia);
   root.addEventListener("focus", checkForChanges);
