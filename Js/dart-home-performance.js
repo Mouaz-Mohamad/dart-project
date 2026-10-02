@@ -47,11 +47,6 @@
     root.addEventListener("touchstart", eagerLoad, { once: true, passive: true, capture: true });
     root.addEventListener("keydown", eagerLoad, { once: true, capture: true });
 
-    if ("requestIdleCallback" in root) {
-      root.requestIdleCallback(loadFontAwesome, { timeout: 1800 });
-    } else {
-      root.setTimeout(loadFontAwesome, 900);
-    }
   }
 
   function syncMenuAccessibility() {
