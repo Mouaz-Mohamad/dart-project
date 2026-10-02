@@ -2889,8 +2889,6 @@ button,
   cursor: pointer;
 }
 .product-option-status {
-  min-height: 20px;
-  margin: 6px 0 10px;
   padding: 7px 9px;
   border-radius: 7px;
   background: #f8fafc;
