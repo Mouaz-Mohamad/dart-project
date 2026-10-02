@@ -2266,6 +2266,25 @@ let sceneIndex = 0;
 let wordIndex = 0;
 let charIndex = 0;
 let typingRunId = 0;
+let heroCursorFrame = 0;
+
+function syncHeroCursor() {
+    heroCursorFrame = 0;
+    if (!typingContainer) return;
+    const title = typingContainer.closest('.dart-hero-title');
+    const cursor = title?.querySelector('.dart-cursor');
+    if (!title || !cursor) return;
+    const words = typingContainer.querySelectorAll('.dart-word');
+    const lastWord = words[words.length - 1];
+    const x = lastWord ? lastWord.offsetLeft + lastWord.offsetWidth : 0;
+    const y = lastWord ? lastWord.offsetTop : 0;
+    cursor.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
+}
+
+function scheduleHeroCursorSync() {
+    if (heroCursorFrame) return;
+    heroCursorFrame = window.requestAnimationFrame(syncHeroCursor);
+}
 
 function capitalizeWords(text) {
     return String(text || '').replace(
@@ -2315,11 +2334,13 @@ function typeScene(runId = typingRunId) {
     span.style.display = "inline-block";
     typingContainer.appendChild(span);
     charIndex = 0;
+    scheduleHeroCursorSync();
 
     const typeCharacter = () => {
         if (runId !== typingRunId || !span.isConnected) return;
         charIndex += 1;
         span.textContent = formattedText.substring(0, charIndex);
+        scheduleHeroCursorSync();
         if (charIndex < formattedText.length) {
             scheduleTyping(typeCharacter, typingSpeed, runId);
             return;
@@ -2338,6 +2359,7 @@ function deleteScene(runId = typingRunId) {
 
     if (!lastWord) {
         typingContainer.innerHTML = "";
+        scheduleHeroCursorSync();
         nextScene(runId);
         return;
     }
@@ -2345,17 +2367,20 @@ function deleteScene(runId = typingRunId) {
     const currentText = lastWord.textContent || "";
     if (currentText.length > 0) {
         lastWord.textContent = currentText.substring(0, currentText.length - 1);
+        scheduleHeroCursorSync();
         scheduleTyping(deleteScene, deletingSpeed, runId);
         return;
     }
 
     lastWord.remove();
+    scheduleHeroCursorSync();
     scheduleTyping(deleteScene, deletingSpeed, runId);
 }
 
 function nextScene(runId = typingRunId) {
     if (!typingContainer || runId !== typingRunId || !scenes.length) return;
     typingContainer.innerHTML = "";
+    scheduleHeroCursorSync();
     wordIndex = 0;
     charIndex = 0;
     sceneIndex = (sceneIndex + 1) % scenes.length;
@@ -2375,6 +2400,7 @@ function restartHeroTyping() {
     typingRunId += 1;
     if (!typingContainer) return;
     typingContainer.innerHTML = "";
+    scheduleHeroCursorSync();
     if (scenes.length) typeScene(typingRunId);
 }
 
