@@ -16,7 +16,7 @@ The model code suffix is the stable lookup key. If the product title changes lat
 1. Clicking a product card opens the current Modal exactly as before.
 2. The browser URL is updated with `history.replaceState`; there is no reload and no second product-data request.
 3. Closing the Modal uses the existing browser-history behavior and returns to `/products`.
-4. Opening a deep link directly loads `products.html` once through the Vercel rewrite, waits for the server-authoritative catalog, and opens the requested Model in the same Modal.
+4. Opening a deep link first passes through the Vercel serverless SEO renderer. The initial HTML already contains the product-specific title, description, self-canonical URL, social cards and ProductGroup/Breadcrumb structured data from the server-authoritative catalog; the existing JavaScript then hydrates the same products UI and opens the requested Model in the existing Modal.
 5. Back/Forward navigation replays the Modal state without forcing a page refresh.
 6. Product titles remain crawlable `<a href>` links; card images receive descriptive alt text from the real product title/category.
 
@@ -24,7 +24,7 @@ The model code suffix is the stable lookup key. If the product title changes lat
 
 The home and collection metadata use the real brand aliases naturally: `Dart`, `Dart for you`, `Dart Wear`, and `دارت`, together with Egyptian menswear terms such as `لبس رجالي` and `لبس شبابي`. We deliberately do **not** add a `meta keywords` tag or make unsupported claims such as “أفضل براند”.
 
-When a model route is active, the runtime publishes a model-specific title, description, canonical URL, Open Graph/Twitter product values and schema.org JSON-LD. Models with color/size options use `ProductGroup` + `Product` variants with:
+For a model route, those product-specific values are now present in the **initial server response**, not only after client-side JavaScript runs. The renderer resolves the stable model-code suffix against the public PostgreSQL-backed catalog and redirects an outdated title slug to the current canonical URL. It publishes the title, description, Open Graph/Twitter product values and schema.org JSON-LD before hydration. Models with color/size options use `ProductGroup` + `Product` variants with:
 
 - Brand: `Dart | for you`
 - Alternative brand names: `Dart Wear` and `دارت`
@@ -49,3 +49,7 @@ The dynamic sitemap includes only active public models already allowed by the pu
 - Product sitemap data comes from the Backend, not LocalStorage or client-supplied prices/stock.
 - Private/admin pages stay excluded from the sitemap and retain `noindex` rules.
 - Search copy is descriptive rather than keyword stuffing.
+
+## Brand entity links
+
+The Organization/Brand identity uses clean profile URLs for Instagram, TikTok and YouTube, plus the supplied Facebook share URL. Tracking query parameters are intentionally excluded from long-lived structured data.
