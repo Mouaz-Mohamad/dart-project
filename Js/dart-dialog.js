@@ -178,3 +178,15 @@
     prompt: showPrompt,
   });
 })(window);
+
+// Load the product deep-link helper only on the products surface. The helper waits
+// for DOMContentLoaded, so it can coexist with the existing deferred storefront scripts.
+(function loadDartProductLinks(root) {
+  if (!/^\/products(?:\.html|\/|$)/i.test(root.location.pathname)) return;
+  if (document.querySelector('script[data-dart-product-links="1"]')) return;
+  const script = document.createElement("script");
+  script.src = "/Js/dart-product-links.js";
+  script.async = false;
+  script.dataset.dartProductLinks = "1";
+  (document.head || document.documentElement).appendChild(script);
+})(window);
