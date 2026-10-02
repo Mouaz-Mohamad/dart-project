@@ -943,7 +943,7 @@ header {
     overflow-y: scroll;
     padding-right: 6px;
     scrollbar-width: thin;
-    scrollbar-color: var(--bragnte) #f1f1f1;
+    scrollbar-color: var(--bragnte) #fff;
 }
 
 .model i.fa-x {
@@ -1852,6 +1852,7 @@ header {
     scroll-snap-type: x mandatory;
     padding: 10px 0;
     scrollbar-width: thin;
+    scrollbar-color: var(--bragnte) #fff;
 }
 
 /* إخفاء شريط الإسكرول لو حابب الشكل يكون أضفئ (اختياري) */
