@@ -940,7 +940,10 @@ header {
     padding: 15px;
     box-shadow: 0 4px 10px var(--bg-dark);
     gap: 10px;
-    overflow: hidden;
+    overflow-y: auto;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bragnte) #f1f1f1;
 }
 
 .model i.fa-x {
@@ -1077,10 +1080,6 @@ header {
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
-    overflow-y: auto;
-    padding-right: 6px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--bragnte) #f1f1f1;
 }
 
 .model-product::-webkit-scrollbar {
