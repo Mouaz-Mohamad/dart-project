@@ -73,7 +73,11 @@ jobs:
       - name: Print Dart Lighthouse summary
         run: node scripts/lighthouse-summary.mjs lighthouse-mobile.json lighthouse-desktop.json
 
+      - name: Enforce Dart Lighthouse quality gate
+        run: node scripts/lighthouse-gate.mjs lighthouse-mobile.json lighthouse-desktop.json
+
       - name: Upload Lighthouse reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dart-lighthouse-${{ github.event.workflow_run.head_sha }}
