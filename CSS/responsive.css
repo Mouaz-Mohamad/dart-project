@@ -199,7 +199,7 @@
   }
   .model {
     width: calc(100% - 20px);
-    max-height: 92vh;
+    max-height: 98vh;
     overflow: auto;
   }
   .checkout-summary-box,
