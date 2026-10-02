@@ -40,13 +40,27 @@
     <link rel="icon" type="image/png" sizes="192x192" href="Photos/192px.png">
     <link rel="apple-touch-icon" sizes="192x192" href="Photos/192px.png">
 
+    <!-- Critical image discovery: the hero is the main mobile LCP candidate. -->
+    <link rel="preload" as="image" href="/Photos/hero 1.webp" type="image/webp" fetchpriority="high">
+
     <link rel="stylesheet" href="CSS/main.css">
     <link rel="stylesheet" href="CSS/base.css">
     <link rel="stylesheet" href="CSS/responsive.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Page-scoped critical performance/a11y rules. Keep the global 3-file CSS architecture unchanged. -->
+    <style id="dart-home-critical-performance">
+        .fa-solid,.fa-regular{display:inline-block;min-width:1em;min-height:1em}
+        .dart-modal-close{width:100%;height:28px;padding:0;border:0;background:transparent;color:var(--bg-dark);font-size:28px;line-height:1;text-align:right;cursor:pointer}
+        .dart-modal-close:hover,.dart-modal-close:focus-visible{background:transparent;color:var(--bragnte)}
+        .dart-modal-close::before{display:none!important}
+        .icon-menu:focus-visible,.dart-modal-close:focus-visible,.carousel-arrow:focus-visible,.btn-go-product:focus-visible,.cart-btn:focus-visible{outline:3px solid #111;outline-offset:3px}
+        #birthday,.reviews-section,#why,#feedback-form,footer{content-visibility:auto;contain-intrinsic-size:auto 600px}
+        @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}.dart-cursor{animation:none!important}.product-card,.side-menu,.menu-facke{transition:none!important}}
+    </style>
+
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -82,13 +96,11 @@
             <main class="#">
                 <h1 class="sr-only">Dart Menswear — ملابس رجالية عصرية في مصر</h1>
 
-                <!-- <section id="search-serial-container" aria-label="Product Authenticity Check"></section> -->
-
-                <!-- Hero secthion -->
-                <section class="hero">
-                    <img id="dart-hero-image" data-dart-hero src="/Photos/hero 1.webp" alt="Hero" loading="eager" decoding="async" fetchpriority="high">
+                <!-- Hero section -->
+                <section class="hero" aria-label="Dart featured collection">
+                    <img id="dart-hero-image" data-dart-hero src="/Photos/hero 1.webp" alt="Dart menswear featured collection" loading="eager" decoding="async" fetchpriority="high">
                     <h1 class="dart-hero-title">
-                        <span id="dartTyping"></span><span class="dart-cursor">|</span>
+                        <span id="dartTyping"></span><span class="dart-cursor" aria-hidden="true">|</span>
                     </h1>
                     <button id="btnToProducts" data-go-products type="button" class="btn-go-product">Shop Now</button>
                 </section>
@@ -99,14 +111,14 @@
                     <div class="x-scroll-container" id="bestProductsContainer"></div>
                 </section>
 
-                <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
+                <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard"></section>
 
                 <!-- ================= سكشن المنتجات ================= -->
                 <section class="products-section">
                     <h2 class="section-title-">&nbsp;Newest products</h2>
                     <div class="products-grid" id="productsContainer">
                         <div class="product-card" id="productTemplate" style="display: none;">
-                            <img src="" alt="Product photograph; description is filled from the product name" class="product-img" loading="lazy">
+                            <img src="" alt="Product photograph; description is filled from the product name" class="product-img" loading="lazy" decoding="async">
                             <div class="product-details">
                             <div class="product-category"></div>
                             <div class="product-code" dir="rtl"></div>
@@ -117,7 +129,7 @@
                                     <span class="product-price" data-product-price="current"></span>
                                     <span class="product-discount-badge" data-product-price="discount" hidden></span>
                                 </div>
-                                <button type="button" class="cart-btn dja">Buy &nbsp;<i class="fa-solid fa-bag-shopping"></i></button>
+                                <button type="button" class="cart-btn dja">Buy &nbsp;<i class="fa-solid fa-bag-shopping" aria-hidden="true"></i></button>
                             </div>
                             </div>
                         </div>
@@ -134,12 +146,12 @@
                     <div class="reviews-container" id="reviewsContainer">
                         <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
                             <div>
-                                <div class="stars"></div>
+                                <div class="stars" aria-label="Review rating"></div>
                                 <div class="review-title"></div>
                                 <div class="review-text"></div>
                             </div>
                             <div class="user-info" dir="rtl">
-                                <i class="fa-regular fa-circle-user fa-xl user-avatar"></i>
+                                <i class="fa-regular fa-circle-user fa-xl user-avatar" aria-hidden="true"></i>
                                 <div>
                                     <div class="user-name-"></div>
                                     <div class="review-date"></div>
@@ -150,19 +162,19 @@
                 </section>
                 <div class="margen2020"></div>
 
-                <section id="why" aria-label="Why Choose DART?."></section>
+                <section id="why" aria-label="Why Choose DART?"></section>
                 <div class="margen2020"></div>
                 <section id="feedback-form" aria-label="Share Your Experience"></section>
 
-                <section class="model" id="SectionModel">
-                    <i class="fa-solid fa-x"></i>
+                <section class="model" id="SectionModel" role="dialog" aria-modal="true" aria-labelledby="dartProductModalTitle" aria-hidden="true">
+                    <button type="button" class="dart-modal-close fa-x" aria-label="Close product details">&times;</button>
                     <div class="model-carousel" id="modelCarousel">
                         <div class="carousel-track" id="carouselTrack"></div>
                         <button type="button" class="carousel-arrow carousel-prev" id="carouselPrev" aria-label="Previous image">
-                            <i class="fa-solid fa-chevron-left"></i>
+                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
                         </button>
                         <button type="button" class="carousel-arrow carousel-next" id="carouselNext" aria-label="Next image">
-                            <i class="fa-solid fa-chevron-right"></i>
+                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                         </button>
                         <div class="carousel-dots" id="carouselDots"></div>
                     </div>
@@ -170,7 +182,7 @@
                     <article class="model-product">
                         <div class="model-product-category"></div>
                         <div class="model-product-code"></div>
-                        <div class="model-product-title"></div>
+                        <div class="model-product-title" id="dartProductModalTitle"></div>
                         <div class="model-product-price">Price: &nbsp;<span class="price-number"></span>&nbsp; EGP</div>
                         <div class="sizes-container">
                             <button type="button" class="size-btn" data-size=""></button>
@@ -209,7 +221,7 @@
                 </section>
             </main>
             <div class="margen2020"></div>
-            <footer id="footer" aria-label="footer."></footer>
+            <footer id="footer" aria-label="Footer"></footer>
     </div>
     <script src="Js/dart-state.js" defer></script>
     <script src="Js/dart-site-settings.js" defer></script>
@@ -217,7 +229,8 @@
     <script src="Js/dart-cache-recovery.js" defer></script>
     <script src="Js/dart-ui.js" defer></script>
     <script src="Js/dart-storefront.js" defer></script>
-    <script src="Js/dart-dialog.js"></script>
+    <script src="Js/dart-dialog.js" defer></script>
     <script src="Js/dart-platform.js" defer></script>
+    <script src="Js/dart-home-performance.js" defer></script>
 </body>
 </html>
