@@ -102,6 +102,5 @@
       "source": "/api/:path*",
       "destination": "https://dart-api-dusky.vercel.app/api/:path*"
     }
-  ],
-  "ignoreCommand": "bash scripts/vercel-ignore-frontend.sh"
+  ]
 }
