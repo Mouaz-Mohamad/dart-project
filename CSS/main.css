@@ -940,7 +940,7 @@ header {
     padding: 15px;
     box-shadow: 0 4px 10px var(--bg-dark);
     gap: 10px;
-    overflow: scroll;
+    overflow-y: scroll;
     padding-right: 6px;
     scrollbar-width: thin;
     scrollbar-color: var(--bragnte) #f1f1f1;
