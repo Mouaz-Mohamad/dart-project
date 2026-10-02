@@ -179,14 +179,21 @@
   });
 })(window);
 
-// Load the product deep-link helper only on the products surface. The helper waits
-// for DOMContentLoaded, so it can coexist with the existing deferred storefront scripts.
-(function loadDartProductLinks(root) {
-  if (!/^\/products(?:\.html|\/|$)/i.test(root.location.pathname)) return;
-  if (document.querySelector('script[data-dart-product-links="1"]')) return;
-  const script = document.createElement("script");
-  script.src = "/Js/dart-product-links.js";
-  script.async = false;
-  script.dataset.dartProductLinks = "1";
-  (document.head || document.documentElement).appendChild(script);
+// Product links are needed anywhere the shared storefront product modal exists,
+// including Home, Products and Best Products. Versioned URLs force old tabs/caches
+// to fetch the current routing code after a normal page reload.
+(function loadDartProductRouting(root) {
+  if (!document.getElementById("SectionModel")) return;
+
+  function addScript(src, marker) {
+    if (document.querySelector(`script[data-${marker}="1"]`)) return;
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = false;
+    script.dataset[marker] = "1";
+    (document.head || document.documentElement).appendChild(script);
+  }
+
+  addScript("/Js/dart-product-links.js?v=2", "dartProductLinks");
+  addScript("/Js/dart-product-route-fix.js?v=1", "dartProductRouteFix");
 })(window);
