@@ -35,7 +35,7 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" },
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self' 'sha256-WdSecpwi5DRvBFDd8Q3vpXDIGkqpdbi2XWG7DTATCWU=' 'sha256-LpSSCkpXnxJiUPlzIrby0TOsDcjIEkmzxH5r0lR6Ke0=' 'sha256-jmjVBYcOw+8aVURborlKrSwUDvU3eUy0zfIGfy/BcPk=' 'sha256-ekcTE5vQdKw0lDYiUZpXwQnPfrCKlhofJvNbxK9R+po=' 'sha256-vsGXAX93uUaQK4Vqry98C0OjExYxfzYPNd/l8oyQ9OM=' 'sha256-qV6bhliA9kxG+gx/V1yuK2WpuQTQTEpoBBzaWU46gm4=' 'sha256-8m6YABCko63QVvJGc2Z3/uhBcImVyrQDrcyJtZdGSEU=' https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https://unpkg.com https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://via.placeholder.com; connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self' 'sha256-WdSecpwi5DRvBFDd8Q3vpXDIGkqpdbi2XWG7DTATCWU=' 'sha256-NZT0wpM8V2lEU09bIaXXe4xeG/CYBwOyF5SGGeNmvmk=' 'sha256-jmjVBYcOw+8aVURborlKrSwUDvU3eUy0zfIGfy/BcPk=' 'sha256-ekcTE5vQdKw0lDYiUZpXwQnPfrCKlhofJvNbxK9R+po=' 'sha256-vsGXAX93uUaQK4Vqry98C0OjExYxfzYPNd/l8oyQ9OM=' 'sha256-qV6bhliA9kxG+gx/V1yuK2WpuQTQTEpoBBzaWU46gm4=' 'sha256-8m6YABCko63QVvJGc2Z3/uhBcImVyrQDrcyJtZdGSEU=' https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https://unpkg.com https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://via.placeholder.com; connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests" },
         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
         { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
         { "key": "Cross-Origin-Resource-Policy", "value": "same-site" }
@@ -47,9 +47,18 @@
       "source": "/Photos/me.webp",
       "destination": "/Photos/me.png?v=founder-png-v10",
       "permanent": false
+    },
+    {
+      "source": "/products.html",
+      "destination": "/products",
+      "permanent": true
     }
   ],
   "rewrites": [
+    {
+      "source": "/product-sitemap.xml",
+      "destination": "https://dart-api-dusky.vercel.app/api/v1/catalog/sitemap.xml"
+    },
     {
       "source": "/products",
       "destination": "/products.html"
