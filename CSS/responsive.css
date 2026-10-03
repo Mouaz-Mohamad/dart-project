@@ -351,3 +351,8 @@ body {
 .serial-result-skeleton { grid-template-columns:1fr; } .serial-skeleton-image { width:100%; height:220px; }
 }
 /* END (max-width:520px) */
+
+@media (max-width: 760px) {
+  .dart-set-modal{padding:8px;align-items:end}.dart-set-dialog{grid-template-columns:1fr;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);border-radius:16px 16px 0 0}.dart-set-gallery{padding:12px}.dart-set-gallery>[data-set-cover]{aspect-ratio:4/3;max-height:42vh;object-fit:contain}.dart-set-details{padding:18px 14px 20px}.dart-set-component{grid-template-columns:1fr}.dart-set-component-head{grid-column:1}.dart-set-pricing>[data-set-price]{font-size:21px}.dart-set-cart-card .cart-product-img{width:84px;min-width:84px}
+}
+

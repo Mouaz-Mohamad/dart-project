@@ -398,19 +398,6 @@
     `${rootPath}Js/dart-sets.js`,
     ...(isAdmin ? ["dart-sets-admin.js"] : []),
   ];
-  const styles = [
-    `${rootPath}CSS/sets.css`,
-    ...(isAdmin ? ["dart-sets-admin.css"] : []),
-  ];
-
-  function loadStyle(href) {
-    if (root.document.querySelector(`link[data-dart-sets-asset="${href}"]`)) return;
-    const link = root.document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = href;
-    link.dataset.dartSetsAsset = href;
-    root.document.head.appendChild(link);
-  }
 
   function loadScript(src) {
     if (root.document.querySelector(`script[data-dart-sets-asset="${src}"]`)) return Promise.resolve();
@@ -426,7 +413,6 @@
   }
 
   async function boot() {
-    styles.forEach(loadStyle);
     for (const src of scripts) {
       try { await loadScript(src); }
       catch (error) { console.warn("Dart Sets extension asset unavailable", error); }
