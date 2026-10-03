@@ -1676,6 +1676,7 @@ header {
     opacity: 1;
     visibility: visible;
     transform: translateY(0); /* ترجع لمكانها الطبيعي بسلاسة */
+    z-index: 300000;
 }
 .exit-edit{
     margin: 0 10px 50px 0;
