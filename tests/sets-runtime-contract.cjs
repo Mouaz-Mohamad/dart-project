@@ -19,6 +19,8 @@ assert(profile.includes('dart:sets-extension-ready'), "Profile rows must re-enha
 assert(sets.includes('/api/v1/sets'), "Storefront Sets client must use the server Sets API");
 assert(sets.includes('/api/v1/cart/set-groups'), "Set cart operations must use the server Set-cart API");
 assert(sets.includes("setFilterActive"), "Storefront must expose the Sets product filter state");
+assert(sets.includes("!drafts().length && !cartRef().length"), "Fresh empty carts must not probe non-existent Set reservations");
+assert(sets.includes("if (cartRef().length && !drafts().length) void restoreServerGroups()"), "Cart hydration must retry Set-group restoration when real cart lines arrive");
 assert(sets.includes("data-set-color") && sets.includes("data-set-size"), "Set modal must select color and size per component");
 
 assert(admin.includes('data-model-set-view="sets"'), "Models section must expose the Sets tab");

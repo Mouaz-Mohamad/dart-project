@@ -718,6 +718,9 @@
 
   async function restoreServerGroups() {
     const id=root.DartSets?.currentReservationId?.(); if (!id) return;
+    // A fresh Dart session creates a local CART id before any server reservation exists.
+    // Do not probe Set-cart state until there is actual cart/Set state to restore.
+    if (!drafts().length && !cartRef().length) { scheduleCartDecoration(); return; }
     try {
       const groups=normalizeGroups(await root.DartSets.cartGroups(id));
       if (groups.length) { root.DartSets.writeDrafts(groups); lastAttachedGroups=groups; }
@@ -734,7 +737,11 @@
     if (filter) new MutationObserver(()=>{ensureSetFilter();renderSetCards();}).observe(filter,{childList:true});
     ["productsPart1","productsPart2","productsContainer"].forEach(id=>{ const node=root.document.getElementById(id); if (node) new MutationObserver(()=>renderSetCards()).observe(node,{childList:true}); });
     const cart=root.document.getElementById("cartItemsContainer"); if (cart) new MutationObserver(scheduleCartDecoration).observe(cart,{childList:true});
-    root.document.addEventListener("dart:data-changed",event=>{ if (event.detail?.key==="dart_cart") scheduleCartDecoration(); });
+    root.document.addEventListener("dart:data-changed",event=>{
+      if (event.detail?.key!=="dart_cart") return;
+      scheduleCartDecoration();
+      if (cartRef().length && !drafts().length) void restoreServerGroups();
+    });
     root.addEventListener("dart:set-cart-draft-changed",scheduleCartDecoration);
     root.addEventListener("dart:customer-session-changed",()=>{ void restoreServerGroups(); void root.DartSets?.loadWaiting?.(); });
     root.document.addEventListener("click",()=>root.setTimeout(renderSetAwareTotals,0),true);
