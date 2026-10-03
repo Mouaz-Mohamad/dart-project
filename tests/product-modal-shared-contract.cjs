@@ -14,6 +14,7 @@ const actions = read("Js/dart-product-button-state.js");
 const homeUi = read("Js/dart-ui.home.min.js");
 const productsUi = read("Js/dart-ui.js");
 const homePerformance = read("Js/dart-home-performance.js");
+const dialog = read("Js/dart-dialog.js");
 const productPage = read("api/product-page.js");
 
 const host = '<div id="product-modal-host" data-section-src="sections/product-modal.html"></div>';
@@ -65,6 +66,8 @@ assert.match(storefront, /event\.key !== "Escape"/);
 assert.match(storefront, /addEventListener\("popstate"/);
 assert.match(storefront, /window\.DartStorefront = \{[\s\S]{0,120}\bopen,[\s\S]{0,80}\bclose,/);
 assert.match(storefront, /setOptionStatus: setProductOptionStatus/);
+assert.match(dialog, /product-modal-host/);
+assert.match(dialog, /dart-product-route-fix\.js\?v=1\.1/);
 assert.match(actions, /\$\("modalBuyBtn"\)/);
 assert.match(actions, /\$\("modalWaitBtn"\)/);
 assert.match(actions, /DartPlatform\.joinWaiting/);

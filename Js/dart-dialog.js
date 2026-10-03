@@ -183,7 +183,11 @@
 // including Home, Products and Best Products. Versioned URLs force old tabs/caches
 // to fetch the current routing code after a normal page reload.
 (function loadDartProductRouting(root) {
-  if (!document.getElementById("SectionModel")) return;
+  if (
+    !document.getElementById("SectionModel") &&
+    !document.getElementById("product-modal-host")
+  )
+    return;
 
   function addScript(src, marker) {
     if (document.querySelector(`script[data-${marker}="1"]`)) return;
@@ -195,5 +199,5 @@
   }
 
   addScript("/Js/dart-product-links.js?v=2", "dartProductLinks");
-  addScript("/Js/dart-product-route-fix.js?v=1", "dartProductRouteFix");
+  addScript("/Js/dart-product-route-fix.js?v=1.1", "dartProductRouteFix");
 })(window);
