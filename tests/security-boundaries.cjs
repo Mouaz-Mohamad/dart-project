@@ -9,21 +9,21 @@ const adminAuth = fs.readFileSync("Eye/dart-admin-auth.js", "utf8");
 const identity = fs.readFileSync("backend/src/modules/identity/identity.service.ts", "utf8");
 const logger = fs.readFileSync("backend/src/config/logger.ts", "utf8");
 
+assert.doesNotMatch(
+  sw,
+  /addEventListener\(['"]fetch['"]|respondWith\(|caches\.match\(/,
+  "Retired Service Worker must never intercept/cache storefront or API responses",
+);
 assert.match(
   sw,
-  /url\.pathname\.startsWith\(['"]\/api\/['"]\)/,
-  "Service Worker must never intercept/cache API business responses",
+  /self\.registration\.unregister\(\)/,
+  "Retired Service Worker must unregister itself after legacy cache cleanup",
 );
-for (const privatePath of [
-  "/Eye/",
-  "/profile.html",
-  "/cart-checkout.html",
-  "/track.html",
-  "/rep.html",
-  "/Sign%20Up%20modern.html",
-]) {
-  assert.ok(sw.includes(privatePath), `Service Worker private-path exclusion missing: ${privatePath}`);
-}
+assert.match(
+  sw,
+  /key\.startsWith\(DART_CACHE_PREFIX\)/,
+  "Retired Service Worker must purge only Dart legacy static caches",
+);
 
 assert.ok(
   state.includes("const values = new Map()"),
