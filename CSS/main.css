@@ -939,7 +939,7 @@ header {
     z-index: 100000000;
     background-color: var(--white);
     border-radius: 20px;
-    padding: 15px;
+    padding: 17px 0 10px 10px;
     box-shadow: 0 4px 10px var(--bg-dark);
     overflow-y: scroll;
     scrollbar-width: auto;
@@ -2942,16 +2942,15 @@ button,
   z-index: 10020;
   display: grid;
   place-items: center;
-  padding: 18px;
   background: rgba(15, 23, 42, 0.66);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(5px);
 }
 .product-size-chart-dialog {
   position: relative;
   width: min(820px, 96vw);
   max-height: 86vh;
   overflow: auto;
-  padding: 24px;
+  padding: 10px;
   border-radius: 15px;
   background: #fff;
   color: #111827;
@@ -2962,13 +2961,13 @@ button,
 }
 .product-size-chart-close {
   position: absolute;
-  top: 12px;
+  top: 5px;
   inset-inline-end: 14px;
   width: 34px;
   height: 34px;
   border: 0;
   border-radius: 50%;
-  background: #f1f5f9;
+  background: #f1f5f900;
   color: #111827;
   font-size: 24px;
   cursor: pointer;
@@ -2985,7 +2984,7 @@ button,
 }
 .product-size-chart-table th,
 .product-size-chart-table td {
-  padding: 11px 12px;
+  padding: 9px;
   border-bottom: 1px solid #e5e7eb;
   text-align: center;
   white-space: nowrap;
