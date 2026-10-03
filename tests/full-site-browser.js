@@ -178,7 +178,8 @@ const server = http.createServer((request, response) => {
     await page.waitForSelector("#header-container .hedar-nav");
     await page.waitForSelector("#footer .footer-continear");
     assert.equal(await page.locator("#header-container .hedar-nav").count(), 1);
-    assert.equal(await page.locator("#header-container .dart-nav-icon").count(), 2);
+    assert.equal(await page.locator("#header-container .dart-nav-icon").count(), 1);
+    assert.equal(await page.locator("#header-container .icon-menu").count(), 1);
     assert.equal(await page.locator("#header-container .social-icons svg").count(), 5);
     assert.equal(await page.locator("#footer .footer-continear").count(), 1);
     await page.close();

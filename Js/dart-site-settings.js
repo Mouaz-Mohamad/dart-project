@@ -392,38 +392,68 @@
   if (!root?.document || root.__dartSetsExtensionLoader) return;
   root.__dartSetsExtensionLoader = true;
 
-  const isAdmin = /\/Eye\//i.test(root.location?.pathname || "");
+  const pathname = String(root.location?.pathname || "/");
+  const isAdmin = /\/Eye\//i.test(pathname);
   const rootPath = isAdmin ? "../" : "";
-  const scripts = [
-    `${rootPath}Js/dart-sets.js`,
-    ...(isAdmin ? ["dart-sets-admin.js"] : []),
-  ];
+  const SET_STOREFRONT_PAGES = ["/", "/index.html", "/products.html", "/cart-checkout.html", "/profile.html"];
+  const storefrontPage = SET_STOREFRONT_PAGES.some((suffix) => pathname === suffix || pathname.endsWith(suffix));
+  let bootPromise = null;
 
   function loadScript(src) {
-    if (root.document.querySelector(`script[data-dart-sets-asset="${src}"]`)) return Promise.resolve();
+    const existing = root.document.querySelector(`script[data-dart-sets-asset="${src}"]`);
+    if (existing?.dataset.dartLoaded === "1") return Promise.resolve();
+    if (existing) {
+      return new Promise((resolve, reject) => {
+        existing.addEventListener("load", resolve, { once: true });
+        existing.addEventListener("error", reject, { once: true });
+      });
+    }
     return new Promise((resolve, reject) => {
       const script = root.document.createElement("script");
       script.src = src;
       script.defer = true;
       script.dataset.dartSetsAsset = src;
-      script.addEventListener("load", resolve, { once: true });
+      script.addEventListener("load", () => { script.dataset.dartLoaded = "1"; resolve(); }, { once: true });
       script.addEventListener("error", () => reject(new Error(`Unable to load ${src}`)), { once: true });
       root.document.head.appendChild(script);
     });
   }
 
-  async function boot() {
-    for (const src of scripts) {
-      try { await loadScript(src); }
-      catch (error) { console.warn("Dart Sets extension asset unavailable", error); }
-    }
-    root.dispatchEvent(new CustomEvent("dart:sets-extension-ready"));
+  function boot() {
+    if (bootPromise) return bootPromise;
+    bootPromise = (async () => {
+      const scripts = [`${rootPath}Js/dart-sets.js`, ...(isAdmin ? ["dart-sets-admin.js"] : [])];
+      for (const src of scripts) await loadScript(src);
+      root.dispatchEvent(new CustomEvent("dart:sets-extension-ready"));
+    })().catch((error) => {
+      bootPromise = null;
+      console.warn("Dart Sets extension asset unavailable", error);
+    });
+    return bootPromise;
   }
 
-  if (root.document.readyState === "loading") {
-    root.document.addEventListener("DOMContentLoaded", () => void boot(), { once: true });
-  } else {
-    void boot();
+  function bootWhenReady() {
+    if (root.document.readyState === "loading") {
+      root.document.addEventListener("DOMContentLoaded", () => void boot(), { once: true });
+    } else {
+      void boot();
+    }
+  }
+
+  if (isAdmin) {
+    root.document.addEventListener("click", (event) => {
+      if (event.target.closest?.('[data-target="models"]')) void boot();
+    }, true);
+    root.document.addEventListener("dart:sets-load-request", () => void boot());
+    const bootIfModelsActive = () => {
+      if (root.document.getElementById("models")?.classList.contains("active-section")) void boot();
+    };
+    if (root.document.readyState === "loading") {
+      root.document.addEventListener("DOMContentLoaded", bootIfModelsActive, { once: true });
+    } else {
+      bootIfModelsActive();
+    }
+  } else if (storefrontPage) {
+    bootWhenReady();
   }
 })(typeof window !== "undefined" ? window : globalThis);
-

@@ -722,7 +722,10 @@
       const groups=normalizeGroups(await root.DartSets.cartGroups(id));
       if (groups.length) { root.DartSets.writeDrafts(groups); lastAttachedGroups=groups; }
       else if (!cartRef().length) { root.DartSets.clearDrafts(); lastAttachedGroups=[]; }
-    } catch (error) { if (![401,404,409].includes(error?.status)) console.warn("Dart Set cart restore failed",error); }
+    } catch (error) {
+      const navigationAbort = error?.name === "TypeError" && /Failed to fetch/i.test(String(error?.message || ""));
+      if (!navigationAbort && ![401,404,409].includes(error?.status)) console.warn("Dart Set cart restore failed",error);
+    }
     scheduleCartDecoration();
   }
 

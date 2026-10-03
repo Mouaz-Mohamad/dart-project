@@ -346,6 +346,7 @@
     observeLists(); scheduleEnhance();
     root.document.addEventListener("dart:data-changed",scheduleEnhance);
     root.addEventListener("dart:set-waiting-changed",scheduleEnhance);
+    root.addEventListener("dart:sets-extension-ready",scheduleEnhance);
     root.document.addEventListener("dart:sections-loaded",()=>{observeLists();scheduleEnhance();});
     root.document.addEventListener("click",event=>{
       const confirm=event.target.closest?.("[data-set-waiting-confirm]");

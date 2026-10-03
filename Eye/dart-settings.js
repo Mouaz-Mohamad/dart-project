@@ -257,7 +257,7 @@
   function renderMedia(settings) {
     previewAsset(settings.heroDayImage, $("settings-hero-day-preview"), "../Photos/hero 2.webp");
     previewAsset(settings.heroNightImage || settings.heroDayImage, $("settings-hero-night-preview"), "../Photos/hero 2.webp");
-    previewAsset(settings.founderImage, $("settings-founder-preview"), "../Photos/me.webp");
+    previewAsset(settings.founderImage, $("settings-founder-preview"), "../Photos/me.png");
   }
 
   function renderAnnouncements(settings) {

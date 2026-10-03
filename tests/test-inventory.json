@@ -16,10 +16,12 @@
     "product-modal-shared-contract.cjs",
     "product_deep_links.cjs",
     "product_ssr_seo.cjs",
+    "profile-compact-records.cjs",
     "promotion-settings-contract.js",
     "security-boundaries.cjs",
     "seo_checks.js",
     "server-authority-contract.js",
+    "sets-runtime-contract.cjs",
     "settings-and-groups-unit.js",
     "settings-reset-unit.js",
     "test-inventory-contract.cjs"

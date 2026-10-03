@@ -64,8 +64,9 @@ header, .side-menu, .pge-que .pge, .que,
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 9 / 16;
+    aspect-ratio: 3/ 4;
     z-index: 1;
+    object-fit: cover;
 
 }
 .hero .btn-go-product{
@@ -176,6 +177,7 @@ header {
     width: 70px;
     height: 50px;
     background-color: var(--bragnte);
+    cursor: pointer;
 }
 
 .icon-shop {
@@ -943,19 +945,17 @@ header {
     z-index: 100000000;
     background-color: var(--white);
     border-radius: 20px;
-    padding: 15px;
+    padding: 17px 0 10px 10px;
     box-shadow: 0 4px 10px var(--bg-dark);
-    gap: 10px;
     overflow-y: scroll;
-    padding-right: 6px;
-    scrollbar-width: thin;
+    scrollbar-width: auto;
     scrollbar-color: var(--bragnte) #fff;
 }
 
 .dart-modal-close {
-    font-size: 30px;
-    width: 100%;
-    position: static;
+    font-size: 50px;
+    width: 97%;
+    position:static;
     color: var(--bragnte);
     cursor: pointer;
     text-align: right;
@@ -967,7 +967,7 @@ header {
     line-height: 1;
     flex-shrink: 0;
     z-index: 10;
-    margin: 0 10px 0 0;
+    margin-top: -10px;
 }
 
 .dart-modal-close:hover,
@@ -1439,7 +1439,6 @@ header {
     padding: 10px;
     gap: 2px;
     background: var(--white);
-    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border-radius: 15px;
     box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
@@ -1685,6 +1684,7 @@ header {
     opacity: 1;
     visibility: visible;
     transform: translateY(0); /* ترجع لمكانها الطبيعي بسلاسة */
+    z-index: 300000;
 }
 .exit-edit{
     margin: 0 10px 50px 0;
@@ -2188,8 +2188,9 @@ button,
   border: 1px solid rgba(171, 1, 43, 0.25);
   border-radius: 20px;
   background: #fff;
-  box-shadow: 0 12px 30px rgba(30, 30, 30, 0.07);
+  box-shadow: 0 0px 30px rgba(30, 30, 30, 0.07);
   text-align: center;
+  direction: rtl;
 }
 .feedback-access-message i {
   color: #ab012b;
@@ -2205,6 +2206,7 @@ button,
   align-items: center;
   justify-content: center;
   text-decoration: none;
+  color: var(--bragnte);
 }
 .cart-reservation-timer {
   width: fit-content;
@@ -2623,7 +2625,6 @@ button,
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
-  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 .dart-map-reset:hover,
@@ -2949,17 +2950,15 @@ button,
   z-index: 10020;
   display: grid;
   place-items: center;
-  padding: 18px;
   background: rgba(15, 23, 42, 0.66);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(5px);
 }
 .product-size-chart-dialog {
   position: relative;
   width: min(820px, 96vw);
   max-height: 86vh;
   overflow: auto;
-  padding: 24px;
+  padding: 10px;
   border-radius: 15px;
   background: #fff;
   color: #111827;
@@ -2970,13 +2969,13 @@ button,
 }
 .product-size-chart-close {
   position: absolute;
-  top: 12px;
+  top: 5px;
   inset-inline-end: 14px;
   width: 34px;
   height: 34px;
   border: 0;
   border-radius: 50%;
-  background: #f1f5f9;
+  background: #f1f5f900;
   color: #111827;
   font-size: 24px;
   cursor: pointer;
@@ -2993,7 +2992,7 @@ button,
 }
 .product-size-chart-table th,
 .product-size-chart-table td {
-  padding: 11px 12px;
+  padding: 9px;
   border-bottom: 1px solid #e5e7eb;
   text-align: center;
   white-space: nowrap;
@@ -4200,7 +4199,6 @@ button,
   padding: 18px 18px 82px;
   overflow: hidden;
   background: rgba(10, 7, 8, .76);
-  -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
 }
 .dart-birthday-card {
@@ -4467,6 +4465,9 @@ button,
 }
 /* END Waiting / Restock Reservation */
 
+/* DART SETS — storefront source styles; responsive rules stay in responsive.css. */
+.dart-set-modal[hidden]{display:none!important}.dart-set-modal{position:fixed;inset:0;z-index:10050;background:rgba(10,10,10,.58);display:grid;place-items:center;padding:16px;overflow:auto}.dart-set-dialog{position:relative;width:min(980px,100%);max-height:calc(100vh - 32px);overflow:auto;background:#fff;border-radius:18px;display:grid;grid-template-columns:minmax(260px,.9fr) minmax(320px,1.1fr);box-shadow:0 24px 80px rgba(0,0,0,.28)}.dart-set-close{position:absolute;top:10px;right:12px;z-index:2;width:38px;height:38px;border:0;border-radius:50%;background:#fff;font-size:28px;cursor:pointer}.dart-set-gallery{padding:18px;background:#f6f3ef}.dart-set-gallery>[data-set-cover]{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:14px;background:#eee}.dart-set-thumbs{display:flex;gap:8px;overflow:auto;padding-top:10px}.dart-set-thumb{flex:0 0 64px;padding:0;border:1px solid #ddd;border-radius:9px;background:#fff;overflow:hidden;cursor:pointer}.dart-set-thumb img{display:block;width:64px;height:74px;object-fit:cover}.dart-set-details{padding:30px 24px 24px}.dart-set-category{display:inline-block;color:#ab012b;font-weight:700}.dart-set-details>[data-set-code]{display:block;margin-top:4px;color:#6b7280}.dart-set-details h2{margin:8px 0 6px}.dart-set-details>[data-set-description]{color:#4b5563;line-height:1.7}.dart-set-pricing{display:flex;align-items:center;gap:10px;margin:16px 0}.dart-set-pricing>[data-set-old-price]{text-decoration:line-through;color:#777}.dart-set-pricing>[data-set-price]{font-size:24px;color:#111}.dart-set-pricing>[data-set-discount]{font-style:normal;background:#f8e8ed;color:#ab012b;border-radius:999px;padding:4px 9px;font-size:12px}.dart-set-components{display:grid;gap:10px}.dart-set-component{border:1px solid #e5e7eb;border-radius:12px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.dart-set-component-head{grid-column:1/-1;display:flex;justify-content:space-between;gap:12px}.dart-set-component-head small{color:#6b7280}.dart-set-component label{display:grid;gap:5px;font-size:12px;color:#555}.dart-set-component select{width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff}.dart-set-status{min-height:22px;margin:12px 0;color:#6b7280;font-size:13px}.dart-set-modal-open{overflow:hidden}.dart-set-cart-card{border-color:rgba(171,1,43,.22)}.dart-set-cart-card .dart-set-cart-specs{white-space:normal;line-height:1.6}.dart-set-cart-card .cart-product-price-qty strong{font-size:12px;color:#6b7280}
+
 /* === CSS/base.css === */
 /* DART CODE GUIDE | CSS/base.css
    الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */
@@ -4620,7 +4621,9 @@ img, picture, video, canvas, svg {
 
 input, button, textarea, select {
   font: inherit;
-  color: inherit;
+  color: #000000;
+  font-size:small;
+  font-weight: 400;
 }
 
 input, textarea, select {
@@ -5034,3 +5037,7 @@ body {
 .serial-result-skeleton { grid-template-columns:1fr; } .serial-skeleton-image { width:100%; height:220px; }
 }
 /* END (max-width:520px) */
+
+@media (max-width: 760px) {
+  .dart-set-modal{padding:8px;align-items:end}.dart-set-dialog{grid-template-columns:1fr;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);border-radius:16px 16px 0 0}.dart-set-gallery{padding:12px}.dart-set-gallery>[data-set-cover]{aspect-ratio:4/3;max-height:42vh;object-fit:contain}.dart-set-details{padding:18px 14px 20px}.dart-set-component{grid-template-columns:1fr}.dart-set-component-head{grid-column:1}.dart-set-pricing>[data-set-price]{font-size:21px}.dart-set-cart-card .cart-product-img{width:84px;min-width:84px}
+}

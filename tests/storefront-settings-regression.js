@@ -225,8 +225,8 @@ const server = http.createServer(async (request, response) => {
 
   const products = await context.newPage();
   await products.goto(`${origin}/products.html`, { waitUntil: "domcontentloaded" });
-  await products.waitForSelector("#header-container .fa-bars");
-  assert.equal(await products.locator("#header-container .fa-bars").count(), 1);
+  await products.waitForSelector("#header-container .icon-menu");
+  assert.equal(await products.locator("#header-container .icon-menu").count(), 1);
   assert.equal(await products.locator("#header-container .fa-cart-shopping").count(), 1);
 
   await products.waitForSelector('.product-card[data-id="DT-TEST-1"]');

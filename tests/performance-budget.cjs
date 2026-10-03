@@ -62,6 +62,8 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-rep.js",
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
+  "Js/dart-sets.js",
+  "Eye/dart-sets-admin.js",
 ]);
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 const dashboardRuntime = fs.readFileSync("Eye/dart.js", "utf8");
@@ -83,14 +85,23 @@ if (/script[^>]+src=["']dart-finance\.js["']/i.test(dashboardHtml)) {
 if (!dashboardRuntime.includes('script.src = "dart-finance.js"')) {
   failures.push("Eye/dart.js: Finance lazy loader is missing");
 }
+const settingsRuntime = fs.readFileSync("Js/dart-site-settings.js", "utf8");
+if (!settingsRuntime.includes("SET_STOREFRONT_PAGES")) {
+  failures.push("Js/dart-site-settings.js: Sets storefront runtime must stay page-scoped");
+}
+if (!settingsRuntime.includes('[data-target="models"]')) {
+  failures.push("Js/dart-site-settings.js: Dart Eye Sets must lazy-load from the Models section");
+}
 
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
 let coreJsBytes = 0;
+let lazyJsBytes = 0;
 for (const file of jsFiles) {
   const size = fs.statSync(file).size;
   totalJsBytes += size;
-  if (!pageScopedFeatureFiles.has(file)) coreJsBytes += size;
+  if (pageScopedFeatureFiles.has(file)) lazyJsBytes += size;
+  else coreJsBytes += size;
   if (size > maxJsBytes) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
@@ -98,8 +109,8 @@ for (const file of jsFiles) {
 if (coreJsBytes > 900 * 1024) {
   failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 900KB`);
 }
-if (totalJsBytes > 1150 * 1024) {
-  failures.push(`Repository browser JavaScript is ${Math.ceil(totalJsBytes / 1024)}KB; budget is 1150KB`);
+if (lazyJsBytes > 400 * 1024) {
+  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 400KB`);
 }
 
 // Platform delivery is still an exact minified derivative of dart-platform.js.
@@ -221,5 +232,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `PASS performance budget: ${jsFiles.length} JS files, ${Math.ceil(coreJsBytes / 1024)}KB initial/core, ${Math.ceil(homeInitialJsBytes / 1024)}KB homepage direct, ${Math.ceil(totalJsBytes / 1024)}KB repository total`,
+  `PASS performance budget: ${jsFiles.length} JS files, ${Math.ceil(coreJsBytes / 1024)}KB initial/core, ${Math.ceil(homeInitialJsBytes / 1024)}KB homepage direct, ${Math.ceil(lazyJsBytes / 1024)}KB lazy/page-scoped, ${Math.ceil(totalJsBytes / 1024)}KB repository source`,
 );

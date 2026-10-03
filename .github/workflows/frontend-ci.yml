@@ -80,6 +80,8 @@ jobs:
           node tests/promotion-settings-contract.js
           node tests/product-button-state-contract.cjs
           node tests/product-modal-shared-contract.cjs
+          node tests/profile-compact-records.cjs
+          node tests/sets-runtime-contract.cjs
           node tests/test-inventory-contract.cjs
 
   browser-smoke:

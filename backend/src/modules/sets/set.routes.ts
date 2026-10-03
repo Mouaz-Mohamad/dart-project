@@ -18,7 +18,7 @@ const componentSchema = z.object({
   modelId: z.string().trim().min(1).max(120),
   quantity: z.number().int().min(1).max(20).default(1),
 });
-const setWriteSchema = z.object({
+const setWriteBaseSchema = z.object({
   setId: setIdSchema,
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(4000).default(""),
@@ -26,7 +26,12 @@ const setWriteSchema = z.object({
   discountPercent: z.number().min(0).max(100).default(0),
   images: z.array(z.string().trim().min(1).max(1200)).max(30).default([]),
   components: z.array(componentSchema).min(1).max(100),
-}).superRefine((value, context) => {
+});
+
+function validateSetPieceCount(
+  value: { components: Array<{ quantity: number }> },
+  context: z.RefinementCtx,
+): void {
   const pieceCount = value.components.reduce((sum, component) => sum + component.quantity, 0);
   if (pieceCount > 100) {
     context.addIssue({
@@ -35,16 +40,19 @@ const setWriteSchema = z.object({
       message: "A Set can contain at most 100 physical pieces",
     });
   }
-});
+}
 
-const setUpdateSchema = setWriteSchema.omit({ setId: true }).extend({
-  expectedVersion: z.number().int().positive(),
-});
+const setWriteSchema = setWriteBaseSchema.superRefine(validateSetPieceCount);
+
+const setUpdateSchema = setWriteBaseSchema
+  .omit({ setId: true })
+  .extend({ expectedVersion: z.number().int().positive() })
+  .superRefine(validateSetPieceCount);
 
 export function createSetRouter(
   sets: SetService,
   identity: IdentityService,
-  config: Pick<AppConfig, "sessionCookieName">,
+  config: Pick<AppConfig, "sessionCookieName" | "authPepper">,
 ): Router {
   const router = Router();
   const signedIn = authenticate(identity, config);
