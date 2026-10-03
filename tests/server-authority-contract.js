@@ -347,21 +347,20 @@ assert.ok(
   "dashboard HTML must not contain duplicate type attributes",
 );
 
-assert.match(
+assert.doesNotMatch(
   serviceWorker,
-  /new Request\(request, \{ cache: 'no-cache' \}\)/,
-  "service worker must explicitly revalidate public requests while online",
-);
-const networkFirstBranch = serviceWorker.slice(serviceWorker.indexOf("async function networkFirst"));
-assert.match(
-  networkFirstBranch,
-  /fetch\(refreshRequest\)[\s\S]*caches\.match\(request\)/,
-  "public assets must try a revalidated network request before cached fallback so devices do not run stale content",
+  /addEventListener\(['"]fetch['"]|respondWith\(|caches\.match\(/,
+  "retired service worker must not intercept storefront or API requests",
 );
 assert.match(
   serviceWorker,
-  /event\.respondWith\(networkFirst\(request\)\)/,
-  "all same-origin public GET assets must use the shared network-first cache policy",
+  /self\.registration\.unregister\(\)/,
+  "retired service worker must remove itself after cleaning legacy caches",
+);
+assert.match(
+  serviceWorker,
+  /key\.startsWith\(DART_CACHE_PREFIX\)/,
+  "retired service worker must limit cleanup to Dart legacy static caches",
 );
 
 console.log("PASS server-authority contract");
