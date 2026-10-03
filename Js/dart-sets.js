@@ -6,6 +6,7 @@
 
   const DRAFT_KEY = "dart_cart_set_groups_v1";
   let catalog = [];
+  let setWaiting = [];
   let settings = { birthdayPercent: 10, dartCardPercent: 10, version: 1 };
   let loadedAt = 0;
   const CACHE_MS = 30_000;
@@ -134,6 +135,61 @@
     return groups;
   }
 
+  async function loadWaiting() {
+    if (!signedIn()) { setWaiting = []; return []; }
+    const payload = await request("/api/v1/me/sets/waiting");
+    setWaiting = Array.isArray(payload?.entries) ? payload.entries : [];
+    root.dispatchEvent?.(new CustomEvent("dart:set-waiting-changed", { detail: { entries: clone(setWaiting) } }));
+    return clone(setWaiting);
+  }
+
+  async function joinWaiting(setId, selections) {
+    if (!signedIn()) throw Object.assign(new Error("Sign in to join Set Waiting."), { code: "AUTH_REQUIRED" });
+    const payload = await request("/api/v1/me/sets/waiting", { method: "POST", body: { setId, selections } });
+    await loadWaiting();
+    return payload?.entry || null;
+  }
+
+  async function confirmWaiting(entryId) {
+    const payload = await request(`/api/v1/me/sets/waiting/${encodeURIComponent(entryId)}/confirm`, { method: "POST", body: {} });
+    const entry = payload?.entry || null;
+    if (entry?.status === "confirmed" && entry.cartReservationId) {
+      const set = setById(entry.setId) || await detail(entry.setId);
+      const currentCart = root.DartState?.clone?.(root.DartState?.read?.("dart_cart", []) || [])
+        || clone(root.DartState?.read?.("dart_cart", []) || []);
+      const currentGroups = readDrafts();
+      const unitIndex = 1 + Math.max(0,...currentGroups.filter((group) => String(group.setId) === String(entry.setId)).map((group) => Number(group.unitIndex) || 0));
+      const key = `${entry.setId}:${unitIndex}`;
+      const selections = Array.isArray(entry.selections) ? entry.selections : [];
+      const lines = selections.map((selection) => {
+        const model = root.DartCatalog?.model?.(selection.modelId);
+        let price = Number(model?.selling || 0);
+        try { price = Number(root.DartCatalog?.price?.(model) ?? price); } catch {}
+        let image = "";
+        try { image = root.DartCatalog?.cover?.(model,selection.color) || ""; } catch {}
+        return {
+          id:String(selection.modelId),title:model?.name || String(selection.modelId),price,
+          size:String(selection.size),color:String(selection.color),quantity:1,image,
+          setId:String(entry.setId),dartSetKey:key,dartSetUnitIndex:unitIndex,
+          reservationId:String(entry.cartReservationId),reservationUntil:entry.reservedUntil || null,
+        };
+      });
+      writeDrafts([...currentGroups,{setId:String(entry.setId),unitIndex,selections}]);
+      root.DartPlatform?.adoptCartReservationId?.(entry.cartReservationId);
+      const combined = [...currentCart,...lines];
+      if (root.DartPlatform?.reserveCart) await root.DartPlatform.reserveCart(combined);
+      else root.DartState?.write?.("dart_cart",combined,{source:"set-waiting-confirm"});
+    }
+    await loadWaiting();
+    return entry;
+  }
+
+  async function cancelWaiting(entryId) {
+    const payload = await request(`/api/v1/me/sets/waiting/${encodeURIComponent(entryId)}`, { method: "DELETE" });
+    await loadWaiting();
+    return payload?.entry || null;
+  }
+
   function setById(setId) {
     return catalog.find((row) => String(row.setId) === String(setId)) || null;
   }
@@ -158,6 +214,11 @@
     clearDrafts,
     attachCartGroups,
     cartGroups,
+    loadWaiting,
+    joinWaiting,
+    confirmWaiting,
+    cancelWaiting,
+    waitingEntries: () => clone(setWaiting),
     currentReservationId,
     signedIn,
     moneyMinor,
@@ -401,6 +462,7 @@
     modal.addEventListener("click", (event) => { if (event.target === modal || event.target.closest?.("[data-set-close]")) closeSetModal(); });
     root.document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeSetModal(); });
     modal.querySelector("[data-set-add]")?.addEventListener("click", () => void addActiveSetToCart());
+    modal.querySelector("[data-set-wait]")?.addEventListener("click", () => void joinActiveSetWaiting());
     return modal;
   }
 
@@ -489,6 +551,26 @@
     try { price=Number(root.DartCatalog?.price?.(model) ?? price); } catch {}
     let image=""; try { image=root.DartCatalog?.cover?.(model,selection.color)||""; } catch {}
     return { id:selection.modelId,title:model?.name||selection.modelId,price,size:selection.size,color:selection.color,quantity:1,image,setId:set.setId,dartSetKey:key,dartSetUnitIndex:unitIndex };
+  }
+
+  async function joinActiveSetWaiting() {
+    if (!activeSet) return;
+    if (!root.DartSets?.signedIn?.()) {
+      if (typeof showToast === "function") showToast("سجل دخولك أولاً للانضمام إلى Waiting.");
+      root.location.href = "login.html";
+      return;
+    }
+    const selections = selectedComponents();
+    try {
+      const entry = await root.DartSets.joinWaiting(activeSet.setId, selections);
+      if (typeof showToast === "function") {
+        showToast(entry?.status === "reserved" ? "الطقم أصبح متاحاً بالكامل وتم حجزه لك." : "تمت إضافتك إلى Waiting للطقم بالكامل.");
+      }
+      closeSetModal();
+    } catch (error) {
+      if (error?.code === "SET_STOCK_AVAILABLE") { updateModalAvailability(); }
+      if (typeof showToast === "function") showToast(error?.message || "تعذر الانضمام إلى Waiting.");
+    }
   }
 
   async function addActiveSetToCart() {
@@ -651,7 +733,7 @@
     const cart=root.document.getElementById("cartItemsContainer"); if (cart) new MutationObserver(scheduleCartDecoration).observe(cart,{childList:true});
     root.document.addEventListener("dart:data-changed",event=>{ if (event.detail?.key==="dart_cart") scheduleCartDecoration(); });
     root.addEventListener("dart:set-cart-draft-changed",scheduleCartDecoration);
-    root.addEventListener("dart:customer-session-changed",()=>void restoreServerGroups());
+    root.addEventListener("dart:customer-session-changed",()=>{ void restoreServerGroups(); void root.DartSets?.loadWaiting?.(); });
     root.document.addEventListener("click",()=>root.setTimeout(renderSetAwareTotals,0),true);
   }
 
@@ -661,6 +743,7 @@
     ensureSetFilter(); renderSetCards(); observe();
     lastAttachedGroups=drafts();
     await restoreServerGroups();
+    if (root.DartSets?.signedIn?.()) await root.DartSets.loadWaiting().catch(()=>[]);
   }
 
   if (root.document.readyState==="loading") root.document.addEventListener("DOMContentLoaded",()=>void boot(),{once:true});

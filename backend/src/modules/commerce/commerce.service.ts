@@ -3384,6 +3384,7 @@ export class CommerceService {
         customer_name: string | null;
         email: string | null;
         contact_snapshot: Record<string, unknown>;
+        order_item_id: string;
         inventory_item_id: string;
         item_code: string;
         model_id: string;
@@ -3397,7 +3398,7 @@ export class CommerceService {
                 o.final_minor::text, o.amount_refunded_minor::text, o.promotion,
                 o.customer_user_id::text, c.client_code, c.full_name AS customer_name,
                 u.email, o.contact_snapshot,
-                oi.inventory_item_id, oi.item_code, oi.model_id, oi.model_name,
+                oi.id::text AS order_item_id, oi.inventory_item_id, oi.item_code, oi.model_id, oi.model_name,
                 oi.color, oi.size, oi.final_unit_minor::text, oi.discount_source
            FROM orders o
            JOIN order_items oi ON oi.order_id=o.id
@@ -3455,10 +3456,15 @@ export class CommerceService {
       const previousRefundMinor = existing
         ? Math.max(0, Math.round((Number(existing.refundAmount) || 0) * 100))
         : 0;
-      const requestedRefundMinor = Math.max(
+      let requestedRefundMinor = Math.max(
         0,
         Math.round((Number(input.refundAmount) || 0) * 100),
       );
+      const setLine = await client.query(
+        "SELECT 1 FROM order_set_components WHERE order_item_id=$1",
+        [line.order_item_id],
+      );
+      if (setLine.rowCount) requestedRefundMinor = Number(line.final_unit_minor || 0);
       const currentOrderRefundedMinor = Number(line.amount_refunded_minor || 0);
       const availableRefundMinor = Math.max(
         0,
@@ -3686,6 +3692,10 @@ export class CommerceService {
         }
       }
 
+      await this.restoreSetDartCardReturnedItem(
+        client,line.order_id,line.order_item_id,requestedItemCode,String(record.id || ""),line.promotion,
+      );
+
       const activityLog = Array.isArray(record.activityLog)
         ? record.activityLog as Record<string, unknown>[]
         : [];
@@ -3779,6 +3789,7 @@ export class CommerceService {
 
       const itemResult = await client.query<{
         item_id: string;
+        order_item_id: string;
         item_code: string;
         model_id: string;
         color: string;
@@ -3796,7 +3807,7 @@ export class CommerceService {
         line_final_minor: string;
         discount_source: string;
       }>(
-        `SELECT i.id AS item_id, i.item_code, i.model_id, i.color, i.size,
+        `SELECT i.id AS item_id, oi.id::text AS order_item_id, i.item_code, i.model_id, i.color, i.size,
                 i.status AS item_status,
                 o.id::text AS order_db_id, o.order_code, o.customer_user_id::text,
                 o.final_minor::text, o.amount_refunded_minor::text,
@@ -3864,10 +3875,15 @@ export class CommerceService {
       const previousRefundMinor = existing
         ? Math.max(0, Math.round(Number(existing.refundAmount || 0) * 100))
         : 0;
-      const requestedRefundMinor = Math.max(
+      let requestedRefundMinor = Math.max(
         0,
         Math.round(Number(input.refundAmount || 0) * 100),
       );
+      const setLine = await client.query(
+        "SELECT 1 FROM order_set_components WHERE order_item_id=$1",
+        [item.order_item_id],
+      );
+      if (setLine.rowCount) requestedRefundMinor = Number(item.line_final_minor || 0);
       const currentRefundedMinor = Number(item.amount_refunded_minor || 0);
       const baseWithoutThisReturn = Math.max(0, currentRefundedMinor - previousRefundMinor);
       const maxRemainingMinor = Math.max(0, Number(item.final_minor || 0) - baseWithoutThisReturn);
@@ -4090,6 +4106,10 @@ export class CommerceService {
           );
         }
       }
+
+      await this.restoreSetDartCardReturnedItem(
+        client,item.order_db_id,item.order_item_id,item.item_code,recordId,item.promotion,
+      );
 
       const returnsVersion = Number(returnsState?.version || 1);
       const returnsUpdate = await client.query(
@@ -4724,11 +4744,15 @@ export class CommerceService {
           throw new AppError(409, "RETURN_ORDER_NOT_FOUND", "The original delivered order could not be found");
         }
         completedOrderId = order.id;
-        const discountLineResult = await client.query<{ discount_source: string }>(
-          "SELECT discount_source FROM order_items WHERE order_id=$1 AND item_code=$2 FOR UPDATE",
+        const discountLineResult = await client.query<{
+          id: string; discount_source: string; final_unit_minor: string;
+        }>(
+          "SELECT id::text,discount_source,final_unit_minor::text FROM order_items WHERE order_id=$1 AND item_code=$2 FOR UPDATE",
           [order.id, itemCode],
         );
-        const returnedDiscountSource = discountLineResult.rows[0]?.discount_source || "None";
+        const returnedLine = discountLineResult.rows[0];
+        if (!returnedLine) throw new AppError(409,"RETURN_ORDER_LINE_NOT_FOUND","Original order line could not be found");
+        const returnedDiscountSource = returnedLine.discount_source || "None";
 
         const requestType = String(record.requestType || "");
         await client.query(
@@ -4742,10 +4766,10 @@ export class CommerceService {
         );
 
         if (requestType === "Refund") {
-          const refundMinor = Math.max(
-            0,
-            Math.round(Number(record.originalNetAmount ?? record.refundAmount ?? 0) * 100),
-          );
+          // Refund is always derived from the immutable order-item snapshot. For a Set
+          // this is the exact allocated share captured at checkout, never a client/admin amount.
+          const refundMinor = Math.max(0,Number(returnedLine.final_unit_minor || 0));
+          record.originalNetAmount = refundMinor / 100;
           const finalMinor = Number(order.final_minor || 0);
           const refundedMinor = Math.min(
             finalMinor,
@@ -4809,6 +4833,10 @@ export class CommerceService {
               );
             }
           }
+
+          await this.restoreSetDartCardReturnedItem(
+            client,order.id,returnedLine.id,itemCode,String(record.id || returnRef),order.promotion,
+          );
         } else if (requestType === "Exchange") {
           const replacementCode = String(record.replacementItemCode || "");
           if (!replacementCode) {
@@ -7013,6 +7041,153 @@ export class CommerceService {
     }
   }
 
+  private async syncSetDartCardOrderStatus(
+    client: PoolClient,
+    orderId: string,
+    orderCode: string,
+    previousStatus: string | null,
+    nextStatus: string,
+    parentPromotion: Record<string, unknown> | null,
+  ): Promise<void> {
+    const usages = await client.query<{
+      id: string;
+      card_code: string;
+      piece_count: number;
+      returned_piece_count: number;
+      status: string;
+      item_codes: string[];
+    }>(
+      `SELECT slu.id::text,slu.card_code,slu.piece_count,slu.returned_piece_count,slu.status,
+              COALESCE((
+                SELECT array_agg(oi.item_code ORDER BY oi.created_at,oi.id)
+                  FROM order_set_components osc
+                  JOIN order_items oi ON oi.id=osc.order_item_id
+                 WHERE osc.group_id=slu.order_set_group_id
+              ),ARRAY[]::text[]) AS item_codes
+         FROM set_loyalty_usage slu
+        WHERE slu.order_id=$1
+        ORDER BY slu.id
+        FOR UPDATE OF slu`,
+      [orderId],
+    );
+    if (!usages.rows.length) return;
+
+    for (const usage of usages.rows) {
+      const parentOwnsAggregate =
+        String(parentPromotion?.type || "") === "Dart Card" &&
+        String(parentPromotion?.cardId || "") === usage.card_code;
+      const activePieces = Math.max(0, Number(usage.piece_count) - Number(usage.returned_piece_count));
+      const shouldDeliver = nextStatus === "Delivered" && previousStatus !== "Delivered" && usage.status !== "Used";
+      const shouldRelease = ["Cancelled", "Refused"].includes(nextStatus) && usage.status !== "Released";
+      const shouldReReserve = previousStatus === "Delivered" && nextStatus !== "Delivered" && !["Cancelled", "Refused"].includes(nextStatus);
+
+      if (!parentOwnsAggregate && (shouldDeliver || (shouldRelease && usage.status === "Used") || shouldReReserve)) {
+        const cardResult = await client.query<{ record_id: string; payload: Record<string, unknown> }>(
+          `SELECT record_id,payload FROM loyalty_cards
+            WHERE COALESCE(payload->>'cardId',payload->>'id',record_id)=$1
+            ORDER BY updated_at DESC LIMIT 1 FOR UPDATE`,
+          [usage.card_code],
+        );
+        const cardRow = cardResult.rows[0];
+        if (cardRow) {
+          const card = { ...(cardRow.payload || {}) };
+          const current = Math.max(0, Number(card.purchasedItems || 0));
+          const codes = Array.isArray(card.requestedProducts) ? card.requestedProducts.map(String) : [];
+          if (shouldDeliver) {
+            card.purchasedItems = String(current + activePieces);
+            card.requestedProducts = [...new Set([...codes, ...usage.item_codes])];
+          } else {
+            card.purchasedItems = String(Math.max(0, current - activePieces));
+            const removed = new Set(usage.item_codes);
+            card.requestedProducts = codes.filter((code) => !removed.has(code));
+          }
+          const limit = Number(card.itemLimit || card.purchasedLimit || 10);
+          const expiry = flexibleDateExpiry(card.expDate || card.expiresAt);
+          card.status = Number(card.purchasedItems || 0) >= limit || Boolean(expiry && expiry < Date.now()) ? "Expired" : "Active";
+          await client.query(
+            `UPDATE loyalty_cards SET payload=$2::jsonb,updated_at=now() WHERE record_id=$1`,
+            [cardRow.record_id,JSON.stringify(card)],
+          );
+        }
+      }
+
+      if (shouldDeliver) {
+        await client.query(`UPDATE set_loyalty_usage SET status='Used',used_at=now(),released_at=NULL,updated_at=now() WHERE id=$1`,[usage.id]);
+      } else if (shouldRelease) {
+        await client.query(`UPDATE set_loyalty_usage SET status='Released',released_at=now(),updated_at=now() WHERE id=$1`,[usage.id]);
+      } else if (shouldReReserve) {
+        await client.query(`UPDATE set_loyalty_usage SET status='Reserved',used_at=NULL,released_at=NULL,updated_at=now() WHERE id=$1`,[usage.id]);
+      }
+    }
+  }
+
+  private async restoreSetDartCardReturnedItem(
+    client: PoolClient,
+    orderId: string,
+    orderItemId: string,
+    itemCode: string,
+    returnRecordId: string,
+    parentPromotion: Record<string, unknown> | null,
+  ): Promise<boolean> {
+    const usageResult = await client.query<{
+      id: string;
+      card_code: string;
+      piece_count: number;
+      returned_piece_count: number;
+      status: string;
+    }>(
+      `SELECT slu.id::text,slu.card_code,slu.piece_count,slu.returned_piece_count,slu.status
+         FROM order_set_components osc
+         JOIN set_loyalty_usage slu ON slu.order_set_group_id=osc.group_id
+        WHERE osc.order_item_id=$1 AND slu.order_id=$2
+        FOR UPDATE OF slu`,
+      [orderItemId,orderId],
+    );
+    const usage = usageResult.rows[0];
+    if (!usage) return false;
+    const inserted = await client.query(
+      `INSERT INTO set_loyalty_returned_items(order_item_id,usage_id,return_record_id)
+       VALUES ($1,$2,$3) ON CONFLICT(order_item_id) DO NOTHING`,
+      [orderItemId,usage.id,returnRecordId || null],
+    );
+    if (!inserted.rowCount) return false;
+
+    const returned = Math.min(Number(usage.piece_count),Number(usage.returned_piece_count)+1);
+    await client.query(
+      `UPDATE set_loyalty_usage
+          SET returned_piece_count=$2,status=CASE WHEN $2>=piece_count THEN 'Released' ELSE status END,
+              released_at=CASE WHEN $2>=piece_count THEN now() ELSE released_at END,updated_at=now()
+        WHERE id=$1`,[usage.id,returned],
+    );
+
+    const parentAlreadyRestores =
+      String(parentPromotion?.type || "") === "Dart Card" &&
+      String(parentPromotion?.cardId || "") === usage.card_code;
+    if (parentAlreadyRestores) return true;
+
+    const cardResult = await client.query<{ record_id: string; payload: Record<string, unknown> }>(
+      `SELECT record_id,payload FROM loyalty_cards
+        WHERE COALESCE(payload->>'cardId',payload->>'id',record_id)=$1
+        ORDER BY updated_at DESC LIMIT 1 FOR UPDATE`,[usage.card_code],
+    );
+    const cardRow=cardResult.rows[0];
+    if (cardRow) {
+      const card={...(cardRow.payload||{})};
+      card.purchasedItems=String(Math.max(0,Number(card.purchasedItems||0)-1));
+      card.requestedProducts=(Array.isArray(card.requestedProducts)?card.requestedProducts:[]).filter((code)=>String(code)!==itemCode);
+      const limit=Number(card.itemLimit||card.purchasedLimit||10);
+      const expiry=flexibleDateExpiry(card.expDate||card.expiresAt);
+      if (Number(card.purchasedItems||0)<limit && (!expiry||expiry>=Date.now())) card.status="Active";
+      await client.query(`UPDATE loyalty_cards SET payload=$2::jsonb,updated_at=now() WHERE record_id=$1`,[cardRow.record_id,JSON.stringify(card)]);
+    }
+    await client.query(
+      `INSERT INTO audit_logs(actor_type,action,entity_type,entity_id,metadata)
+       VALUES ('system','SET_DART_CARD_PIECE_RESTORED','orders',$1,$2::jsonb)`,
+      [orderId,JSON.stringify({itemCode,cardCode:usage.card_code,returnRecordId})],
+    );
+    return true;
+  }
+
   private async applyOrderStatusTransition(
     client: PoolClient,
     orderId: string,
@@ -7296,6 +7471,10 @@ export class CommerceService {
       }
     }
 
+    await this.syncSetDartCardOrderStatus(
+      client,orderId,orderCode,previousStatus,nextStatus,promotion,
+    );
+
     await client.query(
       `INSERT INTO order_events (
          order_id, event_type, from_status, to_status, actor_type, actor_id, metadata
@@ -7500,6 +7679,7 @@ export class CommerceService {
       courier_longitude: number | null;
       courier_accuracy_meters: number | null;
       courier_updated_at: Date | null;
+      set_groups: Array<Record<string, unknown>>;
       items: Array<Record<string, unknown>>;
     }>(
       `SELECT o.id, o.order_code, o.status, o.payment_method, o.payment_status,
@@ -7516,6 +7696,20 @@ export class CommerceService {
               rl.longitude AS courier_longitude,
               rl.accuracy_meters AS courier_accuracy_meters,
               rl.updated_at AS courier_updated_at,
+              COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                  'id',osg.id::text,
+                  'setId',osg.set_id,
+                  'setName',osg.set_name_snapshot,
+                  'setImage',osg.set_image_snapshot,
+                  'pieceCount',osg.piece_count,
+                  'basePrice',osg.set_base_price_minor/100.0,
+                  'finalAmount',osg.final_minor/100.0,
+                  'discountSource',osg.discount_source,
+                  'discountPercent',osg.discount_percent
+                ) ORDER BY osg.created_at,osg.id)
+                  FROM order_set_groups osg WHERE osg.order_id=o.id
+              ),'[]'::jsonb) AS set_groups,
               COALESCE(
                 jsonb_agg(
                   jsonb_build_object(
@@ -7607,6 +7801,7 @@ export class CommerceService {
         birthdayRewardId: row.promotion?.type === "Birthday" ? String(row.promotion?.rewardId || "") : "",
         dartCardId: row.promotion?.type === "Dart Card" ? String(row.promotion?.cardId || "") : "",
         priceSnapshot: row.items,
+        setGroups: row.set_groups || [],
         items: row.items.map((item) => item.itemCode),
         totalProducts: row.items.length,
         name: contact.name || "",

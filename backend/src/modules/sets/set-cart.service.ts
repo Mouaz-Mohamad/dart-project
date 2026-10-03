@@ -281,15 +281,40 @@ export class SetCartService {
     const now = Date.now();
     for (const card of cards.rows) {
       const payload = card.payload || {};
+      const cardCode = String(payload.cardId || payload.id || card.record_id);
+      const expiry = expiryMs(payload.expDate || payload.expiresAt);
+      if (expiry && expiry < now) continue;
+
+      // Serialize Set slot decisions for this card across different carts.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:set-card:${cardCode}`]);
+      // pg PoolClient executes statements sequentially; keep these reads ordered.
+      const cartSetReservations = await client.query<{ pieces: string }>(
+        `SELECT COALESCE(sum(piece_count),0)::text AS pieces
+           FROM set_loyalty_cart_reservations
+          WHERE card_code=$1 AND expires_at>now()`,
+        [cardCode],
+      );
+      const orderSetReservations = await client.query<{ pieces: string }>(
+        `SELECT COALESCE(sum(slu.piece_count-slu.returned_piece_count),0)::text AS pieces
+           FROM set_loyalty_usage slu
+           JOIN orders o ON o.id=slu.order_id
+          WHERE slu.card_code=$1 AND slu.status='Reserved'
+            AND NOT (
+              COALESCE(o.promotion->>'type','')='Dart Card'
+              AND COALESCE(o.promotion->>'cardId','')=$1
+            )`,
+        [cardCode],
+      );
       const limit = Math.max(1, Number(payload.itemLimit || payload.purchasedLimit || 10));
       const used = Math.max(0, Number(payload.purchasedItems || 0));
-      const reserved = Math.max(0, Number(payload.reservedItems || 0));
-      const expiry = expiryMs(payload.expDate || payload.expiresAt);
-      const remaining = Math.max(0, limit - used - reserved);
-      if (remaining > 0 && (!expiry || expiry >= now)) {
+      const ordinaryReserved = Math.max(0, Number(payload.reservedItems || 0));
+      const setCartReserved = Math.max(0, Number(cartSetReservations.rows[0]?.pieces || 0));
+      const setOrderReserved = Math.max(0, Number(orderSetReservations.rows[0]?.pieces || 0));
+      const remaining = Math.max(0, limit - used - ordinaryReserved - setCartReserved - setOrderReserved);
+      if (remaining > 0) {
         base.dartCardEligible = true;
         base.dartCardRemainingPieces = remaining;
-        base.dartCardReference = String(payload.cardId || payload.id || card.record_id);
+        base.dartCardReference = cardCode;
         break;
       }
     }
@@ -442,6 +467,18 @@ export class SetCartService {
           ],
         );
         const groupId = groupResult.rows[0]!.id;
+
+        if (resolved.source === "Dart Card" && customerUserId && discountReference) {
+          await client.query(
+            `INSERT INTO set_loyalty_cart_reservations(
+               cart_set_group_id,customer_user_id,card_code,piece_count,expires_at
+             )
+             SELECT $1,$2,$3,$4,expires_at
+               FROM cart_reservations
+              WHERE id=$5`,
+            [groupId,customerUserId,discountReference,pieceCount,reservationId],
+          );
+        }
 
         for (const row of assigned) {
           await client.query(

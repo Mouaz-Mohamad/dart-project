@@ -47,6 +47,9 @@
     return { id: txt(record.returnId || record.id), status: txt(record.publicStatus || record.status), date: displayDate(record.date, record.createdAt), pieces: returnPieceCount(record) };
   }
   function waitingSummary(entry = {}) {
+    if (String(entry.type || "").toLowerCase() === "set") {
+      return { id:txt(entry.id),design:txt(entry.setName || entry.setId,"Set"),size:`${Number(entry.pieceCount)||0} Pieces`,color:"Set",date:displayDate(entry.requestedAt,entry.createdAt),status:txt(entry.statusLabel || entry.status) };
+    }
     return { id: txt(entry.id), design: txt(entry.modelName || entry.modelId), size: txt(entry.size), color: txt(entry.color), date: displayDate(entry.requestedAt, entry.createdAt), status: txt(entry.statusLabel || entry.status) };
   }
 
@@ -63,6 +66,16 @@
     return new Set(snapshot(order).map(x => txt(x?.modelCode || x?.modelId || x?.name, "")).filter(Boolean)).size;
   }
   function orderVisualSummary(order = {}) {
+    const sets = Array.isArray(order?.setGroups) ? order.setGroups.filter(Boolean) : [];
+    if (sets.length) {
+      const set = sets[0] || {}, setPieces = sets.reduce((sum,row)=>sum+(Number(row?.pieceCount)||0),0);
+      const otherPieces = Math.max(0,orderPieceCount(order)-setPieces);
+      return {
+        ...orderSummary(order),design:txt(set.setName || set.name || set.setId,"Set"),
+        extraDesigns:Math.max(0,sets.length-1+otherPieces),color:"Set",size:`${Number(set.pieceCount)||0} Pieces`,
+        modelId:"",lineImage:txt(set.setImage || set.image,""),isSet:true,
+      };
+    }
     const line = chooseOrderLine(order) || {};
     return { ...orderSummary(order), design: designName(line), extraDesigns: Math.max(0, distinctDesignCount(order) - 1), color: txt(line.color), size: txt(line.size), modelId: txt(line.modelCode || line.modelId || line.model_id, ""), lineImage: txt(line.image || line.imageUrl || line.image_url, "") };
   }
@@ -91,9 +104,17 @@
   }
   const customerOrders = () => customerRows("dart_orders");
   const customerReturns = () => customerRows("dart_returns");
-  function waitingEntries() {
+  function normalWaitingEntries() {
     const rows = platform()?.waitingEntries?.();
-    return Array.isArray(rows) ? rows.slice().sort((a,b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0)) : [];
+    return Array.isArray(rows) ? rows.slice() : [];
+  }
+  function setWaitingEntries() {
+    const rows = root.DartSets?.waitingEntries?.();
+    return Array.isArray(rows) ? rows.map(row=>({...row,type:"Set"})) : [];
+  }
+  function waitingEntries() {
+    return [...normalWaitingEntries(),...setWaitingEntries()]
+      .sort((a,b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0));
   }
   function field(card, label) {
     const wanted = String(label).toLowerCase();
@@ -164,11 +185,19 @@
     });
   }
   function enhanceWaiting(list) {
-    const cards = [...list.children].filter(x => x.matches?.(".profile-record-card:not([data-dart-compact-row])")); if (!cards.length) return;
-    const entries = waitingEntries(), labels = {waiting:"Waiting",reserved:"Reserved for you",confirmed:"Added to cart",converted:"Ordered",expired:"Reservation expired",cancelled:"Cancelled"};
+    list.querySelectorAll("[data-dart-set-waiting-id]").forEach(node=>node.remove());
+    const cards = [...list.children].filter(x => x.matches?.(".profile-record-card:not([data-dart-compact-row])"));
+    const normalEntries = normalWaitingEntries(), labels = {waiting:"Waiting",reserved:"Reserved for you",confirmed:"Added to cart",converted:"Ordered",expired:"Reservation expired",cancelled:"Cancelled"};
     cards.forEach((card,i) => {
-      const e = entries[i] || {}, b = waitingSummary(e), s = {...b,id:e.id || `${identity(card) || "waiting"}-${i}`,design:e.modelName || identity(card) || b.design,size:e.size || field(card,"Size") || "-",color:e.color || field(card,"Requested color") || "-",date:e.requestedAt ? displayDate(e.requestedAt) : field(card,"Requested") || "-",status:labels[e.status] || cardStatus(card)};
-      const image = imageFor(e.modelId,e.color), key = remember("waiting",s.id,card,{title:s.design,image,imageAlt:s.design,summary:s}); card.replaceWith(waitingRow(s,image,key));
+      const e = normalEntries[i] || {}, b = waitingSummary(e), s = {...b,id:e.id || `${identity(card) || "waiting"}-${i}`,design:e.modelName || identity(card) || b.design,size:e.size || field(card,"Size") || "-",color:e.color || field(card,"Requested color") || "-",date:e.requestedAt ? displayDate(e.requestedAt) : field(card,"Requested") || "-",status:labels[e.status] || cardStatus(card)};
+      const image = imageFor(e.modelId,e.color), key = remember("waiting",s.id,card,{title:s.design,image,imageAlt:s.design,summary:s,entry:e}); card.replaceWith(waitingRow(s,image,key));
+    });
+    setWaitingEntries().forEach((e) => {
+      const s={...waitingSummary(e),status:labels[e.status] || txt(e.status)};
+      const detail=root.document.createElement("article"); detail.className="profile-record-card";
+      detail.innerHTML=`<div class="profile-record-head"><strong>${esc(e.id)}</strong><span class="profile-status">${esc(s.status)}</span></div><div class="profile-record-grid"><div class="profile-record-field"><small>Size</small><span>${esc(s.size)}</span></div><div class="profile-record-field"><small>Requested color</small><span>Set</span></div><div class="profile-record-field"><small>Requested</small><span>${esc(s.date)}</span></div><div class="profile-record-field"><small>Reservation expires</small><span>${esc(e.reservedUntil || "-")}</span></div><div class="profile-record-field"><small>Order</small><span>${esc(e.orderId || "-")}</span></div></div>`;
+      const image=String(e.setImage || "Photos/logo-1to1.png"), key=remember("waiting",s.id,detail,{title:s.design,image,imageAlt:s.design,summary:s,entry:e});
+      const row=waitingRow(s,image,key); row.dataset.dartSetWaitingId=String(e.id); list.appendChild(row);
     });
   }
 
@@ -285,6 +314,12 @@
     else if (m.type === "return") detail = layoutReturnDetail(detail,m);
     else if (m.type === "waiting") detail = layoutWaitingDetail(detail,m);
     body.appendChild(detail);
+    if (m.type === "waiting" && String(m.entry?.type || "").toLowerCase() === "set") {
+      const actions=root.document.createElement("div"); actions.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px";
+      if (m.entry.status === "reserved") actions.innerHTML += `<button type="button" class="buy-now-btn" data-set-waiting-confirm="${esc(m.entry.id)}">Add complete Set to cart</button>`;
+      if (["waiting","reserved"].includes(String(m.entry.status))) actions.innerHTML += `<button type="button" class="buy-now-btn" data-set-waiting-cancel="${esc(m.entry.id)}">Cancel Waiting</button>`;
+      if (actions.children.length) body.appendChild(actions);
+    }
     lastOpener = opener || root.document.activeElement; modal.hidden = false; root.document.body.dataset.dartProfilePreviousOverflow = root.document.body.style.overflow || ""; root.document.body.style.overflow = "hidden";
     root.requestAnimationFrame?.(() => modal.querySelector("[data-detail-close]")?.focus());
   }
@@ -310,8 +345,17 @@
   function bindDom() {
     observeLists(); scheduleEnhance();
     root.document.addEventListener("dart:data-changed",scheduleEnhance);
+    root.addEventListener("dart:set-waiting-changed",scheduleEnhance);
     root.document.addEventListener("dart:sections-loaded",()=>{observeLists();scheduleEnhance();});
     root.document.addEventListener("click",event=>{
+      const confirm=event.target.closest?.("[data-set-waiting-confirm]");
+      if (confirm) {
+        confirm.disabled=true; void root.DartSets?.confirmWaiting?.(confirm.dataset.setWaitingConfirm).then(()=>{closeDetail();scheduleEnhance();}).catch(error=>{confirm.disabled=false; root.DartDialog?.alert?.({title:"Waiting",message:error?.message||"Could not add the Set to cart."});}); return;
+      }
+      const cancel=event.target.closest?.("[data-set-waiting-cancel]");
+      if (cancel) {
+        cancel.disabled=true; void root.DartSets?.cancelWaiting?.(cancel.dataset.setWaitingCancel).then(()=>{closeDetail();scheduleEnhance();}).catch(error=>{cancel.disabled=false; root.DartDialog?.alert?.({title:"Waiting",message:error?.message||"Could not cancel Set Waiting."});}); return;
+      }
       const opener = event.target.closest?.("[data-dart-profile-record-open]"); if (opener) return openDetail(opener.dataset.dartProfileRecordOpen,opener);
       const modal = root.document.getElementById("dartProfileRecordDetailModal"); if (!modal) return;
       if (event.target.closest?.("[data-detail-close]") || event.target === modal) return closeDetail();

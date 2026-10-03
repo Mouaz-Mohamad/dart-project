@@ -52,6 +52,8 @@ import { createSetRouter } from "./modules/sets/set.routes.js";
 import type { SetService } from "./modules/sets/set.service.js";
 import { createSetCartRouter } from "./modules/sets/set-cart.routes.js";
 import type { SetCartService } from "./modules/sets/set-cart.service.js";
+import { createSetWaitingRouter } from "./modules/sets/set-waiting.routes.js";
+import type { SetWaitingService } from "./modules/sets/set-waiting.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -64,6 +66,7 @@ export interface AppDependencies extends HealthDependencies {
   dartCardDrawService?: DartCardDrawService;
   setService?: SetService;
   setCartService?: SetCartService;
+  setWaitingService?: SetWaitingService;
   siteSettingsService?: SiteSettingsService;
   dashboardStateService?: DashboardStateService;
   customerInteractionService?: CustomerInteractionService;
@@ -217,6 +220,16 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         "/api/v1",
         createSetCartRouter(
           dependencies.setCartService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.setWaitingService) {
+      app.use(
+        "/api/v1",
+        createSetWaitingRouter(
+          dependencies.setWaitingService,
           dependencies.identityService,
           config,
         ),

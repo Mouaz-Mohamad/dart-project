@@ -4043,6 +4043,7 @@
     renderLeaderboard,
     hydratePublicLeaderboard,
     reserveCart,
+    adoptCartReservationId: setCartReservationId,
     releaseCartReservation,
     cleanupCartReservations,
     renderFeedbackEligibility,
