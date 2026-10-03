@@ -2202,6 +2202,7 @@ button,
   align-items: center;
   justify-content: center;
   text-decoration: none;
+  color: var(--bragnte);
 }
 .cart-reservation-timer {
   width: fit-content;
