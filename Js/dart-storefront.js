@@ -666,14 +666,19 @@
       }
 
       const resolved = resolveProductTrigger(event.target);
-      if (resolved) void open(resolved.product, { trigger: resolved.trigger });
+      if (resolved)
+        void window.DartStorefront.open(resolved.product, {
+          trigger: resolved.trigger,
+        });
     });
 
     document.addEventListener("keydown", (event) => {
       const resolved = resolveProductTrigger(event.target);
       if (resolved && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
-        void open(resolved.product, { trigger: resolved.trigger });
+        void window.DartStorefront.open(resolved.product, {
+          trigger: resolved.trigger,
+        });
         return;
       }
       if (event.key !== "Escape") return;
