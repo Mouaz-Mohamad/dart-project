@@ -887,6 +887,7 @@ header {
     font-family: var(--font-cabin, sans-serif);
     font-size: 10px;
     color: var(--bragnte); /* أو حسب لون الخط عندك */
+    -webkit-user-select: none;
     user-select: none;
 }
 .simple-checkbox span{
@@ -895,6 +896,7 @@ header {
 
 /* تنسيق هادئ للشيك بوكس نفسه */
 .simple-checkbox input[type="checkbox"] {
+    -moz-appearance: none;
     appearance: none;
     -webkit-appearance: none;
     width: 22px;
@@ -945,8 +947,8 @@ header {
 }
 
 .dart-modal-close {
-    font-size: 30px;
-    width: 100%;
+    font-size: 50px;
+    width: 97%;
     position:static;
     color: var(--bragnte);
     cursor: pointer;
@@ -959,7 +961,7 @@ header {
     line-height: 1;
     flex-shrink: 0;
     z-index: 10;
-    margin-right: 10px;
+    margin-top: -10px;
 }
 
 .dart-modal-close:hover,
