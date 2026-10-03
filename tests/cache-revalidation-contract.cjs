@@ -33,6 +33,17 @@ assert.doesNotMatch(ui, /cache:\s*'force-cache'/,
 assert.doesNotMatch(homeUi, /cache:\s*["']force-cache["']/,
   'Homepage fragment loading must not force stale browser cache');
 
+assert.doesNotMatch(ui, /serviceWorker\.register\s*\(/,
+  'Storefront runtime must not register a Service Worker after Cache Lifecycle V2 retirement');
+assert.doesNotMatch(homeUi, /serviceWorker\.register\s*\(/,
+  'Homepage runtime must not register a Service Worker after Cache Lifecycle V2 retirement');
+for (const entry of fs.readdirSync(path.join(root, 'Js'), { withFileTypes: true })) {
+  if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+  const source = fs.readFileSync(path.join(root, 'Js', entry.name), 'utf8');
+  assert.doesNotMatch(source, /serviceWorker\.register\s*\(/,
+    `Storefront JS must not re-register retired Service Workers: ${entry.name}`);
+}
+
 assert.match(staging, /dart-cache-recovery\.js\?v=/,
   'Production staging must content-version the cache recovery asset');
 const config = JSON.parse(vercel);

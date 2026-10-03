@@ -2087,22 +2087,8 @@ function warmInternalPageCache() {
     else window.setTimeout(idleWarm, 500);
 }
 
-function registerDartServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-    const allowedProtocol =
-        location.protocol === 'https:' ||
-        ['localhost', '127.0.0.1'].includes(location.hostname);
-    if (!allowedProtocol) return;
-    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
-        .then((registration) => registration.update())
-        .catch((error) => {
-            console.warn('Dart service worker registration failed.', error);
-        });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     initAccountModeToggle();
-    registerDartServiceWorker();
 });
 
 document.querySelectorAll("[data-go-products]").forEach((button) =>
