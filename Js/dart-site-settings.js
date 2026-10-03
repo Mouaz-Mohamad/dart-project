@@ -385,3 +385,59 @@
 
 
 // END MODULE
+
+// DART SETS EXTENSION LOADER
+(function installDartSetsExtension(root) {
+  "use strict";
+  if (!root?.document || root.__dartSetsExtensionLoader) return;
+  root.__dartSetsExtensionLoader = true;
+
+  const isAdmin = /\/Eye\//i.test(root.location?.pathname || "");
+  const rootPath = isAdmin ? "../" : "";
+  const scripts = [
+    `${rootPath}Js/dart-sets.js`,
+    ...(isAdmin ? ["dart-sets-admin.js"] : []),
+  ];
+  const styles = [
+    `${rootPath}CSS/sets.css`,
+    ...(isAdmin ? ["dart-sets-admin.css"] : []),
+  ];
+
+  function loadStyle(href) {
+    if (root.document.querySelector(`link[data-dart-sets-asset="${href}"]`)) return;
+    const link = root.document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.dataset.dartSetsAsset = href;
+    root.document.head.appendChild(link);
+  }
+
+  function loadScript(src) {
+    if (root.document.querySelector(`script[data-dart-sets-asset="${src}"]`)) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = root.document.createElement("script");
+      script.src = src;
+      script.defer = true;
+      script.dataset.dartSetsAsset = src;
+      script.addEventListener("load", resolve, { once: true });
+      script.addEventListener("error", () => reject(new Error(`Unable to load ${src}`)), { once: true });
+      root.document.head.appendChild(script);
+    });
+  }
+
+  async function boot() {
+    styles.forEach(loadStyle);
+    for (const src of scripts) {
+      try { await loadScript(src); }
+      catch (error) { console.warn("Dart Sets extension asset unavailable", error); }
+    }
+    root.dispatchEvent(new CustomEvent("dart:sets-extension-ready"));
+  }
+
+  if (root.document.readyState === "loading") {
+    root.document.addEventListener("DOMContentLoaded", () => void boot(), { once: true });
+  } else {
+    void boot();
+  }
+})(typeof window !== "undefined" ? window : globalThis);
+
