@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AppConfig } from "../src/config/env.js";
 import { runMigrations } from "../src/database/migrate.js";
+import { bindMigrationFunctionsToIsolatedTestSchema } from "./integration-schema.js";
 import type { EmailMessage, EmailProvider } from "../src/modules/outbox/email-provider.js";
 import { OutboxService } from "../src/modules/outbox/outbox.service.js";
 import { encryptSecret } from "../src/security/crypto.js";
@@ -52,6 +53,7 @@ describe.skipIf(!databaseUrl)("email outbox", () => {
       options: `-c search_path=${schemaName},public`,
     });
     await runMigrations(pool, resolve(process.cwd(), "migrations"));
+    await bindMigrationFunctionsToIsolatedTestSchema(pool);
   });
 
   afterAll(async () => {

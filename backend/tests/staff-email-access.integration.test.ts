@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AppConfig } from "../src/config/env.js";
 import { runMigrations } from "../src/database/migrate.js";
+import { bindMigrationFunctionsToIsolatedTestSchema } from "./integration-schema.js";
 import { IdentityService } from "../src/modules/identity/identity.service.js";
 import type { IssuedSession } from "../src/modules/identity/identity.types.js";
 import { decryptSecret } from "../src/security/crypto.js";
@@ -84,6 +85,7 @@ describe.skipIf(!databaseUrl)("Staff simplified email access integration", () =>
       options: `-c search_path=${schemaName},public`,
     });
     await runMigrations(testPool, resolve(process.cwd(), "migrations"));
+    await bindMigrationFunctionsToIsolatedTestSchema(testPool);
     service = new IdentityService(testPool, authConfig);
   });
 
