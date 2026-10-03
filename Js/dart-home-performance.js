@@ -127,23 +127,6 @@
     trigger.addEventListener("click", () => queueMicrotask(syncMenuAccessibility));
   }
 
-  function bindProductModalAccessibility() {
-    const modal = document.getElementById("SectionModel");
-    const close = modal?.querySelector(".dart-modal-close");
-    if (!modal || !close || modal.dataset.dartA11yBound === "1") return;
-    modal.dataset.dartA11yBound = "1";
-
-    const sync = () => {
-      const open = root.getComputedStyle(modal).display !== "none";
-      modal.setAttribute("aria-hidden", String(!open));
-      if (open && document.activeElement !== close) {
-        root.requestAnimationFrame(() => close.focus({ preventScroll: true }));
-      }
-    };
-    new MutationObserver(sync).observe(modal, { attributes: true, attributeFilter: ["style", "class"] });
-    sync();
-  }
-
   function bindCspSafeNavigation() {
     document.addEventListener("click", (event) => {
       const signup = event.target.closest("[data-dart-signup-link]");
@@ -166,13 +149,7 @@
         return;
       }
 
-      const modal = document.getElementById("SectionModel");
-      if (modal && root.getComputedStyle(modal).display !== "none") {
-        const sizeChart = document.getElementById("productSizeChartPanel");
-        if (sizeChart && !sizeChart.hidden) return;
-        event.preventDefault();
-        root.closeProductModal?.();
-      }
+      // Product Modal Escape handling is owned by DartStorefront on every page.
     });
   }
 
@@ -304,7 +281,6 @@
     activateBrandFontsAfterCriticalLoad();
     scheduleNonCriticalAssets();
     bindMenuAccessibility();
-    bindProductModalAccessibility();
     bindCspSafeNavigation();
     bindEscapeKey();
     bindLeaderboardStructure();

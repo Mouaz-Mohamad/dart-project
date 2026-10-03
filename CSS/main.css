@@ -945,22 +945,34 @@ header {
 }
 
 .model i.fa-x {
-    font-size: 50px;
-    width: 97%;
+    font-size: 30px;
+    width: 100%;
     position:static;
     color: var(--bragnte);
     cursor: pointer;
-    align-self: flex-end;
     text-align: right;
     transition: 0.2s;
-    height: 10px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    line-height: 1;
     flex-shrink: 0;
     z-index: 10;
-    margin-top: -20px;
+    margin-right: 10px;
 }
 
-.model i.fa-x:hover {
+.dart-modal-close:hover,
+.dart-modal-close:focus-visible {
     color: var(--bragnte);
+    background: transparent;
+}
+
+.dart-modal-close:focus-visible,
+.carousel-arrow:focus-visible,
+.product-size-chart-trigger:focus-visible {
+    outline: 3px solid var(--bg-dark);
+    outline-offset: 3px;
 }
 
 .model img {
@@ -1023,6 +1035,11 @@ header {
 }
 
 .carousel-arrow:hover { background-color: var(--white); }
+.carousel-arrow span {
+    font-size: 26px;
+    line-height: 1;
+    transform: translateY(-1px);
+}
 .carousel-prev { left: 10px; }
 .carousel-next { right: 10px; }
 .carousel-arrow.hidden { display: none; }
@@ -1174,6 +1191,10 @@ header {
 
 .model .buy-now-btn:hover {
     opacity: 0.9;
+}
+
+.model .buy-now-btn[hidden] {
+    display: none !important;
 }
 
 .out-of-stock-badge {
@@ -2878,6 +2899,9 @@ button,
   margin: 10px 0 6px;
 }
 .product-size-chart-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   min-height: 38px;
   padding: 8px 13px;
   border: 1px solid #8c1d2c;
@@ -2886,6 +2910,10 @@ button,
   color: #8c1d2c;
   font-weight: 700;
   cursor: pointer;
+}
+.product-size-chart-icon {
+  font-size: 18px;
+  line-height: 1;
 }
 .product-option-status {
   padding: 7px 9px;

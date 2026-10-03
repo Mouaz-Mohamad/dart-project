@@ -362,16 +362,10 @@
 
   function openWithoutAddingHistory(product) {
     if (!product || !root.DartStorefront?.open) return false;
-    const originalPushState = history.pushState;
-    history.pushState = function interceptedPushState(state, title, url) {
-      history.replaceState({ ...(history.state || {}), ...(state || {}) }, title, url || root.location.href);
-    };
-    try {
-      root.DartStorefront.open(product);
-      return true;
-    } finally {
-      history.pushState = originalPushState;
-    }
+    void Promise.resolve(
+      root.DartStorefront.open(product, { history: false }),
+    ).catch((error) => console.error("Dart product deep link failed to open.", error));
+    return true;
   }
 
   function seedDirectEntry(product) {

@@ -1,5 +1,5 @@
 // DART CODE GUIDE | tests/product-waiting-browser.js
-// Browser regression for the single Buy/Waiting action across real production-style unavailable size/color combinations.
+// Browser regression for the shared Buy/Waiting actions across Home and Products.
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
@@ -83,34 +83,27 @@ const server = http.createServer((req, res) => {
   }
 });
 
-async function expectPrimaryAction(page, expected) {
+async function expectAction(page, expected) {
   await page.waitForFunction((mode) => {
-    const primary = document.getElementById("modalBuyBtn");
-    const legacyWaiting = document.getElementById("modalWaitBtn");
-    if (!primary || !legacyWaiting) return false;
-    return !primary.hidden && legacyWaiting.hidden && primary.dataset.dartAction === mode;
-  }, expected);
-  const primary = page.locator("#modalBuyBtn");
-  const legacyWaiting = page.locator("#modalWaitBtn");
-  assert.equal(await primary.isVisible(), true);
-  assert.equal(await legacyWaiting.isVisible(), false);
-  if (expected === "buy") {
-    assert.equal(await primary.isEnabled(), true);
-    assert.equal((await primary.textContent()).trim(), "Buy");
-  } else {
-    assert.equal((await primary.textContent()).trim(), "Waiting");
-    assert.equal(await primary.getAttribute("data-dart-action"), "waiting");
-  }
-}
-
-async function expectFallbackWaiting(page) {
-  await page.waitForFunction(() => {
     const buy = document.getElementById("modalBuyBtn");
     const waiting = document.getElementById("modalWaitBtn");
-    return Boolean(buy && waiting && buy.hidden && !waiting.hidden);
-  });
-  assert.equal(await page.locator("#modalBuyBtn").isVisible(), false);
-  assert.equal(await page.locator("#modalWaitBtn").isVisible(), true);
+    if (!buy || !waiting) return false;
+    return mode === "buy"
+      ? !buy.hidden && waiting.hidden
+      : buy.hidden && !waiting.hidden;
+  }, expected);
+  const buy = page.locator("#modalBuyBtn");
+  const waiting = page.locator("#modalWaitBtn");
+  if (expected === "buy") {
+    assert.equal(await buy.isVisible(), true);
+    assert.equal(await waiting.isVisible(), false);
+    assert.equal(await buy.isEnabled(), true);
+    assert.equal((await buy.textContent()).trim(), "Buy");
+  } else {
+    assert.equal(await buy.isVisible(), false);
+    assert.equal(await waiting.isVisible(), true);
+    assert.equal((await waiting.textContent()).trim(), "Notify me when available");
+  }
 }
 
 async function openModel(page) {
@@ -124,43 +117,34 @@ async function openModel(page) {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    await page.goto(`${origin}/products.html`, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() => Boolean(window.DartProductButtonState));
-    await openModel(page);
+    for (const pathname of ["/products.html", "/index.html"]) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await page.goto(`${origin}${pathname}`, { waitUntil: "domcontentloaded" });
+      await openModel(page);
+      await page.waitForFunction(() => Boolean(window.DartProductButtonState));
 
-    await page.locator('#SectionModel .color-btn[data-color="Begi"]').click();
-    await page.locator('#SectionModel .size-btn[data-size="Xl"]').click();
-    await expectPrimaryAction(page, "buy");
+      await page.locator('#SectionModel .color-btn[data-color="Begi"]').click();
+      await page.locator('#SectionModel .size-btn[data-size="Xl"]').click();
+      await expectAction(page, "buy");
 
-    await page.locator('#SectionModel .color-btn[data-color="Red"]').click();
-    await expectPrimaryAction(page, "waiting");
-    assert.equal(await page.locator('#SectionModel .size-btn[data-size="Xl"]').getAttribute("aria-pressed"), "true");
+      await page.locator('#SectionModel .color-btn[data-color="Red"]').click();
+      await expectAction(page, "waiting");
+      assert.equal(await page.locator('#SectionModel .size-btn[data-size="Xl"]').getAttribute("aria-pressed"), "true");
 
-    await page.locator('#SectionModel .color-btn[data-color="Begi"]').click();
-    await page.locator('#SectionModel .size-btn[data-size="M"]').click();
-    await expectPrimaryAction(page, "waiting");
+      await page.locator('#SectionModel .color-btn[data-color="Begi"]').click();
+      await page.locator('#SectionModel .size-btn[data-size="M"]').click();
+      await expectAction(page, "waiting");
 
-    await page.locator('#SectionModel .color-btn[data-color="Red"]').click();
-    await expectPrimaryAction(page, "waiting");
-    assert.equal(await page.locator('#SectionModel .size-btn[data-size="M"]').getAttribute("aria-pressed"), "true");
+      await page.locator('#SectionModel .color-btn[data-color="Red"]').click();
+      await expectAction(page, "waiting");
+      assert.equal(await page.locator('#SectionModel .size-btn[data-size="M"]').getAttribute("aria-pressed"), "true");
 
-    await page.evaluate(() => window.DartStorefront.refresh());
-    await expectPrimaryAction(page, "waiting");
-    await page.close();
+      await page.evaluate(() => window.DartStorefront.refresh());
+      await expectAction(page, "waiting");
+      await page.close();
+    }
 
-    const fallbackPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    await fallbackPage.route("**/Js/dart-product-button-state.js*", (route) => route.abort());
-    await fallbackPage.goto(`${origin}/products.html`, { waitUntil: "domcontentloaded" });
-    await openModel(fallbackPage);
-    await fallbackPage.locator('#SectionModel .color-btn[data-color="Begi"]').click();
-    await fallbackPage.locator('#SectionModel .size-btn[data-size="M"]').click();
-    await expectFallbackWaiting(fallbackPage);
-    await fallbackPage.locator('#SectionModel .color-btn[data-color="Red"]').click();
-    await expectFallbackWaiting(fallbackPage);
-    await fallbackPage.close();
-
-    console.log("PASS production-shaped single Buy/Waiting action + controller fallback");
+    console.log("PASS shared Home/Products Buy + Waiting actions");
   } finally {
     await browser.close();
     await new Promise((resolve) => server.close(resolve));

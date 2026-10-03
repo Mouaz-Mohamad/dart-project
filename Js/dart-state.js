@@ -85,23 +85,45 @@
     }
   }
 
+  let productButtonStatePromise = null;
+
   function loadProductButtonStateWhenNeeded() {
     const document = root.document;
-    if (!document?.getElementById?.("SectionModel")) return;
+    if (
+      !document?.getElementById?.("SectionModel") &&
+      !document?.getElementById?.("product-modal-host")
+    )
+      return Promise.resolve(null);
     if (root.DartProductButtonState?.sync) {
       root.DartProductButtonState.sync();
-      return;
+      return Promise.resolve(root.DartProductButtonState);
     }
-    if (document.querySelector?.('script[data-dart-product-button-state="1"]')) return;
+    if (productButtonStatePromise) return productButtonStatePromise;
     const script = document.createElement("script");
-    script.src = "/Js/dart-product-button-state.js?v=20260924-single-action-v4";
+    script.src = "/Js/dart-product-button-state.js?v=20261003-shared-modal-v5";
     script.async = false;
     script.dataset.dartProductButtonState = "1";
-    script.addEventListener("load", () => root.DartProductButtonState?.sync?.(), { once: true });
-    script.addEventListener("error", () => {
-      console.error("Dart product button-state controller failed to load.");
-    }, { once: true });
+    productButtonStatePromise = new Promise((resolve) => {
+      script.addEventListener(
+        "load",
+        () => {
+          root.DartProductButtonState?.sync?.();
+          resolve(root.DartProductButtonState || null);
+        },
+        { once: true },
+      );
+      script.addEventListener(
+        "error",
+        () => {
+          productButtonStatePromise = null;
+          console.error("Dart product button-state controller failed to load.");
+          resolve(null);
+        },
+        { once: true },
+      );
+    });
     document.head?.appendChild(script);
+    return productButtonStatePromise;
   }
 
   function scheduleProductButtonState() {
@@ -185,7 +207,12 @@
   // Legacy cleanup is maintenance work, not render-critical work. Deferring it
   // keeps localStorage/IndexedDB scans out of the mobile first-interaction window.
   scheduleLegacyCleanup();
-  root.DartState = Object.freeze({ read, write, clone });
+  root.DartState = Object.freeze({
+    read,
+    write,
+    clone,
+    ensureProductButtonState: loadProductButtonStateWhenNeeded,
+  });
   scheduleProductButtonState();
   scheduleCheckoutStability();
   scheduleDashboardOrderGroups();

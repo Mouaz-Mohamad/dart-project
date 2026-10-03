@@ -8,6 +8,8 @@ const service = readFileSync(new URL("../src/modules/waiting/waiting.service.ts"
 const routes = readFileSync(new URL("../src/modules/waiting/waiting.routes.ts", import.meta.url), "utf8");
 const commerce = readFileSync(new URL("../src/modules/commerce/commerce.service.ts", import.meta.url), "utf8");
 const storefront = readFileSync(new URL("../../Js/dart-storefront.js", import.meta.url), "utf8");
+const productActions = readFileSync(new URL("../../Js/dart-product-button-state.js", import.meta.url), "utf8");
+const productModal = readFileSync(new URL("../../sections/product-modal.html", import.meta.url), "utf8");
 const platform = readFileSync(new URL("../../Js/dart-platform.js", import.meta.url), "utf8");
 const profile = readFileSync(new URL("../../profile.html", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../../Eye/Dart Eye.html", import.meta.url), "utf8");
@@ -51,7 +53,8 @@ describe("Waiting restock reservation contract", () => {
 
   it("lets customers select unavailable variants and manage My Waiting", () => {
     expect(storefront).toContain("is-unavailable");
-    expect(storefront).toContain("Notify me when available");
+    expect(productModal).toContain("Notify me when available");
+    expect(productActions).toContain("DartPlatform.joinWaiting");
     expect(platform).toContain("joinWaiting");
     expect(platform).toContain("cancelWaiting");
     expect(platform).toContain("confirmWaiting");

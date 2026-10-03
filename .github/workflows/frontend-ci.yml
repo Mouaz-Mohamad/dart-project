@@ -68,6 +68,7 @@ jobs:
           node tests/performance-budget.cjs
           node tests/home-performance-contract.cjs
           node tests/product_deep_links.cjs
+          node tests/product_ssr_seo.cjs
           node tests/seo_checks.js
           node tests/catalog-category-contract.js
           node tests/dart-finance-unit.js
@@ -78,6 +79,7 @@ jobs:
           node tests/settings-reset-unit.js
           node tests/promotion-settings-contract.js
           node tests/product-button-state-contract.cjs
+          node tests/product-modal-shared-contract.cjs
           node tests/test-inventory-contract.cjs
 
   browser-smoke:
@@ -103,7 +105,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Full storefront and dashboard Chromium smoke
         run: |
-          node tests/full-site-browser.js
-          node tests/storefront-settings-regression.js
           node tests/product-waiting-browser.js
           node tests/home-storefront-browser.js
+          node tests/storefront-settings-regression.js
+          node tests/full-site-browser.js

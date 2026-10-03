@@ -64,7 +64,7 @@ header, .side-menu, .pge-que .pge, .que,
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 941 / 1672;
+    aspect-ratio: 9 / 16;
     z-index: 1;
 
 }
@@ -938,30 +938,47 @@ header {
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1000;
+    z-index: 100000000;
     background-color: var(--white);
     border-radius: 20px;
     padding: 15px;
     box-shadow: 0 4px 10px var(--bg-dark);
     gap: 10px;
-    overflow: hidden;
+    overflow-y: scroll;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bragnte) #fff;
 }
 
-.model i.fa-x {
-    font-size: 20px;
+.dart-modal-close {
+    font-size: 30px;
     width: 100%;
-    position:static;
-    color: var(--bg-dark);
+    position: static;
+    color: var(--bragnte);
     cursor: pointer;
-    align-self: flex-end;
     text-align: right;
     transition: 0.2s;
-    height: 10px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    line-height: 1;
     flex-shrink: 0;
+    z-index: 10;
+    margin: 0 10px 0 0;
 }
 
-.model i.fa-x:hover {
+.dart-modal-close:hover,
+.dart-modal-close:focus-visible {
     color: var(--bragnte);
+    background: transparent;
+}
+
+.dart-modal-close:focus-visible,
+.carousel-arrow:focus-visible,
+.product-size-chart-trigger:focus-visible {
+    outline: 3px solid var(--bg-dark);
+    outline-offset: 3px;
 }
 
 .model img {
@@ -977,11 +994,12 @@ header {
 .model-carousel {
     position: relative;
     width: 100%;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 3 / 4;
     border-radius: 20px;
     overflow: hidden;
     flex-shrink: 0;
     background-color: #f1f1f1;
+    margin-top: -25px;
 }
 
 .carousel-track {
@@ -1023,6 +1041,11 @@ header {
 }
 
 .carousel-arrow:hover { background-color: var(--white); }
+.carousel-arrow span {
+    font-size: 26px;
+    line-height: 1;
+    transform: translateY(-1px);
+}
 .carousel-prev { left: 10px; }
 .carousel-next { right: 10px; }
 .carousel-arrow.hidden { display: none; }
@@ -1076,13 +1099,7 @@ header {
 .model-product {
     display: flex;
     flex-direction: column;
-    gap: 8px;
     flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    padding-right: 6px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--bragnte) #f1f1f1;
 }
 
 .model-product::-webkit-scrollbar {
@@ -1180,6 +1197,10 @@ header {
 
 .model .buy-now-btn:hover {
     opacity: 0.9;
+}
+
+.model .buy-now-btn[hidden] {
+    display: none !important;
 }
 
 .out-of-stock-badge {
@@ -1490,7 +1511,7 @@ header {
 }
 
 .footer-continear a span {
-    color: #0066CC;
+    color: #0056a1;
 }
 
 .social-icons-contact {
@@ -1856,6 +1877,7 @@ header {
     scroll-snap-type: x mandatory;
     padding: 10px 0;
     scrollbar-width: thin;
+    scrollbar-color: var(--bragnte) #fff;
 }
 
 /* إخفاء شريط الإسكرول لو حابب الشكل يكون أضفئ (اختياري) */
@@ -2883,6 +2905,9 @@ button,
   margin: 10px 0 6px;
 }
 .product-size-chart-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   min-height: 38px;
   padding: 8px 13px;
   border: 1px solid #8c1d2c;
@@ -2892,9 +2917,11 @@ button,
   font-weight: 700;
   cursor: pointer;
 }
+.product-size-chart-icon {
+  font-size: 18px;
+  line-height: 1;
+}
 .product-option-status {
-  min-height: 20px;
-  margin: 6px 0 10px;
   padding: 7px 9px;
   border-radius: 7px;
   background: #f8fafc;
@@ -3155,7 +3182,7 @@ button,
 
 /* Size Chart: the page stays fixed; only the measurement viewport scrolls. */
 .product-size-chart-dialog {
-  width: min(900px, calc(100vw - 24px));
+  width: min(310px, calc(100vw - 24px));
   max-height: calc(100dvh - 32px);
   overflow: hidden;
   display: flex;
@@ -4740,7 +4767,7 @@ picture.dart-picture { display: contents; }
     padding: 8px;
   }
   .product-size-chart-dialog {
-    width: calc(100vw - 16px);
+    width: calc(90vw - 16px);
     max-height: calc(100vh - 16px);
     max-height: calc(100dvh - 16px);
     padding: 18px 10px 12px;
@@ -4849,8 +4876,13 @@ picture.dart-picture { display: contents; }
   }
   .model {
     width: calc(100% - 20px);
-    max-height: 92vh;
+    max-height: 98vh;
+    max-height: 98dvh;
     overflow: auto;
+  }
+  .dart-modal-close {
+    min-height: 36px;
+    margin-inline-end: 4px;
   }
   .checkout-summary-box,
   .totals-calculation,
