@@ -939,16 +939,14 @@ header {
     border-radius: 20px;
     padding: 15px;
     box-shadow: 0 4px 10px var(--bg-dark);
-    gap: 10px;
     overflow-y: scroll;
-    padding-right: 6px;
-    scrollbar-width: thin;
+    scrollbar-width: auto;
     scrollbar-color: var(--bragnte) #fff;
 }
 
 .model i.fa-x {
-    font-size: 30px;
-    width: 100%;
+    font-size: 50px;
+    width: 97%;
     position:static;
     color: var(--bragnte);
     cursor: pointer;
@@ -958,7 +956,7 @@ header {
     height: 10px;
     flex-shrink: 0;
     z-index: 10;
-    margin-right: 10px;
+    margin-top: -20px;
 }
 
 .model i.fa-x:hover {
