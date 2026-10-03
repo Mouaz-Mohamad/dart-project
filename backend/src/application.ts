@@ -48,6 +48,8 @@ import { createPromotionRouter } from "./modules/promotions/promotion.routes.js"
 import type { PromotionService } from "./modules/promotions/promotion.service.js";
 import { createDartCardDrawRouter } from "./modules/loyalty/dart-card-draw.routes.js";
 import type { DartCardDrawService } from "./modules/loyalty/dart-card-draw.service.js";
+import { createSetRouter } from "./modules/sets/set.routes.js";
+import type { SetService } from "./modules/sets/set.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -58,6 +60,7 @@ export interface AppDependencies extends HealthDependencies {
   commerceService?: CommerceService;
   promotionService?: PromotionService;
   dartCardDrawService?: DartCardDrawService;
+  setService?: SetService;
   siteSettingsService?: SiteSettingsService;
   dashboardStateService?: DashboardStateService;
   customerInteractionService?: CustomerInteractionService;
@@ -191,6 +194,16 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         "/api/v1",
         createCatalogAssetRouter(
           dependencies.catalogAssetService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.setService) {
+      app.use(
+        "/api/v1",
+        createSetRouter(
+          dependencies.setService,
           dependencies.identityService,
           config,
         ),

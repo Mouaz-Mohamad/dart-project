@@ -30,6 +30,7 @@ import { OutboxService } from "./modules/outbox/outbox.service.js";
 import { WaitingService } from "./modules/waiting/waiting.service.js";
 import { PromotionService } from "./modules/promotions/promotion.service.js";
 import { DartCardDrawService } from "./modules/loyalty/dart-card-draw.service.js";
+import { SetService } from "./modules/sets/set.service.js";
 import { createEmailProvider } from "./modules/outbox/email-provider.js";
 
 export interface DartRuntime {
@@ -84,6 +85,7 @@ export function createRuntimeApplication(
   const commerceService = new CommerceService(database);
   const promotionService = new PromotionService(database);
   const dartCardDrawService = new DartCardDrawService(database);
+  const setService = new SetService(database);
   const siteSettingsService = new SiteSettingsService(database);
   const dashboardStateService = new DashboardStateService(database);
   const customerInteractionService = new CustomerInteractionService(database);
@@ -118,6 +120,7 @@ export function createRuntimeApplication(
     commerceService,
     promotionService,
     dartCardDrawService,
+    setService,
     siteSettingsService,
     dashboardStateService,
     customerInteractionService,
