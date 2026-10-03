@@ -150,7 +150,9 @@ img, picture, video, canvas, svg {
 
 input, button, textarea, select {
   font: inherit;
-  color: inherit;
+  color: #000000;
+  font-size:small;
+  font-weight: 400;
 }
 
 input, textarea, select {
