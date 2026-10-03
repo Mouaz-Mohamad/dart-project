@@ -50,6 +50,8 @@ import { createDartCardDrawRouter } from "./modules/loyalty/dart-card-draw.route
 import type { DartCardDrawService } from "./modules/loyalty/dart-card-draw.service.js";
 import { createSetRouter } from "./modules/sets/set.routes.js";
 import type { SetService } from "./modules/sets/set.service.js";
+import { createSetCartRouter } from "./modules/sets/set-cart.routes.js";
+import type { SetCartService } from "./modules/sets/set-cart.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -61,6 +63,7 @@ export interface AppDependencies extends HealthDependencies {
   promotionService?: PromotionService;
   dartCardDrawService?: DartCardDrawService;
   setService?: SetService;
+  setCartService?: SetCartService;
   siteSettingsService?: SiteSettingsService;
   dashboardStateService?: DashboardStateService;
   customerInteractionService?: CustomerInteractionService;
@@ -204,6 +207,16 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         "/api/v1",
         createSetRouter(
           dependencies.setService,
+          dependencies.identityService,
+          config,
+        ),
+      );
+    }
+    if (dependencies.setCartService) {
+      app.use(
+        "/api/v1",
+        createSetCartRouter(
+          dependencies.setCartService,
           dependencies.identityService,
           config,
         ),
