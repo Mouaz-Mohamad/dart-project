@@ -34,26 +34,18 @@ function makeButton(text = "") {
 (async () => {
   assert.match(stateSource, /DOMContentLoaded/);
   assert.match(stateSource, /scheduleProductButtonState/);
-  assert.match(stateSource, /20260924-single-action-v\d+/, "controller URL must be versioned so stale browser code cannot survive deployment");
+  assert.match(stateSource, /20261003-shared-modal-v\d+/, "controller URL must be versioned so stale browser code cannot survive deployment");
   assert.match(stateSource, /DartProductButtonState\?\.sync/, "controller load must immediately resync the product action");
   assert.doesNotMatch(
     storefrontSource,
     /availableStock\(product, selectedSize, selectedColor\) <= 0\)[\s\S]{0,120}selectedSize = null/,
     "Storefront must never erase the selected size just because the exact variant is out of stock",
   );
-  assert.match(
-    storefrontSource,
-    /const showWaiting = Boolean\(waitingEnabled && hasVariant && qty <= 0\)/,
-    "Storefront must have an immediate Waiting fallback while the action controller loads",
-  );
-  assert.ok(
-    source.includes('action=state.showWaiting?handleWaiting:handleBuy'),
-    "the single primary action must route unavailable variants to Waiting, not Buy",
-  );
-  assert.ok(
-    source.includes('data-dart-action="waiting"') && source.includes("#2563eb"),
-    "Waiting must have a scoped blue visual rule on the primary action",
-  );
+  assert.match(storefrontSource, /DartProductButtonState\?\.sync/);
+  assert.doesNotMatch(storefrontSource, /\$\("modalWaitBtn"\)/, "Waiting state must have one owner");
+  assert.match(source, /waiting\.hidden = !state\.showWaiting/);
+  assert.match(source, /buy\.hidden = state\.showWaiting/);
+  assert.doesNotMatch(source, /createElement\(["']style["']\)/, "the shared action owner must not inject duplicate modal CSS");
 
   const buy = makeButton("Buy");
   const legacyWaiting = makeButton("Waiting");
@@ -105,16 +97,11 @@ function makeButton(text = "") {
     modalQuantity: 1,
     cartData: [],
     getAvailableStock: () => 1,
-    setProductOptionStatus: (message, state) => statuses.push({ message, state }),
     showToast: (message) => toasts.push(message),
     cacheFastCartSnapshot: () => {},
     renderCart: () => {},
     updateCartCount: () => {},
     showCartBanner: () => {},
-    closeProductModal: () => {
-      closeCalls += 1;
-      modal.style.display = "none";
-    },
     persistCartReservation: () => {
       persistCalls += 1;
       return new Promise((resolve) => { resolvePersist = resolve; });
@@ -132,7 +119,14 @@ function makeButton(text = "") {
         return { id: "W1" };
       },
     },
-    DartStorefront: { refresh() {} },
+    DartStorefront: {
+      refresh() {},
+      setOptionStatus: (message, state) => statuses.push({ message, state }),
+      close() {
+        closeCalls += 1;
+        modal.style.display = "none";
+      },
+    },
   };
   context.window = context;
   context.globalThis = context;
@@ -170,16 +164,15 @@ function makeButton(text = "") {
   legacyWaiting.hidden = true;
   const waitingState = actions.sync();
   assert.equal(waitingState.showWaiting, true);
-  assert.equal(buy.hidden, false, "primary action must never disappear for an unavailable selected variant");
-  assert.equal(buy.dataset.dartAction, "waiting");
-  assert.equal(buy.textContent, "Waiting");
-  assert.equal(legacyWaiting.hidden, true, "legacy secondary Waiting node must stay out of the visual path");
+  assert.equal(buy.hidden, true, "Buy must disappear for an unavailable selected variant");
+  assert.equal(legacyWaiting.hidden, false, "the shared Waiting action must replace Buy");
+  assert.equal(legacyWaiting.textContent, "Notify me when available");
   assert.equal(qtyRow.hidden, true);
 
   assert.equal(await actions.handleWaiting(), true);
   assert.deepEqual(waitingCalls, [["DT-1", "M", "Black"]]);
-  assert.equal(buy.textContent, "Reserved in Waiting");
-  assert.equal(buy.disabled, true);
+  assert.equal(legacyWaiting.textContent, "Already in Waiting");
+  assert.equal(legacyWaiting.disabled, true);
   assert.ok(
     toasts.some(
       (message) =>
@@ -188,7 +181,7 @@ function makeButton(text = "") {
     "Waiting confirmation must identify product, size and color",
   );
 
-  console.log("PASS single-primary-action Buy + Adding + real Waiting reservation contract");
+  console.log("PASS shared Buy + Waiting reservation controller contract");
 })().catch((error) => {
   console.error(error.stack || error);
   process.exit(1);

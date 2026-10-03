@@ -597,115 +597,6 @@ function renderReviewsLogic() {
 }
 
 // ==========================================
-// 3. نظام المودال (عرض التفاصيل، المقاسات، الألوان)
-// ==========================================
-
-document.addEventListener('click', (e) => {
-    const sizeChartButton = e.target.closest('#productSizeChartBtn');
-    if (sizeChartButton) {
-        const panel = document.getElementById('productSizeChartPanel');
-        if (panel) {
-            panel.hidden = !panel.hidden;
-            sizeChartButton.setAttribute('aria-expanded', String(!panel.hidden));
-        }
-        return;
-    }
-
-    if (e.target.closest('#closeProductSizeChart')) {
-        const panel = document.getElementById('productSizeChartPanel');
-        if (panel) panel.hidden = true;
-        document.getElementById('productSizeChartBtn')?.setAttribute('aria-expanded', 'false');
-        return;
-    }
-
-    const openSizeChartPanel = document.getElementById('productSizeChartPanel');
-    if (openSizeChartPanel && !openSizeChartPanel.hidden && e.target === openSizeChartPanel) {
-        openSizeChartPanel.hidden = true;
-        document.getElementById('productSizeChartBtn')?.setAttribute('aria-expanded', 'false');
-        return;
-    }
-
-    const productCard = e.target.closest('.product-card');
-    const cartBtn = e.target.closest('.cart-btn');
-
-    if (productCard || cartBtn) {
-        document.body.classList.add('modal-open');
-        const targetElement = cartBtn || productCard;
-        const productId = targetElement.getAttribute('data-id');
-
-        activeProduct = productsData.find(p => p.id == productId);
-        if(activeProduct) activeProduct = {...activeProduct,cardColor:(productCard || cartBtn.closest(".product-card"))?.dataset.color};
-        if (activeProduct) {
-            openProductModal(activeProduct);
-        }
-    }
-
-    if (e.target.closest('.model .fa-x')) {
-        closeProductModal();
-    }
-
-    const modal = document.getElementById('SectionModel');
-    if (e.target === modal) {
-        closeProductModal();
-    }
-});
-
-document.addEventListener('keydown', event => {
-    if (event.key !== 'Escape') return;
-    const panel = document.getElementById('productSizeChartPanel');
-    if (panel && !panel.hidden) {
-        panel.hidden = true;
-        document.getElementById('productSizeChartBtn')?.setAttribute('aria-expanded', 'false');
-    }
-});
-
-window.addEventListener('popstate', () => {
-    const modal = document.getElementById('SectionModel');
-    if (modal && modal.style.display === 'flex') {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-        document.body.classList.remove('modal-open');
-    }
-});
-
-function closeProductModal() {
-    const modal = document.getElementById('SectionModel');
-    if (!modal) return;
-
-    modal.style.display = 'none';
-    const sizeChartPanel = modal.querySelector('#productSizeChartPanel');
-    if (sizeChartPanel) sizeChartPanel.hidden = true;
-    modal.querySelector('#productSizeChartBtn')?.setAttribute('aria-expanded', 'false');
-    document.body.style.overflow = 'auto';
-    document.body.classList.remove('modal-open');
-
-    if (history.state && history.state.modalOpen) {
-        history.back();
-    }
-}
-
-function setProductOptionStatus(message, state = '') {
-    const status = document.getElementById('productOptionStatus');
-    if (!status) return;
-    status.textContent = message;
-    status.dataset.state = state;
-}
-
-/* BEGIN Product Modal Delegation */
-function openProductModal(product) {
-    return DartStorefront.open(product);
-}
-/* END Product Modal Delegation */
-
-// ==========================================
-// Product modal carousel state synchronization
-// ==========================================
-
-// ==========================================
-// عداد الكمية داخل المودال (قبل الإضافة للسلة)
-// ==========================================
-
-// ==========================================
 // 4. دوال السلة، الخصم، وإتمام الطلب
 // ==========================================
 
@@ -969,8 +860,9 @@ function renderCart() {
     updateCartCount();
 }
 
-async function persistCartReservation() {
-    const previous = window.DartState?.clone?.(window.DartState?.read?.('dart_cart', []) || [])
+async function persistCartReservation(previousSnapshot = null) {
+    const previous = previousSnapshot
+        ?? window.DartState?.clone?.(window.DartState?.read?.('dart_cart', []) || [])
         ?? JSON.parse(JSON.stringify(window.DartState?.read?.('dart_cart', []) || []));
     try {
         cacheFastCartSnapshot(cartData);
@@ -1025,9 +917,6 @@ function initCartAndCheckoutEvents() {
     const checkoutView = document.getElementById('checkoutView');
     const toCheckoutBtn = document.getElementById('toCheckoutBtn');
     const checkoutForm = document.getElementById('checkoutForm');
-    const modalBuyBtn = document.getElementById('modalBuyBtn');
-    const modalWaitBtn = document.getElementById('modalWaitBtn');
-    
     const discountBtn = document.getElementById('applyDiscountBtn');
     const discountInput = document.getElementById('discountInput');
 
@@ -1036,93 +925,6 @@ function initCartAndCheckoutEvents() {
     if (cartView) cartView.style.display = 'block';
 
     renderCart();
-
-    if (modalWaitBtn) {
-        modalWaitBtn.addEventListener('click', async () => {
-            if (!selectedSize || !selectedColor || !activeProduct) {
-                showToast('Choose the size and color you want first.');
-                return;
-            }
-            if (!window.DartPlatform?.currentUser?.()) {
-                sessionStorage.setItem('dart_internal_navigation', '1');
-                location.assign(`Sign Up modern.html?next=${encodeURIComponent(location.pathname.split('/').pop() || 'products.html')}`);
-                return;
-            }
-            modalWaitBtn.disabled = true;
-            try {
-                await window.DartPlatform.joinWaiting(
-                    String(activeProduct.id),
-                    String(selectedSize),
-                    String(selectedColor)
-                );
-                modalWaitBtn.textContent = 'You are in Waiting';
-                showToast('تم تسجيلك في Waiting وسنبلغك عند توفر القطعة.');
-            } catch (error) {
-                if (error?.code === 'WAITING_ALREADY_EXISTS') {
-                    modalWaitBtn.textContent = 'Already in Waiting';
-                    showToast('أنت بالفعل في Waiting لنفس التصميم واللون والمقاس.');
-                } else if (error?.code === 'STOCK_AVAILABLE') {
-                    showToast('القطعة أصبحت متاحة الآن. أضفها إلى السلة.');
-                    window.DartStorefront?.refresh?.();
-                } else {
-                    modalWaitBtn.disabled = false;
-                    showToast(error?.message || 'تعذر الانضمام إلى Waiting.');
-                }
-            }
-        });
-    }
-
-    if (modalBuyBtn) {
-        modalBuyBtn.addEventListener('click', async () => {
-            if (!selectedSize) {
-                setProductOptionStatus('Choose an available size before adding this product.', 'error');
-                showToast('Choose a size first.');
-                return;
-            }
-            if (!selectedColor) {
-                setProductOptionStatus('Choose an available color before adding this product.', 'error');
-                showToast('Choose a color first.');
-                return;
-            }
-
-            const availableStock = getAvailableStock(activeProduct, selectedSize, selectedColor);
-            const existingItem = cartData.find(c =>
-                c.id === activeProduct.id && c.size === selectedSize && c.color === selectedColor
-            );
-            const requestedTotal = (existingItem ? existingItem.quantity : 0) + modalQuantity;
-
-            if (requestedTotal > availableStock) {
-                setProductOptionStatus(`Only ${availableStock} item${availableStock === 1 ? '' : 's'} available for this size and color.`, 'error');
-                showToast(`Only ${availableStock} item${availableStock === 1 ? '' : 's'} available for this size and color.`);
-                return;
-            }
-
-            if (existingItem) {
-                existingItem.quantity = requestedTotal;
-            } else {
-                cartData.push({
-                    id: activeProduct.id,
-                    title: activeProduct.title,
-                    price: activeProduct.price,
-                    size: selectedSize,
-                    color: selectedColor,
-                    quantity: modalQuantity,
-                    image: DartCatalog.cover(DartCatalog.model(activeProduct.id), selectedColor)
-                });
-            }
-
-            // Optimistic UI: the cart badge/list updates immediately, while the
-            // backend reservation remains authoritative and can roll this back.
-            cacheFastCartSnapshot(cartData);
-            renderCart();
-            updateCartCount();
-            if (!await persistCartReservation()) { renderCart(); return; }
-            showToast("تم إضافة المنتج إلى السلة بنجاح!");
-            showCartBanner(activeProduct.title);
-            closeProductModal();
-            renderCart();
-        });
-    }
 
     if (discountBtn && discountInput) {
         discountBtn.addEventListener('click', async () => {

@@ -1,0 +1,65 @@
+<!-- DART CODE GUIDE | sections/product-modal.html
+     الغرض: المصدر الوحيد لنافذة تفاصيل المنتج في Home وProducts. -->
+<section
+    class="model"
+    id="SectionModel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="dartProductModalTitle"
+    aria-hidden="true"
+    tabindex="-1">
+    <button type="button" class="dart-modal-close" aria-label="Close product details">&times;</button>
+
+    <div class="model-carousel" id="modelCarousel">
+        <div class="carousel-track" id="carouselTrack"></div>
+        <button type="button" class="carousel-arrow carousel-prev" id="carouselPrev" aria-label="Previous image">
+            <span aria-hidden="true">&#8249;</span>
+        </button>
+        <button type="button" class="carousel-arrow carousel-next" id="carouselNext" aria-label="Next image">
+            <span aria-hidden="true">&#8250;</span>
+        </button>
+        <div class="carousel-dots" id="carouselDots"></div>
+    </div>
+
+    <article class="model-product">
+        <div class="model-product-category"></div>
+        <div class="model-product-code"></div>
+        <div class="model-product-title" id="dartProductModalTitle"></div>
+        <div class="model-product-price">Price: &nbsp;<span class="price-number"></span>&nbsp; EGP</div>
+        <div class="sizes-container">
+            <button type="button" class="size-btn" data-size=""></button>
+        </div>
+        <div class="colors-container">
+            <button type="button" class="color-btn" data-color=""></button>
+        </div>
+
+        <div class="product-size-chart-actions">
+            <button type="button" id="productSizeChartBtn" class="product-size-chart-trigger" aria-controls="productSizeChartPanel" aria-expanded="false">
+                <span class="product-size-chart-icon" aria-hidden="true">&#8596;</span>
+                <span>Size Chart</span>
+            </button>
+        </div>
+        <p id="productOptionStatus" class="product-option-status" role="status" aria-live="polite"></p>
+
+        <div id="productSizeChartPanel" class="product-size-chart-panel" hidden>
+            <div class="product-size-chart-dialog" role="dialog" aria-modal="true" aria-labelledby="productSizeChartTitle">
+                <button type="button" id="closeProductSizeChart" class="product-size-chart-close" aria-label="Close size chart">&times;</button>
+                <h3 id="productSizeChartTitle">Size Chart</h3>
+                <div id="productSizeChartContent"></div>
+            </div>
+        </div>
+
+        <div class="modal-qty-row djasb">
+            <span class="modal-qty-label">Quantity</span>
+            <div class="qty-control" id="modalQtyControl">
+                <button type="button" class="qty-btn" id="modalQtyDecrease" aria-label="Decrease quantity">-</button>
+                <span class="qty-value" id="modalQtyValue">1</span>
+                <button type="button" class="qty-btn" id="modalQtyIncrease" aria-label="Increase quantity">+</button>
+            </div>
+        </div>
+
+        <h6 class="model-all-detelis" dir="rtl"></h6>
+        <button type="button" id="modalBuyBtn" class="buy-now-btn">Buy</button>
+        <button type="button" id="modalWaitBtn" class="buy-now-btn dart-waiting-btn" hidden>Notify me when available</button>
+    </article>
+</section>

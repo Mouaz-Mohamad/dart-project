@@ -200,7 +200,12 @@
   .model {
     width: calc(100% - 20px);
     max-height: 98vh;
+    max-height: 98dvh;
     overflow: auto;
+  }
+  .dart-modal-close {
+    min-height: 36px;
+    margin-inline-end: 4px;
   }
   .checkout-summary-box,
   .totals-calculation,

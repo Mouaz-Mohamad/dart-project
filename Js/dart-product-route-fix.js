@@ -59,9 +59,12 @@
     }
 
     const originalOpen = storefront.open;
-    function openWithProductRoute(product) {
-      const result = originalOpen.call(this, product);
-      routeProduct(product);
+    async function openWithProductRoute(product, options = {}) {
+      const result = await originalOpen.call(this, product, {
+        ...options,
+        history: false,
+      });
+      if (result && options.history !== false) routeProduct(product);
       return result;
     }
     Object.defineProperty(openWithProductRoute, "__dartProductRouteFix", {
@@ -87,7 +90,7 @@
   }
 
   root.DartProductRouteFix = Object.freeze({
-    version: "1.0.0",
+    version: "1.1.0",
     slugPart,
     pathFor,
     routeProduct,
