@@ -945,7 +945,7 @@ header {
 }
 
 .model i.fa-x {
-    font-size: 50px;
+    font-size: 30px;
     width: 100%;
     position:static;
     color: var(--bragnte);
@@ -959,7 +959,7 @@ header {
     line-height: 1;
     flex-shrink: 0;
     z-index: 10;
-    margin-top: -20px;
+    margin-right: 10px;
 }
 
 .dart-modal-close:hover,

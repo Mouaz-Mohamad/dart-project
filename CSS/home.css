@@ -948,7 +948,7 @@ header {
     gap: 10px;
     overflow-y: scroll;
     padding-right: 6px;
-    scrollbar-width: auto;
+    scrollbar-width: thin;
     scrollbar-color: var(--bragnte) #fff;
 }
 
