@@ -427,7 +427,10 @@
   function boot() {
     if (bootPromise) return bootPromise;
     bootPromise = (async () => {
-      const scripts = [`${rootPath}Js/dart-sets.js`, ...(isAdmin ? ["dart-sets-admin.js"] : [])];
+      const scripts = [
+        `${rootPath}Js/dart-sets.js`,
+        ...(isAdmin ? ["dart-sets-admin.js"] : [`${rootPath}Js/dart-set-modal-ui.js`]),
+      ];
       for (const src of scripts) await loadScript(src);
       root.dispatchEvent(new CustomEvent("dart:sets-extension-ready"));
     })().catch((error) => {
