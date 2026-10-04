@@ -31,6 +31,8 @@ assert(!admin.includes('data-set-search'), "Sets must reuse the existing Models 
 assert(admin.includes('panel.className="cont-titel dart-sets-admin-panel"') && admin.includes('node.className=`model-row'), "Sets list must reuse the Models table and row visual structure");
 assert(admin.includes("data-set-component-add"), "Set editor must support adding components");
 assert(admin.includes('can("sets.manage")'), "Set mutations must honor central dashboard permissions");
+assert(admin.includes('root.DartAdminHydration?.ready!==true'), "Sets admin must not initialize before authenticated dashboard hydration is ready");
+assert(admin.includes('function syncAccess()') && admin.includes('dart:admin-authenticated'), "Sets permissions must be re-synced after admin authentication");
 assert(admin.includes("Selling Below Cost"), "Owner below-cost override must remain visibly warned");
 
 console.log("PASS Sets lazy runtime, storefront and Dart Eye contracts");

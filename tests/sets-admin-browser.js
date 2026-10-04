@@ -35,7 +35,6 @@ const items = [
   {modelId:"M-OVER",status:"In stock",isArchived:false,isDeleted:false}
 ];
 window.__stateCalls=[];
-window.DartAdminAccess={can:()=>true};
 window.DartCatalog={
   norm:(v)=>String(v??"").trim().toLowerCase(),
   model:(id)=>models[id]||null,
@@ -57,7 +56,7 @@ async function request(path,options={}){
   if(path==="/api/v1/admin/sets/settings") return {settings:{birthdayPercent:10,dartCardPercent:10,version:1}};
   return {};
 }
-window.DartSets={request}; window.DartAdminApi={request}; window.DartAdminHydration={ready:true};
+window.DartSets={request}; window.DartAdminApi={request}; window.DartAdminHydration={ready:false};
 window.DartDialog={confirm:async()=>true,alert:async()=>{},prompt:async()=>""};
 document.querySelector("#models .add-btn").addEventListener("click",()=>{document.getElementById("model-modal").hidden=false;});
 </script>
@@ -95,7 +94,15 @@ const server = http.createServer((request, response) => {
   const page = await browser.newPage({viewport:{width:1440,height:1000}});
   try {
     await page.goto(origin + "/");
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("dart:sets-client-ready")));
+    assert.equal(await page.locator('[data-model-set-view="sets"]').count(), 0, "Sets UI must not initialize before admin auth/hydration is ready");
+    await page.evaluate(() => {
+      window.DartAdminAccess={can:()=>true};
+      window.DartAdminHydration={ready:true};
+      window.dispatchEvent(new CustomEvent("dart:admin-authenticated"));
+    });
     await page.waitForSelector('[data-model-set-view="sets"]');
+    assert.equal(await page.locator('[data-model-set-view="sets"]').isHidden(), false, "Sets button must become visible after authenticated permissions are available");
 
     assert.equal(await page.locator("#models > .first.filter-bar").count(), 1, "shared filter bar must remain a single original toolbar");
     assert.deepEqual(await page.locator("#models > .second > button").allTextContents(), ["Models", "Sets", "Delete"]);

@@ -311,8 +311,25 @@
 
   async function saveSettings(event) {event.preventDefault();const form=event.currentTarget;try{const payload=await api("/api/v1/admin/sets/settings",{method:"PUT",body:{expectedVersion:Number(settingsCache.version),birthdayPercent:Number(form.elements.birthday.value),dartCardPercent:Number(form.elements.card.value)}});settingsCache=payload?.settings||settingsCache;form.closest("#dartSetSettingsModal").hidden=true;}catch(error){setStatus(form,error.message||"Unable to save Set discounts.",true);}}
 
-  function init(){if(initialized)return; if(!root.DartSets||!root.DartAdminApi)return; initialized=true;installPanel();}
+  function syncAccess(){
+    if(!initialized)return;
+    const controls=dashboardControls();
+    const setsButton=controls.second?.querySelector?.('[data-model-set-view="sets"]');
+    const readable=can("sets.read")||can("sets.manage");
+    if(setsButton)setsButton.hidden=!readable;
+    if(currentView==="sets"&&!readable)setActiveView("models");
+    if(currentView==="sets"&&controls.add){
+      const originalHidden=controls.add.dataset.dartSetsOriginalHidden==="1";
+      controls.add.hidden=originalHidden||!can("sets.manage");
+    }
+  }
+
+  function init(){
+    if(!root.DartSets||!root.DartAdminApi||root.DartAdminHydration?.ready!==true)return;
+    if(!initialized){initialized=true;installPanel();}
+    syncAccess();
+  }
   root.addEventListener("dart:admin-authenticated",init);
   root.addEventListener("dart:sets-client-ready",init);
-  if(root.DartAdminHydration?.ready) init(); else root.setTimeout(init,0);
+  if(root.DartAdminHydration?.ready===true)init();
 })(typeof window!=="undefined"?window:globalThis);
