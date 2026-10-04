@@ -602,8 +602,28 @@
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", "dartSetModalTitle");
-    modal.innerHTML = `<div class="dart-set-dialog"><button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button><div class="dart-set-gallery"><img data-set-cover alt=""><div data-set-thumbs class="dart-set-thumbs"></div></div><article class="dart-set-details"><span class="dart-set-category">Sets</span><small data-set-code></small><h2 id="dartSetModalTitle" data-set-title></h2><div data-set-components class="dart-set-components"></div><p data-set-description></p><div class="dart-set-pricing"><span data-set-old-price></span><strong data-set-price></strong><em data-set-discount></em></div><p class="dart-set-status" data-set-status role="status" aria-live="polite"></p><button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button></article></div>`;
-    root.document.body.appendChild(modal);
+    modal.innerHTML = `<div class="dart-set-dialog">
+      <button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button>
+      <div class="dart-set-gallery">
+      <img data-set-cover alt="">
+      <div data-set-thumbs class="dart-set-thumbs"></div>
+      </div>
+      <article class="dart-set-details">
+        <span class="dart-set-category">Sets</span>
+        <small data-set-code></small>
+        <h2 id="dartSetModalTitle" data-set-title></h2>
+        <div data-set-components class="dart-set-components"></div>
+        <p data-set-description></p>
+        <div class="dart-set-pricing">
+          <span data-set-old-price></span>
+          Price : <strong data-set-price></strong> EGP <em data-set-discount></em>
+        </div>
+        <p class="dart-set-status" data-set-status role="status" aria-live="polite"></p>
+        <button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button>
+        </article>
+        </div>`;
+    
+      root.document.body.appendChild(modal);
     modal.addEventListener("click", (event) => { if (event.target === modal || event.target.closest?.("[data-set-close]")) closeSetModal(); });
     root.document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeSetModal(); });
     modal.querySelector("[data-set-add]")?.addEventListener("click", () => void addActiveSetToCart());
