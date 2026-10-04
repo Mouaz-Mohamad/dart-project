@@ -31,6 +31,7 @@
     "home-storefront-browser.js",
     "product-waiting-browser.js",
     "sets-admin-browser.js",
+    "sets-storefront-browser.js",
     "storefront-settings-regression.js"
   ],
   "legacyRewrite": {

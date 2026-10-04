@@ -81,7 +81,8 @@ const server = http.createServer((request, response) => {
       </div>
       <div id="cartItemsContainer">
         <div id="cartItemTemplate" class="cart-product-card"></div>
-        <div class="cart-product-card" data-test-base-cart-card></div>
+        <div class="cart-product-card" data-test-base-cart-card="standalone"></div>
+        <div class="cart-product-card" data-test-base-cart-card="set"></div>
       </div>
       <script src="/Js/dart-state.js"></script>
       <script>
@@ -122,6 +123,42 @@ const server = http.createServer((request, response) => {
     }
     if (pathname === "/api/v1/sets/settings") {
       response.end(JSON.stringify({ settings: { birthdayPercent: 10, dartCardPercent: 10, version: 1 } }));
+      return;
+    }
+    if (pathname.startsWith("/api/v1/cart/reservation/")) {
+      const reservationId = pathname.split("/").pop();
+      response.end(JSON.stringify({
+        cart: {
+          reservationId,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          lines: [
+            { modelId: "DW-101", color: "Black", size: "M", quantity: 1 },
+            {
+              modelId: "DW-101", color: "Black", size: "M", quantity: 1,
+              setGroupId: "GROUP-HYDRATED-1", setId: "SET-DW-101", setUnitIndex: 1,
+              setCartComponentId: "CART-COMPONENT-HYDRATED-1",
+              setComponentId: "COMPONENT-HYDRATED-1", setComponentUnitIndex: 1,
+            },
+          ],
+        },
+      }));
+      return;
+    }
+    if (pathname.startsWith("/api/v1/cart/set-groups/")) {
+      const reservationId = pathname.split("/").pop();
+      response.end(JSON.stringify({
+        reservationId,
+        groups: [{
+          id: "GROUP-HYDRATED-1", setId: "SET-DW-101", unitIndex: 1, setName: "Cairo Campus Set",
+          image: "/Photos/products/1.jpg", pieceCount: 1, componentsTotalMinor: 80000, basePriceMinor: 70000,
+          discountSource: "None", discountPercent: 0, discountReference: "", finalMinor: 70000,
+          components: [{
+            modelId: "DW-101", modelName: "Cairo Wide Leg Jeans", color: "Black", size: "M",
+            cartComponentId: "CART-COMPONENT-HYDRATED-1", componentId: "COMPONENT-HYDRATED-1",
+            componentUnitIndex: 1, allocatedBaseMinor: 70000, allocatedFinalMinor: 70000,
+          }],
+        }],
+      }));
       return;
     }
     if (pathname === "/api/v1/reviews") {
@@ -196,6 +233,25 @@ const server = http.createServer((request, response) => {
   await setCard.waitFor({ state: "visible" });
   assert.match(await setCard.textContent(), /Cairo Campus Set/);
 
+  await page.waitForFunction(() => (window.DartState?.read?.("dart_cart", []) || []).length === 2);
+  const hydratedCartIdentity = await page.evaluate(() =>
+    (window.DartState.read("dart_cart", []) || []).map((line) => ({
+      title: line.title,
+      setGroupId: line.setGroupId || "",
+      dartSetKey: line.dartSetKey || "",
+      dartSetCartComponentId: line.dartSetCartComponentId || "",
+    })),
+  );
+  assert.deepEqual(hydratedCartIdentity, [
+    { title: "Cairo Wide Leg Jeans", setGroupId: "", dartSetKey: "", dartSetCartComponentId: "" },
+    {
+      title: "Cairo Wide Leg Jeans",
+      setGroupId: "GROUP-HYDRATED-1",
+      dartSetKey: "SET-DW-101:1",
+      dartSetCartComponentId: "CART-COMPONENT-HYDRATED-1",
+    },
+  ], "Cart hydration must preserve explicit server Set identity for an otherwise identical variant");
+
   await setCard.locator('.product-title').click();
   await page.locator('#dartSetModal:not([hidden])').waitFor({ state: "visible" });
   assert.equal(await page.locator('#dartSetModal [data-set-title]').textContent(), "Cairo Campus Set");
@@ -266,15 +322,24 @@ const server = http.createServer((request, response) => {
   const stableCart = await page.evaluate(async () => {
     const container = document.getElementById("cartItemsContainer");
     const group = {
+      id: "GROUP-FIXTURE-1",
       setId: "SET-DW-101",
       unitIndex: 1,
-      selections: [{ modelId: "DW-101", modelName: "Cairo Wide Leg Jeans", color: "Black", size: "M" }],
+      selections: [{
+        modelId: "DW-101", modelName: "Cairo Wide Leg Jeans", color: "Black", size: "M",
+        cartComponentId: "CART-COMPONENT-1", componentId: "COMPONENT-1", componentUnitIndex: 1,
+      }],
     };
     window.DartSets.writeDrafts([group]);
-    window.setFixtureCart([{
-      id: "DW-101", title: "Cairo Wide Leg Jeans", price: 720, color: "Black", size: "M", quantity: 1,
-      setId: "SET-DW-101", dartSetKey: "SET-DW-101:1", dartSetUnitIndex: 1,
-    }]);
+    window.setFixtureCart([
+      { id: "DW-101", title: "Standalone Jeans", price: 720, color: "Black", size: "M", quantity: 1 },
+      {
+        id: "DW-101", title: "Set Jeans", price: 720, color: "Black", size: "M", quantity: 1,
+        setGroupId: "GROUP-FIXTURE-1", setId: "SET-DW-101", setUnitIndex: 1,
+        dartSetCartComponentId: "CART-COMPONENT-1", dartSetComponentId: "COMPONENT-1",
+        dartSetComponentUnitIndex: 1,
+      },
+    ]);
     await new Promise((resolve) => setTimeout(resolve, 120));
     let childListMutations = 0;
     const observer = new MutationObserver((records) => {
@@ -286,21 +351,31 @@ const server = http.createServer((request, response) => {
     const grouped = {
       childListMutations,
       setCards: container.querySelectorAll('[data-dart-set-cart-card="1"][data-dart-set-key="SET-DW-101:1"]').length,
-      baseDisplay: container.querySelector('[data-test-base-cart-card]').style.display,
+      baseDisplays: [...container.querySelectorAll('[data-test-base-cart-card]')].map((node) => node.style.display),
       cartLines: window.fixtureCartLength(),
+      lineIdentity: (window.DartState.read("dart_cart", []) || []).map((line) => ({
+        title: line.title, setGroupId: line.setGroupId || "", dartSetKey: line.dartSetKey || "",
+      })),
     };
     window.setFixtureCart([]);
     await new Promise((resolve) => setTimeout(resolve, 80));
     grouped.afterClear = {
       setCards: container.querySelectorAll('[data-dart-set-cart-card="1"]').length,
-      baseDisplay: container.querySelector('[data-test-base-cart-card]').style.display,
+      baseDisplays: [...container.querySelectorAll('[data-test-base-cart-card]')].map((node) => node.style.display),
     };
     return grouped;
   });
   assert.deepEqual(stableCart, {
-    childListMutations: 0, setCards: 1, baseDisplay: "none", cartLines: 1,
-    afterClear: { setCards: 0, baseDisplay: "flex" },
-  }, "Set cart decoration must be keyed, stable, and remove stale grouped cards when cart lines disappear");
+    childListMutations: 0,
+    setCards: 1,
+    baseDisplays: ["flex", "none"],
+    cartLines: 2,
+    lineIdentity: [
+      { title: "Standalone Jeans", setGroupId: "", dartSetKey: "" },
+      { title: "Set Jeans", setGroupId: "GROUP-FIXTURE-1", dartSetKey: "SET-DW-101:1" },
+    ],
+    afterClear: { setCards: 0, baseDisplays: ["flex", "flex"] },
+  }, "Set cart decoration must use explicit server identity and never absorb an identical standalone variant");
 
   assert.deepEqual(localFailures, []);
   console.log("PASS home storefront browser: API catalogue -> card -> modal -> deep link -> back/forward without reload");

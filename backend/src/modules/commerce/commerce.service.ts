@@ -18,6 +18,19 @@ export interface CartLineInput {
   quantity: number;
 }
 
+export interface CartReservationLine {
+  modelId: string;
+  color: string;
+  size: string;
+  quantity: number;
+  setGroupId?: string;
+  setId?: string;
+  setUnitIndex?: number;
+  setCartComponentId?: string;
+  setComponentId?: string;
+  setComponentUnitIndex?: number;
+}
+
 export interface CheckoutInput {
   reservationId: string;
   contact: {
@@ -389,6 +402,65 @@ function flexibleDateExpiry(value: unknown): number | null {
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
 
+  private async cartLinesForReservation(
+    client: PoolClient,
+    reservationId: string,
+  ): Promise<CartReservationLine[]> {
+    const lines = await client.query<{
+      model_id: string;
+      color: string;
+      size: string;
+      quantity: string;
+      set_group_id: string | null;
+      set_id: string | null;
+      set_unit_index: number | null;
+      set_cart_component_id: string | null;
+      set_component_id: string | null;
+      set_component_unit_index: number | null;
+    }>(
+      `SELECT i.model_id,i.color,i.size,count(*)::text AS quantity,
+              sc.set_group_id,sc.set_id,sc.set_unit_index,sc.set_cart_component_id,
+              sc.set_component_id,sc.set_component_unit_index
+         FROM inventory_items i
+         LEFT JOIN LATERAL (
+           SELECT g.id::text AS set_group_id,g.set_id,g.unit_index AS set_unit_index,
+                  c.id::text AS set_cart_component_id,c.component_id::text AS set_component_id,
+                  c.component_unit_index AS set_component_unit_index
+             FROM cart_set_components c
+             JOIN cart_set_groups g ON g.id=c.group_id
+            WHERE c.inventory_item_id=i.id
+              AND g.reservation_id=$1
+            LIMIT 1
+         ) sc ON true
+        WHERE i.cart_reservation_id=$1
+          AND lower(i.status)='cart reserved'
+          AND i.reservation_until > now()
+          AND i.active
+          AND NOT i.is_archived
+          AND NOT i.is_deleted
+        GROUP BY i.model_id,i.color,i.size,sc.set_group_id,sc.set_id,sc.set_unit_index,
+                 sc.set_cart_component_id,sc.set_component_id,sc.set_component_unit_index
+        ORDER BY sc.set_group_id NULLS FIRST,sc.set_unit_index NULLS FIRST,
+                 sc.set_component_unit_index NULLS FIRST,i.model_id,i.color,i.size`,
+      [reservationId],
+    );
+    return lines.rows.map((line) => ({
+      modelId: line.model_id,
+      color: line.color,
+      size: line.size,
+      quantity: Number(line.quantity || 0),
+      ...(line.set_group_id
+        ? {
+            setGroupId: line.set_group_id,
+            setId: String(line.set_id || ""),
+            setUnitIndex: Number(line.set_unit_index || 0),
+            setCartComponentId: String(line.set_cart_component_id || ""),
+            setComponentId: String(line.set_component_id || ""),
+            setComponentUnitIndex: Number(line.set_component_unit_index || 0),
+          }
+        : {}),
+    }));
+  }
 
   private async refreshCodRiskForOrder(
     client: PoolClient,
@@ -1379,7 +1451,7 @@ export class CommerceService {
     cart: null | {
       reservationId: string;
       expiresAt: string;
-      lines: Array<{ modelId: string; color: string; size: string; quantity: number }>;
+      lines: CartReservationLine[];
     };
   }> {
     const client = await this.pool.connect();
@@ -1405,38 +1477,16 @@ export class CommerceService {
         await client.query("COMMIT");
         return { cart: null };
       }
-      const lines = await client.query<{
-        model_id: string;
-        color: string;
-        size: string;
-        quantity: string;
-      }>(
-        `SELECT model_id, color, size, count(*)::text AS quantity
-           FROM inventory_items
-          WHERE cart_reservation_id=$1
-            AND lower(status)='cart reserved'
-            AND reservation_until > now()
-            AND active
-            AND NOT is_archived
-            AND NOT is_deleted
-          GROUP BY model_id, color, size
-          ORDER BY model_id, color, size`,
-        [row.id],
-      );
+      const lines = await this.cartLinesForReservation(client, row.id);
       await client.query("COMMIT");
-      if (!lines.rows.length) {
+      if (!lines.length) {
         return { cart: null };
       }
       return {
         cart: {
           reservationId: row.id,
           expiresAt: row.expires_at.toISOString(),
-          lines: lines.rows.map((line) => ({
-            modelId: line.model_id,
-            color: line.color,
-            size: line.size,
-            quantity: Number(line.quantity || 0),
-          })),
+          lines,
         },
       };
     } catch (error) {
@@ -1454,7 +1504,7 @@ export class CommerceService {
     cart: null | {
       reservationId: string;
       expiresAt: string;
-      lines: Array<{ modelId: string; color: string; size: string; quantity: number }>;
+      lines: CartReservationLine[];
     };
   }> {
     const client = await this.pool.connect();
@@ -1483,34 +1533,14 @@ export class CommerceService {
       if (row.customer_user_id || !row.guest_owner_hash || row.guest_owner_hash !== guestOwnerHash) {
         throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "This guest cart belongs to another browser");
       }
-      const lines = await client.query<{
-        model_id: string;
-        color: string;
-        size: string;
-        quantity: string;
-      }>(
-        `SELECT model_id, color, size, count(*)::text AS quantity
-           FROM inventory_items
-          WHERE cart_reservation_id=$1
-            AND lower(status)='cart reserved'
-            AND reservation_until > now()
-            AND active AND NOT is_archived AND NOT is_deleted
-          GROUP BY model_id, color, size
-          ORDER BY model_id, color, size`,
-        [row.id],
-      );
+      const lines = await this.cartLinesForReservation(client, row.id);
       await client.query("COMMIT");
-      if (!lines.rows.length) return { cart: null };
+      if (!lines.length) return { cart: null };
       return {
         cart: {
           reservationId: row.id,
           expiresAt: row.expires_at.toISOString(),
-          lines: lines.rows.map((line) => ({
-            modelId: line.model_id,
-            color: line.color,
-            size: line.size,
-            quantity: Number(line.quantity || 0),
-          })),
+          lines,
         },
       };
     } catch (error) {

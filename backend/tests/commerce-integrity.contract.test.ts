@@ -19,6 +19,10 @@ const customerInteractions = readFileSync(
   new URL("../src/modules/commerce/customer-interaction.service.ts", import.meta.url),
   "utf8",
 );
+const setCartService = readFileSync(
+  new URL("../src/modules/sets/set-cart.service.ts", import.meta.url),
+  "utf8",
+);
 
 describe("commerce concurrency and representative safety contracts", () => {
   it("enforces checkout idempotency inside the order transaction", () => {
@@ -114,6 +118,22 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toMatch(
       /WHERE order_code=\$1[\s\S]{0,120}AND status='Delivered'[\s\S]{0,120}AND NOT is_deleted[\s\S]{0,120}AND NOT is_archived/,
     );
+  });
+
+
+  it("returns explicit Set identity on cart lines instead of variant guessing", () => {
+    expect(service).toContain("export interface CartReservationLine");
+    expect(service).toContain("setGroupId?: string");
+    expect(service).toContain("setCartComponentId?: string");
+    expect(service).toContain("LEFT JOIN LATERAL (");
+    expect(service).toContain("JOIN cart_set_groups g ON g.id=c.group_id");
+    expect(service).toContain("WHERE c.inventory_item_id=i.id");
+    expect(service).toContain("AND g.reservation_id=$1");
+    expect(service).toContain("setCartComponentId: String(line.set_cart_component_id");
+    expect(platform).toContain("const setGroupId = String(line.setGroupId");
+    expect(platform).toContain("dartSetKey: `${setId}:${setUnitIndex}`");
+    expect(setCartService).toContain("'cartComponentId',c.id::text");
+    expect(setCartService).toContain("'componentUnitIndex',c.component_unit_index");
   });
 
   it("claims the same guest reservation after authentication without releasing its items", () => {

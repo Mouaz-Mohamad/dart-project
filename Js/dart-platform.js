@@ -1917,6 +1917,9 @@
     const hydrated = (remote.lines || []).map((line) => {
       const product = products.find((row) => String(row.code || row.id) === String(line.modelId));
       const model = DartCatalog.model(String(line.modelId));
+      const setId = String(line.setId || "").trim();
+      const setUnitIndex = Number(line.setUnitIndex || 0);
+      const setGroupId = String(line.setGroupId || "").trim();
       return {
         id: String(line.modelId),
         title: product?.title || model?.name || String(line.modelId),
@@ -1925,6 +1928,19 @@
         quantity: Number(line.quantity) || 1,
         image: DartCatalog.cover(model, String(line.color)),
         reservationId: CART_RESERVATION_ID, reservationUntil: remote.expiresAt,
+        ...(setGroupId && setId && setUnitIndex > 0
+          ? {
+              setGroupId,
+              setId,
+              dartSetKey: `${setId}:${setUnitIndex}`,
+              dartSetUnitIndex: setUnitIndex,
+              ...(line.setCartComponentId ? { dartSetCartComponentId: String(line.setCartComponentId) } : {}),
+              ...(line.setComponentId ? { dartSetComponentId: String(line.setComponentId) } : {}),
+              ...(Number(line.setComponentUnitIndex) > 0
+                ? { dartSetComponentUnitIndex: Number(line.setComponentUnitIndex) }
+                : {}),
+            }
+          : {}),
       };
     });
     write("dart_cart", hydrated);

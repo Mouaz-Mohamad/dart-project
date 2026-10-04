@@ -1487,6 +1487,7 @@ function resetProductFilters() {
         button.classList.toggle('active', button.dataset.category?.toLocaleLowerCase() === 'all');
     });
     renderProductPageResults();
+    window.dispatchEvent(new CustomEvent('dart:product-filters-rendered'));
 }
 
 function initProductFilterToggle() {

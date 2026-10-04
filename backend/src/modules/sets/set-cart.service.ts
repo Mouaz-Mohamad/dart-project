@@ -515,6 +515,8 @@ export class SetCartService {
             color: row.selection.color,
             size: row.selection.size,
             itemCode: row.item.item_code,
+            componentId: row.component.id,
+            componentUnitIndex: row.unitIndex,
             allocatedBaseMinor: row.baseAllocatedMinor,
             allocatedFinalMinor: row.finalAllocatedMinor,
           })),
@@ -561,7 +563,8 @@ export class SetCartService {
                 g.discount_source,g.discount_percent::text,g.discount_reference,g.final_minor::text,
                 COALESCE(jsonb_agg(jsonb_build_object(
                   'modelId',c.model_id,'modelName',c.model_name_snapshot,'color',c.color,'size',c.size,
-                  'itemCode',i.item_code,'allocatedBaseMinor',c.allocated_base_minor,
+                  'itemCode',i.item_code,'cartComponentId',c.id::text,'componentId',c.component_id::text,
+                  'componentUnitIndex',c.component_unit_index,'allocatedBaseMinor',c.allocated_base_minor,
                   'allocatedFinalMinor',c.allocated_final_minor
                 ) ORDER BY c.created_at,c.id) FILTER (WHERE c.id IS NOT NULL),'[]'::jsonb) AS components
            FROM cart_set_groups g

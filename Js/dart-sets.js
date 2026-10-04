@@ -273,6 +273,9 @@
           modelId: String(row.modelId || ""), color: String(row.color || ""), size: String(row.size || ""),
           ...(row.modelName ? { modelName: String(row.modelName) } : {}),
           ...(row.itemCode ? { itemCode: String(row.itemCode) } : {}),
+          ...(row.cartComponentId ? { cartComponentId: String(row.cartComponentId) } : {}),
+          ...(row.componentId ? { componentId: String(row.componentId) } : {}),
+          ...(Number(row.componentUnitIndex) > 0 ? { componentUnitIndex: Number(row.componentUnitIndex) } : {}),
           ...(Number.isFinite(Number(row.allocatedBaseMinor)) ? { allocatedBaseMinor: Number(row.allocatedBaseMinor) } : {}),
           ...(Number.isFinite(Number(row.allocatedFinalMinor)) ? { allocatedFinalMinor: Number(row.allocatedFinalMinor) } : {}),
         }))
@@ -713,19 +716,24 @@
   function tagCartLines() {
     const cart=cartRef(), groups=drafts();
     const validKeys=new Set(groups.map(g=>`${g.setId}:${g.unitIndex}`));
-    cart.forEach((line)=>{ if (line.dartSetKey && !validKeys.has(line.dartSetKey)) { delete line.dartSetKey; delete line.setId; delete line.dartSetUnitIndex; } });
-    for (const group of groups) {
-      const key=`${group.setId}:${group.unitIndex}`;
-      for (const selection of group.selections) {
-        let line=cart.find(row=>!row.dartSetKey&&String(row.id)===selection.modelId&&String(row.color)===selection.color&&String(row.size)===selection.size&&Number(row.quantity)>0);
-        if (!line) line=cart.find(row=>row.dartSetKey===key&&String(row.id)===selection.modelId&&String(row.color)===selection.color&&String(row.size)===selection.size);
-        if (!line) continue;
-        if (!line.dartSetKey && Number(line.quantity)>1) {
-          line.quantity-=1; const unit={...line,quantity:1}; cart.push(unit); line=unit;
-        }
-        line.dartSetKey=key; line.setId=group.setId; line.dartSetUnitIndex=group.unitIndex;
+    const groupsById=new Map(groups.filter(group=>group.id).map(group=>[String(group.id),group]));
+    cart.forEach((line)=>{
+      const serverGroupId=String(line.setGroupId||"").trim();
+      const serverSetId=String(line.setId||"").trim();
+      const serverUnitIndex=Math.max(0,Number(line.dartSetUnitIndex||line.setUnitIndex)||0);
+      const serverGroup=serverGroupId?groupsById.get(serverGroupId):null;
+      const setId=String(serverGroup?.setId||serverSetId||"").trim();
+      const unitIndex=Math.max(0,Number(serverGroup?.unitIndex||serverUnitIndex)||0);
+      if (serverGroupId && setId && unitIndex>0) {
+        line.dartSetKey=`${setId}:${unitIndex}`;
+        line.setId=setId;
+        line.dartSetUnitIndex=unitIndex;
+        return;
       }
-    }
+      if (line.dartSetKey && !validKeys.has(line.dartSetKey)) {
+        delete line.dartSetKey; delete line.setId; delete line.dartSetUnitIndex;
+      }
+    });
     return cart;
   }
 

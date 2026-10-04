@@ -38,6 +38,8 @@ assert(sets.includes('if (event.detail?.key!=="dart_cart") return;'), "Generic d
 assert(sets.includes('const settingsRequest = request("/api/v1/sets/settings")') && sets.includes('const setsPayload = await request("/api/v1/sets")'), "Set catalogue loading must not depend on Set settings availability");
 assert(sets.includes('DEFAULT_SETTINGS = Object.freeze({ birthdayPercent: 10, dartCardPercent: 10, version: 1 })'), "Set settings fallback must remain 10% Birthday and 10% Dart Card");
 assert(sets.includes('card.addEventListener("click"') && sets.includes('["Enter", " "].includes(event.key)'), "The whole Set card must open like a Product card by pointer or keyboard");
+assert(sets.includes('const groupsById=new Map') && sets.includes('const serverGroupId=String(line.setGroupId'), "Cart Set grouping must use explicit server group identity");
+assert(!sets.includes('cart.find(row=>!row.dartSetKey&&String(row.id)===selection.modelId'), "Cart Set grouping must never guess membership from model/color/size");
 
 assert(admin.includes('setsButton.dataset.modelSetView="sets"'), "Models section must expose the Sets view inside the shared second bar");
 assert(admin.includes('dashboardControls()'), "Models / Sets must share the existing Models dashboard controls");
