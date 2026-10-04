@@ -19,12 +19,21 @@ describe("Set lifecycle integrity contracts", () => {
     expect(cart).toContain('client.query("ROLLBACK")');
   });
 
-  it("keeps Set Waiting atomic and concurrency-safe", () => {
-    const waiting = source("src/modules/sets/set-waiting.service.ts");
-    expect(waiting).toContain("FOR UPDATE SKIP LOCKED");
-    expect(waiting).toContain("dart:set-wait-entry:");
-    expect(waiting).toContain('client.query("BEGIN")');
-    expect(waiting).toContain('client.query("ROLLBACK")');
+  it("enforces strict Set Sold Out rules on the server", () => {
+    const cart = source("src/modules/sets/set-cart.service.ts");
+    expect(cart).toContain("assertEveryOfferedVariantAvailable");
+    expect(cart).toContain("SET_SOLD_OUT");
+    expect(cart).toContain("FOR SHARE");
+    expect(cart).toContain("cart_reservation_id=$2");
+  });
+
+  it("retires Set Waiting without deleting its historical records", () => {
+    const app = source("src/app.ts");
+    const application = source("src/application.ts");
+    const historicalMigration = source("migrations/0054_sets_foundation.sql");
+    expect(app).not.toContain("SetWaitingService");
+    expect(application).not.toContain("createSetWaitingRouter");
+    expect(historicalMigration).toContain("set_waiting_entries");
   });
 
   it("snapshots the allocated Set amount onto physical order items", () => {

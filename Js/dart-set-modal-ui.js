@@ -19,11 +19,13 @@
 #dartSetModal .dart-set-close{top:0;right:10px;z-index:10;margin-top:-10px;width:42px;height:46px;border-radius:0;background:transparent;color:${BURGUNDY};font-size:46px;line-height:1}
 #dartSetModal .dart-set-gallery{position:relative}
 #dartSetModal [data-set-cover],#dartSetModal [data-set-thumbs]{display:none!important}
-#dartSetModal .dart-set-carousel{margin:0;width:100%;aspect-ratio:3/4;border-radius:14px;background:#eee}
-#dartSetModal .dart-set-carousel .carousel-slide img{border-radius:0}
+#dartSetModal .dart-set-carousel{margin:0;width:100%;aspect-ratio:9/16;border-radius:14px;background:#eee}
+#dartSetModal .dart-set-carousel .carousel-slide img{width:100%;height:100%;object-fit:cover;border-radius:0}
 #dartSetModal .dart-set-component{grid-template-columns:minmax(72px,1fr) minmax(0,3fr);align-items:start;gap:12px}
+#dartSetModal .dart-set-piece-media{min-width:0;display:grid;gap:5px}
 #dartSetModal .dart-set-piece-image{width:100%;padding:0;border:0;border-radius:10px;background:#f3f4f6;overflow:hidden;cursor:pointer}
-#dartSetModal .dart-set-piece-image img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:#eee}
+#dartSetModal .dart-set-piece-image img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:10px;background:#eee}
+#dartSetModal .dart-set-piece-code{display:block;color:#6b7280;font-size:10px;line-height:1.25;text-align:center;overflow-wrap:anywhere}
 #dartSetModal .dart-set-piece-body{min-width:0;display:grid;gap:8px}
 #dartSetModal .dart-set-piece-body .dart-set-component-head{grid-column:auto;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 #dartSetModal .dart-set-piece-body .dart-set-component-head strong{min-width:0;overflow-wrap:anywhere}
@@ -36,7 +38,7 @@
 #dartSetModal .dart-set-native-selects{display:none!important}
 #dartSetModal .dart-set-piece-empty{margin:0;color:#991b1b;font-size:12px}
 @media (max-width:760px){
-  #dartSetModal .dart-set-carousel{aspect-ratio:3/4;max-height:44dvh}
+  #dartSetModal .dart-set-carousel{width:min(100%,calc(58dvh * 9 / 16));max-height:58dvh;margin-inline:auto;aspect-ratio:9/16}
   #dartSetModal .dart-set-component{grid-template-columns:minmax(68px,1fr) minmax(0,3fr);padding:10px;gap:10px}
   #dartSetModal .dart-set-option-buttons .size-btn,#dartSetModal .dart-set-option-buttons .color-btn{padding:6px 9px;font-size:12px}
 }
@@ -212,6 +214,7 @@
     if (!colorSelect || !sizeSelect) return;
 
     const head = block.querySelector(".dart-set-component-head");
+    const code = head?.querySelector("small");
     const colorLabel = colorSelect.closest("label");
     const sizeLabel = sizeSelect.closest("label");
     const native = doc.createElement("div");
@@ -220,6 +223,13 @@
     if (sizeLabel) native.appendChild(sizeLabel);
 
     const imageButton = pieceImageButton(block, pieceIndex);
+    const media = doc.createElement("div");
+    media.className = "dart-set-piece-media";
+    media.appendChild(imageButton);
+    if (code) {
+      code.className = "dart-set-piece-code";
+      media.appendChild(code);
+    }
     const body = doc.createElement("div");
     body.className = "dart-set-piece-body";
     if (head) body.appendChild(head);
@@ -232,7 +242,7 @@
       body.appendChild(empty);
     }
     body.appendChild(native);
-    block.replaceChildren(imageButton, body);
+    block.replaceChildren(media, body);
     block.dataset.dartSetUiReady = "1";
 
     const onOptionChange = (event) => {

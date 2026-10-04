@@ -237,7 +237,18 @@ const server = http.createServer(async (request, response) => {
   assert.equal(await page.locator('#dartSetModal .dart-set-component').count(), 2);
   assert.equal(await page.locator('#dartSetModal [data-set-color]').count(), 2);
   assert.equal(await page.locator('#dartSetModal [data-set-size]').count(), 2);
-  assert.match(await page.locator('#dartSetModal [data-set-status]').textContent(), /2 pieces ready to reserve together/);
+  assert.match(await page.locator('#dartSetModal [data-set-status]').textContent(), /2 pieces ready to add together/);
+  assert.equal(await page.locator('#dartSetModal [data-set-wait]').count(), 0, 'Sets must not expose Waiting');
+  assert.equal(await page.locator('#dartSetModal .dart-set-piece-code').count(), 2, 'Each model code must sit below its piece image');
+  assert.deepEqual(await page.locator('#dartSetModal .dart-set-details').evaluate((details) => {
+    const children = [...details.children];
+    return {
+      componentsBeforeDescription: children.indexOf(details.querySelector('[data-set-components]')) < children.indexOf(details.querySelector('[data-set-description]')),
+      componentsBeforePricing: children.indexOf(details.querySelector('[data-set-components]')) < children.indexOf(details.querySelector('.dart-set-pricing')),
+    };
+  }), { componentsBeforeDescription: true, componentsBeforePricing: true });
+  assert.equal(await page.locator('#dartSetModal .dart-set-carousel').evaluate((node) => getComputedStyle(node).aspectRatio), '9 / 16');
+  assert.equal(await page.locator('#dartSetModal .dart-set-piece-image img').first().evaluate((node) => getComputedStyle(node).aspectRatio), '9 / 16');
 
   // Add-to-cart reserves both physical pieces, then attaches one commercial Set group to that same reservation.
   await page.locator('#dartSetModal [data-set-add]').click();

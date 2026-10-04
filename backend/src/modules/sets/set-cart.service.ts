@@ -48,6 +48,12 @@ interface ReservedItemRow {
   cost_snapshot_minor: string | null;
 }
 
+interface AvailableVariantRow {
+  model_id: string;
+  color: string;
+  size: string;
+}
+
 function normalized(value: unknown): string {
   return String(value || "").trim();
 }
@@ -104,6 +110,16 @@ function variantOptionActive(options: unknown, value: string): boolean {
     if (!option || typeof option !== "object") return false;
     const row = option as Record<string, unknown>;
     return String(row.name || "") === value && row.active !== false;
+  });
+}
+
+function activeOptionNames(options: unknown): string[] {
+  if (!Array.isArray(options)) return [];
+  return options.flatMap((option) => {
+    if (!option || typeof option !== "object") return [];
+    const row = option as Record<string, unknown>;
+    const name = normalized(row.name);
+    return name && row.active !== false ? [name] : [];
   });
 }
 
@@ -203,6 +219,47 @@ export class SetCartService {
     }
     if ([...seen.values()].reduce((sum, value) => sum + value, 0) !== selections.length) {
       throw new AppError(422, "SET_SELECTION_COUNT_INVALID", "Set selections do not match its components");
+    }
+  }
+
+  private async assertEveryOfferedVariantAvailable(
+    client: PoolClient,
+    components: ComponentRow[],
+    reservationId: string,
+  ): Promise<void> {
+    const modelIds = [...new Set(components.map((row) => row.model_id))];
+    const result = await client.query<AvailableVariantRow>(
+      `SELECT model_id,color,size
+         FROM inventory_items
+        WHERE model_id=ANY($1::text[])
+          AND active AND NOT is_archived AND NOT is_deleted
+          AND (
+            lower(status)='in stock'
+            OR (lower(status)='cart reserved' AND cart_reservation_id=$2 AND reservation_until>now())
+          )
+        FOR SHARE`,
+      [modelIds, reservationId],
+    );
+    const counts = new Map<string, number>();
+    for (const row of result.rows) {
+      const key = JSON.stringify([row.model_id, row.color, String(row.size)]);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    for (const component of components) {
+      const required = Math.max(1, Number(component.quantity) || 1);
+      const sizes = activeOptionNames(component.size_options);
+      const colors = activeOptionNames(component.color_options);
+      if (!sizes.length || !colors.length) {
+        throw new AppError(409, "SET_SOLD_OUT", `${component.name} has no available options`);
+      }
+      for (const size of sizes) {
+        for (const color of colors) {
+          const key = JSON.stringify([component.model_id, color, String(size)]);
+          if ((counts.get(key) || 0) < required) {
+            throw new AppError(409, "SET_SOLD_OUT", "This Set is Sold Out because one or more offered options are unavailable");
+          }
+        }
+      }
     }
   }
 
@@ -368,6 +425,7 @@ export class SetCartService {
           size: normalized(row.size),
         }));
         const { set, components } = await this.loadSet(client, setId);
+        await this.assertEveryOfferedVariantAvailable(client, components, reservationId);
         this.validateSelections(components, selections);
         const pieceCount = selections.length;
 

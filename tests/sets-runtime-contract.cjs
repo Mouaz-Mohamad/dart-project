@@ -9,6 +9,9 @@ const ui = fs.readFileSync("Js/dart-ui.js", "utf8");
 const homeUi = fs.readFileSync("Js/dart-ui.home.min.js", "utf8");
 const admin = fs.readFileSync("Eye/dart-sets-admin.js", "utf8");
 const profile = fs.readFileSync("Js/dart-profile-records.js", "utf8");
+const cartPage = fs.readFileSync("cart-checkout.html", "utf8");
+const appRuntime = fs.readFileSync("backend/src/app.ts", "utf8");
+const application = fs.readFileSync("backend/src/application.ts", "utf8");
 
 assert.match(settings, /SET_STOREFRONT_PAGES/);
 assert(settings.includes("normalizedPathname"), "Sets loader must normalize production extensionless routes");
@@ -22,6 +25,10 @@ assert(profile.includes('dart:sets-extension-ready'), "Profile rows must re-enha
 
 assert(sets.includes('/api/v1/sets'), "Storefront Sets client must use the server Sets API");
 assert(sets.includes('/api/v1/cart/set-groups'), "Set cart operations must use the server Set-cart API");
+assert(!sets.includes('/api/v1/me/sets/waiting'), "Sets must not expose a separate Waiting flow");
+assert(!appRuntime.includes('SetWaitingService'), "Runtime must not start the retired Set Waiting service");
+assert(!application.includes('createSetWaitingRouter'), "API must not register retired Set Waiting routes");
+assert(cartPage.includes('src="Js/dart-sets.js" defer data-dart-sets-asset="Js/dart-sets.js" data-dart-loaded="1"'), "Cart must preload Set grouping before its first render");
 assert(!sets.includes("setFilterActive"), "Sets category must use the same category state as normal products, not a parallel filter state");
 assert(sets.includes("function listingCategory()") && sets.includes("isSetsCategory"), "Set listing must read the shared product category state");
 assert(sets.includes("sortedCombinedCards") && sets.includes("placeProductPageCards"), "Models and Sets must share one Products-page ordering and grid placement flow");
@@ -29,6 +36,8 @@ assert(sets.includes("updateListingCount(combined.length)"), "All-products resul
 assert(sets.includes("!drafts().length && !cartRef().length"), "Fresh empty carts must not probe non-existent Set reservations");
 assert(sets.includes("if (cartRef().length && !drafts().length) void restoreServerGroups()"), "Cart hydration must retry Set-group restoration when real cart lines arrive");
 assert(sets.includes("data-set-color") && sets.includes("data-set-size"), "Set modal must select color and size per component");
+assert(sets.includes('sizes.every((size) =>') && sets.includes('colors.every((color) => variantAvailable'), "A Set must become Sold Out when any offered size/color option is unavailable");
+assert(sets.includes('stockBadge.textContent = "Sold Out"') && !sets.includes('stockBadge.textContent = "Waiting available"'), "Set cards must show Sold Out instead of Waiting");
 assert(sets.includes("function syncSetCards(rows, target = null)"), "Set catalogue rendering must reconcile keyed cards instead of recreating every card");
 assert(sets.includes("function syncSetCartCard(card, group, set, pricing, key)"), "Set cart rendering must reconcile keyed group cards");
 assert(!sets.includes('["productsPart1","productsPart2","productsContainer"].forEach'), "Set runtime must not observe and rewrite its own product containers");
@@ -45,7 +54,7 @@ assert(sets.includes('DEFAULT_SETTINGS = Object.freeze({ birthdayPercent: 10, da
 assert(sets.includes('card.addEventListener("click"') && sets.includes('["Enter", " "].includes(event.key)'), "The whole Set card must open like a Product card by pointer or keyboard");
 assert(sets.includes('const groupsById=new Map') && sets.includes('const serverGroupId=String(line.setGroupId'), "Cart Set grouping must use explicit server group identity");
 assert(!sets.includes('cart.find(row=>!row.dartSetKey&&String(row.id)===selection.modelId'), "Cart Set grouping must never guess membership from model/color/size");
-assert(sets.includes('root.renderCart=(...args)=>') && sets.includes('scheduleCartDecoration()'), "Every generic cart rerender must re-apply Set grouping");
+assert(sets.includes('root.renderCart=(...args)=>') && sets.includes('decorateCart(); return result;'), "Every generic cart rerender must synchronously re-apply Set grouping");
 assert(sets.includes('root.updateCartTotals=(...args)=>') && sets.includes('if (drafts().length) renderSetAwareTotals()'), "Set-aware totals must win after generic totals");
 assert(ui.includes('if (line?.setGroupId || line?.dartSetKey) return false;'), "Set components must not trigger ordinary Birthday/Dart Card fallback eligibility");
 

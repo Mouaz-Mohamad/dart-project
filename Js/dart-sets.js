@@ -7,7 +7,6 @@
   const DRAFT_KEY = "dart_cart_set_groups_v1";
   const DEFAULT_SETTINGS = Object.freeze({ birthdayPercent: 10, dartCardPercent: 10, version: 1 });
   let catalog = [];
-  let setWaiting = [];
   let settings = { ...DEFAULT_SETTINGS };
   let loadedAt = 0;
   const CACHE_MS = 30_000;
@@ -147,61 +146,6 @@
     return groups;
   }
 
-  async function loadWaiting() {
-    if (!signedIn()) { setWaiting = []; return []; }
-    const payload = await request("/api/v1/me/sets/waiting");
-    setWaiting = Array.isArray(payload?.entries) ? payload.entries : [];
-    root.dispatchEvent?.(new CustomEvent("dart:set-waiting-changed", { detail: { entries: clone(setWaiting) } }));
-    return clone(setWaiting);
-  }
-
-  async function joinWaiting(setId, selections) {
-    if (!signedIn()) throw Object.assign(new Error("Sign in to join Set Waiting."), { code: "AUTH_REQUIRED" });
-    const payload = await request("/api/v1/me/sets/waiting", { method: "POST", body: { setId, selections } });
-    await loadWaiting();
-    return payload?.entry || null;
-  }
-
-  async function confirmWaiting(entryId) {
-    const payload = await request(`/api/v1/me/sets/waiting/${encodeURIComponent(entryId)}/confirm`, { method: "POST", body: {} });
-    const entry = payload?.entry || null;
-    if (entry?.status === "confirmed" && entry.cartReservationId) {
-      const set = setById(entry.setId) || await detail(entry.setId);
-      const currentCart = root.DartState?.clone?.(root.DartState?.read?.("dart_cart", []) || [])
-        || clone(root.DartState?.read?.("dart_cart", []) || []);
-      const currentGroups = readDrafts();
-      const unitIndex = 1 + Math.max(0,...currentGroups.filter((group) => String(group.setId) === String(entry.setId)).map((group) => Number(group.unitIndex) || 0));
-      const key = `${entry.setId}:${unitIndex}`;
-      const selections = Array.isArray(entry.selections) ? entry.selections : [];
-      const lines = selections.map((selection) => {
-        const model = root.DartCatalog?.model?.(selection.modelId);
-        let price = Number(model?.selling || 0);
-        try { price = Number(root.DartCatalog?.price?.(model) ?? price); } catch {}
-        let image = "";
-        try { image = root.DartCatalog?.cover?.(model,selection.color) || ""; } catch {}
-        return {
-          id:String(selection.modelId),title:model?.name || String(selection.modelId),price,
-          size:String(selection.size),color:String(selection.color),quantity:1,image,
-          setId:String(entry.setId),dartSetKey:key,dartSetUnitIndex:unitIndex,
-          reservationId:String(entry.cartReservationId),reservationUntil:entry.reservedUntil || null,
-        };
-      });
-      writeDrafts([...currentGroups,{setId:String(entry.setId),unitIndex,selections}]);
-      root.DartPlatform?.adoptCartReservationId?.(entry.cartReservationId);
-      const combined = [...currentCart,...lines];
-      if (root.DartPlatform?.reserveCart) await root.DartPlatform.reserveCart(combined);
-      else root.DartState?.write?.("dart_cart",combined,{source:"set-waiting-confirm"});
-    }
-    await loadWaiting();
-    return entry;
-  }
-
-  async function cancelWaiting(entryId) {
-    const payload = await request(`/api/v1/me/sets/waiting/${encodeURIComponent(entryId)}`, { method: "DELETE" });
-    await loadWaiting();
-    return payload?.entry || null;
-  }
-
   function setById(setId) {
     return catalog.find((row) => String(row.setId) === String(setId)) || null;
   }
@@ -226,11 +170,6 @@
     clearDrafts,
     attachCartGroups,
     cartGroups,
-    loadWaiting,
-    joinWaiting,
-    confirmWaiting,
-    cancelWaiting,
-    waitingEntries: () => clone(setWaiting),
     currentReservationId,
     signedIn,
     moneyMinor,
@@ -308,9 +247,9 @@
     return (set.components || []).every((component) => {
       const sizes = activeOptions(component.sizes);
       const colors = activeOptions(component.colors);
-      let total = 0;
-      sizes.forEach((size) => colors.forEach((color) => { total += Math.max(0, variantAvailable(component.modelId, size, color)); }));
-      return total >= Math.max(1, Number(component.quantity) || 1);
+      const required = Math.max(1, Number(component.quantity) || 1);
+      return sizes.length > 0 && colors.length > 0 && sizes.every((size) =>
+        colors.every((color) => variantAvailable(component.modelId, size, color) >= required));
     });
   }
 
@@ -370,7 +309,7 @@
       card.appendChild(stockBadge);
     }
     if (stockBadge) {
-      stockBadge.textContent = "Waiting available";
+      stockBadge.textContent = "Sold Out";
       stockBadge.hidden = available;
     }
     card.dataset.dartProductKind = "set";
@@ -378,7 +317,14 @@
     card.dataset.dartBrowseName = String(set.name || "");
     card.dataset.dartBrowseNewest = String(Date.parse(set.createdAt || "") || 0);
     const button = card.querySelector(".cart-btn");
-    if (button) { button.removeAttribute("data-id"); button.dataset.dartSetBuy = set.setId; }
+    if (button) {
+      button.removeAttribute("data-id");
+      button.dataset.dartSetBuy = set.setId;
+      if (!button.dataset.dartSetAvailableHtml) button.dataset.dartSetAvailableHtml = button.innerHTML;
+      button.disabled = !available;
+      button.setAttribute("aria-disabled", String(!available));
+      button.innerHTML = available ? button.dataset.dartSetAvailableHtml : "Sold Out";
+    }
     return card;
   }
 
@@ -656,12 +602,11 @@
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", "dartSetModalTitle");
-    modal.innerHTML = `<div class="dart-set-dialog"><button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button><div class="dart-set-gallery"><img data-set-cover alt=""><div data-set-thumbs class="dart-set-thumbs"></div></div><article class="dart-set-details"><span class="dart-set-category">Sets</span><small data-set-code></small><h2 id="dartSetModalTitle" data-set-title></h2><p data-set-description></p><div class="dart-set-pricing"><span data-set-old-price></span><strong data-set-price></strong><em data-set-discount></em></div><div data-set-components class="dart-set-components"></div><p class="dart-set-status" data-set-status role="status" aria-live="polite"></p><button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button><button type="button" class="buy-now-btn dart-waiting-btn" data-set-wait hidden>Join Set Waiting</button></article></div>`;
+    modal.innerHTML = `<div class="dart-set-dialog"><button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button><div class="dart-set-gallery"><img data-set-cover alt=""><div data-set-thumbs class="dart-set-thumbs"></div></div><article class="dart-set-details"><span class="dart-set-category">Sets</span><small data-set-code></small><h2 id="dartSetModalTitle" data-set-title></h2><div data-set-components class="dart-set-components"></div><p data-set-description></p><div class="dart-set-pricing"><span data-set-old-price></span><strong data-set-price></strong><em data-set-discount></em></div><p class="dart-set-status" data-set-status role="status" aria-live="polite"></p><button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button></article></div>`;
     root.document.body.appendChild(modal);
     modal.addEventListener("click", (event) => { if (event.target === modal || event.target.closest?.("[data-set-close]")) closeSetModal(); });
     root.document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeSetModal(); });
     modal.querySelector("[data-set-add]")?.addEventListener("click", () => void addActiveSetToCart());
-    modal.querySelector("[data-set-wait]")?.addEventListener("click", () => void joinActiveSetWaiting());
     return modal;
   }
 
@@ -733,11 +678,15 @@
 
   function updateModalAvailability() {
     const modal=root.document.getElementById("dartSetModal"); if (!modal || !activeSet) return;
-    const selections=selectedComponents(), ok=selections.length===Number(activeSet.pieceCount||selections.length) && selections.every(r=>r.color&&r.size) && exactSelectionsAvailable(selections);
+    const selections=selectedComponents(), soldOut=!setAvailable(activeSet), ok=!soldOut && selections.length===Number(activeSet.pieceCount||selections.length) && selections.every(r=>r.color&&r.size) && exactSelectionsAvailable(selections);
     const status=modal.querySelector("[data-set-status]");
-    if (status) status.textContent=ok?`${selections.length} pieces ready to reserve together.`:"One or more selected pieces are unavailable. You can join Waiting without reserving part of the Set.";
-    const add=modal.querySelector("[data-set-add]"); if (add) add.disabled=!ok;
-    const wait=modal.querySelector("[data-set-wait]"); if (wait) wait.hidden=ok;
+    if (status) status.textContent=soldOut?"Sold Out":ok?`${selections.length} pieces ready to add together.`:"One or more selected pieces are unavailable.";
+    const add=modal.querySelector("[data-set-add]");
+    if (add) {
+      if (!add.dataset.availableText) add.dataset.availableText=add.textContent || "Add Set to Cart";
+      add.disabled=!ok;
+      add.textContent=soldOut?"Sold Out":add.dataset.availableText;
+    }
   }
 
   function nextUnitIndex(setId, groups) {
@@ -750,26 +699,6 @@
     try { price=Number(root.DartCatalog?.price?.(model) ?? price); } catch {}
     let image=""; try { image=root.DartCatalog?.cover?.(model,selection.color)||""; } catch {}
     return { id:selection.modelId,title:model?.name||selection.modelId,price,size:selection.size,color:selection.color,quantity:1,image,setId:set.setId,dartSetKey:key,dartSetUnitIndex:unitIndex };
-  }
-
-  async function joinActiveSetWaiting() {
-    if (!activeSet) return;
-    if (!root.DartSets?.signedIn?.()) {
-      if (typeof showToast === "function") showToast("سجل دخولك أولاً للانضمام إلى Waiting.");
-      root.location.href = "login.html";
-      return;
-    }
-    const selections = selectedComponents();
-    try {
-      const entry = await root.DartSets.joinWaiting(activeSet.setId, selections);
-      if (typeof showToast === "function") {
-        showToast(entry?.status === "reserved" ? "الطقم أصبح متاحاً بالكامل وتم حجزه لك." : "تمت إضافتك إلى Waiting للطقم بالكامل.");
-      }
-      closeSetModal();
-    } catch (error) {
-      if (error?.code === "SET_STOCK_AVAILABLE") { updateModalAvailability(); }
-      if (typeof showToast === "function") showToast(error?.message || "تعذر الانضمام إلى Waiting.");
-    }
   }
 
   async function addActiveSetToCart() {
@@ -951,7 +880,10 @@
     } finally { cartDecorating=false; }
   }
 
-  function scheduleCartDecoration() { root.setTimeout(decorateCart,0); }
+  function scheduleCartDecoration() {
+    if (typeof root.queueMicrotask === "function") root.queueMicrotask(decorateCart);
+    else root.setTimeout(decorateCart,0);
+  }
 
   async function restoreServerGroups() {
     const id=root.DartSets?.currentReservationId?.(); if (!id) return;
@@ -982,23 +914,21 @@
       if (cartRef().length && !drafts().length) void restoreServerGroups();
     });
     root.addEventListener("dart:set-cart-draft-changed",scheduleCartDecoration);
-    root.addEventListener("dart:customer-session-changed",()=>{ void restoreServerGroups(); void root.DartSets?.loadWaiting?.(); });
+    root.addEventListener("dart:customer-session-changed",()=>{ void restoreServerGroups(); });
     root.document.addEventListener("click",()=>root.setTimeout(renderSetAwareTotals,0),true);
   }
 
   async function boot() {
     installReservationBridge();
     const render=root.renderCart,totals=root.updateCartTotals;
-    if (typeof render==="function") root.renderCart=(...args)=>{ const result=render(...args); scheduleCartDecoration(); return result; };
+    if (typeof render==="function") root.renderCart=(...args)=>{ const result=render(...args); decorateCart(); return result; };
     if (typeof totals==="function") root.updateCartTotals=(...args)=>{ const result=totals(...args); if (drafts().length) renderSetAwareTotals(); return result; };
     try { setCatalog=await root.DartSets.loadCatalog(true); } catch (error) { console.warn("Dart Sets catalog unavailable",error); setCatalog=[]; }
     ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); observe();
     lastAttachedGroups=drafts();
     await restoreServerGroups();
-    if (root.DartSets?.signedIn?.()) await root.DartSets.loadWaiting().catch(()=>[]);
   }
 
   if (root.document.readyState==="loading") root.document.addEventListener("DOMContentLoaded",()=>void boot(),{once:true});
   else void boot();
 })(typeof window !== "undefined" ? window : globalThis);
-

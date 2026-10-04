@@ -32,7 +32,6 @@ import { PromotionService } from "./modules/promotions/promotion.service.js";
 import { DartCardDrawService } from "./modules/loyalty/dart-card-draw.service.js";
 import { SetService } from "./modules/sets/set.service.js";
 import { SetCartService } from "./modules/sets/set-cart.service.js";
-import { SetWaitingService } from "./modules/sets/set-waiting.service.js";
 import { createEmailProvider } from "./modules/outbox/email-provider.js";
 
 export interface DartRuntime {
@@ -89,7 +88,6 @@ export function createRuntimeApplication(
   const dartCardDrawService = new DartCardDrawService(database);
   const setService = new SetService(database);
   const setCartService = new SetCartService(database);
-  const setWaitingService = new SetWaitingService(database, setCartService);
   const siteSettingsService = new SiteSettingsService(database);
   const dashboardStateService = new DashboardStateService(database);
   const customerInteractionService = new CustomerInteractionService(database);
@@ -126,7 +124,6 @@ export function createRuntimeApplication(
     dartCardDrawService,
     setService,
     setCartService,
-    setWaitingService,
     siteSettingsService,
     dashboardStateService,
     customerInteractionService,
