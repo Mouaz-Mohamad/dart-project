@@ -5,9 +5,10 @@
   if (!root || root.DartSets) return;
 
   const DRAFT_KEY = "dart_cart_set_groups_v1";
+  const DEFAULT_SETTINGS = Object.freeze({ birthdayPercent: 10, dartCardPercent: 10, version: 1 });
   let catalog = [];
   let setWaiting = [];
-  let settings = { birthdayPercent: 10, dartCardPercent: 10, version: 1 };
+  let settings = { ...DEFAULT_SETTINGS };
   let loadedAt = 0;
   const CACHE_MS = 30_000;
 
@@ -97,12 +98,23 @@
 
   async function loadCatalog(force = false) {
     if (!force && catalog.length && Date.now() - loadedAt < CACHE_MS) return clone(catalog);
-    const [setsPayload, settingsPayload] = await Promise.all([
-      request("/api/v1/sets"),
-      request("/api/v1/sets/settings"),
-    ]);
+    const settingsRequest = request("/api/v1/sets/settings")
+      .then((payload) => ({ payload, error: null }))
+      .catch((error) => ({ payload: null, error }));
+    const setsPayload = await request("/api/v1/sets");
+    const settingsResult = await settingsRequest;
     catalog = Array.isArray(setsPayload?.sets) ? setsPayload.sets : [];
-    settings = settingsPayload?.settings || settings;
+    if (settingsResult.payload?.settings) {
+      settings = { ...DEFAULT_SETTINGS, ...settingsResult.payload.settings };
+    } else if (settingsResult.error) {
+      settings = { ...DEFAULT_SETTINGS, ...settings };
+      root.dispatchEvent?.(new CustomEvent("dart:sets-settings-unavailable", {
+        detail: {
+          code: settingsResult.error.code || "SETS_SETTINGS_UNAVAILABLE",
+          usingDefaults: settings.birthdayPercent === 10 && settings.dartCardPercent === 10,
+        },
+      }));
+    }
     loadedAt = Date.now();
     root.dispatchEvent?.(new CustomEvent("dart:sets-catalog-changed", { detail: { sets: clone(catalog), settings: clone(settings) } }));
     return clone(catalog);
@@ -381,7 +393,15 @@
     if (button) button.addEventListener("click", (event) => {
       event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); openCurrentSet();
     });
-    card.addEventListener("keydown", (event) => { if (event.key === "Enter") openCurrentSet(); });
+    card.addEventListener("click", (event) => {
+      if (event.target.closest?.(".cart-btn")) return;
+      openCurrentSet();
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.target !== card || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      openCurrentSet();
+    });
     return syncSetCard(card, set);
   }
 
@@ -827,9 +847,8 @@
   }
 
   function observe() {
-    const filter=root.document.getElementById("filterContainer");
-    if (filter) new MutationObserver(()=>{ensureSetFilter();renderSetCards();}).observe(filter,{childList:true});
     const scheduleSetRender=()=>root.setTimeout(renderSetCards,0);
+    const syncFiltersAndSets=()=>root.setTimeout(()=>{ ensureSetFilter(); renderSetCards(); },0);
     [
       ["productSearchInput","input"],
       ["productSizeFilter","change"],
@@ -838,10 +857,11 @@
       ["productPriceFilter","change"],
       ["productSortSelect","change"],
     ].forEach(([id,eventName])=>root.document.getElementById(id)?.addEventListener(eventName,scheduleSetRender));
-    root.addEventListener("dart:catalog-hydrated",scheduleSetRender);
-    root.addEventListener("dart:site-settings-changed",scheduleSetRender);
+    root.addEventListener("dart:catalog-hydrated",syncFiltersAndSets);
+    root.addEventListener("dart:products-rendered",syncFiltersAndSets);
+    root.addEventListener("dart:product-filters-rendered",syncFiltersAndSets);
+    root.addEventListener("dart:sets-catalog-changed",scheduleSetRender);
     root.addEventListener("dart:data-changed",event=>{
-      scheduleSetRender();
       if (event.detail?.key!=="dart_cart") return;
       scheduleCartDecoration();
       if (cartRef().length && !drafts().length) void restoreServerGroups();

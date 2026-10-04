@@ -195,6 +195,35 @@ const server = http.createServer((request, response) => {
   const setCard = page.locator('#productsContainer [data-dart-set-card="1"][data-dart-set-id="SET-DW-101"]');
   await setCard.waitFor({ state: "visible" });
   assert.match(await setCard.textContent(), /Cairo Campus Set/);
+
+  await setCard.locator('.product-title').click();
+  await page.locator('#dartSetModal:not([hidden])').waitFor({ state: "visible" });
+  assert.equal(await page.locator('#dartSetModal [data-set-title]').textContent(), "Cairo Campus Set");
+  await page.locator('#dartSetModal [data-set-close]').click();
+  await page.waitForFunction(() => document.getElementById("dartSetModal")?.hidden === true);
+
+  await setCard.focus();
+  await page.keyboard.press('Space');
+  await page.locator('#dartSetModal:not([hidden])').waitFor({ state: "visible" });
+  await page.locator('#dartSetModal [data-set-close]').click();
+
+  await page.route('**/api/v1/sets/settings', (route) => route.abort('failed'));
+  const settingsFailureFallback = await page.evaluate(async () => {
+    const sets = await window.DartSets.loadCatalog(true);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    return {
+      setCount: sets.length,
+      renderedSets: document.querySelectorAll('[data-dart-set-card="1"][data-dart-set-id="SET-DW-101"]').length,
+      settings: window.DartSets.settings(),
+    };
+  });
+  assert.deepEqual(settingsFailureFallback, {
+    setCount: 1,
+    renderedSets: 1,
+    settings: { birthdayPercent: 10, dartCardPercent: 10, version: 1 },
+  }, "Set catalogue must remain visible when Set settings temporarily fail");
+  await page.unroute('**/api/v1/sets/settings');
+
   await page.waitForTimeout(150);
   const stableRender = await page.evaluate(async () => {
     const container = document.getElementById("productsContainer");

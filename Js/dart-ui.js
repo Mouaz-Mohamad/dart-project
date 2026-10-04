@@ -463,6 +463,7 @@ function renderProductsLogic() {
     const part2Container = document.getElementById('productsPart2');
 
     if (part1Container || part2Container) renderProductPageResults();
+    window.dispatchEvent(new CustomEvent('dart:products-rendered'));
 }
 
 function createProductCard(item, template) {
@@ -1584,6 +1585,7 @@ function renderFilterButtons() {
         clear.addEventListener('click', resetProductFilters);
     }
     renderProductPageResults();
+    window.dispatchEvent(new CustomEvent('dart:product-filters-rendered'));
 }
 
 function showCartBanner(productTitle) {

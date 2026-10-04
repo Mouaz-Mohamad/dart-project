@@ -5,6 +5,8 @@ const fs = require("node:fs");
 
 const settings = fs.readFileSync("Js/dart-site-settings.js", "utf8");
 const sets = fs.readFileSync("Js/dart-sets.js", "utf8");
+const ui = fs.readFileSync("Js/dart-ui.js", "utf8");
+const homeUi = fs.readFileSync("Js/dart-ui.home.min.js", "utf8");
 const admin = fs.readFileSync("Eye/dart-sets-admin.js", "utf8");
 const profile = fs.readFileSync("Js/dart-profile-records.js", "utf8");
 
@@ -26,6 +28,16 @@ assert(sets.includes("function syncSetCards(rows, target)"), "Set catalogue rend
 assert(sets.includes("function syncSetCartCard(card, group, set, pricing, key)"), "Set cart rendering must reconcile keyed group cards");
 assert(!sets.includes('["productsPart1","productsPart2","productsContainer"].forEach'), "Set runtime must not observe and rewrite its own product containers");
 assert(!sets.includes('new MutationObserver(scheduleCartDecoration).observe(cart'), "Set runtime must not observe and rewrite its own cart container");
+assert(!sets.includes("new MutationObserver"), "Set runtime must not observe storefront DOM it also updates");
+assert(ui.includes("dart:products-rendered") && homeUi.includes("dart:products-rendered"), "Desktop/products and curated Home renderers must publish an explicit completion event for additive Set rendering");
+assert(ui.includes("dart:product-filters-rendered"), "Models filter renderer must publish an explicit completion event for additive Set rendering");
+assert(sets.includes('root.addEventListener("dart:products-rendered",syncFiltersAndSets)'), "Sets must render after the Models-owned product renderer completes");
+assert(sets.includes('root.addEventListener("dart:product-filters-rendered",syncFiltersAndSets)'), "Sets must render after the Models-owned filter renderer completes");
+assert(!sets.includes('root.addEventListener("dart:site-settings-changed",scheduleSetRender)'), "Unrelated site-settings changes must not rerender Set cards");
+assert(sets.includes('if (event.detail?.key!=="dart_cart") return;'), "Generic data changes must only trigger Set cart work for dart_cart");
+assert(sets.includes('const settingsRequest = request("/api/v1/sets/settings")') && sets.includes('const setsPayload = await request("/api/v1/sets")'), "Set catalogue loading must not depend on Set settings availability");
+assert(sets.includes('DEFAULT_SETTINGS = Object.freeze({ birthdayPercent: 10, dartCardPercent: 10, version: 1 })'), "Set settings fallback must remain 10% Birthday and 10% Dart Card");
+assert(sets.includes('card.addEventListener("click"') && sets.includes('["Enter", " "].includes(event.key)'), "The whole Set card must open like a Product card by pointer or keyboard");
 
 assert(admin.includes('setsButton.dataset.modelSetView="sets"'), "Models section must expose the Sets view inside the shared second bar");
 assert(admin.includes('dashboardControls()'), "Models / Sets must share the existing Models dashboard controls");
