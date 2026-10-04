@@ -23,7 +23,12 @@ assert(sets.includes("!drafts().length && !cartRef().length"), "Fresh empty cart
 assert(sets.includes("if (cartRef().length && !drafts().length) void restoreServerGroups()"), "Cart hydration must retry Set-group restoration when real cart lines arrive");
 assert(sets.includes("data-set-color") && sets.includes("data-set-size"), "Set modal must select color and size per component");
 
-assert(admin.includes('data-model-set-view="sets"'), "Models section must expose the Sets tab");
+assert(admin.includes('setsButton.dataset.modelSetView="sets"'), "Models section must expose the Sets view inside the shared second bar");
+assert(admin.includes('dashboardControls()'), "Models / Sets must share the existing Models dashboard controls");
+assert(admin.includes('controls.second.insertBefore(modelsButton,controls.remove)') && admin.includes('controls.second.insertBefore(setsButton,controls.remove)'), "Models / Sets toggles must live in the existing second bar before Delete");
+assert(admin.includes('currentView!=="sets"') && admin.includes('stopImmediatePropagation()'), "Shared Add/Delete controls must preserve existing Models handlers and intercept only Sets view");
+assert(!admin.includes('data-set-search'), "Sets must reuse the existing Models search instead of creating a second search box");
+assert(admin.includes('panel.className="cont-titel dart-sets-admin-panel"') && admin.includes('node.className=`model-row'), "Sets list must reuse the Models table and row visual structure");
 assert(admin.includes("data-set-component-add"), "Set editor must support adding components");
 assert(admin.includes('can("sets.manage")'), "Set mutations must honor central dashboard permissions");
 assert(admin.includes("Selling Below Cost"), "Owner below-cost override must remain visibly warned");

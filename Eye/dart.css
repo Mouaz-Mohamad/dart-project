@@ -1956,3 +1956,117 @@ section{
 .dart-model-set-tabs{display:flex;gap:8px;margin:0 0 16px}.dart-model-set-tabs button{border:1px solid #d8d8d8;background:#fff;border-radius:10px;padding:9px 18px;font-weight:700;cursor:pointer}.dart-model-set-tabs button.is-active{background:#ab012b;color:#fff;border-color:#ab012b}.dart-sets-admin-panel[hidden]{display:none!important}.dart-sets-toolbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:14px}.dart-sets-toolbar h2{margin:0}.dart-sets-toolbar p{margin:4px 0 0;color:#667085}.dart-sets-toolbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.dart-sets-toolbar-actions input{min-width:220px;padding:9px 12px;border:1px solid #d0d5dd;border-radius:9px}.dart-sets-toolbar-actions button:not(.add-btn){padding:9px 12px;border:1px solid #d0d5dd;background:#fff;border-radius:9px;cursor:pointer}.dart-sets-table{overflow:auto;border:1px solid #e5e7eb;border-radius:12px;background:#fff}.dart-sets-head,.dart-set-row{min-width:1450px;display:grid;grid-template-columns:150px 80px 130px 190px 80px 130px 130px 130px 90px 130px 140px 100px;align-items:center;gap:8px;padding:10px 12px}.dart-sets-head{background:#f8f8f8;font-size:12px;font-weight:800;border-bottom:1px solid #e5e7eb}.dart-set-row{border-bottom:1px solid #f0f0f0;font-size:13px}.dart-set-row:last-child{border-bottom:0}.dart-set-row-image{width:54px;height:66px;object-fit:cover;border-radius:8px;background:#f3f4f6}.dart-set-actions{display:flex;gap:6px}.dart-set-actions button{width:32px;height:32px;border:0;border-radius:8px;background:#f2f4f7;cursor:pointer}.dart-set-row .is-loss,.dart-set-price-summary .is-loss{color:#b42318}.dart-set-row .is-profit,.dart-set-price-summary .is-profit{color:#027a48}.dart-sets-empty,.dart-sets-loading,.dart-sets-error{padding:20px;text-align:center}.dart-sets-error{color:#b42318}.dart-admin-set-modal[hidden]{display:none!important}.dart-admin-set-modal{position:fixed;inset:0;z-index:12000;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:14px;overflow:auto}.dart-admin-set-dialog,.dart-set-settings-dialog{position:relative;width:min(980px,100%);max-height:calc(100vh - 28px);overflow:auto;background:#fff;border-radius:16px;padding:24px;box-shadow:0 24px 80px rgba(0,0,0,.25)}.dart-set-settings-dialog{width:min(520px,100%);display:grid;gap:14px}.dart-admin-set-close{position:absolute;top:10px;right:12px;width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:25px;cursor:pointer}.dart-admin-set-title{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}.dart-admin-set-title p,.dart-set-settings-dialog>p:first-of-type{color:#ab012b;font-size:12px;font-weight:800;letter-spacing:.08em;margin:0}.dart-admin-set-title h2{margin:3px 0 0}.dart-admin-set-title>[data-set-cost-warning]{background:#fee4e2;color:#b42318;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:800}.dart-set-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.dart-set-form-grid .is-wide{grid-column:1/-1}.dart-set-form-grid label,.dart-set-pricing-editor label,.dart-set-settings-dialog label{display:grid;gap:6px;font-size:12px;font-weight:700}.dart-set-form-grid input,.dart-set-form-grid textarea,.dart-set-pricing-editor input,.dart-set-settings-dialog input{padding:10px 11px;border:1px solid #d0d5dd;border-radius:9px;font:inherit}.dart-set-form-grid small{font-weight:400;color:#667085}.dart-set-builder{margin-top:20px;border:1px solid #e5e7eb;border-radius:12px;padding:14px}.dart-set-builder-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.dart-set-builder-head h3{margin:0}.dart-set-builder-head p{margin:3px 0 0;color:#667085;font-size:12px}.dart-set-builder-head button{border:1px solid #ab012b;color:#ab012b;background:#fff;border-radius:9px;padding:8px 11px;cursor:pointer}.dart-set-component-admin{display:grid;grid-template-columns:180px 90px minmax(240px,1fr) 40px;gap:9px;align-items:end;margin-top:10px}.dart-set-component-admin label{display:grid;gap:5px;font-size:12px}.dart-set-component-admin input{padding:9px;border:1px solid #d0d5dd;border-radius:8px}.dart-set-component-admin>[data-set-component-remove]{height:38px;border:0;border-radius:8px;background:#fff1f3;color:#ab012b;cursor:pointer}.dart-set-model-preview{min-height:40px;display:flex;align-items:center;gap:9px;color:#667085}.dart-set-model-preview img{width:38px;height:44px;object-fit:cover;border-radius:6px}.dart-set-model-preview div{display:grid}.dart-set-model-preview small{color:#667085}.dart-set-model-preview.is-error{color:#b42318}.dart-set-pricing-editor{margin-top:16px;display:grid;grid-template-columns:180px 180px 1fr;gap:12px;align-items:start}.dart-set-price-summary{display:grid;grid-template-columns:repeat(3,minmax(110px,1fr));gap:7px}.dart-set-price-summary>div{background:#f8f8f8;border-radius:9px;padding:8px;display:grid;gap:2px}.dart-set-price-summary span{font-size:11px;color:#667085}.dart-set-existing-images{display:flex;gap:8px;overflow:auto;margin-top:14px}.dart-set-existing-images img{width:64px;height:74px;object-fit:cover;border-radius:8px}.dart-set-form-status{min-height:20px;color:#027a48}.dart-set-form-status.is-error{color:#b42318}.dart-set-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.dart-set-form-actions>button:not(.add-btn){border:1px solid #d0d5dd;background:#fff;border-radius:9px;padding:9px 14px;cursor:pointer}.dart-admin-set-modal-open{overflow:hidden}
 @media(max-width:760px){.dart-sets-toolbar{align-items:stretch;flex-direction:column}.dart-sets-toolbar-actions{display:grid;grid-template-columns:1fr 1fr}.dart-sets-toolbar-actions input{min-width:0;grid-column:1/-1}.dart-admin-set-dialog{padding:18px 12px;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}.dart-set-form-grid,.dart-set-pricing-editor{grid-template-columns:1fr}.dart-set-form-grid .is-wide{grid-column:1}.dart-set-component-admin{grid-template-columns:1fr 90px 40px}.dart-set-model-preview{grid-column:1/-1;grid-row:2}.dart-set-price-summary{grid-template-columns:1fr 1fr}}
 
+
+/* BEGIN Models / Sets shared dashboard controls */
+#models .second {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+#models .second .dart-model-set-view-btn {
+  min-width: 88px;
+  border: 1px solid var(--bragnte);
+  background: var(--white);
+  color: var(--bragnte);
+  font-weight: 700;
+}
+
+#models .second .dart-model-set-view-btn:hover,
+#models .second .dart-model-set-view-btn.is-active {
+  background: var(--bragnte);
+  color: var(--white);
+}
+
+#models .dart-sets-admin-panel[hidden] {
+  display: none !important;
+}
+
+#models .dart-sets-admin-panel {
+  height: 80.5%;
+}
+
+#models .dart-set-title-name {
+  margin-bottom: 20px;
+}
+
+#models .dart-set-action-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#models .dart-set-action-heading h2 {
+  width: auto;
+  flex: 1;
+}
+
+#models .dart-set-action-heading [data-set-settings] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--white);
+}
+
+#models .dart-set-action-heading [data-set-settings]:hover {
+  background: var(--white);
+  color: var(--bragnte);
+}
+
+#models .dart-set-row .dart-set-view-action,
+#models .dart-set-row [data-set-view] {
+  color: #19485f;
+}
+
+#models .dart-set-row .dart-set-out-of-stock {
+  color: #b42318;
+  font-weight: 700;
+}
+
+#models .dart-sets-empty,
+#models .dart-sets-loading,
+#models .dart-sets-error {
+  width: min(520px, calc(100% - 32px));
+  margin: 18px auto;
+  border-radius: 10px;
+  background: var(--white);
+}
+
+@media (max-width: 760px) {
+  #models .second {
+    width: 100%;
+    padding-inline: 4px;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  #models .second .dart-model-set-view-btn,
+  #models .second .delete-btn {
+    flex: 0 0 auto;
+  }
+}
+/* END Models / Sets shared dashboard controls */
+
+#models .dart-set-row {
+  display: flex;
+  grid-template-columns: none;
+  min-width: 0;
+  width: fit-content;
+  align-items: center;
+  gap: 10px;
+  background-color: #ffffff;
+  border: 1px solid #ab012b;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  font-family: sans-serif;
+  font-size: 14px;
+  color: #333;
+}

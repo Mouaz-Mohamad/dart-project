@@ -108,6 +108,7 @@ jobs:
       - name: Full storefront and dashboard Chromium smoke
         run: |
           node tests/product-waiting-browser.js
+          node tests/sets-admin-browser.js
           node tests/home-storefront-browser.js
           node tests/storefront-settings-regression.js
           node tests/full-site-browser.js
