@@ -39,9 +39,68 @@ const model = {
   ],
 };
 
+
+const setFixture = {
+  setId: "SET-DW-101",
+  name: "Cairo Campus Set",
+  category: "Sets",
+  description: "Set storefront stability fixture",
+  images: ["/Photos/products/1.jpg"],
+  active: true,
+  isArchived: false,
+  pieceCount: 1,
+  components: [{
+    modelId: "DW-101",
+    name: "Cairo Wide Leg Jeans",
+    quantity: 1,
+    sizes: [{ name: "M", active: true }],
+    colors: [{ name: "Black", active: true }],
+  }],
+  pricing: {
+    componentsSellingTotalMinor: 80000,
+    basePriceMinor: 70000,
+    discountPercent: 0,
+    finalMinor: 70000,
+    savingVsSeparateMinor: 10000,
+  },
+};
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, "http://test");
   const pathname = decodeURIComponent(url.pathname);
+
+  if (pathname === "/sets-runtime-fixture.html") {
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.end(`<!doctype html><html><head><meta charset="utf-8"></head><body>
+      <div id="productsContainer">
+        <div id="productTemplate" class="product-card" style="display:none">
+          <img class="product-img" alt=""><span class="product-category"></span><span class="product-code"></span>
+          <span class="product-title"></span><span class="product-price"></span>
+          <span data-product-price="old"></span><span data-product-price="discount"></span><button class="cart-btn">Buy</button>
+        </div>
+      </div>
+      <div id="cartItemsContainer">
+        <div id="cartItemTemplate" class="cart-product-card"></div>
+        <div class="cart-product-card" data-test-base-cart-card></div>
+      </div>
+      <script src="/Js/dart-state.js"></script>
+      <script>
+        const fixtureModel = ${JSON.stringify(model)};
+        let cartData = [];
+        window.setFixtureCart = (value) => { cartData = value; window.DartState.write("dart_cart", value, { source: "sets-browser-regression" }); };
+        window.fixtureCartLength = () => cartData.length;
+        window.DartCatalog = {
+          model: (id) => String(id) === "DW-101" ? fixtureModel : null,
+          available: () => 3,
+          cover: () => "/Photos/products/1.jpg",
+          price: () => 720,
+        };
+        window.DartPlatform = { cartReservationId: "CART-FIXTURE", currentUser: () => null };
+      </script>
+      <script src="/Js/dart-sets.js"></script>
+    </body></html>`);
+    return;
+  }
 
   if (pathname.startsWith("/api/")) {
     response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -55,6 +114,14 @@ const server = http.createServer((request, response) => {
     }
     if (pathname === "/api/v1/site-settings") {
       response.end(JSON.stringify({ version: 1, settings: {} }));
+      return;
+    }
+    if (pathname === "/api/v1/sets") {
+      response.end(JSON.stringify({ sets: [setFixture] }));
+      return;
+    }
+    if (pathname === "/api/v1/sets/settings") {
+      response.end(JSON.stringify({ settings: { birthdayPercent: 10, dartCardPercent: 10, version: 1 } }));
       return;
     }
     if (pathname === "/api/v1/reviews") {
@@ -125,6 +192,27 @@ const server = http.createServer((request, response) => {
   await card.waitFor({ state: "visible" });
   assert.match(await card.textContent(), /Cairo Wide Leg Jeans/);
 
+  const setCard = page.locator('#productsContainer [data-dart-set-card="1"][data-dart-set-id="SET-DW-101"]');
+  await setCard.waitFor({ state: "visible" });
+  assert.match(await setCard.textContent(), /Cairo Campus Set/);
+  await page.waitForTimeout(150);
+  const stableRender = await page.evaluate(async () => {
+    const container = document.getElementById("productsContainer");
+    let childListMutations = 0;
+    const observer = new MutationObserver((records) => {
+      childListMutations += records.filter((record) => record.type === "childList").length;
+    });
+    observer.observe(container, { childList: true });
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    observer.disconnect();
+    return {
+      childListMutations,
+      modelCards: container.querySelectorAll('.product-card[data-id="DW-101"]').length,
+      setCards: container.querySelectorAll('[data-dart-set-card="1"][data-dart-set-id="SET-DW-101"]').length,
+    };
+  });
+  assert.deepEqual(stableRender, { childListMutations: 0, modelCards: 1, setCards: 1 }, "Models and Sets must settle without a self-triggering render loop");
+
   const navEntriesBefore = await page.evaluate(() => performance.getEntriesByType("navigation").length);
   await card.click();
   await page.waitForFunction(() => getComputedStyle(document.getElementById("SectionModel")).display !== "none");
@@ -143,6 +231,47 @@ const server = http.createServer((request, response) => {
   await page.goForward();
   await page.waitForURL(/\/products\/cairo-wide-leg-jeans--dw-101$/);
   await page.waitForFunction(() => getComputedStyle(document.getElementById("SectionModel")).display !== "none");
+
+  await page.goto(`${origin}/sets-runtime-fixture.html`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-dart-set-card="1"][data-dart-set-id="SET-DW-101"]').waitFor({ state: "visible" });
+  const stableCart = await page.evaluate(async () => {
+    const container = document.getElementById("cartItemsContainer");
+    const group = {
+      setId: "SET-DW-101",
+      unitIndex: 1,
+      selections: [{ modelId: "DW-101", modelName: "Cairo Wide Leg Jeans", color: "Black", size: "M" }],
+    };
+    window.DartSets.writeDrafts([group]);
+    window.setFixtureCart([{
+      id: "DW-101", title: "Cairo Wide Leg Jeans", price: 720, color: "Black", size: "M", quantity: 1,
+      setId: "SET-DW-101", dartSetKey: "SET-DW-101:1", dartSetUnitIndex: 1,
+    }]);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    let childListMutations = 0;
+    const observer = new MutationObserver((records) => {
+      childListMutations += records.filter((record) => record.type === "childList").length;
+    });
+    observer.observe(container, { childList: true });
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    observer.disconnect();
+    const grouped = {
+      childListMutations,
+      setCards: container.querySelectorAll('[data-dart-set-cart-card="1"][data-dart-set-key="SET-DW-101:1"]').length,
+      baseDisplay: container.querySelector('[data-test-base-cart-card]').style.display,
+      cartLines: window.fixtureCartLength(),
+    };
+    window.setFixtureCart([]);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    grouped.afterClear = {
+      setCards: container.querySelectorAll('[data-dart-set-cart-card="1"]').length,
+      baseDisplay: container.querySelector('[data-test-base-cart-card]').style.display,
+    };
+    return grouped;
+  });
+  assert.deepEqual(stableCart, {
+    childListMutations: 0, setCards: 1, baseDisplay: "none", cartLines: 1,
+    afterClear: { setCards: 0, baseDisplay: "flex" },
+  }, "Set cart decoration must be keyed, stable, and remove stale grouped cards when cart lines disappear");
 
   assert.deepEqual(localFailures, []);
   console.log("PASS home storefront browser: API catalogue -> card -> modal -> deep link -> back/forward without reload");

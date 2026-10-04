@@ -22,6 +22,10 @@ assert(sets.includes("setFilterActive"), "Storefront must expose the Sets produc
 assert(sets.includes("!drafts().length && !cartRef().length"), "Fresh empty carts must not probe non-existent Set reservations");
 assert(sets.includes("if (cartRef().length && !drafts().length) void restoreServerGroups()"), "Cart hydration must retry Set-group restoration when real cart lines arrive");
 assert(sets.includes("data-set-color") && sets.includes("data-set-size"), "Set modal must select color and size per component");
+assert(sets.includes("function syncSetCards(rows, target)"), "Set catalogue rendering must reconcile keyed cards instead of recreating every card");
+assert(sets.includes("function syncSetCartCard(card, group, set, pricing, key)"), "Set cart rendering must reconcile keyed group cards");
+assert(!sets.includes('["productsPart1","productsPart2","productsContainer"].forEach'), "Set runtime must not observe and rewrite its own product containers");
+assert(!sets.includes('new MutationObserver(scheduleCartDecoration).observe(cart'), "Set runtime must not observe and rewrite its own cart container");
 
 assert(admin.includes('setsButton.dataset.modelSetView="sets"'), "Models section must expose the Sets view inside the shared second bar");
 assert(admin.includes('dashboardControls()'), "Models / Sets must share the existing Models dashboard controls");

@@ -317,16 +317,24 @@
   function setCurrentPrice(set) { return Math.max(0, Number(set?.pricing?.finalMinor || 0)) / 100; }
   function setBasePrice(set) { return Math.max(0, Number(set?.pricing?.basePriceMinor || 0)) / 100; }
 
-  function createSetCard(set) {
-    const template = root.document.getElementById("productTemplate");
-    if (!template) return null;
-    const card = template.cloneNode(true);
-    card.removeAttribute("id");
-    card.style.display = "flex";
-    card.style.position = "relative";
-    card.dataset.dartSetCard = "1";
+  function setCardSignature(set) {
+    return JSON.stringify({
+      id: String(set?.setId || ""),
+      name: String(set?.name || ""),
+      image: setImage(set || {}),
+      price: setCurrentPrice(set),
+      base: setBasePrice(set),
+      discount: Number(set?.pricing?.discountPercent || 0),
+      available: setAvailable(set || {}),
+    });
+  }
+
+  function syncSetCard(card, set) {
+    if (!card || !set) return card;
+    const signature = setCardSignature(set);
+    if (card.dataset.dartSetRenderKey === signature) return card;
+    card.dataset.dartSetRenderKey = signature;
     card.dataset.dartSetId = set.setId;
-    card.setAttribute("tabindex", "0");
     const image = card.querySelector(".product-img");
     if (image) { image.src = setImage(set); image.alt = set.name; image.loading = "lazy"; }
     const category = card.querySelector(".product-category"); if (category) category.textContent = "Sets";
@@ -339,23 +347,42 @@
     if (current) current.textContent = `EGP ${Math.trunc(price)}`;
     if (old) { old.textContent = `EGP ${Math.trunc(base)}`; old.hidden = !(discount > 0); }
     if (badge) { badge.textContent = `خصم ${Math.round(discount)}%`; badge.hidden = !(discount > 0); }
-    if (!setAvailable(set)) {
-      card.classList.add("out-of-stock");
-      const stockBadge = root.document.createElement("span");
+    const available = setAvailable(set);
+    card.classList.toggle("out-of-stock", !available);
+    let stockBadge = card.querySelector(".out-of-stock-badge");
+    if (!available && !stockBadge) {
+      stockBadge = root.document.createElement("span");
       stockBadge.className = "out-of-stock-badge";
-      stockBadge.textContent = "Waiting available";
       card.appendChild(stockBadge);
     }
-    const button = card.querySelector(".cart-btn");
-    if (button) {
-      button.removeAttribute("data-id");
-      button.dataset.dartSetBuy = set.setId;
-      button.addEventListener("click", (event) => {
-        event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); openSetModal(set);
-      });
+    if (stockBadge) {
+      stockBadge.textContent = "Waiting available";
+      stockBadge.hidden = available;
     }
-    card.addEventListener("keydown", (event) => { if (event.key === "Enter") openSetModal(set); });
+    const button = card.querySelector(".cart-btn");
+    if (button) { button.removeAttribute("data-id"); button.dataset.dartSetBuy = set.setId; }
     return card;
+  }
+
+  function createSetCard(set) {
+    const template = root.document.getElementById("productTemplate");
+    if (!template) return null;
+    const card = template.cloneNode(true);
+    card.removeAttribute("id");
+    card.style.display = "flex";
+    card.style.position = "relative";
+    card.dataset.dartSetCard = "1";
+    card.setAttribute("tabindex", "0");
+    const openCurrentSet = () => {
+      const current = setCatalog.find((row) => String(row.setId) === String(card.dataset.dartSetId));
+      if (current) openSetModal(current);
+    };
+    const button = card.querySelector(".cart-btn");
+    if (button) button.addEventListener("click", (event) => {
+      event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); openCurrentSet();
+    });
+    card.addEventListener("keydown", (event) => { if (event.key === "Enter") openCurrentSet(); });
+    return syncSetCard(card, set);
   }
 
   function filterSetCatalog() {
@@ -385,8 +412,48 @@
     return rows;
   }
 
-  function clearSetCards() {
-    root.document.querySelectorAll('[data-dart-set-card="1"]').forEach((node) => node.remove());
+  function restoreSuppressedProductCards() {
+    root.document.querySelectorAll('[data-dart-set-suppressed="1"]').forEach((node) => {
+      node.style.display = node.dataset.dartSetPreviousDisplay || "";
+      delete node.dataset.dartSetPreviousDisplay;
+      delete node.dataset.dartSetSuppressed;
+    });
+  }
+
+  function suppressNormalProductCards(containers) {
+    for (const container of containers.filter(Boolean)) {
+      [...container.children].forEach((node) => {
+        if (node.id === "productTemplate" || node.dataset?.dartSetCard === "1" || node.dataset?.dartSetSuppressed === "1") return;
+        node.dataset.dartSetPreviousDisplay = node.style.display || "";
+        node.dataset.dartSetSuppressed = "1";
+        node.style.display = "none";
+      });
+    }
+  }
+
+  function syncSetCards(rows, target) {
+    const desiredIds = rows.map((set) => String(set.setId));
+    const desired = new Set(desiredIds);
+    const existing = new Map();
+    root.document.querySelectorAll('[data-dart-set-card="1"]').forEach((node) => {
+      const id = String(node.dataset.dartSetId || "");
+      if (!desired.has(id)) { node.remove(); return; }
+      if (existing.has(id)) { node.remove(); return; }
+      existing.set(id, node);
+    });
+    if (!target) {
+      existing.forEach((node) => node.remove());
+      return;
+    }
+    const cards = rows.map((set) => {
+      const card = existing.get(String(set.setId)) || createSetCard(set);
+      return syncSetCard(card, set);
+    }).filter(Boolean);
+    const currentIds = [...target.querySelectorAll(':scope > [data-dart-set-card="1"]')]
+      .map((node) => String(node.dataset.dartSetId || ""));
+    if (currentIds.join("|") !== desiredIds.join("|") || cards.some((card) => card.parentElement !== target)) {
+      cards.forEach((card) => target.appendChild(card));
+    }
   }
 
   function renderSetCards() {
@@ -394,23 +461,22 @@
     renderScheduled = true;
     queueMicrotask(() => {
       renderScheduled = false;
-      clearSetCards();
-      if (!setCatalog.length) return;
       const activeCategory = root.document.querySelector("#filterContainer .filter-btn.active")?.dataset.category || "All";
       const category = setFilterActive ? "Sets" : activeCategory;
-      if (!setFilterActive && !["All", "all", ""].includes(category)) return;
-      const rows = filterSetCatalog();
       const part1 = root.document.getElementById("productsPart1");
       const part2 = root.document.getElementById("productsPart2");
       const home = root.document.getElementById("productsContainer");
-      if (setFilterActive) {
-        [part1, part2].filter(Boolean).forEach((container) => {
-          [...container.children].forEach((node) => { if (node.id !== "productTemplate") node.remove(); });
-        });
+      const productContainers = [part1, part2, home];
+      if (setFilterActive) suppressNormalProductCards([part1, part2, home]);
+      else restoreSuppressedProductCards();
+      if (!setCatalog.length || (!setFilterActive && !["All", "all", ""].includes(category))) {
+        syncSetCards([], null);
+        return;
       }
+      const rows = filterSetCatalog();
       const target = setFilterActive ? (part1 || home) : (part2 || home);
-      if (!target) return;
-      rows.forEach((set) => { const card = createSetCard(set); if (card) target.appendChild(card); });
+      syncSetCards(rows, target);
+      if (setFilterActive) suppressNormalProductCards(productContainers);
       const count = root.document.getElementById("productResultsCount");
       if (count && setFilterActive) count.textContent = `${rows.length} set${rows.length === 1 ? "" : "s"}`;
     });
@@ -691,24 +757,52 @@
     if (typeof renderCart === "function") renderCart();
   }
 
+  function setCartCardSignature(group, set, pricing) {
+    return JSON.stringify({
+      key: `${group.setId}:${group.unitIndex}`,
+      name: String(set?.name || group.setName || group.setId || ""),
+      image: setImage(set || {}),
+      specs: group.selections.map((row) => [row.modelName || row.modelId, row.color, row.size]),
+      finalMinor: Number(pricing.finalMinor || 0),
+    });
+  }
+
+  function syncSetCartCard(card, group, set, pricing, key) {
+    const signature = setCartCardSignature(group, set, pricing);
+    card.dataset.dartSetCartCard = "1";
+    card.dataset.dartSetKey = key;
+    if (card.dataset.dartSetRenderKey === signature) return card;
+    card.dataset.dartSetRenderKey = signature;
+    card.className = "cart-product-card dart-set-cart-card";
+    const specs=group.selections.map(row=>`${esc(row.modelName||row.modelId)}: ${esc(row.color)} / ${esc(row.size)}`).join(" · ");
+    card.innerHTML=`<img src="${esc(setImage(set||{}))}" alt="${esc(set?.name||group.setName||group.setId)}" class="cart-product-img"><div class="cart-product-info"><div class="cart-product-title">${esc(set?.name||group.setName||group.setId)}</div><div class="cart-product-specs dart-set-cart-specs">${specs}</div><div class="cart-product-price-qty"><span class="cart-item-price">${root.DartSets.moneyMinor(pricing.finalMinor)}</span><strong>${group.selections.length} pieces</strong></div><div class="cart-item-total-price">Set Total: <span class="p-total">${root.DartSets.moneyMinor(pricing.finalMinor)}</span></div></div><button type="button" class="remove-item-btn" data-set-remove>حذف</button>`;
+    card.querySelector("[data-set-remove]")?.addEventListener("click",()=>void removeSetGroup(key));
+    return card;
+  }
+
   function decorateCart() {
     if (cartDecorating) return;
     const container=root.document.getElementById("cartItemsContainer"); if (!container) return;
     cartDecorating=true;
     try {
       const cart=tagCartLines(), groups=drafts();
-      container.querySelectorAll('[data-dart-set-cart-card="1"]').forEach(node=>node.remove());
-      const cards=[...container.querySelectorAll(".cart-product-card:not(#cartItemTemplate)")];
-      cards.forEach((card,index)=>{ card.style.display=cart[index]?.dartSetKey?"none":"flex"; });
+      const groupKeys=new Set(groups
+        .map((group)=>`${group.setId}:${group.unitIndex}`)
+        .filter((key)=>cart.some((line)=>line.dartSetKey===key)));
+      const baseCards=[...container.querySelectorAll('.cart-product-card:not(#cartItemTemplate):not([data-dart-set-cart-card="1"])')];
+      baseCards.forEach((card,index)=>{ card.style.display=cart[index]?.dartSetKey?"none":"flex"; });
+      const existing=new Map();
+      container.querySelectorAll('[data-dart-set-cart-card="1"]').forEach((card)=>{
+        const key=String(card.dataset.dartSetKey||"");
+        if (!groupKeys.has(key) || existing.has(key)) { card.remove(); return; }
+        existing.set(key,card);
+      });
       groups.forEach((group)=>{
         const key=`${group.setId}:${group.unitIndex}`,set=root.DartSets?.setById?.(group.setId),pricing=groupPricing(group);
         const firstIndex=cart.findIndex(line=>line.dartSetKey===key); if (firstIndex<0) return;
-        const firstCard=cards[firstIndex]; if (!firstCard) return;
-        const card=root.document.createElement("div"); card.className="cart-product-card dart-set-cart-card"; card.dataset.dartSetCartCard="1";
-        const specs=group.selections.map(row=>`${esc(row.modelName||row.modelId)}: ${esc(row.color)} / ${esc(row.size)}`).join(" · ");
-        card.innerHTML=`<img src="${esc(setImage(set||{}))}" alt="${esc(set?.name||group.setName||group.setId)}" class="cart-product-img"><div class="cart-product-info"><div class="cart-product-title">${esc(set?.name||group.setName||group.setId)}</div><div class="cart-product-specs dart-set-cart-specs">${specs}</div><div class="cart-product-price-qty"><span class="cart-item-price">${root.DartSets.moneyMinor(pricing.finalMinor)}</span><strong>${group.selections.length} pieces</strong></div><div class="cart-item-total-price">Set Total: <span class="p-total">${root.DartSets.moneyMinor(pricing.finalMinor)}</span></div></div><button type="button" class="remove-item-btn" data-set-remove>حذف</button>`;
-        card.querySelector("[data-set-remove]")?.addEventListener("click",()=>void removeSetGroup(key));
-        firstCard.insertAdjacentElement("beforebegin",card);
+        const firstCard=baseCards[firstIndex]; if (!firstCard) return;
+        const card=syncSetCartCard(existing.get(key)||root.document.createElement("div"),group,set,pricing,key);
+        if (card.parentElement!==container || card.nextElementSibling!==firstCard) firstCard.insertAdjacentElement("beforebegin",card);
       });
       renderSetAwareTotals();
     } finally { cartDecorating=false; }
@@ -735,9 +829,19 @@
   function observe() {
     const filter=root.document.getElementById("filterContainer");
     if (filter) new MutationObserver(()=>{ensureSetFilter();renderSetCards();}).observe(filter,{childList:true});
-    ["productsPart1","productsPart2","productsContainer"].forEach(id=>{ const node=root.document.getElementById(id); if (node) new MutationObserver(()=>renderSetCards()).observe(node,{childList:true}); });
-    const cart=root.document.getElementById("cartItemsContainer"); if (cart) new MutationObserver(scheduleCartDecoration).observe(cart,{childList:true});
-    root.document.addEventListener("dart:data-changed",event=>{
+    const scheduleSetRender=()=>root.setTimeout(renderSetCards,0);
+    [
+      ["productSearchInput","input"],
+      ["productSizeFilter","change"],
+      ["productColorFilter","change"],
+      ["productAvailabilityFilter","change"],
+      ["productPriceFilter","change"],
+      ["productSortSelect","change"],
+    ].forEach(([id,eventName])=>root.document.getElementById(id)?.addEventListener(eventName,scheduleSetRender));
+    root.addEventListener("dart:catalog-hydrated",scheduleSetRender);
+    root.addEventListener("dart:site-settings-changed",scheduleSetRender);
+    root.addEventListener("dart:data-changed",event=>{
+      scheduleSetRender();
       if (event.detail?.key!=="dart_cart") return;
       scheduleCartDecoration();
       if (cartRef().length && !drafts().length) void restoreServerGroups();
