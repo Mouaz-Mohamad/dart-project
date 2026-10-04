@@ -19,7 +19,7 @@
 #dartSetModal .dart-set-close{top:0;right:10px;z-index:10;margin-top:-10px;width:42px;height:46px;border-radius:0;background:transparent;color:${BURGUNDY};font-size:46px;line-height:1}
 #dartSetModal .dart-set-gallery{position:relative}
 #dartSetModal [data-set-cover],#dartSetModal [data-set-thumbs]{display:none!important}
-#dartSetModal .dart-set-carousel{margin:0;width:100%;aspect-ratio:9/16;border-radius:14px;background:#eee}
+#dartSetModal .dart-set-carousel{margin:0;width:100%;aspect-ratio:3/4;border-radius:14px;background:#eee}
 #dartSetModal .dart-set-carousel .carousel-slide img{width:100%;height:100%;object-fit:cover;border-radius:0}
 #dartSetModal .dart-set-component{grid-template-columns:minmax(72px,1fr) minmax(0,3fr);align-items:start;gap:12px}
 #dartSetModal .dart-set-piece-media{min-width:0;display:grid;gap:5px}
@@ -38,7 +38,7 @@
 #dartSetModal .dart-set-native-selects{display:none!important}
 #dartSetModal .dart-set-piece-empty{margin:0;color:#991b1b;font-size:12px}
 @media (max-width:760px){
-  #dartSetModal .dart-set-carousel{width:min(100%,calc(58dvh * 9 / 16));max-height:58dvh;margin-inline:auto;aspect-ratio:9/16}
+  #dartSetModal .dart-set-carousel{width:min(100%,calc(58dvh * 3 / 4));max-height:58dvh;margin-inline:auto;aspect-ratio:3/4}
   #dartSetModal .dart-set-component{grid-template-columns:minmax(68px,1fr) minmax(0,3fr);padding:10px;gap:10px}
   #dartSetModal .dart-set-option-buttons .size-btn,#dartSetModal .dart-set-option-buttons .color-btn{padding:6px 9px;font-size:12px}
 }

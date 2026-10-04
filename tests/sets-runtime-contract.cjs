@@ -5,6 +5,7 @@ const fs = require("node:fs");
 
 const settings = fs.readFileSync("Js/dart-site-settings.js", "utf8");
 const sets = fs.readFileSync("Js/dart-sets.js", "utf8");
+const setModalUi = fs.readFileSync("Js/dart-set-modal-ui.js", "utf8");
 const ui = fs.readFileSync("Js/dart-ui.js", "utf8");
 const homeUi = fs.readFileSync("Js/dart-ui.home.min.js", "utf8");
 const admin = fs.readFileSync("Eye/dart-sets-admin.js", "utf8");
@@ -36,6 +37,9 @@ assert(sets.includes("updateListingCount(combined.length)"), "All-products resul
 assert(sets.includes("!drafts().length && !cartRef().length"), "Fresh empty carts must not probe non-existent Set reservations");
 assert(sets.includes("if (cartRef().length && !drafts().length) void restoreServerGroups()"), "Cart hydration must retry Set-group restoration when real cart lines arrive");
 assert(sets.includes("data-set-color") && sets.includes("data-set-size"), "Set modal must select color and size per component");
+assert(setModalUi.includes('.dart-set-carousel{margin:0;width:100%;aspect-ratio:3/4'), "Set carousel must use a portrait 3:4 aspect ratio");
+assert(setModalUi.includes('calc(58dvh * 3 / 4)') && setModalUi.includes('aspect-ratio:3/4'), "Mobile Set carousel must preserve the portrait 3:4 aspect ratio");
+assert(setModalUi.includes('.dart-set-piece-image img{display:block;width:100%;aspect-ratio:9/16'), "Set component images must remain portrait 9:16");
 assert(sets.includes('sizes.every((size) =>') && sets.includes('colors.every((color) => variantAvailable'), "A Set must become Sold Out when any offered size/color option is unavailable");
 assert(sets.includes('stockBadge.textContent = "Sold Out"') && !sets.includes('stockBadge.textContent = "Waiting available"'), "Set cards must show Sold Out instead of Waiting");
 assert(sets.includes("function syncSetCards(rows, target = null)"), "Set catalogue rendering must reconcile keyed cards instead of recreating every card");

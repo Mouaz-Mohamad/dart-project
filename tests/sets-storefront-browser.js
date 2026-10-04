@@ -247,7 +247,7 @@ const server = http.createServer(async (request, response) => {
       componentsBeforePricing: children.indexOf(details.querySelector('[data-set-components]')) < children.indexOf(details.querySelector('.dart-set-pricing')),
     };
   }), { componentsBeforeDescription: true, componentsBeforePricing: true });
-  assert.equal(await page.locator('#dartSetModal .dart-set-carousel').evaluate((node) => getComputedStyle(node).aspectRatio), '9 / 16');
+  assert.equal(await page.locator('#dartSetModal .dart-set-carousel').evaluate((node) => getComputedStyle(node).aspectRatio), '3 / 4');
   assert.equal(await page.locator('#dartSetModal .dart-set-piece-image img').first().evaluate((node) => getComputedStyle(node).aspectRatio), '9 / 16');
 
   // Add-to-cart reserves both physical pieces, then attaches one commercial Set group to that same reservation.
