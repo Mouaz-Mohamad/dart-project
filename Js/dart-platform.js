@@ -2196,7 +2196,9 @@
       publicLeaderboardRows = [];
       publicLeaderboardFailed = true;
       renderLeaderboard();
-      console.warn("Dart leaderboard is temporarily unavailable.", error);
+      window.dispatchEvent(new CustomEvent("dart:leaderboard-unavailable", {
+        detail: { code: error?.code || "NETWORK_UNAVAILABLE" },
+      }));
       return [];
     } finally {
       publicLeaderboardLoading = false;
