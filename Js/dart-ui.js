@@ -253,6 +253,7 @@ function renderProductPageResults() {
 
     const count = document.getElementById('productResultsCount');
     if (count) count.textContent = `${filtered.length} product${filtered.length === 1 ? '' : 's'}`;
+    window.dispatchEvent(new CustomEvent('dart:products-rendered'));
 }
 
 // يرجع مصفوفة صور المنتج مهما كانت شكل البيانات (images[] أو image واحدة قديمة)
@@ -463,7 +464,7 @@ function renderProductsLogic() {
     const part2Container = document.getElementById('productsPart2');
 
     if (part1Container || part2Container) renderProductPageResults();
-    window.dispatchEvent(new CustomEvent('dart:products-rendered'));
+    else window.dispatchEvent(new CustomEvent('dart:products-rendered'));
 }
 
 function createProductCard(item, template) {
@@ -520,6 +521,10 @@ function createProductCard(item, template) {
         discountBadge.textContent = `خصم ${Math.round(effectiveDiscount)}%`;
         discountBadge.hidden = !effectiveDiscount;
     }
+    card.dataset.dartProductKind = 'model';
+    card.dataset.dartBrowsePrice = String(finalPrice);
+    card.dataset.dartBrowseName = String(item.title || '');
+    card.dataset.dartBrowseNewest = String(Date.parse(item.createdAt || '') || Number(item.id) || 0);
 
     let totalStock = 0;
     if (item.stock) {

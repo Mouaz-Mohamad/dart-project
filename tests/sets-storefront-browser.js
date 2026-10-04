@@ -188,7 +188,9 @@ const server = http.createServer(async (request, response) => {
   await page.locator('#toggleProductFilters').click();
   await page.locator('#filterContainer .filter-btn[data-category="Sets"]').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelectorAll('[data-dart-set-card="1"]').length === 1);
-  assert.equal(await page.locator('#productsPart1 .product-card[data-id="SHIRT-101"], #productsPart1 .product-card[data-id="PANTS-202"], #productsPart2 .product-card[data-id="SHIRT-101"], #productsPart2 .product-card[data-id="PANTS-202"]').count(), 2, 'Models remain rendered beside additive Sets');
+  await page.waitForFunction(() => document.getElementById('productResultsCount')?.textContent === '3 products');
+  assert.equal(await page.locator('#productsPart1 .product-card[data-id="SHIRT-101"], #productsPart1 .product-card[data-id="PANTS-202"]').count(), 2, 'Models remain in the primary Products grid');
+  assert.equal(await page.locator('#productsPart1 [data-dart-set-card="1"][data-dart-set-id="SET-CAMPUS-1"]').count(), 1, 'Set must be listed beside normal products, not deferred to productsPart2');
 
   // Normal product filters still belong to Models and continue to work.
   await page.locator('#productSearchInput').fill('Campus Shirt');
@@ -196,11 +198,32 @@ const server = http.createServer(async (request, response) => {
   assert.equal(await page.locator('#productsPart1 .product-card[data-id]:visible, #productsPart2 .product-card[data-id]:visible').count(), 1);
   assert.equal(await page.locator('[data-dart-set-card="1"]:visible').count(), 0, 'Set must respect search while normal Models filter remains functional');
   await page.locator('#clearProductFilters').click();
-  await page.waitForFunction(() => document.querySelectorAll('[data-dart-set-card="1"]').length === 1);
+  await page.waitForFunction(() => document.getElementById('productResultsCount')?.textContent === '3 products');
 
-  // The Sets category switches the shared catalogue into Set-only mode.
+  // Sort order is shared across Models and Sets, not one order per product kind.
+  await page.locator('#productSortSelect').selectOption('price-high');
+  await page.waitForFunction(() => document.querySelector('#productsPart1 > .product-card:not(#productTemplate)')?.dataset.dartSetId === 'SET-CAMPUS-1');
+  assert.equal((await page.locator('#productsPart1 > .product-card:not(#productTemplate)').first().locator('.product-title').textContent()).trim(), 'Campus Starter Set');
+  await page.locator('#productSortSelect').selectOption('price-low');
+  await page.waitForFunction(() => document.querySelector('#productsPart1 > .product-card:not(#productTemplate)')?.dataset.id === 'PANTS-202');
+
+  // Price facets include Set prices as first-class catalogue prices (Set is 1100 EGP, Models top out at 700 EGP).
+  const setPriceRange = await page.locator('#productPriceFilter option').evaluateAll((options) => {
+    const setPrice = 1100;
+    return options.map((option) => option.value).find((value) => {
+      const match = value.match(/^range:(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+      return match && setPrice >= Number(match[1]) && setPrice <= Number(match[2]);
+    }) || '';
+  });
+  assert.ok(setPriceRange, 'Shared price filter must include a range that covers the Set price');
+  await page.locator('#productPriceFilter').selectOption(setPriceRange);
+  await page.waitForFunction(() => document.querySelector('[data-dart-set-id="SET-CAMPUS-1"]')?.offsetParent !== null);
+  await page.locator('#clearProductFilters').click();
+  await page.waitForFunction(() => document.getElementById('productResultsCount')?.textContent === '3 products');
+
+  // Sets is a normal category inside the same filter pipeline.
   await page.locator('#filterContainer .filter-btn[data-category="Sets"]').click();
-  await page.waitForFunction(() => document.getElementById('productResultsCount')?.textContent === '1 set');
+  await page.waitForFunction(() => document.getElementById('productResultsCount')?.textContent === '1 product');
   assert.equal(await page.locator('#productsPart1 .product-card[data-id]:visible, #productsPart2 .product-card[data-id]:visible').count(), 0);
   const setCard = page.locator('[data-dart-set-card="1"][data-dart-set-id="SET-CAMPUS-1"]');
   await setCard.waitFor({ state: 'visible' });
@@ -264,7 +287,7 @@ const server = http.createServer(async (request, response) => {
   assert.equal(serverAfterReload.attachCount, 1, 'Read-only rehydration must not duplicate/reattach Set groups');
 
   assert.deepEqual(failures, []);
-  console.log('PASS Sets storefront browser: shared filters, Set-only filter, full-card modal, atomic two-piece cart reservation, server Set-group snapshot and reload rehydration.');
+  console.log('PASS Sets storefront browser: unified Products listing/filter/sort, Set category, full-card modal, atomic two-piece cart reservation, server Set-group snapshot and reload rehydration.');
   await context.close(); await browser.close(); server.close();
 })().catch((error) => {
   console.error(error.stack || error);

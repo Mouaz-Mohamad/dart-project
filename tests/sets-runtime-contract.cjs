@@ -20,11 +20,14 @@ assert(profile.includes('dart:sets-extension-ready'), "Profile rows must re-enha
 
 assert(sets.includes('/api/v1/sets'), "Storefront Sets client must use the server Sets API");
 assert(sets.includes('/api/v1/cart/set-groups'), "Set cart operations must use the server Set-cart API");
-assert(sets.includes("setFilterActive"), "Storefront must expose the Sets product filter state");
+assert(!sets.includes("setFilterActive"), "Sets category must use the same category state as normal products, not a parallel filter state");
+assert(sets.includes("function listingCategory()") && sets.includes("isSetsCategory"), "Set listing must read the shared product category state");
+assert(sets.includes("sortedCombinedCards") && sets.includes("placeProductPageCards"), "Models and Sets must share one Products-page ordering and grid placement flow");
+assert(sets.includes("updateListingCount(combined.length)"), "All-products result count must include Sets as products");
 assert(sets.includes("!drafts().length && !cartRef().length"), "Fresh empty carts must not probe non-existent Set reservations");
 assert(sets.includes("if (cartRef().length && !drafts().length) void restoreServerGroups()"), "Cart hydration must retry Set-group restoration when real cart lines arrive");
 assert(sets.includes("data-set-color") && sets.includes("data-set-size"), "Set modal must select color and size per component");
-assert(sets.includes("function syncSetCards(rows, target)"), "Set catalogue rendering must reconcile keyed cards instead of recreating every card");
+assert(sets.includes("function syncSetCards(rows, target = null)"), "Set catalogue rendering must reconcile keyed cards instead of recreating every card");
 assert(sets.includes("function syncSetCartCard(card, group, set, pricing, key)"), "Set cart rendering must reconcile keyed group cards");
 assert(!sets.includes('["productsPart1","productsPart2","productsContainer"].forEach'), "Set runtime must not observe and rewrite its own product containers");
 assert(!sets.includes('new MutationObserver(scheduleCartDecoration).observe(cart'), "Set runtime must not observe and rewrite its own cart container");

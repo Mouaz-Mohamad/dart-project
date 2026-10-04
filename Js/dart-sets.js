@@ -257,7 +257,6 @@
   let lastAttachedGroups = [];
   let renderScheduled = false;
   let cartDecorating = false;
-  let setFilterActive = false;
 
   function drafts() {
     return normalizeGroups(root.DartSets?.readDrafts?.() || []);
@@ -374,6 +373,10 @@
       stockBadge.textContent = "Waiting available";
       stockBadge.hidden = available;
     }
+    card.dataset.dartProductKind = "set";
+    card.dataset.dartBrowsePrice = String(price);
+    card.dataset.dartBrowseName = String(set.name || "");
+    card.dataset.dartBrowseNewest = String(Date.parse(set.createdAt || "") || 0);
     const button = card.querySelector(".cart-btn");
     if (button) { button.removeAttribute("data-id"); button.dataset.dartSetBuy = set.setId; }
     return card;
@@ -447,6 +450,7 @@
     for (const container of containers.filter(Boolean)) {
       [...container.children].forEach((node) => {
         if (node.id === "productTemplate" || node.dataset?.dartSetCard === "1" || node.dataset?.dartSetSuppressed === "1") return;
+        if (!node.matches?.('.product-card[data-id]')) return;
         node.dataset.dartSetPreviousDisplay = node.style.display || "";
         node.dataset.dartSetSuppressed = "1";
         node.style.display = "none";
@@ -454,7 +458,7 @@
     }
   }
 
-  function syncSetCards(rows, target) {
+  function syncSetCards(rows, target = null) {
     const desiredIds = rows.map((set) => String(set.setId));
     const desired = new Set(desiredIds);
     const existing = new Map();
@@ -464,19 +468,116 @@
       if (existing.has(id)) { node.remove(); return; }
       existing.set(id, node);
     });
-    if (!target) {
-      existing.forEach((node) => node.remove());
-      return;
-    }
     const cards = rows.map((set) => {
       const card = existing.get(String(set.setId)) || createSetCard(set);
       return syncSetCard(card, set);
     }).filter(Boolean);
-    const currentIds = [...target.querySelectorAll(':scope > [data-dart-set-card="1"]')]
-      .map((node) => String(node.dataset.dartSetId || ""));
-    if (currentIds.join("|") !== desiredIds.join("|") || cards.some((card) => card.parentElement !== target)) {
-      cards.forEach((card) => target.appendChild(card));
+    if (target) cards.forEach((card) => target.appendChild(card));
+    return cards;
+  }
+
+  function listingCategory() {
+    return String(root.document.querySelector("#filterContainer .filter-btn.active")?.dataset.category || "All");
+  }
+
+  function productPageFiltersAreDefault(category) {
+    return ["All", "all", ""].includes(category)
+      && !String(root.document.getElementById("productSearchInput")?.value || "").trim()
+      && String(root.document.getElementById("productSizeFilter")?.value || "all") === "all"
+      && String(root.document.getElementById("productColorFilter")?.value || "all") === "all"
+      && String(root.document.getElementById("productAvailabilityFilter")?.value || "all") === "all"
+      && String(root.document.getElementById("productPriceFilter")?.value || "all") === "all"
+      && String(root.document.getElementById("productSortSelect")?.value || "featured") === "featured";
+  }
+
+  function normalProductCards(containers) {
+    return containers.filter(Boolean).flatMap((container) =>
+      [...container.children].filter((node) => node.matches?.('.product-card[data-id]:not([data-dart-set-card="1"])')),
+    );
+  }
+
+  function sortedCombinedCards(cards) {
+    const sort = String(root.document.getElementById("productSortSelect")?.value || "featured");
+    if (sort === "featured") return cards;
+    const rows = [...cards];
+    const number = (card, key) => Number(card.dataset[key] || 0);
+    if (sort === "price-low") rows.sort((a, b) => number(a, "dartBrowsePrice") - number(b, "dartBrowsePrice"));
+    if (sort === "price-high") rows.sort((a, b) => number(b, "dartBrowsePrice") - number(a, "dartBrowsePrice"));
+    if (sort === "newest") rows.sort((a, b) => number(b, "dartBrowseNewest") - number(a, "dartBrowseNewest"));
+    if (sort === "name") rows.sort((a, b) => String(a.dataset.dartBrowseName || "").localeCompare(String(b.dataset.dartBrowseName || ""), ["en", "ar"]));
+    return rows;
+  }
+
+  function removeProductEmptyState(container) {
+    container?.querySelectorAll?.(':scope > .dart-ui-state').forEach((node) => node.remove());
+  }
+
+  function placeProductPageCards(part1, part2, cards, splitAtSix) {
+    removeProductEmptyState(part1);
+    removeProductEmptyState(part2);
+    cards.forEach((card, index) => {
+      const target = splitAtSix && part2 && index >= 6 ? part2 : part1;
+      target?.appendChild(card);
+    });
+  }
+
+  function updateListingCount(count) {
+    const node = root.document.getElementById("productResultsCount");
+    if (node) node.textContent = `${count} product${count === 1 ? "" : "s"}`;
+  }
+
+  function addMissingSelectValues(select, values) {
+    if (!select) return;
+    const current = select.value || "all";
+    const existing = new Set([...select.options].map((option) => option.value));
+    [...new Set(values.filter(Boolean))]
+      .sort((a, b) => String(a).localeCompare(String(b), ["en", "ar"], { numeric: true }))
+      .forEach((value) => {
+        if (!existing.has(value)) select.add(new Option(value, value));
+      });
+    if ([...select.options].some((option) => option.value === current)) select.value = current;
+  }
+
+  function syncSetFilterFacets() {
+    if (!root.document.getElementById("productsPart1")) return;
+    const sizes = [], colors = [];
+    setCatalog.forEach((set) => (set.components || []).forEach((component) => {
+      sizes.push(...activeOptions(component.sizes));
+      colors.push(...activeOptions(component.colors));
+    }));
+    addMissingSelectValues(root.document.getElementById("productSizeFilter"), sizes);
+    addMissingSelectValues(root.document.getElementById("productColorFilter"), colors);
+
+    const priceSelect = root.document.getElementById("productPriceFilter");
+    if (!priceSelect) return;
+    const modelPrices = (root.DartStorefront?.cards?.() || [])
+      .map((product) => Number(product.price) || 0)
+      .filter((price) => price > 0);
+    const prices = [...modelPrices, ...setCatalog.map(setCurrentPrice).filter((price) => price > 0)].sort((a, b) => a - b);
+    if (!prices.length) return;
+    const min = Math.floor(prices[0] / 50) * 50;
+    const max = Math.ceil(prices[prices.length - 1] / 50) * 50;
+    const ranges = [];
+    if (min === max) {
+      ranges.push({ low: min, high: max });
+    } else {
+      const step = Math.max(50, Math.ceil((max - min) / 3 / 50) * 50);
+      for (let low = min; low <= max; low += step) {
+        const high = Math.min(max, low + step - 1);
+        ranges.push({ low, high });
+        if (high >= max) break;
+      }
     }
+    const expectedValues = ["all", ...ranges.map(({ low, high }) => `range:${low}:${high}`)];
+    const currentValues = [...priceSelect.options].map((option) => option.value);
+    if (currentValues.join("|") === expectedValues.join("|")) return;
+    const current = priceSelect.value || "all";
+    priceSelect.replaceChildren(new Option("All prices", "all"));
+    ranges.forEach(({ low, high }) => {
+      const label = low === high ? `${low} EGP` : `${low} – ${high} EGP`;
+      priceSelect.add(new Option(label, `range:${low}:${high}`));
+    });
+    priceSelect.value = expectedValues.includes(current) ? current : "all";
   }
 
   function renderSetCards() {
@@ -484,24 +585,50 @@
     renderScheduled = true;
     queueMicrotask(() => {
       renderScheduled = false;
-      const activeCategory = root.document.querySelector("#filterContainer .filter-btn.active")?.dataset.category || "All";
-      const category = setFilterActive ? "Sets" : activeCategory;
+      const category = listingCategory();
       const part1 = root.document.getElementById("productsPart1");
       const part2 = root.document.getElementById("productsPart2");
       const home = root.document.getElementById("productsContainer");
-      const productContainers = [part1, part2, home];
-      if (setFilterActive) suppressNormalProductCards([part1, part2, home]);
-      else restoreSuppressedProductCards();
-      if (!setCatalog.length || (!setFilterActive && !["All", "all", ""].includes(category))) {
-        syncSetCards([], null);
+      const onProductsPage = Boolean(part1 || part2);
+
+      if (!setCatalog.length) {
+        restoreSuppressedProductCards();
+        syncSetCards([]);
         return;
       }
-      const rows = filterSetCatalog();
-      const target = setFilterActive ? (part1 || home) : (part2 || home);
-      syncSetCards(rows, target);
-      if (setFilterActive) suppressNormalProductCards(productContainers);
-      const count = root.document.getElementById("productResultsCount");
-      if (count && setFilterActive) count.textContent = `${rows.length} set${rows.length === 1 ? "" : "s"}`;
+
+      if (home && !onProductsPage) {
+        const rows = filterSetCatalog();
+        syncSetCards(rows, home);
+        return;
+      }
+
+      if (!onProductsPage) return;
+      const productContainers = [part1, part2];
+      const isSetsCategory = category.toLocaleLowerCase() === "sets";
+      const isAllCategory = ["all", ""].includes(category.toLocaleLowerCase());
+
+      if (!isSetsCategory && !isAllCategory) {
+        restoreSuppressedProductCards();
+        syncSetCards([]);
+        return;
+      }
+
+      const setRows = filterSetCatalog();
+      const setCards = syncSetCards(setRows);
+
+      if (isSetsCategory) {
+        suppressNormalProductCards(productContainers);
+        placeProductPageCards(part1, part2, setCards, false);
+        updateListingCount(setCards.length);
+        return;
+      }
+
+      restoreSuppressedProductCards();
+      const modelCards = normalProductCards(productContainers);
+      const combined = sortedCombinedCards([...modelCards, ...setCards]);
+      placeProductPageCards(part1, part2, combined, productPageFiltersAreDefault(category));
+      updateListingCount(combined.length);
     });
   }
 
@@ -516,23 +643,6 @@
       button.dataset.category = "Sets";
       button.textContent = "Sets";
       container.appendChild(button);
-    }
-    if (container.dataset.dartSetsCapture !== "1") {
-      container.dataset.dartSetsCapture = "1";
-      container.addEventListener("click", (event) => {
-        const target = event.target.closest?.(".filter-btn");
-        if (!target) return;
-        if (target.dataset.category === "Sets") {
-          event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();
-          container.querySelectorAll(".filter-btn").forEach((node) => node.classList.remove("active"));
-          target.classList.add("active");
-          setFilterActive = true;
-          renderSetCards();
-        } else {
-          setFilterActive = false;
-          queueMicrotask(renderSetCards);
-        }
-      }, true);
     }
   }
 
@@ -856,19 +966,11 @@
 
   function observe() {
     const scheduleSetRender=()=>root.setTimeout(renderSetCards,0);
-    const syncFiltersAndSets=()=>root.setTimeout(()=>{ ensureSetFilter(); renderSetCards(); },0);
-    [
-      ["productSearchInput","input"],
-      ["productSizeFilter","change"],
-      ["productColorFilter","change"],
-      ["productAvailabilityFilter","change"],
-      ["productPriceFilter","change"],
-      ["productSortSelect","change"],
-    ].forEach(([id,eventName])=>root.document.getElementById(id)?.addEventListener(eventName,scheduleSetRender));
+    const syncFiltersAndSets=()=>root.setTimeout(()=>{ ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); },0);
     root.addEventListener("dart:catalog-hydrated",syncFiltersAndSets);
     root.addEventListener("dart:products-rendered",syncFiltersAndSets);
     root.addEventListener("dart:product-filters-rendered",syncFiltersAndSets);
-    root.addEventListener("dart:sets-catalog-changed",scheduleSetRender);
+    root.addEventListener("dart:sets-catalog-changed",syncFiltersAndSets);
     root.addEventListener("dart:data-changed",event=>{
       if (event.detail?.key!=="dart_cart") return;
       scheduleCartDecoration();
@@ -882,7 +984,7 @@
   async function boot() {
     installReservationBridge();
     try { setCatalog=await root.DartSets.loadCatalog(true); } catch (error) { console.warn("Dart Sets catalog unavailable",error); setCatalog=[]; }
-    ensureSetFilter(); renderSetCards(); observe();
+    ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); observe();
     lastAttachedGroups=drafts();
     await restoreServerGroups();
     if (root.DartSets?.signedIn?.()) await root.DartSets.loadWaiting().catch(()=>[]);
