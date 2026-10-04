@@ -35,7 +35,7 @@ const setFixture = {
     { modelId: 'SHIRT-101', name: 'Campus Shirt', quantity: 1, sizes: [{ name: 'M', active: true }, { name: 'L', active: true }], colors: [{ name: 'Black', active: true }] },
     { modelId: 'PANTS-202', name: 'Campus Pants', quantity: 1, sizes: [{ name: 'M', active: true }, { name: 'L', active: true }], colors: [{ name: 'Stone', active: true }] },
   ],
-  pricing: { componentsSellingTotalMinor: 130000, basePriceMinor: 110000, discountPercent: 0, finalMinor: 110000, savingVsSeparateMinor: 20000 },
+  pricing: { componentsSellingTotalMinor: 130000, basePriceMinor: 110000, discountPercent: 10, finalMinor: 99000, savingVsSeparateMinor: 31000 },
 };
 
 let cartState = null;
@@ -105,6 +105,8 @@ const server = http.createServer(async (request, response) => {
           image: setFixture.images[0],
           basePriceMinor: setFixture.pricing.basePriceMinor,
           finalMinor: setFixture.pricing.finalMinor,
+          discountSource: 'Set',
+          discountPercent: setFixture.pricing.discountPercent,
           selections: (group.selections || []).map((selection, componentIndex) => ({
             ...selection,
             cartComponentId: `CART-COMPONENT-${groupIndex + 1}-${componentIndex + 1}`,
@@ -208,9 +210,9 @@ const server = http.createServer(async (request, response) => {
   await page.locator('#productSortSelect').selectOption('price-low');
   await page.waitForFunction(() => document.querySelector('#productsPart1 > .product-card:not(#productTemplate)')?.dataset.id === 'PANTS-202');
 
-  // Price facets include Set prices as first-class catalogue prices (Set is 1100 EGP, Models top out at 700 EGP).
+  // Price facets include Set prices as first-class catalogue prices (Set is 990 EGP after its own 10% discount, Models top out at 700 EGP).
   const setPriceRange = await page.locator('#productPriceFilter option').evaluateAll((options) => {
-    const setPrice = 1100;
+    const setPrice = 990;
     return options.map((option) => option.value).find((value) => {
       const match = value.match(/^range:(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
       return match && setPrice >= Number(match[1]) && setPrice <= Number(match[2]);
@@ -280,6 +282,38 @@ const server = http.createServer(async (request, response) => {
     specs: 'SHIRT-101: Black / M · PANTS-202: Stone / M',
   }, 'Set cart grouping must rehydrate from server after local Set draft loss');
 
+  // A delayed generic cart rerender must not split the Set or let a 40% Dart Card override the Set's own 10% price.
+  await page.evaluate(() => {
+    const customer = { customerId: 'DR-SET-TEST' };
+    window.DartPlatform.currentUser = () => customer;
+    window.DartPlatform.activeBirthdayReward = () => null;
+    window.DartPlatform.activeDartCard = () => ({
+      cardId: 'CARD-40', clientId: customer.customerId, status: 'Active',
+      discountPercent: 40, itemLimit: 10, purchasedItems: 0,
+    });
+    window.setTimeout(() => window.renderCart(), 50);
+  });
+  await page.waitForTimeout(180);
+  const delayedRender = await page.evaluate(() => ({
+    groupedCards: document.querySelectorAll('#cartItemsContainer [data-dart-set-cart-card="1"]').length,
+    visibleBaseCards: [...document.querySelectorAll('#cartItemsContainer .cart-product-card:not(#cartItemTemplate):not([data-dart-set-cart-card="1"])')]
+      .filter((node) => getComputedStyle(node).display !== 'none').length,
+    subtotal: document.getElementById('subtotalVal')?.textContent?.trim(),
+    discount: document.getElementById('discountVal')?.textContent?.trim(),
+    total: document.getElementById('totalVal')?.textContent?.trim(),
+    discountInput: document.getElementById('discountInput')?.value,
+    appliedPromotion: window.dartAppliedPromotion?.type || null,
+  }));
+  assert.deepEqual(delayedRender, {
+    groupedCards: 1,
+    visibleBaseCards: 0,
+    subtotal: '1100 EGP',
+    discount: '110 EGP',
+    total: '990 EGP',
+    discountInput: 'SET 10% — AUTO',
+    appliedPromotion: null,
+  }, 'Delayed cart renders must preserve Set identity and Set discount priority over Dart Card');
+
   // A real page reload remains grouped and must not attach duplicate Set groups.
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('#cartItemsContainer [data-dart-set-cart-card="1"]').length === 1);
@@ -288,7 +322,7 @@ const server = http.createServer(async (request, response) => {
   assert.equal(serverAfterReload.attachCount, 1, 'Read-only rehydration must not duplicate/reattach Set groups');
 
   assert.deepEqual(failures, []);
-  console.log('PASS Sets storefront browser: unified Products listing/filter/sort, Set category, full-card modal, atomic two-piece cart reservation, server Set-group snapshot and reload rehydration.');
+  console.log('PASS Sets storefront browser: unified Products listing/filter/sort, Set category, full-card modal, atomic two-piece cart reservation, Set discount priority through delayed rerenders, server Set-group snapshot and reload rehydration.');
   await context.close(); await browser.close(); server.close();
 })().catch((error) => {
   console.error(error.stack || error);

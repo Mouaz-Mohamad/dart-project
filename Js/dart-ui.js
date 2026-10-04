@@ -671,8 +671,18 @@ function updateCartCount() {
     });
 }
 
+function cartLineIsSetComponent(line) {
+    return Boolean(
+        String(line?.setGroupId || '').trim() ||
+        String(line?.dartSetKey || '').trim() ||
+        (String(line?.setId || '').trim() &&
+            Number(line?.dartSetUnitIndex || line?.setUnitIndex || 0) > 0)
+    );
+}
+
 function syncBirthdayCheckoutDiscount(showNotice = false) {
     const hasUndiscountedPiece = cartData.some((line) => {
+        if (cartLineIsSetComponent(line)) return false;
         const model = window.DartCatalog?.model?.(line.id);
         return Number(model?.discount || 0) <= 0 && Number(line.quantity || 0) > 0;
     });

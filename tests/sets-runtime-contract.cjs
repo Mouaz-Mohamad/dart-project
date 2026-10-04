@@ -45,6 +45,9 @@ assert(sets.includes('DEFAULT_SETTINGS = Object.freeze({ birthdayPercent: 10, da
 assert(sets.includes('card.addEventListener("click"') && sets.includes('["Enter", " "].includes(event.key)'), "The whole Set card must open like a Product card by pointer or keyboard");
 assert(sets.includes('const groupsById=new Map') && sets.includes('const serverGroupId=String(line.setGroupId'), "Cart Set grouping must use explicit server group identity");
 assert(!sets.includes('cart.find(row=>!row.dartSetKey&&String(row.id)===selection.modelId'), "Cart Set grouping must never guess membership from model/color/size");
+assert(sets.includes("function installCartUiBridge()") && sets.includes("root.renderCart=function renderCartWithSets"), "Every generic cart rerender must re-apply Set grouping");
+assert(sets.includes("root.updateCartTotals=function updateCartTotalsWithSets") && sets.includes("syncSetDiscountSummary(cart,groups,groupKeys)"), "Set-aware totals must win after generic totals and keep the Set discount summary");
+assert(ui.includes("function cartLineIsSetComponent(line)") && ui.includes("if (cartLineIsSetComponent(line)) return false;"), "Set components must not trigger ordinary Birthday/Dart Card fallback eligibility");
 
 assert(admin.includes('setsButton.dataset.modelSetView="sets"'), "Models section must expose the Sets view inside the shared second bar");
 assert(admin.includes('dashboardControls()'), "Models / Sets must share the existing Models dashboard controls");

@@ -881,6 +881,33 @@
     if (subtotalEl) subtotalEl.textContent=`${Math.trunc(subtotal)} EGP`;
     if (discountEl) discountEl.textContent=`${Math.trunc(discount)} EGP`;
     if (totalEl) totalEl.textContent=`${Math.trunc(finalTotal)} EGP`;
+    syncSetDiscountSummary(cart,groups,groupKeys);
+  }
+
+  function syncSetDiscountSummary(cart,groups,groupKeys) {
+    if (!groups.length || cart.some((line)=>!line.dartSetKey||!groupKeys.has(line.dartSetKey))) return;
+    const discounted=groups
+      .map((group)=>({source:String(group.discountSource||"None"),percent:Math.max(0,Math.min(100,Number(group.discountPercent)||0))}))
+      .filter((row)=>row.percent>0&&row.source!=="None");
+    if (!discounted.length) return;
+    const first=discounted[0];
+    const uniform=discounted.length===groups.length&&discounted.every((row)=>row.source===first.source&&row.percent===first.percent);
+    const input=root.document.getElementById("discountInput");
+    const button=root.document.getElementById("applyDiscountBtn");
+    const box=input?.closest?.(".discount-box");
+    let note=root.document.querySelector(".birthday-auto-discount-note");
+    if (input) {
+      input.value=uniform?`${first.source.toUpperCase()} ${Math.round(first.percent)}% — AUTO`:"SET PRICING — AUTO";
+      input.disabled=true;
+      input.dataset.dartSetSummary="1";
+    }
+    if (button) { button.disabled=true; button.textContent="Applied"; }
+    if (box&&!note) {
+      note=root.document.createElement("p");
+      note.className="birthday-auto-discount-note";
+      box.insertAdjacentElement("afterend",note);
+    }
+    if (note) note.textContent="Set pricing is calculated as one commercial unit; no second discount is stacked on the same Set pieces.";
   }
 
   async function removeSetGroup(key) {
@@ -948,6 +975,28 @@
 
   function scheduleCartDecoration() { root.setTimeout(decorateCart,0); }
 
+  function installCartUiBridge() {
+    if (root.__dartSetsCartUiWrapped) return;
+    const originalRenderCart=typeof root.renderCart==="function"?root.renderCart:null;
+    const originalUpdateCartTotals=typeof root.updateCartTotals==="function"?root.updateCartTotals:null;
+    if (!originalRenderCart&&!originalUpdateCartTotals) return;
+    root.__dartSetsCartUiWrapped=true;
+    if (originalUpdateCartTotals) {
+      root.updateCartTotals=function updateCartTotalsWithSets(...args) {
+        const result=originalUpdateCartTotals.apply(this,args);
+        if (drafts().length) renderSetAwareTotals();
+        return result;
+      };
+    }
+    if (originalRenderCart) {
+      root.renderCart=function renderCartWithSets(...args) {
+        const result=originalRenderCart.apply(this,args);
+        scheduleCartDecoration();
+        return result;
+      };
+    }
+  }
+
   async function restoreServerGroups() {
     const id=root.DartSets?.currentReservationId?.(); if (!id) return;
     // A fresh Dart session creates a local CART id before any server reservation exists.
@@ -983,6 +1032,7 @@
 
   async function boot() {
     installReservationBridge();
+    installCartUiBridge();
     try { setCatalog=await root.DartSets.loadCatalog(true); } catch (error) { console.warn("Dart Sets catalog unavailable",error); setCatalog=[]; }
     ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); observe();
     lastAttachedGroups=drafts();
