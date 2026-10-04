@@ -72,7 +72,7 @@ const server = http.createServer(async (request, response) => {
         models,
         stock: {
           '["SHIRT-101","Black","M"]': 3, '["SHIRT-101","Black","L"]': 2,
-          '["PANTS-202","Stone","M"]': 3, '["PANTS-202","Stone","L"]': 2,
+          '["PANTS-202","Stone","M"]': 3,
         },
       });
       if (pathname === '/api/v1/catalog/version') return json(response, 200, { version: 7 });
@@ -230,6 +230,7 @@ const server = http.createServer(async (request, response) => {
   assert.equal(await page.locator('#productsPart1 .product-card[data-id]:visible, #productsPart2 .product-card[data-id]:visible').count(), 0);
   const setCard = page.locator('[data-dart-set-card="1"][data-dart-set-id="SET-CAMPUS-1"]');
   await setCard.waitFor({ state: 'visible' });
+  assert.notEqual((await setCard.locator('.stock-badge').textContent()).trim(), 'Sold Out', 'An unavailable offered size must not hide a purchasable Set');
 
   // Whole-card interaction opens the real Set modal; every physical component has its own variant selectors.
   await setCard.locator('.product-title').click();

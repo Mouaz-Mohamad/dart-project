@@ -244,12 +244,17 @@
   }
 
   function setAvailable(set) {
-    return (set.components || []).every((component) => {
+    const components = Array.isArray(set?.components) ? set.components : [];
+    return components.length > 0 && components.every((component) => {
       const sizes = activeOptions(component.sizes);
       const colors = activeOptions(component.colors);
       const required = Math.max(1, Number(component.quantity) || 1);
-      return sizes.length > 0 && colors.length > 0 && sizes.every((size) =>
-        colors.every((color) => variantAvailable(component.modelId, size, color) >= required));
+      if (!sizes.length || !colors.length) return false;
+      const availableUnits = sizes.reduce((total, size) => total + colors.reduce(
+        (variantTotal, color) => variantTotal + variantAvailable(component.modelId, size, color),
+        0,
+      ), 0);
+      return availableUnits >= required;
     });
   }
 

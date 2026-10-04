@@ -19,12 +19,12 @@ describe("Set lifecycle integrity contracts", () => {
     expect(cart).toContain('client.query("ROLLBACK")');
   });
 
-  it("enforces strict Set Sold Out rules on the server", () => {
+  it("validates the selected reserved pieces instead of requiring every offered variant", () => {
     const cart = source("src/modules/sets/set-cart.service.ts");
-    expect(cart).toContain("assertEveryOfferedVariantAvailable");
-    expect(cart).toContain("SET_SOLD_OUT");
-    expect(cart).toContain("FOR SHARE");
-    expect(cart).toContain("cart_reservation_id=$2");
+    expect(cart).not.toContain("assertEveryOfferedVariantAvailable");
+    expect(cart).toContain("validateSelections(components, selections)");
+    expect(cart).toContain("SET_RESERVED_ITEMS_MISMATCH");
+    expect(cart).toContain("usedInventoryIds");
   });
 
   it("retires Set Waiting without deleting its historical records", () => {

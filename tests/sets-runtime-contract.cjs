@@ -40,7 +40,8 @@ assert(sets.includes("data-set-color") && sets.includes("data-set-size"), "Set m
 assert(setModalUi.includes('.dart-set-carousel{margin:0;width:100%;aspect-ratio:3/4'), "Set carousel must use a portrait 3:4 aspect ratio");
 assert(setModalUi.includes('calc(58dvh * 3 / 4)') && setModalUi.includes('aspect-ratio:3/4'), "Mobile Set carousel must preserve the portrait 3:4 aspect ratio");
 assert(setModalUi.includes('.dart-set-piece-image img{display:block;width:100%;aspect-ratio:9/16'), "Set component images must remain portrait 9:16");
-assert(sets.includes('sizes.every((size) =>') && sets.includes('colors.every((color) => variantAvailable'), "A Set must become Sold Out when any offered size/color option is unavailable");
+assert(sets.includes('const availableUnits = sizes.reduce') && sets.includes('return availableUnits >= required'), "A Set must remain purchasable when its available variants can supply every required piece");
+assert(!sets.includes('sizes.every((size) =>') && !sets.includes('colors.every((color) => variantAvailable'), "One unavailable offered option must not mark the whole Set Sold Out");
 assert(sets.includes('stockBadge.textContent = "Sold Out"') && !sets.includes('stockBadge.textContent = "Waiting available"'), "Set cards must show Sold Out instead of Waiting");
 assert(sets.includes("function syncSetCards(rows, target = null)"), "Set catalogue rendering must reconcile keyed cards instead of recreating every card");
 assert(sets.includes("function syncSetCartCard(card, group, set, pricing, key)"), "Set cart rendering must reconcile keyed group cards");
