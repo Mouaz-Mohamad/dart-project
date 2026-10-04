@@ -603,23 +603,17 @@ function renderReviewsLogic() {
 }
 
 // ==========================================
-// 4. دوال السلة، الخصم، وإتمام الطلب
-// ==========================================
-
 function showToast(message) {
     const existingToast = document.querySelector('.custom-toast');
     if (existingToast) existingToast.remove();
-
     const toast = document.createElement('div');
     toast.className = 'custom-toast';
     toast.innerText = message;
     document.body.appendChild(toast);
-
     setTimeout(() => {
         toast.remove();
     }, 3000);
 }
-
 function updateConnectivityBanner() {
     let banner = document.getElementById('dartConnectivityBanner');
     const offline = !navigator.onLine;
@@ -644,7 +638,6 @@ function updateConnectivityBanner() {
         window.dartConnectivityTimer = setTimeout(() => banner.classList.remove('is-visible', 'is-restored'), 1800);
     }
 }
-
 window.addEventListener('offline', updateConnectivityBanner);
 window.addEventListener('online', updateConnectivityBanner);
 window.addEventListener('dart:cart-reservation-expired', event => {
@@ -660,17 +653,14 @@ window.addEventListener('dart:cart-reservation-expired', event => {
         cartContainer.appendChild(state);
     }
 });
-
 function updateCartCount() {
     const totalItems = cartData.reduce((sum, item) => sum + (item.quantity || 1), 0);
-    
     const elements = document.querySelectorAll('.cart-count, #cartCount');
     elements.forEach(el => {
         el.textContent = totalItems;
         el.style.display = totalItems > 0 ? 'inline-block' : 'none';
     });
 }
-
 function syncBirthdayCheckoutDiscount(showNotice = false) {
     const hasUndiscountedPiece = cartData.some((line) => {
         if (line?.setGroupId || line?.dartSetKey) return false;
@@ -693,7 +683,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
     const discountBtn = document.getElementById('applyDiscountBtn');
     const discountBox = discountInput?.closest('.discount-box');
     let note = document.querySelector('.birthday-auto-discount-note');
-
     if (activeCampaign) {
         appliedDiscountRate = Math.max(0, Math.min(1, Number(activeCampaign.discountPercent ?? activeCampaign.percent ?? 0) / 100));
         if (discountInput) {
@@ -712,7 +701,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         if (note) note.textContent = 'Campaign discount applies only to items without their own item discount.';
         return true;
     }
-
     if (birthdayReward) {
         window.dartAppliedPromotion = { ...birthdayReward, type: 'Birthday' };
         appliedDiscountRate = Math.max(0, Math.min(1, Number(birthdayReward.discountPercent ?? 30) / 100));
@@ -733,7 +721,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         if (showNotice) showToast(`تم تطبيق خصم عيد الميلاد ${Math.round(appliedDiscountRate * 100)}% تلقائيًا.`);
         return true;
     }
-
     if (dartCard) {
         const cardPercent = Number(dartCard.discountPercent ?? window.DartSiteSettings?.get?.().dartCardDiscountPercent ?? 40);
         window.dartAppliedPromotion = { ...dartCard, type: 'Dart Card', percent: cardPercent };
@@ -755,7 +742,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         if (showNotice) showToast(`تم تطبيق خصم Dart Card بنسبة ${Math.round(cardPercent)}% تلقائيًا.`);
         return true;
     }
-
     if (['Birthday', 'Dart Card'].includes(window.dartAppliedPromotion?.type)) {
         window.dartAppliedPromotion = null;
         appliedDiscountRate = 0;
@@ -771,13 +757,11 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
     note?.remove();
     return false;
 }
-
 function updateCartTotals() {
     syncBirthdayCheckoutDiscount();
     const subtotalEl = document.getElementById('subtotalVal');
     const totalEl = document.getElementById('totalVal');
     const discountEl = document.getElementById('discountVal');
-
     let subtotal = 0;
     let finalTotal = 0;
     let remainingCardItems = window.dartAppliedPromotion?.type === 'Dart Card'
@@ -797,32 +781,25 @@ function updateCartTotals() {
         }
     });
     const discountAmount = Math.max(0, subtotal - finalTotal);
-
     if (subtotalEl) subtotalEl.textContent = `${Math.trunc(subtotal)} EGP`;
     if (discountEl) discountEl.textContent = `${Math.trunc(discountAmount)} EGP`;
     if (totalEl) totalEl.textContent = `${Math.trunc(finalTotal)} EGP`;
 }
-
 function renderCart() {
     const container = document.getElementById('cartItemsContainer');
     const template = document.getElementById('cartItemTemplate');
-    
     if (!container || !template) return;
-
     container.querySelectorAll('.cart-product-card:not(#cartItemTemplate)').forEach(el => el.remove());
     container.querySelector('.dart-cart-empty-state')?.remove();
-
     if (!cartData.length) {
         const empty = createUiState('empty', 'Your cart is empty', 'Choose a product, size and color to start a 15-minute reservation.');
         empty.classList.add('dart-cart-empty-state');
         container.appendChild(empty);
     }
-
     cartData.forEach((item, index) => {
         const card = template.cloneNode(true);
         card.removeAttribute('id');
         card.style.display = 'flex';
-
         card.querySelector('.cart-product-img').src = item.image;
         card.querySelector('.cart-product-img').alt = `${item.title} in ${item.color}, size ${item.size}`;
         card.querySelector('.cart-product-title').textContent = item.title;
@@ -831,21 +808,17 @@ function renderCart() {
         card.querySelector('.cart-item-price').textContent = `${Math.trunc(Number(item.price) || 0)} EGP`;
         card.querySelector('.qty-value').textContent = item.quantity;
         card.querySelector('.p-total').textContent = Math.trunc(item.price * item.quantity);
-
         card.querySelector('.increase').addEventListener('click', async () => {
             const product = productsData.find(p => p.id === item.id);
             const availableStock = product ? getAvailableStock(product, item.size, item.color) : 0;
-
             if (cartData[index].quantity >= availableStock) {
                 showToast(`عذراً، المتاح بالمخزون ${availableStock} قطع فقط.`);
                 return;
             }
-
             cartData[index].quantity += 1;
             if (!await persistCartReservation()) return renderCart();
             renderCart();
         });
-
         card.querySelector('.decrease').addEventListener('click', async () => {
             if (cartData[index].quantity > 1) {
                 cartData[index].quantity -= 1;
@@ -853,20 +826,16 @@ function renderCart() {
                 renderCart();
             }
         });
-
         card.querySelector('.remove-item-btn').addEventListener('click', async () => {
             cartData.splice(index, 1);
             if (!await persistCartReservation()) return renderCart();
             renderCart();
         });
-
         container.appendChild(card);
     });
-
     updateCartTotals();
     updateCartCount();
 }
-
 async function persistCartReservation(previousSnapshot = null) {
     const previous = previousSnapshot
         ?? window.DartState?.clone?.(window.DartState?.read?.('dart_cart', []) || [])
@@ -892,7 +861,6 @@ async function persistCartReservation(previousSnapshot = null) {
         return false;
     }
 }
-
 async function resolveAutomaticCampaign() {
     if (!cartData.length || !window.DartPlatform?.currentUser?.() || !window.DartPlatform?.apiRequest) return;
     if (window.dartAppliedPromotion?.type === 'Promotion' && !window.dartAppliedPromotion?.automatic) return;
@@ -913,12 +881,10 @@ async function resolveAutomaticCampaign() {
         if (error?.status !== 401) console.warn('Automatic promotion resolution failed', error);
     }
 }
-
 window.addEventListener('dart:customer-session-changed', () => { void resolveAutomaticCampaign(); });
 document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(() => { void resolveAutomaticCampaign(); }, 0);
 });
-
 function initCartAndCheckoutEvents() {
     const cartView = document.getElementById('cartView');
     const checkoutView = document.getElementById('checkoutView');
@@ -926,20 +892,16 @@ function initCartAndCheckoutEvents() {
     const checkoutForm = document.getElementById('checkoutForm');
     const discountBtn = document.getElementById('applyDiscountBtn');
     const discountInput = document.getElementById('discountInput');
-
     window.DartPlatform?.cleanupCartReservations?.();
     cartData = window.DartState?.read?.('dart_cart', []) || [];
     if (cartView) cartView.style.display = 'block';
-
     renderCart();
-
     if (discountBtn && discountInput) {
         discountBtn.addEventListener('click', async () => {
             if (syncBirthdayCheckoutDiscount(true)) {
                 updateCartTotals();
                 return;
             }
-
             const code = discountInput.value.trim().toUpperCase();
             if (!code) {
                 window.dartAppliedPromotion = null;
@@ -948,7 +910,6 @@ function initCartAndCheckoutEvents() {
                 updateCartTotals();
                 return;
             }
-
             let promotion = null;
             if (window.DartPlatform?.apiRequest) {
                 if (!window.DartPlatform?.currentUser?.()) {
@@ -983,7 +944,6 @@ function initCartAndCheckoutEvents() {
                     ) || null;
                 } catch {}
             }
-
             if (promotion) {
                 promotion.type = 'Promotion';
                 promotion.code = code;
@@ -1001,7 +961,6 @@ function initCartAndCheckoutEvents() {
             updateCartTotals();
         });
     }
-
     if (toCheckoutBtn && checkoutView) {
         toCheckoutBtn.addEventListener('click', () => {
             if (cartData.length === 0) {
@@ -1021,11 +980,9 @@ function initCartAndCheckoutEvents() {
             setTimeout(() => window.dartCheckoutAddress?.invalidate?.(), 320);
         });
     }
-
     if (checkoutForm) {
         checkoutForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-
             if (window.DartPlatform?.checkout) {
                 try {
                     const order = await window.DartPlatform.checkout(checkoutForm);
@@ -1059,7 +1016,6 @@ function initCartAndCheckoutEvents() {
                             showToast("لم يتم إنشاء الطلب. راجع الأسعار الجديدة في السلة.");
                             return;
                         }
-
                         changes.forEach(change => {
                             cartData
                                 .filter(line =>
@@ -1074,7 +1030,6 @@ function initCartAndCheckoutEvents() {
                         });
                         window.DartState?.write?.('dart_cart', cartData, { source: 'cart' });
                         renderCart();
-
                         try {
                             const order = await window.DartPlatform.checkout(
                                 checkoutForm,
@@ -1100,18 +1055,13 @@ function initCartAndCheckoutEvents() {
                 }
                 return;
             }
-
             if (!DART_LOCAL_DEMO_MODE) {
                 showToast("خدمة إتمام الطلب غير متاحة الآن. لم يتم إنشاء أي طلب.");
                 return;
             }
-
-            // فحص وجود موقع من الخريطة/GPS
             const latVal = document.getElementById('lat-input')?.value.trim();
             const addressInputVal = document.getElementById('address-input')?.value.trim();
             const hasGpsAddress = Boolean(latVal || addressInputVal);
-
-            // فحص إدخال أي عنوان يدوياً داخل other-addres
             const manualInputs = document.querySelectorAll('.other-addres input');
             let hasManualAddress = false;
             manualInputs.forEach(inputEl => {
@@ -1119,13 +1069,10 @@ function initCartAndCheckoutEvents() {
                     hasManualAddress = true;
                 }
             });
-
-            // الشرط: إما إحداثيات/عنوان الخريطة أو أحد الحقول اليدوية
             if (!hasGpsAddress && !hasManualAddress) {
                 showToast("يرجى تحديد الموقع على الخريطة أو إدخال العنوان يدوياً لإتمام الطلب!");
                 return;
             }
-
             cartData = [];
             await persistCartReservation();
             appliedDiscountRate = 0;
@@ -1137,11 +1084,6 @@ function initCartAndCheckoutEvents() {
         });
     }
 }
-
-
-// ==========================================
-// 5. تهيئة الخريطة والبحث عن العنوان (معتمد على GPS و OpenStreetMap)
-// ==========================================
 function initAddressMap() {
     if (window.DartAddress) {
         window.DartAddress.initCheckout();
@@ -1150,18 +1092,11 @@ function initAddressMap() {
     const mapElement = document.getElementById('map');
     const input = document.getElementById('address-input');
     const resultsList = document.getElementById('results-list');
-
     if (!mapElement || typeof L === 'undefined') return;
-
-    // Fallback only: use a broad Cairo/Giza envelope, then verify the returned
-    // administrative governorate. The primary implementation lives in
-    // Js/dart-address.js and follows the same rule.
     const CAIRO_GIZA_BOUNDS = L.latLngBounds([27.00, 27.00], [30.65, 32.25]);
-
     function isWithinCairoGizaEnvelope(lat, lng) {
         return CAIRO_GIZA_BOUNDS.contains(L.latLng(lat, lng));
     }
-
     function fallbackGovernorate(result) {
         const address = result?.address || {};
         const raw = String(address.state || address.governorate || address.region || '').trim().toLocaleLowerCase();
@@ -1170,47 +1105,35 @@ function initAddressMap() {
         if (iso === 'EG-GZ' || ['giza', 'giza governorate', 'al jizah', 'الجيزة', 'محافظة الجيزة'].includes(raw)) return 'Giza';
         return '';
     }
-
-    // إخفاء حقول العنوان اليدوي والتحكم في ظهورها عند النقر على السهم
     const otherAddressDiv = document.querySelector('.other-addres');
     const arrowBtn = document.querySelector('.arrwo-for-other-adrees');
-
     if (otherAddressDiv) {
         otherAddressDiv.style.display = 'none';
     }
-
     if (arrowBtn && otherAddressDiv) {
         arrowBtn.addEventListener('click', () => {
             const isHidden = otherAddressDiv.style.display === 'none';
             otherAddressDiv.style.display = isHidden ? 'block' : 'none';
         });
     }
-
     try {
         if (window.orderMap) window.orderMap.remove();
-
-        // Keep navigation around the two launch governorates.
         const map = L.map('map', { 
             attributionControl: true,
             zoomControl: false,
             maxBounds: CAIRO_GIZA_BOUNDS,
             maxBoundsViscosity: 1
         }).setView([30.0444, 31.2357], 11);
-        
         window.orderMap = map;
         map.attributionControl?.setPrefix(false);
-
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4571_1_f3f5f58e8a8808e98e8b6df9', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
         }).addTo(map);
-
         setTimeout(() => map.invalidateSize(), 300);
-
         if (window.ResizeObserver) {
             new ResizeObserver(() => map.invalidateSize()).observe(mapElement);
         }
-
         const customIcon = L.divIcon({
             className: 'custom-map-pin',
             html: `<div style="color: #ef4444; font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); cursor: pointer;">
@@ -1219,12 +1142,10 @@ function initAddressMap() {
             iconSize: [30, 30],
             iconAnchor: [15, 30]
         });
-
         let marker = null;
         let selectedAddressData = null;
         let timeout = null;
         let userInteractedWithAddress = false;
-
         window.getCartAddressData = function() {
             return selectedAddressData || {
                 address: input ? input.value : '',
@@ -1232,7 +1153,6 @@ function initAddressMap() {
                 lng: document.getElementById('lng-input')?.value || null
             };
         };
-
         async function setLocation(lat, lon, knownResult = null) {
             if (!isWithinCairoGizaEnvelope(lat, lon)) {
                 if (typeof showToast === 'function') {
@@ -1242,7 +1162,6 @@ function initAddressMap() {
                 }
                 return false;
             }
-
             let result = knownResult;
             try {
                 if (!result?.address) {
@@ -1254,30 +1173,23 @@ function initAddressMap() {
                 if (typeof showToast === 'function') showToast('The delivery governorate could not be verified. Try again.');
                 return false;
             }
-
             const governorate = fallbackGovernorate(result);
             if (!governorate) {
                 if (typeof showToast === 'function') showToast('Delivery is currently available in Cairo and Giza only.');
                 else window.DartDialog.alert('Delivery is currently available in Cairo and Giza only.');
                 return false;
             }
-
             const addressName = result.display_name || `${lat}, ${lon}`;
-
             const latInp = document.getElementById('lat-input');
             const lngInp = document.getElementById('lng-input');
             const fmtInp = document.getElementById('formatted-address-input');
-
             if (latInp) latInp.value = lat;
             if (lngInp) lngInp.value = lon;
-
             map.setView([lat, lon], 16);
-
             if (marker) {
                 marker.setLatLng([lat, lon]);
             } else {
                 marker = L.marker([lat, lon], { draggable: true, icon: customIcon }).addTo(map);
-
                 marker.on('dragend', (e) => {
                     userInteractedWithAddress = true;
                     const position = e.target.getLatLng();
@@ -1291,10 +1203,8 @@ function initAddressMap() {
                     setLocation(position.lat, position.lng);
                 });
             }
-
             if (input) input.value = addressName;
             if (fmtInp) fmtInp.value = addressName;
-
             const components = result.address || {};
             selectedAddressData = {
                 address: addressName,
@@ -1308,7 +1218,6 @@ function initAddressMap() {
                 floor: ''
             };
             marker.bindPopup(addressName).openPopup();
-
             if (window.DartPlatform?.saveCustomerAddress) {
                 window.DartPlatform.saveCustomerAddress(selectedAddressData).catch(error => {
                     console.warn('Saved address sync failed', error);
@@ -1317,28 +1226,23 @@ function initAddressMap() {
                 throw new Error('Saved addresses require the secure API.');
             }
         }
-
         map.on('click', (e) => {
             userInteractedWithAddress = true;
             setLocation(e.latlng.lat, e.latlng.lng);
         });
-
         const applySavedLocation = (parsed) => {
             if (!parsed || userInteractedWithAddress) return false;
             if (!isWithinCairoGizaEnvelope(parsed.lat, parsed.lng)) return false;
             void setLocation(parsed.lat, parsed.lng);
             return true;
         };
-
         const savedLoc = window.DartState?.read?.('user_last_address', null);
         let restoredSavedLocation = false;
         if (savedLoc) restoredSavedLocation = applySavedLocation(savedLoc);
         if (!restoredSavedLocation) fetchGPS();
-
         window.addEventListener('dart:saved-address-hydrated', event => {
             applySavedLocation(event.detail?.address);
         });
-
         function fetchGPS() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -1348,7 +1252,6 @@ function initAddressMap() {
                 );
             }
         }
-
         const controlsGroup = L.control({ position: 'bottomright' });
         controlsGroup.onAdd = function() {
             const container = L.DomUtil.create('div', 'map-controls-container');
@@ -1356,7 +1259,6 @@ function initAddressMap() {
             container.style.flexDirection = 'column';
             container.style.gap = '8px';
             container.style.margin = '10px';
-
             const locateBtn = document.createElement('button');
             locateBtn.type = 'button';
             locateBtn.title = 'Use my current location';
@@ -1372,7 +1274,6 @@ function initAddressMap() {
                 userInteractedWithAddress = true;
                 fetchGPS();
             };
-
             const resetBtn = document.createElement('button');
             resetBtn.type = 'button';
             resetBtn.title = 'Clear saved address';
@@ -1403,32 +1304,26 @@ function initAddressMap() {
                 if (marker) map.removeLayer(marker);
                 marker = null;
             };
-
             container.appendChild(locateBtn);
             container.appendChild(resetBtn);
             return container;
         };
         controlsGroup.addTo(map);
-
         if (input && resultsList) {
             input.addEventListener('input', () => {
                 clearTimeout(timeout);
                 const query = input.value.trim();
-
                 if (query.length < 2) {
                     resultsList.style.display = 'none';
                     return;
                 }
-
                 resultsList.innerHTML = '<li style="color:#888; padding:10px;"><i class="fa-solid fa-spinner fa-spin"></i> Searching…</li>';
                 resultsList.style.display = 'block';
-
                 timeout = setTimeout(async () => {
                     try {
                         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&countrycodes=eg&addressdetails=1`);
                         const data = (await response.json()).filter(item => isWithinCairoGizaEnvelope(item.lat, item.lon) && fallbackGovernorate(item));
                         resultsList.innerHTML = '';
-
                         if (data && data.length > 0) {
                             data.forEach(item => {
                                 const li = document.createElement('li');
@@ -1448,7 +1343,6 @@ function initAddressMap() {
                     }
                 }, 400);
             });
-
             document.addEventListener('click', (e) => {
                 if (e.target !== input) resultsList.style.display = 'none';
             });
@@ -1457,19 +1351,10 @@ function initAddressMap() {
         console.error("خطأ في الخريطة:", err);
     }
 }
-
-// ==========================================
-// 6. خريطة تتبع الطلب (وجهة ثابتة + موقع متغير)
-// ==========================================
-// ==========================================
-// 6. الفلترة والبانر
-// ==========================================
-
 function filterProductsByCategory(selectedCat) {
     productFilterState.category = !selectedCat || selectedCat.toLocaleLowerCase() === 'all' ? 'all' : selectedCat;
     renderProductPageResults();
 }
-
 function setProductFilterSelectOptions(select, values, firstLabel) {
     if (!select) return;
     const current = select.value || 'all';
@@ -1477,7 +1362,6 @@ function setProductFilterSelectOptions(select, values, firstLabel) {
     values.forEach(value => select.add(new Option(value, value)));
     select.value = [...select.options].some(option => option.value === current) ? current : 'all';
 }
-
 function resetProductFilters() {
     Object.assign(productFilterState, {
         query: '', category: 'all', size: 'all', color: 'all',
@@ -1495,7 +1379,6 @@ function resetProductFilters() {
     renderProductPageResults();
     window.dispatchEvent(new CustomEvent('dart:product-filters-rendered'));
 }
-
 function initProductFilterToggle() {
     const button = document.getElementById('toggleProductFilters');
     const panel = document.getElementById('productFiltersPanel');
@@ -1508,13 +1391,11 @@ function initProductFilterToggle() {
         if (label) label.textContent = panel.hidden ? 'Filter products' : 'Hide filters';
     });
 }
-
 function renderFilterButtons() {
     const filterContainer = document.getElementById('filterContainer');
     if (!filterContainer) return;
     productsData = DartCatalog.products();
     if (!productsData.length && !publicCatalogProducts().length) return;
-
     const catalog = publicCatalogProducts();
     const categoryMap = new Map();
     catalog.forEach(product => {
@@ -1530,13 +1411,11 @@ function renderFilterButtons() {
     const sizes = [...new Set(pairs.map(pair => pair.size))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     const colors = [...new Set(pairs.map(pair => pair.color))].sort((a, b) => a.localeCompare(b, ['en', 'ar']));
     const prices = catalog.map(product => Number(product.price) || 0).filter(price => price > 0).sort((a, b) => a - b);
-
     filterContainer.innerHTML = categories.map(cat => `
         <button type="button" class="filter-btn ${String(productFilterState.category).toLocaleLowerCase() === String(cat).toLocaleLowerCase() ? 'active' : ''}" data-category="${escapeCatalogHtml(cat)}">
             ${escapeCatalogHtml(cat)}
         </button>
     `).join('');
-
     setProductFilterSelectOptions(document.getElementById('productSizeFilter'), sizes, 'All sizes');
     setProductFilterSelectOptions(document.getElementById('productColorFilter'), colors, 'All colors');
     const priceSelect = document.getElementById('productPriceFilter');
@@ -1560,18 +1439,14 @@ function renderFilterButtons() {
         priceSelect.value = [...priceSelect.options].some(option => option.value === current) ? current : 'all';
         productFilterState.price = priceSelect.value;
     }
-
     filterContainer.onclick = function(e) {
         const btn = e.target.closest('.filter-btn');
         if (!btn) return;
-
         filterContainer.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-
         const cat = btn.getAttribute('data-category');
         filterProductsByCategory(cat);
     };
-
     const bindings = [
         ['productSearchInput', 'input', element => { productFilterState.query = element.value.trim(); }],
         ['productSizeFilter', 'change', element => { productFilterState.size = element.value; }],
@@ -1594,26 +1469,21 @@ function renderFilterButtons() {
     renderProductPageResults();
     window.dispatchEvent(new CustomEvent('dart:product-filters-rendered'));
 }
-
 function showCartBanner(productTitle) {
     let banner = document.getElementById('cartBanner');
-
     if (!banner) {
         banner = document.createElement('div');
         banner.id = 'cartBanner';
         banner.className = 'cart-banner';
         document.body.appendChild(banner);
     }
-
     const message = document.createElement('span');
     message.style.fontSize = '13px';
     message.textContent = `تم إضافة "${String(productTitle || '')}" للسلة`;
-
     const actions = document.createElement('div');
     actions.style.display = 'flex';
     actions.style.gap = '10px';
     actions.style.alignItems = 'center';
-
     const cartLink = document.createElement('a');
     cartLink.href = '#cartView';
     cartLink.id = 'bannerGoToCart';
@@ -1626,7 +1496,6 @@ function showCartBanner(productTitle) {
         textDecoration: 'none',
         fontSize: '12px'
     });
-
     const close = document.createElement('button');
     close.type = 'button';
     close.setAttribute('aria-label', 'إغلاق إشعار السلة');
@@ -1639,30 +1508,21 @@ function showCartBanner(productTitle) {
         background: 'transparent'
     });
     close.addEventListener('click', () => banner.classList.remove('show'));
-
     actions.append(cartLink, close);
     banner.replaceChildren(message, actions);
     banner.classList.add('show');
-
     clearTimeout(window.cartBannerTimeout);
     window.cartBannerTimeout = setTimeout(() => {
         banner.classList.remove('show');
     }, 2500);
 }
-
-// ==========================================
-// 7. معلومات المستخدم والملف الشخصي
-// ==========================================
-
 document.addEventListener('DOMContentLoaded', () => {
     const sections = document.querySelectorAll('.profile-details, .order-info, .return-info, .waiting-info');
     if (!sections.length) return;
-
     function closeAllSections() {
         sections.forEach(sec => sec.classList.remove('active'));
         document.body.classList.remove('no-scroll');
     }
-
     function openTargetSection(selector) {
         const targetSection = document.querySelector(selector);
         if (targetSection) {
@@ -1672,22 +1532,18 @@ document.addEventListener('DOMContentLoaded', () => {
             history.pushState({ activeSection: selector }, '');
         }
     }
-
     const profileBtns = document.querySelectorAll('.profile');
     if (profileBtns.length) {
         profileBtns.forEach(el => el.addEventListener('click', () => openTargetSection('.profile-details')));
     }
-
     const orderBtns = document.querySelectorAll('.orde2r');
     if (orderBtns.length) {
         orderBtns.forEach(el => el.addEventListener('click', () => openTargetSection('.order-info')));
     }
-
     const returnBtns = document.querySelectorAll('.retur2n');
     if (returnBtns.length) {
         returnBtns.forEach(el => el.addEventListener('click', () => openTargetSection('.return-info')));
     }
-
     const waitingBtns = document.querySelectorAll('.waitin2g');
     if (waitingBtns.length) {
         waitingBtns.forEach(el => el.addEventListener('click', async () => {
@@ -1695,7 +1551,6 @@ document.addEventListener('DOMContentLoaded', () => {
             openTargetSection('.waiting-info');
         }));
     }
-
     const closeBtns = document.querySelectorAll('.fa-arrow-right-from-bracket');
     if (closeBtns.length) {
         closeBtns.forEach(btn => {
@@ -1708,28 +1563,22 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-
     window.addEventListener('popstate', () => {
         closeAllSections();
     });
-
     sections.forEach(section => {
         let startX = 0;
         let startY = 0;
-
         section.addEventListener('touchstart', (e) => {
             if (e.touches && e.touches[0]) {
                 startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
             }
         }, { passive: true });
-
         section.addEventListener('touchend', (e) => {
             if (!e.changedTouches || !e.changedTouches[0]) return;
-
             const endX = e.changedTouches[0].clientX;
             const endY = e.changedTouches[0].clientY;
-
             if (endX - startX > 100 || endY - startY > 150) {
                 if (history.state && history.state.activeSection) {
                     history.back();
@@ -1740,19 +1589,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
-
-// Authentication is handled by dart-platform.js and, later, the Express API.
-
-// ==========================================
-// 10. التشغيل عند تحميل الصفحة
-// ==========================================
-
 document.addEventListener('DOMContentLoaded', async () => {
-    // Header/navigation is critical: initialize it independently so a slow optional
-    // section can never freeze navigation or leave the overlay blocking the page.
     await loadSection('header-container', 'sections/Nav-Bar.html', 5000);
     initHeader();
-
     const optionalSections = [
         ['leaderboard-card', 'sections/leaderboard-card.html'],
         ['birthday', 'sections/birthday.html'],
@@ -1765,7 +1604,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         ['why', 'sections/why-dart.html'],
         ['footer', 'sections/footer.html'],
     ];
-
     renderProductsLogic();
     renderFilterButtons();
     initProductFilterToggle();
@@ -1785,19 +1623,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.DartAddress?.initReturnRequest?.();
     updateCartCount();
     if (!navigator.onLine) updateConnectivityBanner();
-
     const optionalQueue = [];
     const queuedOptionalIds = new Set();
     const completedOptionalIds = new Set();
     let optionalQueueBusy = false;
     let optionalSectionsFinished = false;
-
     const finishOptionalSections = () => {
         if (optionalSectionsFinished || completedOptionalIds.size < optionalSections.length) return;
         optionalSectionsFinished = true;
         document.dispatchEvent(new CustomEvent('dart:sections-loaded'));
     };
-
     const scheduleOptionalQueue = () => {
         if (optionalQueueBusy || !optionalQueue.length) return;
         const run = async () => {
@@ -1821,7 +1656,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.setTimeout(() => { void run(); }, 60);
         }
     };
-
     const queueOptionalSection = (entry) => {
         const [containerId] = entry;
         if (queuedOptionalIds.has(containerId) || completedOptionalIds.has(containerId)) return;
@@ -1829,14 +1663,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         optionalQueue.push(entry);
         scheduleOptionalQueue();
     };
-
     const observableSections = optionalSections.filter(([containerId]) => {
         if (document.getElementById(containerId)) return true;
         completedOptionalIds.add(containerId);
         return false;
     });
     finishOptionalSections();
-
     if ('IntersectionObserver' in window) {
         const optionalObserver = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
@@ -1848,26 +1680,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }, { rootMargin: '700px 0px', threshold: 0.01 });
         observableSections.forEach(([containerId]) => optionalObserver.observe(document.getElementById(containerId)));
-
-        // Ensure the full document eventually hydrates even when the user never scrolls.
-        // Keep this outside the critical Lighthouse/TTI window and retain serialized work.
         window.setTimeout(() => {
             observableSections.forEach((entry, index) => {
                 window.setTimeout(() => queueOptionalSection(entry), index * 220);
             });
         }, 6500);
     } else {
-        // Old-browser fallback: still serialize work instead of injecting every fragment in one task.
         observableSections.forEach((entry, index) => {
             window.setTimeout(() => queueOptionalSection(entry), index * 180);
         });
     }
 });
-
-// =========================================
-// --. الازرار الي بتحولني الي اقسام وصفحات مختلفه
-// =========================================
-
 function initAccountModeToggle() {
     const container = document.querySelector('.container');
     const registerButton = document.querySelector('.register-btn');
@@ -1876,7 +1699,6 @@ function initAccountModeToggle() {
     registerButton.addEventListener('click', () => container.classList.add('active'));
     loginButton.addEventListener('click', () => container.classList.remove('active'));
 }
-
 function warmInternalPageCache() {
     const seen = new Set();
     const warm = (link) => {
@@ -1897,37 +1719,16 @@ function warmInternalPageCache() {
     if ('requestIdleCallback' in window) window.requestIdleCallback(idleWarm, { timeout: 1500 });
     else window.setTimeout(idleWarm, 500);
 }
-
 document.addEventListener('DOMContentLoaded', () => {
     initAccountModeToggle();
 });
-
 document.querySelectorAll("[data-go-products]").forEach((button) =>
     button.addEventListener("click", function () { window.location.href = "products.html"; }),
 );
-
-
-
-// ==========================================
-// DART HERO - ADVANCED TYPING EFFECT
-// ==========================================
-
 const typingContainer = document.getElementById("dartTyping");
-
-
-// ==========================================
-// الجمل والكلمات
-// كل كلمة تقدر تتحكم فيها بشكل منفصل
-// ==========================================
-
 const defaultScenes = [
-
-    // =========================
-    // SCENE 1
-    // =========================
     {
         hold: 2000,
-
         words: [
                         {
                 text: "Dart |",
@@ -1943,14 +1744,8 @@ const defaultScenes = [
             },
         ]
     },
-
-
-    // =========================
-    // SCENE 2 ff
-    // =========================
     {
         hold: 2000,
-
         words: [
             {
                 text: "Delivered Fast",
@@ -1958,14 +1753,12 @@ const defaultScenes = [
                 size: "35px",
                 weight: "400"
             },
-
             {
                 text: "up to",
                 color: "#fff",
                 size: "35px",
                 weight: "400"
             },
-
             {
                 text: "12h.",
                 color: "#AB012B",
@@ -1974,14 +1767,8 @@ const defaultScenes = [
             }
         ]
     },
-
-
-    // =========================
-    // SCENE 3
-    // =========================
     {
         hold: 2500,
-
         words: [
             {
                 text: "30%",
@@ -1989,14 +1776,12 @@ const defaultScenes = [
                 size: "40px",
                 weight: "700"
             },
-
             {
                 text: "birthday",
                 color: "#fff",
                 size: "30px",
                 weight: "500"
             },
-
             {
                 text: "discount.",
                 color: "#fff",
@@ -2005,14 +1790,8 @@ const defaultScenes = [
             }
         ]
     },
-
-
-    // =========================
-    // SCENE 4
-    // =========================
     {
         hold: 2200,
-
         words: [
             {
                 text: "Easy",
@@ -2020,7 +1799,6 @@ const defaultScenes = [
                 size: "50px",
                 weight: "500"
             },
-
             {
                 text: "R&E",
                 color: "#fff",
@@ -2029,14 +1807,9 @@ const defaultScenes = [
             },
         ]
     },
-    // =========================
-    // SCENE 5
-    // =========================
     {
         hold: 2200,
-
         words: [
-            
             {
                 text: "Made",
                 color: "#fff",
@@ -2051,9 +1824,7 @@ const defaultScenes = [
             },
         ]
     }
-
 ];
-
 let scenes = [];
 let typingSpeed = 70;
 let deletingSpeed = 10;
@@ -2064,7 +1835,6 @@ let wordIndex = 0;
 let charIndex = 0;
 let typingRunId = 0;
 let heroCursorFrame = 0;
-
 function syncHeroCursor() {
     heroCursorFrame = 0;
     if (!typingContainer) return;
@@ -2077,19 +1847,16 @@ function syncHeroCursor() {
     const y = lastWord ? lastWord.offsetTop : 0;
     cursor.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
 }
-
 function scheduleHeroCursorSync() {
     if (heroCursorFrame) return;
     heroCursorFrame = window.requestAnimationFrame(syncHeroCursor);
 }
-
 function capitalizeWords(text) {
     return String(text || '').replace(
         /(^|\s)([a-z])/g,
         (match, space, letter) => space + letter.toUpperCase()
     );
 }
-
 function typingSettings() {
     const current = window.DartSiteSettings?.get?.().typing || {};
     return {
@@ -2102,23 +1869,19 @@ function typingSettings() {
         nextSceneDelay: Math.max(0, Number(current.nextSceneDelay) || 400),
     };
 }
-
 function scheduleTyping(callback, delay, runId) {
     window.setTimeout(() => {
         if (runId === typingRunId) callback(runId);
     }, Math.max(0, Number(delay) || 0));
 }
-
 function typeScene(runId = typingRunId) {
     if (!typingContainer || runId !== typingRunId || !scenes.length) return;
     const scene = scenes[sceneIndex];
     if (!scene) return;
-
     if (wordIndex >= scene.words.length) {
         scheduleTyping(deleteScene, Number(scene.hold) || 0, runId);
         return;
     }
-
     const word = scene.words[wordIndex];
     const formattedText = capitalizeWords(word.text);
     const span = document.createElement("span");
@@ -2132,7 +1895,6 @@ function typeScene(runId = typingRunId) {
     typingContainer.appendChild(span);
     charIndex = 0;
     scheduleHeroCursorSync();
-
     const typeCharacter = () => {
         if (runId !== typingRunId || !span.isConnected) return;
         charIndex += 1;
@@ -2148,19 +1910,16 @@ function typeScene(runId = typingRunId) {
     };
     typeCharacter();
 }
-
 function deleteScene(runId = typingRunId) {
     if (!typingContainer || runId !== typingRunId) return;
     const words = typingContainer.querySelectorAll(".dart-word");
     const lastWord = words[words.length - 1];
-
     if (!lastWord) {
         typingContainer.innerHTML = "";
         scheduleHeroCursorSync();
         nextScene(runId);
         return;
     }
-
     const currentText = lastWord.textContent || "";
     if (currentText.length > 0) {
         lastWord.textContent = currentText.substring(0, currentText.length - 1);
@@ -2168,12 +1927,10 @@ function deleteScene(runId = typingRunId) {
         scheduleTyping(deleteScene, deletingSpeed, runId);
         return;
     }
-
     lastWord.remove();
     scheduleHeroCursorSync();
     scheduleTyping(deleteScene, deletingSpeed, runId);
 }
-
 function nextScene(runId = typingRunId) {
     if (!typingContainer || runId !== typingRunId || !scenes.length) return;
     typingContainer.innerHTML = "";
@@ -2183,7 +1940,6 @@ function nextScene(runId = typingRunId) {
     sceneIndex = (sceneIndex + 1) % scenes.length;
     scheduleTyping(typeScene, nextSceneDelay, runId);
 }
-
 function restartHeroTyping() {
     const current = typingSettings();
     scenes = current.scenes;
@@ -2200,7 +1956,6 @@ function restartHeroTyping() {
     scheduleHeroCursorSync();
     if (scenes.length) typeScene(typingRunId);
 }
-
 let dartHeroSettingsReady = false;
 try {
     dartHeroSettingsReady = Boolean(localStorage.getItem('dart_public_site_settings_v2'));
@@ -2214,24 +1969,15 @@ window.addEventListener("dart:site-settings-changed", () => {
     dartHeroSettingsReady = true;
     restartHeroTyping();
 });
-// Offline/API-failure fallback: never leave the hero copy blank forever.
 window.setTimeout(() => {
     if (!dartHeroSettingsReady) {
         dartHeroSettingsReady = true;
         restartHeroTyping();
     }
 }, 2500);
-
-
-// Keep public reviews current without a page reload, but only on pages that render them.
 if (document.getElementById('reviewsContainer')) {
     window.setInterval(() => {
         if (!document.hidden) void hydratePublicReviews();
     }, 30000);
     window.addEventListener('focus', () => void hydratePublicReviews());
 }
-
-// END DART | STOREFRONT UI
-
-
-// END MODULE
