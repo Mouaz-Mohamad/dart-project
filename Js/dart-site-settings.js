@@ -395,8 +395,13 @@
   const pathname = String(root.location?.pathname || "/");
   const isAdmin = /\/Eye\//i.test(pathname);
   const rootPath = isAdmin ? "../" : "";
-  const SET_STOREFRONT_PAGES = ["/", "/index.html", "/products.html", "/cart-checkout.html", "/profile.html"];
-  const storefrontPage = SET_STOREFRONT_PAGES.some((suffix) => pathname === suffix || pathname.endsWith(suffix));
+  const normalizedPathname = pathname
+    .replace(/\/index(?:\.html)?$/i, "/")
+    .replace(/\.html$/i, "");
+  const SET_STOREFRONT_PAGES = ["/", "/products", "/cart-checkout", "/profile"];
+  const storefrontPage = SET_STOREFRONT_PAGES.some((suffix) =>
+    normalizedPathname === suffix || (suffix !== "/" && normalizedPathname.endsWith(suffix)),
+  );
   let bootPromise = null;
 
   function loadScript(src) {

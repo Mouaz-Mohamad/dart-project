@@ -151,7 +151,8 @@ const server = http.createServer(async (request, response) => {
     return json(response, 200, { cartState, setGroupsState, attachCount, reservationWriteCount });
   }
 
-  let relative = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '');
+  const canonicalStaticRoutes = { '/products': 'products.html', '/cart-checkout': 'cart-checkout.html', '/profile': 'profile.html' };
+  let relative = pathname === '/' ? 'index.html' : (canonicalStaticRoutes[pathname] || pathname.replace(/^\//, ''));
   const filename = path.resolve(root, relative);
   if (filename !== root && !filename.startsWith(root + path.sep)) {
     response.statusCode = 403; response.end(); return;
@@ -184,7 +185,7 @@ const server = http.createServer(async (request, response) => {
     if (String(message.location()?.url || '').startsWith(origin)) failures.push(`console: ${message.text()}`);
   });
 
-  await page.goto(`${origin}/products.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${origin}/products`, { waitUntil: 'domcontentloaded' });
   await page.locator('#toggleProductFilters').click();
   await page.locator('#filterContainer .filter-btn[data-category="Sets"]').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelectorAll('[data-dart-set-card="1"]').length === 1);
