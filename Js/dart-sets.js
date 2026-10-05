@@ -612,19 +612,12 @@
   }
   // END Set listing.
 
-  // BEGIN Set modal: the HTML-owned shell is reused, with a fallback for pages without it.
+  // BEGIN Set modal: the HTML-owned shell in index.html/products.html is reused by the storefront script.
   function ensureModal() {
-    let modal = root.document.getElementById("dartSetModal");
+    const modal = root.document.getElementById("dartSetModal");
     if (!modal) {
-      modal = root.document.createElement("section");
-      modal.id = "dartSetModal";
-      modal.className = "dart-set-modal";
-      modal.hidden = true;
-      modal.setAttribute("role", "dialog");
-      modal.setAttribute("aria-modal", "true");
-      modal.setAttribute("aria-labelledby", "dartSetModalTitle");
-      modal.innerHTML = `<div class="dart-set-dialog"><button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button><div class="dart-set-gallery"><img data-set-cover alt=""><div data-set-thumbs class="dart-set-thumbs"></div></div><article class="dart-set-details"><span class="dart-set-category">Sets</span><small data-set-code></small><h2 id="dartSetModalTitle" data-set-title></h2><div data-set-components class="dart-set-components"></div><p data-set-description></p><div class="dart-set-pricing"><span data-set-old-price></span>Price : <strong data-set-price></strong> EGP <em data-set-discount></em></div><p class="dart-set-status" data-set-status role="status" aria-live="polite"></p><button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button></article></div>`;
-      root.document.body.appendChild(modal);
+      root.console?.warn?.("Dart Sets modal shell is missing from this page.");
+      return null;
     }
     if (modal.dataset.dartSetBound!=="1") {
       modal.dataset.dartSetBound="1";
@@ -648,6 +641,7 @@
     if (setPurchaseBusy) return;
     activeSet = set;
     const modal = ensureModal();
+    if (!modal) return;
     const images = componentImages(set);
     const cover = modal.querySelector("[data-set-cover]");
     cover.src = images[0] || setImage(set); cover.alt = set.name;
