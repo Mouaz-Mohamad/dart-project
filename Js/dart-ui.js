@@ -1590,6 +1590,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 document.addEventListener('DOMContentLoaded', async () => {
+    initCartAndCheckoutEvents();
     await loadSection('header-container', 'sections/Nav-Bar.html', 5000);
     initHeader();
     const optionalSections = [
@@ -1618,7 +1619,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     renderReviewsLogic();
     if (document.getElementById('reviewsContainer')) void hydratePublicReviews();
-    initCartAndCheckoutEvents();
     initAddressMap();
     window.DartAddress?.initReturnRequest?.();
     updateCartCount();

@@ -84,6 +84,7 @@ const server = http.createServer(async (request, response) => {
 
       if (pathname === '/api/v1/cart/reservation' && request.method === 'PUT') {
         const body = await readBody(request);
+        await new Promise((resolve) => setTimeout(resolve, 150));
         reservationWriteCount += 1;
         cartState = { reservationId: String(body.reservationId), expiresAt, lines: Array.isArray(body.lines) ? body.lines : [] };
         return json(response, 200, cartState);
@@ -252,7 +253,16 @@ const server = http.createServer(async (request, response) => {
   assert.equal(await page.locator('#dartSetModal .dart-set-piece-image img').first().evaluate((node) => getComputedStyle(node).aspectRatio), '9 / 16');
 
   // Add-to-cart reserves both physical pieces, then attaches one commercial Set group to that same reservation.
-  await page.locator('#dartSetModal [data-set-add]').click();
+  await page.evaluate(() => {
+    const button = document.querySelector('#dartSetModal [data-set-add]');
+    button.click();
+    button.click();
+  });
+  await page.waitForFunction(() => {
+    const button = document.querySelector('#dartSetModal [data-set-add]');
+    return button?.disabled && button.getAttribute('aria-busy') === 'true';
+  });
+  assert.equal(await page.locator('.cart-count, #cartCount').first().textContent(), '1', 'One commercial Set must appear in the cart count before the reservation response');
   await page.waitForFunction(() => document.getElementById('dartSetModal')?.hidden === true);
   await page.waitForFunction(() => (window.DartState?.read?.('dart_cart', []) || []).length === 2);
   const clientCart = await page.evaluate(() => ({
@@ -270,10 +280,12 @@ const server = http.createServer(async (request, response) => {
   assert.equal(serverAfterAdd.setGroupsState.length, 1, 'Server must persist one Set commercial group');
   assert.equal(serverAfterAdd.setGroupsState[0].selections.length, 2);
   assert.equal(serverAfterAdd.attachCount, 1);
+  assert.equal(serverAfterAdd.reservationWriteCount, 1, 'A double click must create only one Set reservation write');
 
   // Prove reload/cross-page recovery comes from server group identity, not only the local Set draft.
   await page.evaluate(() => sessionStorage.removeItem('dart_cart_set_groups_v1'));
   await page.goto(`${origin}/cart-checkout.html`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => window.DartPlatform?.__dartSetsReserveWrapped === true);
   await page.waitForFunction(() => document.querySelectorAll('#cartItemsContainer [data-dart-set-cart-card="1"]').length === 1);
   await page.waitForTimeout(250);
   const groupedCart = await page.evaluate(() => ({

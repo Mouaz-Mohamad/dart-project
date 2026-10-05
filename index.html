@@ -165,6 +165,29 @@
                 <section id="feedback-form" aria-label="Share Your Experience"></section>
 
                 <div id="product-modal-host" data-section-src="sections/product-modal.html"></div>
+
+                <section id="dartSetModal" class="dart-set-modal" role="dialog" aria-modal="true" aria-labelledby="dartSetModalTitle" hidden>
+                    <div class="dart-set-dialog">
+                        <button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button>
+                        <div class="dart-set-gallery">
+                            <img data-set-cover src="" alt="Set product gallery cover">
+                            <div data-set-thumbs class="dart-set-thumbs"></div>
+                        </div>
+                        <article class="dart-set-details">
+                            <span class="dart-set-category">Sets</span>
+                            <small data-set-code></small>
+                            <h2 id="dartSetModalTitle" data-set-title></h2>
+                            <div data-set-components class="dart-set-components"></div>
+                            <p data-set-description></p>
+                            <div class="dart-set-pricing">
+                                <span data-set-old-price></span>
+                                Price : <strong data-set-price></strong> EGP <em data-set-discount></em>
+                            </div>
+                            <p class="dart-set-status" data-set-status role="status" aria-live="polite"></p>
+                            <button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button>
+                        </article>
+                    </div>
+                </section>
             </main>
             <div class="margen2020"></div>
             <footer id="footer" aria-label="Footer"></footer>
