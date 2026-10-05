@@ -2,6 +2,7 @@
 // Browser contract for page-scoped Sets loading and additive storefront/dashboard integration.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const vm = require("node:vm");
 
 const settings = fs.readFileSync("Js/dart-site-settings.js", "utf8");
 const sets = fs.readFileSync("Js/dart-sets.js", "utf8");
@@ -11,6 +12,8 @@ const homeUi = fs.readFileSync("Js/dart-ui.home.min.js", "utf8");
 const admin = fs.readFileSync("Eye/dart-sets-admin.js", "utf8");
 const profile = fs.readFileSync("Js/dart-profile-records.js", "utf8");
 const cartPage = fs.readFileSync("cart-checkout.html", "utf8");
+const homePage = fs.readFileSync("index.html", "utf8");
+const productsPage = fs.readFileSync("products.html", "utf8");
 const appRuntime = fs.readFileSync("backend/src/app.ts", "utf8");
 const application = fs.readFileSync("backend/src/application.ts", "utf8");
 
@@ -30,6 +33,10 @@ assert(!sets.includes('/api/v1/me/sets/waiting'), "Sets must not expose a separa
 assert(!appRuntime.includes('SetWaitingService'), "Runtime must not start the retired Set Waiting service");
 assert(!application.includes('createSetWaitingRouter'), "API must not register retired Set Waiting routes");
 assert(cartPage.includes('src="Js/dart-sets.js" defer data-dart-sets-asset="Js/dart-sets.js" data-dart-loaded="1"'), "Cart must preload Set grouping before its first render");
+for (const [name,page] of [["Home",homePage],["Products",productsPage]]) {
+  assert.equal((page.match(/id="dartSetModal"/g)||[]).length,1,`${name} must contain exactly one Set modal in its HTML`);
+}
+assert(sets.includes('modal.dataset.dartSetBound!=="1"'), "Set runtime must bind the HTML-owned modal exactly once");
 assert(!sets.includes("setFilterActive"), "Sets category must use the same category state as normal products, not a parallel filter state");
 assert(sets.includes("function listingCategory()") && sets.includes("isSetsCategory"), "Set listing must read the shared product category state");
 assert(sets.includes("sortedCombinedCards") && sets.includes("placeProductPageCards"), "Models and Sets must share one Products-page ordering and grid placement flow");
@@ -60,8 +67,47 @@ assert(sets.includes('card.addEventListener("click"') && sets.includes('["Enter"
 assert(sets.includes('const groupsById=new Map') && sets.includes('const serverGroupId=String(line.setGroupId'), "Cart Set grouping must use explicit server group identity");
 assert(!sets.includes('cart.find(row=>!row.dartSetKey&&String(row.id)===selection.modelId'), "Cart Set grouping must never guess membership from model/color/size");
 assert(sets.includes('root.renderCart=(...args)=>') && sets.includes('decorateCart(); return result;'), "Every generic cart rerender must synchronously re-apply Set grouping");
+assert(sets.includes('function storefrontRuntimeReady()') && sets.includes('root.DartPlatform?.reserveCart') && sets.includes('typeof root.renderCart==="function"'), "Set cart bootstrap must wait for the cart reservation and renderer dependencies");
+assert(sets.includes('if (!storefrontRuntimeReady() && root.document.readyState!=="complete")'), "A preloaded deferred Set runtime must wait for later deferred cart scripts before booting");
 assert(sets.includes('root.updateCartTotals=(...args)=>') && sets.includes('if (drafts().length) renderSetAwareTotals()'), "Set-aware totals must win after generic totals");
 assert(ui.includes('if (line?.setGroupId || line?.dartSetKey) return false;'), "Set components must not trigger ordinary Birthday/Dart Card fallback eligibility");
+assert(sets.includes('if (setPurchaseBusy || !activeSet) return;') && sets.includes('add.disabled=setPurchaseBusy||!ok'), "Set purchase must lock synchronously on the first click");
+assert(sets.includes('cacheFastCartSnapshot(current)') && sets.includes('if (typeof updateCartCount==="function") updateCartCount();'), "Set purchase must update the visible cart immediately while reservation persists");
+assert(sets.includes('function renderSetAwareCartCount()') && sets.includes('const total=standaloneCount+groupKeys.size'), "One commercial Set must count as one cart unit while its physical pieces remain reserved separately");
+const cartBootstrap = ui.indexOf("document.addEventListener('DOMContentLoaded', async () => {");
+assert(cartBootstrap >= 0 && ui.indexOf('initCartAndCheckoutEvents();',cartBootstrap) < ui.indexOf("await loadSection('header-container'",cartBootstrap), "Cart content must render before the asynchronous header request");
+
+const documentListeners = new Map();
+const runtimeDocument = {
+  readyState: "interactive",
+  addEventListener(type, listener) { documentListeners.set(type, listener); },
+  querySelector() { return null; },
+};
+const runtimeWindow = {
+  document: runtimeDocument,
+  location: { pathname: "/cart-checkout", origin: "https://dart.test" },
+  sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+  setTimeout,
+  queueMicrotask,
+};
+vm.runInNewContext(sets, {
+  window: runtimeWindow,
+  fetch: () => new Promise(() => {}),
+  console,
+  CustomEvent: class CustomEvent {},
+  URLSearchParams,
+  setTimeout,
+  clearTimeout,
+});
+assert.equal(runtimeWindow.DartPlatform, undefined, "Fixture starts before the later deferred cart scripts execute");
+assert.equal(typeof documentListeners.get("DOMContentLoaded"), "function", "Interactive preload must defer Set boot until DOMContentLoaded");
+const originalRenderCart = () => {};
+runtimeWindow.DartPlatform = { reserveCart: async () => ({ reservationId: "CART-BOOT-TEST-1" }) };
+runtimeWindow.renderCart = originalRenderCart;
+runtimeWindow.updateCartTotals = () => {};
+documentListeners.get("DOMContentLoaded")();
+assert.equal(runtimeWindow.DartPlatform.__dartSetsReserveWrapped, true, "Deferred Set boot must install the reservation bridge once DartPlatform is ready");
+assert.notEqual(runtimeWindow.renderCart, originalRenderCart, "Deferred Set boot must install grouped cart rendering once renderCart is ready");
 
 assert(admin.includes('setsButton.dataset.modelSetView="sets"'), "Models section must expose the Sets view inside the shared second bar");
 assert(admin.includes('dashboardControls()'), "Models / Sets must share the existing Models dashboard controls");

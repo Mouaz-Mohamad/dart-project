@@ -196,6 +196,8 @@
   let lastAttachedGroups = [];
   let renderScheduled = false;
   let cartDecorating = false;
+  let storefrontBootPromise = null;
+  let setPurchaseBusy = false;
 
   function drafts() {
     return normalizeGroups(root.DartSets?.readDrafts?.() || []);
@@ -599,39 +601,23 @@
 
   function ensureModal() {
     let modal = root.document.getElementById("dartSetModal");
-    if (modal) return modal;
-    modal = root.document.createElement("section");
-    modal.id = "dartSetModal";
-    modal.className = "dart-set-modal";
-    modal.hidden = true;
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-labelledby", "dartSetModalTitle");
-    modal.innerHTML = `<div class="dart-set-dialog">
-      <button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button>
-      <div class="dart-set-gallery">
-      <img data-set-cover alt="">
-      <div data-set-thumbs class="dart-set-thumbs"></div>
-      </div>
-      <article class="dart-set-details">
-        <span class="dart-set-category">Sets</span>
-        <small data-set-code></small>
-        <h2 id="dartSetModalTitle" data-set-title></h2>
-        <div data-set-components class="dart-set-components"></div>
-        <p data-set-description></p>
-        <div class="dart-set-pricing">
-          <span data-set-old-price></span>
-          Price : <strong data-set-price></strong> EGP <em data-set-discount></em>
-        </div>
-        <p class="dart-set-status" data-set-status role="status" aria-live="polite"></p>
-        <button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button>
-        </article>
-        </div>`;
-    
+    if (!modal) {
+      modal = root.document.createElement("section");
+      modal.id = "dartSetModal";
+      modal.className = "dart-set-modal";
+      modal.hidden = true;
+      modal.setAttribute("role", "dialog");
+      modal.setAttribute("aria-modal", "true");
+      modal.setAttribute("aria-labelledby", "dartSetModalTitle");
+      modal.innerHTML = `<div class="dart-set-dialog"><button type="button" class="dart-set-close" data-set-close aria-label="Close Set details">&times;</button><div class="dart-set-gallery"><img data-set-cover alt=""><div data-set-thumbs class="dart-set-thumbs"></div></div><article class="dart-set-details"><span class="dart-set-category">Sets</span><small data-set-code></small><h2 id="dartSetModalTitle" data-set-title></h2><div data-set-components class="dart-set-components"></div><p data-set-description></p><div class="dart-set-pricing"><span data-set-old-price></span>Price : <strong data-set-price></strong> EGP <em data-set-discount></em></div><p class="dart-set-status" data-set-status role="status" aria-live="polite"></p><button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button></article></div>`;
       root.document.body.appendChild(modal);
-    modal.addEventListener("click", (event) => { if (event.target === modal || event.target.closest?.("[data-set-close]")) closeSetModal(); });
-    root.document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeSetModal(); });
-    modal.querySelector("[data-set-add]")?.addEventListener("click", () => void addActiveSetToCart());
+    }
+    if (modal.dataset.dartSetBound!=="1") {
+      modal.dataset.dartSetBound="1";
+      modal.addEventListener("click", (event) => { if (event.target === modal || event.target.closest?.("[data-set-close]")) closeSetModal(); });
+      root.document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeSetModal(); });
+      modal.querySelector("[data-set-add]")?.addEventListener("click", () => void addActiveSetToCart());
+    }
     return modal;
   }
 
@@ -645,6 +631,7 @@
   }
 
   function openSetModal(set) {
+    if (setPurchaseBusy) return;
     activeSet = set;
     const modal = ensureModal();
     const images = componentImages(set);
@@ -682,7 +669,8 @@
     root.requestAnimationFrame?.(()=>modal.querySelector("[data-set-close]")?.focus());
   }
 
-  function closeSetModal() {
+  function closeSetModal(force = false) {
+    if (setPurchaseBusy && !force) return;
     const modal=root.document.getElementById("dartSetModal"); if (!modal) return;
     modal.hidden=true; root.document.body.classList.remove("dart-set-modal-open"); activeSet=null;
   }
@@ -709,9 +697,12 @@
     const add=modal.querySelector("[data-set-add]");
     if (add) {
       if (!add.dataset.availableText) add.dataset.availableText=add.textContent || "Add Set to Cart";
-      add.disabled=!ok;
-      add.textContent=soldOut?"Sold Out":add.dataset.availableText;
+      add.disabled=setPurchaseBusy||!ok;
+      add.textContent=setPurchaseBusy?"Adding…":soldOut?"Sold Out":add.dataset.availableText;
+      if (setPurchaseBusy) add.setAttribute("aria-busy","true");
+      else add.removeAttribute("aria-busy");
     }
+    if (status&&setPurchaseBusy) status.textContent="Adding Set to cart…";
   }
 
   function nextUnitIndex(setId, groups) {
@@ -727,26 +718,47 @@
   }
 
   async function addActiveSetToCart() {
-    if (!activeSet) return;
+    if (setPurchaseBusy || !activeSet) return;
+    const set=activeSet;
     const selections=selectedComponents();
     if (!exactSelectionsAvailable(selections)) return updateModalAvailability();
+    setPurchaseBusy=true; updateModalAvailability();
     const current=cartRef(), previousCart=clone(current), previousGroups=drafts();
-    const unitIndex=nextUnitIndex(activeSet.setId,previousGroups), key=`${activeSet.setId}:${unitIndex}`;
-    const group={setId:activeSet.setId,unitIndex,selections};
-    selections.forEach((selection)=>current.push(lineForSelection(selection,activeSet,key,unitIndex)));
+    const unitIndex=nextUnitIndex(set.setId,previousGroups), key=`${set.setId}:${unitIndex}`;
+    const group={setId:set.setId,unitIndex,selections};
+    selections.forEach((selection)=>current.push(lineForSelection(selection,set,key,unitIndex)));
     root.DartSets.writeDrafts([...previousGroups,group]);
+    if (typeof cacheFastCartSnapshot==="function") cacheFastCartSnapshot(current);
+    if (typeof renderCart==="function") renderCart();
+    if (typeof updateCartCount==="function") updateCartCount();
+    renderSetAwareCartCount();
+    scheduleCartDecoration();
+    const rollback=()=>{
+      const cart=cartRef(); cart.splice(0,cart.length,...clone(previousCart));
+      root.DartState?.write?.("dart_cart",cart,{source:"set-cart-rollback"});
+      root.DartSets.writeDrafts(previousGroups); lastAttachedGroups=normalizeGroups(previousGroups);
+      if (typeof cacheFastCartSnapshot==="function") cacheFastCartSnapshot(cart);
+      if (typeof renderCart==="function") renderCart();
+      if (typeof updateCartCount==="function") updateCartCount();
+      if (previousGroups.length) renderSetAwareCartCount();
+      scheduleCartDecoration();
+    };
     try {
       if (typeof persistCartReservation !== "function") throw new Error("Cart reservation service is unavailable.");
       const ok=await persistCartReservation(previousCart);
-      if (!ok) { root.DartSets.writeDrafts(previousGroups); return; }
+      if (!ok) { rollback(); return; }
       lastAttachedGroups=normalizeGroups(root.DartSets.readDrafts());
       if (typeof renderCart === "function") renderCart();
-      if (typeof showCartBanner === "function") showCartBanner(activeSet.name);
-      else if (typeof showToast === "function") showToast(`تم إضافة ${activeSet.name} للسلة`);
-      closeSetModal(); scheduleCartDecoration();
+      if (typeof showCartBanner === "function") showCartBanner(set.name);
+      else if (typeof showToast === "function") showToast(`تم إضافة ${set.name} للسلة`);
+      closeSetModal(true); scheduleCartDecoration();
     } catch (error) {
-      root.DartSets.writeDrafts(previousGroups);
+      rollback();
       if (typeof showToast === "function") showToast(error.message || "تعذر إضافة الطقم.");
+    } finally {
+      setPurchaseBusy=false;
+      const modal=root.document.getElementById("dartSetModal");
+      if (modal&&!modal.hidden&&activeSet) updateModalAvailability();
     }
   }
 
@@ -807,6 +819,22 @@
       baseMinor:Number.isFinite(Number(group.basePriceMinor))?Number(group.basePriceMinor):Number(set?.pricing?.basePriceMinor||0),
       finalMinor:Number.isFinite(Number(group.finalMinor))?Number(group.finalMinor):Number(set?.pricing?.finalMinor||0),
     };
+  }
+
+  function renderSetAwareCartCount() {
+    const cart=tagCartLines(),groups=drafts();
+    if (!groups.length) return;
+    const groupKeys=new Set(groups
+      .map((group)=>`${group.setId}:${group.unitIndex}`)
+      .filter((key)=>cart.some((line)=>line.dartSetKey===key)));
+    const standaloneCount=cart.reduce((total,line)=>line.dartSetKey&&groupKeys.has(line.dartSetKey)
+      ? total
+      : total+Math.max(0,Number(line.quantity)||0),0);
+    const total=standaloneCount+groupKeys.size;
+    root.document.querySelectorAll(".cart-count, #cartCount").forEach((element)=>{
+      element.textContent=String(total);
+      element.style.display=total>0?"inline-block":"none";
+    });
   }
 
   function renderSetAwareTotals() {
@@ -902,6 +930,7 @@
         if (card.parentElement!==container || card.nextElementSibling!==firstCard) firstCard.insertAdjacentElement("beforebegin",card);
       });
       renderSetAwareTotals();
+      renderSetAwareCartCount();
     } finally { cartDecorating=false; }
   }
 
@@ -943,17 +972,27 @@
     root.document.addEventListener("click",()=>root.setTimeout(renderSetAwareTotals,0),true);
   }
 
-  async function boot() {
-    installReservationBridge();
-    const render=root.renderCart,totals=root.updateCartTotals;
-    if (typeof render==="function") root.renderCart=(...args)=>{ const result=render(...args); decorateCart(); return result; };
-    if (typeof totals==="function") root.updateCartTotals=(...args)=>{ const result=totals(...args); if (drafts().length) renderSetAwareTotals(); return result; };
-    try { setCatalog=await root.DartSets.loadCatalog(true); } catch (error) { console.warn("Dart Sets catalog unavailable",error); setCatalog=[]; }
-    ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); observe();
-    lastAttachedGroups=drafts();
-    await restoreServerGroups();
+  function boot() {
+    if (storefrontBootPromise) return storefrontBootPromise;
+    storefrontBootPromise=(async()=>{
+      installReservationBridge();
+      const render=root.renderCart,totals=root.updateCartTotals,count=root.updateCartCount;
+      if (typeof render==="function") root.renderCart=(...args)=>{ const result=render(...args); decorateCart(); return result; };
+      if (typeof totals==="function") root.updateCartTotals=(...args)=>{ const result=totals(...args); if (drafts().length) renderSetAwareTotals(); return result; };
+      if (typeof count==="function") root.updateCartCount=(...args)=>{ const result=count(...args); if (drafts().length) renderSetAwareCartCount(); return result; };
+      try { setCatalog=await root.DartSets.loadCatalog(true); } catch (error) { console.warn("Dart Sets catalog unavailable",error); setCatalog=[]; }
+      ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); observe();
+      lastAttachedGroups=drafts();
+      await restoreServerGroups();
+    })();
+    return storefrontBootPromise;
   }
 
-  if (root.document.readyState==="loading") root.document.addEventListener("DOMContentLoaded",()=>void boot(),{once:true});
-  else void boot();
+  function storefrontRuntimeReady() {
+    return Boolean(root.DartPlatform?.reserveCart) && typeof root.renderCart==="function";
+  }
+
+  if (!storefrontRuntimeReady() && root.document.readyState!=="complete") {
+    root.document.addEventListener("DOMContentLoaded",()=>void boot(),{once:true});
+  } else void boot();
 })(typeof window !== "undefined" ? window : globalThis);
