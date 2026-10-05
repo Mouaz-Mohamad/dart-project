@@ -11,6 +11,7 @@
     "finance-dashboard-contract.js",
     "finance-persistence-contract.js",
     "home-performance-contract.cjs",
+    "order-action-latency-contract.cjs",
     "performance-budget.cjs",
     "product-button-state-contract.cjs",
     "product-modal-shared-contract.cjs",

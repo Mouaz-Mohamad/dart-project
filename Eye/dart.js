@@ -631,7 +631,9 @@ window.addEventListener("dart:orders-hydrated", (event) => {
 });
 
 /* BEGIN Dashboard data synchronization */
-window.addEventListener("dart:data-changed", () => {
+window.addEventListener("dart:data-changed", (event) => {
+  if (event.detail?.key === "dart_orders" &&
+      ["orders:hydrate", "orders:authoritative", "orders:sync-confirmed"].includes(event.detail?.source)) return;
   try {
     loadAllDataFromStorage(false);
     dartRefreshAll();

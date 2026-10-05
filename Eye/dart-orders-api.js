@@ -178,7 +178,7 @@
     return await syncChain;
   }
 
-  async function runAuthoritativeMutation(path, body, returnPayload = false) {
+  async function runAuthoritativeMutation(path, body, returnPayload = false, deferRelatedRefresh = false) {
     if (dirty) await flush();
     authoritativeMutations += 1;
     authoritativeEpoch += 1;
@@ -191,7 +191,8 @@
         dirty = false;
         cache(payload.orders || [], "orders:authoritative");
       }
-      await refreshRelatedServerState();
+      if (deferRelatedRefresh) void refreshRelatedServerState();
+      else await refreshRelatedServerState();
       return returnPayload ? payload : payload.orders || [];
     } finally {
       authoritativeMutations = Math.max(0, authoritativeMutations - 1);
@@ -202,6 +203,8 @@
     return await runAuthoritativeMutation(
       `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/workflow`,
       input,
+      false,
+      true,
     );
   }
 

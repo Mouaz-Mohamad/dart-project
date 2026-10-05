@@ -981,11 +981,30 @@ function initCartAndCheckoutEvents() {
         });
     }
     if (checkoutForm) {
+        let checkoutSubmitting = false;
+        const checkoutSubmitButton = checkoutForm.querySelector('[type="submit"]');
+        const checkoutSubmitLabel = checkoutSubmitButton?.tagName === 'INPUT'
+            ? checkoutSubmitButton.value : checkoutSubmitButton?.textContent;
+        const setCheckoutBusy = (busy) => {
+            checkoutSubmitting = busy;
+            checkoutForm.setAttribute('aria-busy', String(busy));
+            if (!checkoutSubmitButton) return;
+            checkoutSubmitButton.disabled = busy;
+            if (checkoutSubmitButton.tagName === 'INPUT') {
+                checkoutSubmitButton.value = busy ? 'Creating order...' : checkoutSubmitLabel;
+            } else {
+                checkoutSubmitButton.textContent = busy ? 'Creating order...' : checkoutSubmitLabel;
+            }
+        };
         checkoutForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (checkoutSubmitting) return;
             if (window.DartPlatform?.checkout) {
+                setCheckoutBusy(true);
+                let orderCreated = false;
                 try {
                     const order = await window.DartPlatform.checkout(checkoutForm);
+                    orderCreated = true;
                     sessionStorage.setItem('dart_last_order_id', order.orderId);
                     sessionStorage.setItem('dart_internal_navigation', '1');
                     cartData = [];
@@ -1035,6 +1054,7 @@ function initCartAndCheckoutEvents() {
                                 checkoutForm,
                                 { acceptPriceChanges: true }
                             );
+                            orderCreated = true;
                             sessionStorage.setItem('dart_last_order_id', order.orderId);
                             sessionStorage.setItem('dart_internal_navigation', '1');
                             cartData = [];
@@ -1052,6 +1072,8 @@ function initCartAndCheckoutEvents() {
                         return;
                     }
                     showToast(error.message || "تعذر إنشاء الطلب.");
+                } finally {
+                    if (!orderCreated) setCheckoutBusy(false);
                 }
                 return;
             }

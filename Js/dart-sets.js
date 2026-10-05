@@ -196,6 +196,7 @@
   let lastAttachedGroups = [];
   let renderScheduled = false;
   let cartDecorating = false;
+  let cartDecorationScheduled = false;
   let storefrontBootPromise = null;
   let setPurchaseBusy = false;
 
@@ -935,8 +936,11 @@
   }
 
   function scheduleCartDecoration() {
-    if (typeof root.queueMicrotask === "function") root.queueMicrotask(decorateCart);
-    else root.setTimeout(decorateCart,0);
+    if (cartDecorationScheduled) return;
+    cartDecorationScheduled=true;
+    const run=()=>{ cartDecorationScheduled=false; decorateCart(); };
+    if (typeof root.queueMicrotask === "function") root.queueMicrotask(run);
+    else root.setTimeout(run,0);
   }
 
   async function restoreServerGroups() {
@@ -969,7 +973,6 @@
     });
     root.addEventListener("dart:set-cart-draft-changed",scheduleCartDecoration);
     root.addEventListener("dart:customer-session-changed",()=>{ void restoreServerGroups(); });
-    root.document.addEventListener("click",()=>root.setTimeout(renderSetAwareTotals,0),true);
   }
 
   function boot() {
