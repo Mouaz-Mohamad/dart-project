@@ -15,6 +15,8 @@ assert(ui.includes("if (checkoutSubmitting) return;") && ui.includes("setCheckou
   "Checkout must lock synchronously on the first submission");
 assert(ui.includes("if (!orderCreated) setCheckoutBusy(false);"),
   "Checkout must unlock after failure or rejected price review");
+assert.equal((ui.match(/completeCheckout\(order\);/g) || []).length, 2,
+  "Normal checkout and accepted price-review retry must share the success path");
 assert(dashboard.includes('event.detail?.key === "dart_orders"') &&
   dashboard.includes('"orders:hydrate", "orders:authoritative", "orders:sync-confirmed"'),
   "Dashboard must not fully render twice for the same orders hydration");
@@ -32,10 +34,12 @@ const checkoutForm = {
 };
 const checkoutContext = {
   document: { getElementById(id) { return id === "checkoutForm" ? checkoutForm : null; } },
-  window: { DartState: { read: () => [] }, DartPlatform: {
+  window: { location: { href: "" }, DartState: { read: () => [], write() {} }, DartPlatform: {
     checkout: () => { checkoutCalls += 1; return new Promise((_, reject) => { rejectCheckout = reject; }); },
   } },
-  cartData: [], renderCart() {}, showToast() {},
+  sessionStorage: { setItem() {} },
+  cartData: [], renderCart() {}, updateCartCount() {}, showToast() {},
+  setTimeout() {},
 };
 vm.runInNewContext(checkoutSource, checkoutContext);
 checkoutContext.initCartAndCheckoutEvents();
@@ -78,6 +82,13 @@ vm.runInNewContext(apiSource, {
   await firstSubmit;
   assert.equal(submitButton.disabled, false, "Failed checkout must restore the button");
   assert.equal(submitButton.textContent, "Order");
+  checkoutContext.window.DartPlatform.checkout = async () => {
+    checkoutCalls += 1;
+    return { orderId: "D-2" };
+  };
+  await submitHandler({ preventDefault() {} });
+  assert.equal(checkoutCalls, 2);
+  assert.equal(submitButton.disabled, true, "Committed checkout stays locked until navigation");
 
   const result = await Promise.race([
     runtimeWindow.DartOrdersApi.workflow("D-1", { expectedStatus: "New", target: "Accepted" }),

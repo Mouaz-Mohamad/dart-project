@@ -505,6 +505,93 @@
             </div>
         </section>
 
+        <!-- BEGIN Models modals: kept beside the owning dashboard section. -->
+        <div id="model-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" id="close-model-btn">&times;</span>
+                <form id="model-form">
+                    <input type="hidden" id="modal-edit-id">
+                    <div class="modal-grid">
+                        <div class="modal-col">
+                            <div class="form-group">
+                                <label for="modal-id">ID Model</label>
+                                <input type="text" id="modal-id" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="modal-name">Model Name</label>
+                                <input type="text" id="modal-name" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="modal-category">Category</label>
+                                <input id="modal-category" type="text" list="model-category-options" placeholder="Choose or type a new category" autocomplete="off" required>
+                                <datalist id="model-category-options"></datalist>
+                                <small>Choose an existing category or type a new one. New categories are saved with the model and become available in filters automatically.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="modal-description">Description</label>
+                                <textarea id="modal-description" placeholder="+ Value" rows="4"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="modal-discount">Discount %</label>
+                                <input type="number" id="modal-discount" placeholder="Value" value="0">
+                            </div>
+                            <div class="price-summary">
+                                <span>Final Price :</span>
+                                <strong id="modal-final-price">0 EGP</strong>
+                            </div>
+                        </div>
+                        <div class="modal-col">
+                            <div class="form-group">
+                                <label for="modal-cost">Cost</label>
+                                <input type="number" id="modal-cost" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="modal-selling">Selling</label>
+                                <input type="number" id="modal-selling" placeholder="Value" required>
+                            </div>
+                            <div class="form-group" style="margin-top: 20px;">
+                                <button type="submit" id="btn-submit-modal" class="btn-done">DONE</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal" id="size-chart-modal">
+          <div class="modal-content dart-size-chart-admin-modal">
+            <span class="close-modal" aria-label="Close size chart">&times;</span>
+            <div class="dart-size-chart-admin-head">
+              <div>
+                <h3 id="dashboard-size-chart-title">Model Size Chart</h3>
+                <p>Fill only the measurements that apply to this model. Values are shown to customers inside the product modal.</p>
+              </div>
+              <label>Unit
+                <select id="dashboard-size-chart-unit">
+                  <option value="cm">cm</option>
+                  <option value="in">inches</option>
+                </select>
+              </label>
+            </div>
+            <form id="dashboard-size-chart-form">
+              <input type="hidden" id="dashboard-size-chart-model-id">
+              <div class="dart-size-chart-toolbar">
+                <button type="button" id="dashboard-size-chart-stock-sizes"><i class="bx bx-list-check"></i> Use model sizes</button>
+                <button type="button" id="dashboard-size-chart-add-row"><i class="bx bx-plus"></i> Add size</button>
+              </div>
+              <div class="dart-size-chart-admin-table-wrap">
+                <table class="dart-size-chart-admin-table">
+                  <thead><tr><th>Size</th><th>Chest</th><th>Waist</th><th>Hip</th><th>Length</th><th>Shoulder</th><th>Sleeve</th><th>Inseam</th><th>Notes</th><th>Action</th></tr></thead>
+                  <tbody id="dashboard-size-chart-body"></tbody>
+                </table>
+              </div>
+              <p id="dashboard-size-chart-status" class="dart-size-chart-admin-status" role="status" aria-live="polite"></p>
+              <button type="submit" class="btn-done">Save Size Chart</button>
+            </form>
+          </div>
+        </div>
+        <!-- END Models modals. -->
+
         <!-- items -->
         <section id="items" class="dashboard-section">
             <div class="first filter-bar">
@@ -584,6 +671,47 @@
             </div>
         </section>
 
+        <!-- BEGIN Items modals: kept beside the owning dashboard section. -->
+        <div id="item-add-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" id="close-item-add-btn">&times;</span>
+                <form id="item-add-form">
+                    <input type="hidden" id="modal-item-add-edit-id">
+                    <div class="form-group">
+                        <label>Photo</label>
+                        <input type="file" id="modal-item-file" accept="image/*">
+                        <img id="item-preview-img" style="display:none; width: 100px; margin-top: 10px;" alt="Preview of the uploaded physical item image">
+                    </div>
+                    <div class="form-group">
+                        <label>Model Code</label>
+                        <input type="text" id="modal-item-model-id" list="models-list" placeholder="اختر أو اكتب كود الموديل" required>
+                        <datalist id="models-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>Code PIC</label>
+                        <input type="text" id="modal-item-code-pic" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Color</label>
+                        <input type="text" id="modal-item-color" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Size</label>
+                        <input type="text" id="modal-item-size" required>
+                    </div>
+                    <button type="submit" class="btn-submit">Save</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal" id="image-preview-modal">
+          <div class="modal-content dart-image-preview-content">
+            <span class="close-modal">&times;</span>
+            <img id="full-item-image" alt="Full item preview">
+          </div>
+        </div>
+        <!-- END Items modals. -->
+
         <!-- Customers -->
         <section id="customers" class="dashboard-section">
             <div class="first filter-bar">
@@ -658,6 +786,65 @@
                 </template>
             </div>
         </section>
+
+        <!-- BEGIN Customers modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="customerModal">
+            <div class="modal-content">
+                <span class="close-modal close-customer-modal">&times;</span>
+                <form id="customerForm">
+                    <input type="hidden" id="modal-customer-edit-id">
+                    <div class="modal-grid">
+                        <div class="modal-column">
+                            <div class="form-group">
+                                <label for="custName">Name</label>
+                                <input type="text" id="custName" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="custBirthday">Birthday</label>
+                                <input type="date" id="custBirthday" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="custEmail">E-Mail</label>
+                                <input type="email" id="custEmail" placeholder="Value">
+                            </div>
+                            <div class="form-group" style="margin-top: 30px;">
+                                <button type="submit" class="btn-done">DONE</button>
+                            </div>
+                        </div>
+                        <div class="modal-column">
+                            <div class="form-group">
+                                <label for="custPhone1">Phone number</label>
+                                <input type="text" id="custPhone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="custPhone2">Phone number 2</label>
+                                <input type="text" id="custPhone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                            </div>
+                            <div class="form-group">
+                                <label for="custCountry">Country</label>
+                                <input id="custCountry" class="modal-input" list="country-options" value="Egypt" placeholder="Country" required>
+                                <datalist id="country-options"><option value="Egypt"></option></datalist>
+                            </div>
+                            <div class="form-group">
+                                <label for="custGovernorate">Governorate</label>
+                                <input id="custGovernorate" class="modal-input" list="egypt-governorates" placeholder="Governorate" required>
+                                <datalist id="egypt-governorates"><option value="Cairo"></option><option value="Alexandria"></option><option value="Giza"></option><option value="Qalyubia"></option><option value="Dakahlia"></option><option value="Sharqia"></option><option value="Gharbia"></option><option value="Monufia"></option><option value="Beheira"></option><option value="Kafr El Sheikh"></option><option value="Damietta"></option><option value="Port Said"></option><option value="Ismailia"></option><option value="Suez"></option><option value="North Sinai"></option><option value="South Sinai"></option><option value="Beni Suef"></option><option value="Faiyum"></option><option value="Minya"></option><option value="Asyut"></option><option value="Sohag"></option><option value="Qena"></option><option value="Luxor"></option><option value="Aswan"></option><option value="Red Sea"></option><option value="New Valley"></option><option value="Matrouh"></option></datalist>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal" id="password-requests-modal">
+          <div class="modal-content dart-history-modal">
+            <span class="close-modal">&times;</span>
+            <h3>Password Reset Requests</h3>
+            <p class="dart-sensitive-note">Set a one-time temporary password. The account owner must replace it at the next login.</p>
+            <div id="password-requests-list"></div>
+          </div>
+        </div>
+        <!-- END Customers modals. -->
 
         <!-- order -->
         <section id="orders" class="dashboard-section">
@@ -790,6 +977,158 @@
                 <div id="orders-container"></div>
             </div>
         </section>
+
+        <!-- BEGIN Orders modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="orderModal">
+            <div class="modal-content">
+                <span class="close-modal" id="closeModalBtn">&times;</span>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <input type="text" id="orderSearchInput" placeholder="search about client">
+                </div>
+                <form id="orderForm">
+                    <div class="modal-grid">
+                        <div class="column">
+                            <div class="form-group">
+                                <label for="clientName">Name</label>
+                                <input type="text" id="clientName" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="clientId">id client</label>
+                                <input type="text" id="clientId" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone1">Phone number</label>
+                                <input type="text" id="phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone2">Phone number 2</label>
+                                <input type="text" id="phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                            </div>
+                            <div class="form-group">
+                                <label for="email">E-Mail</label>
+                                <input type="email" id="email" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="paymentMethod">Payment Method</label>
+                                <select id="paymentMethod"required>
+                                    <option value="Cash on Delivery" selected>Cash on Delivery</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="paymentStatus">Payment Status</label>
+                                <select id="paymentStatus">
+                                    <option value="Unpaid">Unpaid</option>
+                                    <option value="Partially Paid">Partially Paid</option>
+                                    <option value="Paid">Paid</option>
+                                    <option value="Partially Refunded">Partially Refunded</option>
+                                    <option value="Refunded">Refunded</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderSource">Order Source</label>
+                                <select id="orderSource">
+                                    <option value="Website">Website</option>
+                                    <option value="Instagram">Instagram</option>
+                                    <option value="Facebook">Facebook</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                    <option value="TikTok">TikTok</option>
+                                    <option value="Manual" selected>Manual</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="amountPaid">Amount Paid</label>
+                                <input type="number" id="amountPaid" min="0" step="1" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="amountRefunded">Amount Refunded</label>
+                                <input type="number" id="amountRefunded" min="0" step="1" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="deliveryNotes">Delivery Notes</label>
+                                <textarea id="deliveryNotes" placeholder="Value" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderAddress">Address (OpenStreetMap)</label>
+                                <textarea id="orderAddress" placeholder="Search for the delivery address"></textarea>
+                                <ul id="dashboard-address-results" class="dart-address-results" hidden></ul>
+                            </div>
+                            <div id="dashboard-order-map" class="dart-dashboard-order-map" aria-label="Order delivery location map"></div>
+                            <p class="dart-delivery-zone-note"><i class="fa-solid fa-clock" aria-hidden="true"></i> Cairo and Giza delivery only — promised within 12 hours.</p>
+                            <p id="dashboard-address-status" class="dart-address-status" role="status" aria-live="polite">Select a Cairo/Giza pin or enter the complete address manually.</p>
+                            <input type="hidden" id="orderLatitude">
+                            <input type="hidden" id="orderLongitude">
+                            <input type="hidden" id="orderFullAddress">
+                            <div class="price-summary">
+                                <p>Subtotal : <strong id="subtotalVal">0 EGP</strong></p>
+                                <p>Discount : <strong id="discountVal">0 EGP</strong></p>
+                                <p>Total : <strong id="totalVal">0 EGP</strong></p>
+                            </div>
+                            <button type="submit" class="btn-done">DONE</button>
+                        </div>
+                        <div class="column">
+                            <div class="form-group">
+                                <label>Auto Allocate Product</label>
+                                <input type="text" id="orderModelCode" list="models-list" placeholder="Model Code">
+                                <input type="text" id="orderItemColor" placeholder="Color">
+                                <input type="text" id="orderItemSize" placeholder="Size">
+                                <input type="number" id="orderItemQty" min="1" value="1" placeholder="Qty">
+                                <button type="button" id="autoAllocateProductBtn">Auto Allocate</button>
+                            </div>
+                            <div class="form-group">
+                                <label for="productsInputCode">Physical Item Code (optional manual selection)</label>
+                                <input type="text" id="productsInputCode" list="items-datalist" placeholder="اكتب أو اختر كود القطعة...">
+                                <datalist id="items-datalist"></datalist>
+                                <button type="button" id="addProductBtn">Add Item</button>
+                                <div id="selectedProductsList"></div>
+                            </div>
+                            <input type="hidden" id="modal-order-edit-id">
+                            <div class="form-group">
+                                <label for="deductions">Deductions %</label>
+                                <input type="number" id="deductions" placeholder="%" value="0" min="0" max="100" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="customDiscount">Custom Discount</label>
+                                <input type="number" id="customDiscount" placeholder="Auto" value="0" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderCountry">Country</label>
+                                <input type="text" id="orderCountry" value="Egypt" readonly required>
+                            </div>
+                            <div class="form-group">
+                                <label for="governorate">Governorate</label>
+                                <select id="governorate" required>
+                                    <option value="Cairo" selected>Cairo</option>
+                                    <option value="Giza">Giza</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderArea">Area</label>
+                                <input type="text" id="orderArea" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderStreetName">Street Name</label>
+                                <input type="text" id="orderStreetName" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderBuildingNumber">Building Number/Name</label>
+                                <input type="text" id="orderBuildingNumber" placeholder="Value" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderFloor">Floor</label>
+                                <input type="text" id="orderFloor" placeholder="Required" required>
+                            </div>
+                            <button type="button" id="dashboard-locate-manual-address" class="dart-locate-address-btn"><i class="fa-solid fa-location-crosshairs"></i> Locate manual address</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal" id="rep-assignment-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Assign Representative</h3><select id="rep-assignment-select"></select><button type="button" class="btn-done" id="confirm-rep-assignment">Assign</button></div></div>
+
+        <div class="modal" id="order-reason-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3 id="order-reason-title">Reason</h3><select id="order-reason-select"></select><textarea id="order-reason-notes" rows="3" placeholder="Notes / Other reason"></textarea><button type="button" class="btn-done" id="confirm-order-reason">Confirm</button></div></div>
+        <!-- END Orders modals. -->
 
 
         <!-- Waiting / Restock Reservation -->
@@ -962,6 +1301,102 @@
             </div>
         </section>
 
+        <!-- BEGIN Returns modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="return-modal">
+            <div class="modal-content">
+                <span class="close-modal" id="close-return-btn">&times;</span>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
+                        <input type="text" id="returnSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
+                        <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
+                    </div>
+                </div>
+                <form id="return-form">
+                    <input type="hidden" id="modal-return-edit-id">
+                    <div class="modal-grid">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="modal-return-name" placeholder="Value">
+                        </div>
+                        <div class="form-group">
+                            <label>Item code</label>
+                            <input type="text" id="modal-return-item-code" placeholder="Value">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone number</label>
+                            <input type="text" id="modal-return-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                        </div>
+                        <div class="form-group">
+                            <label>Model code</label>
+                            <input type="text" id="modal-return-model-id" placeholder="Value">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone number 2</label>
+                            <input type="text" id="modal-return-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                        </div>
+                        <div class="form-group">
+                            <label>E-Mail</label>
+                            <input type="email" id="modal-return-email" placeholder="Value">
+                        </div>
+                        <div class="input-group">
+                            <label>Condition of returned item</label>
+                            <select id="modal-item-condition" class="modal-select">
+                                <option value="Good">Good</option>
+                                <option value="Bad">Bad</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Reason for return</label>
+                            <select id="modal-item-reason" class="modal-select">
+                                <option value="المقاس صغير">المقاس صغير</option>
+                                <option value="المقاس كبير">المقاس كبير</option>
+                                <option value="عيب في المنتج">عيب في المنتج</option>
+                                <option value="غير مطابق للصورة">غير مطابق للصورة</option>
+                                <option value="سبب آخر">سبب آخر</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal" id="return-approval-modal">
+          <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-approval-title">
+            <span class="close-modal" aria-label="Close">&times;</span>
+            <h3 id="return-approval-title">Approve Return / Exchange</h3>
+            <p id="return-approval-summary"></p>
+            <label id="return-replacement-field" for="return-replacement-select">Replacement physical item
+              <select id="return-replacement-select"></select>
+            </label>
+            <p id="return-approval-fee-note" class="dart-return-admin-note"></p>
+            <button type="button" class="btn-done" id="confirm-return-approval">Approve</button>
+          </div>
+        </div>
+
+        <div class="modal" id="return-rejection-modal">
+          <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-rejection-title">
+            <span class="close-modal" aria-label="Close">&times;</span>
+            <h3 id="return-rejection-title">Reject Request</h3>
+            <label for="return-rejection-reason">Reason shown to customer</label>
+            <textarea id="return-rejection-reason" rows="4" required></textarea>
+            <button type="button" class="btn-done" id="confirm-return-rejection">Reject Request</button>
+          </div>
+        </div>
+
+        <div class="modal" id="return-rep-assignment-modal">
+          <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-rep-assignment-title">
+            <span class="close-modal" aria-label="Close">&times;</span>
+            <h3 id="return-rep-assignment-title">Assign Pickup Representative</h3>
+            <p id="return-rep-assignment-summary"></p>
+            <label for="return-rep-assignment-select">Representative
+              <select id="return-rep-assignment-select"></select>
+            </label>
+            <button type="button" class="btn-done" id="confirm-return-rep-assignment">Assign</button>
+          </div>
+        </div>
+        <!-- END Returns modals. -->
+
 
         <!-- damage -->
         <section id="damage" class="dashboard-section">
@@ -1012,6 +1447,10 @@
                 <div id="damage-container"></div>
             </div>
         </section>
+
+        <!-- BEGIN Damage modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="damage-modal"><div class="modal-content"><span class="close-modal">&times;</span><h3>Damage Record</h3><form id="damage-form"><input type="hidden" id="damage-edit-id"><div class="modal-grid"><div class="form-group"><label>Item Code</label><input id="damage-item-code" required></div><div class="form-group"><label>Reason</label><input id="damage-reason" required></div><div class="form-group"><label>Notes</label><textarea id="damage-notes" rows="3"></textarea></div><div class="form-group"><label>Status</label><select id="damage-status"><option value="Damaged">Damaged</option><option value="Repaired">Repaired</option><option value="Destroyed">Destroyed</option></select></div></div><button type="button" class="btn-done">DONE</button></form></div></div>
+        <!-- END Damage modals. -->
 
         <!-- review -->
         <section id="review" class="dashboard-section">
@@ -1076,6 +1515,67 @@
             </div>
         </section>
 
+        <!-- BEGIN Review modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="customer-review-modal">
+            <div class="modal-content">
+                <span class="close-modal" id="close-review-btn">&times;</span>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
+                        <input type="text" id="reviewSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
+                        <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
+                    </div>
+                </div>
+                <form id="customer-review-form">
+                    <input type="hidden" id="modal-review-edit-id">
+                    <div class="modal-grid">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="modal-cust-rev-name" placeholder="Value">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 10px;">
+                            <label>Star Rating</label>
+                            <select id="modal-cust-rating" class="modal-select">
+                                <option value="1">1 Star</option>
+                                <option value="2">2 Stars</option>
+                                <option value="3">3 Stars</option>
+                                <option value="4">4 Stars</option>
+                                <option value="5" selected>5 Stars</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone number</label>
+                            <input type="tel" id="modal-cust-rev-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 10px;">
+                            <label>Customer Review</label>
+                            <textarea id="modal-cust-review" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone number 2</label>
+                            <input type="text" id="modal-cust-rev-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 10px;">
+                            <label>Reviewer's Title</label>
+                            <textarea id="modal-cust-title" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>E-Mail</label>
+                            <input type="email" id="modal-cust-rev-email" placeholder="Value">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 10px;">
+                            <label>Status</label>
+                            <select id="modal-cust-status" class="modal-select">
+                                <option value="Active">Active</option>
+                                <option value="Hidden">Hidden</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+                </form>
+            </div>
+        </div>
+        <!-- END Review modals. -->
+
         <!-- representative -->
         <section id="representative" class="dashboard-section">
             <div class="first filter-bar">
@@ -1125,6 +1625,76 @@
                 <div id="representative-container"></div>
             </div>
         </section>
+
+        <!-- BEGIN Representative modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="representative-modal">
+            <div class="modal-content">
+                <span class="close-modal" id="close-rep-btn">&times;</span>
+                <form id="rep-form">
+                    <input type="hidden" id="modal-rep-id">
+                    <div class="modal-grid">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="modal-representative-name" placeholder="Value" required>
+                        </div>
+                        <div class="form-group">
+                            <label>ID representative</label>
+                            <input type="text" id="modal-representative-id" placeholder="Assigned automatically" readonly required>
+                        </div>
+                        <div class="form-group">
+                            <label>National ID Number</label>
+                            <input type="text"  id="modal-representative-national-id"  placeholder="أدخل الرقم القومي (14 رقم)"  pattern="\d{14}"  maxlength="14"  inputmode="numeric" required onkeypress="return event.charCode >= 48 && event.charCode <= 57">
+                        </div>
+                        <div class="form-group">
+                            <label>Representative's Address</label>
+                            <textarea id="modal-representative-address" placeholder="Enter full address" rows="2" style="width: 100%;" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone number</label>
+                            <input type="tel" id="modal-rep-phone1" placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone number 2</label>
+                            <input type="tel" id="modal-rep-phone2" placeholder="Enter phone number" maxlength="11" inputmode="numeric">
+                        </div>
+                        <div class="form-group">
+                            <label>E-Mail</label>
+                            <input type="email" id="modal-rep-email" placeholder="name@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Account Status</label>
+                            <select id="modal-rep-status" required>
+                                <option value="Pending Approval">Pending Approval</option>
+                                <option value="Active">Approved / Active</option>
+                                <option value="Rejected">Rejected</option>
+                                <option value="Not available">Not available</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Temporary Password</label>
+                            <input type="password" id="modal-rep-password" minlength="8" placeholder="Only for a new account or reset">
+                        </div>
+                        <div class="form-group dart-file-field">
+                            <label>National ID — Front</label>
+                            <input type="file" id="modal-rep-id-front" accept="image/jpeg,image/png,image/webp">
+                            <img id="modal-rep-id-front-preview" class="dart-rep-upload-preview" alt="Representative national ID front preview" hidden>
+                        </div>
+                        <div class="form-group dart-file-field">
+                            <label>National ID — Back</label>
+                            <input type="file" id="modal-rep-id-back" accept="image/jpeg,image/png,image/webp">
+                            <img id="modal-rep-id-back-preview" class="dart-rep-upload-preview" alt="Representative national ID back preview" hidden>
+                        </div>
+                        <div class="form-group dart-file-field">
+                            <label>Representative Face Photo</label>
+                            <input type="file" id="modal-rep-face" accept="image/jpeg,image/png,image/webp">
+                            <img id="modal-rep-face-preview" class="dart-rep-upload-preview" alt="Representative face verification preview" hidden>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
+                </form>
+            </div>
+        </div>
+        <!-- END Representative modals. -->
         
         <!-- Live Operations Map -->
         <section id="live-operations" class="dashboard-section dart-live-operations" aria-labelledby="live-operations-title">
@@ -1237,6 +1807,37 @@
             
         </section>
 
+        <!-- BEGIN Card modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="card-modal">
+          <div class="modal-content">
+            <span class="close-modal" aria-label="Close Dart Card form">&times;</span>
+            <h3 id="card-modal-title">Additional Benefit — Dart Card</h3>
+            <form id="card-form">
+              <input type="hidden" id="modal-card-edit-id">
+              <div class="modal-grid">
+                <div class="modal-col">
+                  <div class="form-group"><label for="modal-card-client-id">Client</label><select id="modal-card-client-id" required><option value="">Select client</option></select></div>
+                  <div class="form-group"><label for="modal-card-client-name">Client Name</label><input id="modal-card-client-name" readonly required></div>
+                  <div class="form-group"><label for="modal-card-code-id">Card ID</label><input id="modal-card-code-id" readonly></div>
+                  <div class="form-group"><label for="modal-card-phone1">Phone Number</label><input id="modal-card-phone1" readonly></div>
+                  <div class="form-group"><label for="modal-card-phone2">Phone Number 2</label><input id="modal-card-phone2" readonly></div>
+                  <div class="form-group"><label for="modal-card-email">E-Mail</label><input id="modal-card-email" readonly></div>
+                </div>
+                <div class="modal-col">
+                  <div class="form-group"><label for="modal-card-discount">Discount</label><input id="modal-card-discount" value="40%" readonly></div>
+                  <div class="form-group"><label for="modal-card-limit">Purchase Limit</label><input id="modal-card-limit" type="number" value="10" readonly></div>
+                  <div class="form-group"><label for="modal-card-purchased">Purchased Items</label><input id="modal-card-purchased" type="number" min="0" max="10" value="0"></div>
+                  <div class="form-group"><label for="modal-card-issue">Issue Date</label><input id="modal-card-issue" type="date" required></div>
+                  <div class="form-group"><label for="modal-card-exp">Expiry Date</label><input id="modal-card-exp" type="date" required></div>
+                  <div class="form-group"><label for="modal-card-status">Status</label><select id="modal-card-status"><option value="Active">Active</option><option value="Expired">Expired</option><option value="Hidden">Hidden</option></select></div>
+                </div>
+              </div>
+              <button type="submit" class="btn-done">Grant Dart Card</button>
+            </form>
+          </div>
+        </div>
+        <!-- END Card modals. -->
+
         <!-- Finance: the fixed interface lives in HTML; JavaScript only fills saved data by ID. -->
         <section id="finance" class="dashboard-section dart-finance-section">
             <div id="finance-page-header" class="dart-finance-page-head">
@@ -1291,6 +1892,93 @@
 
             <div id="dart-finance-content" aria-live="polite"></div>
         </section>
+
+        <!-- BEGIN Finance modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="dart-finance-modal">
+          <div class="modal-content dart-finance-modal-content" role="dialog" aria-modal="true" aria-labelledby="dart-finance-modal-title">
+            <button id="dart-finance-modal-close" type="button" class="dart-finance-modal-close" aria-label="Close">&times;</button>
+            <div id="dart-finance-modal-body">
+              <div class="dart-finance-modal-head">
+                <p class="dart-eyebrow">DART FINANCE</p>
+                <h2 id="dart-finance-modal-title">Finance Record</h2>
+                <p id="dart-finance-modal-note"></p>
+              </div>
+              <form id="dart-finance-form" data-resource="" data-id="">
+                <input id="finance-record-id" type="hidden">
+                <div class="dart-finance-form-grid">
+                  <fieldset id="finance-expense-fields" class="dart-finance-form-section" data-finance-form-resource="expenses" hidden disabled>
+                    <label class="dart-finance-field"><span>Expense Date</span><input id="finance-expense-date" name="date" type="date" required></label>
+                    <label class="dart-finance-field"><span>Category</span><select id="finance-expense-category" name="category" required><option>Marketing</option><option>Inventory Acquisition</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
+                    <label class="dart-finance-field"><span>Amount (EGP)</span><input id="finance-expense-amount" name="amount" type="number" min="0.01" step="any" required></label>
+                    <label class="dart-finance-field"><span>Status</span><select id="finance-expense-status" name="status" required><option>Unpaid</option><option>Paid</option><option>Void</option></select></label>
+                    <label class="dart-finance-field"><span>Paid Date</span><input id="finance-expense-paid-at" name="paidAt" type="date"></label>
+                    <label class="dart-finance-field"><span>Payment Method</span><input id="finance-expense-payment-method" name="paymentMethod" type="text"></label>
+                    <label class="dart-finance-field"><span>Vendor</span><input id="finance-expense-vendor" name="vendor" type="text"></label>
+                    <label class="dart-finance-field"><span>Invoice Number</span><input id="finance-expense-invoice-number" name="invoiceNumber" type="text"></label>
+                    <label class="dart-finance-field dart-finance-field-wide"><span>Description</span><textarea id="finance-expense-description" name="description" rows="3"></textarea></label>
+                    <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-expense-notes" name="notes" rows="3"></textarea></label>
+                  </fieldset>
+
+                  <fieldset id="finance-budget-fields" class="dart-finance-form-section" data-finance-form-resource="budgets" hidden disabled>
+                    <label class="dart-finance-field"><span>Budget Name</span><input id="finance-budget-name" name="name" type="text" required></label>
+                    <label class="dart-finance-field"><span>Category</span><select id="finance-budget-category" name="category" required><option value="All">All Operating Expenses</option><option>Marketing</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
+                    <label class="dart-finance-field"><span>Budget Limit (EGP)</span><input id="finance-budget-amount" name="amount" type="number" min="0.01" step="any" required></label>
+                    <label class="dart-finance-field"><span>Warning At (%)</span><input id="finance-budget-warning" name="warningPercent" type="number" min="1" max="100" step="1" value="80" required></label>
+                    <label class="dart-finance-field"><span>Start Date</span><input id="finance-budget-start" name="startDate" type="date" required></label>
+                    <label class="dart-finance-field"><span>End Date</span><input id="finance-budget-end" name="endDate" type="date" required></label>
+                  </fieldset>
+
+                  <fieldset id="finance-invoice-fields" class="dart-finance-form-section" data-finance-form-resource="invoices" hidden disabled>
+                    <label class="dart-finance-field"><span>Invoice Number</span><input id="finance-invoice-number" name="number" type="text" required></label>
+                    <label class="dart-finance-field"><span>Invoice Type</span><select id="finance-invoice-type" name="type" required><option value="Supplier">Supplier / Expense</option><option value="Customer">Customer / Sales</option></select></label>
+                    <label class="dart-finance-field"><span>Issue Date</span><input id="finance-invoice-issue" name="issueDate" type="date" required></label>
+                    <label class="dart-finance-field"><span>Due Date</span><input id="finance-invoice-due" name="dueDate" type="date" required></label>
+                    <label class="dart-finance-field"><span>Invoice Total (EGP)</span><input id="finance-invoice-total" name="total" type="number" min="0.01" step="any" required></label>
+                    <label class="dart-finance-field"><span>Amount Paid (EGP)</span><input id="finance-invoice-paid" name="amountPaid" type="number" min="0" step="any" value="0" required></label>
+                    <label class="dart-finance-field"><span>Linked Order / Expense ID</span><input id="finance-invoice-linked" name="linkedId" type="text"></label>
+                    <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-invoice-notes" name="notes" rows="3"></textarea></label>
+                  </fieldset>
+
+                  <fieldset id="finance-goal-fields" class="dart-finance-form-section" data-finance-form-resource="goals" hidden disabled>
+                    <label class="dart-finance-field"><span>Goal Name</span><input id="finance-goal-name" name="name" type="text" required></label>
+                    <label class="dart-finance-field"><span>Metric</span><select id="finance-goal-metric" name="metric" required><option value="revenue">Net Revenue</option><option value="units">Net Units Sold</option><option value="orders">Delivered Orders</option><option value="net_profit">Net Profit</option><option value="repeat_rate">Returning Customer Rate</option><option value="marketing_roas">Marketing ROAS</option><option value="expense_limit">Operating Expense Limit</option></select></label>
+                    <label class="dart-finance-field"><span>Target</span><input id="finance-goal-target" name="target" type="number" min="0.01" step="any" required></label>
+                    <label class="dart-finance-field"><span>Start Date</span><input id="finance-goal-start" name="startDate" type="date" required></label>
+                    <label class="dart-finance-field"><span>End Date</span><input id="finance-goal-end" name="endDate" type="date" required></label>
+                    <label class="dart-finance-field"><span>Status</span><select id="finance-goal-status" name="status" required><option>Active</option><option>Paused</option></select></label>
+                  </fieldset>
+
+                  <fieldset id="finance-marketing-fields" class="dart-finance-form-section" data-finance-form-resource="marketing" hidden disabled>
+                    <label class="dart-finance-field"><span>Date</span><input id="finance-marketing-date" name="date" type="date" required></label>
+                    <label class="dart-finance-field"><span>Channel</span><select id="finance-marketing-channel" name="channel" required><option>Meta</option><option>TikTok</option><option>Google</option><option>Influencer</option><option>Organic</option><option>Other</option></select></label>
+                    <label class="dart-finance-field"><span>Campaign</span><input id="finance-marketing-campaign" name="campaign" type="text" required></label>
+                    <label class="dart-finance-field"><span>Spend (EGP)</span><input id="finance-marketing-spend" name="spend" type="number" min="0" step="any" value="0" required></label>
+                    <label class="dart-finance-field"><span>Impressions</span><input id="finance-marketing-impressions" name="impressions" type="number" min="0" step="1" value="0" required></label>
+                    <label class="dart-finance-field"><span>Clicks</span><input id="finance-marketing-clicks" name="clicks" type="number" min="0" step="1" value="0" required></label>
+                    <label class="dart-finance-field"><span>Attributed Orders</span><input id="finance-marketing-orders" name="orders" type="number" min="0" step="1" value="0" required></label>
+                    <label class="dart-finance-field"><span>Attributed Revenue (EGP)</span><input id="finance-marketing-revenue" name="attributedRevenue" type="number" min="0" step="any" value="0" required></label>
+                    <label class="dart-finance-field"><span>Linked Expense</span><select id="finance-marketing-expense" name="linkedExpenseId"><option value="">Not linked</option></select></label>
+                  </fieldset>
+
+                  <fieldset id="finance-settlement-fields" class="dart-finance-form-section" data-finance-form-resource="settlements" hidden disabled>
+                    <label class="dart-finance-field"><span>Order</span><select id="finance-settlement-order" name="orderId" required></select></label>
+                    <label class="dart-finance-field"><span>Receipt Date</span><input id="finance-settlement-date" name="settlementDate" type="date" required></label>
+                    <label class="dart-finance-field"><span>Amount Received (EGP)</span><input id="finance-settlement-amount" name="amountReceived" type="number" min="0.01" step="any" required></label>
+                    <label class="dart-finance-field"><span>COD Fee (EGP)</span><input id="finance-settlement-fee" name="fee" type="number" min="0" step="any" value="0" required></label>
+                    <label class="dart-finance-field"><span>Receipt Reference</span><input id="finance-settlement-reference" name="reference" type="text"></label>
+                    <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-settlement-notes" name="notes" rows="3"></textarea></label>
+                  </fieldset>
+                </div>
+                <div id="dart-finance-form-error" class="dart-finance-form-error" role="alert"></div>
+                <div class="dart-finance-form-actions">
+                  <button id="dart-finance-modal-cancel" type="button" class="dart-finance-secondary dart-finance-modal-cancel">Cancel</button>
+                  <button id="dart-finance-form-submit" type="submit" class="dart-finance-primary">Save Record</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <!-- END Finance modals. -->
 
         <!-- Settings: fixed HTML structure for future dashboard settings. -->
         <section id="settings" class="dashboard-section dart-settings-section" aria-labelledby="settings-page-title">
@@ -1525,570 +2213,39 @@
             </div>
             <p id="settings-reset-status" class="dart-settings-status" role="status" aria-live="polite" hidden></p>
         </section>
+
+        <!-- BEGIN Settings modals: kept beside the owning dashboard section. -->
+        <div class="modal" id="reset-data-modal" aria-hidden="true">
+          <div class="modal-content dart-reset-modal-content" role="dialog" aria-modal="true" aria-labelledby="reset-data-modal-title" aria-describedby="reset-data-modal-description">
+            <button id="close-reset-data-modal" type="button" class="dart-reset-modal-close" aria-label="Close">&times;</button>
+            <div class="dart-reset-warning-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <p class="dart-reset-kicker">DANGER — PERMANENT ACTION</p>
+            <h2 id="reset-data-modal-title">تحذير شديد: سيتم مسح كل بيانات Dart</h2>
+            <p id="reset-data-modal-description">بعد التأكيد سيتم حذف بيانات النشاط من PostgreSQL: العملاء والمندوبون والمنتجات والقطع والطلبات والمرتجعات والسجلات المالية والصور. سيتم الاحتفاظ بحسابات Owner/Staff والصلاحيات وسجل Audit.</p>
+            <ul class="dart-reset-data-list">
+              <li><i class="fa-solid fa-xmark"></i> Models, Items and saved product images</li>
+              <li><i class="fa-solid fa-xmark"></i> Customer/representative accounts, orders, returns and delivery state</li>
+              <li><i class="fa-solid fa-xmark"></i> Dart Cards, reviews and notifications — Audit history is preserved</li>
+              <li><i class="fa-solid fa-xmark"></i> Finance, goals, budgets, invoices and marketing records</li>
+            </ul>
+            <label class="dart-reset-confirm-label" for="reset-confirmation-input">للتأكيد اكتب <code>DELETE DART</code> كما هي:</label>
+            <input id="reset-confirmation-input" class="dart-reset-confirm-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE DART">
+            <label class="dart-reset-understand-label" for="reset-understand-checkbox">
+              <input id="reset-understand-checkbox" type="checkbox">
+              <span>أفهم أن المسح نهائي ولا توجد إمكانية للتراجع.</span>
+            </label>
+            <p id="reset-data-error" class="dart-reset-error" role="alert" aria-live="assertive" hidden></p>
+            <div class="dart-reset-actions">
+              <button id="cancel-reset-data" type="button" class="dart-reset-cancel-button">Cancel</button>
+                  <button id="confirm-reset-data" type="button" class="dart-reset-confirm-button" disabled><i class="fa-solid fa-skull-crossbones"></i><span id="reset-delete-button-label">Permanently Delete Everything</span></button>
+            </div>
+          </div>
+        </div>
+        <!-- END Settings modals. -->
     </main>
 
-<!-- ==================================== -->
-<!-- 1. Modal إضافة / تعديل الموديل -->
-<div id="model-modal" class="modal">
-    <div class="modal-content">
-        <span class="close-modal" id="close-model-btn">&times;</span>
-        <form id="model-form">
-            <input type="hidden" id="modal-edit-id">
-            <div class="modal-grid">
-                <div class="modal-col">
-                    <div class="form-group">
-                        <label for="modal-id">ID Model</label>
-                        <input type="text" id="modal-id" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="modal-name">Model Name</label>
-                        <input type="text" id="modal-name" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="modal-category">Category</label>
-                        <input id="modal-category" type="text" list="model-category-options" placeholder="Choose or type a new category" autocomplete="off" required>
-                        <datalist id="model-category-options"></datalist>
-                        <small>Choose an existing category or type a new one. New categories are saved with the model and become available in filters automatically.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="modal-description">Description</label>
-                        <textarea id="modal-description" placeholder="+ Value" rows="4"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="modal-discount">Discount %</label>
-                        <input type="number" id="modal-discount" placeholder="Value" value="0">
-                    </div>
-                    <div class="price-summary">
-                        <span>Final Price :</span>
-                        <strong id="modal-final-price">0 EGP</strong>
-                    </div>
-                </div>
-                <div class="modal-col">
-                    <div class="form-group">
-                        <label for="modal-cost">Cost</label>
-                        <input type="number" id="modal-cost" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="modal-selling">Selling</label>
-                        <input type="number" id="modal-selling" placeholder="Value" required>
-                    </div>
-                    <div class="form-group" style="margin-top: 20px;">
-                        <button type="submit" id="btn-submit-modal" class="btn-done">DONE</button>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ==================================== -->
-<!-- 2. Modal القطع (Items) -->
-<div id="item-add-modal" class="modal">
-    <div class="modal-content">
-        <span class="close-modal" id="close-item-add-btn">&times;</span>
-        <form id="item-add-form">
-            <input type="hidden" id="modal-item-add-edit-id">
-            <div class="form-group">
-                <label>Photo</label>
-                <input type="file" id="modal-item-file" accept="image/*">
-                <img id="item-preview-img" style="display:none; width: 100px; margin-top: 10px;" alt="Preview of the uploaded physical item image">
-            </div>
-            <div class="form-group">
-                <label>Model Code</label>
-                <input type="text" id="modal-item-model-id" list="models-list" placeholder="اختر أو اكتب كود الموديل" required>
-                <datalist id="models-list"></datalist>
-            </div>
-            <div class="form-group">
-                <label>Code PIC</label>
-                <input type="text" id="modal-item-code-pic" required>
-            </div>
-            <div class="form-group">
-                <label>Color</label>
-                <input type="text" id="modal-item-color" required>
-            </div>
-            <div class="form-group">
-                <label>Size</label>
-                <input type="text" id="modal-item-size" required>
-            </div>
-            <button type="submit" class="btn-submit">Save</button>
-        </form>
-    </div>
-</div>
-
-<!-- ==================================== -->
-<!-- 3. Modal الطلبات (Orders) -->
-<div class="modal" id="orderModal">
-    <div class="modal-content">
-        <span class="close-modal" id="closeModalBtn">&times;</span>
-        <div style="text-align: center; margin-bottom: 20px;">
-            <input type="text" id="orderSearchInput" placeholder="search about client">
-        </div>
-        <form id="orderForm">
-            <div class="modal-grid">
-                <div class="column">
-                    <div class="form-group">
-                        <label for="clientName">Name</label>
-                        <input type="text" id="clientName" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="clientId">id client</label>
-                        <input type="text" id="clientId" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="phone1">Phone number</label>
-                        <input type="text" id="phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="phone2">Phone number 2</label>
-                        <input type="text" id="phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
-                    </div>
-                    <div class="form-group">
-                        <label for="email">E-Mail</label>
-                        <input type="email" id="email" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="paymentMethod">Payment Method</label>
-                        <select id="paymentMethod"required>
-                            <option value="Cash on Delivery" selected>Cash on Delivery</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="paymentStatus">Payment Status</label>
-                        <select id="paymentStatus">
-                            <option value="Unpaid">Unpaid</option>
-                            <option value="Partially Paid">Partially Paid</option>
-                            <option value="Paid">Paid</option>
-                            <option value="Partially Refunded">Partially Refunded</option>
-                            <option value="Refunded">Refunded</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderSource">Order Source</label>
-                        <select id="orderSource">
-                            <option value="Website">Website</option>
-                            <option value="Instagram">Instagram</option>
-                            <option value="Facebook">Facebook</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                            <option value="TikTok">TikTok</option>
-                            <option value="Manual" selected>Manual</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="amountPaid">Amount Paid</label>
-                        <input type="number" id="amountPaid" min="0" step="1" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label for="amountRefunded">Amount Refunded</label>
-                        <input type="number" id="amountRefunded" min="0" step="1" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label for="deliveryNotes">Delivery Notes</label>
-                        <textarea id="deliveryNotes" placeholder="Value" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderAddress">Address (OpenStreetMap)</label>
-                        <textarea id="orderAddress" placeholder="Search for the delivery address"></textarea>
-                        <ul id="dashboard-address-results" class="dart-address-results" hidden></ul>
-                    </div>
-                    <div id="dashboard-order-map" class="dart-dashboard-order-map" aria-label="Order delivery location map"></div>
-                    <p class="dart-delivery-zone-note"><i class="fa-solid fa-clock" aria-hidden="true"></i> Cairo and Giza delivery only — promised within 12 hours.</p>
-                    <p id="dashboard-address-status" class="dart-address-status" role="status" aria-live="polite">Select a Cairo/Giza pin or enter the complete address manually.</p>
-                    <input type="hidden" id="orderLatitude">
-                    <input type="hidden" id="orderLongitude">
-                    <input type="hidden" id="orderFullAddress">
-                    <div class="price-summary">
-                        <p>Subtotal : <strong id="subtotalVal">0 EGP</strong></p>
-                        <p>Discount : <strong id="discountVal">0 EGP</strong></p>
-                        <p>Total : <strong id="totalVal">0 EGP</strong></p>
-                    </div>
-                    <button type="submit" class="btn-done">DONE</button>
-                </div>
-                <div class="column">
-                    <div class="form-group">
-                        <label>Auto Allocate Product</label>
-                        <input type="text" id="orderModelCode" list="models-list" placeholder="Model Code">
-                        <input type="text" id="orderItemColor" placeholder="Color">
-                        <input type="text" id="orderItemSize" placeholder="Size">
-                        <input type="number" id="orderItemQty" min="1" value="1" placeholder="Qty">
-                        <button type="button" id="autoAllocateProductBtn">Auto Allocate</button>
-                    </div>
-                    <div class="form-group">
-                        <label for="productsInputCode">Physical Item Code (optional manual selection)</label>
-                        <input type="text" id="productsInputCode" list="items-datalist" placeholder="اكتب أو اختر كود القطعة...">
-                        <datalist id="items-datalist"></datalist>
-                        <button type="button" id="addProductBtn">Add Item</button>
-                        <div id="selectedProductsList"></div>
-                    </div>
-                    <input type="hidden" id="modal-order-edit-id">
-                    <div class="form-group">
-                        <label for="deductions">Deductions %</label>
-                        <input type="number" id="deductions" placeholder="%" value="0" min="0" max="100" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="customDiscount">Custom Discount</label>
-                        <input type="number" id="customDiscount" placeholder="Auto" value="0" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderCountry">Country</label>
-                        <input type="text" id="orderCountry" value="Egypt" readonly required>
-                    </div>
-                    <div class="form-group">
-                        <label for="governorate">Governorate</label>
-                        <select id="governorate" required>
-                            <option value="Cairo" selected>Cairo</option>
-                            <option value="Giza">Giza</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderArea">Area</label>
-                        <input type="text" id="orderArea" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderStreetName">Street Name</label>
-                        <input type="text" id="orderStreetName" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderBuildingNumber">Building Number/Name</label>
-                        <input type="text" id="orderBuildingNumber" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderFloor">Floor</label>
-                        <input type="text" id="orderFloor" placeholder="Required" required>
-                    </div>
-                    <button type="button" id="dashboard-locate-manual-address" class="dart-locate-address-btn"><i class="fa-solid fa-location-crosshairs"></i> Locate manual address</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ==================================== -->
-<!-- 4. Modal العملاء الأساسي (Customer Profile) -->
-<div class="modal" id="customerModal">
-    <div class="modal-content">
-        <span class="close-modal close-customer-modal">&times;</span>
-        <form id="customerForm">
-            <input type="hidden" id="modal-customer-edit-id">
-            <div class="modal-grid">
-                <div class="modal-column">
-                    <div class="form-group">
-                        <label for="custName">Name</label>
-                        <input type="text" id="custName" placeholder="Value" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="custBirthday">Birthday</label>
-                        <input type="date" id="custBirthday" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="custEmail">E-Mail</label>
-                        <input type="email" id="custEmail" placeholder="Value">
-                    </div>
-                    <div class="form-group" style="margin-top: 30px;">
-                        <button type="submit" class="btn-done">DONE</button>
-                    </div>
-                </div>
-                <div class="modal-column">
-                    <div class="form-group">
-                        <label for="custPhone1">Phone number</label>
-                        <input type="text" id="custPhone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="custPhone2">Phone number 2</label>
-                        <input type="text" id="custPhone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
-                    </div>
-                    <div class="form-group">
-                        <label for="custCountry">Country</label>
-                        <input id="custCountry" class="modal-input" list="country-options" value="Egypt" placeholder="Country" required>
-                        <datalist id="country-options"><option value="Egypt"></option></datalist>            
-                    </div>
-                    <div class="form-group">
-                        <label for="custGovernorate">Governorate</label>
-                        <input id="custGovernorate" class="modal-input" list="egypt-governorates" placeholder="Governorate" required>
-                        <datalist id="egypt-governorates"><option value="Cairo"></option><option value="Alexandria"></option><option value="Giza"></option><option value="Qalyubia"></option><option value="Dakahlia"></option><option value="Sharqia"></option><option value="Gharbia"></option><option value="Monufia"></option><option value="Beheira"></option><option value="Kafr El Sheikh"></option><option value="Damietta"></option><option value="Port Said"></option><option value="Ismailia"></option><option value="Suez"></option><option value="North Sinai"></option><option value="South Sinai"></option><option value="Beni Suef"></option><option value="Faiyum"></option><option value="Minya"></option><option value="Asyut"></option><option value="Sohag"></option><option value="Qena"></option><option value="Luxor"></option><option value="Aswan"></option><option value="Red Sea"></option><option value="New Valley"></option><option value="Matrouh"></option></datalist>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ==================================== -->
-<!-- 5. Modal المرتجعات (Returns) -->
-<div class="modal" id="return-modal">
-    <div class="modal-content">
-        <span class="close-modal" id="close-return-btn">&times;</span>
-        <div style="text-align: center; margin-bottom: 20px;">
-            <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
-                <input type="text" id="returnSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
-                <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
-            </div>
-        </div>
-        <form id="return-form">
-            <input type="hidden" id="modal-return-edit-id">
-            <div class="modal-grid">
-                <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" id="modal-return-name" placeholder="Value">
-                </div>
-                <div class="form-group">
-                    <label>Item code</label>
-                    <input type="text" id="modal-return-item-code" placeholder="Value">
-                </div>
-                <div class="form-group">
-                    <label>Phone number</label>
-                    <input type="text" id="modal-return-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
-                </div>
-                <div class="form-group">
-                    <label>Model code</label>
-                    <input type="text" id="modal-return-model-id" placeholder="Value">
-                </div>
-                <div class="form-group">
-                    <label>Phone number 2</label>
-                    <input type="text" id="modal-return-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
-                </div>
-                <div class="form-group">
-                    <label>E-Mail</label>
-                    <input type="email" id="modal-return-email" placeholder="Value">
-                </div>
-                <div class="input-group">
-                    <label>Condition of returned item</label>
-                    <select id="modal-item-condition" class="modal-select">
-                        <option value="Good">Good</option>
-                        <option value="Bad">Bad</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label>Reason for return</label>
-                    <select id="modal-item-reason" class="modal-select">
-                        <option value="المقاس صغير">المقاس صغير</option>
-                        <option value="المقاس كبير">المقاس كبير</option>
-                        <option value="عيب في المنتج">عيب في المنتج</option>
-                        <option value="غير مطابق للصورة">غير مطابق للصورة</option>
-                        <option value="سبب آخر">سبب آخر</option>
-                    </select>
-                </div>
-            </div>
-            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
-        </form>
-    </div>
-</div>
-
-<!-- ==================================== -->
-<!-- 6. Modal مراجعات العملاء (Review) -->
-<div class="modal" id="customer-review-modal">
-    <div class="modal-content">
-        <span class="close-modal" id="close-review-btn">&times;</span>
-        <div style="text-align: center; margin-bottom: 20px;">
-            <div class="search-box" style="display: inline-flex; border: 1px solid var(--bragnte, #ab012b); border-radius: 20px; padding: 5px 15px; align-items: center; width: 300px;">
-                <input type="text" id="reviewSearchInput" placeholder="search about client" style="border: none; outline: none; width: 100%; background: transparent; font-size: 14px; color: #333;">
-                <i class='bx bx-search' style="color: var(--bragnte, #ab012b); font-size: 18px;"></i>
-            </div>
-        </div>
-        <form id="customer-review-form">
-            <input type="hidden" id="modal-review-edit-id">
-            <div class="modal-grid">
-                <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" id="modal-cust-rev-name" placeholder="Value">
-                </div>
-                <div class="input-group" style="margin-bottom: 10px;">
-                    <label>Star Rating</label>
-                    <select id="modal-cust-rating" class="modal-select">
-                        <option value="1">1 Star</option>
-                        <option value="2">2 Stars</option>
-                        <option value="3">3 Stars</option>
-                        <option value="4">4 Stars</option>
-                        <option value="5" selected>5 Stars</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Phone number</label>
-                    <input type="tel" id="modal-cust-rev-phone1"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
-                </div>
-                <div class="input-group" style="margin-bottom: 10px;">
-                    <label>Customer Review</label>
-                    <textarea id="modal-cust-review" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Phone number 2</label>
-                    <input type="text" id="modal-cust-rev-phone2"  placeholder="Enter phone number" maxlength="11" inputmode="numeric">
-                </div>
-                <div class="input-group" style="margin-bottom: 10px;">
-                    <label>Reviewer's Title</label>
-                    <textarea id="modal-cust-title" class="modal-select" placeholder="Value" rows="2" style="resize: none;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>E-Mail</label>
-                    <input type="email" id="modal-cust-rev-email" placeholder="Value">
-                </div>
-                <div class="input-group" style="margin-bottom: 10px;">
-                    <label>Status</label>
-                    <select id="modal-cust-status" class="modal-select">
-                        <option value="Active">Active</option>
-                        <option value="Hidden">Hidden</option>
-                    </select>
-                </div>
-            </div>
-            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
-        </form>
-    </div>
-</div>
-
-<!-- ==================================== -->
-<!-- 7. Modal المندوبين(Representative) -->
-<div class="modal" id="representative-modal">
-    <div class="modal-content">
-        <span class="close-modal" id="close-rep-btn">&times;</span>
-        <form id="rep-form">
-            <input type="hidden" id="modal-rep-id">
-            <div class="modal-grid">
-                <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" id="modal-representative-name" placeholder="Value" required>
-                </div>
-                <div class="form-group">
-                    <label>ID representative</label>
-                    <input type="text" id="modal-representative-id" placeholder="Assigned automatically" readonly required>
-                </div>
-                <div class="form-group">
-                    <label>National ID Number</label>
-                    <input type="text"  id="modal-representative-national-id"  placeholder="أدخل الرقم القومي (14 رقم)"  pattern="\d{14}"  maxlength="14"  inputmode="numeric" required onkeypress="return event.charCode >= 48 && event.charCode <= 57">
-                </div>
-                <div class="form-group">
-                    <label>Representative's Address</label>
-                    <textarea id="modal-representative-address" placeholder="Enter full address" rows="2" style="width: 100%;" required></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Phone number</label>
-                    <input type="tel" id="modal-rep-phone1" placeholder="Enter phone number" maxlength="11" inputmode="numeric" required>
-                </div>
-                <div class="form-group">
-                    <label>Phone number 2</label>
-                    <input type="tel" id="modal-rep-phone2" placeholder="Enter phone number" maxlength="11" inputmode="numeric">
-                </div>
-                <div class="form-group">
-                    <label>E-Mail</label>
-                    <input type="email" id="modal-rep-email" placeholder="name@example.com" required>
-                </div>
-                <div class="form-group">
-                    <label>Account Status</label>
-                    <select id="modal-rep-status" required>
-                        <option value="Pending Approval">Pending Approval</option>
-                        <option value="Active">Approved / Active</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Not available">Not available</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Temporary Password</label>
-                    <input type="password" id="modal-rep-password" minlength="8" placeholder="Only for a new account or reset">
-                </div>
-                <div class="form-group dart-file-field">
-                    <label>National ID — Front</label>
-                    <input type="file" id="modal-rep-id-front" accept="image/jpeg,image/png,image/webp">
-                    <img id="modal-rep-id-front-preview" class="dart-rep-upload-preview" alt="Representative national ID front preview" hidden>
-                </div>
-                <div class="form-group dart-file-field">
-                    <label>National ID — Back</label>
-                    <input type="file" id="modal-rep-id-back" accept="image/jpeg,image/png,image/webp">
-                    <img id="modal-rep-id-back-preview" class="dart-rep-upload-preview" alt="Representative national ID back preview" hidden>
-                </div>
-                <div class="form-group dart-file-field">
-                    <label>Representative Face Photo</label>
-                    <input type="file" id="modal-rep-face" accept="image/jpeg,image/png,image/webp">
-                    <img id="modal-rep-face-preview" class="dart-rep-upload-preview" alt="Representative face verification preview" hidden>
-                </div>
-            </div>
-            <button type="submit" class="btn-done" style="margin-top: 20px;">DONE</button>
-        </form>
-    </div>
-</div>
-
-
-<!-- Dart operational modals -->
-<div class="modal" id="rep-assignment-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Assign Representative</h3><select id="rep-assignment-select"></select><button type="button" class="btn-done" id="confirm-rep-assignment">Assign</button></div></div>
-
-<!-- Return workflow controls: markup stays in HTML; JavaScript only fills values by ID. -->
-<div class="modal" id="return-approval-modal">
-  <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-approval-title">
-    <span class="close-modal" aria-label="Close">&times;</span>
-    <h3 id="return-approval-title">Approve Return / Exchange</h3>
-    <p id="return-approval-summary"></p>
-    <label id="return-replacement-field" for="return-replacement-select">Replacement physical item
-      <select id="return-replacement-select"></select>
-    </label>
-    <p id="return-approval-fee-note" class="dart-return-admin-note"></p>
-    <button type="button" class="btn-done" id="confirm-return-approval">Approve</button>
-  </div>
-</div>
-
-<div class="modal" id="return-rejection-modal">
-  <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-rejection-title">
-    <span class="close-modal" aria-label="Close">&times;</span>
-    <h3 id="return-rejection-title">Reject Request</h3>
-    <label for="return-rejection-reason">Reason shown to customer</label>
-    <textarea id="return-rejection-reason" rows="4" required></textarea>
-    <button type="button" class="btn-done" id="confirm-return-rejection">Reject Request</button>
-  </div>
-</div>
-
-<div class="modal" id="return-rep-assignment-modal">
-  <div class="modal-content dart-small-modal" role="dialog" aria-modal="true" aria-labelledby="return-rep-assignment-title">
-    <span class="close-modal" aria-label="Close">&times;</span>
-    <h3 id="return-rep-assignment-title">Assign Pickup Representative</h3>
-    <p id="return-rep-assignment-summary"></p>
-    <label for="return-rep-assignment-select">Representative
-      <select id="return-rep-assignment-select"></select>
-    </label>
-    <button type="button" class="btn-done" id="confirm-return-rep-assignment">Assign</button>
-  </div>
-</div>
-<div class="modal" id="order-reason-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3 id="order-reason-title">Reason</h3><select id="order-reason-select"></select><textarea id="order-reason-notes" rows="3" placeholder="Notes / Other reason"></textarea><button type="button" class="btn-done" id="confirm-order-reason">Confirm</button></div></div>
+<!-- BEGIN Shared dashboard modals: actions used by more than one section. -->
 <div class="modal" id="history-modal"><div class="modal-content dart-history-modal"><span class="close-modal">&times;</span><h3 id="history-modal-title">History</h3><div id="history-modal-body"></div></div></div>
-<div class="modal" id="damage-modal"><div class="modal-content"><span class="close-modal">&times;</span><h3>Damage Record</h3><form id="damage-form"><input type="hidden" id="damage-edit-id"><div class="modal-grid"><div class="form-group"><label>Item Code</label><input id="damage-item-code" required></div><div class="form-group"><label>Reason</label><input id="damage-reason" required></div><div class="form-group"><label>Notes</label><textarea id="damage-notes" rows="3"></textarea></div><div class="form-group"><label>Status</label><select id="damage-status"><option value="Damaged">Damaged</option><option value="Repaired">Repaired</option><option value="Destroyed">Destroyed</option></select></div></div><button type="button" class="btn-done">DONE</button></form></div></div>
-
-<div class="modal" id="password-requests-modal">
-  <div class="modal-content dart-history-modal">
-    <span class="close-modal">&times;</span>
-    <h3>Password Reset Requests</h3>
-    <p class="dart-sensitive-note">Set a one-time temporary password. The account owner must replace it at the next login.</p>
-    <div id="password-requests-list"></div>
-  </div>
-</div>
-
-<!-- BEGIN Manual Dart Card benefit -->
-<div class="modal" id="card-modal">
-  <div class="modal-content">
-    <span class="close-modal" aria-label="Close Dart Card form">&times;</span>
-    <h3 id="card-modal-title">Additional Benefit — Dart Card</h3>
-    <form id="card-form">
-      <input type="hidden" id="modal-card-edit-id">
-      <div class="modal-grid">
-        <div class="modal-col">
-          <div class="form-group"><label for="modal-card-client-id">Client</label><select id="modal-card-client-id" required><option value="">Select client</option></select></div>
-          <div class="form-group"><label for="modal-card-client-name">Client Name</label><input id="modal-card-client-name" readonly required></div>
-          <div class="form-group"><label for="modal-card-code-id">Card ID</label><input id="modal-card-code-id" readonly></div>
-          <div class="form-group"><label for="modal-card-phone1">Phone Number</label><input id="modal-card-phone1" readonly></div>
-          <div class="form-group"><label for="modal-card-phone2">Phone Number 2</label><input id="modal-card-phone2" readonly></div>
-          <div class="form-group"><label for="modal-card-email">E-Mail</label><input id="modal-card-email" readonly></div>
-        </div>
-        <div class="modal-col">
-          <div class="form-group"><label for="modal-card-discount">Discount</label><input id="modal-card-discount" value="40%" readonly></div>
-          <div class="form-group"><label for="modal-card-limit">Purchase Limit</label><input id="modal-card-limit" type="number" value="10" readonly></div>
-          <div class="form-group"><label for="modal-card-purchased">Purchased Items</label><input id="modal-card-purchased" type="number" min="0" max="10" value="0"></div>
-          <div class="form-group"><label for="modal-card-issue">Issue Date</label><input id="modal-card-issue" type="date" required></div>
-          <div class="form-group"><label for="modal-card-exp">Expiry Date</label><input id="modal-card-exp" type="date" required></div>
-          <div class="form-group"><label for="modal-card-status">Status</label><select id="modal-card-status"><option value="Active">Active</option><option value="Expired">Expired</option><option value="Hidden">Hidden</option></select></div>
-        </div>
-      </div>
-      <button type="submit" class="btn-done">Grant Dart Card</button>
-    </form>
-  </div>
-</div>
-<!-- END Manual Dart Card benefit -->
-
-<!-- BEGIN Explicit hard-delete choices -->
 <div class="modal" id="hard-delete-modal">
   <div class="modal-content dart-hard-delete-modal" role="dialog" aria-modal="true" aria-labelledby="hard-delete-title">
     <span class="close-modal" aria-label="Close delete options">&times;</span>
@@ -2106,154 +2263,7 @@
     </div>
   </div>
 </div>
-<!-- END Explicit hard-delete choices -->
-
-<div class="modal" id="size-chart-modal">
-  <div class="modal-content dart-size-chart-admin-modal">
-    <span class="close-modal" aria-label="Close size chart">&times;</span>
-    <div class="dart-size-chart-admin-head">
-      <div>
-        <h3 id="dashboard-size-chart-title">Model Size Chart</h3>
-        <p>Fill only the measurements that apply to this model. Values are shown to customers inside the product modal.</p>
-      </div>
-      <label>Unit
-        <select id="dashboard-size-chart-unit">
-          <option value="cm">cm</option>
-          <option value="in">inches</option>
-        </select>
-      </label>
-    </div>
-    <form id="dashboard-size-chart-form">
-      <input type="hidden" id="dashboard-size-chart-model-id">
-      <div class="dart-size-chart-toolbar">
-        <button type="button" id="dashboard-size-chart-stock-sizes"><i class="bx bx-list-check"></i> Use model sizes</button>
-        <button type="button" id="dashboard-size-chart-add-row"><i class="bx bx-plus"></i> Add size</button>
-      </div>
-      <div class="dart-size-chart-admin-table-wrap">
-        <table class="dart-size-chart-admin-table">
-          <thead><tr><th>Size</th><th>Chest</th><th>Waist</th><th>Hip</th><th>Length</th><th>Shoulder</th><th>Sleeve</th><th>Inseam</th><th>Notes</th><th>Action</th></tr></thead>
-          <tbody id="dashboard-size-chart-body"></tbody>
-        </table>
-      </div>
-      <p id="dashboard-size-chart-status" class="dart-size-chart-admin-status" role="status" aria-live="polite"></p>
-      <button type="submit" class="btn-done">Save Size Chart</button>
-    </form>
-  </div>
-</div>
-
-<!-- Finance editor: static HTML fields, populated and controlled by their IDs. -->
-<div class="modal" id="dart-finance-modal">
-  <div class="modal-content dart-finance-modal-content" role="dialog" aria-modal="true" aria-labelledby="dart-finance-modal-title">
-    <button id="dart-finance-modal-close" type="button" class="dart-finance-modal-close" aria-label="Close">&times;</button>
-    <div id="dart-finance-modal-body">
-      <div class="dart-finance-modal-head">
-        <p class="dart-eyebrow">DART FINANCE</p>
-        <h2 id="dart-finance-modal-title">Finance Record</h2>
-        <p id="dart-finance-modal-note"></p>
-      </div>
-      <form id="dart-finance-form" data-resource="" data-id="">
-        <input id="finance-record-id" type="hidden">
-        <div class="dart-finance-form-grid">
-          <fieldset id="finance-expense-fields" class="dart-finance-form-section" data-finance-form-resource="expenses" hidden disabled>
-            <label class="dart-finance-field"><span>Expense Date</span><input id="finance-expense-date" name="date" type="date" required></label>
-            <label class="dart-finance-field"><span>Category</span><select id="finance-expense-category" name="category" required><option>Marketing</option><option>Inventory Acquisition</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
-            <label class="dart-finance-field"><span>Amount (EGP)</span><input id="finance-expense-amount" name="amount" type="number" min="0.01" step="any" required></label>
-            <label class="dart-finance-field"><span>Status</span><select id="finance-expense-status" name="status" required><option>Unpaid</option><option>Paid</option><option>Void</option></select></label>
-            <label class="dart-finance-field"><span>Paid Date</span><input id="finance-expense-paid-at" name="paidAt" type="date"></label>
-            <label class="dart-finance-field"><span>Payment Method</span><input id="finance-expense-payment-method" name="paymentMethod" type="text"></label>
-            <label class="dart-finance-field"><span>Vendor</span><input id="finance-expense-vendor" name="vendor" type="text"></label>
-            <label class="dart-finance-field"><span>Invoice Number</span><input id="finance-expense-invoice-number" name="invoiceNumber" type="text"></label>
-            <label class="dart-finance-field dart-finance-field-wide"><span>Description</span><textarea id="finance-expense-description" name="description" rows="3"></textarea></label>
-            <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-expense-notes" name="notes" rows="3"></textarea></label>
-          </fieldset>
-
-          <fieldset id="finance-budget-fields" class="dart-finance-form-section" data-finance-form-resource="budgets" hidden disabled>
-            <label class="dart-finance-field"><span>Budget Name</span><input id="finance-budget-name" name="name" type="text" required></label>
-            <label class="dart-finance-field"><span>Category</span><select id="finance-budget-category" name="category" required><option value="All">All Operating Expenses</option><option>Marketing</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
-            <label class="dart-finance-field"><span>Budget Limit (EGP)</span><input id="finance-budget-amount" name="amount" type="number" min="0.01" step="any" required></label>
-            <label class="dart-finance-field"><span>Warning At (%)</span><input id="finance-budget-warning" name="warningPercent" type="number" min="1" max="100" step="1" value="80" required></label>
-            <label class="dart-finance-field"><span>Start Date</span><input id="finance-budget-start" name="startDate" type="date" required></label>
-            <label class="dart-finance-field"><span>End Date</span><input id="finance-budget-end" name="endDate" type="date" required></label>
-          </fieldset>
-
-          <fieldset id="finance-invoice-fields" class="dart-finance-form-section" data-finance-form-resource="invoices" hidden disabled>
-            <label class="dart-finance-field"><span>Invoice Number</span><input id="finance-invoice-number" name="number" type="text" required></label>
-            <label class="dart-finance-field"><span>Invoice Type</span><select id="finance-invoice-type" name="type" required><option value="Supplier">Supplier / Expense</option><option value="Customer">Customer / Sales</option></select></label>
-            <label class="dart-finance-field"><span>Issue Date</span><input id="finance-invoice-issue" name="issueDate" type="date" required></label>
-            <label class="dart-finance-field"><span>Due Date</span><input id="finance-invoice-due" name="dueDate" type="date" required></label>
-            <label class="dart-finance-field"><span>Invoice Total (EGP)</span><input id="finance-invoice-total" name="total" type="number" min="0.01" step="any" required></label>
-            <label class="dart-finance-field"><span>Amount Paid (EGP)</span><input id="finance-invoice-paid" name="amountPaid" type="number" min="0" step="any" value="0" required></label>
-            <label class="dart-finance-field"><span>Linked Order / Expense ID</span><input id="finance-invoice-linked" name="linkedId" type="text"></label>
-            <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-invoice-notes" name="notes" rows="3"></textarea></label>
-          </fieldset>
-
-          <fieldset id="finance-goal-fields" class="dart-finance-form-section" data-finance-form-resource="goals" hidden disabled>
-            <label class="dart-finance-field"><span>Goal Name</span><input id="finance-goal-name" name="name" type="text" required></label>
-            <label class="dart-finance-field"><span>Metric</span><select id="finance-goal-metric" name="metric" required><option value="revenue">Net Revenue</option><option value="units">Net Units Sold</option><option value="orders">Delivered Orders</option><option value="net_profit">Net Profit</option><option value="repeat_rate">Returning Customer Rate</option><option value="marketing_roas">Marketing ROAS</option><option value="expense_limit">Operating Expense Limit</option></select></label>
-            <label class="dart-finance-field"><span>Target</span><input id="finance-goal-target" name="target" type="number" min="0.01" step="any" required></label>
-            <label class="dart-finance-field"><span>Start Date</span><input id="finance-goal-start" name="startDate" type="date" required></label>
-            <label class="dart-finance-field"><span>End Date</span><input id="finance-goal-end" name="endDate" type="date" required></label>
-            <label class="dart-finance-field"><span>Status</span><select id="finance-goal-status" name="status" required><option>Active</option><option>Paused</option></select></label>
-          </fieldset>
-
-          <fieldset id="finance-marketing-fields" class="dart-finance-form-section" data-finance-form-resource="marketing" hidden disabled>
-            <label class="dart-finance-field"><span>Date</span><input id="finance-marketing-date" name="date" type="date" required></label>
-            <label class="dart-finance-field"><span>Channel</span><select id="finance-marketing-channel" name="channel" required><option>Meta</option><option>TikTok</option><option>Google</option><option>Influencer</option><option>Organic</option><option>Other</option></select></label>
-            <label class="dart-finance-field"><span>Campaign</span><input id="finance-marketing-campaign" name="campaign" type="text" required></label>
-            <label class="dart-finance-field"><span>Spend (EGP)</span><input id="finance-marketing-spend" name="spend" type="number" min="0" step="any" value="0" required></label>
-            <label class="dart-finance-field"><span>Impressions</span><input id="finance-marketing-impressions" name="impressions" type="number" min="0" step="1" value="0" required></label>
-            <label class="dart-finance-field"><span>Clicks</span><input id="finance-marketing-clicks" name="clicks" type="number" min="0" step="1" value="0" required></label>
-            <label class="dart-finance-field"><span>Attributed Orders</span><input id="finance-marketing-orders" name="orders" type="number" min="0" step="1" value="0" required></label>
-            <label class="dart-finance-field"><span>Attributed Revenue (EGP)</span><input id="finance-marketing-revenue" name="attributedRevenue" type="number" min="0" step="any" value="0" required></label>
-            <label class="dart-finance-field"><span>Linked Expense</span><select id="finance-marketing-expense" name="linkedExpenseId"><option value="">Not linked</option></select></label>
-          </fieldset>
-
-          <fieldset id="finance-settlement-fields" class="dart-finance-form-section" data-finance-form-resource="settlements" hidden disabled>
-            <label class="dart-finance-field"><span>Order</span><select id="finance-settlement-order" name="orderId" required></select></label>
-            <label class="dart-finance-field"><span>Receipt Date</span><input id="finance-settlement-date" name="settlementDate" type="date" required></label>
-            <label class="dart-finance-field"><span>Amount Received (EGP)</span><input id="finance-settlement-amount" name="amountReceived" type="number" min="0.01" step="any" required></label>
-            <label class="dart-finance-field"><span>COD Fee (EGP)</span><input id="finance-settlement-fee" name="fee" type="number" min="0" step="any" value="0" required></label>
-            <label class="dart-finance-field"><span>Receipt Reference</span><input id="finance-settlement-reference" name="reference" type="text"></label>
-            <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-settlement-notes" name="notes" rows="3"></textarea></label>
-          </fieldset>
-        </div>
-        <div id="dart-finance-form-error" class="dart-finance-form-error" role="alert"></div>
-        <div class="dart-finance-form-actions">
-          <button id="dart-finance-modal-cancel" type="button" class="dart-finance-secondary dart-finance-modal-cancel">Cancel</button>
-          <button id="dart-finance-form-submit" type="submit" class="dart-finance-primary">Save Record</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- Destructive reset confirmation: static HTML controlled by dart-settings.js. -->
-<div class="modal" id="reset-data-modal" aria-hidden="true">
-  <div class="modal-content dart-reset-modal-content" role="dialog" aria-modal="true" aria-labelledby="reset-data-modal-title" aria-describedby="reset-data-modal-description">
-    <button id="close-reset-data-modal" type="button" class="dart-reset-modal-close" aria-label="Close">&times;</button>
-    <div class="dart-reset-warning-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
-    <p class="dart-reset-kicker">DANGER — PERMANENT ACTION</p>
-    <h2 id="reset-data-modal-title">تحذير شديد: سيتم مسح كل بيانات Dart</h2>
-    <p id="reset-data-modal-description">بعد التأكيد سيتم حذف بيانات النشاط من PostgreSQL: العملاء والمندوبون والمنتجات والقطع والطلبات والمرتجعات والسجلات المالية والصور. سيتم الاحتفاظ بحسابات Owner/Staff والصلاحيات وسجل Audit.</p>
-    <ul class="dart-reset-data-list">
-      <li><i class="fa-solid fa-xmark"></i> Models, Items and saved product images</li>
-      <li><i class="fa-solid fa-xmark"></i> Customer/representative accounts, orders, returns and delivery state</li>
-      <li><i class="fa-solid fa-xmark"></i> Dart Cards, reviews and notifications — Audit history is preserved</li>
-      <li><i class="fa-solid fa-xmark"></i> Finance, goals, budgets, invoices and marketing records</li>
-    </ul>
-    <label class="dart-reset-confirm-label" for="reset-confirmation-input">للتأكيد اكتب <code>DELETE DART</code> كما هي:</label>
-    <input id="reset-confirmation-input" class="dart-reset-confirm-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE DART">
-    <label class="dart-reset-understand-label" for="reset-understand-checkbox">
-      <input id="reset-understand-checkbox" type="checkbox">
-      <span>أفهم أن المسح نهائي ولا توجد إمكانية للتراجع.</span>
-    </label>
-    <p id="reset-data-error" class="dart-reset-error" role="alert" aria-live="assertive" hidden></p>
-    <div class="dart-reset-actions">
-      <button id="cancel-reset-data" type="button" class="dart-reset-cancel-button">Cancel</button>
-          <button id="confirm-reset-data" type="button" class="dart-reset-confirm-button" disabled><i class="fa-solid fa-skull-crossbones"></i><span id="reset-delete-button-label">Permanently Delete Everything</span></button>
-    </div>
-  </div>
-</div>
+<!-- END Shared dashboard modals. -->
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script  src="../Js/dart-state.js" defer></script>
@@ -2275,12 +2285,7 @@
     <script src="dart-settings.js"></script>
     <script src="dart-staff.js"></script>
 
-<div class="modal" id="image-preview-modal">
-  <div class="modal-content dart-image-preview-content">
-    <span class="close-modal">&times;</span>
-    <img id="full-item-image" alt="Full item preview">
-  </div>
-</div>
+
 
 </body>
 </html>

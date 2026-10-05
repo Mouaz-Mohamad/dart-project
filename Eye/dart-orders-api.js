@@ -1,3 +1,4 @@
+// BEGIN Deferred bridges: load order actions before the catalog and Settings clients.
 (function installDeferredCatalogBridge() {
   "use strict";
   if (window.DartCatalog) return;
@@ -29,7 +30,9 @@
   });
   window.DartSiteSettings = bridge;
 })();
+// END Deferred bridges.
 
+// BEGIN Authoritative Orders client: DartState is an in-memory projection only.
 (function () {
   "use strict";
   const API_BASE = String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
@@ -46,6 +49,7 @@
   let hydrateSerial = 0;
   let lastAppliedHydrateSerial = 0;
 
+  // BEGIN Local projection and authenticated API transport.
   function readLocal() {
     return window.DartState?.read?.(STORAGE_KEY, []) || [];
   }
@@ -102,7 +106,9 @@
     if (window.DartDomainState?.hydrateAudit) jobs.push(window.DartDomainState.hydrateAudit());
     if (jobs.length) await Promise.allSettled(jobs);
   }
+  // END Local projection and authenticated API transport.
 
+  // BEGIN Versioned local edits: serialize writes and protect in-flight mutations.
   function hasMutationBarrier() {
     return dirty || syncInFlight || authoritativeMutations > 0;
   }
@@ -177,7 +183,9 @@
     syncChain = syncChain.then(sync);
     return await syncChain;
   }
+  // END Versioned local edits.
 
+  // BEGIN Server mutations: only confirmed responses update the local order list.
   async function runAuthoritativeMutation(path, body, returnPayload = false, deferRelatedRefresh = false) {
     if (dirty) await flush();
     authoritativeMutations += 1;
@@ -273,7 +281,9 @@
       authoritativeMutations = Math.max(0, authoritativeMutations - 1);
     }
   }
+  // END Server mutations.
 
+  // BEGIN Hydration and polling: stale responses cannot overwrite newer writes.
   async function hydrate(_force = false) {
     if (hasMutationBarrier()) return readLocal();
     const serial = ++hydrateSerial;
@@ -347,4 +357,6 @@
     serverVersion: () => serverVersion,
   };
   document.head.append(Object.assign(document.createElement("script"), { src: "dart-order-group-ui.js" }));
+  // END Hydration and polling.
 })();
+// END Authoritative Orders client.

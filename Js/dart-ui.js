@@ -980,6 +980,7 @@ function initCartAndCheckoutEvents() {
             setTimeout(() => window.dartCheckoutAddress?.invalidate?.(), 320);
         });
     }
+    // BEGIN Checkout submission: one busy guard and one success path for normal and price-reviewed orders.
     if (checkoutForm) {
         let checkoutSubmitting = false;
         const checkoutSubmitButton = checkoutForm.querySelector('[type="submit"]');
@@ -996,6 +997,19 @@ function initCartAndCheckoutEvents() {
                 checkoutSubmitButton.textContent = busy ? 'Creating order...' : checkoutSubmitLabel;
             }
         };
+        const completeCheckout = (order) => {
+            sessionStorage.setItem('dart_last_order_id', order.orderId);
+            sessionStorage.setItem('dart_internal_navigation', '1');
+            cartData = [];
+            window.DartState?.write?.('dart_cart', [], { source: 'cart' });
+            appliedDiscountRate = 0;
+            updateCartCount();
+            renderCart();
+            showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 700);
+        };
         checkoutForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (checkoutSubmitting) return;
@@ -1005,17 +1019,7 @@ function initCartAndCheckoutEvents() {
                 try {
                     const order = await window.DartPlatform.checkout(checkoutForm);
                     orderCreated = true;
-                    sessionStorage.setItem('dart_last_order_id', order.orderId);
-                    sessionStorage.setItem('dart_internal_navigation', '1');
-                    cartData = [];
-                    window.DartState?.write?.('dart_cart', [], { source: 'cart' });
-                    appliedDiscountRate = 0;
-                    updateCartCount();
-                    renderCart();
-                    showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 700);
+                    completeCheckout(order);
                 } catch (error) {
                     if (error.code === "PRICE_CHANGED") {
                         const changes = Array.isArray(error.details?.changes)
@@ -1055,17 +1059,7 @@ function initCartAndCheckoutEvents() {
                                 { acceptPriceChanges: true }
                             );
                             orderCreated = true;
-                            sessionStorage.setItem('dart_last_order_id', order.orderId);
-                            sessionStorage.setItem('dart_internal_navigation', '1');
-                            cartData = [];
-                            window.DartState?.write?.('dart_cart', [], { source: 'cart' });
-                            appliedDiscountRate = 0;
-                            updateCartCount();
-                            renderCart();
-                            showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
-                            setTimeout(() => {
-                                window.location.href = 'index.html';
-                            }, 700);
+                            completeCheckout(order);
                         } catch (retryError) {
                             showToast(retryError.message || "تعذر إنشاء الطلب بعد مراجعة السعر.");
                         }
@@ -1105,6 +1099,7 @@ function initCartAndCheckoutEvents() {
             }, 1500);
         });
     }
+    // END Checkout submission.
 }
 function initAddressMap() {
     if (window.DartAddress) {

@@ -11,6 +11,7 @@
   let loadedAt = 0;
   const CACHE_MS = 30_000;
 
+  // BEGIN API transport: reuse the authenticated platform client when it is available.
   function apiBase() {
     return String(root.DART_API_BASE_URL || root.DartApi?.baseUrl || root.location?.origin || "").replace(/\/$/, "");
   }
@@ -57,7 +58,9 @@
     }
     return payload;
   }
+  // END API transport.
 
+  // BEGIN Set group session projection: the server reservation remains authoritative.
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
@@ -94,7 +97,9 @@
   function signedIn() {
     return Boolean(root.DartPlatform?.currentUser?.());
   }
+  // END Set group session projection.
 
+  // BEGIN Set catalogue and reservation API: prices and availability come from the backend.
   async function loadCatalog(force = false) {
     if (!force && catalog.length && Date.now() - loadedAt < CACHE_MS) return clone(catalog);
     const settingsRequest = request("/api/v1/sets/settings")
@@ -159,7 +164,9 @@
       ? String(set.images[0] || "")
       : "Photos/logo-1to1.png";
   }
+  // END Set catalogue and reservation API.
 
+  // BEGIN Public Sets client interface.
   root.DartSets = Object.freeze({
     request,
     loadCatalog,
@@ -179,6 +186,7 @@
   });
 
   root.dispatchEvent?.(new CustomEvent("dart:sets-client-ready"));
+  // END Public Sets client interface.
 })(typeof window !== "undefined" ? window : globalThis);
 
 // DART SETS STOREFRONT — additive UI integration; ordinary product rendering remains untouched.
@@ -200,6 +208,7 @@
   let storefrontBootPromise = null;
   let setPurchaseBusy = false;
 
+  // BEGIN Storefront projections: normalize backend Set groups and read current cart state.
   function drafts() {
     return normalizeGroups(root.DartSets?.readDrafts?.() || []);
   }
@@ -277,7 +286,9 @@
 
   function setCurrentPrice(set) { return Math.max(0, Number(set?.pricing?.finalMinor || 0)) / 100; }
   function setBasePrice(set) { return Math.max(0, Number(set?.pricing?.basePriceMinor || 0)) / 100; }
+  // END Storefront projections.
 
+  // BEGIN Set listing: share the Products page filters, counts, and card order.
   function setCardSignature(set) {
     return JSON.stringify({
       id: String(set?.setId || ""),
@@ -599,7 +610,9 @@
       container.appendChild(button);
     }
   }
+  // END Set listing.
 
+  // BEGIN Set modal: the HTML-owned shell is reused, with a fallback for pages without it.
   function ensureModal() {
     let modal = root.document.getElementById("dartSetModal");
     if (!modal) {
@@ -709,7 +722,9 @@
   function nextUnitIndex(setId, groups) {
     return 1+Math.max(0,...groups.filter(g=>g.setId===setId).map(g=>Number(g.unitIndex)||0));
   }
+  // END Set modal.
 
+  // BEGIN Set purchase: reserve physical pieces and attach one commercial Set group.
   function lineForSelection(selection, set, key, unitIndex) {
     const model=modelFor(selection.modelId);
     let price=Number(model?.selling || 0);
@@ -789,7 +804,9 @@
       }
     };
   }
+  // END Set purchase.
 
+  // BEGIN Cart grouping and totals: display one Set card while retaining physical lines.
   function tagCartLines() {
     const cart=cartRef(), groups=drafts();
     const validKeys=new Set(groups.map(g=>`${g.setId}:${g.unitIndex}`));
@@ -942,7 +959,9 @@
     if (typeof root.queueMicrotask === "function") root.queueMicrotask(run);
     else root.setTimeout(run,0);
   }
+  // END Cart grouping and totals.
 
+  // BEGIN Lifecycle: restore server groups and subscribe to cart/catalogue events once.
   async function restoreServerGroups() {
     const id=root.DartSets?.currentReservationId?.(); if (!id) return;
     // A fresh Dart session creates a local CART id before any server reservation exists.
@@ -998,4 +1017,5 @@
   if (!storefrontRuntimeReady() && root.document.readyState!=="complete") {
     root.document.addEventListener("DOMContentLoaded",()=>void boot(),{once:true});
   } else void boot();
+  // END Lifecycle.
 })(typeof window !== "undefined" ? window : globalThis);
