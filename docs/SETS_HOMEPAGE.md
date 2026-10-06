@@ -10,6 +10,8 @@ In **Models → Sets → Edit**, save **Short Description**, **Show on Homepage*
 
 Migration: `backend/migrations/0057_set_homepage_presentation.sql` adds `short_description`, `show_on_homepage` and `homepage_order`, constraints and a partial homepage index. It is additive and leaves prices/components/reservations unchanged. Apply it before deploying the new API.
 
+Production can use a different database connection from Supabase Auth. For an explicit operational release, `DART_APPLY_SET_HOMEPAGE_MIGRATION=0057_set_homepage_presentation` applies only this approved migration using the API's connection before serving requests. It requires migration 0056, uses the migration lock/checksum ledger, and safely skips repeats. Remove the release flag after verification. Normal builds and normal runtime boots do not migrate.
+
 `GET /api/v1/sets`, `GET /api/v1/sets/:setId`, `POST /api/v1/admin/sets` and `PUT /api/v1/admin/sets/:setId` expose/accept the presentation fields. New writes retain the existing central `sets.manage` permission, CSRF, version checks, transactions and audit trail. Updates from older clients preserve omitted presentation fields. Both displayed prices come from server pricing: `componentsSellingTotalMinor` and `finalMinor`.
 
 ## URLs and Back
@@ -30,7 +32,7 @@ Piece/gallery previews use the HTML-owned native dialog and `Js/dart-set-image-p
 | 6. Audit/observability | PASS: Set create/update logs contain presentation values, including before/after on update. |
 | 7. External-service cost | N/A: no WhatsApp, messaging or paid-service calls were added. |
 | 8. Regression safety | PASS for affected paths: normal Product links/modals and Set listing/filter/sort/cart/reload remain covered. General CSS architecture check has a pre-existing failure at the unchanged `Eye/dart.css` Boxicons `@import` (also present at baseline `d8b7792`). |
-| 9. Tests | PASS: backend check/build, admin browser round-trip, real homepage/products navigation and existing cart/Product contracts. Backend suite: 259 passed, 23 skipped; database integration tests require a dedicated test database and were not run against production. |
+| 9. Tests | PASS: backend check/build, admin browser round-trip, real homepage/products navigation and existing cart/Product contracts. Backend suite: 266 passed, 23 skipped; database integration tests require a dedicated test database and were not run against production. The operational migration tests cover disabled/unsupported flags, locking/checksum/order, repeat skips and rollback. |
 | 10. Secrets | PASS: no credentials introduced; browser history stores navigation IDs/URLs, not prices, stock or business snapshots. |
 
 Commands: `cd backend && npm run check && npm run build`; `node scripts/build-home-css.cjs --versioned`; `node scripts/stage-vercel-public.cjs`; `node tests/sets-runtime-contract.cjs`; `node tests/database-authoritative-storage.cjs`; existing Product contract checks. Browser checks: `tests/sets-admin-browser.js`, `tests/sets-home-browser.js`, `tests/sets-storefront-browser.js` (Playwright; `CHROMIUM_EXECUTABLE` can select an installed Chromium).

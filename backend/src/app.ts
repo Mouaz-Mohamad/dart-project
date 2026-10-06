@@ -2,6 +2,7 @@
 // الغرض: إنشاء Runtime وربط الخدمات وقاعدة البيانات بالتطبيق، مع fallback آمن عند سوء الإعداد.
 import express, { type Express } from "express";
 import pino from "pino";
+import { readFile } from "node:fs/promises";
 import { createApp } from "./application.js";
 import {
   EnvironmentConfigError,
@@ -10,6 +11,7 @@ import {
 } from "./config/env.js";
 import { createLogger } from "./config/logger.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
+import { applySetHomepageMigration, SET_HOMEPAGE_MIGRATION } from "./database/set-homepage-migration.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
 import {
   loadSocialAuthConfig,
@@ -151,6 +153,14 @@ try {
     { invalidFields: error.fields },
     "Dart backend environment is invalid",
   );
+}
+
+// An explicit operational release flag is used when the API database differs from Auth.
+// The migration is fixed, checksummed and locked; no request/client can enable it.
+if (runtime && process.env.DART_APPLY_SET_HOMEPAGE_MIGRATION) {
+  const sql = await readFile(new URL(`../migrations/${SET_HOMEPAGE_MIGRATION}.sql`, import.meta.url), "utf8");
+  const applied = await applySetHomepageMigration(runtime.database, sql, process.env.DART_APPLY_SET_HOMEPAGE_MIGRATION);
+  runtime.logger.info({ migration: SET_HOMEPAGE_MIGRATION, applied }, "Explicit Set homepage migration verified");
 }
 
 const app = runtime?.app ?? createMisconfiguredApplication();

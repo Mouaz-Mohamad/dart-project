@@ -1,5 +1,5 @@
-batch=3
+batch=4
 purpose=server-backed-set-homepage-presentation
 api=set-description-visibility-and-order
 migration=0057_set_homepage_presentation.sql
-trigger=final-production-release
+trigger=explicit-api-database-migration-release
