@@ -997,7 +997,10 @@
 
   function observe() {
     const scheduleSetRender=()=>root.setTimeout(renderSetCards,0);
-    const syncFiltersAndSets=()=>root.setTimeout(()=>{ ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); },0);
+    const syncFiltersAndSets=()=>root.setTimeout(()=>{
+      ensureSetFilter(); syncSetFilterFacets(); renderSetCards();
+      if (activeSet) updateModalAvailability();
+    },0);
     root.addEventListener("dart:catalog-hydrated",syncFiltersAndSets);
     root.addEventListener("dart:products-rendered",syncFiltersAndSets);
     root.addEventListener("dart:product-filters-rendered",syncFiltersAndSets);

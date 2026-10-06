@@ -533,6 +533,15 @@
     });
   }
 
+  // Shared links may open before the model catalogue finishes loading.
+  root.addEventListener("dart:catalog-hydrated", () => {
+    const node = modal();
+    if (!node || node.hidden) return;
+    componentBlocks(node).forEach((block, index) => updatePieceImage(block, index));
+    syncAllPieceAvailability(node);
+    renderCarousel(null, node);
+  });
+
   const observer = new root.MutationObserver((mutations) => {
     for (const mutation of mutations) {
       if (mutation.type === "attributes" && mutation.target?.id === "dartSetModal") {

@@ -22,6 +22,7 @@ function fixture(id, order, photo) {
 const first = fixture("SET-FIRST", 1, "/Photos/products/1.jpg");
 const second = fixture("SET-SECOND", 2, "/Photos/products/2.jpg");
 let mode = "featured";
+let catalogDelay = 0;
 function json(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
   response.end(JSON.stringify(body));
@@ -29,7 +30,7 @@ function json(response, status, body) {
 const server = http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, "http://test").pathname);
   if (pathname.startsWith("/api/")) {
-    if (pathname === "/api/v1/catalog") return json(response, 200, { version: 1, models, stock: { '["SHIRT-101","Black","M"]': 5, '["PANTS-202","Stone","M"]': 5 } });
+    if (pathname === "/api/v1/catalog") return setTimeout(() => json(response, 200, { version: 1, models, stock: { '["SHIRT-101","Black","M"]': 5, '["PANTS-202","Stone","M"]': 5 } }), catalogDelay);
     if (pathname === "/api/v1/catalog/version") return json(response, 200, { version: 1 });
     if (pathname === "/api/v1/sets") {
       if (mode === "error") return json(response, 503, { error: { message: "Internal database information must never appear in the UI." } });
@@ -193,8 +194,12 @@ const server = http.createServer((request, response) => {
     const direct = await context.newPage();
     direct.setDefaultTimeout(10000);
     direct.on("pageerror", error => failures.push(error.message));
+    catalogDelay = 400;
     await direct.goto(`${origin}/sets/SET-FIRST`);
     await direct.locator("#dartSetModal").waitFor({ state: "visible" });
+    await direct.waitForFunction(() => !document.querySelector("#dartSetModal [data-set-add]").disabled);
+    assert.equal(new URL(await direct.locator("#dartSetModal [data-set-piece-image] img").first().getAttribute("src"), origin).pathname, "/Photos/products/1.jpg", "Late model hydration refreshes component images and availability without reopening the Set");
+    catalogDelay = 0;
     const directEntries = await direct.evaluate(() => history.length);
     await direct.reload();
     await direct.locator("#dartSetModal").waitFor({ state: "visible" });

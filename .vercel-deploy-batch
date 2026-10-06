@@ -1,6 +1,6 @@
-batch=3
-purpose=homepage-sets-and-set-navigation
-frontend=portrait-carousel-piece-preview-and-set-links
-backend=server-backed-set-homepage-presentation
-scope=three-user-requested-phases
+batch=5
+purpose=sets-shared-link-hydration
+frontend=refresh-set-availability-and-piece-images
+backend=none
+scope=final-frontend-verification
 trigger=final-production-release

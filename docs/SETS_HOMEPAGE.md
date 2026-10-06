@@ -18,6 +18,8 @@ Production can use a different database connection from Supabase Auth. For an ex
 
 `/sets/{SetID}` opens the existing dialog; Vercel rewrites shared links to `products.html`. `Js/dart-set-navigation.js` manages the navigation steps. A fresh shared link creates a Products-list entry underneath it. Reload preserves the same steps.
 
+If model data arrives after a shared Set opens, its availability and piece images refresh in place without clearing the customer's choices.
+
 Piece/gallery previews use the HTML-owned native dialog and `Js/dart-set-image-preview.js`. First Back closes an enlarged image while preserving the Set. Next Back closes the Set and returns to its originating page. Forward restores the overlays. Repeated Close clicks do not traverse twice; late API replies cannot reopen a closed Set. Closing during a pending add does not cancel the already-submitted reservation or trigger another Back when it completes.
 
 ## Verification
