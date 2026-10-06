@@ -44,6 +44,17 @@
     if (options.emit !== false) emit(key, value, options.source || "memory");
     return value;
   }
+  function isBusinessKey(key) {
+    return BUSINESS_KEYS.has(key);
+  }
+  function remove(key, options = {}) {
+    const removed = values.delete(key);
+    if (removed && options.emit !== false) emit(key, undefined, options.source || "memory");
+    return removed;
+  }
+  function clearBusiness() {
+    for (const key of BUSINESS_KEYS) remove(key, { source: "logout" });
+  }
   function purgeLegacyBrowserBusinessData() {
     const marker = "dart_database_only_migration_v1";
     try {
@@ -211,6 +222,9 @@
     read,
     write,
     clone,
+    isBusinessKey,
+    remove,
+    clearBusiness,
     ensureProductButtonState: loadProductButtonStateWhenNeeded,
   });
   scheduleProductButtonState();

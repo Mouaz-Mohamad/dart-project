@@ -502,23 +502,35 @@ let dartFinanceLoadPromise = null;
 function dartLoadFinance() {
   if (window.DartFinance) return Promise.resolve(window.DartFinance);
   if (dartFinanceLoadPromise) return dartFinanceLoadPromise;
+  // A previous failed download cannot emit another load event on retry.
+  document.querySelector('script[data-dart-finance]')?.remove();
   dartFinanceLoadPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-dart-finance]');
-    if (existing) {
-      existing.addEventListener("load", () => resolve(window.DartFinance), { once: true });
-      existing.addEventListener("error", reject, { once: true });
-      return;
-    }
     const script = document.createElement("script");
-    script.src = "dart-finance.js";
+    script.src = "dart-finance.js?v=20261006-finance-state-v1";
     script.defer = true;
     script.dataset.dartFinance = "1";
-    script.onload = () => resolve(window.DartFinance);
+    script.onload = () => {
+      if (window.DartFinance) resolve(window.DartFinance);
+      else script.onerror();
+    };
     script.onerror = () => {
       dartFinanceLoadPromise = null;
+      script.remove();
       reject(new Error("Finance module could not be loaded."));
     };
     document.body.appendChild(script);
+  });
+  // Navigation intentionally does not await loading. Handle its rejection here.
+  void dartFinanceLoadPromise.catch(() => {
+    const content = document.getElementById("dart-finance-content");
+    if (!content) return;
+    content.textContent = "Finance could not be loaded. ";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Retry";
+    retry.className = "dart-finance-secondary";
+    retry.onclick = () => { void dartLoadFinance(); };
+    content.appendChild(retry);
   });
   return dartFinanceLoadPromise;
 }
@@ -3387,6 +3399,8 @@ function setupGlobalModalTriggers() {
   if (document.documentElement.dataset.dartModalReady) return;
   document.documentElement.dataset.dartModalReady = "1";
   document.addEventListener("click", (e) => {
+    // Finance owns its pending-save guard and focus restoration.
+    if (e.target.closest("#dart-finance-modal")) return;
     if (e.target.closest(".close-modal")) {
       closeModal(e.target.closest(".modal"));
       return;

@@ -37,8 +37,10 @@
   const dirty = new Set();
   const timers = new Map();
   const queues = new Map();
+  const revisions = new Map();
   const deniedDomains = new Set();
   let adminPollingEnabled = false;
+  let polling = false;
 
   function readLocal(storageKey) {
     return window.DartState?.read?.(storageKey, []) || [];
@@ -112,7 +114,10 @@
   async function hydrateDomain(domain, _force = false) {
     const storageKey = STORAGE_BY_DOMAIN[domain];
     if (!storageKey) return [];
+    const revision = revisions.get(domain) || 0;
     const payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`);
+    // A read started before a local edit must never discard that edit.
+    if (dirty.has(domain) || revision !== (revisions.get(domain) || 0)) return readLocal(storageKey);
     versions.set(domain, Number(payload.version || 1));
     dirty.delete(domain);
     cache(storageKey, payload.data || [], domain);
@@ -123,16 +128,20 @@
     const storageKey = STORAGE_BY_DOMAIN[domain];
     const version = versions.get(domain);
     if (!storageKey || !version) return readLocal(storageKey);
+    const revision = revisions.get(domain) || 0;
+    const snapshot = structuredClone(readLocal(storageKey));
     const payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`, {
       method: "PUT",
       body: {
         expectedVersion: version,
-        data: await sanitizeDomainData(domain, readLocal(storageKey)),
+        data: await sanitizeDomainData(domain, snapshot),
       },
     });
     versions.set(domain, Number(payload.version || version));
-    dirty.delete(domain);
-    cache(storageKey, payload.data || [], domain);
+    if (revision === (revisions.get(domain) || 0)) {
+      dirty.delete(domain);
+      cache(storageKey, payload.data || [], domain);
+    }
     window.dispatchEvent(
       new CustomEvent("dart:domain-synced", {
         detail: { domain, storageKey, version: versions.get(domain) },
@@ -163,6 +172,8 @@
     }
     if (!versions.get(domain)) await hydrateDomain(domain);
     const previous = readLocal(storageKey);
+    const revision = (revisions.get(domain) || 0) + 1;
+    revisions.set(domain, revision);
     window.DartState?.write?.(
       storageKey,
       Array.isArray(data) ? data : [],
@@ -172,11 +183,13 @@
     try {
       return await syncNow(domain);
     } catch (error) {
-      dirty.delete(domain);
-      if (error.status === 409) {
-        await hydrateDomain(domain, true).catch(() => cache(storageKey, previous, domain));
-      } else {
-        cache(storageKey, previous, domain);
+      if (revision === revisions.get(domain)) {
+        dirty.delete(domain);
+        if (error.status === 409) {
+          await hydrateDomain(domain, true).catch(() => cache(storageKey, previous, domain));
+        } else {
+          cache(storageKey, previous, domain);
+        }
       }
       window.dispatchEvent(new CustomEvent("dart:domain-sync-failed", {
         detail: { domain, storageKey, code: error.code || "SYNC_FAILED" },
@@ -193,7 +206,18 @@
     if (Number(payload?.version) > 0) {
       versions.set("finance_settlements", Number(payload.version));
     }
-    await hydrateDomain("finance_settlements", true);
+    try {
+      await hydrateDomain("finance_settlements", true);
+    } catch (error) {
+      // A failed refresh must not turn an already confirmed cash receipt into a failed save.
+      if (!payload?.settlement) throw error;
+      const storageKey = STORAGE_BY_DOMAIN.finance_settlements;
+      const rows = readLocal(storageKey).filter((row) => String(row.id) !== String(payload.settlement.id));
+      cache(storageKey, [payload.settlement, ...rows], "finance_settlements");
+      window.dispatchEvent(new CustomEvent("dart:domain-refresh-failed", {
+        detail: { domain: "finance_settlements", code: "REFRESH_FAILED" },
+      }));
+    }
     return payload?.settlement || null;
   }
 
@@ -203,16 +227,15 @@
     timers.set(
       domain,
       setTimeout(() => {
-        const chain = queues.get(domain) || Promise.resolve();
-        const next = chain
-          .then(() => syncDomain(domain))
+        const next = syncNow(domain)
           .catch(async (error) => {
             console.error(`Dart ${domain} sync failed`, error);
             if (error.status === 409) {
+              dirty.delete(domain);
               await hydrateDomain(domain, true).catch(() => {});
             }
           });
-        queues.set(domain, next);
+        void next;
       }, 120),
     );
   }
@@ -232,6 +255,7 @@
       );
       return false;
     }
+    revisions.set(domain, (revisions.get(domain) || 0) + 1);
     window.DartState?.write?.(storageKey, Array.isArray(data) ? data : [], { source: `domain:${domain}:edit` });
     dirty.add(domain);
     schedule(domain);
@@ -258,6 +282,7 @@
 
   async function hydrateAll() {
     const allDomains = Object.keys(STORAGE_BY_DOMAIN);
+    const initialRevisions = new Map(revisions);
     const payload = await api("/api/v1/admin/domain-state");
     const rows = Array.isArray(payload?.domains) ? payload.domains : [];
     const received = new Set();
@@ -268,6 +293,7 @@
       if (!storageKey) continue;
       received.add(domain);
       deniedDomains.delete(domain);
+      if (dirty.has(domain) || (revisions.get(domain) || 0) !== (initialRevisions.get(domain) || 0)) continue;
       versions.set(domain, Number(row.version || 1));
       dirty.delete(domain);
       cache(storageKey, row.data || [], domain);
@@ -312,7 +338,7 @@
         return;
       }
       if (dirty.has(domain)) {
-        await syncDomain(domain);
+        await syncNow(domain);
         return;
       }
       if (remoteVersion && remoteVersion !== versions.get(domain)) {
@@ -324,7 +350,8 @@
   }
 
   async function checkAll() {
-    if (!adminPollingEnabled || document.hidden) return;
+    if (!adminPollingEnabled || document.hidden || polling) return;
+    polling = true;
     try {
       const payload = await api("/api/v1/admin/domain-state-versions");
       const remoteVersions = payload?.versions || {};
@@ -335,6 +362,8 @@
       );
     } catch (error) {
       if (error.status !== 401) console.warn("Dart dashboard live refresh failed", error);
+    } finally {
+      polling = false;
     }
   }
 
@@ -351,7 +380,7 @@
   window.DartDomainState = {
     hydrateAll,
     hydrateDomain,
-    syncDomain,
+    syncDomain: syncNow,
     syncNow,
     writeAndSync,
     createFinanceSettlement,

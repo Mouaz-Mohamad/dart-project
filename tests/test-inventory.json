@@ -10,6 +10,8 @@
     "database-authoritative-storage.cjs",
     "finance-dashboard-contract.js",
     "finance-persistence-contract.js",
+    "finance-state-integration.cjs",
+    "finance-ui-runtime.cjs",
     "home-performance-contract.cjs",
     "modal-placement-contract.cjs",
     "order-action-latency-contract.cjs",

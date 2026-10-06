@@ -76,6 +76,8 @@ jobs:
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js
           node tests/finance-persistence-contract.js
+          node tests/finance-state-integration.cjs
+          node tests/finance-ui-runtime.cjs
           node tests/server-authority-contract.js
           node tests/settings-and-groups-unit.js
           node tests/settings-reset-unit.js
