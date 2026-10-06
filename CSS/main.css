@@ -470,7 +470,7 @@ header {
 }
 
 .product-details {
-    padding: 12px;
+    padding: 4px;
     text-align: left;
 }
 
@@ -504,8 +504,8 @@ header {
 }
 
 .product-price {
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 500;
     color: var(--bragnte);
 }
 
