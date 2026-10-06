@@ -30,8 +30,10 @@
 #dartSetModal .dart-set-piece-body .dart-set-component-head{grid-column:auto;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 #dartSetModal .dart-set-piece-body .dart-set-component-head strong{min-width:0;overflow-wrap:anywhere}
 #dartSetModal .dart-set-option-row{display:grid;gap:4px}
-#dartSetModal .dart-set-option-label{color:#555;font-size:12px;font-weight:700}
 #dartSetModal .dart-set-option-buttons{display:flex;flex-wrap:wrap;gap:6px}
+#dartSetModal .dart-set-size-chart-trigger{justify-self:start}
+#dartSetModal .dart-set-size-chart-panel{z-index:10060}
+#dartSetModal .dart-set-size-chart-content{min-height:0;display:flex;flex-direction:column}
 #dartSetModal .dart-set-option-buttons .size-btn,#dartSetModal .dart-set-option-buttons .color-btn{min-height:34px;padding:6px 10px}
 #dartSetModal .dart-set-option-buttons .is-unavailable{text-decoration:line-through;opacity:.5;border-style:dashed}
 #dartSetModal .dart-set-option-buttons .is-unavailable.active{opacity:.72}
@@ -170,9 +172,6 @@
   function optionGroup(kind, select, block, pieceIndex) {
     const row = doc.createElement("div");
     row.className = "dart-set-option-row";
-    const label = doc.createElement("span");
-    label.className = "dart-set-option-label";
-    label.textContent = kind === "size" ? "Size" : "Color";
     const buttons = doc.createElement("div");
     buttons.className = `dart-set-option-buttons ${kind === "size" ? "sizes-container" : "colors-container"}`;
 
@@ -199,8 +198,108 @@
       });
       buttons.appendChild(button);
     });
-    row.append(label, buttons);
+    row.appendChild(buttons);
     return row;
+  }
+
+  const chartColumns = [
+    ["size", "Size"], ["chest", "Chest"], ["waist", "Waist"],
+    ["hip", "Hip"], ["length", "Length"], ["shoulder", "Shoulder"],
+    ["sleeve", "Sleeve"], ["inseam", "Inseam"], ["notes", "Notes"],
+  ];
+
+  function closeSizeChart(modalNode = modal()) {
+    const panel = modalNode?.querySelector("[data-set-size-chart-panel]");
+    if (!panel || panel.hidden) return;
+    panel.hidden = true;
+    const trigger = modalNode.querySelector("[data-set-size-chart-trigger][aria-expanded='true']");
+    trigger?.setAttribute("aria-expanded", "false");
+    trigger?.focus();
+  }
+
+  function sizeChartPanel(modalNode) {
+    let panel = modalNode.querySelector("[data-set-size-chart-panel]");
+    if (panel) return panel;
+    panel = doc.createElement("div");
+    panel.id = "dartSetSizeChartPanel";
+    panel.className = "product-size-chart-panel dart-set-size-chart-panel";
+    panel.dataset.setSizeChartPanel = "1";
+    panel.hidden = true;
+    panel.innerHTML = `<div class="product-size-chart-dialog" role="dialog" aria-modal="true" aria-labelledby="dartSetSizeChartTitle">
+      <button type="button" class="product-size-chart-close" data-set-size-chart-close aria-label="Close size chart">&times;</button>
+      <h3 id="dartSetSizeChartTitle" data-set-size-chart-title></h3>
+      <div class="dart-set-size-chart-content" data-set-size-chart-content></div>
+    </div>`;
+    panel.addEventListener("click", (event) => {
+      if (event.target === panel || event.target.closest("[data-set-size-chart-close]")) closeSizeChart(modalNode);
+    });
+    panel.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closeSizeChart(modalNode);
+      }
+    });
+    modalNode.appendChild(panel);
+    return panel;
+  }
+
+  function showSizeChart(block, modalNode) {
+    const panel = sizeChartPanel(modalNode);
+    const content = panel.querySelector("[data-set-size-chart-content]");
+    const model = root.DartCatalog?.model?.(String(block.dataset.modelId || ""));
+    const source = model?.sizeChart;
+    const rows = (Array.isArray(source) ? source : source?.rows);
+    const validRows = Array.isArray(rows) ? rows.filter((row) => row && String(row.size || "").trim()) : [];
+    const unit = Array.isArray(source) ? "cm" : String(source?.unit || "cm");
+    panel.querySelector("[data-set-size-chart-title]").textContent =
+      `Size Chart — ${model?.name || block.querySelector(".dart-set-component-head strong")?.textContent?.trim() || "Dart"}`;
+    content.replaceChildren();
+    if (!validRows.length) {
+      const empty = doc.createElement("div");
+      empty.className = "dart-ui-state dart-ui-state-empty";
+      const title = doc.createElement("strong");
+      title.textContent = "Size chart is being prepared";
+      const message = doc.createElement("p");
+      message.textContent = "Measurements for this model are not available yet. Contact Dart before ordering if you need help choosing a size.";
+      empty.append(title, message);
+      content.appendChild(empty);
+    } else {
+      const visible = chartColumns.filter(([key]) =>
+        key === "size" || validRows.some((row) => String(row[key] || "").trim()));
+      const wrap = doc.createElement("div");
+      wrap.className = "product-size-chart-table-wrap";
+      const table = doc.createElement("table");
+      table.className = "product-size-chart-table";
+      const head = doc.createElement("tr");
+      visible.forEach(([key, label]) => {
+        const th = doc.createElement("th");
+        th.scope = "col";
+        th.textContent = key === "size" || key === "notes" ? label : `${label} (${unit})`;
+        head.appendChild(th);
+      });
+      const thead = doc.createElement("thead");
+      thead.appendChild(head);
+      const tbody = doc.createElement("tbody");
+      validRows.forEach((row) => {
+        const tr = doc.createElement("tr");
+        visible.forEach(([key]) => {
+          const td = doc.createElement("td");
+          td.textContent = String(row[key] || "—");
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.append(thead, tbody);
+      wrap.appendChild(table);
+      const note = doc.createElement("p");
+      note.className = "product-size-chart-note";
+      note.textContent = `Measurements are in ${unit}. Measure a similar garment laid flat for the closest comparison.`;
+      content.append(wrap, note);
+    }
+    modalNode.querySelectorAll("[data-set-size-chart-trigger]").forEach((button) =>
+      button.setAttribute("aria-expanded", String(button === block.querySelector("[data-set-size-chart-trigger]"))));
+    panel.hidden = false;
+    panel.querySelector("[data-set-size-chart-close]").focus();
   }
 
   function enhancePiece(block, pieceIndex, modalNode) {
@@ -235,6 +334,16 @@
     if (head) body.appendChild(head);
     if (sizeSelect.options.length) body.appendChild(optionGroup("size", sizeSelect, block, pieceIndex));
     if (colorSelect.options.length) body.appendChild(optionGroup("color", colorSelect, block, pieceIndex));
+    const chartButton = doc.createElement("button");
+    chartButton.type = "button";
+    chartButton.className = "product-size-chart-trigger dart-set-size-chart-trigger";
+    chartButton.dataset.setSizeChartTrigger = "1";
+    chartButton.setAttribute("aria-controls", "dartSetSizeChartPanel");
+    chartButton.setAttribute("aria-expanded", "false");
+    chartButton.setAttribute("aria-label", `Size Chart for ${block.dataset.modelId || "model"}`);
+    chartButton.textContent = "Size Chart";
+    chartButton.addEventListener("click", () => showSizeChart(block, modalNode));
+    body.appendChild(chartButton);
     if (!sizeSelect.options.length || !colorSelect.options.length) {
       const empty = doc.createElement("p");
       empty.className = "dart-set-piece-empty";
@@ -393,6 +502,7 @@
     }
     const close = modalNode.querySelector("[data-set-close]");
     if (close) close.setAttribute("aria-label", "Close Set details");
+    closeSizeChart(modalNode);
 
     componentBlocks(modalNode).forEach((block, index) => enhancePiece(block, index, modalNode));
     syncAllPieceAvailability(modalNode);
