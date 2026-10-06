@@ -63,6 +63,7 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
   "Js/dart-sets.js",
+  "Js/dart-set-modal-ui.js",
   "Eye/dart-sets-admin.js",
 ]);
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
@@ -204,7 +205,7 @@ if (!fs.existsSync("CSS/home.min.css")) {
 } else if (!fs.readFileSync("CSS/home.min.css", "utf8").startsWith(homeMinCssBanner)) {
   failures.push("CSS/home.min.css: stale minified stylesheet; rebuild from CSS/home.css with CleanCSS 5.6.3 -O1");
 }
-if (!/<link\b[^>]*href=["']CSS\/home\.min\.css["'][^>]*>/i.test(homeHtml)) {
+if (!/<link\b[^>]*href=["']CSS\/home\.min\.css(?:\?[^"']*)?["'][^>]*>/i.test(homeHtml)) {
   failures.push("index.html: homepage must load CSS/home.min.css");
 }
 if (/<link\b[^>]*href=["']CSS\/home\.css["'][^>]*>/i.test(homeHtml)) {
