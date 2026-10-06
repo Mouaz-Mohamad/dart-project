@@ -240,6 +240,9 @@ describe("COD settlement accounting", () => {
     expect(fixture.queries[0]).toBe("BEGIN");
     expect(fixture.queries.at(-1)).toBe("COMMIT");
     expect(fixture.queries.some((sql) => sql.includes("INSERT INTO audit_logs"))).toBe(true);
+    const orderUpdate = fixture.queries.find((sql) => sql.includes("UPDATE orders"));
+    expect(orderUpdate).toContain("cod_settled_minor=$2::bigint");
+    expect(orderUpdate).toContain("$2::bigint >= $3::bigint");
   });
 
   it("rejects an over-collection and rolls back without inserting a receipt", async () => {
