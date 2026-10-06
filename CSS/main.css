@@ -941,7 +941,7 @@ header {
     z-index: 100000000;
     background-color: var(--white);
     border-radius: 20px;
-    padding: 17px 0 10px 10px;
+    padding: 17px 10px;
     box-shadow: 0 4px 10px var(--bg-dark);
     overflow-y: scroll;
     scrollbar-width: auto;
