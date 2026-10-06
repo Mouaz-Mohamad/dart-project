@@ -199,9 +199,12 @@
   }
 
   async function createFinanceSettlement(data) {
+    // The receipt endpoint accepts command fields only. Status, timestamps and
+    // representative/accounting values are assigned by the server.
+    const { id, orderId, settlementDate, amountReceived, fee, reference, notes } = data;
     const payload = await api("/api/v1/admin/finance/settlements", {
       method: "POST",
-      body: data,
+      body: { id, orderId, settlementDate, amountReceived, fee, reference, notes },
     });
     if (Number(payload?.version) > 0) {
       versions.set("finance_settlements", Number(payload.version));
