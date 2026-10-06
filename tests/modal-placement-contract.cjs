@@ -21,10 +21,10 @@ const groups = {
 
 for (const [section, ids] of Object.entries(groups)) {
   const start = `<!-- BEGIN ${section} modals:`;
-  const end = `<!-- END ${section} modals. -->`;
   const sectionOpen = dashboard.indexOf(`<section id="${section.toLowerCase()}"`);
   const groupStart = dashboard.indexOf(start);
-  const groupEnd = dashboard.indexOf(end);
+  // Decorative separators in comments do not change modal placement.
+  const groupEnd = dashboard.search(new RegExp(`<!--[=\\s]*END ${section} modals\\.[=\\s]*-->`));
   assert.ok(sectionOpen >= 0 && sectionOpen < groupStart && groupStart < groupEnd,
     `${section} dialogs must follow their owning dashboard section`);
   assert.match(dashboard.slice(sectionOpen, groupStart), /<\/section>\s*$/,
@@ -40,7 +40,7 @@ for (const [section, ids] of Object.entries(groups)) {
 for (const filename of ["index.html", "products.html"]) {
   const html = read(filename);
   const start = html.indexOf("<!-- BEGIN Product-card dialogs:");
-  const end = html.indexOf("<!-- END Product-card dialogs. -->");
+  const end = html.search(/<!--[=\s]*END Product-card dialogs\.[=\s]*-->/);
   const block = html.slice(start, end);
   assert.ok(start > 0 && end > start, `${filename} must group its product dialogs`);
   assert.match(html.slice(0, start), /<\/section>\s*$/,

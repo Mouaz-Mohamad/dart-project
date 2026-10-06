@@ -83,7 +83,7 @@ if (/script[^>]+src=["']dart-traffic-analytics\.js["']/i.test(dashboardHtml)) {
 if (/script[^>]+src=["']dart-finance\.js["']/i.test(dashboardHtml)) {
   failures.push("Eye/Dart Eye.html: Finance must remain lazy-loaded");
 }
-if (!dashboardRuntime.includes('script.src = "dart-finance.js"')) {
+if (!/script\.src = "dart-finance\.js(?:\?[^\"]*)?"/.test(dashboardRuntime)) {
   failures.push("Eye/dart.js: Finance lazy loader is missing");
 }
 const settingsRuntime = fs.readFileSync("Js/dart-site-settings.js", "utf8");

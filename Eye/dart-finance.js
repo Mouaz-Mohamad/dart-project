@@ -170,6 +170,7 @@
   const serverFinanceSummaries = new Map();
   const serverFinancePending = new Map();
   const serverFinanceErrors = new Map();
+  let financeSummaryRevision = 0;
   let serverFinanceDenied = false;
   let serverFinanceRefreshTimer = 0;
   let adminAuthenticated = Boolean(root.DartAdminAccess?.list?.().length);
@@ -419,16 +420,30 @@
   };
 
   async function persistFinanceRecord(resource, record) {
+    if (!root.DartState?.isBusinessKey?.(STORAGE_KEYS[resource]) || !root.DartState?.read || !root.DartState?.write) {
+      throw new Error("Finance data could not be loaded safely. Reload and try again.");
+    }
+    const adapter = root.DartDomainState;
+    const domain = adapter?.domainForStorageKey?.(STORAGE_KEYS[resource]);
+    if (!domain || !adapter.writeAndSync || !adapter.hydrateDomain || !adapter.version) {
+      throw new Error("The secure finance service is unavailable. Reload and try again.");
+    }
+    // Never construct a replacement collection from an unhydrated empty cache.
+    if (!adapter.version(domain)) await adapter.hydrateDomain(domain);
+    if (!adapter.version(domain)) throw new Error("Finance records have not finished loading. Try again.");
     const rows = FinanceRepository.list(resource).map((row) => ({ ...row }));
     const index = rows.findIndex((row) => String(row.id) === String(record.id));
     if (index >= 0) rows[index] = record;
     else rows.unshift(record);
-    if (root.DartDomainState?.writeAndSync) {
-      await root.DartDomainState.writeAndSync(STORAGE_KEYS[resource], rows);
-    } else {
-      FinanceRepository.replace(resource, rows);
-    }
+    await root.DartDomainState.writeAndSync(STORAGE_KEYS[resource], rows);
     return record;
+  }
+
+  async function archiveFinanceRecord(resource, id) {
+    const row = FinanceRepository.list(resource).find((entry) => String(entry.id) === String(id));
+    if (!row) throw new Error("This finance record is unavailable. Reload and try again.");
+    const archivedAt = new Date().toISOString();
+    return persistFinanceRecord(resource, { ...row, archivedAt, updatedAt: archivedAt });
   }
 
   function uid(prefix) {
@@ -1141,6 +1156,8 @@
     STORAGE_KEYS,
     GOAL_METRICS,
     repository: FinanceRepository,
+    persistRecord: persistFinanceRecord,
+    archiveRecord: archiveFinanceRecord,
     parseDate,
     periodRange,
     currentRangeSelection,
@@ -1246,19 +1263,23 @@
       return serverFinanceSummaries.get(key);
     }
     if (serverFinancePending.has(key)) return serverFinancePending.get(key);
-
+    const revision = financeSummaryRevision;
     const promise = fetchFinanceSummaryForRange(range)
       .then((summary) => {
+        if (revision !== financeSummaryRevision) return null;
         serverFinanceSummaries.set(key, summary);
         serverFinanceErrors.delete(key);
         return summary;
       })
       .catch((error) => {
+        if (revision !== financeSummaryRevision) return null;
         serverFinanceErrors.set(key, error);
         if (error?.status === 401 || error?.status === 403) serverFinanceDenied = true;
         throw error;
       })
-      .finally(() => serverFinancePending.delete(key));
+      .finally(() => {
+        if (serverFinancePending.get(key) === promise) serverFinancePending.delete(key);
+      });
 
     serverFinancePending.set(key, promise);
     return promise;
@@ -1317,6 +1338,8 @@
   }
 
   function invalidateAuthoritativeFinance() {
+    financeSummaryRevision += 1;
+    serverFinancePending.clear();
     serverFinanceSummaries.clear();
     serverFinanceErrors.clear();
     clearTimeout(serverFinanceRefreshTimer);
@@ -1333,7 +1356,7 @@
     }
     const error = financeSummaryError(range) || financeSummaryError(range.previous);
     if (error) {
-      return '<div class="dart-finance-empty">Authoritative finance totals are temporarily unavailable. No browser-calculated totals are being shown.</div>';
+      return '<div class="dart-finance-empty" role="alert">Finance totals could not be loaded. Your saved records were not changed. <button type="button" class="dart-finance-secondary" data-finance-retry>Retry</button></div>';
     }
     return '<div class="dart-finance-empty">Loading authoritative finance totals…</div>';
   }
@@ -1518,7 +1541,9 @@
     const previous = authoritativeSummary(range.previous);
 
     if (!current || !previous) {
-      void hydrateAuthoritativeFinance(range);
+      if (!financeSummaryError(range) && !financeSummaryError(range.previous)) {
+        void hydrateAuthoritativeFinance(range);
+      }
       const unavailable = serverFinanceDenied || financeSummaryError(range);
       [
         [".sales-cont", unavailable ? "Unavailable" : "Loading…"],
@@ -1969,8 +1994,13 @@
     const summaryTabs = new Set(["overview", "pnl", "cashflow", "marketing", "alerts"]);
 
     if (summaryTabs.has(state.financeTab) && (!current || !previous)) {
-      void hydrateAuthoritativeFinance(range);
-      content.innerHTML = financeSummaryStatusMarkup(range);
+      if (!financeSummaryError(range) && !financeSummaryError(range.previous)) {
+        void hydrateAuthoritativeFinance(range);
+      }
+      const toolbar = state.financeTab === "marketing"
+        ? sectionToolbar("Marketing Analytics", "Saved campaign records", financeAddButton("marketing", "Add Marketing Record"))
+        : "";
+      content.innerHTML = toolbar + financeSummaryStatusMarkup(range);
       document.querySelectorAll("[data-finance-tab]").forEach((button) =>
         button.classList.toggle("active", button.dataset.financeTab === state.financeTab),
       );
@@ -2085,15 +2115,19 @@
     errorBox.classList.remove("is-visible");
     modal.style.display = "block";
     modal.classList.add("active");
+    state.modalTrigger = document.activeElement;
+    section.querySelector("input:not([type='hidden']),select,textarea")?.focus();
   }
 
   function closeFinanceModal() {
     const modal = document.getElementById("dart-finance-modal");
     if (!modal) return;
+    if (document.getElementById("dart-finance-form-submit")?.disabled) return;
     modal.style.display = "none";
     modal.classList.remove("active");
     state.modalResource = null;
     state.modalId = null;
+    state.modalTrigger?.focus?.();
   }
 
   function formValues(form) {
@@ -2151,6 +2185,7 @@
   }
 
   async function saveFinanceForm(form) {
+    if (form.querySelector('[type="submit"]')?.disabled) return;
     const resource = form.dataset.resource;
     if (!financeCanManage(resource)) return;
     const id = form.dataset.id;
@@ -2183,9 +2218,15 @@
       } else {
         await persistFinanceRecord(resource, normalized);
       }
-      FinanceRepository.audit(existing ? "UPDATE" : "CREATE", resource, normalized.id, existing, normalized);
-      if (typeof dartNotify === "function") dartNotify("payment", `${resource.slice(0, -1)} ${existing ? "updated" : "created"}`, normalized.name || normalized.number || normalized.description || normalized.id, `finance:${resource}`, normalized.id);
-      if (typeof dartSaveAll === "function") dartSaveAll();
+      try {
+        FinanceRepository.audit(existing ? "UPDATE" : "CREATE", resource, normalized.id, existing, normalized);
+        if (typeof dartNotify === "function") dartNotify("payment", `${resource.slice(0, -1)} ${existing ? "updated" : "created"}`, normalized.name || normalized.number || normalized.description || normalized.id, `finance:${resource}`, normalized.id);
+        if (typeof dartSaveAll === "function") dartSaveAll();
+      } catch {
+        // The server has already saved the record and its domain audit event.
+        console.warn("Finance record saved; supplementary dashboard updates could not complete.");
+      }
+      if (submit) submit.disabled = false;
       closeFinanceModal();
       renderAllFinance();
     } catch (saveError) {
@@ -2204,9 +2245,13 @@
     if (!record) return;
     if (!await root.DartDialog.confirm(`Archive this ${resource.slice(0, -1)} record? Its audit history will be kept.`)) return;
     const before = { ...record };
-    const archived = FinanceRepository.archive(resource, id);
-    FinanceRepository.audit("ARCHIVE", resource, id, before, archived);
-    renderAllFinance();
+    try {
+      const archived = await archiveFinanceRecord(resource, id);
+      FinanceRepository.audit("ARCHIVE", resource, id, before, archived);
+      renderAllFinance();
+    } catch (error) {
+      await root.DartDialog.alert(error?.message || "The record could not be archived. Try again.");
+    }
   }
 
   function enhanceCustomerDrawControls() {
@@ -2384,6 +2429,12 @@
       void saveFinanceForm(event.target);
     });
     document.addEventListener("click", async (event) => {
+      if (event.target.closest("[data-finance-retry]")) {
+        serverFinanceErrors.clear();
+        void refreshFinanceFromServer(true);
+        renderFinanceSection();
+        return;
+      }
       const financeLink = event.target.closest('[data-target="finance"]');
       if (financeLink) { event.preventDefault(); activateFinance(); return; }
       const tab = event.target.closest("[data-finance-tab]");
@@ -2407,12 +2458,23 @@
       if (draw) { await changeDrawEligibility(draw.dataset.id); return; }
       if (event.target.closest(".dart-finance-modal-close,.dart-finance-modal-cancel") || event.target.id === "dart-finance-modal") closeFinanceModal();
     });
+    document.addEventListener("keydown", (event) => {
+      const modal = document.getElementById("dart-finance-modal");
+      if (!modal?.classList.contains("active")) return;
+      if (event.key === "Escape") { event.preventDefault(); closeFinanceModal(); }
+      if (event.key !== "Tab") return;
+      const controls = [...modal.querySelectorAll("button,input,select,textarea,[tabindex]")]
+        .filter((control) => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    });
     root.addEventListener("storage", (event) => {
       if (Object.values(STORAGE_KEYS).includes(event.key) || ["dart_orders", "dart_returns", "dart_items", "dart_models", "dart_customers", "dart_damage"].includes(event.key)) renderAllFinance();
     });
     root.addEventListener("dart:domain-hydrated", (event) => {
       if (
-        ["finance_expenses","finance_budgets","finance_invoices","finance_goals","finance_marketing","finance_settlements","customers","returns","damage"].includes(event.detail?.domain)
+        ["finance_expenses","finance_budgets","finance_invoices","finance_goals","finance_marketing","finance_settlements","finance_audit","draw_audit","customers","returns","damage"].includes(event.detail?.domain)
       ) {
         invalidateAuthoritativeFinance();
         renderAllFinance();
