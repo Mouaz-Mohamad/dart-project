@@ -59,6 +59,7 @@ assert(ui.includes("dart:products-rendered") && homeUi.includes("dart:products-r
 assert(ui.includes("dart:product-filters-rendered"), "Models filter renderer must publish an explicit completion event for additive Set rendering");
 assert(sets.includes('root.addEventListener("dart:products-rendered",syncFiltersAndSets)'), "Sets must render after the Models-owned product renderer completes");
 assert(sets.includes('root.addEventListener("dart:product-filters-rendered",syncFiltersAndSets)'), "Sets must render after the Models-owned filter renderer completes");
+assert(sets.includes('setCatalog=Array.isArray(event.detail?.sets)?event.detail.sets:root.DartSets.catalog()'), "Set cards must use the refreshed catalogue after a retry or homepage refresh");
 assert(!sets.includes('root.addEventListener("dart:site-settings-changed",scheduleSetRender)'), "Unrelated site-settings changes must not rerender Set cards");
 assert(sets.includes('if (event.detail?.key!=="dart_cart") return;'), "Generic data changes must only trigger Set cart work for dart_cart");
 assert(sets.includes('const settingsRequest = request("/api/v1/sets/settings")') && sets.includes('const setsPayload = await request("/api/v1/sets")'), "Set catalogue loading must not depend on Set settings availability");

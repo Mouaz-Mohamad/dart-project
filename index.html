@@ -45,7 +45,7 @@
     <!-- Critical image discovery: the hero is the main mobile LCP candidate. -->
     <link rel="preload" as="image" href="/Photos/hero 1.webp" type="image/webp" fetchpriority="high">
 
-    <link rel="stylesheet" href="CSS/home.min.css?v=267af6a36d8c6abe">
+    <link rel="stylesheet" href="CSS/home.min.css?v=d07b899b4062eec5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link id="dart-brand-fonts" href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet" media="print">
@@ -111,6 +111,46 @@
 
                 <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard"></section>
 
+                <!-- Sets spotlight: presentation comes from Models / Sets in Dart Eye. -->
+                <section id="dartHomeSets" class="home-sets" aria-labelledby="dartHomeSetsTitle">
+                    <h2 id="dartHomeSetsTitle" class="section-title-">&nbsp;Shop the Set</h2>
+                    <div class="home-sets-state" data-home-sets-state>
+                        <p data-home-sets-status role="status">Loading Sets…</p>
+                        <button type="button" class="home-sets-retry" data-home-sets-retry hidden>Try again</button>
+                    </div>
+                    <div class="home-sets-carousel" data-home-sets-carousel role="region" aria-roledescription="carousel" aria-label="Featured Sets" hidden>
+                        <div class="home-sets-track" data-home-sets-track tabindex="0" aria-label="Swipe or use arrow keys to browse Sets"></div>
+                        <div class="home-sets-controls" data-home-sets-controls>
+                            <button type="button" data-home-sets-prev aria-label="Previous Set"><span aria-hidden="true">&#8249;</span></button>
+                            <span class="home-sets-counter" data-home-sets-counter role="status" aria-live="polite" aria-atomic="true"></span>
+                            <button type="button" data-home-sets-next aria-label="Next Set"><span aria-hidden="true">&#8250;</span></button>
+                        </div>
+                    </div>
+                    <template id="dartHomeSetCard">
+                        <article class="home-set-card" role="group" aria-roledescription="slide">
+                            <img class="home-set-cover" data-home-set-cover alt="" loading="lazy" decoding="async" width="600" height="800" draggable="false">
+                            <span class="home-set-piece-count" data-home-set-piece-count></span>
+                            <div class="home-set-pieces" data-home-set-pieces aria-label="Enlarge piece images"></div>
+                            <div class="home-set-copy">
+                                <h3 data-home-set-title></h3>
+                                <p class="home-set-description" data-home-set-description dir="auto"></p>
+                                <div class="home-set-prices">
+                                    <span class="sr-only">Pieces separately</span>
+                                    <s data-home-set-old-price></s>
+                                    <span class="sr-only">Set price</span>
+                                    <strong data-home-set-price></strong>
+                                </div>
+                            </div>
+                            <button type="button" class="home-set-shop" data-home-set-shop>Shop the Set <span aria-hidden="true">&#8594;</span></button>
+                        </article>
+                    </template>
+                    <template id="dartHomeSetPiece">
+                        <button type="button" class="home-set-piece">
+                            <img alt="" loading="lazy" decoding="async" width="70" height="70" draggable="false">
+                        </button>
+                    </template>
+                </section>
+
                 <!-- ================= سكشن المنتجات ================= -->
                 <section class="products-section">
                     <h2 class="section-title-">&nbsp;Newest products</h2>
@@ -161,6 +201,16 @@
                         </article>
                     </div>
                 </section>
+                <dialog id="dartSetImagePreview" class="set-image-preview" aria-labelledby="dartSetImagePreviewTitle">
+                    <div class="set-image-preview-heading">
+                        <h2 id="dartSetImagePreviewTitle">Image preview</h2>
+                        <button type="button" data-set-image-close aria-label="Close image preview">&times;</button>
+                    </div>
+                    <figure>
+                        <img data-set-image-preview alt="" decoding="async">
+                        <figcaption data-set-image-caption></figcaption>
+                    </figure>
+                </dialog>
                 <!-- END Product-card dialogs. -->
 
                 <div class="margen2020"></div>
@@ -206,5 +256,7 @@
     <script src="Js/dart-storefront.js" defer></script>
     <script src="Js/dart-dialog.js" defer></script>
     <script src="Js/dart-platform.home.min.js" defer></script>
+    <script src="Js/dart-set-image-preview.js" defer></script>
+    <script src="Js/dart-home-sets.js" defer></script>
 </body>
 </html>

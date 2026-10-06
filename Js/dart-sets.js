@@ -120,6 +120,8 @@
       }));
     }
     loadedAt = Date.now();
+    root.__dartSetsCatalogReady = true;
+    root.__dartSetsUnavailable = false;
     root.dispatchEvent?.(new CustomEvent("dart:sets-catalog-changed", { detail: { sets: clone(catalog), settings: clone(settings) } }));
     return clone(catalog);
   }
@@ -638,10 +640,10 @@
   }
 
   function openSetModal(set) {
-    if (setPurchaseBusy) return;
-    activeSet = set;
+    if (setPurchaseBusy || !set?.setId) return false;
     const modal = ensureModal();
-    if (!modal) return;
+    if (!modal) return false;
+    activeSet = set;
     const images = componentImages(set);
     const cover = modal.querySelector("[data-set-cover]");
     cover.src = images[0] || setImage(set); cover.alt = set.name;
@@ -678,6 +680,7 @@
     modal.hidden=false; root.document.body.classList.add("dart-set-modal-open");
     updateModalAvailability();
     root.requestAnimationFrame?.(()=>modal.querySelector("[data-set-close]")?.focus());
+    return true;
   }
 
   function closeSetModal(force = false) {
@@ -981,7 +984,10 @@
     root.addEventListener("dart:catalog-hydrated",syncFiltersAndSets);
     root.addEventListener("dart:products-rendered",syncFiltersAndSets);
     root.addEventListener("dart:product-filters-rendered",syncFiltersAndSets);
-    root.addEventListener("dart:sets-catalog-changed",syncFiltersAndSets);
+    root.addEventListener("dart:sets-catalog-changed",event=>{
+      setCatalog=Array.isArray(event.detail?.sets)?event.detail.sets:root.DartSets.catalog();
+      syncFiltersAndSets();
+    });
     root.addEventListener("dart:data-changed",event=>{
       if (event.detail?.key!=="dart_cart") return;
       scheduleCartDecoration();
@@ -999,7 +1005,11 @@
       if (typeof render==="function") root.renderCart=(...args)=>{ const result=render(...args); decorateCart(); return result; };
       if (typeof totals==="function") root.updateCartTotals=(...args)=>{ const result=totals(...args); if (drafts().length) renderSetAwareTotals(); return result; };
       if (typeof count==="function") root.updateCartCount=(...args)=>{ const result=count(...args); if (drafts().length) renderSetAwareCartCount(); return result; };
-      try { setCatalog=await root.DartSets.loadCatalog(true); } catch (error) { console.warn("Dart Sets catalog unavailable",error); setCatalog=[]; }
+      try { setCatalog=await root.DartSets.loadCatalog(true); } catch (error) {
+        console.warn("Dart Sets catalog unavailable",error); setCatalog=[];
+        root.__dartSetsUnavailable=true;
+        root.dispatchEvent(new CustomEvent("dart:sets-unavailable"));
+      }
       ensureSetFilter(); syncSetFilterFacets(); renderSetCards(); observe();
       lastAttachedGroups=drafts();
       await restoreServerGroups();
@@ -1008,8 +1018,18 @@
   }
 
   function storefrontRuntimeReady() {
-    return Boolean(root.DartPlatform?.reserveCart) && typeof root.renderCart==="function";
+    // The lightweight homepage has no cart renderer; its Set presentation only needs the API.
+    return Boolean(root.document.getElementById?.("dartHomeSets")) ||
+      (Boolean(root.DartPlatform?.reserveCart) && typeof root.renderCart==="function");
   }
+
+  // Reuse the same Set dialog from the homepage spotlight and direct Set links.
+  root.DartSetsStorefront=Object.freeze({
+    open:openSetModal,
+    close:closeSetModal,
+    active:()=>activeSet,
+    busy:()=>setPurchaseBusy,
+  });
 
   if (!storefrontRuntimeReady() && root.document.readyState!=="complete") {
     root.document.addEventListener("DOMContentLoaded",()=>void boot(),{once:true});

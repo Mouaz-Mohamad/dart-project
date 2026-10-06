@@ -419,7 +419,7 @@
       script.defer = true;
       script.dataset.dartSetsAsset = src;
       script.addEventListener("load", () => { script.dataset.dartLoaded = "1"; resolve(); }, { once: true });
-      script.addEventListener("error", () => reject(new Error(`Unable to load ${src}`)), { once: true });
+      script.addEventListener("error", () => { script.remove(); reject(new Error(`Unable to load ${src}`)); }, { once: true });
       root.document.head.appendChild(script);
     });
   }
@@ -436,6 +436,8 @@
     })().catch((error) => {
       bootPromise = null;
       console.warn("Dart Sets extension asset unavailable", error);
+      root.__dartSetsUnavailable = true;
+      root.dispatchEvent(new CustomEvent("dart:sets-unavailable"));
     });
     return bootPromise;
   }
@@ -462,6 +464,7 @@
       bootIfModelsActive();
     }
   } else if (storefrontPage) {
+    root.document.addEventListener("dart:sets-load-request", () => void boot());
     bootWhenReady();
   }
 })(typeof window !== "undefined" ? window : globalThis);
