@@ -17,12 +17,14 @@ const models = [
   {
     id: 'model-shirt-101', modelId: 'SHIRT-101', name: 'Campus Shirt', category: 'Shirts', description: 'Soft cotton shirt',
     selling: 700, discount: 0, createdAt: '2026-10-03T00:00:00.000Z', active: true,
+    sizeChart: { unit: 'cm', rows: [{ size: 'M', chest: '96', length: '70' }, { size: 'L', chest: '102', length: '72' }] },
     sizeOptions: [{ name: 'M', active: true }, { name: 'L', active: true }],
     colorOptions: [{ name: 'Black', active: true, images: [{ id: 'shirt-black', name: 'shirt.jpg', url: '/Photos/products/1.jpg' }] }],
   },
   {
     id: 'model-pants-202', modelId: 'PANTS-202', name: 'Campus Pants', category: 'Pants', description: 'Wide-leg campus pants',
     selling: 600, discount: 0, createdAt: '2026-10-02T00:00:00.000Z', active: true,
+    sizeChart: [{ size: 'M', waist: '82', inseam: '76' }, { size: 'L', waist: '88', inseam: '78' }],
     sizeOptions: [{ name: 'M', active: true }, { name: 'L', active: true }],
     colorOptions: [{ name: 'Stone', active: true, images: [{ id: 'pants-stone', name: 'pants.jpg', url: '/Photos/products/2.jpg' }] }],
   },
@@ -231,7 +233,7 @@ const server = http.createServer(async (request, response) => {
   assert.equal(await page.locator('#productsPart1 .product-card[data-id]:visible, #productsPart2 .product-card[data-id]:visible').count(), 0);
   const setCard = page.locator('[data-dart-set-card="1"][data-dart-set-id="SET-CAMPUS-1"]');
   await setCard.waitFor({ state: 'visible' });
-  assert.notEqual((await setCard.locator('.stock-badge').textContent()).trim(), 'Sold Out', 'An unavailable offered size must not hide a purchasable Set');
+  assert.equal(await setCard.locator('.out-of-stock-badge:visible').count(), 0, 'An unavailable offered size must not hide a purchasable Set');
 
   // Whole-card interaction opens the real Set modal; every physical component has its own variant selectors.
   await setCard.locator('.product-title').click();
@@ -257,6 +259,20 @@ const server = http.createServer(async (request, response) => {
   assert.equal(await page.locator('#dartSetModal .dart-set-close').evaluate((node) => getComputedStyle(node).width), '40px');
   assert.equal(await page.locator('#dartSetModal .dart-set-carousel').evaluate((node) => getComputedStyle(node).aspectRatio), '3 / 4');
   assert.equal(await page.locator('#dartSetModal .dart-set-piece-image img').first().evaluate((node) => getComputedStyle(node).aspectRatio), '9 / 16');
+  assert.equal(await page.locator('#dartSetModal .dart-set-option-label').count(), 0, 'Color and Size headings must not consume space');
+  assert.equal(await page.locator('#dartSetModal [data-set-size-chart-trigger]').count(), 2, 'Every Set model has its own chart action');
+  await page.locator('#dartSetModal [data-set-size-chart-trigger]').first().click();
+  assert.match(await page.locator('#dartSetSizeChartPanel [data-set-size-chart-title]').textContent(), /Campus Shirt/);
+  assert.deepEqual(await page.locator('#dartSetSizeChartPanel thead th').allTextContents(), ['Size', 'Chest (cm)', 'Length (cm)']);
+  assert.deepEqual(await page.locator('#dartSetSizeChartPanel tbody tr').first().locator('td').allTextContents(), ['M', '96', '70']);
+  await page.locator('#dartSetSizeChartPanel [data-set-size-chart-close]').click();
+  assert.equal(await page.locator('#dartSetSizeChartPanel').isHidden(), true);
+  await page.locator('#dartSetModal [data-set-size-chart-trigger]').last().click();
+  assert.match(await page.locator('#dartSetSizeChartPanel [data-set-size-chart-title]').textContent(), /Campus Pants/);
+  assert.deepEqual(await page.locator('#dartSetSizeChartPanel thead th').allTextContents(), ['Size', 'Waist (cm)', 'Inseam (cm)']);
+  assert.deepEqual(await page.locator('#dartSetSizeChartPanel tbody tr').first().locator('td').allTextContents(), ['M', '82', '76']);
+  await page.locator('#dartSetSizeChartPanel [data-set-size-chart-close]').press('Escape');
+  assert.equal(await page.locator('#dartSetSizeChartPanel').isHidden(), true);
 
   // Add-to-cart reserves both physical pieces, then attaches one commercial Set group to that same reservation.
   await page.evaluate(() => {
