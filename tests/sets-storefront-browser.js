@@ -245,10 +245,16 @@ const server = http.createServer(async (request, response) => {
   assert.deepEqual(await page.locator('#dartSetModal .dart-set-details').evaluate((details) => {
     const children = [...details.children];
     return {
+      codeBeforeCategory: children.indexOf(details.querySelector('[data-set-code]')) < children.indexOf(details.querySelector('.dart-set-category')),
+      pricingBeforeComponents: children.indexOf(details.querySelector('.dart-set-pricing')) < children.indexOf(details.querySelector('[data-set-components]')),
       componentsBeforeDescription: children.indexOf(details.querySelector('[data-set-components]')) < children.indexOf(details.querySelector('[data-set-description]')),
-      componentsBeforePricing: children.indexOf(details.querySelector('[data-set-components]')) < children.indexOf(details.querySelector('.dart-set-pricing')),
+      descriptionBeforeButton: children.indexOf(details.querySelector('[data-set-description]')) < children.indexOf(details.querySelector('[data-set-add]')),
     };
-  }), { componentsBeforeDescription: true, componentsBeforePricing: true });
+  }), { codeBeforeCategory: true, pricingBeforeComponents: true, componentsBeforeDescription: true, descriptionBeforeButton: true });
+  assert.equal((await page.locator('#dartSetModal [data-set-price]').textContent()).trim(), '990 EGP');
+  assert.equal((await page.locator('#dartSetModal [data-set-old-price]').textContent()).trim(), 'Pieces separately: 1,300 EGP');
+  assert.equal(await page.locator('#dartSetModal [data-set-old-price]').isVisible(), true);
+  assert.equal(await page.locator('#dartSetModal .dart-set-close').evaluate((node) => getComputedStyle(node).width), '40px');
   assert.equal(await page.locator('#dartSetModal .dart-set-carousel').evaluate((node) => getComputedStyle(node).aspectRatio), '3 / 4');
   assert.equal(await page.locator('#dartSetModal .dart-set-piece-image img').first().evaluate((node) => getComputedStyle(node).aspectRatio), '9 / 16');
 
