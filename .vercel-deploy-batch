@@ -1,6 +1,6 @@
-batch=42
-purpose=keyed-carto-positron-basemap
-frontend=publish-carto-positron-raster-tiles-with-project-api-key
-backend=none
-scope=batch-42-production-release
-trigger=production-deploy
+batch=3
+purpose=homepage-sets-and-set-navigation
+frontend=portrait-carousel-piece-preview-and-set-links
+backend=server-backed-set-homepage-presentation
+scope=three-user-requested-phases
+trigger=final-production-release

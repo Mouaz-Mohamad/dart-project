@@ -8,9 +8,10 @@
   const caption = dialog.querySelector("[data-set-image-caption]");
   let current = null;
 
-  function open(details) {
+  function open(details, options = {}) {
     if (!details?.src) return false;
-    const url = new URL(details.src, root.location.href);
+    let url;
+    try { url = new URL(details.src, root.location.href); } catch { return false; }
     if (!["http:", "https:"].includes(url.protocol)) return false;
     current = { src: url.href, alt: String(details.alt || "Set image") };
     image.src = current.src;
@@ -18,16 +19,24 @@
     caption.textContent = current.alt;
     if (!dialog.open) dialog.showModal();
     root.document.body.classList.add("dart-set-image-open");
+    if (options.history !== false) root.DartSetNavigation?.openedImage(current);
     return true;
   }
 
-  function close() {
-    if (dialog.open) dialog.close();
+  function close(options = {}) {
+    if (!dialog.open) return false;
+    if (options.history !== false && root.DartSetNavigation?.closeImage()) return true;
+    dialog.close();
+    current = null;
+    root.document.body.classList.remove("dart-set-image-open");
+    return true;
   }
 
-  dialog.querySelector("[data-set-image-close]").addEventListener("click", close);
+  dialog.querySelector("[data-set-image-close]").addEventListener("click", () => close());
   dialog.addEventListener("click", event => { if (event.target === dialog) close(); });
+  dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
   dialog.addEventListener("close", () => {
+    if (dialog.open) return;
     current = null;
     root.document.body.classList.remove("dart-set-image-open");
   });

@@ -86,7 +86,7 @@ const server = http.createServer(async (request, response) => {
 
       if (pathname === '/api/v1/cart/reservation' && request.method === 'PUT') {
         const body = await readBody(request);
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await new Promise((resolve) => setTimeout(resolve, 250));
         reservationWriteCount += 1;
         cartState = { reservationId: String(body.reservationId), expiresAt, lines: Array.isArray(body.lines) ? body.lines : [] };
         return json(response, 200, cartState);
@@ -285,7 +285,12 @@ const server = http.createServer(async (request, response) => {
     return button?.disabled && button.getAttribute('aria-busy') === 'true';
   });
   assert.equal(await page.locator('.cart-count, #cartCount').first().textContent(), '1', 'One commercial Set must appear in the cart count before the reservation response');
+  // Browser Back can close the overlay while its already-submitted reservation finishes.
+  await page.goBack();
   await page.waitForFunction(() => document.getElementById('dartSetModal')?.hidden === true);
+  assert.equal(new URL(page.url()).pathname, '/products');
+  await page.waitForFunction(() => window.DartSetsStorefront?.busy() === false);
+  assert.equal(new URL(page.url()).pathname, '/products', 'Purchase completion must not trigger an extra Back navigation after the customer closed the Set');
   await page.waitForFunction(() => (window.DartState?.read?.('dart_cart', []) || []).length === 2);
   const clientCart = await page.evaluate(() => ({
     lines: window.DartState.read('dart_cart', []).map((line) => ({ id: line.id, color: line.color, size: line.size, key: line.dartSetKey })),

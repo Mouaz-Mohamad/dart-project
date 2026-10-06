@@ -763,6 +763,43 @@ body.dart-set-image-open {
     font-size: 12px;
 }
 
+.set-route-state {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    padding: 24px;
+    color: var(--bg-dark);
+    background: #fffaf2;
+    border-radius: 12px;
+}
+
+.set-route-state[hidden],
+.set-route-state [hidden] {
+    display: none;
+}
+
+.set-route-state button,
+.set-route-state a {
+    padding: 10px 18px;
+    font-size: 13px;
+}
+
+.dart-set-gallery-preview {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: zoom-in;
+}
+
+.dart-set-gallery-preview:focus-visible {
+    outline: 3px solid var(--bragnte);
+    outline-offset: -4px;
+}
+
 /* ========================================== */
 /* Products & Cards                           */
 /* DART-CSS-PRODUCTS | Home cards and Products listing */

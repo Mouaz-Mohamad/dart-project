@@ -138,6 +138,7 @@
 
   // Touch scroll stays native; mouse drag adds the same gesture on desktop.
   track.addEventListener("pointerdown", event => {
+    dragged = false;
     if (event.pointerType !== "mouse" || event.button !== 0 || event.target.closest("button")) return;
     drag = { pointerId: event.pointerId, x: event.clientX, scroll: track.scrollLeft };
     dragged = false;
@@ -158,6 +159,7 @@
     track.classList.remove("is-dragging");
     if (track.hasPointerCapture(event.pointerId)) track.releasePointerCapture(event.pointerId);
     if (dragged) { syncControls(); goTo(index); }
+    if (event.type === "pointercancel") dragged = false;
   }
   track.addEventListener("pointerup", endDrag);
   track.addEventListener("pointercancel", endDrag);

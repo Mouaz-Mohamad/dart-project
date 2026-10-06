@@ -155,7 +155,10 @@
         if (image.src !== imageFallback()) image.src = imageFallback();
       });
       button.appendChild(image);
-      button.addEventListener("click", () => renderCarousel(pieceIndex));
+      button.addEventListener("click", () => {
+        renderCarousel(pieceIndex);
+        root.DartSetImagePreview?.open({ src: image.src, alt: image.alt });
+      });
       return button;
     })();
   }
@@ -425,6 +428,7 @@
     const next = carousel.querySelector("[data-set-carousel-next]");
     track.replaceChildren();
     dots.replaceChildren();
+    let suppressPreviewClick = false;
 
     carouselSlides.forEach((slideData, index) => {
       const slide = doc.createElement("div");
@@ -438,7 +442,16 @@
       image.addEventListener("error", () => {
         if (image.src !== imageFallback()) image.src = imageFallback();
       }, { once: true });
-      slide.appendChild(image);
+      const preview = doc.createElement("button");
+      preview.type = "button";
+      preview.className = "dart-set-gallery-preview";
+      preview.setAttribute("aria-label", `Enlarge ${slideData.alt || "Set image"}`);
+      preview.appendChild(image);
+      preview.addEventListener("click", () => {
+        if (suppressPreviewClick) { suppressPreviewClick = false; return; }
+        root.DartSetImagePreview?.open({ src: image.src, alt: image.alt });
+      });
+      slide.appendChild(preview);
       track.appendChild(slide);
 
       const dot = doc.createElement("button");
@@ -473,12 +486,13 @@
     };
 
     let touchStartX = 0;
-    track.ontouchstart = (event) => { touchStartX = event.touches?.[0]?.clientX || 0; };
+    track.ontouchstart = (event) => { suppressPreviewClick = false; touchStartX = event.touches?.[0]?.clientX || 0; };
     track.ontouchend = (event) => {
       const endX = event.changedTouches?.[0]?.clientX;
       if (typeof endX !== "number") return;
       const delta = endX - touchStartX;
       if (Math.abs(delta) < 40 || carouselSlides.length < 2) return;
+      suppressPreviewClick = true;
       carouselIndex = delta < 0
         ? (carouselIndex + 1) % carouselSlides.length
         : (carouselIndex - 1 + carouselSlides.length) % carouselSlides.length;

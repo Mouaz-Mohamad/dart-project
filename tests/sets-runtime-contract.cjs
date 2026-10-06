@@ -23,6 +23,7 @@ for (const page of ["/products", "/cart-checkout", "/profile"]) {
   assert(settings.includes(page), `Sets loader must include canonical ${page}`);
 }
 assert(settings.includes('.replace(/\\.html$/i, "")'), "Sets loader must keep legacy .html URLs compatible");
+assert(settings.includes('normalizedPathname.startsWith("/sets/")'), "Direct Set URLs must load the shared Sets client");
 assert(settings.includes('[data-target="models"]'), "Dart Eye Sets must lazy-load from Models navigation");
 assert(settings.includes("dart:sets-load-request"), "Sets loader must expose an explicit lazy-load request hook");
 assert(profile.includes('dart:sets-extension-ready'), "Profile rows must re-enhance after lazy Sets runtime loads");

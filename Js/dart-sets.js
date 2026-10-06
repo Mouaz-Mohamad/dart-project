@@ -209,6 +209,7 @@
   let cartDecorationScheduled = false;
   let storefrontBootPromise = null;
   let setPurchaseBusy = false;
+  let lastSetTrigger = null;
 
   // BEGIN Storefront projections: normalize backend Set groups and read current cart state.
   function drafts() {
@@ -624,7 +625,17 @@
     if (modal.dataset.dartSetBound!=="1") {
       modal.dataset.dartSetBound="1";
       modal.addEventListener("click", (event) => { if (event.target === modal || event.target.closest?.("[data-set-close]")) closeSetModal(); });
-      root.document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeSetModal(); });
+      root.document.addEventListener("keydown", (event) => {
+        if (modal.hidden || root.DartSetImagePreview?.isOpen() || event.defaultPrevented) return;
+        if (event.key === "Escape") closeSetModal();
+        if (event.key !== "Tab") return;
+        const scope = modal.querySelector("#dartSetSizeChartPanel:not([hidden])") || modal;
+        const focusable = [...scope.querySelectorAll('button,a[href],input,select,textarea,[tabindex="0"]')]
+          .filter(node => !node.disabled && node.getClientRects().length);
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && root.document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && root.document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      });
       modal.querySelector("[data-set-add]")?.addEventListener("click", () => void addActiveSetToCart());
     }
     return modal;
@@ -639,10 +650,11 @@
     return [...new Set(images.filter(Boolean))];
   }
 
-  function openSetModal(set) {
+  function openSetModal(set, options = {}) {
     if (setPurchaseBusy || !set?.setId) return false;
     const modal = ensureModal();
     if (!modal) return false;
+    if (modal.hidden) lastSetTrigger = root.document.activeElement;
     activeSet = set;
     const images = componentImages(set);
     const cover = modal.querySelector("[data-set-cover]");
@@ -679,14 +691,18 @@
     modal.querySelectorAll("select").forEach((select)=>select.addEventListener("change", updateModalAvailability));
     modal.hidden=false; root.document.body.classList.add("dart-set-modal-open");
     updateModalAvailability();
+    if (options.history !== false) root.DartSetNavigation?.openedSet(set);
     root.requestAnimationFrame?.(()=>modal.querySelector("[data-set-close]")?.focus());
     return true;
   }
 
-  function closeSetModal(force = false) {
-    if (setPurchaseBusy && !force) return;
-    const modal=root.document.getElementById("dartSetModal"); if (!modal) return;
+  function closeSetModal(force = false, options = {}) {
+    if (setPurchaseBusy && !force) return false;
+    const modal=root.document.getElementById("dartSetModal"); if (!modal || modal.hidden) return false;
+    if (options.history !== false && root.DartSetNavigation?.closeSet()) return true;
     modal.hidden=true; root.document.body.classList.remove("dart-set-modal-open"); activeSet=null;
+    lastSetTrigger?.isConnected && lastSetTrigger.focus?.({preventScroll:true});
+    return true;
   }
 
   function selectedComponents() {
@@ -775,6 +791,7 @@
       setPurchaseBusy=false;
       const modal=root.document.getElementById("dartSetModal");
       if (modal&&!modal.hidden&&activeSet) updateModalAvailability();
+      root.dispatchEvent(new CustomEvent("dart:set-purchase-finished"));
     }
   }
 

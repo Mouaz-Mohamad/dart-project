@@ -36,12 +36,18 @@ const server = http.createServer((request, response) => {
       return json(response, 200, { sets: mode === "empty" ? [] : mode === "single" ? [first] : [second, { ...first, setId: "SET-HIDDEN", showOnHomepage: false }, first, { ...first, setId: "SET-ARCHIVED", isArchived: true }] });
     }
     if (pathname === "/api/v1/sets/settings") return json(response, 200, { settings: { birthdayPercent: 10, dartCardPercent: 10, version: 1 } });
+    if (pathname.startsWith("/api/v1/sets/")) {
+      const id = pathname.split("/").pop();
+      if (id === "SET-LATE") return setTimeout(() => json(response, 200, { set: { ...first, setId: id } }), 250);
+      const set = [first, second].find(row => row.setId === id);
+      return set ? json(response, 200, { set }) : json(response, 404, { error: { message: "Set not found" } });
+    }
     if (pathname === "/api/v1/site-settings") return json(response, 200, { version: 1, settings: {} });
     if (pathname === "/api/v1/reviews") return json(response, 200, { reviews: [] });
     if (pathname === "/api/v1/leaderboard") return json(response, 200, { rows: [] });
     return json(response, 200, {});
   }
-  const file = path.resolve(root, pathname === "/" ? "index.html" : pathname.replace(/^\//, ""));
+  const file = path.resolve(root, pathname === "/" ? "index.html" : pathname === "/products" || /^\/(?:sets|products)\/[^/]+$/.test(pathname) ? "products.html" : pathname.replace(/^\//, ""));
   if (!file.startsWith(root + path.sep)) { response.writeHead(403); response.end(); return; }
   try { const content = fs.readFileSync(file); response.writeHead(200, { "Content-Type": types[path.extname(file)] || "application/octet-stream" }); response.end(content); }
   catch { response.writeHead(404); response.end(); }
@@ -52,7 +58,7 @@ const server = http.createServer((request, response) => {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE || chromium.executablePath(), args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] });
   try {
-    const context = await browser.newContext({ viewport: { width: 430, height: 932 }, reducedMotion: "reduce" });
+    const context = await browser.newContext({ viewport: { width: 430, height: 932 }, hasTouch: true, reducedMotion: "reduce" });
     await context.route("**/*", route => route.request().url().startsWith(origin) ? route.continue() : route.abort());
     const page = await context.newPage();
     page.setDefaultTimeout(10000);
@@ -104,17 +110,53 @@ const server = http.createServer((request, response) => {
     await page.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "2 / 2");
     await page.locator("[data-home-sets-prev]").click();
     await page.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "1 / 2");
+    await page.locator(".home-sets-track").scrollIntoViewIfNeeded();
+    const touchBox = await page.locator(".home-sets-track").boundingBox();
+    const touch = await context.newCDPSession(page);
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: touchBox.x + touchBox.width - 80, y: touchBox.y + 190 }] });
+    for (let step = 1; step <= 8; step++) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: touchBox.x + touchBox.width - 80 - step * 27, y: touchBox.y + 190 }] });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "2 / 2");
+    await page.locator("[data-home-sets-prev]").click();
+    await page.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "1 / 2");
+    await touch.detach();
 
     await cards.first().locator(".home-set-piece").first().click();
     assert.equal(await page.locator("#dartSetImagePreview").evaluate(dialog => dialog.open), true);
     assert.equal(await page.locator("#dartSetModal").evaluate(modal => modal.hidden), true, "Enlarge only; Set dialog stays closed");
     assert.equal(await page.locator("#SectionModel").isVisible(), false, "No ordinary Product modal is opened");
+    assert.equal(new URL(page.url()).pathname, "/");
+    await page.goBack();
+    await page.waitForFunction(() => !document.getElementById("dartSetImagePreview").open);
+    assert.equal(new URL(page.url()).pathname, "/", "Back from a homepage preview stays on the website");
+    await page.goForward();
+    await page.waitForFunction(() => document.getElementById("dartSetImagePreview").open);
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => !document.getElementById("dartSetImagePreview").open);
     await cards.first().locator("[data-home-set-shop]").click();
     await page.locator("#dartSetModal").waitFor({ state: "visible" });
     assert.equal(await page.locator("#dartSetModalTitle").textContent(), first.name);
-    await page.locator("#dartSetModal [data-set-close]").click();
+    assert.equal(new URL(page.url()).pathname, "/sets/SET-FIRST");
+    const entries = await page.evaluate(() => history.length);
+    await page.evaluate(() => window.DartSetsStorefront.open(window.DartSets.setById("SET-FIRST")));
+    assert.equal(await page.evaluate(() => history.length), entries, "Reopening the same Set adds no duplicate history entry");
+    await page.locator("#dartSetModal [data-set-piece-image]").first().click();
+    await page.waitForFunction(() => document.getElementById("dartSetImagePreview").open);
+    await page.goBack();
+    await page.waitForFunction(() => !document.getElementById("dartSetImagePreview").open);
+    assert.equal(await page.locator("#dartSetModal").isVisible(), true, "First Back closes only the image");
+    await page.goBack();
+    await page.waitForFunction(() => document.getElementById("dartSetModal").hidden);
+    assert.equal(new URL(page.url()).pathname, "/", "Second Back restores the homepage");
+    await page.goForward();
+    await page.waitForFunction(() => !document.getElementById("dartSetModal").hidden);
+    await page.goForward();
+    await page.waitForFunction(() => document.getElementById("dartSetImagePreview").open);
+    await page.locator("[data-set-image-close]").click();
+    await page.waitForFunction(() => !document.getElementById("dartSetImagePreview").open);
+    await page.evaluate(() => { const close = document.querySelector("#dartSetModal [data-set-close]"); close.click(); close.click(); });
+    await page.waitForFunction(() => document.getElementById("dartSetModal").hidden);
+    assert.equal(new URL(page.url()).pathname, "/", "Repeated Close clicks consume just one Back step");
     await page.setViewportSize({ width: 430, height: 932 });
     await page.locator("#dartHomeSets").scrollIntoViewIfNeeded();
     if (process.env.DART_SCREENSHOT_DIR) {
@@ -146,7 +188,49 @@ const server = http.createServer((request, response) => {
     await page.locator("[data-home-sets-retry]").click();
     await page.locator(".home-set-card").first().waitFor();
     assert.equal(await cards.count(), 2, "Retry also recovers a failed lazy-loaded script");
+    await context.unroute("**/Js/dart-sets.js*");
+
+    const direct = await context.newPage();
+    direct.setDefaultTimeout(10000);
+    direct.on("pageerror", error => failures.push(error.message));
+    await direct.goto(`${origin}/sets/SET-FIRST`);
+    await direct.locator("#dartSetModal").waitFor({ state: "visible" });
+    const directEntries = await direct.evaluate(() => history.length);
+    await direct.reload();
+    await direct.locator("#dartSetModal").waitFor({ state: "visible" });
+    assert.equal(await direct.evaluate(() => history.length), directEntries, "Refreshing a shared Set link adds no extra Back entry");
+    await direct.locator("#dartSetModal .dart-set-gallery-preview").first().click();
+    await direct.waitForFunction(() => document.getElementById("dartSetImagePreview").open);
+    await direct.reload();
+    await direct.waitForFunction(() => document.getElementById("dartSetImagePreview").open && !document.getElementById("dartSetModal").hidden);
+    await direct.goBack();
+    await direct.waitForFunction(() => !document.getElementById("dartSetImagePreview").open);
+    assert.equal(await direct.locator("#dartSetModal").isVisible(), true);
+    await direct.goBack();
+    await direct.waitForFunction(() => document.getElementById("dartSetModal").hidden);
+    assert.equal(new URL(direct.url()).pathname, "/products", "Back from a fresh shared link stays on the product listing");
+
+    // Normal Product routing still works after Set / image traversal.
+    await direct.locator('.product-card[data-id="SHIRT-101"]').first().click();
+    await direct.waitForFunction(() => location.pathname.startsWith("/products/") && document.getElementById("SectionModel")?.style.display === "flex");
+    await direct.goBack();
+    await direct.waitForFunction(() => document.getElementById("SectionModel")?.style.display === "none");
+    assert.equal(new URL(direct.url()).pathname, "/products");
+
+    await direct.goto(`${origin}/sets/SET-NOT-FOUND`);
+    await direct.locator("[data-set-route-retry]").waitFor();
+    assert.match(await direct.locator("[data-set-route-message]").textContent(), /unavailable/);
+    await direct.goBack();
+    assert.equal(new URL(direct.url()).pathname, "/products");
+    const lateRequest = direct.waitForRequest(request => request.url().endsWith("/api/v1/sets/SET-LATE"));
+    const lateResponse = direct.waitForResponse(response => response.url().endsWith("/api/v1/sets/SET-LATE"));
+    await direct.goto(`${origin}/sets/SET-LATE`);
+    await lateRequest;
+    await direct.goBack();
+    await lateResponse;
+    await direct.waitForFunction(() => document.getElementById("dartSetModal").hidden);
+    assert.equal(new URL(direct.url()).pathname, "/products", "A late detail response must not reopen a Set after Back");
     assert.deepEqual(failures, [], "No new JS failures in the real homepage runtime");
-    console.log("PASS homepage Sets selection/order, server prices, portrait layout, drag/arrows/keyboard, image preview and empty/error/retry states");
+    console.log("PASS homepage Sets layout/data/states, mouse/touch/arrows, nested image/Set Back and Forward, shared-link refresh, late-response cancellation and Product route regression");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

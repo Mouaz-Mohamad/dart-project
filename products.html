@@ -67,6 +67,12 @@
         <main class="#">
             <h1 class="sr-only">منتجات Dart for you - ملابس رجالي وشبابي في مصر</h1>
 
+            <section id="dartSetRouteState" class="set-route-state" hidden>
+                <p data-set-route-message role="status"></p>
+                <button type="button" data-set-route-retry hidden>Try again</button>
+                <a href="/products">Browse products</a>
+            </section>
+
             <!-- <section id="search-serial-container" aria-label="Product Authenticity Check"></section> -->
             
             <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard "></section>
@@ -192,6 +198,16 @@
                         </article>
                     </div>
                 </section>
+                <dialog id="dartSetImagePreview" class="set-image-preview" aria-labelledby="dartSetImagePreviewTitle">
+                    <div class="set-image-preview-heading">
+                        <h2 id="dartSetImagePreviewTitle">Image preview</h2>
+                        <button type="button" data-set-image-close aria-label="Close image preview">&times;</button>
+                    </div>
+                    <figure>
+                        <img data-set-image-preview alt="" decoding="async">
+                        <figcaption data-set-image-caption></figcaption>
+                    </figure>
+                </dialog>
             <!-- END Product-card dialogs. -->
 
             <section id="dart-for-you" aria-label="The brand logo is a kite bird in a burgundy color."></section>
@@ -208,5 +224,7 @@
     <script src="Js/dart-storefront.js" defer></script>
     <script src="Js/dart-dialog.js"></script>
     <script src="Js/dart-platform.js" defer></script>
+    <script src="Js/dart-set-image-preview.js" defer></script>
+    <script src="Js/dart-set-navigation.js" defer></script>
 </body>
 </html>

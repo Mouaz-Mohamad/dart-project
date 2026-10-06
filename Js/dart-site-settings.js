@@ -399,7 +399,7 @@
     .replace(/\/index(?:\.html)?$/i, "/")
     .replace(/\.html$/i, "");
   const SET_STOREFRONT_PAGES = ["/", "/products", "/cart-checkout", "/profile"];
-  const storefrontPage = SET_STOREFRONT_PAGES.some((suffix) =>
+  const storefrontPage = normalizedPathname.startsWith("/sets/") || SET_STOREFRONT_PAGES.some((suffix) =>
     normalizedPathname === suffix || (suffix !== "/" && normalizedPathname.endsWith(suffix)),
   );
   let bootPromise = null;

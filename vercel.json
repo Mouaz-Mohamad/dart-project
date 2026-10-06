@@ -30,6 +30,15 @@
       ]
     },
     {
+      "source": "/sets/:setId",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/manifest.json",
       "headers": [
         {
@@ -174,6 +183,10 @@
     {
       "source": "/products/:slug",
       "destination": "/api/product-page?slug=:slug"
+    },
+    {
+      "source": "/sets/:setId",
+      "destination": "/products.html"
     },
     {
       "source": "/api/:path*",

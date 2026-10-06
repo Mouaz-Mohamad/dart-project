@@ -1,4 +1,5 @@
-batch=8
-purpose=production-recovery
-api=runtime-config
-trigger=api-production-1
+batch=3
+purpose=server-backed-set-homepage-presentation
+api=set-description-visibility-and-order
+migration=0057_set_homepage_presentation.sql
+trigger=final-production-release
