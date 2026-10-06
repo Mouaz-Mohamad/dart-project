@@ -18,7 +18,7 @@ describe("browser polling safety contracts", () => {
 
   it("gates Orders and dashboard-domain polling behind authentication", () => {
     expect(orders).toContain("if (!adminPollingEnabled || document.hidden) return");
-    expect(domains).toContain("if (!adminPollingEnabled || document.hidden) return");
+    expect(domains).toMatch(/if \(!adminPollingEnabled \|\| document\.hidden(?: \|\| polling)?\) return/);
   });
 
   it("does not hydrate secure representatives from DOMContentLoaded", () => {
