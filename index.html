@@ -45,7 +45,7 @@
     <!-- Critical image discovery: the hero is the main mobile LCP candidate. -->
     <link rel="preload" as="image" href="/Photos/hero 1.webp" type="image/webp" fetchpriority="high">
 
-    <link rel="stylesheet" href="CSS/home.min.css">
+    <link rel="stylesheet" href="CSS/home.min.css?v=c551a43348bc0b97">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link id="dart-brand-fonts" href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet" media="print">
@@ -150,19 +150,19 @@
                             <small data-set-code></small>
                             <span class="dart-set-category">Sets</span>
                             <h2 id="dartSetModalTitle" data-set-title></h2>
-                            <span data-set-old-price></span>
-                            <strong data-set-price>Price :</strong> EGP <em data-set-discount></em>
+                            <div class="dart-set-pricing">
+                                <div class="dart-set-sale-price">Price : <strong data-set-price></strong> <em data-set-discount></em></div>
+                                <div class="dart-set-separate-price" data-set-old-price hidden></div>
+                            </div>
                             <div data-set-components class="dart-set-components"></div>
                             <p data-set-description></p>
-                            <div class="dart-set-pricing">
-                            </div>
                             <p class="dart-set-status" data-set-status role="status" aria-live="polite"></p>
                             <button type="button" class="buy-now-btn" data-set-add>Add Set to Cart</button>
                         </article>
                     </div>
                 </section>
                 <!-- END Product-card dialogs. -->
-                
+
                 <div class="margen2020"></div>
                 <section id="birthday"></section>
                 <div class="margen2020"></div>

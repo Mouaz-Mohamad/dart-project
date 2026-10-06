@@ -657,7 +657,10 @@
     modal.querySelector("[data-set-description]").textContent = set.description || "";
     const old = modal.querySelector("[data-set-old-price]");
     const discount = Number(set?.pricing?.discountPercent || 0);
-    old.textContent = root.DartSets.moneyMinor(set?.pricing?.basePriceMinor || 0); old.hidden = !(discount > 0);
+    const separateTotalMinor = Number(set?.pricing?.componentsSellingTotalMinor);
+    old.textContent = Number.isFinite(separateTotalMinor) && separateTotalMinor > 0
+      ? `Pieces separately: ${root.DartSets.moneyMinor(separateTotalMinor)}` : "";
+    old.hidden = !old.textContent;
     modal.querySelector("[data-set-price]").textContent = root.DartSets.moneyMinor(set?.pricing?.finalMinor || 0);
     modal.querySelector("[data-set-discount]").textContent = discount > 0 ? `${Math.round(discount)}% OFF` : "";
     const components = modal.querySelector("[data-set-components]"); components.replaceChildren();

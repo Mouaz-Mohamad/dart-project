@@ -16,7 +16,7 @@
     const style = doc.createElement("style");
     style.id = "dartSetModalUiStyles";
     style.textContent = `
-#dartSetModal .dart-set-close{top:0;right:10px;z-index:10;margin-top:-10px;width:42px;height:46px;border-radius:0;background:transparent;color:${BURGUNDY};font-size:46px;line-height:1}
+#dartSetModal .dart-set-close{top:0;right:10px;z-index:10;margin-top:-10px;width:40px;height:40px;border-radius:0;background:transparent;color:${BURGUNDY};font-size:40px;line-height:1}
 #dartSetModal .dart-set-gallery{position:relative}
 #dartSetModal [data-set-cover],#dartSetModal [data-set-thumbs]{display:none!important}
 #dartSetModal .dart-set-carousel{margin:0;width:100%;aspect-ratio:3/4;border-radius:14px;background:#eee}
