@@ -221,7 +221,18 @@
   function ensureEditor() {
     let modal=root.document.getElementById("dartSetAdminModal"); if(modal)return modal;
     modal=root.document.createElement("section"); modal.id="dartSetAdminModal"; modal.className="dart-admin-set-modal"; modal.hidden=true; modal.setAttribute("role","dialog"); modal.setAttribute("aria-modal","true");
-    modal.innerHTML=`<form class="dart-admin-set-dialog" data-set-form><button type="button" class="dart-admin-set-close" data-set-close aria-label="Close">&times;</button><div class="dart-admin-set-title"><div><p>MODELS / SETS</p><h2 data-set-form-title>Add Set</h2></div><span data-set-cost-warning hidden>Selling Below Cost</span></div><div class="dart-set-form-grid"><label>Set ID<input name="setId" required maxlength="120" pattern="[A-Za-z0-9_-]+" placeholder="SET-001"></label><label>Set Name<input name="name" required maxlength="160"></label><label class="is-wide">Description<textarea name="description" rows="3" maxlength="4000"></textarea></label><label class="is-wide">Set Images<input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>Uploaded Set images are stored once. Existing model images remain referenced from their Models.</small></label></div><section class="dart-set-builder"><div class="dart-set-builder-head"><div><h3>Set Items</h3><p>Type an existing Model ID. Use Quantity when the same design appears more than once.</p></div><button type="button" data-set-component-add>+ Add Item</button></div><div data-set-component-list></div></section><div class="dart-set-pricing-editor"><label>Set Price (EGP)<input name="basePrice" type="number" min="0" step="0.01" required></label><label>Set Discount %<input name="discount" type="number" min="0" max="100" step="0.01" value="0"></label><div class="dart-set-price-summary" data-set-summary></div></div><div class="dart-set-existing-images" data-set-existing-images></div><p class="dart-set-form-status" data-set-form-status role="status"></p><div class="dart-set-form-actions"><button type="button" data-set-close>Cancel</button><button type="submit" class="add-btn" data-set-save>Save Set</button></div></form>`;
+    modal.innerHTML=`<form class="dart-admin-set-dialog" data-set-form><button type="button" class="dart-admin-set-close" data-set-close aria-label="Close">&times;</button><div class="dart-admin-set-title"><div><p>MODELS / SETS</p><h2 data-set-form-title>Add Set</h2></div><span data-set-cost-warning hidden>Selling Below Cost</span></div><div class="dart-set-form-grid"><label>Set ID<input name="setId" required maxlength="120" pattern="[A-Za-z0-9_-]+" placeholder="SET-001"></label><label>Set Name<input name="name" required maxlength="160"></label><label class="is-wide">Description<textarea name="description" rows="3" maxlength="4000"></textarea></label>
+      <label class="is-wide">Short Description
+        <textarea name="shortDescription" rows="2" maxlength="280" placeholder="A short description for the homepage Set card"></textarea>
+      </label>
+      <label>Show on Homepage
+        <select name="showOnHomepage"><option value="false">Hidden</option><option value="true">Visible</option></select>
+      </label>
+      <label>Homepage Order
+        <input name="homepageOrder" type="number" min="0" max="9999" step="1" value="0">
+        <small>Lower numbers appear first.</small>
+      </label>
+      <label class="is-wide">Set Images<input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>Uploaded Set images are stored once. Existing model images remain referenced from their Models.</small></label></div><section class="dart-set-builder"><div class="dart-set-builder-head"><div><h3>Set Items</h3><p>Type an existing Model ID. Use Quantity when the same design appears more than once.</p></div><button type="button" data-set-component-add>+ Add Item</button></div><div data-set-component-list></div></section><div class="dart-set-pricing-editor"><label>Set Price (EGP)<input name="basePrice" type="number" min="0" step="0.01" required></label><label>Set Discount %<input name="discount" type="number" min="0" max="100" step="0.01" value="0"></label><div class="dart-set-price-summary" data-set-summary></div></div><div class="dart-set-existing-images" data-set-existing-images></div><p class="dart-set-form-status" data-set-form-status role="status"></p><div class="dart-set-form-actions"><button type="button" data-set-close>Cancel</button><button type="submit" class="add-btn" data-set-save>Save Set</button></div></form>`;
     root.document.body.appendChild(modal);
     modal.querySelectorAll("[data-set-close]").forEach(button=>button.addEventListener("click",closeEditor));
     modal.addEventListener("click",event=>{if(event.target===modal)closeEditor();});
@@ -272,10 +283,13 @@
   function openEditor(row=null,readOnly=false) {
     const modal=ensureEditor(),form=modal.querySelector("[data-set-form]"); editRecord=row; form.reset();
     form.elements.setId.disabled=Boolean(row); form.elements.setId.value=row?.setId||""; form.elements.name.value=row?.name||""; form.elements.description.value=row?.description||""; form.elements.basePrice.value=((Number(row?.pricing?.basePriceMinor)||0)/100)||""; form.elements.discount.value=Number(row?.pricing?.discountPercent)||0;
+    form.elements.shortDescription.value=row?.shortDescription||"";
+    form.elements.showOnHomepage.value=row?.showOnHomepage===true?"true":"false";
+    form.elements.homepageOrder.value=Number(row?.homepageOrder)||0;
     modal.querySelector("[data-set-form-title]").textContent=readOnly?`Set ${row?.setId||""}`:row?`Edit ${row.setId}`:"Add Set";
     const list=modal.querySelector("[data-set-component-list]"); list.replaceChildren(); (row?.components?.length?row.components:[{}]).forEach(addComponentRow);
     const images=modal.querySelector("[data-set-existing-images]"); images.replaceChildren(); (row?.images||[]).forEach(src=>{const img=root.document.createElement("img");img.src=src;img.alt=row?.name||"Set image";images.appendChild(img);});
-    [...form.elements].forEach(el=>{if(el.name!=="setId")el.disabled=readOnly;}); form.querySelector("[data-set-component-add]").disabled=readOnly; form.querySelectorAll("[data-set-component-remove]").forEach(b=>b.disabled=readOnly); form.querySelector("[data-set-save]").hidden=readOnly;
+    [...form.elements].forEach(el=>{if(el.name!=="setId")el.disabled=readOnly&&!el.matches("[data-set-close]");}); form.querySelector("[data-set-component-add]").disabled=readOnly; form.querySelectorAll("[data-set-component-remove]").forEach(b=>b.disabled=readOnly); form.querySelector("[data-set-save]").hidden=readOnly;
     updateSummary(); setStatus(form,""); modal.hidden=false; root.document.body.classList.add("dart-admin-set-modal-open");
   }
 
@@ -295,7 +309,18 @@
     try {
       const newImages=await uploadImages([...form.elements.images.files]);
       const images=[...(editRecord?.images||[]),...newImages];
-      const input={name:form.elements.name.value.trim(),description:form.elements.description.value.trim(),basePriceMinor:Math.round(p.base*100),discountPercent:p.discount,images,components};
+      if(form.elements.showOnHomepage.value==="true" && !images.length) return setStatus(form,"Upload a Set image before showing it on the homepage.",true);
+      const input={
+        name:form.elements.name.value.trim(),
+        description:form.elements.description.value.trim(),
+        shortDescription:form.elements.shortDescription.value.trim(),
+        showOnHomepage:form.elements.showOnHomepage.value==="true",
+        homepageOrder:Number(form.elements.homepageOrder.value)||0,
+        basePriceMinor:Math.round(p.base*100),
+        discountPercent:p.discount,
+        images,
+        components,
+      };
       if(editRecord) await api(`/api/v1/admin/sets/${encodeURIComponent(editRecord.setId)}`,{method:"PUT",body:{...input,expectedVersion:Number(editRecord.version)}});
       else await api("/api/v1/admin/sets",{method:"POST",body:{setId:form.elements.setId.value.trim(),...input}});
       closeEditor(); await loadSets();

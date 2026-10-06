@@ -13,6 +13,9 @@ export interface SetWriteInput {
   setId: string;
   name: string;
   description: string;
+  shortDescription?: string | undefined;
+  showOnHomepage?: boolean | undefined;
+  homepageOrder?: number | undefined;
   basePriceMinor: number;
   discountPercent: number;
   images: string[];
@@ -37,6 +40,9 @@ interface SetRow {
   set_id: string;
   name: string;
   description: string;
+  short_description: string;
+  show_on_homepage: boolean;
+  homepage_order: number;
   base_price_minor: string;
   discount_percent: string;
   images: unknown;
@@ -70,6 +76,17 @@ function normalizeComponents(value: SetComponentInput[]): SetComponentInput[] {
 
 function finalMinor(basePriceMinor: number, discountPercent: number): number {
   return applyPercentMinor(basePriceMinor, discountPercent);
+}
+
+// Older clients can omit these fields on update without clearing the saved presentation.
+function homepagePresentation(input: Partial<SetWriteInput>, before?: SetRow) {
+  const shortDescription = String(input.shortDescription ?? before?.short_description ?? "").trim();
+  const showOnHomepage = input.showOnHomepage ?? before?.show_on_homepage ?? false;
+  const homepageOrder = input.homepageOrder ?? before?.homepage_order ?? 0;
+  if (showOnHomepage && !safeImages(input.images).length) {
+    throw new AppError(422, "SET_HOMEPAGE_IMAGE_REQUIRED", "Upload a Set image before showing it on the homepage");
+  }
+  return { shortDescription, showOnHomepage, homepageOrder };
 }
 
 export class SetService {
@@ -211,6 +228,9 @@ export class SetService {
       name: row.name,
       category: "Sets",
       description: row.description,
+      shortDescription: row.short_description,
+      showOnHomepage: row.show_on_homepage,
+      homepageOrder: Number(row.homepage_order),
       images: safeImages(row.images),
       active: row.active,
       isArchived: row.is_archived,
@@ -235,7 +255,8 @@ export class SetService {
     const client = await this.pool.connect();
     try {
       const rows = await client.query<SetRow>(
-        `SELECT set_id,name,description,base_price_minor::text,discount_percent::text,images,
+        `SELECT set_id,name,description,short_description,show_on_homepage,homepage_order,
+                base_price_minor::text,discount_percent::text,images,
                 active,is_archived,is_deleted,version::text,created_at,updated_at
            FROM catalog_sets
           WHERE active AND NOT is_archived AND NOT is_deleted
@@ -253,7 +274,8 @@ export class SetService {
     const client = await this.pool.connect();
     try {
       const rows = await client.query<SetRow>(
-        `SELECT set_id,name,description,base_price_minor::text,discount_percent::text,images,
+        `SELECT set_id,name,description,short_description,show_on_homepage,homepage_order,
+                base_price_minor::text,discount_percent::text,images,
                 active,is_archived,is_deleted,version::text,created_at,updated_at
            FROM catalog_sets
           WHERE NOT is_deleted
@@ -271,7 +293,8 @@ export class SetService {
     const client = await this.pool.connect();
     try {
       const result = await client.query<SetRow>(
-        `SELECT set_id,name,description,base_price_minor::text,discount_percent::text,images,
+        `SELECT set_id,name,description,short_description,show_on_homepage,homepage_order,
+                base_price_minor::text,discount_percent::text,images,
                 active,is_archived,is_deleted,version::text,created_at,updated_at
            FROM catalog_sets
           WHERE set_id=$1 AND active AND NOT is_archived AND NOT is_deleted`,
@@ -308,11 +331,14 @@ export class SetService {
         pricing.finalMinor,
         pricing.costTotalMinor,
       );
+      const homepage = homepagePresentation(input);
       const inserted = await client.query<SetRow>(
         `INSERT INTO catalog_sets(
-           set_id,name,description,base_price_minor,discount_percent,images,created_by,updated_by
-         ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$7)
-         RETURNING set_id,name,description,base_price_minor::text,discount_percent::text,images,
+           set_id,name,description,base_price_minor,discount_percent,images,
+           short_description,show_on_homepage,homepage_order,created_by,updated_by
+         ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$10)
+         RETURNING set_id,name,description,short_description,show_on_homepage,homepage_order,
+                base_price_minor::text,discount_percent::text,images,
                    active,is_archived,is_deleted,version::text,created_at,updated_at`,
         [
           setId,
@@ -321,6 +347,9 @@ export class SetService {
           basePriceMinor,
           discountPercent,
           JSON.stringify(safeImages(input.images)),
+          homepage.shortDescription,
+          homepage.showOnHomepage,
+          homepage.homepageOrder,
           actorId,
         ],
       );
@@ -335,7 +364,7 @@ export class SetService {
       await client.query(
         `INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,metadata)
          VALUES ('staff',$1,'SET_CREATED','sets',$2,$3,$4::jsonb)`,
-        [actorId, setId, requestId, JSON.stringify({ pricing, belowCostOverride, components })],
+        [actorId, setId, requestId, JSON.stringify({ pricing, belowCostOverride, components, homepage })],
       );
       await client.query(
         "UPDATE domain_state_versions SET version=version+1,updated_at=now() WHERE domain='sets'",
@@ -364,7 +393,8 @@ export class SetService {
       const setId = cleanId(setIdInput);
       await this.lockKey(client, setId);
       const current = await client.query<SetRow>(
-        `SELECT set_id,name,description,base_price_minor::text,discount_percent::text,images,
+        `SELECT set_id,name,description,short_description,show_on_homepage,homepage_order,
+                base_price_minor::text,discount_percent::text,images,
                 active,is_archived,is_deleted,version::text,created_at,updated_at
            FROM catalog_sets WHERE set_id=$1 AND NOT is_deleted FOR UPDATE`,
         [setId],
@@ -389,12 +419,15 @@ export class SetService {
         pricing.finalMinor,
         pricing.costTotalMinor,
       );
+      const homepage = homepagePresentation(input, before);
       const updated = await client.query<SetRow>(
         `UPDATE catalog_sets
             SET name=$2,description=$3,base_price_minor=$4,discount_percent=$5,images=$6::jsonb,
-                version=version+1,updated_by=$7,updated_at=now()
+                short_description=$7,show_on_homepage=$8,homepage_order=$9,
+                version=version+1,updated_by=$10,updated_at=now()
           WHERE set_id=$1
-          RETURNING set_id,name,description,base_price_minor::text,discount_percent::text,images,
+          RETURNING set_id,name,description,short_description,show_on_homepage,homepage_order,
+                base_price_minor::text,discount_percent::text,images,
                     active,is_archived,is_deleted,version::text,created_at,updated_at`,
         [
           setId,
@@ -403,6 +436,9 @@ export class SetService {
           basePriceMinor,
           discountPercent,
           JSON.stringify(safeImages(input.images)),
+          homepage.shortDescription,
+          homepage.showOnHomepage,
+          homepage.homepageOrder,
           actorId,
         ],
       );
@@ -422,7 +458,17 @@ export class SetService {
           actorId,
           setId,
           requestId,
-          JSON.stringify({ previousVersion: Number(before.version), pricing, belowCostOverride, components }),
+          JSON.stringify({
+            previousVersion: Number(before.version), pricing, belowCostOverride, components,
+            homepage: {
+              before: {
+                shortDescription: before.short_description,
+                showOnHomepage: before.show_on_homepage,
+                homepageOrder: before.homepage_order,
+              },
+              after: homepage,
+            },
+          }),
         ],
       );
       await client.query(
@@ -456,7 +502,8 @@ export class SetService {
             SET is_archived=$2,active=CASE WHEN $2 THEN false ELSE true END,
                 version=version+1,updated_by=$3,updated_at=now()
           WHERE set_id=$1 AND version=$4 AND NOT is_deleted
-          RETURNING set_id,name,description,base_price_minor::text,discount_percent::text,images,
+          RETURNING set_id,name,description,short_description,show_on_homepage,homepage_order,
+                base_price_minor::text,discount_percent::text,images,
                     active,is_archived,is_deleted,version::text,created_at,updated_at`,
         [setId, action === "archive", actorId, expectedVersion],
       );

@@ -154,6 +154,19 @@ Endpoints:
 
 `period_key` unique وrun يستخدم PostgreSQL advisory transaction lock؛ إعادة نفس الشهر idempotent ولا تمنح كروت إضافية.
 
+## Sets — homepage presentation
+
+Existing `POST /api/v1/admin/sets` and `PUT /api/v1/admin/sets/:setId` accept
+`shortDescription` (trimmed text, at most 280 characters), `showOnHomepage` (boolean),
+and `homepageOrder` (integer 0–9999; lower numbers first). These fields are stored in
+`catalog_sets` by migration `0057_set_homepage_presentation.sql`. New Sets default to
+hidden with empty short copy and order 0; omitted fields on update preserve the saved values.
+A visible homepage Set requires its own uploaded Set image. Auth, CSRF, `sets.manage`,
+version conflict handling and audit logs apply to these edits through the existing Set service.
+`GET /api/v1/sets` and `GET /api/v1/sets/:setId` expose the presentation fields alongside
+the server-calculated Set prices. Homepage visibility does not hide an active Set from
+the regular catalogue, create inventory, or reserve pieces.
+
 ## Site Settings
 
 `PUT /api/v1/admin/site-settings` يتطلب `expectedVersion` و`settings` التي تمر من strict central Zod schema. Unknown root settings are rejected. Public `GET /api/v1/site-settings` returns explicit allowlisted keys only؛ `codRisk` لا يخرج للمتصفح العام.

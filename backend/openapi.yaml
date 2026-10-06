@@ -19,7 +19,57 @@ tags:
   - name: Promotions
   - name: Dart Card
   - name: Internal Jobs
+  - name: Sets
 paths:
+  /sets:
+    get:
+      tags: [Sets]
+      operationId: getPublicSets
+      summary: Read active Sets including homepage presentation and server-calculated prices
+      responses:
+        "200": { description: Active non-archived Sets; no private cost data }
+  /sets/{setId}:
+    get:
+      tags: [Sets]
+      operationId: getPublicSet
+      parameters:
+        - { in: path, name: setId, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Set detail including shortDescription, showOnHomepage and homepageOrder }
+        "404": { description: Set does not exist or is unavailable for public viewing }
+  /admin/sets:
+    post:
+      tags: [Sets]
+      operationId: createSet
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Requires staff sets.manage; visible homepage cards require an uploaded Set image.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetCreate" }
+      responses:
+        "201": { description: Created Set }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/sets/{setId}:
+    put:
+      tags: [Sets]
+      operationId: updateSet
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { in: path, name: setId, required: true, schema: { type: string } }
+      description: Requires staff sets.manage and expectedVersion; omitted homepage fields preserve saved values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetUpdate" }
+      responses:
+        "200": { description: Updated Set with homepage audit before/after values }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /health/live:
     get:
       tags: [Health]
@@ -595,6 +645,42 @@ components:
       required: true
       schema: { type: string, enum: [google, facebook] }
   schemas:
+    SetWrite:
+      type: object
+      required: [name, basePriceMinor, components]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string, maxLength: 4000 }
+        shortDescription: { type: string, maxLength: 280 }
+        showOnHomepage: { type: boolean }
+        homepageOrder: { type: integer, minimum: 0, maximum: 9999 }
+        basePriceMinor: { type: integer, minimum: 0, maximum: 1000000000 }
+        discountPercent: { type: number, minimum: 0, maximum: 100 }
+        images: { type: array, maxItems: 30, items: { type: string, maxLength: 1200 } }
+        components:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [modelId]
+            properties:
+              modelId: { type: string, minLength: 1, maxLength: 120 }
+              quantity: { type: integer, minimum: 1, maximum: 20, default: 1 }
+    SetCreate:
+      allOf:
+        - { $ref: "#/components/schemas/SetWrite" }
+        - type: object
+          required: [setId]
+          properties:
+            setId: { type: string, minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9_-]+$" }
+    SetUpdate:
+      allOf:
+        - { $ref: "#/components/schemas/SetWrite" }
+        - type: object
+          required: [expectedVersion]
+          properties:
+            expectedVersion: { type: integer, minimum: 1 }
     TrafficAnalyticsEvent:
       type: object
       additionalProperties: false

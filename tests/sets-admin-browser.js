@@ -23,7 +23,7 @@ const html = `<!doctype html><html><head><link rel="stylesheet" href="/Eye/dart.
 <section id="model-modal" hidden></section>
 <script>
 const fixtureSets = [
-  {setId:"SET-CAMPUS",name:"Campus Look",description:"Overshirt campus set",category:"Sets",active:true,isArchived:false,version:1,createdAt:"2026-10-01T00:00:00.000Z",pieceCount:2,images:[],components:[{modelId:"M-OVER",name:"Overshirt",quantity:2}],pricing:{costTotalMinor:60000,componentsSellingTotalMinor:100000,basePriceMinor:80000,discountPercent:0,finalMinor:80000,marginVsCostMinor:20000}},
+  {setId:"SET-CAMPUS",name:"Campus Look",description:"Overshirt campus set",category:"Sets",active:true,isArchived:false,version:1,createdAt:"2026-10-01T00:00:00.000Z",pieceCount:2,images:["/placeholder.png"],shortDescription:"Original homepage copy",showOnHomepage:false,homepageOrder:0,components:[{modelId:"M-OVER",name:"Overshirt",quantity:2}],pricing:{costTotalMinor:60000,componentsSellingTotalMinor:100000,basePriceMinor:80000,discountPercent:0,finalMinor:80000,marginVsCostMinor:20000}},
   {setId:"SET-DENIM",name:"Denim Box",description:"Jeans set",category:"Sets",active:true,isArchived:false,version:1,createdAt:"2026-10-02T00:00:00.000Z",pieceCount:1,images:[],components:[{modelId:"M-JEAN",name:"Jeans",quantity:1}],pricing:{costTotalMinor:50000,componentsSellingTotalMinor:120000,basePriceMinor:120000,discountPercent:0,finalMinor:120000,marginVsCostMinor:70000}}
 ];
 const models = {
@@ -34,7 +34,7 @@ const items = [
   {modelId:"M-OVER",status:"In stock",isArchived:false,isDeleted:false},
   {modelId:"M-OVER",status:"In stock",isArchived:false,isDeleted:false}
 ];
-window.__stateCalls=[];
+window.__stateCalls=[]; window.__setWriteCalls=[];
 window.DartCatalog={
   norm:(v)=>String(v??"").trim().toLowerCase(),
   model:(id)=>models[id]||null,
@@ -46,6 +46,13 @@ window.DartCatalog={
 };
 async function request(path,options={}){
   if(path==="/api/v1/admin/sets") return {sets:structuredClone(fixtureSets)};
+  if(options.method==="PUT" && path.startsWith("/api/v1/admin/sets/") && !path.endsWith("/settings")){
+    const setId=decodeURIComponent(path.split("/admin/sets/")[1]);
+    const row=fixtureSets.find(item=>item.setId===setId);
+    window.__setWriteCalls.push({setId,body:options.body});
+    Object.assign(row,options.body,{version:row.version+1});
+    return {set:structuredClone(row)};
+  }
   if(path.includes("/state")){
     const setId=decodeURIComponent(path.split("/admin/sets/")[1].split("/state")[0]);
     const row=fixtureSets.find(item=>item.setId===setId);
@@ -146,10 +153,32 @@ const server = http.createServer((request, response) => {
     assert.equal(await page.locator("[data-set-rows] .dart-set-row").first().getAttribute("data-set-id"), "SET-DENIM");
     await page.locator('#models select[data-filter-key="priceRange"]').selectOption("");
 
+    const campusRow=page.locator('[data-set-rows] .dart-set-row[data-set-id="SET-CAMPUS"]');
+    await campusRow.locator('[data-set-view]').click();
+    assert.equal(await page.locator('[name="shortDescription"]').inputValue(), "Original homepage copy");
+    assert.equal(await page.locator('[name="shortDescription"]').isDisabled(), true, "View keeps homepage fields read-only");
+    await page.locator('#dartSetAdminModal [data-set-close]').first().click();
+    await campusRow.locator('[data-set-edit]').click();
+    await page.locator('[name="shortDescription"]').fill("Ready for your everyday look");
+    await page.locator('[name="showOnHomepage"]').selectOption("true");
+    await page.locator('[name="homepageOrder"]').fill("2");
+    await page.locator('#dartSetAdminModal [data-set-save]').click();
+    await page.waitForFunction(() => window.__setWriteCalls.length === 1);
+    const written=await page.evaluate(() => window.__setWriteCalls[0].body);
+    assert.equal(written.shortDescription, "Ready for your everyday look");
+    assert.equal(written.showOnHomepage, true);
+    assert.equal(written.homepageOrder, 2);
+    assert.equal(written.expectedVersion, 1);
+    await campusRow.locator('[data-set-edit]').click();
+    assert.equal(await page.locator('[name="shortDescription"]').inputValue(), written.shortDescription);
+    assert.equal(await page.locator('[name="showOnHomepage"]').inputValue(), "true");
+    assert.equal(await page.locator('[name="homepageOrder"]').inputValue(), "2");
+    await page.locator('#dartSetAdminModal [data-set-close]').first().click();
+
     await page.locator('[data-set-rows] .dart-set-row[data-set-id="SET-CAMPUS"] [data-set-select]').check();
     await page.locator("#models > .second .delete-btn").click();
     await page.waitForFunction(() => window.__stateCalls.length === 1);
-    assert.deepEqual(await page.evaluate(() => window.__stateCalls[0]), {setId:"SET-CAMPUS",body:{action:"archive",expectedVersion:1}});
+    assert.deepEqual(await page.evaluate(() => window.__stateCalls[0]), {setId:"SET-CAMPUS",body:{action:"archive",expectedVersion:2}});
 
     await page.locator('[data-model-set-view="models"]').click();
     await page.locator("#models .add-btn").click();
