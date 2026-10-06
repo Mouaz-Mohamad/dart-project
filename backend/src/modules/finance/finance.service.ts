@@ -356,8 +356,8 @@ export class FinanceService {
       );
       await client.query(
         `UPDATE orders
-            SET cod_settled_minor=$2,
-                cod_settled_at=CASE WHEN $2 >= $3 THEN now() ELSE NULL END,
+            SET cod_settled_minor=$2::bigint,
+                cod_settled_at=CASE WHEN $2::bigint >= $3::bigint THEN now() ELSE NULL END,
                 version=version+1,
                 updated_at=now()
           WHERE id=$1::uuid`,
