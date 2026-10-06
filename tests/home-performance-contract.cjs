@@ -14,6 +14,11 @@ assert.match(source, /rootMargin:\s*["']700px 0px["']/, "reviews must not wait u
 assert.match(source, /__dartHomeRenderGuard/, "homepage product rendering must remain guarded against duplicate DOM rebuilds");
 assert.match(source, /productRenderSignature/, "render guard must compare visible catalogue state");
 assert.match(source, /requestIdleCallback/, "non-critical brand assets should stay outside the critical render path");
+assert.match(
+  source,
+  /root\.setTimeout\(loadFontAwesome,\s*0\)/,
+  "Font Awesome must start automatically without waiting for the first pointer or keyboard interaction",
+);
 
 const perfIndex = home.indexOf('src="Js/dart-home-performance.js"');
 const uiIndex = home.indexOf('src="Js/dart-ui.home.min.js"');
@@ -23,4 +28,4 @@ assert.ok(perfIndex < uiIndex, "performance/session guard must install before th
 assert.ok(!home.includes('src="Js/dart-ui.js"'), "homepage must not regress to the full shared UI runtime");
 assert.ok(!home.includes('src="Js/dart-platform.js"'), "homepage must not regress to the full unminified platform runtime");
 
-console.log("PASS home performance contract: guest probe, lazy reviews, render guard and runtime ordering");
+console.log("PASS home performance contract: guest probe, lazy reviews, automatic icons, render guard and runtime ordering");

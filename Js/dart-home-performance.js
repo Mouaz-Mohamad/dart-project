@@ -107,6 +107,10 @@
     root.addEventListener("pointerdown", eagerLoad, { once: true, passive: true, capture: true });
     root.addEventListener("touchstart", eagerLoad, { once: true, passive: true, capture: true });
     root.addEventListener("keydown", eagerLoad, { once: true, capture: true });
+
+    // Start the icon stylesheet automatically after DOMContentLoaded without making it render-blocking.
+    // Interaction listeners above remain as an immediate fallback if the user acts before this queued task.
+    root.setTimeout(loadFontAwesome, 0);
   }
 
   function syncMenuAccessibility() {
@@ -295,7 +299,7 @@
   }
 
   root.DartHomePerformance = Object.freeze({
-    version: "1.1.0",
+    version: "1.1.1",
     productRenderSignature,
     installProductRenderGuard,
     invalidateProductRender() {
