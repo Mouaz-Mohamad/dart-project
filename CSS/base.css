@@ -1,5 +1,10 @@
 /* DART CODE GUIDE | CSS/base.css
    الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */
+/* DART CSS NAVIGATION | Shared by Home, Products, About, Contact, tracking,
+   returns, item trace, My Account and the remaining storefront pages.
+   Find: Reset & Design Tokens; Global Document Setup; Typography & Links;
+   Media & Forms; Utility Classes; WebP picture layout guard.
+   This file stays global; page components are indexed in CSS/main.css. */
 /* ==========================================================================
    DART | STOREFRONT BASE
    Reset, design tokens, global element defaults, and tiny shared utilities.

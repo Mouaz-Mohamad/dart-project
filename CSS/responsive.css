@@ -1,5 +1,10 @@
 /* DART CODE GUIDE | CSS/responsive.css
    الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */
+/* DART CSS NAVIGATION (cascade order retained)
+   Home / Products / About / Contact / Track / Returns / Trace / Account:
+   shared responsive overrides appear under the breakpoint headings below.
+   Returns: 640px; trace: later 520px; Sets on Products: final 760px block.
+   Search by breakpoint and then selector; moving these blocks changes precedence. */
 /* ==========================================================================
    DART | STOREFRONT RESPONSIVE
    Media-query-only overrides. Keep normal component rules in Stayle 1.css.
@@ -352,6 +357,7 @@ body {
 }
 /* END (max-width:520px) */
 
+/* DART-CSS-SETS-MOBILE | Products: Set dialog and cards */
 @media (max-width: 760px) {
   .dart-set-modal{padding:8px;align-items:end}.dart-set-dialog{grid-template-columns:1fr;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);border-radius:16px 16px 0 0}.dart-set-gallery{padding: 5px;}.dart-set-gallery>[data-set-cover]{aspect-ratio:4/3;max-height:42vh;object-fit:contain}.dart-set-details{padding:18px 14px 20px}.dart-set-component{grid-template-columns:1fr}.dart-set-component-head{grid-column:1}.dart-set-pricing>[data-set-price]{font-size:21px}.dart-set-cart-card .cart-product-img{width:84px;min-width:84px}
   .dart-set-gallery>[data-set-cover]{width:min(100%,calc(58dvh * 3 / 4));max-height:58dvh;margin-inline:auto;aspect-ratio:3/4;object-fit:cover}
