@@ -9,20 +9,29 @@ const root = path.resolve(__dirname, "..");
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml", ".json": "application/json" };
 const models = [
   { id: "shirt", modelId: "SHIRT-101", name: "Campus Shirt", category: "Shirts", selling: 700, active: true,
-    sizeOptions: [{ name: "M", active: true }], colorOptions: [{ name: "Black", active: true, images: [{ url: "/Photos/products/1.jpg" }] }] },
+    images: ["/Photos/products/5.jpg", { src: "/Photos/products/6.jpg" }],
+    sizeOptions: [{ name: "M", active: true }], colorOptions: [
+      { name: "Black", active: true, images: [{ url: "/Photos/products/1.jpg" }, { url: "/Photos/products/7.jpg" }] },
+      { name: "White", active: false, images: [{ url: "/Photos/products/9.jpg" }] },
+    ] },
   { id: "pants", modelId: "PANTS-202", name: "Campus Pants", category: "Pants", selling: 600, active: true,
-    sizeOptions: [{ name: "M", active: true }], colorOptions: [{ name: "Stone", active: true, images: [{ url: "/Photos/products/2.jpg" }] }] },
+    images: [{ url: "/Photos/products/10.jpg" }],
+    sizeOptions: [{ name: "M", active: true }], colorOptions: [
+      { name: "Stone", active: true, images: [{ url: "/Photos/products/2.jpg" }, { url: "/Photos/products/11.webp" }] },
+      { name: "Olive", active: true, images: [{ url: "/Photos/products/14.webp" }] },
+    ] },
 ];
 const components = models.map(model => ({ modelId: model.modelId, name: model.name, quantity: 1, sizes: model.sizeOptions, colors: model.colorOptions }));
 function fixture(id, order, photo) {
   return { setId: id, name: `Campus Look ${order}`, description: "Full details stay inside the Set dialog.", shortDescription: "Your everyday look, ready together.",
-    images: [photo], showOnHomepage: true, homepageOrder: order, active: true, pieceCount: 2, components,
+    images: Array.isArray(photo) ? photo : [photo], showOnHomepage: true, homepageOrder: order, active: true, pieceCount: 2, components,
     pricing: { componentsSellingTotalMinor: 130000, basePriceMinor: 110000, discountPercent: 10, finalMinor: 99000 } };
 }
-const first = fixture("SET-FIRST", 1, "/Photos/products/1.jpg");
-const second = fixture("SET-SECOND", 2, "/Photos/products/2.jpg");
+const first = fixture("SET-FIRST", 1, ["/Photos/products/3.jpg", "/Photos/products/4.jpg"]);
+const second = fixture("SET-SECOND", 2, "/Photos/products/12.webp");
+const expectedGallery = ["3.jpg", "4.jpg", "5.jpg", "6.jpg", "1.jpg", "7.jpg", "9.jpg", "10.jpg", "2.jpg", "11.webp", "14.webp"].map(name => `/Photos/products/${name}`);
 let mode = "featured";
-let catalogDelay = 0;
+let catalogDelay = 400;
 function json(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
   response.end(JSON.stringify(body));
@@ -77,7 +86,10 @@ const server = http.createServer((request, response) => {
     assert.equal((await cards.first().locator("[data-home-set-description]").textContent()).trim(), first.shortDescription);
     assert.equal(await cards.first().locator("[data-home-set-old-price]").textContent(), "1,300 EGP");
     assert.equal(await cards.first().locator("[data-home-set-price]").textContent(), "990 EGP");
-    assert.equal(await cards.first().locator(".home-set-piece img").first().getAttribute("src"), "/Photos/products/1.jpg");
+    await page.waitForFunction(count => document.querySelectorAll('.home-set-card:first-child .home-set-piece img').length === count, expectedGallery.length);
+    const gallery = await cards.first().locator(".home-set-piece img").evaluateAll(images => images.map(image => new URL(image.src).pathname));
+    assert.deepEqual(gallery, expectedGallery, "All Set photos lead, followed by every model photo and all color photos in component order, even after late hydration");
+    catalogDelay = 0;
     assert.equal(await page.evaluate(() => document.getElementById("dartHomeSets").nextElementSibling.classList.contains("products-section")), true);
 
     async function geometry() {
@@ -85,18 +97,54 @@ const server = http.createServer((request, response) => {
         const track = document.querySelector(".home-sets-track").getBoundingClientRect();
         const card = document.querySelector(".home-set-card").getBoundingClientRect();
         const piece = document.querySelector(".home-set-piece").getBoundingClientRect();
-        return { width: track.width, card: card.width, height: card.height, pieceWidth: piece.width, pieceHeight: piece.height, cover: getComputedStyle(document.querySelector(".home-set-cover")).objectFit, overflow: document.documentElement.scrollWidth > innerWidth };
+        const copy = document.querySelector(".home-set-copy").getBoundingClientRect();
+        const strip = document.querySelector(".home-set-pieces").getBoundingClientRect();
+        const pieces = [...document.querySelectorAll('.home-set-card:first-child .home-set-piece')].slice(0, 2).map(node => node.getBoundingClientRect());
+        return { width: track.width, card: card.width, height: card.height, pieceWidth: piece.width, pieceHeight: piece.height,
+          copyWidth: copy.width, copyHeight: copy.height, copyLeft: copy.left - card.left, copyBottom: card.bottom - copy.bottom,
+          stripTop: strip.top - card.top, stripRight: card.right - strip.right, stripDirection: getComputedStyle(document.querySelector(".home-set-pieces")).flexDirection,
+          pieceRow: pieces[0].top === pieces[1].top && pieces[1].left > pieces[0].left,
+          cover: getComputedStyle(document.querySelector(".home-set-cover")).objectFit, overflow: document.documentElement.scrollWidth > innerWidth };
       });
     }
     const mobile = await geometry();
     assert.ok(Math.abs(mobile.card / mobile.width - .9) < .001, "90% card leaves the next Set visible");
-    assert.ok(Math.abs(mobile.card / mobile.height - .75) < .001);
-    assert.equal(mobile.pieceWidth, 70); assert.equal(mobile.pieceHeight, 70); assert.equal(mobile.cover, "cover");
+    assert.equal(mobile.height, 665);
+    assert.equal(mobile.pieceWidth, 70); assert.equal(mobile.pieceHeight, 70); assert.equal(mobile.cover, "contain");
+    assert.equal(mobile.copyHeight, 227); assert.equal(mobile.copyWidth, mobile.card);
+    assert.equal(mobile.copyLeft, 0); assert.equal(mobile.copyBottom, 0);
+    assert.equal(mobile.stripTop, 12); assert.equal(mobile.stripRight, 12);
+    assert.equal(mobile.stripDirection, "row"); assert.equal(mobile.pieceRow, true);
     await page.setViewportSize({ width: 1440, height: 960 });
     const desktop = await geometry();
     assert.equal(desktop.card, mobile.card, "Desktop uses the same compact portrait size as a 430px phone");
+    assert.equal(desktop.height, 665);
     await page.setViewportSize({ width: 360, height: 800 });
     assert.equal((await geometry()).overflow, false, "Narrow phones must keep content within the viewport");
+
+    // The photo strip scrolls independently of the outer Set carousel.
+    const strip = cards.first().locator(".home-set-pieces");
+    await strip.scrollIntoViewIfNeeded();
+    const stripBox = await strip.boundingBox();
+    const setScroll = await page.locator(".home-sets-track").evaluate(node => node.scrollLeft);
+    await page.mouse.move(stripBox.x + stripBox.width - 24, stripBox.y + 35);
+    await page.mouse.down();
+    await page.mouse.move(stripBox.x + 12, stripBox.y + 35, { steps: 10 });
+    await page.mouse.up();
+    assert.ok(await strip.evaluate(node => node.scrollLeft > 50), "Mouse drag reaches more photos");
+    assert.equal(await page.locator(".home-sets-track").evaluate(node => node.scrollLeft), setScroll);
+    assert.equal(await page.locator("#dartSetImagePreview").evaluate(node => node.open), false, "Dragging a thumbnail does not enlarge it");
+    await strip.evaluate(node => { node.scrollLeft = 0; });
+    const stripTouch = await context.newCDPSession(page);
+    await stripTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: stripBox.x + stripBox.width - 24, y: stripBox.y + 35 }] });
+    for (let step = 1; step <= 8; step++) await stripTouch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: stripBox.x + stripBox.width - 24 - step * 16, y: stripBox.y + 35 }] });
+    await stripTouch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForFunction(() => document.querySelector(".home-set-pieces").scrollLeft > 30);
+    assert.equal(await page.locator(".home-sets-track").evaluate(node => node.scrollLeft), setScroll, "Touch swipe stays inside the photo strip");
+    await stripTouch.detach();
+    await strip.focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await page.locator("[data-home-sets-counter]").textContent(), "1 / 2");
 
     await page.locator("[data-home-sets-next]").click();
     await page.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "2 / 2");
@@ -236,6 +284,6 @@ const server = http.createServer((request, response) => {
     await direct.waitForFunction(() => document.getElementById("dartSetModal").hidden);
     assert.equal(new URL(direct.url()).pathname, "/products", "A late detail response must not reopen a Set after Back");
     assert.deepEqual(failures, [], "No new JS failures in the real homepage runtime");
-    console.log("PASS homepage Sets layout/data/states, mouse/touch/arrows, nested image/Set Back and Forward, shared-link refresh, late-response cancellation and Product route regression");
+    console.log("PASS homepage Sets 665px layout, all-photo order and late hydration, independent photo/Set mouse/touch scrolling, image-only preview/history, states and Product route regression");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

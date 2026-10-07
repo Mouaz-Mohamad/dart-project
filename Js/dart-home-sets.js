@@ -34,16 +34,67 @@
   }
 
   function imageSource(value) {
-    return typeof value === "string" ? value : String(value?.url || value?.src || "");
+    if (typeof value === "string") return value.trim();
+    if (!value) return "";
+    const source = String(value.url || value.src || "").trim();
+    if (!source && !value.id) return "";
+    return root.DartCatalog?.imageSrc?.({ ...value, url: source }) || source;
   }
 
-  function pieceImage(component) {
-    const colors = Array.isArray(component.colors) ? component.colors : [];
-    const color = colors.find(value => value && value.active !== false);
-    const fromSet = (Array.isArray(color?.images) ? color.images : []).map(imageSource).find(Boolean);
-    if (fromSet) return fromSet;
-    const model = root.DartCatalog?.model?.(component.modelId);
-    return root.DartCatalog?.cover?.(model, typeof color === "string" ? color : color?.name) || fallback;
+  function galleryImages(set) {
+    const images = [];
+    const append = (values, label) => {
+      (Array.isArray(values) ? values : []).forEach((value, position) => {
+        const src = imageSource(value);
+        if (src) images.push({ src, alt: `${label} ${position + 1}` });
+      });
+    };
+    // Keep the dashboard order: Set photos, then each model and every color.
+    append(set.images, set.name);
+    (set.components || []).forEach(component => {
+      const model = root.DartCatalog?.model?.(component.modelId);
+      const name = component.name || model?.name || component.modelId;
+      append(model?.images, name);
+      const colors = model ? root.DartCatalog.colors(model) : component.colors;
+      (Array.isArray(colors) ? colors : []).forEach(color => {
+        append(color?.images, `${name} ${color?.name || ""}`.trim());
+      });
+    });
+    return images;
+  }
+
+  function bindImageStrip(pieces) {
+    let pointer = null;
+    let moved = false;
+    pieces.addEventListener("pointerdown", event => {
+      moved = false;
+      if (event.pointerType !== "mouse" || event.button !== 0) return;
+      pointer = { id: event.pointerId, x: event.clientX, scroll: pieces.scrollLeft };
+    });
+    pieces.addEventListener("pointermove", event => {
+      if (!pointer || pointer.id !== event.pointerId) return;
+      const delta = event.clientX - pointer.x;
+      if (Math.abs(delta) <= 6 && !moved) return;
+      moved = true;
+      pieces.setPointerCapture(event.pointerId);
+      pieces.classList.add("is-dragging");
+      pieces.scrollLeft = pointer.scroll - delta;
+    });
+    const release = event => {
+      if (!pointer || pointer.id !== event.pointerId) return;
+      pointer = null;
+      pieces.classList.remove("is-dragging");
+      if (pieces.hasPointerCapture(event.pointerId)) pieces.releasePointerCapture(event.pointerId);
+      if (event.type === "pointercancel") moved = false;
+    };
+    pieces.addEventListener("pointerup", release);
+    pieces.addEventListener("pointercancel", release);
+    pieces.addEventListener("click", event => {
+      if (!moved) return;
+      event.preventDefault();
+      event.stopPropagation();
+      moved = false;
+    }, true);
   }
 
   function protectImage(image) {
@@ -66,16 +117,17 @@
     card.querySelector("[data-home-set-price]").textContent = root.DartSets.moneyMinor(set.pricing?.finalMinor);
     card.querySelector("[data-home-set-piece-count]").textContent = `${set.pieceCount || 0} PIECES`;
     const pieces = card.querySelector("[data-home-set-pieces]");
-    (set.components || []).forEach(component => {
+    galleryImages(set).forEach(photo => {
       const button = pieceTemplate.content.firstElementChild.cloneNode(true);
       const image = button.querySelector("img");
-      image.src = pieceImage(component);
-      image.alt = component.name || component.modelId;
+      image.src = photo.src;
+      image.alt = photo.alt;
       protectImage(image);
       button.setAttribute("aria-label", `Enlarge ${image.alt} image`);
       button.addEventListener("click", () => root.DartSetImagePreview?.open({ src: image.src, alt: image.alt }));
       pieces.appendChild(button);
     });
+    bindImageStrip(pieces);
     const shop = card.querySelector("[data-home-set-shop]");
     shop.setAttribute("aria-label", `Shop ${set.name}`);
     shop.addEventListener("click", () => root.DartSetsStorefront?.open(set));
@@ -127,6 +179,7 @@
   previous.addEventListener("click", () => goTo(index - 1));
   next.addEventListener("click", () => goTo(index + 1));
   track.addEventListener("keydown", event => {
+    if (event.target.closest(".home-set-pieces")) return;
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     goTo(event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1 : index + (event.key === "ArrowRight" ? 1 : -1));
@@ -139,7 +192,7 @@
   // Touch scroll stays native; mouse drag adds the same gesture on desktop.
   track.addEventListener("pointerdown", event => {
     dragged = false;
-    if (event.pointerType !== "mouse" || event.button !== 0 || event.target.closest("button")) return;
+    if (event.pointerType !== "mouse" || event.button !== 0 || event.target.closest("button, .home-set-pieces")) return;
     drag = { pointerId: event.pointerId, x: event.clientX, scroll: track.scrollLeft };
     dragged = false;
   });

@@ -1,6 +1,6 @@
-batch=5
-purpose=sets-shared-link-hydration
-frontend=refresh-set-availability-and-piece-images
+batch=6
+purpose=homepage-set-layout-and-complete-photo-strip
+frontend=requested-card-cover-copy-css-and-all-set-model-color-photos
 backend=none
-scope=final-frontend-verification
+scope=user-requested-homepage-set-adjustments-only
 trigger=final-production-release
