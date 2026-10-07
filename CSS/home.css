@@ -506,6 +506,7 @@ header {
 .home-sets-track.is-dragging {
     scroll-snap-type: none;
     cursor: grabbing;
+    -webkit-user-select: none;
     user-select: none;
 }
 
@@ -582,6 +583,7 @@ header {
 }
 
 .home-set-pieces.is-dragging {
+    -webkit-user-select: none;
     user-select: none;
 }
 

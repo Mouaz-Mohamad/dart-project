@@ -282,6 +282,51 @@ const server = http.createServer((request, response) => {
     assert.equal(await cards.count(), 2, "Retry also recovers a failed lazy-loaded script");
     await context.unroute("**/Js/dart-sets.js*");
 
+    // A copied spotlight needs its presenter on Products as well as the homepage.
+    const products = await context.newPage();
+    products.setDefaultTimeout(10000);
+    products.on("pageerror", error => failures.push(error.message));
+    for (const pathname of ["/products", "/products.html"]) {
+      await products.goto(`${origin}${pathname}`);
+      const spotlight = products.locator(".home-set-card");
+      await spotlight.first().waitFor();
+      await products.waitForFunction(count => document.querySelectorAll('.home-set-card:first-child .home-set-piece img').length === count, expectedGallery.length);
+      assert.equal(await spotlight.count(), 2, "Products renders the same selected Sets as the homepage");
+      assert.equal(await products.locator("[data-home-sets-state]").isVisible(), false, "Products stops showing Loading Sets after hydration");
+      assert.equal(await spotlight.first().locator("[data-home-set-title]").textContent(), first.name);
+      assert.equal(await spotlight.first().locator("[data-home-set-price]").textContent(), "990 EGP");
+      assert.equal(await spotlight.first().evaluate(card => card.getBoundingClientRect().height), 665);
+      assert.deepEqual(await spotlight.first().locator(".home-set-piece img").evaluateAll(images => images.map(image => new URL(image.src).pathname)), expectedGallery);
+      await products.locator("[data-home-sets-next]").click();
+      await products.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "2 / 2");
+      await products.locator("[data-home-sets-prev]").click();
+      await products.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "1 / 2");
+      await spotlight.first().locator(".home-set-piece").first().click();
+      await products.waitForFunction(() => document.getElementById("dartSetImagePreview").open);
+      assert.equal(await products.locator("#dartSetModal").evaluate(modal => modal.hidden), true);
+      await products.goBack();
+      await products.waitForFunction(() => !document.getElementById("dartSetImagePreview").open);
+      assert.equal(new URL(products.url()).pathname, pathname);
+      await spotlight.first().locator("[data-home-set-shop]").click();
+      await products.locator("#dartSetModal").waitFor({ state: "visible" });
+      assert.equal(await products.locator("#dartSetModalTitle").textContent(), first.name);
+      await products.goBack();
+      await products.waitForFunction(() => document.getElementById("dartSetModal").hidden);
+      assert.equal(new URL(products.url()).pathname, pathname, "Back restores the actual Products entry route");
+    }
+    mode = "single"; await products.reload();
+    await products.locator(".home-set-card").waitFor();
+    assert.equal(await products.locator("[data-home-sets-controls]").isVisible(), false);
+    mode = "empty"; await products.reload();
+    await products.waitForFunction(() => document.getElementById("dartHomeSets").hidden);
+    mode = "error"; await products.reload();
+    await products.locator("[data-home-sets-retry]").waitFor();
+    assert.equal(await products.locator("[data-home-sets-status]").textContent(), "Sets are temporarily unavailable.");
+    mode = "featured"; await products.locator("[data-home-sets-retry]").click();
+    await products.locator(".home-set-card").first().waitFor();
+    assert.equal(await products.locator(".home-set-card").count(), 2);
+    await products.close();
+
     const direct = await context.newPage();
     direct.setDefaultTimeout(10000);
     direct.on("pageerror", error => failures.push(error.message));
@@ -327,6 +372,6 @@ const server = http.createServer((request, response) => {
     await direct.waitForFunction(() => document.getElementById("dartSetModal").hidden);
     assert.equal(new URL(direct.url()).pathname, "/products", "A late detail response must not reopen a Set after Back");
     assert.deepEqual(failures, [], "No new JS failures in the real homepage runtime");
-    console.log("PASS homepage Sets 665px card/3:4 image, fluid overlapping copy and complete description-line fitting, vertical photo mouse/touch scrolling, all-photo order, preview/history, states and Product routes");
+    console.log("PASS Home and Products Set spotlight hydration, 665px card/3:4 image, photo order/gestures, controls, preview/Set Back, loading/error/empty states and normal Product routes");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

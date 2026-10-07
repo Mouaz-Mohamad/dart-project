@@ -1,6 +1,6 @@
 # Homepage Sets and Set navigation
 
-The homepage spotlight sits immediately before **Newest products**. Its HTML/templates live in `index.html`, its styles in `CSS/main.css`, and its browser behavior in `Js/dart-home-sets.js`. `CSS/home.css` and `CSS/home.min.css` are generated delivery bundles.
+The homepage spotlight sits immediately before **Newest products**. Its HTML/templates also appear in `products.html` before **Best Products**. Both pages explicitly load `Js/dart-home-sets.js`, the presenter that replaces the loading placeholder after Sets data arrives. Copying the HTML alone leaves the placeholder visible because the presenter never runs. Styles live in `CSS/main.css`; `CSS/home.css` and `CSS/home.min.css` are generated delivery bundles.
 
 Each card takes 90% of the carousel width and leaves the next card visible. The requested October 7 layout fixes its height at 665px. The HTML-owned `home-set-media` frame keeps the cover at 3:4, with `object-fit: contain`. Phone and desktop use the same compact width, capped at 410px; narrower phones fit their viewport.
 
@@ -63,3 +63,22 @@ Files: `CSS/main.css`, generated `CSS/home.css`/`CSS/home.min.css`, `index.html`
 | 10. Secrets | PASS: only existing public photo references are used; no credential or browser business persistence added. |
 
 Manual check: open a featured Set with several uploaded photos and model colors. Scroll the top-right column vertically and confirm Set photos precede all photos of the first model, then the next model. Resize between phone widths and desktop: the card remains 665px, the cover remains 3:4 and the copy fills the rest with 5px overlap. Use a long name/short description to confirm only complete description lines are removed while name, prices and button remain visible. Enlarge a photo, use Back to close it, and swipe horizontally outside the column to move between Sets.
+
+## October 7 Products spotlight wiring review
+
+The copied section in `products.html` was stuck at **Loading Sets…** because its shared presenter script was missing. The page now loads that existing deferred script once. Both spotlights use the same **Show on Homepage** selection/order from the dashboard. The ordinary Products listing, shared Set modal, photos, prices and reservation logic keep their existing code. No new migration or endpoint. Rebuilt homepage CSS incorporates the two Safari selection rules already added to `CSS/main.css` on `main`.
+
+| Review section | Result and evidence |
+| --- | --- |
+| 1. State coverage | PASS: Products now resolves loading and renders selected Sets; single/empty Sets and API retry are tested. Existing homepage asset failure/retry remains covered. |
+| 2. Server authority | PASS: the existing presenter displays server prices and catalogue photos; no stock, money or eligibility logic added. |
+| 3. Concurrency | PASS: delayed model hydration renders the complete ordered gallery on both pages; script/listeners are reused once per document. |
+| 4. Validation/authorization | N/A: no input, endpoint or permission changes; existing safe text/image assignments are reused. |
+| 5. Idempotency | PASS: retry replaces the card list; Set/image opening and Back use existing navigation steps, without a new durable write. |
+| 6. Audit/observability | N/A: adding the presenter introduces no sensitive action or persistent write. |
+| 7. External-service cost | N/A: no messaging or new paid-service calls. |
+| 8. Regression safety | PASS: copied HTML/layout and the latest main changes are preserved. Homepage presentation, Products filters/listing, Set cart grouping/reservation and normal Product routes pass their existing checks. |
+| 9. Tests | PASS: `tests/sets-home-browser.js` now visits `/products` and `/products.html`, checking selected cards, dismissal of Loading Sets, server price/title, 665px height, all-photo order, next/previous controls, image-only preview, Shop dialog and Back to the originating route. It also checks Products single/empty/error/retry states. Existing homepage geometry/gestures/history, Sets storefront browser, runtime and database storage contracts pass. |
+| 10. Secrets | PASS: no credentials, storage or commercial snapshots added. |
+
+Manual check: visit `/products` and scroll to **Shop the Set**. Selected Sets should replace **Loading Sets…**. Change cards with the arrows/swipe, enlarge a photo and use Back, then select **Shop the Set** and use Back again. Confirm both return to Products. Check the homepage and the ordinary Products filters/Set purchase flow as usual.

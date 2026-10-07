@@ -1,6 +1,6 @@
-batch=7
-purpose=homepage-set-vertical-photos-and-fluid-copy
-frontend=bounded-vertical-photo-column-responsive-copy-and-description-fitting
+batch=10
+purpose=products-set-spotlight-presenter
+frontend=load-existing-set-spotlight-presenter-on-products
 backend=none
-scope=user-requested-homepage-set-adjustments-only
+scope=user-requested-products-set-loading-fix
 trigger=final-production-release
