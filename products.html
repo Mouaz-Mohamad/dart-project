@@ -143,6 +143,50 @@
                 </div>
             </section>
 
+
+                <!-- Sets spotlight: presentation comes from Models / Sets in Dart Eye. -->
+                <section id="dartHomeSets" class="home-sets" aria-labelledby="dartHomeSetsTitle">
+                    <h2 id="dartHomeSetsTitle" class="section-title-">&nbsp;Shop the Set</h2>
+                    <div class="home-sets-state" data-home-sets-state>
+                        <p data-home-sets-status role="status">Loading Sets…</p>
+                        <button type="button" class="home-sets-retry" data-home-sets-retry hidden>Try again</button>
+                    </div>
+                    <div class="home-sets-carousel" data-home-sets-carousel role="region" aria-roledescription="carousel" aria-label="Featured Sets" hidden>
+                        <div class="home-sets-track" data-home-sets-track tabindex="0" aria-label="Swipe or use arrow keys to browse Sets"></div>
+                        <div class="home-sets-controls" data-home-sets-controls>
+                            <button type="button" data-home-sets-prev aria-label="Previous Set"><span aria-hidden="true">&#8249;</span></button>
+                            <span class="home-sets-counter" data-home-sets-counter role="status" aria-live="polite" aria-atomic="true"></span>
+                            <button type="button" data-home-sets-next aria-label="Next Set"><span aria-hidden="true">&#8250;</span></button>
+                        </div>
+                    </div>
+                    <template id="dartHomeSetCard">
+                        <article class="home-set-card" role="group" aria-roledescription="slide">
+                            <div class="home-set-media">
+                                <img class="home-set-cover" data-home-set-cover alt="" loading="lazy" decoding="async" width="600" height="800" draggable="false">
+                                <span class="home-set-piece-count" data-home-set-piece-count></span>
+                                <div class="home-set-pieces" data-home-set-pieces role="group" tabindex="0" aria-label="Set and model photos: scroll vertically to browse, select to enlarge"></div>
+                            </div>
+                            <div class="home-set-copy">
+                                <h3 data-home-set-title></h3>
+                                <p class="home-set-description" data-home-set-description dir="auto"></p>
+                                <div class="home-set-prices">
+                                    <span class="sr-only">Pieces separately</span>
+                                    <s data-home-set-old-price></s>
+                                    <span class="sr-only">Set price</span>
+                                    <strong data-home-set-price></strong>
+                                </div>
+                            </div>
+                            <button type="button" class="home-set-shop" data-home-set-shop>Shop the Set <span aria-hidden="true">&#8594;</span></button>
+                        </article>
+                    </template>
+                    <template id="dartHomeSetPiece">
+                        <button type="button" class="home-set-piece">
+                            <img alt="" loading="lazy" decoding="async" width="70" height="70" draggable="false">
+                        </button>
+                    </template>
+                </section>
+
+
             <section class="best-products-section">
                 <h2 class="section-title-">&nbsp;Best Products</h2>
                 <div class="x-scroll-container" id="bestProductsContainer"></div>
