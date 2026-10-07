@@ -34,13 +34,18 @@
     if (!card?.isConnected) return;
     const copy = card.querySelector(".home-set-copy");
     const description = card.querySelector("[data-home-set-description]");
-    if (!copy.clientHeight || description.hidden) return;
+    if (!copy.clientHeight) return;
     const title = card.querySelector("[data-home-set-title]");
     const prices = card.querySelector(".home-set-prices");
     const style = root.getComputedStyle(copy);
     const lineHeight = parseFloat(root.getComputedStyle(description).lineHeight);
-    const available = copy.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
-      - title.getBoundingClientRect().height - prices.getBoundingClientRect().height - 2 * parseFloat(style.rowGap);
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const contentHeight = title.getBoundingClientRect().height + prices.getBoundingClientRect().height;
+    const gap = parseFloat(style.rowGap);
+    // Short viewports shrink the portrait image before hiding essential information.
+    copy.style.setProperty("--home-set-copy-min-height", `${Math.ceil(padding + contentHeight + gap)}px`);
+    if (description.hidden) return;
+    const available = copy.clientHeight - padding - contentHeight - 2 * gap;
     const lines = Math.max(0, Math.min(3, Math.floor(available / lineHeight)));
     description.style.setProperty("--home-set-description-lines", String(Math.max(1, lines)));
     description.classList.toggle("is-space-hidden", lines === 0);

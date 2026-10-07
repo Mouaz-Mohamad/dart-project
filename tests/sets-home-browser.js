@@ -95,6 +95,9 @@ const server = http.createServer((request, response) => {
     async function geometry() {
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       return page.evaluate(() => {
+        const section = document.getElementById("dartHomeSets").getBoundingClientRect();
+        const heading = document.getElementById("dartHomeSetsTitle").getBoundingClientRect();
+        const controls = document.querySelector(".home-sets-controls").getBoundingClientRect();
         const track = document.querySelector(".home-sets-track").getBoundingClientRect();
         const card = document.querySelector(".home-set-card").getBoundingClientRect();
         const piece = document.querySelector(".home-set-piece").getBoundingClientRect();
@@ -103,14 +106,17 @@ const server = http.createServer((request, response) => {
         const title = document.querySelector("[data-home-set-title]").getBoundingClientRect();
         const descriptionNode = document.querySelector("[data-home-set-description]");
         const description = descriptionNode.getBoundingClientRect();
-        const descriptionVisible = getComputedStyle(descriptionNode).display !== "none";
+        const descriptionVisible = !descriptionNode.hidden && getComputedStyle(descriptionNode).display !== "none";
         const prices = document.querySelector(".home-set-prices").getBoundingClientRect();
         const shop = document.querySelector(".home-set-shop").getBoundingClientRect();
         const strip = document.querySelector(".home-set-pieces").getBoundingClientRect();
         const pieces = [...document.querySelectorAll('.home-set-card:first-child .home-set-piece')].slice(0, 2).map(node => node.getBoundingClientRect());
-        return { width: track.width, card: card.width, height: card.height, pieceWidth: piece.width, pieceHeight: piece.height,
+        return { viewportHeight: innerHeight, sectionHeight: section.height,
+          headingHeight: heading.height, headingTop: heading.top - section.top, controlsBottom: section.bottom - controls.bottom,
+          allCardHeights: [...document.querySelectorAll(".home-set-card")].map(node => node.getBoundingClientRect().height),
+          width: track.width, card: card.width, height: card.height, pieceWidth: piece.width, pieceHeight: piece.height,
           copyWidth: copy.width, copyHeight: copy.height, copyLeft: copy.left - card.left, copyBottom: card.bottom - copy.bottom,
-          coverHeight: cover.height, overlap: cover.bottom - copy.top, shadow: getComputedStyle(document.querySelector(".home-set-copy")).boxShadow,
+          coverWidth: cover.width, coverHeight: cover.height, overlap: cover.bottom - copy.top, shadow: getComputedStyle(document.querySelector(".home-set-copy")).boxShadow,
           stripTop: strip.top - card.top, stripRight: card.right - strip.right, stripDirection: getComputedStyle(document.querySelector(".home-set-pieces")).flexDirection,
           stripClearance: copy.top - strip.bottom, pieceColumn: pieces[0].left === pieces[1].left && pieces[1].top > pieces[0].top,
           descriptionLines: descriptionVisible ? Number(getComputedStyle(descriptionNode).getPropertyValue("--home-set-description-lines")) : 0,
@@ -120,12 +126,27 @@ const server = http.createServer((request, response) => {
           cover: getComputedStyle(document.querySelector(".home-set-cover")).objectFit, overflow: document.documentElement.scrollWidth > innerWidth };
       });
     }
+    function checkViewportLayout(layout) {
+      assert.ok(Math.abs(layout.height - layout.viewportHeight * .8) < .1, "Every card is 80% of the current viewport height");
+      assert.ok(layout.allCardHeights.every(height => Math.abs(height - layout.height) < .1), "All Sets use the same viewport-based height");
+      assert.ok(Math.abs(layout.sectionHeight - layout.viewportHeight * .9) < .1, "The entire section is 90% of the viewport height");
+      assert.ok(layout.headingTop >= 0 && layout.controlsBottom >= -.1, "Heading and arrows stay inside the 90% section");
+      assert.ok(Math.abs(layout.coverWidth / layout.coverHeight - .75) < .001, "The cover stays 3:4 even when space is short");
+      assert.ok(layout.coverWidth <= layout.card + .1, "The image fits inside the card");
+      assert.ok(Math.abs(layout.copyHeight - (layout.height - layout.coverHeight + 5)) < .1, "Copy fills the remaining card height");
+      assert.equal(layout.overlap, 5);
+      assert.ok(layout.stripClearance >= 11.9, "Photos stay above the overlapping copy panel");
+      assert.ok(layout.titleTop >= 0 && layout.titleClearance >= 0, "Name remains visible above prices");
+      assert.ok(layout.descriptionClearance >= -.1, "Description does not cover prices");
+      assert.ok(layout.priceButtonClearance >= 7.9, "Both prices remain above the purchase button");
+      assert.equal(layout.shopBottom, 12);
+      assert.equal(layout.overflow, false, "Content stays inside the viewport");
+    }
     const mobile = await geometry();
+    checkViewportLayout(mobile);
     assert.ok(Math.abs(mobile.card / mobile.width - .9) < .001, "90% card leaves the next Set visible");
-    assert.equal(mobile.height, 665);
     assert.equal(mobile.pieceWidth, 70); assert.equal(mobile.pieceHeight, 70); assert.equal(mobile.cover, "contain");
-    assert.ok(Math.abs(mobile.card / mobile.coverHeight - .75) < .001, "The full cover frame stays 3:4");
-    assert.ok(Math.abs(mobile.copyHeight - (665 - mobile.coverHeight + 5)) < .1, "Copy fills exactly the remaining card height");
+    assert.equal(mobile.coverWidth, mobile.card, "A tall viewport shows the image at the full card width");
     assert.equal(mobile.copyWidth, mobile.card); assert.equal(mobile.overlap, 5);
     assert.notEqual(mobile.shadow, "none");
     assert.equal(mobile.copyLeft, 0); assert.equal(mobile.copyBottom, 0);
@@ -134,8 +155,8 @@ const server = http.createServer((request, response) => {
     assert.ok(mobile.stripClearance >= 11.9, "Photos end above the copy overlap");
     await page.setViewportSize({ width: 1440, height: 960 });
     const desktop = await geometry();
+    checkViewportLayout(desktop);
     assert.equal(desktop.card, mobile.card, "Desktop uses the same compact portrait size as a 430px phone");
-    assert.equal(desktop.height, 665);
 
     // Long copy must sacrifice complete description lines, never the name/prices/button.
     const originalName = first.name, originalDescription = first.shortDescription;
@@ -143,22 +164,20 @@ const server = http.createServer((request, response) => {
     first.shortDescription = "A complete everyday outfit with coordinated pieces, comfortable details and several colors. Wear it together for a ready look, or style each piece separately throughout the week.";
     await page.evaluate(() => window.DartSets.loadCatalog(true));
     const descriptionLines = new Map();
-    for (const width of [320, 360, 390, 430, 1440]) {
-      await page.setViewportSize({ width, height: 960 });
+    for (const [width, height] of [[320, 568], [360, 640], [360, 800], [390, 844], [430, 640], [430, 800], [430, 932], [800, 360], [932, 430], [1440, 960]]) {
+      await page.setViewportSize({ width, height });
       const layout = await geometry();
-      assert.equal(layout.height, 665);
-      assert.equal(layout.overflow, false, "All tested screens keep content inside the viewport");
-      assert.ok(Math.abs(layout.copyHeight - (665 - layout.coverHeight + 5)) < .1);
-      assert.equal(layout.overlap, 5);
-      assert.ok(layout.stripClearance >= 11.9);
-      assert.ok(layout.titleTop >= 0 && layout.titleClearance >= 0, "Name remains visible above prices");
-      assert.ok(layout.descriptionClearance >= 0, "Description does not cover prices");
-      assert.ok(layout.priceButtonClearance >= 7.9, "Both prices remain above the fixed purchase button");
-      assert.equal(layout.shopBottom, 12);
+      checkViewportLayout(layout);
       assert.ok(layout.descriptionLines >= 0 && layout.descriptionLines <= 3);
-      descriptionLines.set(width, layout.descriptionLines);
+      descriptionLines.set(`${width}x${height}`, layout.descriptionLines);
     }
-    assert.ok(descriptionLines.get(360) > descriptionLines.get(430), "A taller remaining panel shows more full description lines");
+    assert.ok(descriptionLines.get("430x932") > descriptionLines.get("430x640"), "The same phone width gains complete description lines on a taller screen");
+    first.shortDescription = "";
+    await page.evaluate(() => window.DartSets.loadCatalog(true));
+    await page.setViewportSize({ width: 430, height: 640 });
+    const noDescription = await geometry();
+    checkViewportLayout(noDescription);
+    assert.equal(noDescription.descriptionLines, 0, "Sets without short copy still reserve the name/prices/button");
     first.name = originalName; first.shortDescription = originalDescription;
     await page.evaluate(() => window.DartSets.loadCatalog(true));
     await page.setViewportSize({ width: 360, height: 800 });
@@ -327,6 +346,6 @@ const server = http.createServer((request, response) => {
     await direct.waitForFunction(() => document.getElementById("dartSetModal").hidden);
     assert.equal(new URL(direct.url()).pathname, "/products", "A late detail response must not reopen a Set after Back");
     assert.deepEqual(failures, [], "No new JS failures in the real homepage runtime");
-    console.log("PASS homepage Sets 665px card/3:4 image, fluid overlapping copy and complete description-line fitting, vertical photo mouse/touch scrolling, all-photo order, preview/history, states and Product routes");
+    console.log("PASS homepage Sets 80% viewport cards / 90% section across 10 portrait/landscape screens, 3:4 image fitting, protected name/prices/button, vertical photo gestures/order, preview/history, states and Product routes");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

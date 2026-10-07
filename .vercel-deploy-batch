@@ -1,6 +1,6 @@
-batch=7
-purpose=homepage-set-vertical-photos-and-fluid-copy
-frontend=bounded-vertical-photo-column-responsive-copy-and-description-fitting
+batch=8
+purpose=homepage-set-viewport-height
+frontend=80-percent-viewport-cards-and-90-percent-section-with-protected-copy
 backend=none
 scope=user-requested-homepage-set-adjustments-only
 trigger=final-production-release

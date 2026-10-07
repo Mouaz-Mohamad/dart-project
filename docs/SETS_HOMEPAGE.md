@@ -2,9 +2,9 @@
 
 The homepage spotlight sits immediately before **Newest products**. Its HTML/templates live in `index.html`, its styles in `CSS/main.css`, and its browser behavior in `Js/dart-home-sets.js`. `CSS/home.css` and `CSS/home.min.css` are generated delivery bundles.
 
-Each card takes 90% of the carousel width and leaves the next card visible. The requested October 7 layout fixes its height at 665px. The HTML-owned `home-set-media` frame keeps the cover at 3:4, with `object-fit: contain`. Phone and desktop use the same compact width, capped at 410px; narrower phones fit their viewport.
+Each card takes 90% of the carousel width and leaves the next card visible. Its height is 80% of the visible viewport, and the full section is 90%. The heading and carousel controls each occupy the remaining 5%; their type/control height scales to fit that space. CSS uses `dvh` where supported, with `vh` as the fallback, so browser bars, resizing and rotation update the layout without a viewport listener. Phone and desktop retain the same compact carousel width, capped at 410px; narrower phones fit their viewport.
 
-The cream copy panel fills the remaining card height through flex layout: `665px - cover height + 5px`. It overlaps the cover by 5px and has a soft upper shadow. Its padding reserves space for the purchase button. One ResizeObserver fits up to three complete description lines after reserving the name and both prices; if no full line fits, it hides only the short description. It observes panel/name/price dimensions and disconnects when cards rebuild, so resize and font changes update the fit without polling or persistent browser data.
+The HTML-owned `home-set-media` frame prefers the full-width 3:4 portrait height. On a short viewport it can shrink before the copy panel; the image itself remains centered at 3:4 with `object-fit: contain`, without stretching or cropping. The cream copy panel fills the remaining card height through flex layout: `card height - image height + 5px`. It overlaps the image by 5px and has a soft upper shadow. Its padding reserves space for the purchase button. One ResizeObserver first reserves a minimum panel height from the actual name, both prices, padding and gap, even when there is no short description. It then fits up to three complete description lines; if no full line fits, it hides only that description. It observes panel/name/price dimensions and disconnects when cards rebuild, so resize and font changes update the fit without polling or persistent browser data.
 
 The photo column stays at its original top/right 12px position inside the image frame. Its 70×70px thumbnails scroll vertically and stop 12px above the overlapping copy panel. It shows every uploaded Set photo first, then each component's model photos (when present) and all photos of every color, in dashboard order. Color availability does not filter the photos. Native touch and vertical mouse dragging stay inside this column; selecting a photo still only enlarges it. **Shop the Set** opens the existing Set dialog. The outer carousel continues to support horizontal touch/mouse drag, arrows and keyboard without autoplay.
 
@@ -63,3 +63,22 @@ Files: `CSS/main.css`, generated `CSS/home.css`/`CSS/home.min.css`, `index.html`
 | 10. Secrets | PASS: only existing public photo references are used; no credential or browser business persistence added. |
 
 Manual check: open a featured Set with several uploaded photos and model colors. Scroll the top-right column vertically and confirm Set photos precede all photos of the first model, then the next model. Resize between phone widths and desktop: the card remains 665px, the cover remains 3:4 and the copy fills the rest with 5px overlap. Use a long name/short description to confirm only complete description lines are removed while name, prices and button remain visible. Enlarge a photo, use Back to close it, and swipe horizontally outside the column to move between Sets.
+
+## October 7 viewport height review
+
+This review supersedes the previous 665px height. Source changes: `CSS/main.css` and the existing copy measurement in `Js/dart-home-sets.js`; generated CSS bundles and the versioned link in `index.html` are rebuilt. No database migration, endpoint, permission or purchase flow changes.
+
+| Review section | Result and evidence |
+| --- | --- |
+| 1. State coverage | PASS: loading, no featured Sets, a single Set, API/asset errors and retry remain covered; a hidden section takes no space. |
+| 2. Server authority | PASS: both prices still come from the existing Sets API; only presentation dimensions change. |
+| 3. Concurrency | PASS: late catalogue hydration and observer replacement remain covered; one observer adapts the minimum copy height to name/price/font changes without polling. |
+| 4. Validation/authorization | N/A: no inputs, write endpoint or permission changes; safe existing text/image assignments remain. |
+| 5. Idempotency | PASS: resize changes styles only, with no API write or duplicate card; existing preview/open/close history checks pass. |
+| 6. Audit/observability | N/A: no sensitive action or durable state change. |
+| 7. External-service cost | N/A: no messaging or new paid-service call. |
+| 8. Regression safety | PASS: equal card heights, 90% width/next-card peek, vertical photo mouse/touch, horizontal carousel controls, preview Back/Forward and Product routing remain covered. |
+| 9. Tests | PASS: `tests/sets-home-browser.js` covers 320×568, 360×640, 360×800, 390×844, 430×640, 430×800, 430×932, 800×360, 932×430 and 1440×960. It checks 80% card / 90% full section, heading/arrows containment, 3:4 images, short-viewport shrinking, 5px overlap, full remaining copy height, long/empty descriptions and visible name/prices/button. Existing Sets runtime and database-authoritative storage contracts pass. |
+| 10. Secrets | PASS: no credentials, new persistent browser storage or business data snapshots added. |
+
+Manual check: open the homepage, resize its height while keeping its width fixed, and rotate a phone. Every Set should use 80% of the current viewport height; the section including its title and arrows should use 90%. On short screens the image stays proportional and the name, both prices and Shop button stay visible. Confirm the photo column, swipe/arrows, photo enlargement and Back still work. An empty homepage selection hides the section entirely.
