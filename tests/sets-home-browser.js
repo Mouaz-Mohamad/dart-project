@@ -93,17 +93,30 @@ const server = http.createServer((request, response) => {
     assert.equal(await page.evaluate(() => document.getElementById("dartHomeSets").nextElementSibling.classList.contains("products-section")), true);
 
     async function geometry() {
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       return page.evaluate(() => {
         const track = document.querySelector(".home-sets-track").getBoundingClientRect();
         const card = document.querySelector(".home-set-card").getBoundingClientRect();
         const piece = document.querySelector(".home-set-piece").getBoundingClientRect();
         const copy = document.querySelector(".home-set-copy").getBoundingClientRect();
+        const cover = document.querySelector(".home-set-cover").getBoundingClientRect();
+        const title = document.querySelector("[data-home-set-title]").getBoundingClientRect();
+        const descriptionNode = document.querySelector("[data-home-set-description]");
+        const description = descriptionNode.getBoundingClientRect();
+        const descriptionVisible = getComputedStyle(descriptionNode).display !== "none";
+        const prices = document.querySelector(".home-set-prices").getBoundingClientRect();
+        const shop = document.querySelector(".home-set-shop").getBoundingClientRect();
         const strip = document.querySelector(".home-set-pieces").getBoundingClientRect();
         const pieces = [...document.querySelectorAll('.home-set-card:first-child .home-set-piece')].slice(0, 2).map(node => node.getBoundingClientRect());
         return { width: track.width, card: card.width, height: card.height, pieceWidth: piece.width, pieceHeight: piece.height,
           copyWidth: copy.width, copyHeight: copy.height, copyLeft: copy.left - card.left, copyBottom: card.bottom - copy.bottom,
+          coverHeight: cover.height, overlap: cover.bottom - copy.top, shadow: getComputedStyle(document.querySelector(".home-set-copy")).boxShadow,
           stripTop: strip.top - card.top, stripRight: card.right - strip.right, stripDirection: getComputedStyle(document.querySelector(".home-set-pieces")).flexDirection,
-          pieceRow: pieces[0].top === pieces[1].top && pieces[1].left > pieces[0].left,
+          stripClearance: copy.top - strip.bottom, pieceColumn: pieces[0].left === pieces[1].left && pieces[1].top > pieces[0].top,
+          descriptionLines: descriptionVisible ? Number(getComputedStyle(descriptionNode).getPropertyValue("--home-set-description-lines")) : 0,
+          titleTop: title.top - copy.top, titleClearance: prices.top - title.bottom,
+          descriptionClearance: descriptionVisible ? prices.top - description.bottom : 0,
+          priceButtonClearance: shop.top - prices.bottom, shopBottom: card.bottom - shop.bottom,
           cover: getComputedStyle(document.querySelector(".home-set-cover")).objectFit, overflow: document.documentElement.scrollWidth > innerWidth };
       });
     }
@@ -111,39 +124,68 @@ const server = http.createServer((request, response) => {
     assert.ok(Math.abs(mobile.card / mobile.width - .9) < .001, "90% card leaves the next Set visible");
     assert.equal(mobile.height, 665);
     assert.equal(mobile.pieceWidth, 70); assert.equal(mobile.pieceHeight, 70); assert.equal(mobile.cover, "contain");
-    assert.equal(mobile.copyHeight, 227); assert.equal(mobile.copyWidth, mobile.card);
+    assert.ok(Math.abs(mobile.card / mobile.coverHeight - .75) < .001, "The full cover frame stays 3:4");
+    assert.ok(Math.abs(mobile.copyHeight - (665 - mobile.coverHeight + 5)) < .1, "Copy fills exactly the remaining card height");
+    assert.equal(mobile.copyWidth, mobile.card); assert.equal(mobile.overlap, 5);
+    assert.notEqual(mobile.shadow, "none");
     assert.equal(mobile.copyLeft, 0); assert.equal(mobile.copyBottom, 0);
     assert.equal(mobile.stripTop, 12); assert.equal(mobile.stripRight, 12);
-    assert.equal(mobile.stripDirection, "row"); assert.equal(mobile.pieceRow, true);
+    assert.equal(mobile.stripDirection, "column"); assert.equal(mobile.pieceColumn, true);
+    assert.ok(mobile.stripClearance >= 11.9, "Photos end above the copy overlap");
     await page.setViewportSize({ width: 1440, height: 960 });
     const desktop = await geometry();
     assert.equal(desktop.card, mobile.card, "Desktop uses the same compact portrait size as a 430px phone");
     assert.equal(desktop.height, 665);
+
+    // Long copy must sacrifice complete description lines, never the name/prices/button.
+    const originalName = first.name, originalDescription = first.shortDescription;
+    first.name = "Campus Layered Outfit with a Coordinated Shirt and Comfortable Everyday Pants";
+    first.shortDescription = "A complete everyday outfit with coordinated pieces, comfortable details and several colors. Wear it together for a ready look, or style each piece separately throughout the week.";
+    await page.evaluate(() => window.DartSets.loadCatalog(true));
+    const descriptionLines = new Map();
+    for (const width of [320, 360, 390, 430, 1440]) {
+      await page.setViewportSize({ width, height: 960 });
+      const layout = await geometry();
+      assert.equal(layout.height, 665);
+      assert.equal(layout.overflow, false, "All tested screens keep content inside the viewport");
+      assert.ok(Math.abs(layout.copyHeight - (665 - layout.coverHeight + 5)) < .1);
+      assert.equal(layout.overlap, 5);
+      assert.ok(layout.stripClearance >= 11.9);
+      assert.ok(layout.titleTop >= 0 && layout.titleClearance >= 0, "Name remains visible above prices");
+      assert.ok(layout.descriptionClearance >= 0, "Description does not cover prices");
+      assert.ok(layout.priceButtonClearance >= 7.9, "Both prices remain above the fixed purchase button");
+      assert.equal(layout.shopBottom, 12);
+      assert.ok(layout.descriptionLines >= 0 && layout.descriptionLines <= 3);
+      descriptionLines.set(width, layout.descriptionLines);
+    }
+    assert.ok(descriptionLines.get(360) > descriptionLines.get(430), "A taller remaining panel shows more full description lines");
+    first.name = originalName; first.shortDescription = originalDescription;
+    await page.evaluate(() => window.DartSets.loadCatalog(true));
     await page.setViewportSize({ width: 360, height: 800 });
-    assert.equal((await geometry()).overflow, false, "Narrow phones must keep content within the viewport");
+    await geometry();
 
     // The photo strip scrolls independently of the outer Set carousel.
     const strip = cards.first().locator(".home-set-pieces");
     await strip.scrollIntoViewIfNeeded();
     const stripBox = await strip.boundingBox();
     const setScroll = await page.locator(".home-sets-track").evaluate(node => node.scrollLeft);
-    await page.mouse.move(stripBox.x + stripBox.width - 24, stripBox.y + 35);
+    await page.mouse.move(stripBox.x + 35, stripBox.y + stripBox.height - 24);
     await page.mouse.down();
-    await page.mouse.move(stripBox.x + 12, stripBox.y + 35, { steps: 10 });
+    await page.mouse.move(stripBox.x + 35, stripBox.y + 12, { steps: 10 });
     await page.mouse.up();
-    assert.ok(await strip.evaluate(node => node.scrollLeft > 50), "Mouse drag reaches more photos");
+    assert.ok(await strip.evaluate(node => node.scrollTop > 50), "Vertical mouse drag reaches more photos");
     assert.equal(await page.locator(".home-sets-track").evaluate(node => node.scrollLeft), setScroll);
     assert.equal(await page.locator("#dartSetImagePreview").evaluate(node => node.open), false, "Dragging a thumbnail does not enlarge it");
-    await strip.evaluate(node => { node.scrollLeft = 0; });
+    await strip.evaluate(node => { node.scrollTop = 0; });
     const stripTouch = await context.newCDPSession(page);
-    await stripTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: stripBox.x + stripBox.width - 24, y: stripBox.y + 35 }] });
-    for (let step = 1; step <= 8; step++) await stripTouch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: stripBox.x + stripBox.width - 24 - step * 16, y: stripBox.y + 35 }] });
+    await stripTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: stripBox.x + 35, y: stripBox.y + stripBox.height - 24 }] });
+    for (let step = 1; step <= 8; step++) await stripTouch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: stripBox.x + 35, y: stripBox.y + stripBox.height - 24 - step * 24 }] });
     await stripTouch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    await page.waitForFunction(() => document.querySelector(".home-set-pieces").scrollLeft > 30);
+    await page.waitForFunction(() => document.querySelector(".home-set-pieces").scrollTop > 30);
     assert.equal(await page.locator(".home-sets-track").evaluate(node => node.scrollLeft), setScroll, "Touch swipe stays inside the photo strip");
     await stripTouch.detach();
     await strip.focus();
-    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowDown");
     assert.equal(await page.locator("[data-home-sets-counter]").textContent(), "1 / 2");
 
     await page.locator("[data-home-sets-next]").click();
@@ -152,7 +194,8 @@ const server = http.createServer((request, response) => {
     await page.keyboard.press("Home");
     await page.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "1 / 2");
     const track = await page.locator(".home-sets-track").boundingBox();
-    await page.mouse.move(track.x + track.width - 90, track.y + 190);
+    const coverWidth = await cards.first().evaluate(node => node.getBoundingClientRect().width);
+    await page.mouse.move(track.x + coverWidth - 112, track.y + 190);
     await page.mouse.down();
     await page.mouse.move(track.x + 12, track.y + 190, { steps: 12 });
     await page.mouse.up();
@@ -162,8 +205,8 @@ const server = http.createServer((request, response) => {
     await page.locator(".home-sets-track").scrollIntoViewIfNeeded();
     const touchBox = await page.locator(".home-sets-track").boundingBox();
     const touch = await context.newCDPSession(page);
-    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: touchBox.x + touchBox.width - 80, y: touchBox.y + 190 }] });
-    for (let step = 1; step <= 8; step++) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: touchBox.x + touchBox.width - 80 - step * 27, y: touchBox.y + 190 }] });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: touchBox.x + coverWidth - 112, y: touchBox.y + 190 }] });
+    for (let step = 1; step <= 8; step++) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: touchBox.x + coverWidth - 112 - step * (coverWidth - 128) / 8, y: touchBox.y + 190 }] });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await page.waitForFunction(() => document.querySelector("[data-home-sets-counter]").textContent === "2 / 2");
     await page.locator("[data-home-sets-prev]").click();
@@ -284,6 +327,6 @@ const server = http.createServer((request, response) => {
     await direct.waitForFunction(() => document.getElementById("dartSetModal").hidden);
     assert.equal(new URL(direct.url()).pathname, "/products", "A late detail response must not reopen a Set after Back");
     assert.deepEqual(failures, [], "No new JS failures in the real homepage runtime");
-    console.log("PASS homepage Sets 665px layout, all-photo order and late hydration, independent photo/Set mouse/touch scrolling, image-only preview/history, states and Product route regression");
+    console.log("PASS homepage Sets 665px card/3:4 image, fluid overlapping copy and complete description-line fitting, vertical photo mouse/touch scrolling, all-photo order, preview/history, states and Product routes");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

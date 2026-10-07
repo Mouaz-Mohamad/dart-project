@@ -1,6 +1,6 @@
-batch=6
-purpose=homepage-set-layout-and-complete-photo-strip
-frontend=requested-card-cover-copy-css-and-all-set-model-color-photos
+batch=7
+purpose=homepage-set-vertical-photos-and-fluid-copy
+frontend=bounded-vertical-photo-column-responsive-copy-and-description-fitting
 backend=none
 scope=user-requested-homepage-set-adjustments-only
 trigger=final-production-release

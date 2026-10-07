@@ -23,6 +23,35 @@
   let drag = null;
   let dragged = false;
   let retrying = false;
+  const copyObserver = typeof root.ResizeObserver === "function"
+    ? new root.ResizeObserver(entries => {
+      const cards = new Set(entries.map(entry => entry.target.closest(".home-set-card")));
+      cards.forEach(fitDescription);
+    })
+    : null;
+
+  function fitDescription(card) {
+    if (!card?.isConnected) return;
+    const copy = card.querySelector(".home-set-copy");
+    const description = card.querySelector("[data-home-set-description]");
+    if (!copy.clientHeight || description.hidden) return;
+    const title = card.querySelector("[data-home-set-title]");
+    const prices = card.querySelector(".home-set-prices");
+    const style = root.getComputedStyle(copy);
+    const lineHeight = parseFloat(root.getComputedStyle(description).lineHeight);
+    const available = copy.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+      - title.getBoundingClientRect().height - prices.getBoundingClientRect().height - 2 * parseFloat(style.rowGap);
+    const lines = Math.max(0, Math.min(3, Math.floor(available / lineHeight)));
+    description.style.setProperty("--home-set-description-lines", String(Math.max(1, lines)));
+    description.classList.toggle("is-space-hidden", lines === 0);
+  }
+
+  function observeCopy(card) {
+    [".home-set-copy", "[data-home-set-title]", ".home-set-prices"].forEach(selector => {
+      copyObserver?.observe(card.querySelector(selector));
+    });
+    fitDescription(card);
+  }
 
   function showState(message, failed = false) {
     section.hidden = false;
@@ -69,16 +98,16 @@
     pieces.addEventListener("pointerdown", event => {
       moved = false;
       if (event.pointerType !== "mouse" || event.button !== 0) return;
-      pointer = { id: event.pointerId, x: event.clientX, scroll: pieces.scrollLeft };
+      pointer = { id: event.pointerId, y: event.clientY, scroll: pieces.scrollTop };
     });
     pieces.addEventListener("pointermove", event => {
       if (!pointer || pointer.id !== event.pointerId) return;
-      const delta = event.clientX - pointer.x;
+      const delta = event.clientY - pointer.y;
       if (Math.abs(delta) <= 6 && !moved) return;
       moved = true;
       pieces.setPointerCapture(event.pointerId);
       pieces.classList.add("is-dragging");
-      pieces.scrollLeft = pointer.scroll - delta;
+      pieces.scrollTop = pointer.scroll - delta;
     });
     const release = event => {
       if (!pointer || pointer.id !== event.pointerId) return;
@@ -165,13 +194,16 @@
     section.hidden = !rows.length;
     state.hidden = true;
     carousel.hidden = !rows.length;
+    copyObserver?.disconnect();
     if (!rows.length) { track.replaceChildren(); return; }
     track.replaceChildren(...rows.map(buildCard));
+    [...track.children].forEach(observeCopy);
     controls.hidden = rows.length < 2;
     index = Math.max(0, rows.findIndex(set => set.setId === selected));
     root.requestAnimationFrame(() => {
       const card = track.children[index];
       track.scrollTo({ left: card.offsetLeft, behavior: "instant" });
+      [...track.children].forEach(fitDescription);
       syncControls();
     });
   }
@@ -235,6 +267,7 @@
   root.addEventListener("dart:sets-catalog-changed", event => render(event.detail?.sets));
   root.addEventListener("dart:catalog-hydrated", () => { if (rows.length) render(root.DartSets.catalog()); });
   root.addEventListener("dart:sets-unavailable", () => { retrying = false; showState("Sets are temporarily unavailable.", true); });
+  if (!copyObserver) root.addEventListener("resize", () => [...track.children].forEach(fitDescription));
   // Lazy assets can settle before this deferred script; keep their terminal state.
   if (root.__dartSetsUnavailable) showState("Sets are temporarily unavailable.", true);
   else if (root.__dartSetsCatalogReady) render(root.DartSets.catalog());
