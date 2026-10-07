@@ -444,33 +444,11 @@ header {
 /* DART-CSS-HOME-SETS | Portrait homepage carousel, before Newest products.
    The same layout is used on phone and desktop; no autoplay. */
 .home-sets {
-    --home-sets-viewport: 1vh;
-    display: flex;
-    flex-direction: column;
     width: 100%;
-    height: calc(90 * var(--home-sets-viewport));
-    margin: 0 auto;
+    margin: 22px auto 6px;
     color: var(--bg-dark);
 }
 
-/* Follow the visible viewport as mobile browser bars open/close. */
-@supports (height: 1dvh) {
-    .home-sets {
-        --home-sets-viewport: 1dvh;
-    }
-}
-
-.home-sets > .section-title- {
-    display: flex;
-    align-items: center;
-    flex: 0 0 calc(5 * var(--home-sets-viewport));
-    min-height: 0;
-    margin: 0;
-    font-size: min(32px, calc(4 * var(--home-sets-viewport)));
-    line-height: 1;
-}
-
-.home-sets[hidden],
 .home-sets [hidden],
 .set-image-preview:not([open]) {
     display: none;
@@ -478,9 +456,6 @@ header {
 
 .home-sets-state {
     display: grid;
-    flex: 1 1 0;
-    min-height: 0;
-    align-content: center;
     justify-items: center;
     gap: 12px;
     padding: 28px 12px;
@@ -499,21 +474,17 @@ header {
 }
 
 .home-sets-carousel {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 0;
-    min-height: 0;
     width: 100%;
     max-width: 410px;
-    margin: 0 auto;
+    margin: 18px auto 0;
 }
 
 .home-sets-track {
     position: relative;
     display: flex;
-    flex: 0 0 auto;
     gap: 12px;
     width: 100%;
+    padding-bottom: 6px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
@@ -544,19 +515,19 @@ header {
     flex-direction: column;
     flex: 0 0 90%;
     min-width: 0;
+    aspect-ratio: 3 / 4;
     overflow: hidden;
     isolation: isolate;
     scroll-snap-align: start;
     scroll-snap-stop: always;
     border-radius: 16px;
     background: #ffffff;
-    height: calc(80 * var(--home-sets-viewport));
+    height: 665px;
 }
 
 .home-set-media {
     position: relative;
-    flex: 0 1 auto;
-    min-height: 0;
+    flex: 0 0 auto;
     width: 100%;
     aspect-ratio: 3 / 4;
 }
@@ -566,11 +537,8 @@ header {
     inset: 0;
     z-index: -2;
     display: block;
-    width: auto;
-    max-width: 100%;
+    width: 100%;
     height: 100%;
-    aspect-ratio: 3 / 4;
-    margin-inline: auto;
     object-fit: contain;
     top: 0;
 }
@@ -640,9 +608,8 @@ header {
     position: relative;
     display: flex;
     flex-direction: column;
-    flex: 1 0 0;
-    /* ResizeObserver reserves the actual name/prices/button before the image. */
-    min-height: var(--home-set-copy-min-height, 178px);
+    flex: 1 1 0;
+    min-height: 0;
     gap: 6px;
     width: 100%;
     margin-top: -5px;
@@ -727,24 +694,23 @@ header {
 
 .home-sets-controls {
     display: flex;
-    flex: 1 1 0;
-    min-height: 0;
     align-items: center;
     justify-content: center;
     gap: 16px;
+    margin-top: 12px;
 }
 
 .home-sets-controls button {
     display: grid;
     place-items: center;
     width: 44px;
-    height: min(44px, calc(5 * var(--home-sets-viewport)));
+    height: 44px;
     padding: 0;
     border: 1px solid #e6ded5;
     border-radius: 50%;
     background: #fffaf2;
     color: var(--bragnte);
-    font-size: min(28px, calc(4 * var(--home-sets-viewport)));
+    font-size: 28px;
     line-height: 1;
     cursor: pointer;
 }
