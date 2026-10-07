@@ -511,6 +511,8 @@ header {
 
 .home-set-card {
     position: relative;
+    display: flex;
+    flex-direction: column;
     flex: 0 0 90%;
     min-width: 0;
     aspect-ratio: 3 / 4;
@@ -519,7 +521,15 @@ header {
     scroll-snap-align: start;
     scroll-snap-stop: always;
     border-radius: 16px;
-    background: #f2ede7;
+    background: #ffffff;
+    height: 665px;
+}
+
+.home-set-media {
+    position: relative;
+    flex: 0 0 auto;
+    width: 100%;
+    aspect-ratio: 3 / 4;
 }
 
 .home-set-cover {
@@ -529,7 +539,8 @@ header {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    top: 0;
 }
 
 .home-set-card::before {
@@ -562,10 +573,16 @@ header {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: calc(100% - 86px);
+    /* Leave 12px above the copy panel, including its 5px overlap. */
+    max-height: calc(100% - 29px);
+    overflow-x: auto;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: none;
+}
+
+.home-set-pieces.is-dragging {
+    user-select: none;
 }
 
 .home-set-piece {
@@ -588,18 +605,25 @@ header {
 }
 
 .home-set-copy {
-    position: absolute;
-    left: 12px;
-    bottom: 74px;
-    width: calc(100% - 106px);
-    padding: 12px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    gap: 6px;
+    width: 100%;
+    margin-top: -5px;
+    /* Reserve the 48px button, its 12px bottom inset and an 8px gap. */
+    padding: 8px 12px 68px;
     border-radius: 10px;
-    background: rgba(255, 250, 242, .95);
+    background: #fffaf2;
+    box-shadow: 0 -8px 16px rgba(36, 27, 25, .16);
     color: #241b19;
     text-align: left;
 }
 
 .home-set-copy h3 {
+    flex-shrink: 0;
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
@@ -612,26 +636,33 @@ header {
 }
 
 .home-set-description {
+    flex-shrink: 0;
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    margin-top: 9px;
+    -webkit-line-clamp: var(--home-set-description-lines, 3);
+    margin: 0;
     font-size: 11px;
     font-weight: 300;
     line-height: 1.55;
 }
 
+.home-set-description.is-space-hidden {
+    display: none;
+}
+
 .home-set-prices {
+    flex-shrink: 0;
     display: grid;
     gap: 2px;
-    margin-top: 12px;
+    margin-top: auto;
     font-family: var(--font-cabin);
     font-weight: 600;
 }
 
 .home-set-prices s {
     font-size: 13px;
+    line-height: 1.2;
     color: #645d56;
 }
 

@@ -45,7 +45,7 @@
     <!-- Critical image discovery: the hero is the main mobile LCP candidate. -->
     <link rel="preload" as="image" href="/Photos/hero 1.webp" type="image/webp" fetchpriority="high">
 
-    <link rel="stylesheet" href="CSS/home.min.css?v=26a23bdb39b6d3ab">
+    <link rel="stylesheet" href="CSS/home.min.css?v=1219ff81fb951ff0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link id="dart-brand-fonts" href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet" media="print">
@@ -134,9 +134,11 @@
                     </div>
                     <template id="dartHomeSetCard">
                         <article class="home-set-card" role="group" aria-roledescription="slide">
-                            <img class="home-set-cover" data-home-set-cover alt="" loading="lazy" decoding="async" width="600" height="800" draggable="false">
-                            <span class="home-set-piece-count" data-home-set-piece-count></span>
-                            <div class="home-set-pieces" data-home-set-pieces aria-label="Enlarge piece images"></div>
+                            <div class="home-set-media">
+                                <img class="home-set-cover" data-home-set-cover alt="" loading="lazy" decoding="async" width="600" height="800" draggable="false">
+                                <span class="home-set-piece-count" data-home-set-piece-count></span>
+                                <div class="home-set-pieces" data-home-set-pieces role="group" tabindex="0" aria-label="Set and model photos: scroll vertically to browse, select to enlarge"></div>
+                            </div>
                             <div class="home-set-copy">
                                 <h3 data-home-set-title></h3>
                                 <p class="home-set-description" data-home-set-description dir="auto"></p>

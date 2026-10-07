@@ -1,6 +1,6 @@
-batch=5
-purpose=sets-shared-link-hydration
-frontend=refresh-set-availability-and-piece-images
+batch=7
+purpose=homepage-set-vertical-photos-and-fluid-copy
+frontend=bounded-vertical-photo-column-responsive-copy-and-description-fitting
 backend=none
-scope=final-frontend-verification
+scope=user-requested-homepage-set-adjustments-only
 trigger=final-production-release

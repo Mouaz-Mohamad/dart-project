@@ -2,7 +2,11 @@
 
 The homepage spotlight sits immediately before **Newest products**. Its HTML/templates live in `index.html`, its styles in `CSS/main.css`, and its browser behavior in `Js/dart-home-sets.js`. `CSS/home.css` and `CSS/home.min.css` are generated delivery bundles.
 
-Each card uses the uploaded Set cover at 3:4 with `object-fit: cover`, takes 90% of the carousel width, and leaves the next card visible. Phone and desktop use the same compact layout, capped at 410px; narrower phones fit their viewport. Right-hand piece thumbnails are 70×70px. Short copy and both prices appear on the left; **Shop the Set** opens the existing Set dialog. Navigation supports touch, mouse drag, arrows and keyboard without autoplay.
+Each card takes 90% of the carousel width and leaves the next card visible. The requested October 7 layout fixes its height at 665px. The HTML-owned `home-set-media` frame keeps the cover at 3:4, with `object-fit: contain`. Phone and desktop use the same compact width, capped at 410px; narrower phones fit their viewport.
+
+The cream copy panel fills the remaining card height through flex layout: `665px - cover height + 5px`. It overlaps the cover by 5px and has a soft upper shadow. Its padding reserves space for the purchase button. One ResizeObserver fits up to three complete description lines after reserving the name and both prices; if no full line fits, it hides only the short description. It observes panel/name/price dimensions and disconnects when cards rebuild, so resize and font changes update the fit without polling or persistent browser data.
+
+The photo column stays at its original top/right 12px position inside the image frame. Its 70×70px thumbnails scroll vertically and stop 12px above the overlapping copy panel. It shows every uploaded Set photo first, then each component's model photos (when present) and all photos of every color, in dashboard order. Color availability does not filter the photos. Native touch and vertical mouse dragging stay inside this column; selecting a photo still only enlarges it. **Shop the Set** opens the existing Set dialog. The outer carousel continues to support horizontal touch/mouse drag, arrows and keyboard without autoplay.
 
 ## Dashboard and API
 
@@ -40,3 +44,22 @@ Piece/gallery previews use the HTML-owned native dialog and `Js/dart-set-image-p
 Commands: `cd backend && npm run check && npm run build`; `node scripts/build-home-css.cjs --versioned`; `node scripts/stage-vercel-public.cjs`; `node tests/sets-runtime-contract.cjs`; `node tests/database-authoritative-storage.cjs`; existing Product contract checks. Browser checks: `tests/sets-admin-browser.js`, `tests/sets-home-browser.js`, `tests/sets-storefront-browser.js` (Playwright; `CHROMIUM_EXECUTABLE` can select an installed Chromium).
 
 Manual check: choose two Sets, save their short copy/order/visibility, open the homepage, swipe between cards and enlarge a piece. Open a Set, copy/reload its URL, enlarge another image, then use Back twice and Forward. Save an unselected Set and verify it remains absent from the spotlight while still available in the normal catalogue.
+
+## October 7 vertical photos and responsive copy review
+
+Files: `CSS/main.css`, generated `CSS/home.css`/`CSS/home.min.css`, `index.html`, `Js/dart-home-sets.js` and `tests/sets-home-browser.js`. This is a frontend presentation change with no new migration or API contract change. Prices and purchases keep the existing server-backed flow.
+
+| Review section | Result and evidence |
+| --- | --- |
+| 1. State coverage | PASS: the browser check covers loading/late model hydration, empty/single Sets, API and asset retry, and photo preview dismissal. |
+| 2. Server authority | PASS: both prices are displayed from the Sets API; photo collection does not calculate price or stock. |
+| 3. Concurrency | PASS: late catalog hydration rebuilds the complete photo list; the copy observer disconnects from removed nodes. Vertical dragging does not move the outer Set carousel or open a preview. |
+| 4. Validation/authorization | N/A for writes: no endpoint or permission changed. Existing image-source resolution and safe text/attribute assignment are retained. |
+| 5. Idempotency | PASS: rebuilding replaces the card list rather than appending copies; photo selection retains the tested preview history. No durable write added. |
+| 6. Audit/observability | N/A: this change adds no sensitive action or persistent write. |
+| 7. External-service cost | N/A: no messaging or new paid-service integration. Images remain lazy-loaded references to existing uploads. |
+| 8. Regression safety | PASS: 320/360/390/430/1440px widths, viewport containment, outer carousel mouse/touch/arrows, Set/image Back/Forward and normal Product routes pass. |
+| 9. Tests | PASS: homepage browser check verifies the full ordered photo list, 665px card, 3:4 image frame, fluid remaining copy height, exact 5px overlap, upper shadow, long name/description fitting, both prices/button clearance, unchanged column coordinates and independent vertical touch/mouse scrolling. Sets runtime and database-authoritative storage contracts also pass. |
+| 10. Secrets | PASS: only existing public photo references are used; no credential or browser business persistence added. |
+
+Manual check: open a featured Set with several uploaded photos and model colors. Scroll the top-right column vertically and confirm Set photos precede all photos of the first model, then the next model. Resize between phone widths and desktop: the card remains 665px, the cover remains 3:4 and the copy fills the rest with 5px overlap. Use a long name/short description to confirm only complete description lines are removed while name, prices and button remain visible. Enlarge a photo, use Back to close it, and swipe horizontally outside the column to move between Sets.
