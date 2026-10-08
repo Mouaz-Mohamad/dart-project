@@ -9,6 +9,7 @@ import type { AppConfig } from "../src/config/env.js";
 import type { DashboardStateService } from "../src/modules/dashboard/dashboard-state.service.js";
 import type { IdentityService } from "../src/modules/identity/identity.service.js";
 import type { AuthenticatedAccount } from "../src/modules/identity/identity.types.js";
+import { hashCsrfToken } from "../src/security/session-token.js";
 
 const config: AppConfig = {
   nodeEnv: "test",
@@ -52,7 +53,7 @@ function staffAccount(permissions: string[]): AuthenticatedAccount {
     mustChangePassword: false,
     sessionId,
     sessionFamilyId: "123e4567-e89b-12d3-a456-426614174102",
-    csrfTokenHash: "unused-for-get",
+    csrfTokenHash: hashCsrfToken("staff-csrf-token", config.authPepper),
     mfaRequired: true,
     mfaSatisfied: true,
     permissions,
@@ -71,6 +72,7 @@ function application(permissions: string[]) {
       data: [{ id: `${domain}-1` }],
     })),
     readMany: vi.fn(async (domains: string[]) => domains.map((domain) => ({ domain, version: 2, data: [] }))),
+    write: vi.fn(async (domain: string, version: number, data: unknown[]) => ({ domain, version: version + 1, data })),
     versions: vi.fn().mockResolvedValue({ contacts: 2, finance_expenses: 4, customers: 7 }),
     publicReviews: vi.fn().mockResolvedValue([]),
     audit: vi.fn().mockResolvedValue([]),
@@ -115,6 +117,42 @@ describe("dashboard domain permissions", () => {
     expect(response.status).toBe(200);
     expect(response.body.domain).toBe("contacts");
     expect(state.read).toHaveBeenCalledWith("contacts");
+  });
+
+  it("hydrates only contact data and versions for a contact-only employee", async () => {
+    const { app, state } = application(["contacts.read"]);
+    const cookie = `dart_session=${sessionToken}`;
+    const contact = await request(app).get("/api/v1/admin/domain-state/contacts").set("Cookie", cookie);
+    expect(contact.status).toBe(200);
+    const domains = await request(app).get("/api/v1/admin/domain-state").set("Cookie", cookie);
+    expect(domains.status).toBe(200);
+    expect(domains.body.domains.map((row: { domain: string }) => row.domain)).toEqual(["contacts"]);
+    expect(state.readMany).toHaveBeenCalledWith(["contacts"]);
+    const versions = await request(app).get("/api/v1/admin/domain-state-versions").set("Cookie", cookie);
+    expect(versions.status).toBe(200);
+    expect(versions.body.versions).toEqual({ contacts: 2 });
+    const finance = await request(app).get("/api/v1/admin/domain-state/finance_expenses").set("Cookie", cookie);
+    expect(finance.status).toBe(403);
+  });
+
+  it("allows a customer-only employee to read customers but not contacts", async () => {
+    const { app } = application(["customers.read"]);
+    const cookie = `dart_session=${sessionToken}`;
+    expect((await request(app).get("/api/v1/admin/domain-state/customers").set("Cookie", cookie)).status).toBe(200);
+    expect((await request(app).get("/api/v1/admin/domain-state/contacts").set("Cookie", cookie)).status).toBe(403);
+  });
+
+  it("permits a contact-only manager to write contacts with CSRF, never customer data", async () => {
+    const { app, state } = application(["contacts.manage"]);
+    const put = (domain: string) => request(app)
+      .put(`/api/v1/admin/domain-state/${domain}`)
+      .set("Cookie", `dart_session=${sessionToken}`)
+      .set("X-CSRF-Token", "staff-csrf-token")
+      .send({ expectedVersion: 2, data: [] });
+    expect((await put("contacts")).status).toBe(200);
+    expect(state.write).toHaveBeenCalledWith("contacts", 2, [], expect.any(String), expect.any(String));
+    expect((await put("customers")).status).toBe(403);
+    expect(state.write).toHaveBeenCalledTimes(1);
   });
 
   it("lets a Finance cost viewer read only the Finance domains granted by that permission", async () => {

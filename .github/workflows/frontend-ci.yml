@@ -113,6 +113,7 @@ jobs:
         run: |
           node tests/product-waiting-browser.js
           node tests/sets-admin-browser.js
+          node tests/sets-home-browser.js
           node tests/sets-storefront-browser.js
           node tests/home-storefront-browser.js
           node tests/storefront-settings-regression.js

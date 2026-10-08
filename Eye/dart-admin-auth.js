@@ -240,6 +240,9 @@
       permission.startsWith("finance.view_") ||
       permission.startsWith("finance.manage_"),
     );
+    const canHydrateOtherDomains = permissions.some((permission) =>
+      /^(?:customers|returns|reviews|contacts|representatives|damage|loyalty|messaging|notifications|promotions)\.(?:read|manage)$/.test(permission),
+    );
     try {
       if (window.DartSiteSettings?.hydrate) {
         await hydrateStage(
@@ -258,7 +261,7 @@
       } else {
         window.DartState?.remove?.("dart_orders");
       }
-      if ((can("dashboard_state.read") || canHydrateFinanceDomains) && window.DartDomainState?.hydrateAll) {
+      if ((can("dashboard_state.read") || canHydrateFinanceDomains || canHydrateOtherDomains) && window.DartDomainState?.hydrateAll) {
         await hydrateStage(
           "dashboard-state",
           () => window.DartDomainState.hydrateAll(),
