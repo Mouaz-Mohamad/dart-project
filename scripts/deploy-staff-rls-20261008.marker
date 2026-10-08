@@ -1,0 +1,2 @@
+Deployment marker: staff domain permissions and Set RLS migration 0058.
+Backend and frontend CI passed on PR #14; Neon migration applied and API health verified.
