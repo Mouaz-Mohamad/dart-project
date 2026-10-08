@@ -52,6 +52,8 @@ import { createSetRouter } from "./modules/sets/set.routes.js";
 import type { SetService } from "./modules/sets/set.service.js";
 import { createSetCartRouter } from "./modules/sets/set-cart.routes.js";
 import type { SetCartService } from "./modules/sets/set-cart.service.js";
+import { createNewsRouter } from "./modules/news/news.routes.js";
+import type { NewsService } from "./modules/news/news.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -64,6 +66,7 @@ export interface AppDependencies extends HealthDependencies {
   dartCardDrawService?: DartCardDrawService;
   setService?: SetService;
   setCartService?: SetCartService;
+  newsService?: NewsService;
   siteSettingsService?: SiteSettingsService;
   dashboardStateService?: DashboardStateService;
   customerInteractionService?: CustomerInteractionService;
@@ -120,7 +123,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   // Keep ordinary API bodies small. Only the few transitional bulk/image endpoints
   // get larger parsers, which limits memory-amplification and JSON-body DoS exposure.
   app.use(
-    "/api/v1/admin/catalog/assets",
+    ["/api/v1/admin/catalog/assets", "/api/v1/admin/news/assets"],
     express.json({ limit: "6mb", strict: true }),
   );
   app.use(
@@ -211,6 +214,10 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
           config,
         ),
       );
+    }
+    if (dependencies.newsService && dependencies.catalogAssetService) {
+      app.use("/api/v1", createNewsRouter(dependencies.newsService, dependencies.catalogAssetService,
+        dependencies.identityService, config));
     }
     if (dependencies.setCartService) {
       app.use(

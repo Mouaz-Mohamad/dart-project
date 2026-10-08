@@ -20,7 +20,124 @@ tags:
   - name: Dart Card
   - name: Internal Jobs
   - name: Sets
+  - name: News
 paths:
+  /news:
+    get:
+      tags: [News]
+      operationId: listPublicNews
+      summary: List published, non-archived News summaries
+      description: Manual sortOrder ascending first, then newest publication first. Full body and staff metadata are omitted. Unknown query fields are rejected.
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, minimum: 0, maximum: 100000, default: 0 } }
+      responses:
+        "200": { description: News summaries, total and nullable nextOffset }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /news/{id}:
+    get:
+      tags: [News]
+      operationId: getPublicNews
+      summary: Read the complete plain-text published article
+      parameters:
+        - { $ref: "#/components/parameters/NewsId" }
+      responses:
+        "200": { description: News summary plus plain-text body }
+        "404": { description: Missing, draft or archived News }
+  /admin/news:
+    get:
+      tags: [News]
+      operationId: listAdminNews
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff news.read or news.manage. Includes draft, archive, full text and version metadata.
+      parameters:
+        - { in: query, name: q, schema: { type: string, maxLength: 160 } }
+        - { in: query, name: status, schema: { type: string, enum: [all, draft, published], default: all } }
+        - { in: query, name: archive, schema: { type: string, enum: [active, archived, all], default: active } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, minimum: 0, maximum: 100000, default: 0 } }
+      responses:
+        "200": { description: News records, total and nullable nextOffset }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [News]
+      operationId: createNews
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Requires Staff news.manage and MFA when configured. Repeating the same newsId and payload by the creator is safe. All writes are audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewsCreate" }
+      responses:
+        "201": { description: Created News with version }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/news/{id}:
+    get:
+      tags: [News]
+      operationId: getAdminNews
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/NewsId" }
+      description: Requires Staff news.read or news.manage; permits draft and archived previews.
+      responses:
+        "200": { description: Complete News and version metadata }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: News does not exist }
+    put:
+      tags: [News]
+      operationId: updateNews
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/NewsId" }
+      description: Requires Staff news.manage and MFA when configured. Stale versions and edits of archived News return 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewsUpdate" }
+      responses:
+        "200": { description: Updated News with incremented version }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/news/{id}/state:
+    post:
+      tags: [News]
+      operationId: archiveOrRestoreNews
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/NewsId" }
+      description: Requires Staff news.manage and MFA when configured. Archive hides News without deleting it; restore preserves publication status. Repeated identical state is safe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewsState" }
+      responses:
+        "200": { description: Archived or restored News }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/news/assets:
+    put:
+      tags: [News]
+      operationId: uploadNewsCover
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Requires Staff news.manage and MFA when configured, independently of catalog permissions. JPG, PNG or WebP real image bytes up to 4 MiB; NEWSIMG namespace only. Rate limit 30 uploads per 15 minutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewsAsset" }
+      responses:
+        "200": { description: Asset id and versioned urlPath }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /sets:
     get:
       tags: [Sets]
@@ -634,6 +751,11 @@ components:
       type: http
       scheme: bearer
   parameters:
+    NewsId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{1,120}$" }
     DrawPeriod:
       in: path
       name: period
@@ -645,6 +767,46 @@ components:
       required: true
       schema: { type: string, enum: [google, facebook] }
   schemas:
+    NewsCreate:
+      type: object
+      additionalProperties: false
+      required: [newsId, title, body, coverAssetId, status]
+      properties:
+        newsId: { type: string, pattern: "^[A-Za-z0-9_-]{1,120}$" }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        excerpt: { type: string, maxLength: 280, default: "" }
+        body: { type: string, minLength: 1, maxLength: 30000, description: Plain text only; rendered without HTML interpretation. }
+        coverAssetId: { type: string, pattern: "^[A-Za-z0-9_-]{8,120}$" }
+        status: { type: string, enum: [draft, published] }
+        sortOrder: { type: [integer, "null"], minimum: 0, maximum: 9999, default: null }
+    NewsUpdate:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, title, body, coverAssetId, status]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        excerpt: { type: string, maxLength: 280, default: "" }
+        body: { type: string, minLength: 1, maxLength: 30000, description: Plain text only; rendered without HTML interpretation. }
+        coverAssetId: { type: string, pattern: "^[A-Za-z0-9_-]{8,120}$" }
+        status: { type: string, enum: [draft, published] }
+        sortOrder: { type: [integer, "null"], minimum: 0, maximum: 9999, default: null }
+    NewsState:
+      type: object
+      additionalProperties: false
+      required: [action, expectedVersion]
+      properties:
+        action: { type: string, enum: [archive, restore] }
+        expectedVersion: { type: integer, minimum: 1 }
+    NewsAsset:
+      type: object
+      additionalProperties: false
+      required: [assetId, contentType, base64]
+      properties:
+        assetId: { type: string, pattern: "^NEWSIMG-[A-Za-z0-9_-]{8,100}$" }
+        originalName: { type: string, maxLength: 255, default: "" }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        base64: { type: string, minLength: 4, maxLength: 5600000, pattern: "^[A-Za-z0-9+/]+={0,2}$" }
     SetWrite:
       type: object
       required: [name, basePriceMinor, components]

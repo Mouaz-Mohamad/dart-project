@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="dart-inventory.css">
     <link rel="stylesheet" href="dart-finance.css">
     <link rel="stylesheet" href="dart-settings.css">
+    <link rel="stylesheet" href="dart-news.css?v=20261008-news-v1">
     <link rel="stylesheet" href="dart-live-operations.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -72,6 +73,7 @@
             <li><a href="#" data-target="representative">Rep</a></li>
             <li><a href="#" data-target="live-operations">Live Map</a></li>
             <li><a href="#" data-target="card">Dart Card</a></li>
+            <li hidden><a href="#" data-target="news">News</a></li>
             <li><a href="#" data-target="finance"> Finance</a></li>
             <li><a href="#" data-target="settings"> Settings</a></li>
         </ul>
@@ -93,6 +95,7 @@
         <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
         <li><a href="#" data-target="live-operations"><i class="fa-solid fa-map-location-dot"></i><span>Live</span></a></li>
         <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
+        <li hidden><a href="#" data-target="news"><i class="fa-regular fa-newspaper"></i><span>News</span></a></li>
         <li><a href="#" data-target="finance"><i class="fa-solid fa-wallet"></i><span>Finance</span></a></li>
         <li><a href="#" data-target="settings"><i class="fa-solid fa-gear"></i><span>Settings</span></a></li>
     </ul>
@@ -1839,6 +1842,58 @@
 <!--============================= END Card modals. ============================ -->
 
 <!--============================= Finance: the fixed interface lives in HTML; JavaScript only fills saved data by ID. -->
+
+        <!-- BEGIN News management: same First / Second / table structure as existing sections. -->
+        <section id="news" class="dashboard-section" hidden aria-label="News management">
+            <div class="first filter-bar">
+                <div class="search-box"><input type="search" id="news-search" placeholder="Search News" maxlength="160" aria-label="Search News"><i class="bx bx-search"></i></div>
+                <div class="select-box"><select id="news-status" aria-label="Publication status"><option value="all">All statuses</option><option value="draft">Draft</option><option value="published">Published</option></select><i class="bx bx-chevron-down arrow-icon"></i></div>
+                <div class="select-box"><select id="news-archive" aria-label="Archive filter"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All News</option></select><i class="bx bx-chevron-down arrow-icon"></i></div>
+                <button type="button" class="add-btn" id="news-add" hidden><span>+</span> Add News</button>
+            </div>
+            <div class="second"><button type="button" class="delete-btn" id="news-delete" hidden disabled><i class="bx bx-trash"></i><span>Delete</span></button></div>
+            <p id="news-message" class="dart-news-admin-message" role="status"></p>
+            <button type="button" id="news-retry" hidden>Try again</button>
+            <div class="cont-titel dart-news-table">
+                <div class="title-name"><input type="checkbox" id="news-select-all" aria-label="Select visible active News"><h2 class="w200">Action</h2><h2 class="w100">Photo</h2><h2 class="w300">Title</h2><h2 class="w300">Excerpt</h2><h2 class="w150">Status</h2><h2 class="w100">Order</h2><h2 class="w200">Published</h2><h2 class="w200">Updated</h2></div>
+                <div id="news-rows"></div>
+            </div>
+            <div class="dart-news-pagination"><button type="button" id="news-page-prev" disabled>Previous</button><span id="news-page-count"></span><button type="button" id="news-page-next" disabled>Next</button></div>
+            <template id="news-row-template">
+                <div class="model-row dart-news-row">
+                    <input class="news-checkbox" type="checkbox" data-news-select aria-label="Select News">
+                    <div class="w200 row-action-btns">
+                        <button type="button" class="action-btn" data-news-action="preview" title="Preview News" aria-label="Preview News"><i class="fa-regular fa-eye"></i></button>
+                        <button type="button" class="action-btn" data-news-action="edit" title="Edit News" aria-label="Edit News"><i class="fa-solid fa-pen"></i></button>
+                        <button type="button" class="action-btn" data-news-action="state" aria-label="Archive News"><i class="fa-solid fa-box-archive"></i></button>
+                    </div>
+                    <div class="w100"><img width="60" height="80" loading="lazy" data-news-photo alt="News cover; filled from the News title"></div>
+                    <div class="w300" data-news-cell="title" dir="auto"></div><div class="w300" data-news-cell="excerpt" dir="auto"></div>
+                    <div class="w150" data-news-cell="status"></div><div class="w100" data-news-cell="sortOrder"></div>
+                    <div class="w200" data-news-cell="publishedAt"></div><div class="w200" data-news-cell="updatedAt"></div>
+                </div>
+            </template>
+        </section>
+        <dialog id="news-editor" class="dart-news-editor" aria-labelledby="news-editor-title">
+            <button type="button" class="dart-news-close" data-news-editor-close aria-label="Close editor">&times;</button>
+            <h2 id="news-editor-title">Add News</h2>
+            <form id="news-form">
+                <label>Cover image<input type="file" name="cover" accept="image/jpeg,image/png,image/webp"><span>JPG, PNG or WebP. Shown in a 3:4 frame.</span></label>
+                <img id="news-cover-preview" width="150" height="200" alt="News cover preview" hidden>
+                <label>Title<input name="title" type="text" maxlength="160" required dir="auto"></label>
+                <label>Excerpt<textarea name="excerpt" maxlength="280" rows="2" dir="auto"></textarea><span>Optional: leave empty to use the beginning of the News.</span></label>
+                <label>Full News<textarea name="body" maxlength="30000" rows="10" required dir="auto"></textarea><span>Plain text only. Paragraphs and line breaks are preserved.</span></label>
+                <div class="dart-news-editor-options">
+                    <label>Status<select name="status"><option value="draft">Draft</option><option value="published">Published</option></select></label>
+                    <label>Display order<input name="sortOrder" type="number" min="0" max="9999" step="1"><span>Optional. Lower numbers appear first; unnumbered News shows newest first.</span></label>
+                </div>
+                <p id="news-form-message" role="status"></p>
+                <button id="news-reload-record" type="button" hidden>Reload latest News</button>
+                <div class="dart-news-editor-actions"><button type="button" data-news-editor-close>Cancel</button><button type="submit" class="add-btn" id="news-save">Save News</button></div>
+            </form>
+        </dialog>
+        <!-- END News management. -->
+
         <section id="finance" class="dashboard-section dart-finance-section">
             <div id="finance-page-header" class="dart-finance-page-head">
                 <div>
@@ -2242,7 +2297,23 @@
           </div>
         </div>
 <!--============================= END Settings modals. ============================ -->
-    </main>
+
+                <!-- BEGIN News details: full plain-text article, independent of product dialogs. -->
+                <dialog id="dart-news-dialog" class="dart-news-dialog" aria-labelledby="dart-news-dialog-title">
+                    <button type="button" class="dart-news-close" data-news-dialog-close aria-label="Close News">&times;</button>
+                    <div class="dart-news-article">
+                        <img data-news-dialog-image width="360" height="480" alt="Full News cover; filled from the News title" hidden>
+                        <div class="dart-news-article-copy">
+                            <h2 id="dart-news-dialog-title" data-news-dialog-title dir="auto">News</h2>
+                            <p data-news-dialog-status role="status"></p>
+                            <button type="button" class="dart-news-retry" data-news-dialog-retry hidden>Try again</button>
+                            <div class="dart-news-body" data-news-dialog-body dir="auto"></div>
+                        </div>
+                    </div>
+                </dialog>
+                <!-- END News details. -->
+
+</main>
 
 <!-- BEGIN Shared dashboard modals: actions used by more than one section. -->
 <div class="modal" id="history-modal"><div class="modal-content dart-history-modal"><span class="close-modal">&times;</span><h3 id="history-modal-title">History</h3><div id="history-modal-body"></div></div></div>
@@ -2284,5 +2355,7 @@
     <script src="dart-size-chart.js"></script>
     <script src="dart-settings.js"></script>
     <script src="dart-staff.js"></script>
+    <script src="../Js/dart-news.js?v=20261008-news-v1" defer></script>
+    <script src="dart-news-admin.js?v=20261008-news-v1" defer></script>
 </body>
 </html>

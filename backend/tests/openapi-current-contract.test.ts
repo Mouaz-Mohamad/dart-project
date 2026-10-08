@@ -11,6 +11,15 @@ async function spec(): Promise<string> {
 }
 
 describe("OpenAPI current Dart contracts", () => {
+  it("documents News privacy, versioned writes and archive/restore", async () => {
+    const text = await spec();
+    for (const path of ["/news:", "/news/{id}:", "/admin/news:", "/admin/news/{id}:", "/admin/news/{id}/state:", "/admin/news/assets:"]) expect(text).toContain(path);
+    expect(text).toContain("news.read or news.manage");
+    expect(text).toContain("NewsUpdate:");
+    expect(text).toContain("enum: [archive, restore]");
+    expect(text).toContain("Full body and staff metadata are omitted");
+  });
+
   it("documents immediate customer signup, required Birthday and the simple customer password policy", async () => {
     const text = await spec();
     expect(text).toContain("Register a customer and create the customer session immediately");

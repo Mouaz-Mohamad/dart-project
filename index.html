@@ -45,7 +45,7 @@
     <!-- Critical image discovery: the hero is the main mobile LCP candidate. -->
     <link rel="preload" as="image" href="/Photos/hero 1.webp" type="image/webp" fetchpriority="high">
 
-    <link rel="stylesheet" href="CSS/home.min.css?v=455a5027bb759072">
+    <link rel="stylesheet" href="CSS/home.min.css?v=dc0a29d60e14728f">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link id="dart-brand-fonts" href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet" media="print">
@@ -184,6 +184,9 @@
                 </section>
 
 
+
+
+
                 <!-- BEGIN Product-card dialogs: the Product fragment and Set dialog belong to the listing above. -->
                 <div id="product-modal-host" data-section-src="sections/product-modal.html"></div>
 
@@ -221,6 +224,32 @@
                 </dialog>
                 <!-- END Product-card dialogs. -->
 
+                <!-- BEGIN News: shared card layout on every viewport. -->
+                <section id="dart-news" class="dart-news" aria-labelledby="dart-news-title">
+                    <div class="dart-news-heading">
+                        <h2 id="dart-news-title">Dart News</h2>
+                        <div class="dart-news-controls" data-news-controls hidden>
+                            <button type="button" data-news-prev aria-label="Previous News">&#8249;</button>
+                            <button type="button" data-news-auto aria-label="Pause automatic News scrolling">Pause</button>
+                            <button type="button" data-news-next aria-label="Next News">&#8250;</button>
+                        </div>
+                    </div>
+                    <p data-news-status role="status">Loading News…</p>
+                    <button type="button" class="dart-news-retry" data-news-retry hidden>Try again</button>
+                    <div class="dart-news-track" data-news-track tabindex="0" role="region" aria-roledescription="carousel" aria-label="News: swipe or use arrow keys"></div>
+                    <template id="dart-news-card">
+                        <article class="dart-news-card">
+                            <img width="188" height="250" loading="lazy" decoding="async" draggable="false" alt="News cover; filled from the News title">
+                            <div class="dart-news-copy">
+                                <h3 data-news-title dir="auto"></h3>
+                                <p data-news-excerpt dir="auto"></p>
+                                <button type="button" data-news-read>Read more</button>
+                            </div>
+                        </article>
+                    </template>
+                </section>
+                <!-- END News. -->
+
                 <div class="margen2020"></div>
                 <section id="birthday"></section>
                 <div class="margen2020"></div>
@@ -251,6 +280,22 @@
                 <div class="margen2020"></div>
                 <section id="feedback-form" aria-label="Share Your Experience"></section>
 
+
+                <!-- BEGIN News details: full plain-text article, independent of product dialogs. -->
+                <dialog id="dart-news-dialog" class="dart-news-dialog" aria-labelledby="dart-news-dialog-title">
+                    <button type="button" class="dart-news-close" data-news-dialog-close aria-label="Close News">&times;</button>
+                    <div class="dart-news-article">
+                        <img data-news-dialog-image width="360" height="480" alt="Full News cover; filled from the News title" hidden>
+                        <div class="dart-news-article-copy">
+                            <h2 id="dart-news-dialog-title" data-news-dialog-title dir="auto">News</h2>
+                            <p data-news-dialog-status role="status"></p>
+                            <button type="button" class="dart-news-retry" data-news-dialog-retry hidden>Try again</button>
+                            <div class="dart-news-body" data-news-dialog-body dir="auto"></div>
+                        </div>
+                    </div>
+                </dialog>
+                <!-- END News details. -->
+
             </main>
             <div class="margen2020"></div>
             <footer id="footer" aria-label="Footer"></footer>
@@ -267,5 +312,6 @@
     <script src="Js/dart-set-image-preview.js" defer></script>
     <script src="Js/dart-set-navigation.js" defer></script>
     <script src="Js/dart-home-sets.js" defer></script>
+    <script src="Js/dart-news.js?v=20261008-news-v1" defer></script>
 </body>
 </html>

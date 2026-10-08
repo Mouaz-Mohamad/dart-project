@@ -199,3 +199,19 @@ Rewards/Promotions/Dart Card/Social Auth hardening is an ordered set:
 ## Deployment boundary
 
 Code in GitHub does not mean production schema is applied. Migrations `0034`–`0038` must run through the existing migration runner in the target environment before enabling these current reward/social/draw contracts. Social providers also require their server-side environment credentials and provider callback registration. The internal monthly endpoint must be called by a trusted scheduler; it is intentionally scheduler-provider neutral.
+
+## News
+
+Migration `0059_news_foundation.sql` adds independent `news_articles`, with RLS and no direct Data API grants. The backend table owner reads it through permissioned APIs. Only Owner receives `news.read` and `news.manage` automatically; additional Staff access is explicitly granted in Settings.
+
+- Public `GET /api/v1/news?limit=100&offset=0` returns published, non-archived summaries, `total` and nullable `nextOffset`. Full body and staff metadata are excluded.
+- Public `GET /api/v1/news/:id` returns current complete plain text; draft/archived/missing records return 404.
+- Staff `GET /api/v1/admin/news` accepts `q`, `status=all|draft|published`, `archive=active|archived|all`, `limit` (1–100) and `offset` (0–100000); read/detail require `news.read` or `news.manage`.
+- Staff `POST /api/v1/admin/news` creates; `PUT /api/v1/admin/news/:id` replaces editable fields with `expectedVersion`; `POST /api/v1/admin/news/:id/state` accepts `archive|restore` and `expectedVersion`. All writes require `news.manage`, CSRF and MFA when configured.
+- Staff `PUT /api/v1/admin/news/assets` uploads one primary JPG/PNG/WebP cover (4 MiB compressed maximum) under `NEWSIMG-…`; this does not require or grant catalog management.
+
+Fields: title (1–160), optional excerpt (≤280; falls back to the start of body), plain-text body (1–30000), existing coverAssetId, draft/published status and optional integer sortOrder (0–9999). Unknown keys are rejected. Manual order ascending precedes automatic newest publication first. Republishing a draft sets a fresh publication timestamp; restoring an archived record preserves its prior publication status.
+
+Row locks and expectedVersion prevent silent overwrites. A stable newsId plus identical create payload by the same actor is safe to retry; duplicate archive/restore is a no-op. Every successful content/state change writes actor, request ID and before/after values in the same transaction. News does not modify orders, prices or inventory and is never persisted in browser storage.
+
+Public cards use 187.5×250px images (3:4) on desktop and mobile. News follows products on Home and brand story on About. Swipe/drag, arrows and five-second automatic movement share the same runtime; interaction, open dialogs, hidden pages and reduced-motion preferences pause automatic movement. Read more fetches current plain text into an accessible dialog, fullscreen on mobile.
