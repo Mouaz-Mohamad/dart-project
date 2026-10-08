@@ -66,6 +66,7 @@ jobs:
           node tests/address-unit.js
           node tests/security-boundaries.cjs
           node tests/performance-budget.cjs
+          node tests/news-loader.cjs
           node tests/home-performance-contract.cjs
           node tests/modal-placement-contract.cjs
           node tests/order-action-latency-contract.cjs
@@ -116,5 +117,6 @@ jobs:
           node tests/sets-home-browser.js
           node tests/sets-storefront-browser.js
           node tests/home-storefront-browser.js
+          node tests/news-browser.cjs
           node tests/storefront-settings-regression.js
           node tests/full-site-browser.js

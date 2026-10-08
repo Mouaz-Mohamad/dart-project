@@ -14,6 +14,7 @@
     "finance-ui-runtime.cjs",
     "home-performance-contract.cjs",
     "modal-placement-contract.cjs",
+    "news-loader.cjs",
     "order-action-latency-contract.cjs",
     "performance-budget.cjs",
     "product-button-state-contract.cjs",
@@ -33,6 +34,7 @@
   "ciBrowser": [
     "full-site-browser.js",
     "home-storefront-browser.js",
+    "news-browser.cjs",
     "product-waiting-browser.js",
     "sets-admin-browser.js",
     "sets-home-browser.js",

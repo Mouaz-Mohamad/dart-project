@@ -65,9 +65,20 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-sets.js",
   "Js/dart-set-modal-ui.js",
   "Eye/dart-sets-admin.js",
+  "Js/dart-news-runtime.js",
+  "Eye/dart-news-admin.js",
 ]);
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 const dashboardRuntime = fs.readFileSync("Eye/dart.js", "utf8");
+const newsLoader = fs.readFileSync("Js/dart-news.js", "utf8");
+for (const source of ["index.html", "about.html", "Eye/Dart Eye.html"]) {
+  if (/script[^>]+src=["'][^"']*dart-news-(?:runtime|admin)\.js/i.test(fs.readFileSync(source, "utf8"))) {
+    failures.push(`${source}: News runtime and management must remain lazy-loaded`);
+  }
+}
+if (!newsLoader.includes('asset("/Js/dart-news-runtime.js")') || !newsLoader.includes('asset("/Eye/dart-news-admin.js")')) {
+  failures.push("Js/dart-news.js: News lazy loaders are missing");
+}
 if (/script[^>]+src=["']dart-live-operations\.js["']/i.test(dashboardHtml)) {
   failures.push("Eye/Dart Eye.html: Live Operations must remain lazy-loaded");
 }
@@ -112,8 +123,9 @@ for (const file of jsFiles) {
 if (coreJsBytes > 904 * 1024) {
   failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 904KB`);
 }
-if (lazyJsBytes > 400 * 1024) {
-  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 400KB`);
+// News adds isolated, on-demand modules; initial/core and homepage ceilings stay unchanged.
+if (lazyJsBytes > 426 * 1024) {
+  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 426KB`);
 }
 
 // Platform delivery is still an exact minified derivative of dart-platform.js.

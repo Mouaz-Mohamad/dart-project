@@ -7,7 +7,7 @@ const adminMarkup = dashboard.match(/<!-- BEGIN News management:[\s\S]*?<!-- END
 const readerMarkup = dashboard.match(/<!-- BEGIN News details:[\s\S]*?<!-- END News details\. -->/)[0];
 const adminHtml = `<!doctype html><html><head><link rel="stylesheet" href="/Eye/dart.css"><link rel="stylesheet" href="/Eye/dart-news.css"></head><body>
 <nav><ul><li hidden><a href="#" data-target="news">News</a></li></ul></nav><main>${adminMarkup}${readerMarkup}</main>
-<script src="/fixture-admin.js"></script><script src="/Js/dart-news.js"></script><script src="/Eye/dart-news-admin.js"></script></body></html>`;
+<script src="/fixture-admin.js"></script><script src="/Js/dart-news.js"></script></body></html>`;
 const fixtureScript = `window.fixturePermissions=['news.read','news.manage'];window.fixtureCalls=[];
 window.DartAdminAccess={can:p=>window.fixturePermissions.includes(p)};window.DartAdminHydration={ready:true};
 window.DartDialog={confirm:async()=>true};window.DartAdminApi={request:async(path,options={})=>{
@@ -137,7 +137,8 @@ const server = http.createServer(async (req, res) => {
     const adminContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     await adminContext.route("**/*", route => route.request().url().startsWith(origin) ? route.continue() : route.abort());
     const admin = await adminContext.newPage(); admin.on("pageerror", error => errors.push(error.message));
-    await admin.goto(origin + "/admin-fixture"); await admin.locator('[data-target="news"]').click(); await admin.locator(".dart-news-row").first().waitFor();
+    await admin.goto(origin + "/admin-fixture");
+    await admin.locator('[data-target="news"]').click(); await admin.locator(".dart-news-row").first().waitFor();
     assert.equal(await admin.locator("#news > .first").count(), 1); assert.equal(await admin.locator("#news > .second").count(), 1);
     await admin.locator("#news-add").click();
     await admin.locator('#news-form [name="title"]').fill("New draft"); await admin.locator('#news-form [name="body"]').fill("Complete plain text.");
