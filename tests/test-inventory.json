@@ -15,6 +15,7 @@
     "home-performance-contract.cjs",
     "modal-placement-contract.cjs",
     "news-loader.cjs",
+    "news-seo.cjs",
     "order-action-latency-contract.cjs",
     "performance-budget.cjs",
     "product-button-state-contract.cjs",

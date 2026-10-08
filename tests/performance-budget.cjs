@@ -66,6 +66,7 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-set-modal-ui.js",
   "Eye/dart-sets-admin.js",
   "Js/dart-news-runtime.js",
+  "Js/dart-news-links.js",
   "Eye/dart-news-admin.js",
 ]);
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
@@ -124,8 +125,8 @@ if (coreJsBytes > 904 * 1024) {
   failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 904KB`);
 }
 // News adds isolated, on-demand modules; initial/core and homepage ceilings stay unchanged.
-if (lazyJsBytes > 426 * 1024) {
-  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 426KB`);
+if (lazyJsBytes > 431 * 1024) {
+  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 431KB`);
 }
 
 // Platform delivery is still an exact minified derivative of dart-platform.js.

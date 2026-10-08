@@ -74,7 +74,7 @@
                 <!-- BEGIN News: shared card layout on every viewport. -->
                 <section id="dart-news" class="dart-news" aria-labelledby="dart-news-title">
                     <div class="dart-news-heading">
-                        <h2 id="dart-news-title">Dart News</h2>
+                        <h2 id="dart-news-title" class="section-title-">Dart News</h2>
                         <div class="dart-news-controls" data-news-controls hidden>
                             <button type="button" data-news-prev aria-label="Previous News">&#8249;</button>
                             <button type="button" data-news-auto aria-label="Pause automatic News scrolling">Pause</button>
@@ -86,11 +86,12 @@
                     <div class="dart-news-track" data-news-track tabindex="0" role="region" aria-roledescription="carousel" aria-label="News: swipe or use arrow keys"></div>
                     <template id="dart-news-card">
                         <article class="dart-news-card">
-                            <img width="188" height="250" loading="lazy" decoding="async" draggable="false" alt="News cover; filled from the News title">
+                            <img width="600" height="800" loading="lazy" decoding="async" draggable="false" alt="News cover; filled from the News title">
                             <div class="dart-news-copy">
+                                <div class="dart-news-meta"><span>Dart News</span><time data-news-date hidden></time></div>
                                 <h3 data-news-title dir="auto"></h3>
                                 <p data-news-excerpt dir="auto"></p>
-                                <button type="button" data-news-read>Read more</button>
+                                <a data-news-read>Read full story <span aria-hidden="true">&#8594;</span></a>
                             </div>
                         </article>
                     </template>
@@ -165,12 +166,14 @@
                     <div class="dart-news-article">
                         <img data-news-dialog-image width="360" height="480" alt="Full News cover; filled from the News title" hidden>
                         <div class="dart-news-article-copy">
+                            <div class="dart-news-meta"><span>Dart News</span><time data-news-dialog-date hidden></time><span data-news-dialog-reading></span></div>
                             <h2 id="dart-news-dialog-title" data-news-dialog-title dir="auto">News</h2>
                             <p data-news-dialog-status role="status"></p>
                             <button type="button" class="dart-news-retry" data-news-dialog-retry hidden>Try again</button>
                             <div class="dart-news-body" data-news-dialog-body dir="auto"></div>
                         </div>
                     </div>
+                    <div class="dart-news-dialog-footer"><button type="button" data-news-dialog-close>Done</button></div>
                 </dialog>
                 <!-- END News details. -->
 

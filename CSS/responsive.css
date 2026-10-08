@@ -363,9 +363,10 @@ body {
   .dart-set-gallery>[data-set-cover]{width:min(100%,calc(58dvh * 3 / 4));max-height:58dvh;margin-inline:auto;aspect-ratio:3/4;object-fit:cover}
 }
 
-/* BEGIN News details — mobile fullscreen. Carousel cards keep desktop dimensions. */
-@media (max-width: 640px) {
-  .dart-news-dialog { inset: 0; width: 100%; height: 100vh; height: 100dvh; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; padding: 54px 20px 24px; }
+/* BEGIN News details — mobile inset reader. */
+@media (max-width: 760px) {
+  .dart-news-heading { flex-wrap: wrap; }
+  .dart-news-dialog { padding: 54px 18px 22px; border-radius: 14px; }
   .dart-news-article { grid-template-columns: minmax(0,1fr); gap: 20px; }
   .dart-news-article > img { width: min(100%,300px); margin-inline: auto; }
 }

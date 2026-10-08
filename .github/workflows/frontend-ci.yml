@@ -9,6 +9,7 @@ on:
       - "*.html"
       - "Eye/**"
       - "Js/**"
+      - "api/**"
       - "CSS/**"
       - "scripts/**"
       - "sections/**"
@@ -25,6 +26,7 @@ on:
       - "*.html"
       - "Eye/**"
       - "Js/**"
+      - "api/**"
       - "CSS/**"
       - "scripts/**"
       - "sections/**"
@@ -67,6 +69,7 @@ jobs:
           node tests/security-boundaries.cjs
           node tests/performance-budget.cjs
           node tests/news-loader.cjs
+          node tests/news-seo.cjs
           node tests/home-performance-contract.cjs
           node tests/modal-placement-contract.cjs
           node tests/order-action-latency-contract.cjs

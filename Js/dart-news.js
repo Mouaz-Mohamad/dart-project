@@ -7,7 +7,7 @@
   function asset(src) {
     return new Promise((resolve, reject) => {
       const script = doc.createElement("script");
-      script.src = `${src}?v=20261008-news-v2`;
+      script.src = `${src}?v=20261008-news-v3`;
       script.onload = resolve;
       script.onerror = () => { script.remove(); reject(new Error("News unavailable")); };
       doc.head.appendChild(script);
@@ -15,7 +15,8 @@
   }
   function boot() {
     if (pending) return pending;
-    pending = (root.DartNews ? Promise.resolve() : asset("/Js/dart-news-runtime.js"))
+    pending = (root.DartNewsLinks ? Promise.resolve() : asset("/Js/dart-news-links.js"))
+      .then(() => root.DartNews ? undefined : asset("/Js/dart-news-runtime.js"))
       .then(() => admin ? asset("/Eye/dart-news-admin.js") : undefined)
       .catch(() => {
         pending = null;

@@ -1,6 +1,9 @@
 {
   "buildCommand": "node scripts/build-home-css.cjs --versioned && node scripts/stage-vercel-public.cjs",
   "outputDirectory": "public",
+  "functions": {
+    "api/news-page.js": { "includeFiles": "api/news-template.html" }
+  },
   "headers": [
     {
       "source": "/",
@@ -172,6 +175,18 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/news-sitemap.xml",
+      "destination": "/api/news-sitemap"
+    },
+    {
+      "source": "/news/:id/:slug",
+      "destination": "/api/news-page?id=:id&slug=:slug"
+    },
+    {
+      "source": "/news/:id",
+      "destination": "/api/news-page?id=:id"
+    },
     {
       "source": "/product-sitemap.xml",
       "destination": "https://dart-api-dusky.vercel.app/api/v1/catalog/sitemap.xml"

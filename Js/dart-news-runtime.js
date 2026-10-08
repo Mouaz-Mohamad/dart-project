@@ -8,6 +8,10 @@
   const dialog = doc.getElementById("dart-news-dialog");
   const section = doc.getElementById("dart-news");
   const track = section?.querySelector("[data-news-track]");
+  const links = root.DartNewsLinks;
+  const historyOwner = root.crypto.randomUUID();
+  let closingHistory = false;
+  const ownedStep = () => root.history.state?.dartNewsStep?.owner === historyOwner ? root.history.state.dartNewsStep : null;
   let modalRequest = 0, previousFocus = null, savedOverflow = "";
   let loading = false, started = false, listGeneration = 0, nextOffset = null;
   let lastRefresh = 0, timer = 0, hover = false, focused = false, inView = false, interacting = false;
@@ -28,6 +32,10 @@
     const image = dialog.querySelector("[data-news-dialog-image]");
     image.src = source(record.imageUrl); image.alt = record.title; image.hidden = false;
     dialog.querySelector("[data-news-dialog-body]").textContent = record.body;
+    const date = dialog.querySelector("[data-news-dialog-date]");
+    date.dateTime = links.date(record.publishedAt); date.textContent = links.dateLabel(record.publishedAt); date.hidden = !date.dateTime;
+    dialog.querySelector("[data-news-dialog-reading]").textContent = links.readingTime(record.body);
+    if (ownedStep() && !ownedStep().preview) root.history.replaceState(root.history.state, "", links.path(record));
     modalStatus("");
   }
   function showDialog() {
@@ -36,34 +44,58 @@
     savedOverflow = doc.body.style.overflow;
     doc.body.style.overflow = "hidden";
     dialog.showModal();
+    dialog.scrollTop = 0;
     schedule();
   }
-  async function open(id, preview = null) {
-    if (!dialog) return;
+  async function open(id, preview = null, options = {}) {
+    if (!dialog || !links.validId(id) || closingHistory) return;
+    const privatePreview = !!preview || options.preview === true;
+    if (privatePreview && (doc.body.classList.contains("dart-admin-locked") ||
+      !(root.DartAdminAccess?.can("news.read") || root.DartAdminAccess?.can("news.manage")))) return;
     const generation = ++modalRequest;
     dialog.dataset.newsId = id;
     dialog.querySelector("[data-news-dialog-title]").textContent = preview?.title || "News";
     dialog.querySelector("[data-news-dialog-image]").hidden = true;
     dialog.querySelector("[data-news-dialog-body]").textContent = "";
+    dialog.querySelector("[data-news-dialog-date]").hidden = true;
+    dialog.querySelector("[data-news-dialog-reading]").textContent = "";
+    if (options.history !== false) {
+      const state = { ...(root.history.state || {}), dartNewsStep: { owner: historyOwner, id, preview: privatePreview } };
+      const url = privatePreview ? root.location.href : links.path({ newsId: id, title: options.title });
+      if (ownedStep()) root.history.replaceState(state, "", url);
+      else root.history.pushState(state, "", url);
+    }
     showDialog();
     if (preview) { fillArticle(preview); return; }
     modalStatus("Loading News…");
     try {
-      const result = await request(`/api/v1/news/${encodeURIComponent(id)}`);
+      const result = privatePreview ? await root.DartAdminApi.request(`/api/v1/admin/news/${encodeURIComponent(id)}`)
+        : await request(`/api/v1/news/${encodeURIComponent(id)}`);
       if (generation === modalRequest && dialog.open) fillArticle(result.news);
     } catch (error) {
       if (generation !== modalRequest || !dialog.open) return;
       modalStatus(error.status === 404 ? "This News is no longer available." : "Unable to load News. Please try again.", error.status !== 404);
-      if (error.status === 404) void load(false);
+      if (error.status === 404 && section && track) void load(false);
     }
   }
   if (dialog) {
-    dialog.querySelector("[data-news-dialog-close]").addEventListener("click", () => dialog.close());
-    dialog.querySelector("[data-news-dialog-retry]").addEventListener("click", () => void open(dialog.dataset.newsId));
-    dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+    dialog.querySelectorAll("[data-news-dialog-close]").forEach(button => button.addEventListener("click", () => dialog.close()));
+    dialog.querySelector("[data-news-dialog-retry]").addEventListener("click", () => void open(dialog.dataset.newsId, null, { preview: ownedStep()?.preview }));
+    dialog.addEventListener("click", event => {
+      const rect = dialog.getBoundingClientRect();
+      if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+    });
     dialog.addEventListener("close", () => {
       ++modalRequest; doc.body.style.overflow = savedOverflow;
       previousFocus?.focus?.({ preventScroll: true }); schedule();
+      // Escape, X and Done consume the same step as the phone's native Back gesture.
+      if (ownedStep() && !closingHistory) { closingHistory = true; root.history.back(); }
+    });
+    root.addEventListener("popstate", () => {
+      closingHistory = false;
+      const step = ownedStep();
+      if (step) void open(step.id, null, { history: false, preview: step.preview });
+      else if (dialog.open) dialog.close();
     });
   }
   function clear() {
@@ -73,6 +105,8 @@
     dialog.querySelector("[data-news-dialog-title]").textContent = "News";
     dialog.querySelector("[data-news-dialog-body]").textContent = "";
     dialog.querySelector("[data-news-dialog-image]").removeAttribute("src");
+    dialog.querySelector("[data-news-dialog-date]").textContent = "";
+    dialog.querySelector("[data-news-dialog-reading]").textContent = "";
   }
   root.DartNews = Object.freeze({ open, clear, source, request });
   if (!section || !track) return;
@@ -94,7 +128,14 @@
     image.addEventListener("error", () => { image.src = "/Photos/logo-1to1.png"; }, { once: true });
     node.querySelector("[data-news-title]").textContent = record.title;
     node.querySelector("[data-news-excerpt]").textContent = record.excerpt;
-    node.querySelector("[data-news-read]").addEventListener("click", () => void open(record.newsId));
+    const date = node.querySelector("[data-news-date]");
+    date.dateTime = links.date(record.publishedAt); date.textContent = links.dateLabel(record.publishedAt); date.hidden = !date.dateTime;
+    const read = node.querySelector("[data-news-read]");
+    read.href = links.path(record); read.setAttribute("aria-label", `Read ${record.title}`);
+    read.addEventListener("click", event => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault(); void open(record.newsId, null, { title: record.title });
+    });
     return node;
   }
   async function load(append = false) {

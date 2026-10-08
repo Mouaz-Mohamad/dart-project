@@ -2,6 +2,9 @@
 const fs = require("node:fs"), path = require("node:path"), http = require("node:http");
 const assert = require("node:assert/strict"), { chromium } = require("playwright");
 const root = path.resolve(__dirname, "..");
+const newsPage = require("../api/news-page.js"), newsSitemap = require("../api/news-sitemap.js");
+const links = require("../Js/dart-news-links.js");
+const originalFetch = global.fetch;
 const dashboard = fs.readFileSync(path.join(root, "Eye/Dart Eye.html"), "utf8");
 const adminMarkup = dashboard.match(/<!-- BEGIN News management:[\s\S]*?<!-- END News management\. -->/)[0];
 const readerMarkup = dashboard.match(/<!-- BEGIN News details:[\s\S]*?<!-- END News details\. -->/)[0];
@@ -27,6 +30,13 @@ seed();
 function json(res, status, value) { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(value)); }
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost"), pathname = decodeURIComponent(url.pathname);
+  if (pathname.startsWith("/news/") || pathname === "/news-sitemap.xml") {
+    req.query = { id: pathname.split("/")[2], slug: pathname.split("/")[3] };
+    res.status = code => { res.statusCode = code; return res; };
+    res.send = body => res.end(body);
+    res.redirect = (code, location) => { res.statusCode = code; res.setHeader("Location", location); res.end(); };
+    return pathname === "/news-sitemap.xml" ? newsSitemap(req, res) : newsPage(req, res);
+  }
   if (pathname === "/admin-fixture") { res.setHeader("Content-Type", "text/html"); return res.end(adminHtml); }
   if (pathname === "/fixture-admin.js") { res.setHeader("Content-Type", "text/javascript"); return res.end(fixtureScript); }
   if (pathname.startsWith("/api/v1/catalog/assets/")) { res.setHeader("Content-Type", "image/jpeg"); return res.end(fs.readFileSync(path.join(root, "Photos/products/1.jpg"))); }
@@ -74,6 +84,7 @@ const server = http.createServer(async (req, res) => {
 (async () => {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
+  global.fetch = (url, options) => originalFetch(String(url).replace("https://dart-api-dusky.vercel.app", origin), options);
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE || chromium.executablePath(), args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: "reduce" });
@@ -84,10 +95,13 @@ const server = http.createServer(async (req, res) => {
       await page.locator(".dart-news-card").first().waitFor();
       assert.equal(await page.locator(".dart-news-card").count(), 8);
       assert.equal(await page.evaluate(route => { const news = document.getElementById("dart-news"); return route === "/" ? Array.from(news.parentElement.querySelectorAll(":scope > section")).filter(node => !node.hidden && node.compareDocumentPosition(news) & Node.DOCUMENT_POSITION_FOLLOWING).at(-1)?.matches(".products-section") : news.previousElementSibling.id === "story"; }, route), true);
-      for (const width of [390, 1440]) {
+      for (const width of [320, 390, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         const size = await page.locator(".dart-news-card img").first().evaluate(node => { const r = node.getBoundingClientRect(); return { width: r.width, height: r.height }; });
-        assert.deepEqual(size, { width: 187.5, height: 250 });
+        assert.ok(Math.abs(size.width - width * .7) < 1, `card image width must be 70vw at ${width}px`);
+        assert.ok(Math.abs(size.width / size.height - .75) < .001, "cover must stay 3:4");
+        const cardWidth = await page.locator(".dart-news-card").first().evaluate(node => node.getBoundingClientRect().width);
+        assert.ok(Math.abs(cardWidth - width * .7) < 1);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       }
       // Mouse drag moves the same track used by native touch scrolling.
@@ -98,16 +112,59 @@ const server = http.createServer(async (req, res) => {
       assert.ok(await page.locator("[data-news-track]").evaluate(node => node.scrollLeft) > 100);
       await page.locator("[data-news-track]").evaluate(node => node.scrollLeft = 0);
       await page.setViewportSize({ width: 390, height: 844 });
+      if (process.env.DART_NEWS_SCREENSHOT_DIR && route === "/") {
+        fs.mkdirSync(process.env.DART_NEWS_SCREENSHOT_DIR, { recursive: true });
+        await page.locator(".dart-news-card").first().screenshot({ path: path.join(process.env.DART_NEWS_SCREENSHOT_DIR, "news-card-phone.png") });
+      }
       await page.locator("[data-news-next]").click();
       assert.ok(await page.locator("[data-news-track]").evaluate(node => node.scrollLeft) > 100);
       await page.locator("[data-news-prev]").click();
       await page.locator("[data-news-read]").first().click();
       await page.waitForFunction(() => document.querySelector("[data-news-dialog-body]").textContent.includes("Paragraph two"));
       assert.equal(await page.evaluate(() => window.newsInjected), undefined, "News text must not become HTML");
-      assert.equal(await page.locator("#dart-news-dialog").evaluate(node => node.getBoundingClientRect().width), 390);
+      await page.locator("#dart-news-dialog").click({ position: { x: 10, y: 20 } });
+      assert.equal(await page.locator("#dart-news-dialog").evaluate(node => node.open), true, "reader padding must not count as a backdrop click");
+      assert.equal(await page.locator("[data-news-dialog-date]").textContent(), "8 Oct 2026");
+      assert.equal(new URL(page.url()).pathname, links.path(records[0]));
+      for (const width of [390, 768, 1440]) {
+        await page.setViewportSize({ width, height: 844 });
+        const box = await page.locator("#dart-news-dialog").boundingBox();
+        assert.ok(Math.abs(box.width - width * .9) < 1);
+        assert.ok(Math.abs(box.height - 844 * .9) < 1);
+        assert.ok(box.x > 0 && box.y > 0, "reader must have screen margins on phones and desktop");
+        assert.equal(await page.locator("#dart-news-dialog").evaluate(node => node.scrollWidth > node.clientWidth), false);
+        if (process.env.DART_NEWS_SCREENSHOT_DIR && route === "/" && width !== 768) await page.screenshot({ path: path.join(process.env.DART_NEWS_SCREENSHOT_DIR, `news-reader-${width}.png`) });
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
       await page.keyboard.press("Escape");
-      assert.equal(await page.locator("#dart-news-dialog").evaluate(node => node.open), false);
+      await page.waitForFunction(() => !document.getElementById("dart-news-dialog").open && !history.state?.dartNewsStep);
+      if (route === "/") {
+        const nativeClick = await page.locator("[data-news-read]").first().evaluate(node => {
+          let allowed = false;
+          const observe = event => { allowed = !event.defaultPrevented; event.preventDefault(); };
+          window.addEventListener("click", observe, { once: true });
+          node.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true, button: 0 }));
+          return allowed;
+        });
+        assert.equal(nativeClick, true, "Ctrl-click must retain the browser's native anchor behavior");
+        assert.equal(new URL(page.url()).pathname, route);
+      }
+      assert.equal(new URL(page.url()).pathname, route);
       assert.equal(await page.locator("[data-news-read]").first().evaluate(node => node === document.activeElement), true);
+      await page.locator("[data-news-read]").first().click();
+      const scrollBefore = await page.evaluate(() => scrollY);
+      await page.goBack();
+      await page.waitForFunction(() => !document.getElementById("dart-news-dialog").open);
+      assert.equal(new URL(page.url()).pathname, route, "native Back must close News instead of leaving the site");
+      await page.waitForFunction(expected => Math.abs(scrollY - expected) < 3, scrollBefore);
+      await page.goForward();
+      await page.waitForFunction(() => document.getElementById("dart-news-dialog").open && document.querySelector("[data-news-dialog-body]").textContent.includes("Paragraph two"));
+      await page.locator(".dart-news-dialog-footer button").click();
+      await page.waitForFunction(() => !document.getElementById("dart-news-dialog").open && !history.state?.dartNewsStep);
+      assert.equal(new URL(page.url()).pathname, route, "Done must consume exactly the News history step");
+      await page.locator("[data-news-read]").first().click();
+      await page.mouse.click(4, 4);
+      await page.waitForFunction(() => !document.getElementById("dart-news-dialog").open && !history.state?.dartNewsStep);
     }
     mode = "error"; await page.reload(); await page.locator("#dart-news").scrollIntoViewIfNeeded();
     await page.locator("[data-news-retry]").waitFor(); assert.ok(!(await page.locator("[data-news-status]").textContent()).includes("private"));
@@ -118,8 +175,12 @@ const server = http.createServer(async (req, res) => {
     await page.reload(); await page.locator("#dart-news").scrollIntoViewIfNeeded(); await page.locator(".dart-news-card").first().waitFor();
     failDetail = true; await page.locator("[data-news-read]").first().click(); await page.locator("[data-news-dialog-retry]").waitFor();
     assert.ok(!(await page.locator("[data-news-dialog-status]").textContent()).includes("private"));
-    failDetail = false; await page.locator("[data-news-dialog-retry]").click(); await page.waitForFunction(() => document.querySelector("[data-news-dialog-body]").textContent.includes("Paragraph two")); await page.keyboard.press("Escape");
-    detailDelay = 120; await page.locator("[data-news-read]").first().click(); await page.locator("[data-news-dialog-close]").click();
+    const historyLength = await page.evaluate(() => history.length);
+    failDetail = false; await page.locator("[data-news-dialog-retry]").click(); await page.waitForFunction(() => document.querySelector("[data-news-dialog-body]").textContent.includes("Paragraph two"));
+    assert.equal(await page.evaluate(() => history.length), historyLength, "retry must not add another modal history step");
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !history.state?.dartNewsStep);
+    detailDelay = 120; await page.locator("[data-news-read]").first().click(); await page.locator(".dart-news-close").click();
     await page.waitForTimeout(180); assert.equal(await page.locator("#dart-news-dialog").evaluate(node => node.open), false); detailDelay = 0;
     // Auto every five seconds, pause, no movement while interacting or with reduced motion.
     await page.clock.install(); await page.emulateMedia({ reducedMotion: "no-preference" }); await page.mouse.move(0, 0); await page.evaluate(() => document.activeElement.blur());
@@ -133,6 +194,17 @@ const server = http.createServer(async (req, res) => {
     const reduced = await page.locator("[data-news-track]").evaluate(node => node.scrollLeft);
     await page.clock.fastForward(11000); assert.equal(await page.locator("[data-news-track]").evaluate(node => node.scrollLeft), reduced);
     await context.close();
+    const noJs = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+    await noJs.route("**/*", route => route.request().url().startsWith(origin) ? route.continue() : route.abort());
+    const articlePage = await noJs.newPage();
+    const direct = await articlePage.goto(origin + links.path(records[0]));
+    assert.equal(direct.status(), 200); assert.equal(await articlePage.locator("h1").textContent(), records[0].title);
+    assert.ok((await articlePage.locator(".news-page-body").textContent()).includes("Paragraph two"));
+    assert.equal(await articlePage.locator('link[rel="canonical"]').getAttribute("href"), "https://dart-project-psi.vercel.app" + links.path(records[0]));
+    records[0].isArchived = true;
+    const archived = await articlePage.reload(); assert.equal(archived.status(), 404); assert.equal(await articlePage.locator(".news-page-body").count(), 0);
+    assert.ok(!(await (await fetch(origin + "/news-sitemap.xml")).text()).includes(links.path(records[0])));
+    records[0].isArchived = false; await noJs.close();
 
     const adminContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     await adminContext.route("**/*", route => route.request().url().startsWith(origin) ? route.continue() : route.abort());
@@ -170,6 +242,11 @@ const server = http.createServer(async (req, res) => {
     await admin.evaluate(() => { window.fixturePermissions = ['news.read']; window.dispatchEvent(new CustomEvent('dart:admin-authenticated')); });
     await admin.waitForFunction(() => document.getElementById("news-add").hidden); assert.equal(await admin.locator("#news-add").isHidden(), true); await admin.waitForFunction(() => document.querySelector('[data-news-action="edit"]').hidden); assert.equal(await admin.locator('[data-news-action="edit"]').first().isHidden(), true);
     await admin.locator('[data-news-action="preview"]').first().click(); assert.equal(await admin.locator("#dart-news-dialog").evaluate(node => node.open), true);
+    assert.equal(new URL(admin.url()).pathname, "/admin-fixture", "private preview must never use a public article URL");
+    await admin.goBack(); await admin.waitForFunction(() => !document.getElementById("dart-news-dialog").open);
+    await admin.goForward(); await admin.waitForFunction(() => document.getElementById("dart-news-dialog").open && document.querySelector("[data-news-dialog-body]").textContent.includes("Complete plain text"));
+    await admin.locator(".dart-news-dialog-footer button").click(); await admin.waitForFunction(() => !history.state?.dartNewsStep);
+    await admin.locator('[data-news-action="preview"]').first().click();
     await admin.evaluate(() => { window.fixturePermissions = []; document.body.classList.add('dart-admin-locked'); });
     await admin.waitForFunction(() => document.getElementById("news").hidden);
     assert.equal(await admin.locator("[data-news-dialog-body]").textContent(), "");
@@ -182,6 +259,6 @@ const server = http.createServer(async (req, res) => {
     assert.equal(await admin.locator(".dart-news-row").count(), 0); assert.equal(await admin.locator("#news-editor").evaluate(node => node.open), false);
     assert.equal(await admin.locator('#news-form [name="body"]').inputValue(), "");
     assert.deepEqual(errors, []);
-    await adminContext.close(); console.log("News browser regression passed: sizes, placement, modal, text safety, autoplay/pause, retries, CRUD, archive/restore, permissions and stale edits.");
-  } finally { await browser.close(); server.close(); }
+    await adminContext.close(); console.log("News browser regression passed: 70vw/3:4 cards, 90vw/90dvh reader, Back/Forward/Done/Escape/backdrop, modifier links, SSR without JS, archive/sitemap visibility, autoplay, retries, CRUD and Staff security.");
+  } finally { global.fetch = originalFetch; await browser.close(); server.close(); }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });

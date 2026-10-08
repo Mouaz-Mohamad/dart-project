@@ -8,4 +8,7 @@
   <sitemap>
     <loc>https://dart-project-psi.vercel.app/product-sitemap.xml</loc>
   </sitemap>
+  <sitemap>
+    <loc>https://dart-project-psi.vercel.app/news-sitemap.xml</loc>
+  </sitemap>
 </sitemapindex>
