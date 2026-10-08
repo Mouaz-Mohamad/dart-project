@@ -7,7 +7,7 @@
   function asset(src) {
     return new Promise((resolve, reject) => {
       const script = doc.createElement("script");
-      script.src = `${src}?v=20261008-news-v3`;
+      script.src = `${src}?v=20261008-news-v4`;
       script.onload = resolve;
       script.onerror = () => { script.remove(); reject(new Error("News unavailable")); };
       doc.head.appendChild(script);

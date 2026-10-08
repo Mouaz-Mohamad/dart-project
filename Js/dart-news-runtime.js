@@ -10,7 +10,7 @@
   const track = section?.querySelector("[data-news-track]");
   const links = root.DartNewsLinks;
   const historyOwner = root.crypto.randomUUID();
-  let closingHistory = false;
+  let closingHistory = false, handledCloses = 0;
   const ownedStep = () => root.history.state?.dartNewsStep?.owner === historyOwner ? root.history.state.dartNewsStep : null;
   let modalRequest = 0, previousFocus = null, savedOverflow = "";
   let loading = false, started = false, listGeneration = 0, nextOffset = null;
@@ -78,30 +78,42 @@
       if (error.status === 404 && section && track) void load(false);
     }
   }
+  function finishClose() {
+    ++modalRequest; doc.body.style.overflow = savedOverflow;
+    previousFocus?.focus?.({ preventScroll: true }); schedule();
+  }
+  function consumeStep() {
+    if (ownedStep() && !closingHistory) { closingHistory = true; root.history.back(); }
+  }
+  function close(fromHistory = false) {
+    if (!dialog?.open) return;
+    // The native close event is queued. Finish synchronously so it cannot close a later Forward entry.
+    ++handledCloses; dialog.close(); finishClose();
+    if (!fromHistory) consumeStep();
+  }
   if (dialog) {
-    dialog.querySelectorAll("[data-news-dialog-close]").forEach(button => button.addEventListener("click", () => dialog.close()));
+    dialog.querySelectorAll("[data-news-dialog-close]").forEach(button => button.addEventListener("click", () => close()));
+    dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
     dialog.querySelector("[data-news-dialog-retry]").addEventListener("click", () => void open(dialog.dataset.newsId, null, { preview: ownedStep()?.preview }));
     dialog.addEventListener("click", event => {
       const rect = dialog.getBoundingClientRect();
-      if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+      if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) close();
     });
     dialog.addEventListener("close", () => {
-      ++modalRequest; doc.body.style.overflow = savedOverflow;
-      previousFocus?.focus?.({ preventScroll: true }); schedule();
-      // Escape, X and Done consume the same step as the phone's native Back gesture.
-      if (ownedStep() && !closingHistory) { closingHistory = true; root.history.back(); }
+      if (handledCloses) { --handledCloses; return; }
+      finishClose(); consumeStep();
     });
     root.addEventListener("popstate", () => {
       closingHistory = false;
       const step = ownedStep();
       if (step) void open(step.id, null, { history: false, preview: step.preview });
-      else if (dialog.open) dialog.close();
+      else if (dialog.open) close(true);
     });
   }
   function clear() {
     ++modalRequest;
     if (!dialog) return;
-    if (dialog.open) dialog.close();
+    if (dialog.open) close();
     dialog.querySelector("[data-news-dialog-title]").textContent = "News";
     dialog.querySelector("[data-news-dialog-body]").textContent = "";
     dialog.querySelector("[data-news-dialog-image]").removeAttribute("src");

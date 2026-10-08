@@ -4915,7 +4915,7 @@ button,
 }
 
 
-/* BEGIN Home / About — News carousel. Cards occupy 70vw with 3:4 covers. */
+/* BEGIN Home / About — News carousel. Cards occupy 80% of the section at 550px tall. */
 .dart-news { margin: 40px auto; width: calc(100% - 32px); text-align: left; color: #151515; }
 .dart-news [hidden] { display: none !important; }
 .dart-news-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
@@ -4928,14 +4928,55 @@ button,
 .dart-news-track::-webkit-scrollbar-thumb { background: #ab012b; border-radius: 5px; }
 .dart-news-track::-webkit-scrollbar-track { background: #e8e0d9; }
 .dart-news-track.is-dragging { scroll-snap-type: none; cursor: grabbing; user-select: none; }
-.dart-news-card { flex: 0 0 70vw; width: 70vw; min-width: 0; scroll-snap-align: start; background: #fbf8f4; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 14px rgba(45,23,20,.09), inset 0 0 0 1px #e4dcd5; }
-.dart-news-card > img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; }
-.dart-news-copy { padding: clamp(16px,2.5vw,32px); display: flex; flex-direction: column; gap: 14px; }
+.dart-news-card {
+  flex: 0 0 80%;
+  width: 80%;
+  height: 550px;
+  min-width: 0;
+  padding: clamp(12px,1.4vw,20px);
+  display: flex;
+  flex-direction: column;
+  scroll-snap-align: start;
+  background: #fff;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(45,23,20,.09), inset 0 0 0 1px #efe9e4;
+}
+.dart-news-card > img {
+  display: block;
+  flex: 0 0 250px;
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.dart-news-copy { padding-top: 16px; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .dart-news-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: #68605c; font-size: 12px; line-height: 1.6; }
 .dart-news-meta > span:first-child { color: #ab012b; font-weight: 700; letter-spacing: .04em; }
-.dart-news-copy h3 { margin: 0; font-size: clamp(22px,2.5vw,36px); line-height: 1.35; height: 2.7em; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.dart-news-copy p { margin: 0; height: 4.8em; font-size: clamp(14px,1.2vw,17px); line-height: 1.6; color: #625a56; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.dart-news-copy [data-news-read] { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 10px 14px; background: #ab012b; color: white; border-radius: 7px; text-decoration: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+.dart-news-copy h3 { margin: 0; flex-shrink: 0; font-size: clamp(20px,1.6vw,24px); font-weight: 700; line-height: 1.35; height: 2.7em; color: #ab012b; text-align: start; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.dart-news-card .dart-news-meta { flex-shrink: 0; }
+.dart-news-copy p {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  font-size: clamp(14px,1.1vw,17px);
+  line-height: 1.65;
+  color: #625a56;
+  text-align: start;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/* Fade only the lower excerpt; the full article link remains outside this layer. */
+.dart-news-copy p::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 70%;
+  background: linear-gradient(to top,rgba(255,255,255,1),rgba(255,255,255,.2));
+  pointer-events: none;
+}
+.dart-news-copy [data-news-read] { flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 14px; background: #ab012b; color: white; border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 600; cursor: pointer; }
 .dart-news button:focus-visible, .dart-news a:focus-visible, .dart-news-track:focus-visible { outline: 2px solid #ab012b; outline-offset: 2px; }
 /* END Home / About — News carousel. */
 

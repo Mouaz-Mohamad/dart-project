@@ -22,7 +22,7 @@ const assetIds = [];
 let records = [];
 function seed() {
   records = Array.from({ length: 8 }, (_, i) => ({ newsId: `NEWS-${i}`, title: `Story ${i}`,
-    excerpt: "Short News preview, with two lines of copy.", body: `Paragraph one ${i}.\n\nParagraph two. <script>window.newsInjected=true</script>`,
+    excerpt: "اكتشف أحدث أخبار Dart وتفاصيل المجموعة الجديدة، من اختيار الخامات والألوان إلى تطوير التصميم وتجربة القطع. تابع حكاية كل إصدار والخطوات التي تجمع بين الراحة والجودة والتفاصيل المناسبة ليومك. ".repeat(3), body: `Paragraph one ${i}.\n\nParagraph two. <script>window.newsInjected=true</script>`,
     imageUrl: `/api/v1/catalog/assets/NEWSIMG-cover${i}?v=test`, coverAssetId: `NEWSIMG-UPLOADED-cover${i}`,
     status: "published", sortOrder: null, isArchived: false, version: 1, publishedAt: "2026-10-08T08:00:00Z", updatedAt: "2026-10-08T08:00:00Z" }));
 }
@@ -97,11 +97,14 @@ const server = http.createServer(async (req, res) => {
       assert.equal(await page.evaluate(route => { const news = document.getElementById("dart-news"); return route === "/" ? Array.from(news.parentElement.querySelectorAll(":scope > section")).filter(node => !node.hidden && node.compareDocumentPosition(news) & Node.DOCUMENT_POSITION_FOLLOWING).at(-1)?.matches(".products-section") : news.previousElementSibling.id === "story"; }, route), true);
       for (const width of [320, 390, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
-        const size = await page.locator(".dart-news-card img").first().evaluate(node => { const r = node.getBoundingClientRect(); return { width: r.width, height: r.height }; });
-        assert.ok(Math.abs(size.width - width * .7) < 1, `card image width must be 70vw at ${width}px`);
-        assert.ok(Math.abs(size.width / size.height - .75) < .001, "cover must stay 3:4");
-        const cardWidth = await page.locator(".dart-news-card").first().evaluate(node => node.getBoundingClientRect().width);
-        assert.ok(Math.abs(cardWidth - width * .7) < 1);
+        const layout = await page.locator(".dart-news-card").first().evaluate(node => {
+          const card = node.getBoundingClientRect(), section = node.closest(".dart-news").getBoundingClientRect();
+          const image = node.querySelector("img").getBoundingClientRect(), excerpt = node.querySelector("p").getBoundingClientRect(), read = node.querySelector("a").getBoundingClientRect();
+          return { cardWidth: card.width, cardHeight: card.height, sectionWidth: section.width, imageBottom: image.bottom, excerptTop: excerpt.top, excerptBottom: excerpt.bottom, readTop: read.top, readBottom: read.bottom, cardBottom: card.bottom };
+        });
+        assert.ok(Math.abs(layout.cardWidth - layout.sectionWidth * .8) < 1, `card must occupy 80% of the section at ${width}px`);
+        assert.ok(layout.cardHeight >= 500 && layout.cardHeight <= 560, "the complete card must remain close to 500px tall");
+        assert.ok(layout.excerptTop > layout.imageBottom && layout.excerptBottom <= layout.readTop && layout.readBottom < layout.cardBottom, "excerpt and read button must fit below the image without overlap");
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       }
       // Mouse drag moves the same track used by native touch scrolling.
@@ -243,8 +246,20 @@ const server = http.createServer(async (req, res) => {
     await admin.waitForFunction(() => document.getElementById("news-add").hidden); assert.equal(await admin.locator("#news-add").isHidden(), true); await admin.waitForFunction(() => document.querySelector('[data-news-action="edit"]').hidden); assert.equal(await admin.locator('[data-news-action="edit"]').first().isHidden(), true);
     await admin.locator('[data-news-action="preview"]').first().click(); assert.equal(await admin.locator("#dart-news-dialog").evaluate(node => node.open), true);
     assert.equal(new URL(admin.url()).pathname, "/admin-fixture", "private preview must never use a public article URL");
+    // Hold a native queued close until the next Forward entry is already open.
+    await admin.evaluate(() => {
+      const dialog = document.getElementById("dart-news-dialog");
+      const delay = event => {
+        event.stopImmediatePropagation(); dialog.removeEventListener("close", delay, true);
+        window.releaseNewsClose = () => dialog.dispatchEvent(new Event("close"));
+      };
+      dialog.addEventListener("close", delay, true);
+    });
     await admin.goBack(); await admin.waitForFunction(() => !document.getElementById("dart-news-dialog").open);
+    await admin.waitForFunction(() => typeof window.releaseNewsClose === "function");
     await admin.goForward(); await admin.waitForFunction(() => document.getElementById("dart-news-dialog").open && document.querySelector("[data-news-dialog-body]").textContent.includes("Complete plain text"));
+    await admin.evaluate(() => window.releaseNewsClose());
+    assert.equal(await admin.locator("#dart-news-dialog").evaluate(node => node.open), true, "an old close event must not close the Forward reader");
     await admin.locator(".dart-news-dialog-footer button").click(); await admin.waitForFunction(() => !history.state?.dartNewsStep);
     await admin.locator('[data-news-action="preview"]').first().click();
     await admin.evaluate(() => { window.fixturePermissions = []; document.body.classList.add('dart-admin-locked'); });
@@ -259,6 +274,6 @@ const server = http.createServer(async (req, res) => {
     assert.equal(await admin.locator(".dart-news-row").count(), 0); assert.equal(await admin.locator("#news-editor").evaluate(node => node.open), false);
     assert.equal(await admin.locator('#news-form [name="body"]').inputValue(), "");
     assert.deepEqual(errors, []);
-    await adminContext.close(); console.log("News browser regression passed: 70vw/3:4 cards, 90vw/90dvh reader, Back/Forward/Done/Escape/backdrop, modifier links, SSR without JS, archive/sitemap visibility, autoplay, retries, CRUD and Staff security.");
+    await adminContext.close(); console.log("News browser regression passed: 80%-section cards near 500px tall, long RTL excerpts and visible read links, 90vw/90dvh reader, Back/Forward/Done/Escape/backdrop, modifier links, SSR without JS, archive/sitemap visibility, autoplay, retries, CRUD and Staff security.");
   } finally { global.fetch = originalFetch; await browser.close(); server.close(); }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });
