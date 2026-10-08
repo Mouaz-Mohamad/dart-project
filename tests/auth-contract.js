@@ -74,6 +74,15 @@ assert(
 assert(admin.includes("DASHBOARD_HYDRATION_TIMEOUT"), "Dashboard authoritative hydration must have a bounded timeout");
 assert(admin.includes("DartAdminHydration"), "Dashboard must expose authoritative hydration readiness/failure state");
 assert(admin.includes("Dashboard remains locked"), "Dashboard must remain locked when required server hydration fails");
+const domainReadSource = admin.match(/const canHydrateOtherDomains = permissions\.some\(\(permission\) =>\s*\/(.*?)\/\.test\(permission\)/s)?.[1];
+assert(domainReadSource, "Dashboard must recognize granular domain-read permissions");
+const canHydrateDomain = new RegExp(domainReadSource);
+for (const permission of ["contacts.read", "customers.read", "returns.read", "damage.manage", "representatives.manage"]) {
+  assert(canHydrateDomain.test(permission), `${permission} must load its authorized dashboard domain`);
+}
+for (const permission of ["contacts.manage", "customers.manage", "loyalty.manage", "staff.manage"]) {
+  assert(!canHydrateDomain.test(permission), `${permission} alone must not trigger a forbidden read during login`);
+}
 assert(dashboard.includes('id="dart-admin-auth"'), "Dashboard auth gate HTML is missing");
 assert(dashboard.includes('id="dart-admin-email-form"'), "Dashboard email access form is missing");
 assert(dashboard.includes('id="dart-admin-code-form"'), "Dashboard email verification form is missing");
