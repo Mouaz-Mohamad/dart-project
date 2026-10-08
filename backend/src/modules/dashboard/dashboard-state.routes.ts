@@ -69,6 +69,7 @@ const FINANCE_DOMAIN_READ_GATE_PERMISSIONS = [
   "finance.manage_goals",
   "finance.manage_marketing",
   "finance.manage_settlements",
+  ...Object.values(SENSITIVE_DOMAIN_PERMISSIONS).flatMap((policy) => permissionList(policy.read)),
 ] as const;
 
 const FINANCE_DOMAIN_WRITE_GATE_PERMISSIONS = [
@@ -80,6 +81,7 @@ const FINANCE_DOMAIN_WRITE_GATE_PERMISSIONS = [
   "finance.manage_goals",
   "finance.manage_marketing",
   "finance.manage_settlements",
+  ...Object.values(SENSITIVE_DOMAIN_PERMISSIONS).flatMap((policy) => permissionList(policy.write)),
 ] as const;
 
 function permissionList(

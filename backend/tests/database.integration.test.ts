@@ -95,6 +95,25 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
     await expect(runMigrations(testPool!, migrationsPath)).resolves.toEqual([]);
   });
 
+  it("enables row security on every Set table without restricting owner-backed API reads", async () => {
+    const setTables = [
+      "catalog_sets", "catalog_set_components", "set_discount_settings",
+      "cart_set_groups", "cart_set_components", "order_set_groups", "order_set_components",
+      "set_waiting_entries", "set_loyalty_usage", "set_loyalty_returned_items",
+      "set_loyalty_cart_reservations",
+    ];
+    const security = await testPool!.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      `SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
+         FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname=$1 AND c.relname=ANY($2::text[])`,
+      [schemaName, setTables],
+    );
+    expect(security.rows).toHaveLength(setTables.length);
+    expect(security.rows.every((row) => row.relrowsecurity && !row.relforcerowsecurity)).toBe(true);
+    const access = await testPool!.query("SELECT count(*)::int AS total FROM catalog_sets");
+    expect(access.rows[0].total).toBeGreaterThanOrEqual(0);
+  });
+
   it("allows only one cart to reserve the final physical item under concurrency", async () => {
     const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
     const modelId = `CONC-${suffix}`;
