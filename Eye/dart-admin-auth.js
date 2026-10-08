@@ -241,7 +241,7 @@
       permission.startsWith("finance.manage_"),
     );
     const canHydrateOtherDomains = permissions.some((permission) =>
-      /^(?:customers|returns|reviews|contacts|representatives|damage|loyalty|messaging|notifications|promotions)\.(?:read|manage)$/.test(permission),
+      /^(?:(?:customers|returns|reviews|contacts|loyalty|messaging|notifications|promotions)\.read|(?:representatives|damage)\.manage)$/.test(permission),
     );
     try {
       if (window.DartSiteSettings?.hydrate) {
