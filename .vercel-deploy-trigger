@@ -1,7 +1,8 @@
-batch=1
-purpose=publish-news-css-version-20.7
-source_sha=48768c9199b031b4278f99b4f820a8343b46b0b6
+batch=2
+purpose=publish-news-css-versions-20.7-and-20.8
+source_sha=dd6f6de59fc7732b0f47c16c1c7b023ffe1b446c
+commits=48768c9199b031b4278f99b4f820a8343b46b0b6,025d9a6acdf40be148eac996567f6fd0756ac5bb
 frontend=CSS/main.css
 backend=none
-scope=news-section-width-and-title-size
+scope=news-section-width-title-size-and-bottom-margin
 trigger=approved-numbered-production-release
