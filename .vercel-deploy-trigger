@@ -1,7 +1,7 @@
-batch=3
-purpose=release-three-news-css-commits
-source_sha=2a47de23dbedab7ecd7dc78917a32e792f2ea4b6
-commits=d1aa7956946c485ec167b458046909436693ce1d,892dd0dff305a7369e2cc44caf77c988f8543c89,2a47de23dbedab7ecd7dc78917a32e792f2ea4b6
+batch=1
+purpose=publish-news-css-version-20.7
+source_sha=48768c9199b031b4278f99b4f820a8343b46b0b6
 frontend=CSS/main.css
 backend=none
+scope=news-section-width-and-title-size
 trigger=approved-numbered-production-release
