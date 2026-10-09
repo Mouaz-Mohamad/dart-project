@@ -14,10 +14,18 @@ const initial = (): Row[] => [
 function runtime() {
   let rows = initial();
   let snapshot = { version: 1, orders: initial() };
+  let deferNextRead = false;
+  let finishRead: ((payload: typeof snapshot) => void) | undefined;
   const pending: Array<{ path: string; resolve: (value: unknown) => void; failHttp: (status: number) => void; reject: (error: Error) => void }> = [];
   const listeners = new Map<string, Array<(event: unknown) => void>>();
   const fetch = vi.fn((url: string, options: { method: string; signal?: AbortSignal }) => {
-    if (options.method === "GET") return Promise.resolve({ ok: true, json: async () => snapshot });
+    if (options.method === "GET") {
+      if (!deferNextRead) return Promise.resolve({ ok: true, json: async () => snapshot });
+      deferNextRead = false;
+      return new Promise((resolve) => {
+        finishRead = (payload) => resolve({ ok: true, json: async () => payload });
+      });
+    }
     return new Promise((resolve, reject) => {
       pending.push({ path: url, resolve: (payload) => resolve({ ok: true, json: async () => payload }),
         failHttp: (status) => resolve({ ok: false, status, json: async () => ({ error: { code: "INTERNAL_ERROR", message: "Request failed" } }) }), reject });
@@ -42,7 +50,9 @@ function runtime() {
     fetch, setTimeout, clearTimeout, AbortController, console,
   });
   return { api: window.DartOrdersApi, pending, fetch, catalog, window,
-    snapshot: (value: typeof snapshot) => { snapshot = value; } };
+    snapshot: (value: typeof snapshot) => { snapshot = value; },
+    deferRead: () => { deferNextRead = true; },
+    finishRead: (payload: typeof snapshot) => { finishRead!(payload); } };
 }
 
 describe("orders browser concurrency", () => {
@@ -62,6 +72,23 @@ describe("orders browser concurrency", () => {
     pending[1]!.resolve({ version: 3, orders: initial().map((row) => ({ ...row, status: "Accepted" })) });
     await second;
     expect(api.read().every((row) => row.status === "Accepted")).toBe(true);
+  });
+
+  it("blocks refreshes during a mutation and discards reads initiated before that mutation", async () => {
+    const f = runtime(); await f.api.hydrate();
+    f.deferRead();
+    const earlierRead = f.api.hydrate(true);
+    const action = f.api.workflow("K-A", { expectedStatus: "New", target: "Accepted" });
+    await f.api.hydrate(true);
+    expect(f.fetch.mock.calls.filter(([, options]) => options.method === "GET")).toHaveLength(2);
+    f.pending[0]!.resolve({ version: 2, orders: initial().map((row) => row.orderId === "K-A" ? { ...row, status: "Accepted" } : row) });
+    await action;
+    f.finishRead({ version: 3, orders: initial() }); await earlierRead;
+    expect(f.api.serverVersion()).toBe(2);
+    expect(f.api.read()[0]?.status).toBe("Accepted");
+    f.snapshot({ version: 3, orders: initial() });
+    await f.api.hydrate(true);
+    expect(f.api.serverVersion()).toBe(3);
   });
 
   it("does not let a slower older response overwrite a newer snapshot", async () => {

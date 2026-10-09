@@ -138,7 +138,7 @@ assert.match(
 );
 assert.match(
   ordersApiRuntime,
-  /authoritativeEpoch[\s\S]*hasMutationBarrier\(\)[\s\S]*return readLocal\(\)/,
+  /async function hydrate[\s\S]*if \(activeMutations > 0\) return readLocal\(\)[\s\S]*epoch !== mutationEpoch[\s\S]*return readLocal\(\)/,
   "stale order hydration must be blocked while an authoritative mutation is active",
 );
 assert.match(

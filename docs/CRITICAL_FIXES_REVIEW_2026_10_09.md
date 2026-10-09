@@ -47,6 +47,8 @@ The requested five priorities are addressed by seven logical implementation/revi
 
 ## Remaining operational step
 
+Post-publication CI found a stale source-pattern assertion that still named the old hydration helper. The production client behavior remained covered by the passing concurrency/Chromium tests. A test-only follow-up updates the assertion and adds a runtime test for hydration during a mutation and reads initiated before it; it introduces no runtime change and no new production build. The final tested Backend case count is 337.
+
 At the pre-publication review cutoff, remote `main` was unchanged at `b4a68367db349434a1a05e1267a4390779465c68`. The initial push was rejected by automatic review because its deploy marker can trigger production. No workaround was attempted. The owner then explicitly authorized publication; GitHub CI and production alias verification are required after the single push. The final release result is recorded by the platform statuses and the delivery message.
 
 The daily backup workflow is **not verified active**. Configure `DART_BACKUP_DATABASE_URL` and `DART_BACKUP_ENCRYPTION_PASSWORD`, verify protected/reviewed `main`, and complete its first dispatch. The connected GitHub integration could not read branch protection (403). Native Neon backup scheduling is blocked by the current plan; no upgrade was made. Production cutover/recovery is never an automatic step in this workflow.
