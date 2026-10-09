@@ -1,7 +1,7 @@
 // DART CODE GUIDE | backend/scripts/database-backup.mjs
 // الغرض: أداة تشغيل/صيانة للـBackend؛ تُستخدم من npm scripts أو CI ولا تعمل داخل المتصفح.
 import { spawn } from "node:child_process";
-import { mkdir, stat } from "node:fs/promises";
+import { chmod, mkdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -70,20 +70,19 @@ export async function verifyBackup(filePath) {
   return { path: target, bytes: info.size };
 }
 
-function sameDatabase(left, right) {
+export function sameDatabase(left, right) {
   const normalize = (value) => {
     const url = new URL(value);
     return [
-      url.hostname.toLowerCase(),
+      url.hostname.toLowerCase().replace(/-pooler(?=\.)/, ""),
       url.port || "5432",
-      decodeURIComponent(url.pathname.replace(/^\\//, "")),
-      decodeURIComponent(url.username),
+      decodeURIComponent(url.pathname.replace(/^\//, "")),
     ].join("|");
   };
   return normalize(left) === normalize(right);
 }
 
-function assertRecoveryDatabaseSafety(productionUrl, recoveryUrl) {
+export function assertRecoveryDatabaseSafety(productionUrl, recoveryUrl) {
   if (!recoveryUrl) {
     throw new Error("DART_RECOVERY_DATABASE_URL is required for a restore drill");
   }
@@ -91,7 +90,7 @@ function assertRecoveryDatabaseSafety(productionUrl, recoveryUrl) {
     throw new Error("Refusing to restore into the production database");
   }
   const recovery = new URL(recoveryUrl);
-  const name = decodeURIComponent(recovery.pathname.replace(/^\\//, ""));
+  const name = decodeURIComponent(recovery.pathname.replace(/^\//, ""));
   if (!/(?:recovery|restore|drill|test)/i.test(name)) {
     throw new Error(
       "Recovery database name must include recovery, restore, drill or test",
@@ -125,7 +124,7 @@ export async function restoreBackupForVerification(filePath) {
 
 export async function createBackup(filePath = defaultBackupPath()) {
   const target = resolve(filePath);
-  await mkdir(dirname(target), { recursive: true });
+  await mkdir(dirname(target), { recursive: true, mode: 0o700 });
   const env = postgresEnvironment(process.env.DATABASE_URL);
   await run(
     "pg_dump",
@@ -139,6 +138,7 @@ export async function createBackup(filePath = defaultBackupPath()) {
     ],
     env,
   );
+  await chmod(target, 0o600);
   return verifyBackup(target);
 }
 

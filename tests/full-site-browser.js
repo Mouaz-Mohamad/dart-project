@@ -299,6 +299,50 @@ const server = http.createServer((request, response) => {
       `dashboard navigation must activate ${target}`,
     );
   }
+  // Real DOM regression: two independent order commands, pending rows and reversed responses.
+  const orderFixture = [
+    { id: "order-a", orderId: "TEST-A", status: "New", clientName: "Synthetic A", phone1: "", items: [], totalPrice: 600 },
+    { id: "order-b", orderId: "TEST-B", status: "New", clientName: "Synthetic B", phone1: "", items: [], totalPrice: 600 },
+  ];
+  const pendingCommands = new Map();
+  await dashboard.route("**/api/v1/admin/orders-state", (route) => route.fulfill({
+    contentType: "application/json", body: JSON.stringify({ version: 2, orders: orderFixture }),
+  }));
+  await dashboard.route("**/api/v1/admin/orders/*/workflow", (route) => {
+    pendingCommands.set(new URL(route.request().url()).pathname.split("/").at(-2), route);
+  });
+  await dashboard.evaluate(async () => {
+    document.querySelector('a[data-target="orders"]')?.click();
+    dartOrdersView = "all";
+    await window.DartOrdersApi.hydrate(true);
+    window.__orderCommands = [
+      window.DartOrdersApi.workflow("TEST-A", { expectedStatus: "New", target: "Accepted" }),
+      window.DartOrdersApi.workflow("TEST-B", { expectedStatus: "New", target: "Accepted" }),
+    ];
+  });
+  const rowA = dashboard.locator('#orders-container [data-id="order-a"]');
+  const rowB = dashboard.locator('#orders-container [data-id="order-b"]');
+  await dashboard.waitForFunction(() => document.querySelector('#orders-container [data-id="order-a"]')?.getAttribute("aria-busy") === "true");
+  assert.equal(await rowA.locator(".dart-status-btn").isDisabled(), true);
+  assert.equal(await rowA.locator(".dart-history-btn").isDisabled(), false);
+  await dashboard.waitForFunction(() => window.DartOrdersApi.isBusy("TEST-B"));
+  const commandDeadline = Date.now() + 5000;
+  while (pendingCommands.size < 2 && Date.now() < commandDeadline) await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(pendingCommands.size, 2);
+  await pendingCommands.get("TEST-B").fulfill({ contentType: "application/json", body: JSON.stringify({
+    version: 4, orders: orderFixture.map((row) => ({ ...row, status: "Accepted" })),
+  }) });
+  await dashboard.evaluate(() => window.__orderCommands[1]);
+  assert.equal(await rowA.getAttribute("aria-busy"), "true");
+  assert.equal(await rowB.getAttribute("aria-busy"), "false");
+  assert.equal(await rowB.locator(".dart-status-btn").isDisabled(), false);
+  await pendingCommands.get("TEST-A").fulfill({ contentType: "application/json", body: JSON.stringify({
+    version: 3, orders: orderFixture.map((row) => row.orderId === "TEST-A" ? { ...row, status: "Accepted" } : row),
+  }) });
+  await dashboard.evaluate(() => window.__orderCommands[0]);
+  assert.equal(await rowA.getAttribute("aria-busy"), "false");
+  assert.equal(await rowB.locator(".status-pill").textContent(), "Accepted");
+  assert.equal(await dashboard.evaluate(() => window.DartOrdersApi.serverVersion()), 4);
   await dashboard.close();
 
   for (const endpoint of ["manifest.json", "sw.js", "sitemap.xml", "robots.txt"]) {

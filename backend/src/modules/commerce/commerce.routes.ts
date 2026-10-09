@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
+import { AppError } from "../../http/app-error.js";
 import type { AppConfig } from "../../config/env.js";
 import { GUEST_CART_COOKIE, hashGuestCartToken } from "../../security/guest-cart-owner.js";
 import {
@@ -43,11 +44,6 @@ const reserveSchema = z.object({
   }
 });
 
-const adminOrderStateSchema = z.object({
-  expectedVersion: z.number().int().positive(),
-  orders: z.array(z.record(z.string(), z.unknown())).max(10000),
-});
-
 const orderWorkflowTargetSchema = z.enum([
   "New",
   "Accepted",
@@ -60,13 +56,13 @@ const orderWorkflowTargetSchema = z.enum([
 ]);
 
 const orderWorkflowInputSchema = z.object({
-  expectedStatus: z.string().trim().min(1).max(80).optional(),
+  expectedStatus: z.string().trim().min(1).max(80),
   target: orderWorkflowTargetSchema,
   representativeId: z.string().trim().max(160).optional(),
   deliveryGroupId: z.string().trim().max(160).optional(),
   reason: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(1500).optional(),
-});
+}).strict();
 
 const bulkOrderWorkflowInputSchema = orderWorkflowInputSchema.extend({
   orderRefs: z.array(z.string().trim().min(1).max(160)).min(1).max(100),
@@ -574,15 +570,12 @@ export function createCommerceRouter(
     requireAccountType("staff"),
     requireMfa,
     requireAnyPermission("orders.manage", "orders.bulk_manage"),
-    async (request, response) => {
-      const body = adminOrderStateSchema.parse(request.body);
-      response.status(200).json(
-        await commerce.replaceAdminOrders(
-          body.expectedVersion,
-          body.orders,
-          request.auth!.userId,
-          String(request.id),
-        ),
+    async (_request, response) => {
+      response.setHeader("Allow", "GET");
+      throw new AppError(
+        405,
+        "ORDER_COMMAND_REQUIRED",
+        "Use the order create, edit, workflow or archive command; order snapshots are read-only",
       );
     },
   );

@@ -173,6 +173,16 @@ the regular catalogue, create inventory, or reserve pieces.
 
 ## Errors and concurrency
 
+### Authoritative order commands
+
+- `GET /api/v1/admin/orders-state` remains a read-only full snapshot, with its `version` and rows read in one PostgreSQL repeatable-read transaction. It requires `orders.read` and configured MFA.
+- Legacy `PUT /api/v1/admin/orders-state` is disabled: authenticated authorized callers receive `405 ORDER_COMMAND_REQUIRED` and `Allow: GET`; it never replaces orders, items, money or status.
+- Single `POST /api/v1/admin/orders/:orderRef/workflow` requires `orders.manage`; bulk `POST /api/v1/admin/orders/bulk-workflow` requires `orders.bulk_manage`. Both require CSRF, configured MFA, `expectedStatus` and `target`, reject unknown fields, and call the same server workflow. Stale state and invalid transitions return `409` before stock, rewards or money change.
+- Bulk commands return explicit per-order results; partial success is preserved. Each successful transition and its inventory/reward effects are audited in the same transaction.
+- A command whose transaction committed remains successful if loading its response snapshot fails: `200` includes `refreshRequired: true` and a placeholder empty `orders` array. Clients must retain the current rows, fetch the read-only snapshot and never automatically retry the mutation. A full snapshot is applied only when its version is at least the current client version.
+- Order commands release their transaction connection before reading the response snapshot, including pools with one connection. Catalog/domain refresh runs separately from command completion.
+- The dashboard prevents overlapping actions on the same order while permitting actions on different orders. Transport failures/timeouts and mutation `5xx` trigger read reconciliation; no automatic mutation retry. Legacy browser saves can change checkbox selection only.
+
 Expected categories:
 
 - `400` malformed business/request parameters

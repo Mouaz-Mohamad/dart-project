@@ -1,4 +1,4 @@
-// BEGIN Deferred bridges: load order actions before the catalog and Settings clients.
+// BEGIN Deferred catalog and Settings bridges.
 (function installDeferredCatalogBridge() {
   "use strict";
   if (window.DartCatalog) return;
@@ -14,7 +14,6 @@
   });
   window.DartCatalog = bridge;
 })();
-
 (function installDeferredSiteSettingsBridge() {
   "use strict";
   if (window.DartSiteSettings) return;
@@ -31,332 +30,236 @@
   window.DartSiteSettings = bridge;
 })();
 // END Deferred bridges.
-
-// BEGIN Authoritative Orders client: DartState is an in-memory projection only.
+// BEGIN Read-only snapshots and server order commands.
 (function () {
   "use strict";
   const API_BASE = String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
   const STORAGE_KEY = "dart_orders";
   let serverVersion = 0;
-  let dirty = false;
-  let syncTimer = 0;
-  let syncChain = Promise.resolve();
+  let confirmedOrders = [];
   let adminPollingEnabled = false;
-  let localRevision = 0;
-  let syncInFlight = false;
-  let authoritativeMutations = 0;
-  let authoritativeEpoch = 0;
+  let mutationEpoch = 0;
+  let sessionEpoch = 0;
+  let activeMutations = 0;
   let hydrateSerial = 0;
   let lastAppliedHydrateSerial = 0;
-
-  // BEGIN Local projection and authenticated API transport.
+  let polling = false;
+  let reconciliationRequired = false;
+  let refreshTimer = 0;
+  let relatedRefreshRunning = false;
+  let refreshAgain = false;
+  const pendingOrders = new Set();
   function readLocal() {
     return window.DartState?.read?.(STORAGE_KEY, []) || [];
   }
-
-  function cache(orders, source = "orders") {
-    const rows = Array.isArray(orders) ? orders : [];
+  function orderKey(ref) {
+    const row = readLocal().find((order) =>
+      String(order.id) === String(ref) || String(order.orderId) === String(ref));
+    return String(row?.orderId || ref);
+  }
+  function publishBusy() {
+    window.dispatchEvent(new CustomEvent("dart:orders-busy", {
+      detail: { orderRefs: [...pendingOrders] },
+    }));
+  }
+  function applySnapshot(payload, source) {
+    if (payload.refreshRequired || !Array.isArray(payload.orders)) return false;
+    const version = Number(payload.version || 0);
+    if (!version || version < serverVersion) return false;
+    const selections = new Map(readLocal().map((order) => [String(order.orderId), Boolean(order.isChecked)]));
+    serverVersion = version;
+    reconciliationRequired = false;
+    confirmedOrders = JSON.parse(JSON.stringify(payload.orders));
+    const rows = payload.orders.map((order) => ({
+      ...order, isChecked: selections.get(String(order.orderId)) || false,
+    }));
     window.DartState?.write?.(STORAGE_KEY, rows, { source });
     window.dispatchEvent(new CustomEvent("dart:orders-hydrated", {
       detail: { version: serverVersion, orders: rows },
     }));
+    publishBusy();
+    return true;
   }
-
   function csrfToken() {
-    return document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("dart_csrf="))
-      ?.split("=")
-      .slice(1)
-      .join("=");
+    return document.cookie.split("; ")
+      .find((row) => row.startsWith("dart_csrf="))?.split("=").slice(1).join("=");
   }
-
   async function api(path, options = {}) {
     const method = String(options.method || "GET").toUpperCase();
     const csrf = csrfToken();
-    const response = await fetch(`${API_BASE}${path}`, {
-      credentials: "include",
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrf
-          ? { "X-CSRF-Token": decodeURIComponent(csrf) }
-          : {}),
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const error = new Error(payload?.error?.message || "Orders request failed");
-      error.status = response.status;
-      error.code = payload?.error?.code;
-      throw error;
-    }
-    return payload;
-  }
-
-  async function refreshRelatedServerState() {
-    const jobs = [];
-    if (window.DartCatalog?.hydrate) jobs.push(window.DartCatalog.hydrate(true));
-    if (window.DartDomainState?.hydrateDomain) {
-      ["cards", "birthday_rewards", "returns", "damage", "notifications"].forEach(
-        (domain) => jobs.push(window.DartDomainState.hydrateDomain(domain, true)),
-      );
-    }
-    if (window.DartDomainState?.hydrateAudit) jobs.push(window.DartDomainState.hydrateAudit());
-    if (jobs.length) await Promise.allSettled(jobs);
-  }
-  // END Local projection and authenticated API transport.
-
-  // BEGIN Versioned local edits: serialize writes and protect in-flight mutations.
-  function hasMutationBarrier() {
-    return dirty || syncInFlight || authoritativeMutations > 0;
-  }
-
-  async function sync() {
-    if (!serverVersion || !dirty || authoritativeMutations > 0) return readLocal();
-    const revision = localRevision;
-    const expectedVersion = serverVersion;
-    const snapshot = readLocal().map((row) => ({ ...row }));
-    syncInFlight = true;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), 20000) : 0;
     try {
-      const payload = await api("/api/v1/admin/orders-state", {
-        method: "PUT",
-        body: { expectedVersion, orders: snapshot },
+      const response = await fetch(`${API_BASE}${path}`, {
+        credentials: "include", method,
+        ...(controller ? { signal: controller.signal } : {}),
+        headers: {
+          "Content-Type": "application/json",
+          ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrf
+            ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}),
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
       });
-      serverVersion = Number(payload.version || serverVersion);
-      if (revision === localRevision) {
-        dirty = false;
-        cache(payload.orders || [], "orders:sync-confirmed");
-        window.dispatchEvent(new CustomEvent("dart:orders-synced", {
-          detail: { version: serverVersion },
-        }));
-      } else {
-        dirty = true;
-        scheduleSync();
+      const payload = await response.json();
+      if (!response.ok) {
+        const error = new Error(payload?.error?.message || "Orders request failed");
+        error.status = response.status;
+        error.code = method !== "GET" && response.status >= 500
+          ? "ORDER_RESULT_UNKNOWN" : payload?.error?.code;
+        throw error;
       }
-      await refreshRelatedServerState();
-      return revision === localRevision ? payload.orders || [] : readLocal();
+      return payload;
+    } catch (cause) {
+      if (cause.status) throw cause;
+      const error = new Error(method === "GET"
+        ? "Orders refresh failed; retry when the connection is available."
+        : "Order result is not confirmed; refresh before repeating this action.");
+      error.code = method === "GET" ? "ORDERS_REFRESH_FAILED" : "ORDER_RESULT_UNKNOWN";
+      throw error;
     } finally {
-      syncInFlight = false;
+      clearTimeout(timeout);
     }
   }
-
-  async function rebaseVersionPreservingLocal() {
+  async function refreshRelatedServerState() {
+    if (relatedRefreshRunning) { refreshAgain = true; return; }
+    relatedRefreshRunning = true;
+    try {
+      const jobs = [];
+      if (window.DartCatalog?.hydrate) jobs.push(window.DartCatalog.hydrate(true));
+      if (window.DartDomainState?.hydrateDomain) {
+        ["cards", "birthday_rewards", "returns", "damage", "notifications"].forEach(
+          (domain) => jobs.push(window.DartDomainState.hydrateDomain(domain, true)));
+      }
+      if (window.DartDomainState?.hydrateAudit) jobs.push(window.DartDomainState.hydrateAudit());
+      await Promise.allSettled(jobs);
+    } catch {
+      window.dispatchEvent(new CustomEvent("dart:orders-refresh-failed"));
+    } finally {
+      relatedRefreshRunning = false;
+      if (refreshAgain) {
+        refreshAgain = false;
+        scheduleRelatedRefresh();
+      }
+    }
+  }
+  function scheduleRelatedRefresh() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => { void refreshRelatedServerState(); }, 150);
+  }
+  // Legacy saves retain selection only.
+  function write(orders) {
+    const selections = new Map((Array.isArray(orders) ? orders : [])
+      .map((order) => [String(order.orderId), Boolean(order.isChecked)]));
+    const rows = JSON.parse(JSON.stringify(confirmedOrders)).map((order) => ({
+      ...order, isChecked: selections.get(String(order.orderId)) || false,
+    }));
+    window.DartState?.write?.(STORAGE_KEY, rows, { source: "orders:selection" });
+  }
+  async function hydrate(_force = false) {
+    if (activeMutations > 0) return readLocal();
+    const serial = ++hydrateSerial;
+    const epoch = mutationEpoch;
     const payload = await api("/api/v1/admin/orders-state");
-    serverVersion = Number(payload.version || serverVersion || 1);
+    if (activeMutations > 0 || epoch !== mutationEpoch || serial < lastAppliedHydrateSerial)
+      return readLocal();
+    lastAppliedHydrateSerial = serial;
+    applySnapshot(payload, "orders:hydrate");
     return readLocal();
   }
-
-  function scheduleSync() {
-    if (!serverVersion || authoritativeMutations > 0) return;
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => {
-      syncChain = syncChain.then(sync).catch(async (error) => {
-        console.error("Dart order sync failed", error);
-        if (error.status === 409) {
-          await rebaseVersionPreservingLocal();
-          dirty = true;
-          scheduleSync();
-        }
-      });
-    }, 120);
-  }
-
-  function write(orders) {
-    window.DartState?.write?.(
-      STORAGE_KEY,
-      Array.isArray(orders) ? orders : [],
-      { source: "orders:edit" },
-    );
-    localRevision += 1;
-    dirty = true;
-    scheduleSync();
-  }
-
-  async function flush() {
-    clearTimeout(syncTimer);
-    if (!dirty) {
-      await syncChain;
-      return readLocal();
+  async function runAuthoritativeMutation(path, body, refs = [], returnPayload = false, method = "POST") {
+    const session = sessionEpoch;
+    const keys = [...new Set(refs.map(orderKey))];
+    if (keys.some((key) => pendingOrders.has(key))) {
+      const error = new Error("This order already has an action in progress.");
+      error.code = "ORDER_ACTION_PENDING";
+      throw error;
     }
-    syncChain = syncChain.then(sync);
-    return await syncChain;
-  }
-  // END Versioned local edits.
-
-  // BEGIN Server mutations: only confirmed responses update the local order list.
-  async function runAuthoritativeMutation(path, body, returnPayload = false, deferRelatedRefresh = false) {
-    if (dirty) await flush();
-    authoritativeMutations += 1;
-    authoritativeEpoch += 1;
-    const epoch = authoritativeEpoch;
-    clearTimeout(syncTimer);
+    keys.forEach((key) => pendingOrders.add(key));
+    activeMutations += 1;
+    mutationEpoch += 1;
+    publishBusy();
+    let reconcile = false;
     try {
-      const payload = await api(path, { method: "POST", body });
-      if (epoch === authoritativeEpoch) {
-        serverVersion = Number(payload.version || serverVersion || 1);
-        dirty = false;
-        cache(payload.orders || [], "orders:authoritative");
+      const payload = await api(path, { method, body });
+      if (session !== sessionEpoch) {
+        const error = new Error("Staff session changed; refresh before continuing.");
+        error.code = "ORDER_SESSION_CHANGED";
+        throw error;
       }
-      if (deferRelatedRefresh) void refreshRelatedServerState();
-      else await refreshRelatedServerState();
-      return returnPayload ? payload : payload.orders || [];
+      reconcile = Boolean(payload.refreshRequired);
+      applySnapshot(payload, "orders:authoritative");
+      scheduleRelatedRefresh();
+      return returnPayload ? payload : readLocal();
+    } catch (error) {
+      reconcile = error.code === "ORDER_RESULT_UNKNOWN" || error.status === 409;
+      throw error;
     } finally {
-      authoritativeMutations = Math.max(0, authoritativeMutations - 1);
+      if (session === sessionEpoch) {
+        keys.forEach((key) => pendingOrders.delete(key));
+        activeMutations -= 1;
+        publishBusy();
+        reconciliationRequired ||= reconcile;
+        if (reconciliationRequired && activeMutations === 0)
+          setTimeout(() => { void hydrate(true).catch(() => {}); }, 0);
+      }
     }
   }
-
-  async function workflow(orderRef, input) {
-    return await runAuthoritativeMutation(
-      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/workflow`,
-      input,
-      false,
-      true,
-    );
+  function workflow(orderRef, input) {
+    return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}/workflow`, input, [orderRef]);
   }
-
-  async function bulkWorkflow(input) {
-    return await runAuthoritativeMutation(
-      "/api/v1/admin/orders/bulk-workflow",
-      input,
-      true,
-    );
+  function bulkWorkflow(input) {
+    return runAuthoritativeMutation("/api/v1/admin/orders/bulk-workflow", input, input.orderRefs, true);
   }
-
-  async function codVerification(orderRef, input) {
-    return await runAuthoritativeMutation(
-      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/cod-verification`,
-      input,
-    );
+  function codVerification(orderRef, input) {
+    return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}/cod-verification`, input, [orderRef]);
   }
-
-  async function stateAction(orderRef, action) {
-    return await runAuthoritativeMutation(
-      `/api/v1/admin/orders/${encodeURIComponent(orderRef)}/state`,
-      { action },
-    );
+  function stateAction(orderRef, action) {
+    return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}/state`, { action }, [orderRef]);
   }
-
-  async function createManual(order) {
-    if (dirty) await flush();
-    authoritativeMutations += 1;
-    authoritativeEpoch += 1;
-    const epoch = authoritativeEpoch;
-    try {
-      const payload = await api("/api/v1/admin/orders", {
-        method: "POST",
-        body: order,
-      });
-      if (epoch === authoritativeEpoch) {
-        serverVersion = Number(payload.version || serverVersion || 1);
-        dirty = false;
-        cache(payload.orders || [], "orders:create-confirmed");
-      }
-      await refreshRelatedServerState();
-      return payload.orders || [];
-    } finally {
-      authoritativeMutations = Math.max(0, authoritativeMutations - 1);
-    }
+  function createManual(order) {
+    return runAuthoritativeMutation("/api/v1/admin/orders", order, ["__manual_create__"]);
   }
-
-  async function updateManual(orderRef, order) {
-    if (dirty) await flush();
-    authoritativeMutations += 1;
-    authoritativeEpoch += 1;
-    const epoch = authoritativeEpoch;
-    try {
-      const payload = await api(
-        `/api/v1/admin/orders/${encodeURIComponent(orderRef)}`,
-        { method: "PATCH", body: order },
-      );
-      if (epoch === authoritativeEpoch) {
-        serverVersion = Number(payload.version || serverVersion || 1);
-        dirty = false;
-        cache(payload.orders || [], "orders:update-confirmed");
-      }
-      await refreshRelatedServerState();
-      return payload.orders || [];
-    } finally {
-      authoritativeMutations = Math.max(0, authoritativeMutations - 1);
-    }
+  function updateManual(orderRef, order) {
+    return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}`, order, [orderRef], false, "PATCH");
   }
-  // END Server mutations.
-
-  // BEGIN Hydration and polling: stale responses cannot overwrite newer writes.
-  async function hydrate(_force = false) {
-    if (hasMutationBarrier()) return readLocal();
-    const serial = ++hydrateSerial;
-    const epoch = authoritativeEpoch;
-    const revision = localRevision;
-    const payload = await api("/api/v1/admin/orders-state");
-    if (
-      hasMutationBarrier() ||
-      epoch !== authoritativeEpoch ||
-      revision !== localRevision ||
-      serial < lastAppliedHydrateSerial
-    ) return readLocal();
-    lastAppliedHydrateSerial = serial;
-    serverVersion = Number(payload.version || 1);
-    dirty = false;
-    cache(payload.orders || [], "orders:hydrate");
-    return payload.orders || [];
-  }
-
   async function check() {
     if (!adminPollingEnabled || document.hidden) return;
-    if (authoritativeMutations > 0) return;
+    if (activeMutations > 0 || polling) return;
+    polling = true;
     try {
-      if (!serverVersion) {
-        await hydrate();
-        return;
-      }
-      if (dirty || syncInFlight) {
-        await flush();
-        if (dirty || syncInFlight) return;
-      }
-      const epoch = authoritativeEpoch;
-      const revision = localRevision;
+      if (!serverVersion || reconciliationRequired) { await hydrate(); return; }
+      const epoch = mutationEpoch;
       const payload = await api("/api/v1/admin/orders-version");
-      if (
-        epoch !== authoritativeEpoch ||
-        revision !== localRevision ||
-        hasMutationBarrier()
-      ) return;
-      const remoteVersion = Number(payload.version || 0);
-      if (remoteVersion && remoteVersion !== serverVersion) await hydrate(true);
+      if (epoch !== mutationEpoch || activeMutations > 0) return;
+      if (Number(payload.version || 0) > serverVersion) await hydrate(true);
     } catch (error) {
       if (error.status !== 401) console.warn("Dart order live refresh failed", error);
+    } finally {
+      polling = false;
     }
   }
-
-  window.addEventListener("dart:admin-authenticated", () => {
-    adminPollingEnabled = true;
+  window.addEventListener("dart:admin-authenticated", () => { adminPollingEnabled = true; });
+  window.addEventListener("dart:data-changed", (event) => {
+    if (event.detail?.key !== STORAGE_KEY || event.detail?.source !== "logout") return;
+    sessionEpoch += 1;
+    mutationEpoch += 1;
+    activeMutations = serverVersion = 0;
+    confirmedOrders = [];
+    adminPollingEnabled = reconciliationRequired = refreshAgain = false;
+    clearTimeout(refreshTimer);
+    pendingOrders.clear();
+    publishBusy();
   });
   window.addEventListener("online", check);
   window.addEventListener("focus", check);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) check();
-  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) void check(); });
   window.setInterval(check, 3000);
-
   window.DartOrdersApi = {
-    hydrate,
-    createManual,
-    updateManual,
-    workflow,
-    bulkWorkflow,
-    codVerification,
-    stateAction,
-    sync,
-    flush,
-    write,
-    read: readLocal,
-    check,
-    isBusy: () => hasMutationBarrier(),
+    hydrate, createManual, updateManual, workflow, bulkWorkflow, codVerification, stateAction,
+    sync: hydrate, flush: async () => readLocal(), write, read: readLocal, check,
+    isBusy: (ref) => ref === undefined ? activeMutations > 0 : pendingOrders.has(orderKey(ref)),
     serverVersion: () => serverVersion,
   };
   document.head.append(Object.assign(document.createElement("script"), { src: "dart-order-group-ui.js" }));
-  // END Hydration and polling.
 })();
-// END Authoritative Orders client.
+// END Orders client.

@@ -4916,10 +4916,10 @@ button,
 
 
 /* BEGIN Home / About — News carousel. Cards occupy 80% of the section at 550px tall. */
-.dart-news { margin: 40px auto; width: calc(100% - 32px); text-align: left; color: #151515; }
+.dart-news { margin: 40px 0 40px 0; width: calc(100% - 0px); text-align: left; color: #151515; }
 .dart-news [hidden] { display: none !important; }
 .dart-news-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-.dart-news-heading h2 { margin: 0; font-size: 32px; color: #ab012b; border-left: 2px solid #ab012b; padding-left: 12px; }
+.dart-news-heading h2 { margin: 0; font-size: 40px; color: #ab012b;  padding-left: 12px; }
 .dart-news-controls { display: flex; gap: 8px; align-items: center; }
 .dart-news-controls button { min-width: 36px; height: 36px; padding: 0 8px; border: 1px solid #ded4ca; border-radius: 50%; background: #fbf8f4; color: #ab012b; cursor: pointer; font-size: 25px; }
 .dart-news-controls [data-news-auto] { border-radius: 6px; font-size: 12px; }
@@ -4927,7 +4927,7 @@ button,
 .dart-news-track::-webkit-scrollbar { height: 5px; }
 .dart-news-track::-webkit-scrollbar-thumb { background: #ab012b; border-radius: 5px; }
 .dart-news-track::-webkit-scrollbar-track { background: #e8e0d9; }
-.dart-news-track.is-dragging { scroll-snap-type: none; cursor: grabbing; user-select: none; }
+.dart-news-track.is-dragging { scroll-snap-type: none; cursor: grabbing; -webkit-user-select: none; user-select: none; }
 .dart-news-card {
   flex: 0 0 80%;
   width: 80%;
@@ -4961,6 +4961,7 @@ button,
   min-height: 0;
   margin: 0;
   font-size: clamp(14px,1.1vw,17px);
+  font-weight: 400;
   line-height: 1.65;
   color: #625a56;
   text-align: start;
@@ -4989,7 +4990,7 @@ button,
 .dart-news-article > img { display: block; width: min(100%,calc(70dvh * 3 / 4)); height: auto; margin-inline: auto; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; }
 .dart-news-article-copy { min-width: 0; }
 .dart-news-article-copy h2 { margin: 14px 0 24px; font-size: clamp(26px,3vw,42px); line-height: 1.3; overflow-wrap: anywhere; }
-.dart-news-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(15px,1.3vw,18px); line-height: 1.9; max-width: 68ch; }
+.dart-news-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(15px,1.3vw,18px); line-height: 1.9; max-width: 68ch; font-weight: 400; }
 .dart-news-dialog-footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e4dcd5; }
 .dart-news-dialog-footer button { width: 100%; min-height: 44px; border: 0; border-radius: 7px; background: #ab012b; color: #fff; font: inherit; cursor: pointer; }
 .dart-news-dialog [hidden] { display: none !important; }

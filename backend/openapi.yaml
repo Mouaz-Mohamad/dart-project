@@ -22,6 +22,64 @@ tags:
   - name: Sets
   - name: News
 paths:
+  /admin/orders-state:
+    get:
+      tags: [Orders]
+      operationId: readAdminOrdersSnapshot
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff orders.read and configured MFA. Read-only version and orders from one repeatable-read database snapshot. Never cached.
+      responses:
+        "200": { description: Consistent version and complete orders array }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      tags: [Orders]
+      operationId: rejectLegacyOrdersReplacement
+      deprecated: true
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Whole-order replacement is disabled. Authorized callers receive ORDER_COMMAND_REQUIRED; use individual create, edit, workflow or archive commands.
+      responses:
+        "405": { description: ORDER_COMMAND_REQUIRED with Allow GET; no database write }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/orders/{orderRef}/workflow:
+    post:
+      tags: [Orders]
+      operationId: adminOrderWorkflowCommand
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { in: path, name: orderRef, required: true, schema: { type: string, minLength: 1, maxLength: 160 } }
+      description: Requires Staff orders.manage and configured MFA. The server locks the order and validates expectedStatus and transitions, inventory, rewards and COD eligibility in one audited transaction. After commit, a failed snapshot refresh returns 200 with refreshRequired true; this is a committed command and must not be automatically retried.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderWorkflowCommand" }
+      responses:
+        "200": { description: Confirmed command plus current complete orders snapshot, or refreshRequired true with an empty placeholder orders array }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/orders/bulk-workflow:
+    post:
+      tags: [Orders]
+      operationId: adminBulkOrderWorkflowCommand
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Requires Staff orders.bulk_manage and configured MFA. Uses the same workflow command and expectedStatus check independently for every order. Returns per-order succeeded and failed results plus the latest snapshot or refreshRequired true. A successful member is not rolled back when another member fails.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/OrderWorkflowFields" }
+              type: object
+              required: [orderRefs, expectedStatus, target]
+              unevaluatedProperties: false
+              properties:
+                orderRefs: { type: array, minItems: 1, maxItems: 100, items: { type: string, minLength: 1, maxLength: 160 } }
+      responses:
+        "200": { description: Confirmed per-order results and snapshot }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /news:
     get:
       tags: [News]
@@ -767,6 +825,20 @@ components:
       required: true
       schema: { type: string, enum: [google, facebook] }
   schemas:
+    OrderWorkflowFields:
+      type: object
+      required: [expectedStatus, target]
+      properties:
+        expectedStatus: { type: string, minLength: 1, maxLength: 80 }
+        target: { type: string, enum: [New, Accepted, Preparing, Out With Representative, Representative On The Way, Delivered, Refused, Cancelled] }
+        representativeId: { type: string, maxLength: 160 }
+        deliveryGroupId: { type: string, maxLength: 160 }
+        reason: { type: string, maxLength: 500 }
+        notes: { type: string, maxLength: 1500 }
+    OrderWorkflowCommand:
+      allOf:
+        - { $ref: "#/components/schemas/OrderWorkflowFields" }
+      unevaluatedProperties: false
     NewsCreate:
       type: object
       additionalProperties: false

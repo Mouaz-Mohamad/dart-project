@@ -1,0 +1,84 @@
+# DART CODE GUIDE | .github/workflows/database-backup.yml
+# الغرض: نسخة يومية مشفرة مع اختبار استعادة منفصل؛ تتطلب أسرار GitHub موثقة.
+name: Encrypted database backup
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dart-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      recovery:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: dart_recovery
+          POSTGRES_PASSWORD: isolated-ci-recovery-only
+          POSTGRES_DB: dart_restore_drill
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U dart_recovery -d dart_restore_drill"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Prepare PostgreSQL 18 clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:18.6
+          mkdir -p "$RUNNER_TEMP/dart-pg-bin"
+          for tool in pg_dump pg_restore; do
+            cat > "$RUNNER_TEMP/dart-pg-bin/$tool" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          docker run --rm --network host -i \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$PWD" \
+            -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGCONNECT_TIMEOUT \
+            postgres:18.6 "$(basename "$0")" "$@"
+          SH
+            chmod 700 "$RUNNER_TEMP/dart-pg-bin/$tool"
+          done
+          echo "$RUNNER_TEMP/dart-pg-bin" >> "$GITHUB_PATH"
+      - name: Create encrypted backup and prove recovery
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DART_BACKUP_DATABASE_URL }}
+          DART_BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.DART_BACKUP_ENCRYPTION_PASSWORD }}
+          DART_RECOVERY_DATABASE_URL: postgresql://dart_recovery:isolated-ci-recovery-only@127.0.0.1:55432/dart_restore_drill
+          DART_BACKUP_TMP_ROOT: ${{ github.workspace }}/.backup-tmp
+          PGCONNECT_TIMEOUT: "15"
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$DATABASE_URL"
+          test -n "$DART_BACKUP_ENCRYPTION_PASSWORD"
+          node backend/scripts/encrypted-database-backup.mjs create backups/database.dump.enc
+          node backend/scripts/encrypted-database-backup.mjs restore-verify backups/database.dump.enc
+      - name: Store only the verified encrypted archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dart-database-backup-${{ github.run_id }}
+          path: backups/database.dump.enc
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+      - name: Remove local backup material
+        if: always()
+        run: rm -rf -- .backup-tmp backups

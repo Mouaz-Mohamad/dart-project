@@ -94,6 +94,7 @@ vm.runInNewContext(apiSource, {
     runtimeWindow.DartOrdersApi.workflow("D-1", { expectedStatus: "New", target: "Accepted" }),
     new Promise((_, reject) => setTimeout(() => reject(new Error("Workflow waited for unrelated domains")), 150)),
   ]);
+  await new Promise((resolve) => setTimeout(resolve, 170));
   assert.equal(relatedRefreshStarted, true);
   assert.equal(result[0].status, "Accepted");
   assert.equal(orders[0].status, "Accepted");

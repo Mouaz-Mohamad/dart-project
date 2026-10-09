@@ -14,6 +14,8 @@ backend/.env.*
 # Local database/tool state
 backend/.postgres-data/
 backend/backups/
+backups/
+.backup-tmp/
 *.log
 
 # OS/editor files

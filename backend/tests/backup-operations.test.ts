@@ -9,6 +9,19 @@ const script = readFileSync(
 );
 
 describe("database backup operations", () => {
+  it("rejects restoring to the same database using a different role or pooled Neon alias", async () => {
+    const { assertRecoveryDatabaseSafety, sameDatabase } = await import(
+      new URL("../scripts/database-backup.mjs", import.meta.url).href
+    );
+    const production = "postgresql://owner:secret@ep-live.example.neon.tech/dart_recovery";
+    const alias = "postgresql://other:password@ep-live-pooler.example.neon.tech:5432/dart_recovery";
+    expect(sameDatabase(production, alias)).toBe(true);
+    expect(() => assertRecoveryDatabaseSafety(production, alias)).toThrow("production database");
+    expect(() => assertRecoveryDatabaseSafety(production, "postgresql://owner:secret@ep-drill.example.neon.tech/dart_recovery"))
+      .not.toThrow();
+    expect(() => assertRecoveryDatabaseSafety(production, "postgresql://owner:secret@ep-drill.example.neon.tech/neondb"))
+      .toThrow("Recovery database name");
+  });
   it("creates custom-format dumps without placing DATABASE_URL in process arguments", () => {
     expect(script).toContain('"pg_dump"');
     expect(script).toContain('"--format=custom"');

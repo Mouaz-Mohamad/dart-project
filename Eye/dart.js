@@ -40,6 +40,7 @@ function saveDataToStorage(key, data) {
   }
   if (key === "dart_orders" && window.DartOrdersApi) {
     window.DartOrdersApi.write(data);
+    ordersData = window.DartOrdersApi.read();
     return;
   }
   if (window.DartDomainState?.domainForStorageKey?.(key)) {
@@ -621,8 +622,6 @@ window.addEventListener("dart:catalog-hydrated", () => {
   if (!window.DartCatalog) return;
   modelsData = window.DartCatalog.models();
   itemsData = window.DartCatalog.items();
-  if (typeof renderModels === "function") renderModels(modelsData);
-  if (typeof renderItems === "function") renderItems(itemsData);
   if (typeof dartRefreshAll === "function") dartRefreshAll();
 });
 
@@ -638,14 +637,34 @@ window.addEventListener("dart:orders-hydrated", (event) => {
   const incoming = event.detail?.orders;
   if (!Array.isArray(incoming)) return;
   ordersData = incoming;
-  if (typeof renderOrders === "function") renderOrders(ordersData);
   if (typeof dartRefreshAll === "function") dartRefreshAll();
 });
+
+// BEGIN Pending order actions.
+function dartRefreshOrderBusyUi() {
+  document.querySelectorAll("#orders-container [data-id]").forEach((row) => {
+    const order = ordersData.find((entry) => String(entry.id) === String(row.dataset.id));
+    if (!order) return;
+    const busy = window.DartOrdersApi?.isBusy?.(order.orderId || order.id) === true;
+    row.setAttribute("aria-busy", String(busy));
+    row.querySelectorAll(".row-action-btns button:not(.dart-history-btn)").forEach((button) => {
+      if (busy && !button.disabled) {
+        button.dataset.dartOrderBusy = "1";
+        button.disabled = true;
+      } else if (!busy && button.dataset.dartOrderBusy) {
+        delete button.dataset.dartOrderBusy;
+        button.disabled = false;
+      }
+    });
+  });
+}
+window.addEventListener("dart:orders-busy", dartRefreshOrderBusyUi);
+// END Per-order pending actions.
 
 /* BEGIN Dashboard data synchronization */
 window.addEventListener("dart:data-changed", (event) => {
   if (event.detail?.key === "dart_orders" &&
-      ["orders:hydrate", "orders:authoritative", "orders:sync-confirmed"].includes(event.detail?.source)) return;
+      ["orders:hydrate", "orders:authoritative", "orders:sync-confirmed", "orders:selection"].includes(event.detail?.source)) return;
   try {
     loadAllDataFromStorage(false);
     dartRefreshAll();
@@ -665,34 +684,13 @@ window.addEventListener("dart:domain-hydrated", (event) => {
   const data = event.detail?.data;
   if (!Array.isArray(data)) return;
   const handlers = {
-    customers(value) {
-      customersData = value;
-      if (typeof renderCustomers === "function") renderCustomers(customersData);
-    },
-    returns(value) {
-      returnsData = value;
-      if (typeof renderReturns === "function") renderReturns(returnsData);
-    },
-    reviews(value) {
-      reviewsData = value;
-      if (typeof renderReviews === "function") renderReviews(reviewsData);
-    },
-    cards(value) {
-      cardsData = value;
-      if (typeof renderCards === "function") renderCards(cardsData);
-    },
-    representatives(value) {
-      representativeData = value;
-      if (typeof renderRepresentative === "function") renderRepresentative(representativeData);
-    },
-    damage(value) {
-      damageData = value;
-      if (typeof renderDamage === "function") renderDamage(damageData);
-    },
-    notifications(value) {
-      notificationData = value;
-      if (typeof renderNotifications === "function") renderNotifications();
-    },
+    customers: (value) => (customersData = value),
+    returns: (value) => (returnsData = value),
+    reviews: (value) => (reviewsData = value),
+    cards: (value) => (cardsData = value),
+    representatives: (value) => (representativeData = value),
+    damage: (value) => (damageData = value),
+    notifications: (value) => (notificationData = value),
   };
   handlers[domain]?.(data);
   if (typeof dartRefreshAll === "function") dartRefreshAll();
@@ -1635,6 +1633,8 @@ function dartPersistOrderWorkflow() {
 }
 
 async function dartApplyTransition(order, target, meta = {}) {
+  if (window.DartOrdersApi?.isBusy?.(order.orderId || order.id))
+    return { ok: false, message: "This order already has an action in progress." };
   if (!dartCanTransition(order, target))
     return {
       ok: false,
@@ -1782,6 +1782,8 @@ async function dartApplyTransition(order, target, meta = {}) {
   return { ok: true };
 }
 async function dartBatchTransition(orders, target, meta = {}) {
+  if (orders.some((order) => window.DartOrdersApi?.isBusy?.(order.orderId || order.id)))
+    return { ok: false, message: "A selected order already has an action in progress." };
   const statuses = new Set(orders.map((order) => String(order.status || "")));
   if (statuses.size !== 1)
     return {
@@ -2966,6 +2968,7 @@ function dartActiveReps() {
 }
 async function dartRequestOrderTransition(orders, target) {
   if (!orders.length) return;
+  if (orders.some((order) => window.DartOrdersApi?.isBusy?.(order.orderId || order.id))) return;
   if (orders.length === 1 && !dartCanTransition(orders[0], target)) {
     window.DartDialog.alert(
       `الانتقال غير منطقي للأوردر: ${orders[0].orderId}`,
@@ -3753,6 +3756,7 @@ function renderOrders(dataArray) {
   if (dartOrdersView === "groups") {
     dartRenderOrderGroups(c, sorted);
     updateOrderCards();
+    dartRefreshOrderBusyUi();
     return;
   }
   sorted.forEach((o) => {
@@ -3820,6 +3824,7 @@ function renderOrders(dataArray) {
     );
   });
   updateOrderCards();
+  dartRefreshOrderBusyUi();
 }
 
 function dartRenderOrderGroups(container, orders) {

@@ -142,6 +142,24 @@ describe("dashboard domain permissions", () => {
     expect((await request(app).get("/api/v1/admin/domain-state/contacts").set("Cookie", cookie)).status).toBe(403);
   });
 
+  it("hydrates only returns for a returns-only employee and rejects other private domains", async () => {
+    const { app, state } = application(["returns.read"]);
+    const cookie = `dart_session=${sessionToken}`;
+    const response = await request(app).get("/api/v1/admin/domain-state").set("Cookie", cookie);
+    expect(response.status).toBe(200);
+    expect(response.body.domains.map((row: { domain: string }) => row.domain)).toEqual(["returns"]);
+    expect(state.readMany).toHaveBeenCalledWith(["returns"]);
+    for (const domain of ["contacts", "customers", "finance_expenses", "cards"]) {
+      const denied = await request(app).get(`/api/v1/admin/domain-state/${domain}`).set("Cookie", cookie);
+      expect(denied.status).toBe(403);
+      expect(denied.body).not.toHaveProperty("data");
+    }
+    const versions = await request(app).get("/api/v1/admin/domain-state-versions").set("Cookie", cookie);
+    expect(versions.status).toBe(200);
+    expect(versions.body.versions).toEqual({});
+    expect(state.read).not.toHaveBeenCalled();
+  });
+
   it("permits a contact-only manager to write contacts with CSRF, never customer data", async () => {
     const { app, state } = application(["contacts.manage"]);
     const put = (domain: string) => request(app)
