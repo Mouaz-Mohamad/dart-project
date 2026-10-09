@@ -1,3 +1,7 @@
-batch=38
-source_sha=5fb2ac35b7dda0b1061ed0493c84404a08dd6a94
-triggered_at=2026-09-29T21:56:00Z
+batch=3
+purpose=release-three-news-css-commits
+source_sha=2a47de23dbedab7ecd7dc78917a32e792f2ea4b6
+commits=d1aa7956946c485ec167b458046909436693ce1d,892dd0dff305a7369e2cc44caf77c988f8543c89,2a47de23dbedab7ecd7dc78917a32e792f2ea4b6
+frontend=CSS/main.css
+backend=none
+trigger=approved-numbered-production-release
