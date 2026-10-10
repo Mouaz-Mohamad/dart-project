@@ -48,6 +48,8 @@
   let refreshTimer = 0;
   let relatedRefreshRunning = false;
   let refreshAgain = false;
+  let relatedRefreshRequired = false;
+  let relatedRefreshNotified = false;
   const pendingOrders = new Set();
   function readLocal() {
     return window.DartState?.read?.(STORAGE_KEY, []) || [];
@@ -65,12 +67,29 @@
   function applySnapshot(payload, source) {
     if (payload.refreshRequired || !Array.isArray(payload.orders)) return false;
     const version = Number(payload.version || 0);
-    if (!version || version < serverVersion) return false;
+    if (!Number.isSafeInteger(version) || version <= 0 || version < serverVersion) return false;
+    let orders = payload.orders;
+    if (payload.responseMode === "delta") {
+      const baseVersion = Number(payload.baseVersion);
+      if (!serverVersion || reconciliationRequired || baseVersion !== serverVersion ||
+          (version !== baseVersion && version !== baseVersion + 1) || !orders.length) return false;
+      const ids = new Set();
+      for (const row of orders) {
+        if (!row?.id || !row.orderId || ids.has(String(row.id))) return false;
+        ids.add(String(row.id));
+      }
+      const merged = new Map(confirmedOrders.map((row) => [String(row.id), row]));
+      orders.forEach((row) => merged.set(String(row.id), row));
+      orders = [...merged.values()].sort((a, b) => {
+        const difference = Date.parse(b.orderCreatedAt || b.createdAt) - Date.parse(a.orderCreatedAt || a.createdAt);
+        return Number.isFinite(difference) ? difference || String(b.id).localeCompare(String(a.id)) : 0;
+      });
+    }
     const selections = new Map(readLocal().map((order) => [String(order.orderId), Boolean(order.isChecked)]));
     serverVersion = version;
     reconciliationRequired = false;
-    confirmedOrders = JSON.parse(JSON.stringify(payload.orders));
-    const rows = payload.orders.map((order) => ({
+    confirmedOrders = JSON.parse(JSON.stringify(orders));
+    const rows = orders.map((order) => ({
       ...order, isChecked: selections.get(String(order.orderId)) || false,
     }));
     window.DartState?.write?.(STORAGE_KEY, rows, { source });
@@ -122,23 +141,36 @@
   }
   async function refreshRelatedServerState() {
     if (relatedRefreshRunning) { refreshAgain = true; return; }
+    const session = sessionEpoch;
     relatedRefreshRunning = true;
+    relatedRefreshRequired = false;
     try {
       const jobs = [];
-      if (window.DartCatalog?.hydrate) jobs.push(window.DartCatalog.hydrate(true));
-      if (window.DartDomainState?.hydrateDomain) {
+      if (window.DartCatalog?.refreshChanged) jobs.push(window.DartCatalog.refreshChanged());
+      else if (window.DartCatalog?.hydrate) jobs.push(window.DartCatalog.hydrate(true));
+      if (window.DartDomainState?.refreshChanged) jobs.push(window.DartDomainState.refreshChanged());
+      else if (window.DartDomainState?.hydrateDomain) {
         ["cards", "birthday_rewards", "returns", "damage", "notifications"].forEach(
           (domain) => jobs.push(window.DartDomainState.hydrateDomain(domain, true)));
       }
       if (window.DartDomainState?.hydrateAudit) jobs.push(window.DartDomainState.hydrateAudit());
-      await Promise.allSettled(jobs);
+      const results = await Promise.allSettled(jobs);
+      if (results.some((result) => result.status === "rejected" && ![401, 403].includes(result.reason?.status)))
+        throw new Error("Related state refresh failed");
+      if (session === sessionEpoch) relatedRefreshNotified = false;
     } catch {
-      window.dispatchEvent(new CustomEvent("dart:orders-refresh-failed"));
+      if (session === sessionEpoch) {
+        relatedRefreshRequired = true;
+        if (!relatedRefreshNotified) window.dispatchEvent(new CustomEvent("dart:orders-refresh-failed"));
+        relatedRefreshNotified = true;
+      }
     } finally {
-      relatedRefreshRunning = false;
-      if (refreshAgain) {
-        refreshAgain = false;
-        scheduleRelatedRefresh();
+      if (session === sessionEpoch) {
+        relatedRefreshRunning = false;
+        if (refreshAgain) {
+          refreshAgain = false;
+          scheduleRelatedRefresh();
+        }
       }
     }
   }
@@ -159,11 +191,12 @@
     if (activeMutations > 0) return readLocal();
     const serial = ++hydrateSerial;
     const epoch = mutationEpoch;
+    const recovering = reconciliationRequired;
     const payload = await api("/api/v1/admin/orders-state");
     if (activeMutations > 0 || epoch !== mutationEpoch || serial < lastAppliedHydrateSerial)
       return readLocal();
     lastAppliedHydrateSerial = serial;
-    applySnapshot(payload, "orders:hydrate");
+    if (applySnapshot(payload, "orders:hydrate") && recovering) scheduleRelatedRefresh();
     return readLocal();
   }
   async function runAuthoritativeMutation(path, body, refs = [], returnPayload = false, method = "POST") {
@@ -180,14 +213,16 @@
     publishBusy();
     let reconcile = false;
     try {
-      const payload = await api(path, { method, body });
+      const requestPath = returnPayload ? path : `${path}?responseMode=delta&baseVersion=${serverVersion}`;
+      const payload = await api(requestPath, { method, body });
       if (session !== sessionEpoch) {
         const error = new Error("Staff session changed; refresh before continuing.");
         error.code = "ORDER_SESSION_CHANGED";
         throw error;
       }
       reconcile = Boolean(payload.refreshRequired);
-      applySnapshot(payload, "orders:authoritative");
+      const applied = applySnapshot(payload, "orders:authoritative");
+      reconcile ||= !applied && Number(payload.version || 0) >= serverVersion;
       scheduleRelatedRefresh();
       return returnPayload ? payload : readLocal();
     } catch (error) {
@@ -227,6 +262,7 @@
     if (activeMutations > 0 || polling) return;
     polling = true;
     try {
+      if (relatedRefreshRequired) scheduleRelatedRefresh();
       if (!serverVersion || reconciliationRequired) { await hydrate(); return; }
       const epoch = mutationEpoch;
       const payload = await api("/api/v1/admin/orders-version");
@@ -245,7 +281,8 @@
     mutationEpoch += 1;
     activeMutations = serverVersion = 0;
     confirmedOrders = [];
-    adminPollingEnabled = reconciliationRequired = refreshAgain = false;
+    adminPollingEnabled = reconciliationRequired = refreshAgain = relatedRefreshRequired = relatedRefreshRunning = false;
+    relatedRefreshNotified = false;
     clearTimeout(refreshTimer);
     pendingOrders.clear();
     publishBusy();

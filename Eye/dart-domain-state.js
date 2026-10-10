@@ -41,6 +41,9 @@
   const deniedDomains = new Set();
   let adminPollingEnabled = false;
   let polling = false;
+  let sessionEpoch = 0;
+  let refreshPromise = null;
+  let refreshAgain = false;
 
   function readLocal(storageKey) {
     return window.DartState?.read?.(storageKey, []) || [];
@@ -115,10 +118,13 @@
     const storageKey = STORAGE_BY_DOMAIN[domain];
     if (!storageKey) return [];
     const revision = revisions.get(domain) || 0;
+    const session = sessionEpoch;
     const payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`);
     // A read started before a local edit must never discard that edit.
-    if (dirty.has(domain) || revision !== (revisions.get(domain) || 0)) return readLocal(storageKey);
-    versions.set(domain, Number(payload.version || 1));
+    const version = Number(payload.version || 1);
+    if (session !== sessionEpoch || dirty.has(domain) || revision !== (revisions.get(domain) || 0) ||
+        version < (versions.get(domain) || 0)) return readLocal(storageKey);
+    versions.set(domain, version);
     dirty.delete(domain);
     cache(storageKey, payload.data || [], domain);
     return payload.data || [];
@@ -129,15 +135,21 @@
     const version = versions.get(domain);
     if (!storageKey || !version) return readLocal(storageKey);
     const revision = revisions.get(domain) || 0;
+    const session = sessionEpoch;
     const snapshot = structuredClone(readLocal(storageKey));
+    const data = await sanitizeDomainData(domain, snapshot);
+    if (session !== sessionEpoch) return readLocal(storageKey);
     const payload = await api(`/api/v1/admin/domain-state/${encodeURIComponent(domain)}`, {
       method: "PUT",
       body: {
         expectedVersion: version,
-        data: await sanitizeDomainData(domain, snapshot),
+        data,
       },
     });
-    versions.set(domain, Number(payload.version || version));
+    if (session !== sessionEpoch) return readLocal(storageKey);
+    const responseVersion = Number(payload.version || version);
+    if (responseVersion < (versions.get(domain) || 0)) return readLocal(storageKey);
+    versions.set(domain, responseVersion);
     if (revision === (revisions.get(domain) || 0)) {
       dirty.delete(domain);
       cache(storageKey, payload.data || [], domain);
@@ -153,12 +165,14 @@
   function syncNow(domain) {
     clearTimeout(timers.get(domain));
     const chain = queues.get(domain) || Promise.resolve();
-    const next = chain.then(() => syncDomain(domain));
+    const session = sessionEpoch;
+    const next = chain.then(() => session === sessionEpoch ? syncDomain(domain) : []);
     queues.set(domain, next.catch(() => undefined));
     return next;
   }
 
   async function writeAndSync(storageKey, data) {
+    const session = sessionEpoch;
     const domain = DOMAIN_BY_STORAGE[storageKey];
     if (!domain) {
       window.DartState?.write?.(storageKey, data, { source: "dashboard" });
@@ -171,6 +185,7 @@
       throw error;
     }
     if (!versions.get(domain)) await hydrateDomain(domain);
+    if (session !== sessionEpoch) throw new Error("Staff session changed; refresh before continuing.");
     const previous = readLocal(storageKey);
     const revision = (revisions.get(domain) || 0) + 1;
     revisions.set(domain, revision);
@@ -183,7 +198,7 @@
     try {
       return await syncNow(domain);
     } catch (error) {
-      if (revision === revisions.get(domain)) {
+      if (session === sessionEpoch && revision === revisions.get(domain)) {
         dirty.delete(domain);
         if (error.status === 409) {
           await hydrateDomain(domain, true).catch(() => cache(storageKey, previous, domain));
@@ -266,7 +281,9 @@
   }
 
   async function hydrateAudit(limit = 500) {
+    const session = sessionEpoch;
     const payload = await api(`/api/v1/admin/audit?limit=${encodeURIComponent(limit)}`);
+    if (session !== sessionEpoch) return [];
     const audit = Array.isArray(payload.audit) ? payload.audit : [];
     window.DartState?.write?.("dart_audit", audit, { source: "audit" });
     window.dispatchEvent(new CustomEvent("dart:audit-hydrated", { detail: { audit } }));
@@ -284,9 +301,11 @@
   }
 
   async function hydrateAll() {
+    const session = sessionEpoch;
     const allDomains = Object.keys(STORAGE_BY_DOMAIN);
     const initialRevisions = new Map(revisions);
     const payload = await api("/api/v1/admin/domain-state");
+    if (session !== sessionEpoch) return {};
     const rows = Array.isArray(payload?.domains) ? payload.domains : [];
     const received = new Set();
 
@@ -296,7 +315,8 @@
       if (!storageKey) continue;
       received.add(domain);
       deniedDomains.delete(domain);
-      if (dirty.has(domain) || (revisions.get(domain) || 0) !== (initialRevisions.get(domain) || 0)) continue;
+      if (dirty.has(domain) || (revisions.get(domain) || 0) !== (initialRevisions.get(domain) || 0) ||
+          Number(row.version || 1) < (versions.get(domain) || 0)) continue;
       versions.set(domain, Number(row.version || 1));
       dirty.delete(domain);
       cache(storageKey, row.data || [], domain);
@@ -319,6 +339,7 @@
     try {
       await hydrateAudit();
     } catch (error) {
+      if (session !== sessionEpoch) return {};
       if (error.status === 403) {
         window.DartState?.remove?.("dart_audit", { source: "permission" });
         window.dispatchEvent(
@@ -328,6 +349,7 @@
         console.warn("Dart audit hydration failed", error);
       }
     }
+    if (session !== sessionEpoch) return {};
     return Object.fromEntries(
       rows.map((row) => [String(row.domain || ""), Array.isArray(row.data) ? row.data : []]),
     );
@@ -352,26 +374,58 @@
     }
   }
 
+  function refreshChanged() {
+    if (refreshPromise) { refreshAgain = true; return refreshPromise; }
+    const session = sessionEpoch;
+    const promise = (async () => {
+      do {
+        refreshAgain = false;
+        const payload = await api("/api/v1/admin/domain-state-versions");
+        if (session !== sessionEpoch) return;
+        const remoteVersions = payload?.versions || {};
+        await Promise.all(Object.keys(remoteVersions).filter((domain) =>
+          STORAGE_BY_DOMAIN[domain] && !deniedDomains.has(domain) && !dirty.has(domain) &&
+          Number(remoteVersions[domain] || 0) > (versions.get(domain) || 0),
+        ).map((domain) => hydrateDomain(domain, true)));
+      } while (refreshAgain && session === sessionEpoch);
+    })();
+    refreshPromise = promise;
+    void promise.finally(() => { if (refreshPromise === promise) refreshPromise = null; }).catch(() => {});
+    return promise;
+  }
+
   async function checkAll() {
     if (!adminPollingEnabled || document.hidden || polling) return;
     polling = true;
+    const session = sessionEpoch;
     try {
-      const payload = await api("/api/v1/admin/domain-state-versions");
-      const remoteVersions = payload?.versions || {};
+      await refreshChanged();
+      if (session !== sessionEpoch) return;
       await Promise.all(
-        Object.keys(STORAGE_BY_DOMAIN).map((domain) =>
-          checkDomain(domain, Number(remoteVersions[domain] || 0)),
-        ),
+        [...dirty].map((domain) => checkDomain(domain)),
       );
     } catch (error) {
-      if (error.status !== 401) console.warn("Dart dashboard live refresh failed", error);
+      if (session === sessionEpoch && error.status !== 401) console.warn("Dart dashboard live refresh failed", error);
     } finally {
-      polling = false;
+      if (session === sessionEpoch) polling = false;
     }
   }
 
   window.addEventListener("dart:admin-authenticated", () => {
     adminPollingEnabled = true;
+  });
+  window.addEventListener("dart:data-changed", (event) => {
+    if (event.detail?.key !== "dart_orders" || event.detail?.source !== "logout") return;
+    sessionEpoch += 1;
+    adminPollingEnabled = polling = refreshAgain = false;
+    refreshPromise = null;
+    versions.clear();
+    dirty.clear();
+    revisions.clear();
+    deniedDomains.clear();
+    queues.clear();
+    timers.forEach(clearTimeout);
+    timers.clear();
   });
   window.addEventListener("online", checkAll);
   window.addEventListener("focus", checkAll);
@@ -388,6 +442,7 @@
     writeAndSync,
     createFinanceSettlement,
     checkAll,
+    refreshChanged,
     hydrateAudit,
     auditFor,
     write,

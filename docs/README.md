@@ -11,6 +11,7 @@
 - `CODE_GUIDE_AR.md` — دليل قراءة وصيانة الكود.
 - `CHANGELOG.md` — سجل التغييرات التاريخي.
 - `DEPLOYMENT_BATCHING.md` — قواعد batching فقط؛ النشر نفسه إجراء منفصل ولا يحدث لمجرد وجود كود جديد.
+- `ORDER_PERFORMANCE.md` — compact order responses, safe related refresh, isolated measurements and bounded load commands.
 - `NEWS.md` — News behavior, API/migration references, end-to-end checks and quality review.
 - `IMAGE_DESCRIPTIONS.md` — وصف الأصول البصرية.
 

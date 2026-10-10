@@ -659,6 +659,9 @@ function dartRefreshOrderBusyUi() {
   });
 }
 window.addEventListener("dart:orders-busy", dartRefreshOrderBusyUi);
+window.addEventListener("dart:orders-refresh-failed", () => {
+  window.DartDialog?.alert?.("تعذّر تحديث بعض البيانات المرتبطة. جارٍ إعادة محاولة قراءة البيانات، دون إعادة تنفيذ العملية.");
+});
 // END Per-order pending actions.
 
 /* BEGIN Dashboard data synchronization */

@@ -308,8 +308,11 @@ const server = http.createServer((request, response) => {
   await dashboard.route("**/api/v1/admin/orders-state", (route) => route.fulfill({
     contentType: "application/json", body: JSON.stringify({ version: 2, orders: orderFixture }),
   }));
-  await dashboard.route("**/api/v1/admin/orders/*/workflow", (route) => {
-    pendingCommands.set(new URL(route.request().url()).pathname.split("/").at(-2), route);
+  await dashboard.route(/\/api\/v1\/admin\/orders\/[^/?]+\/workflow(?:\?.*)?$/, (route) => {
+    const url = new URL(route.request().url());
+    assert.equal(url.searchParams.get("responseMode"), "delta");
+    assert.equal(url.searchParams.get("baseVersion"), "2");
+    pendingCommands.set(url.pathname.split("/").at(-2), route);
   });
   await dashboard.evaluate(async () => {
     document.querySelector('a[data-target="orders"]')?.click();

@@ -18,6 +18,25 @@ export interface CartLineInput {
   quantity: number;
 }
 
+export interface OrderResponseOptions {
+  responseMode: "delta";
+  baseVersion: number;
+}
+
+interface AdminOrdersState {
+  version: number;
+  orders: Record<string, unknown>[];
+  responseMode?: "delta";
+  baseVersion?: number;
+  refreshRequired?: boolean;
+}
+
+interface AdminOrdersScope {
+  orderIds: string[];
+  customerIds: string[];
+  expectedVersion: number;
+}
+
 export interface CartReservationLine {
   modelId: string;
   color: string;
@@ -5049,13 +5068,18 @@ export class CommerceService {
     return Number(result.rows[0]?.version || 1);
   }
 
-  public async adminOrders(): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+  public async adminOrders(scope?: AdminOrdersScope): Promise<AdminOrdersState> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       const versionResult = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
       );
+      const version = Number(versionResult.rows[0]?.version || 1);
+      if (scope && version !== scope.expectedVersion) {
+        await client.query("COMMIT");
+        return { version, orders: [], refreshRequired: true };
+      }
       const result = await client.query<AdminOrderRow>(
         `SELECT o.*, c.client_code,
             c.cod_risk_level AS customer_cod_risk_level,
@@ -5133,11 +5157,19 @@ export class CommerceService {
           LEFT JOIN customers c ON c.user_id=o.customer_user_id
           LEFT JOIN representatives r ON r.user_id=o.representative_user_id
           LEFT JOIN representative_locations rl ON rl.representative_user_id=r.user_id
-          ORDER BY o.created_at DESC`,
+          ${scope ? `WHERE o.id = ANY($1::uuid[])
+             OR o.customer_user_id = ANY($2::uuid[])
+             OR o.customer_user_id IN (
+               SELECT changed.customer_user_id FROM orders changed
+                WHERE changed.id = ANY($1::uuid[])
+                  AND changed.customer_user_id IS NOT NULL
+             )` : ""}
+          ORDER BY o.created_at DESC, o.id DESC`,
+        scope ? [scope.orderIds, scope.customerIds] : [],
       );
       await client.query("COMMIT");
       return {
-        version: Number(versionResult.rows[0]?.version || 1),
+        version,
         orders: result.rows.map((row) => {
           const legacy = row.legacy && typeof row.legacy === "object" ? row.legacy : {};
           const contact = row.contact_snapshot || {};
@@ -5233,13 +5265,23 @@ export class CommerceService {
     }
   }
 
-  private async ordersAfterCommit(version: number): Promise<{
-    version: number;
-    orders: Record<string, unknown>[];
-    refreshRequired?: boolean;
-  }> {
+  private async ordersAfterCommit(
+    version: number,
+    responseOptions?: OrderResponseOptions,
+    orderIds: string[] = [],
+    customerIds: string[] = [],
+  ): Promise<AdminOrdersState> {
     try {
-      return await this.adminOrders();
+      if (!responseOptions) return await this.adminOrders();
+      const baseVersion = responseOptions.baseVersion;
+      // A gap may contain another writer's changes, so never advance a partial snapshot across it.
+      if (!baseVersion || !orderIds.length || (version !== baseVersion + 1 && version !== baseVersion))
+        return { version, orders: [], refreshRequired: true };
+      const state = await this.adminOrders({ orderIds, customerIds, expectedVersion: version });
+      if (state.refreshRequired) return state;
+      if (!orderIds.every((id) => state.orders.some((order) => order.id === id)))
+        return { version, orders: [], refreshRequired: true };
+      return { ...state, responseMode: "delta", baseVersion };
     } catch {
       console.warn("Order command committed; dashboard snapshot refresh deferred");
       return { version, orders: [], refreshRequired: true };
@@ -5251,7 +5293,8 @@ export class CommerceService {
     orderRef: string,
     action: "archive" | "restore" | "delete",
     requestId: string,
-  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    responseOptions?: OrderResponseOptions,
+  ): Promise<AdminOrdersState> {
     const client = await this.pool.connect();
     let clientReleased = false;
     try {
@@ -5356,7 +5399,7 @@ export class CommerceService {
       await client.query("COMMIT");
       client.release();
       clientReleased = true;
-      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1));
+      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1), responseOptions, [order.id]);
     } catch (error) {
       if (!clientReleased) await client.query("ROLLBACK");
       throw error;
@@ -5392,7 +5435,8 @@ export class CommerceService {
       fullAddress?: string | undefined;
     },
     requestId: string,
-  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    responseOptions?: OrderResponseOptions,
+  ): Promise<AdminOrdersState> {
     const client = await this.pool.connect();
     let clientReleased = false;
     try {
@@ -5618,7 +5662,7 @@ export class CommerceService {
       await client.query("COMMIT");
       client.release();
       clientReleased = true;
-      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1));
+      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1), responseOptions, [order.id]);
     } catch (error) {
       if (!clientReleased) await client.query("ROLLBACK");
       throw error;
@@ -5655,7 +5699,8 @@ export class CommerceService {
       fullAddress?: string | undefined;
     },
     requestId: string,
-  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    responseOptions?: OrderResponseOptions,
+  ): Promise<AdminOrdersState> {
     const client = await this.pool.connect();
     let clientReleased = false;
     try {
@@ -5898,7 +5943,10 @@ export class CommerceService {
       await client.query("COMMIT");
       client.release();
       clientReleased = true;
-      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1));
+      return await this.ordersAfterCommit(
+        Number(versionUpdate.rows[0]?.version || 1), responseOptions, [existing.id],
+        existing.customer_user_id ? [existing.customer_user_id] : [],
+      );
     } catch (error) {
       if (!clientReleased) await client.query("ROLLBACK");
       throw error;
@@ -5928,7 +5976,8 @@ export class CommerceService {
     },
     requestId: string,
     includeState = true,
-  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    responseOptions?: OrderResponseOptions,
+  ): Promise<AdminOrdersState> {
     const client = await this.pool.connect();
     let clientReleased = false;
     const flow = [
@@ -5994,7 +6043,7 @@ export class CommerceService {
         transactionOpen = false;
         client.release();
         clientReleased = true;
-        if (includeState) return await this.ordersAfterCommit(Number(version.rows[0]?.version || 1));
+        if (includeState) return await this.ordersAfterCommit(Number(version.rows[0]?.version || 1), responseOptions, [order.id]);
         return { version: Number(version.rows[0]?.version || 1), orders: [] };
       }
 
@@ -6262,7 +6311,7 @@ export class CommerceService {
           orders: [],
         };
       }
-      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1));
+      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1), responseOptions, [order.id]);
     } catch (error) {
       if (transactionOpen) await client.query("ROLLBACK");
       throw error;
@@ -6379,7 +6428,8 @@ export class CommerceService {
       reason: string;
     },
     requestId: string,
-  ): Promise<{ version: number; orders: Record<string, unknown>[] }> {
+    responseOptions?: OrderResponseOptions,
+  ): Promise<AdminOrdersState> {
     const client = await this.pool.connect();
     let clientReleased = false;
     try {
@@ -6535,7 +6585,7 @@ export class CommerceService {
       await client.query("COMMIT");
       client.release();
       clientReleased = true;
-      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1));
+      return await this.ordersAfterCommit(Number(versionUpdate.rows[0]?.version || 1), responseOptions, [order.id]);
     } catch (error) {
       if (!clientReleased) await client.query("ROLLBACK");
       throw error;

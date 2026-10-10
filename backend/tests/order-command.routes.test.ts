@@ -73,6 +73,21 @@ function post(app: ReturnType<typeof application>["app"], path: string, body: Re
 }
 
 describe("order command boundary", () => {
+  it("validates the optional compact response contract without changing command authorization", async () => {
+    const { app, commerce } = application(["orders.manage"]);
+    const body = { expectedStatus: "New", target: "Accepted" };
+    expect((await post(app, "K-1/workflow?responseMode=delta&baseVersion=2", body)).status).toBe(200);
+    expect(commerce.adminOrderWorkflowAction).toHaveBeenLastCalledWith(expect.any(String), "K-1", body,
+      expect.any(String), true, { responseMode: "delta", baseVersion: 2 });
+    for (const query of ["responseMode=unknown", "responseMode=delta&baseVersion=-1",
+      "responseMode=delta&baseVersion=1.5", "responseMode=delta&baseVersion=9007199254740992"]) {
+      expect((await post(app, `K-1/workflow?${query}`, body)).status).toBe(422);
+    }
+    expect(commerce.adminOrderWorkflowAction).toHaveBeenCalledTimes(1);
+    const denied = application(["orders.read"]);
+    expect((await post(denied.app, "K-1/workflow?responseMode=delta&baseVersion=2", body)).status).toBe(403);
+    expect(denied.commerce.adminOrderWorkflowAction).not.toHaveBeenCalled();
+  });
   it("rejects arbitrary price/status/item replacement even for an order manager", async () => {
     const { app, commerce } = application(["orders.manage"]);
     const response = await request(app).put("/api/v1/admin/orders-state")
@@ -101,7 +116,7 @@ describe("order command boundary", () => {
     const { app, commerce } = application(["orders.bulk_manage"]);
     expect((await post(app, "K-1/workflow", { expectedStatus: "New", target: "Accepted" })).status).toBe(200);
     expect((await post(app, "bulk-workflow", { orderRefs: ["K-1"], expectedStatus: "New", target: "Accepted" })).status).toBe(200);
-    expect(commerce.adminOrderWorkflowAction).toHaveBeenCalledWith(expect.any(String), "K-1", { expectedStatus: "New", target: "Accepted" }, expect.any(String));
+    expect(commerce.adminOrderWorkflowAction).toHaveBeenCalledWith(expect.any(String), "K-1", { expectedStatus: "New", target: "Accepted" }, expect.any(String), true, undefined);
     expect(commerce.adminBulkOrderWorkflowAction).toHaveBeenCalledTimes(1);
   });
 });

@@ -21,6 +21,10 @@
   let syncTimer = 0;
   let syncChain = Promise.resolve();
   let catalogDirty = false;
+  let catalogRevision = 0;
+  let sessionEpoch = 0;
+  let refreshPromise = null;
+  let refreshAgain = false;
 
   function normalizeStockKey(modelId, color, size) {
     return JSON.stringify([
@@ -99,6 +103,8 @@
 
   async function syncAdminState() {
     if (!IS_ADMIN || !API_BASE || !serverVersion) return;
+    const revision = catalogRevision;
+    const session = sessionEpoch;
     const payload = await api("/api/v1/admin/catalog-state", {
       method: "PUT",
       body: {
@@ -107,20 +113,28 @@
         items: read("dart_items", []),
       },
     });
-    serverVersion = Number(payload.version || serverVersion);
-    catalogDirty = false;
-    cacheWrite("dart_models", payload.models || []);
-    cacheWrite("dart_items", payload.items || []);
+    if (session !== sessionEpoch) return;
+    const version = Number(payload.version || serverVersion);
+    if (version >= serverVersion) {
+      serverVersion = version;
+      if (revision === catalogRevision) {
+        catalogDirty = false;
+        cacheWrite("dart_models", payload.models || []);
+        cacheWrite("dart_items", payload.items || []);
+      }
+    }
     window.dispatchEvent(new CustomEvent("dart:catalog-synced", { detail: { version: serverVersion } }));
   }
 
   function scheduleAdminSync() {
     if (!IS_ADMIN || !API_BASE || !serverVersion) return;
+    const session = sessionEpoch;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => {
       syncChain = syncChain
-        .then(syncAdminState)
+        .then(() => session === sessionEpoch ? syncAdminState() : undefined)
         .catch(async (error) => {
+          if (session !== sessionEpoch) return;
           console.error("Dart catalogue sync failed", error);
           window.dispatchEvent(new CustomEvent("dart:catalog-sync-error", { detail: { code: error.code || "SYNC_FAILED", message: error.message } }));
           if (error.status === 409) await hydrateCatalog(true);
@@ -131,6 +145,7 @@
   const write = (key, data) => {
     cacheWrite(key, data);
     if (["dart_models", "dart_items"].includes(key)) {
+      catalogRevision += 1;
       catalogDirty = true;
       scheduleAdminSync();
     }
@@ -138,24 +153,48 @@
 
   async function hydrateCatalog(_force = false) {
     if (!API_BASE) throw new Error("Catalogue API is not configured.");
+    const revision = catalogRevision;
+    const session = sessionEpoch;
     if (IS_ADMIN) {
       const state = await api("/api/v1/admin/catalog-state");
-      serverVersion = Number(state.version || 1);
+      const version = Number(state.version || 1);
+      if (session !== sessionEpoch || revision !== catalogRevision || version < serverVersion ||
+          (catalogDirty && !_force)) return;
+      serverVersion = version;
       catalogDirty = false;
       cacheWrite("dart_models", state.models || []);
       cacheWrite("dart_items", state.items || []);
       remoteStock = null;
     } else {
       const state = await api("/api/v1/catalog");
-      serverVersion = Number(state.version || 1);
+      const version = Number(state.version || 1);
+      if (session !== sessionEpoch || version < serverVersion) return;
+      serverVersion = version;
       cacheWrite("dart_models", state.models || []);
       cacheWrite("dart_items", []);
       remoteStock = stockMapFromPayload(state.stock || {});
     }
     await preloadImages().catch(() => {});
+    if (session !== sessionEpoch) return;
     window.dispatchEvent(new CustomEvent("dart:catalog-hydrated", {
       detail: { version: serverVersion, admin: IS_ADMIN },
     }));
+  }
+
+  function refreshChanged() {
+    if (refreshPromise) { refreshAgain = true; return refreshPromise; }
+    const session = sessionEpoch;
+    const promise = (async () => {
+      do {
+        refreshAgain = false;
+        const payload = await api("/api/v1/catalog/version");
+        if (session !== sessionEpoch) return;
+        if (!catalogDirty && Number(payload.version || 0) > serverVersion) await hydrateCatalog();
+      } while (refreshAgain && session === sessionEpoch);
+    })();
+    refreshPromise = promise;
+    void promise.finally(() => { if (refreshPromise === promise) refreshPromise = null; }).catch(() => {});
+    return promise;
   }
 
 
@@ -495,6 +534,7 @@
     products,
     snapshot,
     hydrate: hydrateCatalog,
+    refreshChanged,
     syncAdminState,
     serverVersion: () => serverVersion,
     isServerAuthoritative: () => Boolean(API_BASE && serverVersion),
@@ -507,6 +547,7 @@
   async function checkForServerChanges() {
     if (!API_BASE || versionCheckBusy || document.hidden) return;
     versionCheckBusy = true;
+    const session = sessionEpoch;
     try {
       if (IS_ADMIN && catalogDirty && serverVersion) {
         try {
@@ -519,15 +560,17 @@
           }
         }
       }
+      if (session !== sessionEpoch) return;
       const payload = await api("/api/v1/catalog/version");
+      if (session !== sessionEpoch) return;
       const remoteVersion = Number(payload.version || 0);
       if (remoteVersion && serverVersion && remoteVersion !== serverVersion) {
         await hydrateCatalog(true);
       }
     } catch (error) {
-      console.warn("Dart catalogue live refresh failed", error);
+      if (session === sessionEpoch) console.warn("Dart catalogue live refresh failed", error);
     } finally {
-      versionCheckBusy = false;
+      if (session === sessionEpoch) versionCheckBusy = false;
     }
   }
 
@@ -542,6 +585,17 @@
   window.addEventListener("online", () => {
     if (IS_ADMIN && catalogDirty) scheduleAdminSync();
     checkForServerChanges();
+  });
+  window.addEventListener("dart:data-changed", (event) => {
+    if (!IS_ADMIN || event.detail?.key !== "dart_orders" || event.detail?.source !== "logout") return;
+    sessionEpoch += 1;
+    catalogRevision += 1;
+    serverVersion = 0;
+    remoteStock = null;
+    catalogDirty = refreshAgain = false;
+    versionCheckBusy = false;
+    refreshPromise = null;
+    clearTimeout(syncTimer);
   });
   window.addEventListener("focus", checkForServerChanges);
   document.addEventListener("visibilitychange", () => {

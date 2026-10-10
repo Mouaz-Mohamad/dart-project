@@ -20,6 +20,8 @@ assert.equal((ui.match(/completeCheckout\(order\);/g) || []).length, 2,
 assert(dashboard.includes('event.detail?.key === "dart_orders"') &&
   dashboard.includes('"orders:hydrate", "orders:authoritative", "orders:sync-confirmed"'),
   "Dashboard must not fully render twice for the same orders hydration");
+assert(dashboard.includes('"dart:orders-refresh-failed"'),
+  "A failed secondary refresh must have an admin-facing error state");
 
 const checkoutSource = ui.slice(ui.indexOf("function initCartAndCheckoutEvents()"),
   ui.indexOf("function initAddressMap()"));

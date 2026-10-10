@@ -20,6 +20,8 @@
     "lint": "eslint src tests vitest.config.ts",
     "test": "vitest run",
     "test:integration": "vitest run tests/database.integration.test.ts",
+    "test:load": "node ../scripts/load-store.mjs",
+    "bench:orders": "node --import tsx scripts/benchmark-order-refresh.ts",
     "test:watch": "vitest",
     "check": "npm run check:vercel && npm run lint && npm run typecheck && npm test",
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/database/migrate.ts",

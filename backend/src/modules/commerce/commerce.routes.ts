@@ -17,11 +17,20 @@ import {
   requireActionPermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
-import type { CommerceService } from "./commerce.service.js";
+import type { CommerceService, OrderResponseOptions } from "./commerce.service.js";
 import { fetchRoadRoute } from "./road-routing-provider.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
 const reservationId = z.string().trim().min(16).max(160).regex(/^[A-Za-z0-9_-]+$/);
+
+function orderResponseOptions(request: Request): OrderResponseOptions | undefined {
+  const query = z.object({
+    responseMode: z.literal("delta").optional(),
+    baseVersion: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+  }).parse(request.query);
+  if (!query.responseMode) return undefined;
+  return { responseMode: query.responseMode, baseVersion: query.baseVersion ?? 0 };
+}
 
 const cartLineSchema = z.object({
   modelId: z.string().trim().min(1).max(120),
@@ -315,6 +324,8 @@ export function createCommerceRouter(
           orderRef,
           body,
           String(request.id),
+          true,
+          orderResponseOptions(request),
         ),
       );
     },
@@ -359,6 +370,7 @@ export function createCommerceRouter(
           orderRef,
           body,
           String(request.id),
+          orderResponseOptions(request),
         ),
       );
     },
@@ -386,6 +398,7 @@ export function createCommerceRouter(
           orderRef,
           body.action,
           String(request.id),
+          orderResponseOptions(request),
         ),
       );
     },
@@ -490,6 +503,7 @@ export function createCommerceRouter(
           request.auth!.userId,
           body,
           String(request.id),
+          orderResponseOptions(request),
         ),
       );
     },
@@ -534,6 +548,7 @@ export function createCommerceRouter(
           orderRef,
           body,
           String(request.id),
+          orderResponseOptions(request),
         ),
       );
     },
