@@ -98,8 +98,16 @@ const server = http.createServer((req, res) => {
     }
     await page.waitForFunction(() => window.DartState.read('dart_cart', []).length === 0);
     if (nativeRestore) assert.ok(requests.filter((req) => req.path === '/api/v1/analytics/events').length <= beforeVisit + 1, 'restoration and prerendering do not invent visits');
-    await page.goBack({ waitUntil: "commit" }); await page.waitForURL(origin + '/', { waitUntil: 'commit' });
-    await page.goForward({ waitUntil: "commit" }); await page.waitForURL(/products(?:\.html)?$/, { waitUntil: "commit" });
+    // Read history in the active document after native restoration. A restored document
+    // emits pageshow, not a new load, and CDP's navigation-history cursor may lag behind it.
+    await page.evaluate(() => { setTimeout(() => history.back(), 0); });
+    await page.waitForFunction((url) => location.href === url, origin + '/');
+    if (nativeRestore) {
+      assert.equal(await page.evaluate(() => window.__documentToken), homeToken, 'Back restores the original Home document');
+      assert.equal(await page.evaluate(() => window.__restored), true);
+    }
+    await page.evaluate(() => { setTimeout(() => history.forward(), 0); });
+    await page.waitForFunction(() => /\/products(?:\.html)?$/.test(location.pathname));
     if (nativeRestore) assert.equal(await page.evaluate(() => window.__documentToken), productsToken);
     assert.deepEqual(errors, []);
 
