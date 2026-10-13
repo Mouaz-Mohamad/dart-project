@@ -364,6 +364,8 @@ const server = http.createServer((request, response) => {
   }) });
   await dashboard.evaluate(() => window.__orderCommands[0]);
   assert.equal(await rowA.getAttribute("aria-busy"), "false");
+  await dashboard.waitForFunction(() =>
+    document.querySelector('#orders-container [data-id="order-b"] .status-pill')?.textContent === 'Accepted');
   assert.equal(await rowB.locator(".status-pill").textContent(), "Accepted");
   assert.equal(await dashboard.evaluate(() => window.DartOrdersApi.serverVersion()), 4);
   await dashboard.close();
