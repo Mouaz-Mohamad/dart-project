@@ -2,6 +2,7 @@
 // HTTP bridge for attaching Set identities to the existing atomic physical cart reservation.
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -79,13 +80,13 @@ export function createSetCartRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
-  const guestWriteLimit = rateLimit({
+  const guestWriteLimit = rateLimit({ store: sharedRateLimitStore(config, "set-cart-1"),
     windowMs: 600_000,
     limit: 40,
     standardHeaders: "draft-8",
     legacyHeaders: false,
   });
-  const guestReadLimit = rateLimit({
+  const guestReadLimit = rateLimit({ store: sharedRateLimitStore(config, "set-cart-2"),
     windowMs: 600_000,
     limit: 80,
     standardHeaders: "draft-8",

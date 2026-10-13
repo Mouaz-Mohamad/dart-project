@@ -1,3 +1,4 @@
+import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
 // DART CODE GUIDE | backend/src/modules/catalog/catalog.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
@@ -21,6 +22,23 @@ const stateSchema = z.object({
   items: z.array(z.record(z.string(), z.unknown())),
 });
 
+const pageSchema = z.object({
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+  q: z.string().trim().max(160).optional(),
+  category: z.string().trim().max(120).optional(),
+  sort: z.enum(["newest", "price-low", "price-high", "name"]).optional(),
+});
+const adminPageSchema = pageSchema.pick({ page:true, limit:true, q:true }).strict();
+const patchSchema = stateSchema.extend({
+  models: z.array(z.record(z.string(), z.unknown())).max(500),
+  items: z.array(z.record(z.string(), z.unknown())).max(1000),
+  recordVersions: z.object({
+    models: z.record(z.string(), z.number().int().nonnegative()),
+    items: z.record(z.string(), z.number().int().nonnegative()),
+  }),
+}).refine((body) => body.models.length+body.items.length>0, "At least one record change is required");
+
 export function createCatalogRouter(
   catalog: CatalogService,
   identity: IdentityService,
@@ -42,9 +60,11 @@ export function createCatalogRouter(
     response.status(200).json({ version: await catalog.version() });
   });
 
-  router.get("/catalog", async (_request, response) => {
+  router.get("/catalog", async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
-    response.status(200).json(await catalog.publicCatalog());
+    response.status(200).json(await catalog.publicCatalog(
+      ["page", "limit", "q", "category", "sort"].some((key) => key in request.query) ? pageSchema.parse(request.query) : undefined,
+    ));
   });
 
   router.get("/catalog/sitemap.xml", async (_request, response) => {
@@ -83,8 +103,26 @@ export function createCatalogRouter(
     requireAccountType("staff"),
     requireMfa,
     requireAnyPermission("catalog.manage", "catalog.read"),
-    async (_request, response) => {
-      response.status(200).json(await catalog.adminState());
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await catalog.adminState(
+        ["page", "limit", "q", "category", "sort"].some((key) => key in request.query) ? { page: adminPageSchema.parse(request.query) } : undefined,
+      ));
+    },
+  );
+
+  router.patch(
+    "/admin/catalog-state",
+    signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requireAnyPermission("catalog.manage", "catalog.edit"),
+    async (request, response) => {
+      const body = patchSchema.parse(request.body);
+      const result = await catalog.replaceState(
+        body.expectedVersion, body.models, body.items, request.auth!.userId,
+        String(request.id), body.recordVersions,
+      );
+      await dispatchOutbox(outbox, 10);
+      response.status(200).json(result);
     },
   );
 
@@ -104,7 +142,7 @@ export function createCatalogRouter(
         request.auth!.userId,
         String(request.id),
       );
-      await outbox?.processBatch(20).catch(() => undefined);
+      await dispatchOutbox(outbox, 20);
       response.status(200).json(result);
     },
   );

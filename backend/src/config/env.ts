@@ -49,6 +49,7 @@ const environmentSchema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:4173"),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
+  RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
@@ -99,6 +100,7 @@ export interface AppConfig {
   trustProxyHops: number;
   rateLimitWindowMs: number;
   rateLimitMax: number;
+  rateLimitStore?: "memory" | "postgres";
   logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
   allowDevelopmentSeed: boolean;
   authPepper: string;
@@ -213,6 +215,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxyHops: parsed.data.TRUST_PROXY_HOPS,
     rateLimitWindowMs: parsed.data.RATE_LIMIT_WINDOW_MS,
     rateLimitMax: parsed.data.RATE_LIMIT_MAX,
+    rateLimitStore: parsed.data.RATE_LIMIT_STORE,
     logLevel: parsed.data.LOG_LEVEL,
     allowDevelopmentSeed: parsed.data.ALLOW_DEVELOPMENT_SEED,
     authPepper: parsed.data.AUTH_PEPPER,

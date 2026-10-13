@@ -19,6 +19,7 @@ Codex reads this file automatically before every task, so the rules below apply 
 - Run backend checks: `cd backend && npm run check`
 - Run bounded read-only load checks: `cd backend && npm run test:load -- --base http://127.0.0.1:4000 --users 10 --duration 10`
 - Benchmark isolated order responses: `cd backend && TEST_DATABASE_URL=<local-test-database-url> npm run bench:orders` (local test database only; creates and removes synthetic data).
+- Benchmark isolated catalog scaling: `cd backend && TEST_DATABASE_URL=<local-test-database-url> npm run bench:scale` (local test database only; synthetic data and identity, never a production capacity certification).
 - Run existing frontend checks: use the individual Node.js/Python commands listed under `docs/README.md` → **Checks**.
 - Lint: `cd backend && npm run lint`
 - Run a single migration: `cd backend && npm run db:migrate:one -- <migration-name>`

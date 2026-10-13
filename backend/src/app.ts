@@ -3,6 +3,8 @@
 import express, { type Express } from "express";
 import pino from "pino";
 import { readFile } from "node:fs/promises";
+import { registerSharedRateLimits, pruneRateLimits } from "./security/shared-rate-limit.js";
+import { applyScaleFoundationMigration, SCALE_FOUNDATION_MIGRATION } from "./database/scale-foundation-migration.js";
 import { createApp } from "./application.js";
 import {
   EnvironmentConfigError,
@@ -68,6 +70,7 @@ export function createRuntimeApplication(
   const config = loadConfig(source);
   const logger = createLogger(config);
   const database = createDatabasePool(config);
+  if (config.rateLimitStore === "postgres") registerSharedRateLimits(config, database, config.authPepper);
   const emailProvider = createEmailProvider(config);
   const operationalAlerts = new OperationalAlertService(
     emailProvider,
@@ -136,6 +139,10 @@ export function createRuntimeApplication(
     financeService,
     trafficAnalyticsService,
     outboxService,
+    maintenanceJob: async () => {
+      await catalogService.cleanupReservations();
+      if (config.rateLimitStore === "postgres") await pruneRateLimits(database);
+    },
     waitingService,
     operationalAlerts,
   });
@@ -164,6 +171,12 @@ if (runtime && process.env.DART_APPLY_SET_HOMEPAGE_MIGRATION) {
   const sql = await readFile(new URL(`../migrations/${SET_HOMEPAGE_MIGRATION}.sql`, import.meta.url), "utf8");
   const applied = await applySetHomepageMigration(runtime.database, sql, process.env.DART_APPLY_SET_HOMEPAGE_MIGRATION);
   runtime.logger.info({ migration: SET_HOMEPAGE_MIGRATION, applied }, "Explicit Set homepage migration verified");
+}
+
+if (runtime && process.env.DART_APPLY_SCALE_FOUNDATION_MIGRATION) {
+  const sql = await readFile(new URL(`../migrations/${SCALE_FOUNDATION_MIGRATION}.sql`, import.meta.url), "utf8");
+  const applied = await applyScaleFoundationMigration(runtime.database, sql, process.env.DART_APPLY_SCALE_FOUNDATION_MIGRATION);
+  runtime.logger.info({ migration: SCALE_FOUNDATION_MIGRATION, applied }, "Explicit scale migration verified");
 }
 
 const app = runtime?.app ?? createMisconfiguredApplication();

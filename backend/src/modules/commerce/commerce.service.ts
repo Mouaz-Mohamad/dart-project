@@ -1447,8 +1447,13 @@ export class CommerceService {
                 AND NOT is_archived
                 AND NOT is_deleted
                 AND lower(status)='in stock'
+                AND EXISTS (
+                  SELECT 1 FROM waitlist_entries
+                   WHERE status='waiting' AND eligible_after<=now()
+                )
               ORDER BY updated_at DESC,id
               LIMIT 100
+              FOR UPDATE SKIP LOCKED
            ) candidate`,
       );
       await client.query(

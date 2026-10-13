@@ -2,6 +2,7 @@
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router, type Request, type Response } from "express";
 import type { Logger } from "pino";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -9,8 +10,9 @@ import { AppError } from "../../http/app-error.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
-function limiter() {
+function limiter(config: object, scope: string) {
   return rateLimit({
+    store: sharedRateLimitStore(config, scope),
     windowMs: 15 * 60_000,
     limit: 10,
     standardHeaders: "draft-8",
@@ -131,10 +133,10 @@ export function createStaffOnboardingRouter(
     });
   }
 
-  router.post("/admin/auth/email/start", limiter(), startOrResend);
-  router.post("/admin/auth/email/resend", limiter(), startOrResend);
+  router.post("/admin/auth/email/start", limiter(config, "staff-1"), startOrResend);
+  router.post("/admin/auth/email/resend", limiter(config, "staff-2"), startOrResend);
 
-  router.post("/admin/auth/email/verify", limiter(), async (request, response) => {
+  router.post("/admin/auth/email/verify", limiter(config, "staff-3"), async (request, response) => {
     const body = z.object({
       challengeId: z.uuid(),
       code: z.string().regex(/^\d{6}$/),
