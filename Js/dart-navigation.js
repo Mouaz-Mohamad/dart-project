@@ -97,8 +97,15 @@
       if (match) {
         restoring = true;
         try {
+          const originKey = nav.currentEntry.key;
           const result = nav.traverseTo(match.key);
-          void result.finished.catch(() => { restoring = false; root.location.assign(href); });
+          // Both promises can reject when a newer navigation supersedes this one.
+          void result.committed.catch(() => {});
+          void result.finished.catch((error) => {
+            restoring = false;
+            if (error?.name === "AbortError" || doc.hidden || nav.currentEntry?.key !== originKey) return;
+            root.location.assign(href);
+          });
           return;
         } catch { restoring = false; }
       }
