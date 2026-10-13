@@ -231,6 +231,11 @@
       { rootMargin: "700px 0px", threshold: 0.01 },
     );
     observer.observe(container);
+    document.addEventListener("dart:critical-ready", () => {
+      const prepare = () => { if (!document.hidden && !document.prerendering) activateReviews(); };
+      if (root.requestIdleCallback) root.requestIdleCallback(prepare, { timeout: 2000 });
+      else root.setTimeout(prepare, 100);
+    }, { once: true });
   }
 
   function productRenderSignature() {

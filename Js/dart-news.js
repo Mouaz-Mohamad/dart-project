@@ -50,5 +50,12 @@
       }, { rootMargin: "300px 0px" });
       observer.observe(section);
     } else void boot();
+    // Automatic background preparation after the header/footer and critical content are ready.
+    doc.addEventListener("dart:critical-ready", () => {
+      const prepare = () => { if (!doc.hidden && !doc.prerendering) void boot(); };
+      if (root.requestIdleCallback) root.requestIdleCallback(prepare, { timeout: 2000 });
+      else root.setTimeout(prepare, 100);
+    }, { once: true });
+    doc.addEventListener("prerenderingchange", () => void boot(), { once: true });
   }
 })(window);

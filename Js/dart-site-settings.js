@@ -112,12 +112,7 @@
   }
 
   function localRaw() {
-    try {
-      const cached = JSON.parse(root.localStorage?.getItem(PUBLIC_CACHE_KEY) || "null");
-      if (cached && typeof cached === "object") return cached;
-    } catch {
-      try { root.localStorage?.removeItem(PUBLIC_CACHE_KEY); } catch {}
-    }
+    try { root.localStorage?.removeItem(PUBLIC_CACHE_KEY); } catch {}
     const value = root.DartState?.read?.(STORAGE_KEY, {});
     return value && typeof value === "object" ? value : {};
   }
@@ -132,7 +127,6 @@
     cachedSettings = normalized;
     if (persist) {
       root.DartState?.write?.(STORAGE_KEY, normalized, { source: "site-settings" });
-      try { root.localStorage?.setItem(PUBLIC_CACHE_KEY, JSON.stringify(normalized)); } catch {}
     }
     announce(normalized);
     return normalized;
@@ -341,6 +335,7 @@
 
   const siteSettingsApi = {
     STORAGE_KEY, defaults, get, save, hydrate, sync, checkForChanges,
+    get ready() { return serverVersion > 0; },
     serverVersion: () => serverVersion,
     cairoParts, cairoDateKey, activeSiteDiscount, activeAnnouncements,
     visibleColors, applyPublicMedia, number, heroWordSize,
@@ -351,13 +346,8 @@
 
   if (!root.document) return;
   root.document.addEventListener("DOMContentLoaded", () => {
-    let hasCachedPublicSettings = false;
-    try {
-      hasCachedPublicSettings = Boolean(root.localStorage?.getItem(PUBLIC_CACHE_KEY));
-    } catch {}
     const hero = root.document?.querySelector(".hero > img[data-dart-hero]");
     if (hero) hero.dataset.dartMediaReady = "true";
-    if (hasCachedPublicSettings) void applyPublicMedia();
     hydrate()
       .then(applyPublicMedia)
       .catch((error) => {

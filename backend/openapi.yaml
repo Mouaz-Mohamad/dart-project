@@ -21,7 +21,44 @@ tags:
   - name: Internal Jobs
   - name: Sets
   - name: News
+  - name: Finance
 paths:
+  /admin/finance/report:
+    get:
+      tags: [Finance]
+      operationId: readAdminFinanceReport
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff MFA and finance.read or a granular finance view permission. One repeatable-read snapshot supplies current, previous and up to twelve chart periods. Archived payloads are excluded. Only fields in allowedSections are returned. The whole report span is limited to 3660 days. Cache-Control is no-store.
+      parameters:
+        - { name: start, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end, in: query, required: true, schema: { type: string, format: date } }
+        - { name: previousStart, in: query, required: true, schema: { type: string, format: date } }
+        - { name: previousEnd, in: query, required: true, schema: { type: string, format: date } }
+        - { name: buckets, in: query, schema: { type: integer, minimum: 0, maximum: 12, default: 12 } }
+      responses:
+        "200":
+          description: All periods calculated from one consistent database snapshot; monetary fields use the existing EGP summary contract.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [allowedSections, periods]
+                properties:
+                  allowedSections: { type: array, items: { type: string, enum: [revenue, cost, profit, cashflow, inventory, marketing] } }
+                  periods:
+                    type: array
+                    minItems: 2
+                    maxItems: 14
+                    items:
+                      type: object
+                      required: [start, end, summary]
+                      properties:
+                        start: { type: string, format: date }
+                        end: { type: string, format: date }
+                        summary: { type: object, additionalProperties: true, description: Only permitted finance-section fields. }
+        "401": { description: Authentication required }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { description: Invalid dates, ordering, bucket count or report span }
   /admin/orders-state:
     get:
       tags: [Orders]

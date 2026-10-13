@@ -12,6 +12,8 @@ Codex reads this file automatically before every task, so the rules below apply 
 
 - Install: `cd backend && npm install`
 - Build storefront CSS delivery bundle: `node scripts/build-home-css.cjs`
+- Build Home and navigation JavaScript delivery bundles: `node scripts/build-home-runtime.cjs`
+- Stage production HTML with its shared shell and content-versioned assets: `node scripts/stage-vercel-public.cjs`
 - Run storefront dev server: run the CSS build command after storefront CSS changes, then `python3 -m http.server 4173`
 - Run backend dev server: `cd backend && npm run dev`
 - Run backend checks: `cd backend && npm run check`

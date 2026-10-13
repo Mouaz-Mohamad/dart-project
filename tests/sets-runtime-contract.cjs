@@ -77,7 +77,7 @@ assert(sets.includes('if (setPurchaseBusy || !activeSet) return;') && sets.inclu
 assert(sets.includes('cacheFastCartSnapshot(current)') && sets.includes('if (typeof updateCartCount==="function") updateCartCount();'), "Set purchase must update the visible cart immediately while reservation persists");
 assert(sets.includes('function renderSetAwareCartCount()') && sets.includes('const total=standaloneCount+groupKeys.size'), "One commercial Set must count as one cart unit while its physical pieces remain reserved separately");
 const cartBootstrap = ui.indexOf("document.addEventListener('DOMContentLoaded', async () => {");
-assert(cartBootstrap >= 0 && ui.indexOf('initCartAndCheckoutEvents();',cartBootstrap) < ui.indexOf("await loadSection('header-container'",cartBootstrap), "Cart content must render before the asynchronous header request");
+assert(cartBootstrap >= 0 && ui.indexOf('initCartAndCheckoutEvents();',cartBootstrap) < ui.indexOf("await Promise.all([loadSection('header-container'",cartBootstrap), "Cart content must render before the asynchronous shared shell fallback");
 
 const documentListeners = new Map();
 const runtimeDocument = {

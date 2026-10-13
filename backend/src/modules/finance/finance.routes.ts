@@ -13,7 +13,7 @@ import {
   requirePermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
-import type { FinanceService, FinanceSummary } from "./finance.service.js";
+import type { FinanceRange, FinanceService, FinanceSummary } from "./finance.service.js";
 
 const querySchema = z
   .object({
@@ -57,6 +57,29 @@ const exportQuerySchema = querySchema.and(z.object({
     "pnl",
   ]),
 }));
+
+const reportQuerySchema = querySchema.and(z.object({
+  previousStart: z.iso.date(),
+  previousEnd: z.iso.date(),
+  buckets: z.coerce.number().int().min(0).max(12).default(12),
+})).refine((value) => value.previousStart <= value.previousEnd, {
+  message: "previousStart must be on or before previousEnd", path: ["previousEnd"],
+}).refine((value) =>
+  Math.max(Date.parse(value.end), Date.parse(value.previousEnd)) -
+  Math.min(Date.parse(value.start), Date.parse(value.previousStart)) <= 3660 * 86400000,
+{ message: "A finance report cannot span more than ten years" });
+
+export function financeReportRanges(current: FinanceRange, previous: FinanceRange, buckets: number): FinanceRange[] {
+  const ranges = [current, previous];
+  if (!buckets) return ranges;
+  const start = Date.parse(current.start), end = Date.parse(current.end);
+  const step = Math.max(1, Math.ceil(((end - start) / 86400000 + 1) / buckets));
+  for (let cursor = start; cursor <= end; cursor += step * 86400000) {
+    ranges.push({ start: new Date(cursor).toISOString().slice(0, 10),
+      end: new Date(Math.min(end, cursor + (step - 1) * 86400000)).toISOString().slice(0, 10) });
+  }
+  return ranges;
+}
 
 export function financeSummarySection(
   summary: FinanceSummary,
@@ -179,6 +202,31 @@ export function createFinanceRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
+
+  router.get(
+    "/admin/finance/report",
+    signedIn,
+    requireAccountType("staff"),
+    requireMfa,
+    requireAnyPermission("finance.read", ...Object.values(FINANCE_SECTION_PERMISSIONS)),
+    async (request, response) => {
+      const query = reportQuerySchema.parse(request.query);
+      const allowedSections = (Object.keys(FINANCE_SECTION_PERMISSIONS) as FinanceSection[]).filter(
+        (section) => request.auth!.permissions.includes("finance.read") ||
+          request.auth!.permissions.includes(FINANCE_SECTION_PERMISSIONS[section]),
+      );
+      const ranges = financeReportRanges({ start: query.start, end: query.end },
+        { start: query.previousStart, end: query.previousEnd }, query.buckets);
+      const summaries = await finance.summaries(ranges);
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json({
+        allowedSections,
+        periods: ranges.map((range, index) => ({ ...range,
+          summary: Object.assign({}, ...allowedSections.map((section) => financeSummarySection(summaries[index]!, section))),
+        })),
+      });
+    },
+  );
 
   router.post(
     "/admin/finance/settlements",

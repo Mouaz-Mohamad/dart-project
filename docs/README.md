@@ -12,6 +12,7 @@
 - `CHANGELOG.md` — سجل التغييرات التاريخي.
 - `DEPLOYMENT_BATCHING.md` — قواعد batching فقط؛ النشر نفسه إجراء منفصل ولا يحدث لمجرد وجود كود جديد.
 - `ORDER_PERFORMANCE.md` — compact order responses, safe related refresh, isolated measurements and bounded load commands.
+- `FINANCE_NAVIGATION_PERFORMANCE.md` — archived expenses, combined finance snapshots, visible rendering, public preloading and native page restoration.
 - `NEWS.md` — News behavior, API/migration references, end-to-end checks and quality review.
 - `IMAGE_DESCRIPTIONS.md` — وصف الأصول البصرية.
 

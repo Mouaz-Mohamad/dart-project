@@ -14,7 +14,7 @@ function financePool(options: {
   deliveredRows?: Array<Record<string, unknown>>;
   returnPayloads?: Array<Record<string, unknown>>;
   itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string }>;
-  acquiredItems?: Array<{ item_code: string; cost_snapshot_minor: string }>;
+  acquiredItems?: Array<{ item_code: string; cost_snapshot_minor: string; created_at?: Date }>;
   expensePayloads?: Array<Record<string, unknown>>;
 } = {}) {
   const queries: string[] = [];
@@ -45,7 +45,7 @@ function financePool(options: {
           ],
         };
       }
-      if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: options.acquiredItems ?? [] };
+      if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: (options.acquiredItems ?? []).map((row) => ({ ...row, created_at: row.created_at ?? new Date(`${String(values[0])}T12:00:00Z`) })) };
       if (sql.includes("FROM inventory_items")) return { rows: options.itemCosts ?? [] };
       if (sql.includes("SELECT DISTINCT oi.item_code")) return { rows: [] };
       if (sql.includes("FROM return_requests")) {
@@ -87,6 +87,31 @@ function financePool(options: {
 }
 
 describe("finance summary integrity", () => {
+  it("excludes timestamp-archived expenses from costs, profit and paid cash out without deleting their history", async () => {
+    const fixture = financePool({
+      deliveredRows: [],
+      returnPayloads: [],
+      expensePayloads: [
+        { id: "active", date: "2026-09-06", category: "Salaries", amount: 40, status: "Paid" },
+        { id: "archived", date: "2026-09-06", category: "Salaries", amount: 100, status: "Paid", archivedAt: "2026-09-06T12:28:14.179Z" },
+        { id: "archived-purchase", date: "2026-09-06", category: "Inventory Acquisition", amount: 200, status: "Paid", archivedAt: "2026-09-06T12:28:14.179Z" },
+        { id: "deleted", date: "2026-09-06", category: "Salaries", amount: 300, status: "Paid", isDeleted: true },
+        { id: "legacy-archived", date: "2026-09-06", category: "Salaries", amount: 400, status: "Paid", isArchived: true },
+      ],
+    });
+    const summary = await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30");
+    expect(summary.operatingExpenses).toBe(40);
+    expect(summary.totalCost).toBe(40);
+    expect(summary.brandTotalCost).toBe(40);
+    expect(summary.netProfit).toBe(-40);
+    expect(summary.brandNetProfit).toBe(-40);
+    expect(summary.paidExpenseCashOut).toBe(40);
+    expect(summary.inventoryPurchaseCashOut).toBe(0);
+    expect(summary.cashOut).toBe(40);
+    expect(summary.netCashFlow).toBe(-40);
+    expect(fixture.queries.every((sql) => !/DELETE|UPDATE|INSERT/.test(sql))).toBe(true);
+  });
+
   it("uses one snapshot and keeps refunds as cash-out instead of deducting them twice", async () => {
     const fixture = financePool();
     const summary = await new FinanceService(fixture.pool as never).summary(
@@ -166,6 +191,32 @@ describe("finance summary integrity", () => {
     expect(financeSource).toContain(
       "await readRelationalDashboardDomain(client, domain)",
     );
+  });
+
+  it("calculates multiple periods from one read snapshot and assigns costs to their Cairo dates", async () => {
+    const fixture = financePool({
+      deliveredRows: [], returnPayloads: [],
+      acquiredItems: [
+        { item_code: "first", cost_snapshot_minor: "3000", created_at: new Date("2026-09-03T09:00:00Z") },
+        { item_code: "next-month-in-cairo", cost_snapshot_minor: "7000", created_at: new Date("2026-09-30T22:30:00Z") },
+      ],
+      expensePayloads: [
+        { id: "first", date: "2026-09-03", category: "Salaries", amount: 40, status: "Paid" },
+        { id: "second", date: "2026-10-03", category: "Salaries", amount: 60, status: "Paid" },
+      ],
+    });
+    const periods = await new FinanceService(fixture.pool as never).summaries([
+      { start: "2026-09-01", end: "2026-09-30" },
+      { start: "2026-10-01", end: "2026-10-31" },
+      { start: "2026-09-01", end: "2026-10-31" },
+    ]);
+    expect(periods.map((period) => period.operatingExpenses)).toEqual([40, 60, 100]);
+    expect(periods.map((period) => period.physicalItemCost)).toEqual([30, 70, 100]);
+    expect(fixture.pool.connect).toHaveBeenCalledOnce();
+    expect(fixture.client.release).toHaveBeenCalledOnce();
+    expect(fixture.queries.filter((sql) => sql.startsWith("BEGIN"))).toHaveLength(1);
+    expect(fixture.queries.filter((sql) => sql.includes("FROM finance_records"))).toHaveLength(3);
+    expect(fixture.queries.at(-1)).toBe("COMMIT");
   });
 
   it("rolls the read transaction back when a finance query fails", async () => {

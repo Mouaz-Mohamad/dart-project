@@ -48,6 +48,14 @@ if (/indexedDB\s*\.\s*(?:open|deleteDatabase)\s*\(/.test(catalog)) {
 }
 
 const cart = fs.readFileSync("Js/dart-ui.js", "utf8");
+const platform = fs.readFileSync("Js/dart-platform.js", "utf8");
+if (/sessionStorage\.setItem\((?:API_USER_CACHE_KEY|CART_UI_CACHE_KEY|DART_CART_UI_CACHE_KEY)/.test(platform + cart)) {
+  failures.push('Customer profiles and cart snapshots must remain in memory and rehydrate from the API');
+}
+if (/sessionStorage\?\.setItem\(DRAFT_KEY/.test(fs.readFileSync('Js/dart-sets.js', 'utf8')) ||
+    /localStorage\?\.setItem\(PUBLIC_CACHE_KEY/.test(fs.readFileSync('Js/dart-site-settings.js', 'utf8'))) {
+  failures.push('Set groups and public business settings must rehydrate from the API, never persistent browser caches');
+}
 if (/function\s+saveCartToLocalStorage\s*\(/.test(cart)) {
   failures.push("Js/dart-ui.js: stale saveCartToLocalStorage name hides the server-backed cart contract");
 }

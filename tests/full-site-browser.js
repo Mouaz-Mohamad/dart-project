@@ -91,6 +91,21 @@ const server = http.createServer((request, response) => {
                         : pathname === "/api/v1/reviews"
                           ? { reviews: [] }
                           : {};
+    if (pathname === "/api/v1/admin/finance/report") {
+      const query = new URL(request.url, "http://test").searchParams;
+      const current = { start: query.get("start"), end: query.get("end") };
+      const previous = { start: query.get("previousStart"), end: query.get("previousEnd") };
+      const ranges = [current, previous];
+      const start = Date.parse(current.start), end = Date.parse(current.end);
+      const step = Math.max(1, Math.ceil(((end - start) / 86400000 + 1) / 12));
+      for (let day = start; day <= end; day += step * 86400000) ranges.push({
+        start: new Date(day).toISOString().slice(0, 10), end: new Date(Math.min(end, day + (step - 1) * 86400000)).toISOString().slice(0, 10),
+      });
+      response.end(JSON.stringify({ allowedSections: ["revenue", "cost", "profit", "cashflow", "inventory", "marketing"],
+        periods: ranges.map(range => ({ ...range, summary: { netRevenue: 0, brandTotalCost: 0, brandNetProfit: 0,
+          orderFrequencyBuckets: {oneOrder:0,twoOrders:0,threeOrders:0,fourOrders:0,fivePlusOrders:0}, marketing: {} } })) }));
+      return;
+    }
     response.end(JSON.stringify(payload));
     return;
   }

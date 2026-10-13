@@ -127,7 +127,7 @@ assert(finance.includes("Inventory Investment"), "Finance overview must expose i
 assert(finance.includes("Inventory Acquisition"), "Finance must support paid inventory acquisition as a cash-flow-only category without double-counting P&L.");
 assert(finance.includes("inventoryPurchaseCashOut"), "Cash Flow must expose paid inventory acquisition separately from operating expenses.");
 assert(finance.includes("marginApplicable") && finance.includes("Margin N/A"), "Refund-only periods must not show a misleading positive margin.");
-assert(finance.includes("authoritativeSummary(bucketRange)"), "Financial chart buckets must use authoritative server summaries.");
+assert(finance.includes("authoritativeSummary(period)") && finance.includes("/api/v1/admin/finance/report?"), "Financial chart periods must use the combined authoritative server report.");
 assert(finance.includes("let summary = authoritativeSummary(range)"), "Goal actuals must start from the authoritative server summary.");
 assert(finance.includes("downloadAuthoritativeFinanceCsv"), "P&L and Cash Flow exports must be downloaded from the authoritative backend.");
 assert(dashboard.includes("dartAssignReturnRepresentative"), "Dashboard return requests must support representative assignment.");

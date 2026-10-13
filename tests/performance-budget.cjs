@@ -50,6 +50,7 @@ function walk(root) {
 const generatedDeliveryFiles = new Set([
   "Js/dart-ui.home.min.js",
   "Js/dart-platform.home.min.js",
+  "Js/dart-navigation.min.js",
 ]);
 const jsFiles = ["Js", "Eye"]
   .flatMap(walk)
@@ -64,6 +65,7 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-checkout-stability.js",
   "Js/dart-sets.js",
   "Js/dart-set-modal-ui.js",
+  "Js/dart-navigation.js",
   "Eye/dart-sets-admin.js",
   "Js/dart-news-runtime.js",
   "Js/dart-news-links.js",
@@ -124,9 +126,9 @@ for (const file of jsFiles) {
 if (coreJsBytes > 912 * 1024) {
   failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 912KB`);
 }
-// News adds isolated, on-demand modules; initial/core and homepage ceilings stay unchanged.
-if (lazyJsBytes > 431 * 1024) {
-  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 431KB`);
+// Combined finance hydration and public navigation add 14 KiB of source. Home delivery still fits 225 KiB.
+if (lazyJsBytes > 445 * 1024) {
+  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 445KB`);
 }
 
 // Platform delivery is still an exact minified derivative of dart-platform.js.
@@ -149,6 +151,13 @@ const generatedPlatformRuntime = ["Js/dart-platform.js", "Js/dart-platform.home.
 
 // Homepage UI is now a curated page-scoped runtime, not a minified copy of dart-ui.js.
 const curatedHomeUi = "Js/dart-ui.home.min.js";
+for (const [input, output] of [['scripts/home-ui.source.js', curatedHomeUi], ['Js/dart-navigation.js', 'Js/dart-navigation.min.js']]) {
+  const text = require('../scripts/build-home-runtime.cjs').sourceText(input);
+  const hash = crypto.createHash('sha256').update(text).digest('hex');
+  if (!fs.readFileSync(output, 'utf8').startsWith(`/* source-sha256:${hash}; terser:5.44.0 */`)) {
+    failures.push(`${output}: stale delivery runtime; run node scripts/build-home-runtime.cjs`);
+  }
+}
 if (!fs.existsSync(curatedHomeUi)) {
   failures.push(`${curatedHomeUi}: curated homepage UI runtime is missing`);
 } else {

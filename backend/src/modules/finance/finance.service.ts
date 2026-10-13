@@ -111,7 +111,7 @@ function toMinor(value: unknown): number {
 }
 
 function active(row: JsonRow): boolean {
-  return !row.isDeleted && !row.isArchived;
+  return !row.archivedAt && !row.isDeleted && !row.isArchived;
 }
 
 function isInventoryAcquisitionExpense(row: JsonRow): boolean {
@@ -186,6 +186,330 @@ function uniqueCompletedReturns(
     );
   }
   return [...unique.values()];
+}
+
+export interface FinanceRange { start: string; end: string; }
+
+interface AcquiredItemRow {
+  item_code: string;
+  cost_snapshot_minor: string;
+  created_at: Date;
+}
+
+interface FinanceSnapshot {
+  delivered: DeliveredOrderRow[];
+  acquired: AcquiredItemRow[];
+  itemCost: Map<string, number>;
+  deliveredCodes: Set<string>;
+  states: Map<string, JsonRow[]>;
+}
+
+// Every period is calculated from the same immutable, server-read snapshot.
+function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string): FinanceSummary {
+  const { states, itemCost, deliveredCodes } = snapshot;
+  const deliveredRows = snapshot.delivered.filter((row) => inRange(row.event_at, start, end));
+  const acquiredRows = snapshot.acquired.filter((row) => inRange(row.created_at, start, end));
+  const returns = states.get("returns") || [];
+  const periodReturns = uniqueCompletedReturns(returns, start, end);
+  const refundsRows = periodReturns.filter((row) => !isExchange(row));
+  const refundsMinor = refundsRows.reduce(
+    (sum, row) => sum + toMinor(row.refundAmount),
+    0,
+  );
+
+  const cogsReversalMinor = refundsRows
+    .filter((row) => inspection(row) === "Good")
+    .reduce((sum, row) => {
+      const snapshot = row.originalLineSnapshot as JsonRow | undefined;
+      const snapshotCost = snapshot?.costSnapshot;
+      const costMinor = Number.isFinite(Number(snapshotCost))
+        ? toMinor(snapshotCost)
+        : itemCost.get(String(row.itemCode || "")) || 0;
+      return sum + costMinor;
+    }, 0);
+
+  const returnCourierMinor = periodReturns
+    .filter(isExchange)
+    .reduce((sum, row) => sum + toMinor(row.brandCourierFee), 0);
+
+  const expenses = (states.get("finance_expenses") || []).filter(active);
+  const operatingExpenseMinor = expenses
+    .filter((row) => String(row.status || "").toLowerCase() !== "void")
+    .filter((row) => !isInventoryAcquisitionExpense(row))
+    .filter((row) => inRange(row.date, start, end))
+    .reduce((sum, row) => sum + toMinor(row.amount), 0);
+  const paidExpenseMinor = expenses
+    .filter((row) => String(row.status || "").toLowerCase() === "paid")
+    .filter((row) => !isInventoryAcquisitionExpense(row))
+    .filter((row) => inRange(row.paidAt || row.date, start, end))
+    .reduce((sum, row) => sum + toMinor(row.amount), 0);
+  const inventoryPurchaseCashOutMinor = expenses
+    .filter((row) => String(row.status || "").toLowerCase() === "paid")
+    .filter(isInventoryAcquisitionExpense)
+    .filter((row) => inRange(row.paidAt || row.date, start, end))
+    .reduce((sum, row) => sum + toMinor(row.amount), 0);
+
+  const allSettlements = (states.get("finance_settlements") || []).filter(active);
+  const settlements = allSettlements
+    .filter((row) => inRange(row.settlementDate, start, end));
+  const codFeesMinor = settlements.reduce(
+    (sum, row) => sum + toMinor(row.fee),
+    0,
+  );
+  const settlementCashInMinor = settlements.reduce(
+    (sum, row) => sum + toMinor(row.amountReceived),
+    0,
+  );
+  const settledOrderIds = new Set(
+    allSettlements.map((row) => String(row.orderId || "")).filter(Boolean),
+  );
+
+  const damageRows = (states.get("damage") || [])
+    .filter(active)
+    .filter((row) =>
+      ["damaged", "destroyed"].includes(
+        String(row.status || "").toLowerCase(),
+      ),
+    )
+    .filter((row) =>
+      inRange(
+        row.destroyedAt ||
+          row.inspectedAt ||
+          row.updatedAt ||
+          row.date ||
+          row.createdAt,
+        start,
+        end,
+      ),
+    );
+
+  const damageSeen = new Set<string>();
+  let damageLossMinor = 0;
+  let damageValueMinor = 0;
+  for (const row of damageRows) {
+    const itemCode = String(row.itemCode || row.id || "");
+    if (!itemCode || damageSeen.has(itemCode)) continue;
+    damageSeen.add(itemCode);
+    const rowCost = Number.isFinite(Number(row.costSnapshot))
+      ? toMinor(row.costSnapshot)
+      : itemCost.get(itemCode) || 0;
+    damageValueMinor += rowCost;
+    if (!deliveredCodes.has(itemCode)) damageLossMinor += rowCost;
+  }
+
+  const acquiredCodes = new Set(
+    acquiredRows.map((row) => row.item_code),
+  );
+  const incrementalDamageSeen = new Set<string>();
+  let incrementalDamageMinor = 0;
+  for (const row of damageRows) {
+    const itemCode = String(row.itemCode || row.id || "");
+    if (
+      !itemCode ||
+      acquiredCodes.has(itemCode) ||
+      incrementalDamageSeen.has(itemCode)
+    ) {
+      continue;
+    }
+    incrementalDamageSeen.add(itemCode);
+    incrementalDamageMinor += Number.isFinite(Number(row.costSnapshot))
+      ? toMinor(row.costSnapshot)
+      : itemCost.get(itemCode) || 0;
+  }
+
+  const grossRevenueMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.final_minor || 0),
+    0,
+  );
+  const grossCogsMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.cogs_minor || 0),
+    0,
+  );
+  const deliveryCostMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.delivery_cost_minor || 0),
+    0,
+  );
+  const grossSoldUnits = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.sold_units || 0),
+    0,
+  );
+
+  const netRevenueMinor = grossRevenueMinor - refundsMinor;
+  const netCogsMinor = grossCogsMinor - cogsReversalMinor;
+  // Representative delivery allocation is already embedded in item cost.
+  const totalOperatingMinor =
+    operatingExpenseMinor +
+    codFeesMinor +
+    damageLossMinor +
+    returnCourierMinor;
+  const totalCostMinor = netCogsMinor + totalOperatingMinor;
+
+  const physicalItemCostMinor = acquiredRows.reduce(
+    (sum, row) => sum + Number(row.cost_snapshot_minor || 0),
+    0,
+  );
+  const brandTotalCostMinor =
+    physicalItemCostMinor +
+    operatingExpenseMinor +
+    codFeesMinor +
+    returnCourierMinor +
+    incrementalDamageMinor;
+
+  const grossProfitMinor = netRevenueMinor - netCogsMinor;
+  const netProfitMinor = netRevenueMinor - totalCostMinor;
+  const brandNetProfitMinor = netRevenueMinor - brandTotalCostMinor;
+
+  const customerOrders = new Map<string, number>();
+  for (const order of deliveredRows) {
+    if (!order.customer_user_id) continue;
+    customerOrders.set(
+      order.customer_user_id,
+      (customerOrders.get(order.customer_user_id) || 0) + 1,
+    );
+  }
+  const orderCounts = [...customerOrders.values()];
+  const uniqueCustomers = customerOrders.size;
+  const returningCustomers = orderCounts.filter((count) => count >= 2).length;
+  const oneTimeCustomers = orderCounts.filter((count) => count === 1).length;
+  const orderFrequencyBuckets = {
+    oneOrder: orderCounts.filter((count) => count === 1).length,
+    twoOrders: orderCounts.filter((count) => count === 2).length,
+    threeOrders: orderCounts.filter((count) => count === 3).length,
+    fourOrders: orderCounts.filter((count) => count === 4).length,
+    fivePlusOrders: orderCounts.filter((count) => count >= 5).length,
+  };
+
+  let fallbackCodCashInMinor = 0;
+  for (const order of deliveredRows) {
+    const method = String(order.payment_method || "").toLowerCase();
+    const isCod =
+      method === "cod" || method.includes("cash on") || method === "cash";
+    const paid = ["paid", "partially refunded", "refunded"].includes(
+      String(order.payment_status || "").toLowerCase(),
+    );
+    if (!isCod || !paid || settledOrderIds.has(order.order_code)) continue;
+    const paidMinor =
+      Number(order.amount_paid_minor || 0) > 0
+        ? Number(order.amount_paid_minor)
+        : Number(order.final_minor || 0);
+    const collectedMinor = Math.max(0, paidMinor);
+    fallbackCodCashInMinor += Math.max(
+      0,
+      collectedMinor -
+        Math.min(collectedMinor, Number(order.delivery_cost_minor || 0)),
+    );
+  }
+
+  const cashInMinor =
+    settlementCashInMinor + fallbackCodCashInMinor;
+  const cashOutMinor =
+    paidExpenseMinor +
+    inventoryPurchaseCashOutMinor +
+    codFeesMinor +
+    returnCourierMinor +
+    refundsMinor;
+
+  const marketingRows = (states.get("finance_marketing") || [])
+    .filter(active)
+    .filter((row) => inRange(row.date, start, end));
+  const marketingMinor = marketingRows.reduce<{
+    spend: number;
+    revenue: number;
+    impressions: number;
+    clicks: number;
+    orders: number;
+  }>(
+    (result, row) => {
+      result.spend += toMinor(row.spend);
+      result.revenue += toMinor(row.attributedRevenue);
+      result.impressions += Math.max(0, Number(row.impressions) || 0);
+      result.clicks += Math.max(0, Number(row.clicks) || 0);
+      result.orders += Math.max(0, Number(row.orders) || 0);
+      return result;
+    },
+    { spend: 0, revenue: 0, impressions: 0, clicks: 0, orders: 0 },
+  );
+
+  const returnedUnits = refundsRows.length;
+  const soldUnits = grossSoldUnits - returnedUnits;
+  const marketingSpend = money(marketingMinor.spend);
+  const marketingRevenue = money(marketingMinor.revenue);
+
+  const summary: FinanceSummary = {
+    grossRevenue: money(grossRevenueMinor),
+    refunds: money(refundsMinor),
+    netRevenue: money(netRevenueMinor),
+    grossCogs: money(grossCogsMinor),
+    cogsReversal: money(cogsReversalMinor),
+    netCogs: money(netCogsMinor),
+    operatingExpenses: money(operatingExpenseMinor),
+    codFees: money(codFeesMinor),
+    damageLoss: money(damageLossMinor),
+    damageValue: money(damageValueMinor),
+    returnCourierCosts: money(returnCourierMinor),
+    deliveryCosts: money(deliveryCostMinor),
+    totalOperatingExpenses: money(totalOperatingMinor),
+    totalCost: money(totalCostMinor),
+    grossProfit: money(grossProfitMinor),
+    netProfit: money(netProfitMinor),
+    physicalItemCost: money(physicalItemCostMinor),
+    incrementalDamage: money(incrementalDamageMinor),
+    brandTotalCost: money(brandTotalCostMinor),
+    brandNetProfit: money(brandNetProfitMinor),
+    margin: netRevenueMinor > 0
+      ? metric((netProfitMinor / netRevenueMinor) * 100)
+      : 0,
+    grossMargin: netRevenueMinor > 0
+      ? metric((grossProfitMinor / netRevenueMinor) * 100)
+      : 0,
+    marginApplicable: netRevenueMinor > 0,
+    deliveredOrders: deliveredRows.length,
+    grossSoldUnits,
+    returnedUnits,
+    soldUnits,
+    averageOrderValue:
+      deliveredRows.length > 0
+        ? money(Math.round(netRevenueMinor / deliveredRows.length))
+        : 0,
+    uniqueCustomers,
+    returningCustomers,
+    oneTimeCustomers,
+    orderFrequencyBuckets,
+    repeatRate: uniqueCustomers > 0
+      ? metric((returningCustomers / uniqueCustomers) * 100)
+      : 0,
+    cashIn: money(cashInMinor),
+    cashOut: money(cashOutMinor),
+    netCashFlow: money(cashInMinor - cashOutMinor),
+    paidExpenseCashOut: money(paidExpenseMinor),
+    inventoryPurchaseCashOut: money(inventoryPurchaseCashOutMinor),
+    refundCashOut: money(refundsMinor),
+    marketing: {
+      spend: marketingSpend,
+      revenue: marketingRevenue,
+      roas: marketingSpend ? metric(marketingRevenue / marketingSpend) : 0,
+      cac:
+        marketingMinor.orders > 0
+          ? metric(marketingSpend / marketingMinor.orders)
+          : 0,
+      ctr:
+        marketingMinor.impressions > 0
+          ? metric((marketingMinor.clicks / marketingMinor.impressions) * 100)
+          : 0,
+      cpc:
+        marketingMinor.clicks > 0
+          ? metric(marketingSpend / marketingMinor.clicks)
+          : 0,
+      conversion:
+        marketingMinor.clicks > 0
+          ? metric((marketingMinor.orders / marketingMinor.clicks) * 100)
+          : 0,
+      impressions: marketingMinor.impressions,
+      clicks: marketingMinor.clicks,
+      orders: marketingMinor.orders,
+    },
+  };
+  return summary;
 }
 
 export class FinanceService {
@@ -407,6 +731,21 @@ export class FinanceService {
   }
 
   public async summary(start: string, end: string): Promise<FinanceSummary> {
+    const [summary] = await this.summaries([{ start, end }]);
+    return summary!;
+  }
+
+  public async summaries(ranges: readonly FinanceRange[]): Promise<FinanceSummary[]> {
+    if (!ranges.length) return [];
+    if (ranges.length > 14) throw new AppError(400, "INVALID_FINANCE_RANGES", "Too many finance periods");
+    const start = ranges.reduce((first, range) => range.start < first ? range.start : first, ranges[0]!.start);
+    const end = ranges.reduce((last, range) => range.end > last ? range.end : last, ranges[0]!.end);
+    const snapshot = await this.readSnapshot(start, end);
+    // Release the database connection before calculating chart periods in memory.
+    return ranges.map((range) => calculateSnapshot(snapshot, range.start, range.end));
+  }
+
+  private async readSnapshot(start: string, end: string): Promise<FinanceSnapshot> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
@@ -437,11 +776,8 @@ export class FinanceService {
         [start, end],
       );
 
-      const acquiredResult = await client.query<{
-        item_code: string;
-        cost_snapshot_minor: string;
-      }>(
-        `SELECT item_code, cost_snapshot_minor::text
+      const acquiredResult = await client.query<AcquiredItemRow>(
+        `SELECT item_code, cost_snapshot_minor::text, created_at
            FROM inventory_items
           WHERE NOT is_deleted
             AND created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
@@ -491,308 +827,9 @@ export class FinanceService {
         );
       }
 
-      const returns = states.get("returns") || [];
-      const periodReturns = uniqueCompletedReturns(returns, start, end);
-      const refundsRows = periodReturns.filter((row) => !isExchange(row));
-      const refundsMinor = refundsRows.reduce(
-        (sum, row) => sum + toMinor(row.refundAmount),
-        0,
-      );
-
-      const cogsReversalMinor = refundsRows
-        .filter((row) => inspection(row) === "Good")
-        .reduce((sum, row) => {
-          const snapshot = row.originalLineSnapshot as JsonRow | undefined;
-          const snapshotCost = snapshot?.costSnapshot;
-          const costMinor = Number.isFinite(Number(snapshotCost))
-            ? toMinor(snapshotCost)
-            : itemCost.get(String(row.itemCode || "")) || 0;
-          return sum + costMinor;
-        }, 0);
-
-      const returnCourierMinor = periodReturns
-        .filter(isExchange)
-        .reduce((sum, row) => sum + toMinor(row.brandCourierFee), 0);
-
-      const expenses = (states.get("finance_expenses") || []).filter(active);
-      const operatingExpenseMinor = expenses
-        .filter((row) => String(row.status || "").toLowerCase() !== "void")
-        .filter((row) => !isInventoryAcquisitionExpense(row))
-        .filter((row) => inRange(row.date, start, end))
-        .reduce((sum, row) => sum + toMinor(row.amount), 0);
-      const paidExpenseMinor = expenses
-        .filter((row) => String(row.status || "").toLowerCase() === "paid")
-        .filter((row) => !isInventoryAcquisitionExpense(row))
-        .filter((row) => inRange(row.paidAt || row.date, start, end))
-        .reduce((sum, row) => sum + toMinor(row.amount), 0);
-      const inventoryPurchaseCashOutMinor = expenses
-        .filter((row) => String(row.status || "").toLowerCase() === "paid")
-        .filter(isInventoryAcquisitionExpense)
-        .filter((row) => inRange(row.paidAt || row.date, start, end))
-        .reduce((sum, row) => sum + toMinor(row.amount), 0);
-
-      const allSettlements = (states.get("finance_settlements") || []).filter(active);
-      const settlements = allSettlements
-        .filter((row) => inRange(row.settlementDate, start, end));
-      const codFeesMinor = settlements.reduce(
-        (sum, row) => sum + toMinor(row.fee),
-        0,
-      );
-      const settlementCashInMinor = settlements.reduce(
-        (sum, row) => sum + toMinor(row.amountReceived),
-        0,
-      );
-      const settledOrderIds = new Set(
-        allSettlements.map((row) => String(row.orderId || "")).filter(Boolean),
-      );
-
-      const damageRows = (states.get("damage") || [])
-        .filter(active)
-        .filter((row) =>
-          ["damaged", "destroyed"].includes(
-            String(row.status || "").toLowerCase(),
-          ),
-        )
-        .filter((row) =>
-          inRange(
-            row.destroyedAt ||
-              row.inspectedAt ||
-              row.updatedAt ||
-              row.date ||
-              row.createdAt,
-            start,
-            end,
-          ),
-        );
-
-      const damageSeen = new Set<string>();
-      let damageLossMinor = 0;
-      let damageValueMinor = 0;
-      for (const row of damageRows) {
-        const itemCode = String(row.itemCode || row.id || "");
-        if (!itemCode || damageSeen.has(itemCode)) continue;
-        damageSeen.add(itemCode);
-        const rowCost = Number.isFinite(Number(row.costSnapshot))
-          ? toMinor(row.costSnapshot)
-          : itemCost.get(itemCode) || 0;
-        damageValueMinor += rowCost;
-        if (!deliveredCodes.has(itemCode)) damageLossMinor += rowCost;
-      }
-
-      const acquiredCodes = new Set(
-        acquiredResult.rows.map((row) => row.item_code),
-      );
-      const incrementalDamageSeen = new Set<string>();
-      let incrementalDamageMinor = 0;
-      for (const row of damageRows) {
-        const itemCode = String(row.itemCode || row.id || "");
-        if (
-          !itemCode ||
-          acquiredCodes.has(itemCode) ||
-          incrementalDamageSeen.has(itemCode)
-        ) {
-          continue;
-        }
-        incrementalDamageSeen.add(itemCode);
-        incrementalDamageMinor += Number.isFinite(Number(row.costSnapshot))
-          ? toMinor(row.costSnapshot)
-          : itemCost.get(itemCode) || 0;
-      }
-
-      const grossRevenueMinor = deliveredResult.rows.reduce(
-        (sum, row) => sum + Number(row.final_minor || 0),
-        0,
-      );
-      const grossCogsMinor = deliveredResult.rows.reduce(
-        (sum, row) => sum + Number(row.cogs_minor || 0),
-        0,
-      );
-      const deliveryCostMinor = deliveredResult.rows.reduce(
-        (sum, row) => sum + Number(row.delivery_cost_minor || 0),
-        0,
-      );
-      const grossSoldUnits = deliveredResult.rows.reduce(
-        (sum, row) => sum + Number(row.sold_units || 0),
-        0,
-      );
-
-      const netRevenueMinor = grossRevenueMinor - refundsMinor;
-      const netCogsMinor = grossCogsMinor - cogsReversalMinor;
-      // Representative delivery allocation is already embedded in item cost.
-      const totalOperatingMinor =
-        operatingExpenseMinor +
-        codFeesMinor +
-        damageLossMinor +
-        returnCourierMinor;
-      const totalCostMinor = netCogsMinor + totalOperatingMinor;
-
-      const physicalItemCostMinor = acquiredResult.rows.reduce(
-        (sum, row) => sum + Number(row.cost_snapshot_minor || 0),
-        0,
-      );
-      const brandTotalCostMinor =
-        physicalItemCostMinor +
-        operatingExpenseMinor +
-        codFeesMinor +
-        returnCourierMinor +
-        incrementalDamageMinor;
-
-      const grossProfitMinor = netRevenueMinor - netCogsMinor;
-      const netProfitMinor = netRevenueMinor - totalCostMinor;
-      const brandNetProfitMinor = netRevenueMinor - brandTotalCostMinor;
-
-      const customerOrders = new Map<string, number>();
-      for (const order of deliveredResult.rows) {
-        if (!order.customer_user_id) continue;
-        customerOrders.set(
-          order.customer_user_id,
-          (customerOrders.get(order.customer_user_id) || 0) + 1,
-        );
-      }
-      const orderCounts = [...customerOrders.values()];
-      const uniqueCustomers = customerOrders.size;
-      const returningCustomers = orderCounts.filter((count) => count >= 2).length;
-      const oneTimeCustomers = orderCounts.filter((count) => count === 1).length;
-      const orderFrequencyBuckets = {
-        oneOrder: orderCounts.filter((count) => count === 1).length,
-        twoOrders: orderCounts.filter((count) => count === 2).length,
-        threeOrders: orderCounts.filter((count) => count === 3).length,
-        fourOrders: orderCounts.filter((count) => count === 4).length,
-        fivePlusOrders: orderCounts.filter((count) => count >= 5).length,
-      };
-
-      let fallbackCodCashInMinor = 0;
-      for (const order of deliveredResult.rows) {
-        const method = String(order.payment_method || "").toLowerCase();
-        const isCod =
-          method === "cod" || method.includes("cash on") || method === "cash";
-        const paid = ["paid", "partially refunded", "refunded"].includes(
-          String(order.payment_status || "").toLowerCase(),
-        );
-        if (!isCod || !paid || settledOrderIds.has(order.order_code)) continue;
-        const paidMinor =
-          Number(order.amount_paid_minor || 0) > 0
-            ? Number(order.amount_paid_minor)
-            : Number(order.final_minor || 0);
-        const collectedMinor = Math.max(0, paidMinor);
-        fallbackCodCashInMinor += Math.max(
-          0,
-          collectedMinor -
-            Math.min(collectedMinor, Number(order.delivery_cost_minor || 0)),
-        );
-      }
-
-      const cashInMinor =
-        settlementCashInMinor + fallbackCodCashInMinor;
-      const cashOutMinor =
-        paidExpenseMinor +
-        inventoryPurchaseCashOutMinor +
-        codFeesMinor +
-        returnCourierMinor +
-        refundsMinor;
-
-      const marketingRows = (states.get("finance_marketing") || [])
-        .filter(active)
-        .filter((row) => inRange(row.date, start, end));
-      const marketingMinor = marketingRows.reduce<{
-        spend: number;
-        revenue: number;
-        impressions: number;
-        clicks: number;
-        orders: number;
-      }>(
-        (result, row) => {
-          result.spend += toMinor(row.spend);
-          result.revenue += toMinor(row.attributedRevenue);
-          result.impressions += Math.max(0, Number(row.impressions) || 0);
-          result.clicks += Math.max(0, Number(row.clicks) || 0);
-          result.orders += Math.max(0, Number(row.orders) || 0);
-          return result;
-        },
-        { spend: 0, revenue: 0, impressions: 0, clicks: 0, orders: 0 },
-      );
-
-      const returnedUnits = refundsRows.length;
-      const soldUnits = grossSoldUnits - returnedUnits;
-      const marketingSpend = money(marketingMinor.spend);
-      const marketingRevenue = money(marketingMinor.revenue);
-
-      const summary: FinanceSummary = {
-        grossRevenue: money(grossRevenueMinor),
-        refunds: money(refundsMinor),
-        netRevenue: money(netRevenueMinor),
-        grossCogs: money(grossCogsMinor),
-        cogsReversal: money(cogsReversalMinor),
-        netCogs: money(netCogsMinor),
-        operatingExpenses: money(operatingExpenseMinor),
-        codFees: money(codFeesMinor),
-        damageLoss: money(damageLossMinor),
-        damageValue: money(damageValueMinor),
-        returnCourierCosts: money(returnCourierMinor),
-        deliveryCosts: money(deliveryCostMinor),
-        totalOperatingExpenses: money(totalOperatingMinor),
-        totalCost: money(totalCostMinor),
-        grossProfit: money(grossProfitMinor),
-        netProfit: money(netProfitMinor),
-        physicalItemCost: money(physicalItemCostMinor),
-        incrementalDamage: money(incrementalDamageMinor),
-        brandTotalCost: money(brandTotalCostMinor),
-        brandNetProfit: money(brandNetProfitMinor),
-        margin: netRevenueMinor > 0
-          ? metric((netProfitMinor / netRevenueMinor) * 100)
-          : 0,
-        grossMargin: netRevenueMinor > 0
-          ? metric((grossProfitMinor / netRevenueMinor) * 100)
-          : 0,
-        marginApplicable: netRevenueMinor > 0,
-        deliveredOrders: deliveredResult.rows.length,
-        grossSoldUnits,
-        returnedUnits,
-        soldUnits,
-        averageOrderValue:
-          deliveredResult.rows.length > 0
-            ? money(Math.round(netRevenueMinor / deliveredResult.rows.length))
-            : 0,
-        uniqueCustomers,
-        returningCustomers,
-        oneTimeCustomers,
-        orderFrequencyBuckets,
-        repeatRate: uniqueCustomers > 0
-          ? metric((returningCustomers / uniqueCustomers) * 100)
-          : 0,
-        cashIn: money(cashInMinor),
-        cashOut: money(cashOutMinor),
-        netCashFlow: money(cashInMinor - cashOutMinor),
-        paidExpenseCashOut: money(paidExpenseMinor),
-        inventoryPurchaseCashOut: money(inventoryPurchaseCashOutMinor),
-        refundCashOut: money(refundsMinor),
-        marketing: {
-          spend: marketingSpend,
-          revenue: marketingRevenue,
-          roas: marketingSpend ? metric(marketingRevenue / marketingSpend) : 0,
-          cac:
-            marketingMinor.orders > 0
-              ? metric(marketingSpend / marketingMinor.orders)
-              : 0,
-          ctr:
-            marketingMinor.impressions > 0
-              ? metric((marketingMinor.clicks / marketingMinor.impressions) * 100)
-              : 0,
-          cpc:
-            marketingMinor.clicks > 0
-              ? metric(marketingSpend / marketingMinor.clicks)
-              : 0,
-          conversion:
-            marketingMinor.clicks > 0
-              ? metric((marketingMinor.orders / marketingMinor.clicks) * 100)
-              : 0,
-          impressions: marketingMinor.impressions,
-          clicks: marketingMinor.clicks,
-          orders: marketingMinor.orders,
-        },
-      };
+      const snapshot = { delivered: deliveredResult.rows, acquired: acquiredResult.rows, itemCost, deliveredCodes, states };
       await client.query("COMMIT");
-      return summary;
+      return snapshot;
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;

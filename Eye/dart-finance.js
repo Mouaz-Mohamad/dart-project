@@ -171,6 +171,13 @@
   const serverFinancePending = new Map();
   const serverFinanceErrors = new Map();
   let financeSummaryRevision = 0;
+  let financeReportSupported = null;
+  let financeRenderQueued = false;
+  const chartBindings = new Map();
+  let financeContentHost = null;
+  let financeContentMarkup = "";
+  let financeChartGeneration = 0;
+  let financeReportFingerprint = "";
   let serverFinanceDenied = false;
   let serverFinanceRefreshTimer = 0;
   let adminAuthenticated = Boolean(root.DartAdminAccess?.list?.().length);
@@ -1164,6 +1171,8 @@
     calculateSummary,
     authoritativeSummary,
     hydrateAuthoritativeFinance,
+    bucketRanges: financeBucketRanges,
+    render: scheduleFinanceRender,
     comparison,
     invoiceStatus,
     budgetRows,
@@ -1215,6 +1224,7 @@
   }
 
   function authoritativeSummary(range) {
+    if (serverFinanceErrors.has(financeRangeKey(range))) return null;
     return serverFinanceSummaries.get(financeRangeKey(range)) || null;
   }
 
@@ -1256,6 +1266,81 @@
     return summary;
   }
 
+  function financeBucketRanges(range) {
+    const start = Date.parse(dateInputValue(range.start)), end = Date.parse(dateInputValue(range.end));
+    const step = Math.max(1, Math.ceil(((end - start) / 864e5 + 1) / 12));
+    const ranges = [];
+    for (let day = start; day <= end; day += step * 864e5) {
+      ranges.push({ start: parseDate(new Date(day).toISOString().slice(0, 10)),
+        end: endOfDay(parseDate(new Date(Math.min(end, day + (step - 1) * 864e5)).toISOString().slice(0, 10))) });
+    }
+    return ranges;
+  }
+
+  function financeVisible() {
+    const section = document.querySelector(".dashboard-section.active-section");
+    return !section || section.id === "brand" || section.id === "finance";
+  }
+
+  function scheduleFinanceRender() {
+    if (financeRenderQueued || !financeVisible() || document.hidden) return;
+    financeRenderQueued = true;
+    const render = () => { financeRenderQueued = false; renderAllFinance(); };
+    if (root.requestAnimationFrame) root.requestAnimationFrame(render);
+    else root.setTimeout(render, 0);
+  }
+
+  async function hydrateFinanceReport(range, force) {
+    const ranges = [range, range.previous, ...financeBucketRanges(range)];
+    const currentKey = financeRangeKey(range), previousKey = financeRangeKey(range.previous);
+    const key = `report:${currentKey}:${previousKey}:${financeViewSections().join(",")}`;
+    if (!force && ranges.every((period) => authoritativeSummary(period))) return true;
+    if (serverFinancePending.has(key)) return serverFinancePending.get(key);
+    const knownError = serverFinanceErrors.get(currentKey);
+    if (!force && knownError) throw knownError;
+    const revision = financeSummaryRevision;
+    const query = new URLSearchParams({ start: dateInputValue(range.start), end: dateInputValue(range.end),
+      previousStart: dateInputValue(range.previous.start), previousEnd: dateInputValue(range.previous.end), buckets: "12" });
+    const promise = (async () => {
+      let payload;
+      try { payload = await root.DartAdminApi.request(`/api/v1/admin/finance/report?${query}`); }
+      catch (error) {
+        // Older API deployments remain usable while the two production builds complete.
+        if (error?.status === 404 || error?.status === 405) { financeReportSupported = false; return false; }
+        throw error;
+      }
+      if (revision !== financeSummaryRevision) return false;
+      const allowed = financeViewSections().filter((section) => payload?.allowedSections?.includes(section));
+      if (!allowed.length || !Array.isArray(payload?.periods) ||
+          !ranges.every((period) => payload.periods.some((row) =>
+            `${row.start}:${row.end}` === financeRangeKey(period) && row.summary && typeof row.summary === "object"))) {
+        throw new Error("Finance report response is incomplete.");
+      }
+      // Commit all periods together. No older response can mix into a newer report.
+      const fingerprint = JSON.stringify([allowed, payload.periods]);
+      if (fingerprint !== financeReportFingerprint) {
+        financeReportFingerprint = fingerprint;
+        financeChartGeneration += 1;
+      }
+      payload.periods.forEach((row) => {
+        const periodKey = `${row.start}:${row.end}`;
+        if (!ranges.some((period) => financeRangeKey(period) === periodKey)) return;
+        serverFinanceSummaries.set(periodKey, { ...row.summary, __allowedSections: allowed });
+        serverFinanceErrors.delete(periodKey);
+      });
+      financeReportSupported = true;
+      return true;
+    })().catch((error) => {
+      if (revision !== financeSummaryRevision) return false;
+      serverFinanceErrors.set(currentKey, error);
+      serverFinanceErrors.set(previousKey, error);
+      if (error?.status === 401 || error?.status === 403) serverFinanceDenied = true;
+      throw error;
+    }).finally(() => { if (serverFinancePending.get(key) === promise) serverFinancePending.delete(key); });
+    serverFinancePending.set(key, promise);
+    return promise;
+  }
+
   async function hydrateServerFinanceSummary(range, force = false) {
     if (!root.DartAdminApi?.request || serverFinanceDenied) return null;
     const key = financeRangeKey(range);
@@ -1263,10 +1348,12 @@
       return serverFinanceSummaries.get(key);
     }
     if (serverFinancePending.has(key)) return serverFinancePending.get(key);
+    if (!force && serverFinanceErrors.has(key)) throw serverFinanceErrors.get(key);
     const revision = financeSummaryRevision;
     const promise = fetchFinanceSummaryForRange(range)
       .then((summary) => {
         if (revision !== financeSummaryRevision) return null;
+        if (JSON.stringify(serverFinanceSummaries.get(key)) !== JSON.stringify(summary)) financeChartGeneration += 1;
         serverFinanceSummaries.set(key, summary);
         serverFinanceErrors.delete(key);
         return summary;
@@ -1288,6 +1375,8 @@
   async function hydrateAuthoritativeFinance(range = currentRange(), force = false) {
     if (serverFinanceDenied || !adminAuthenticated || document.hidden) return false;
     try {
+      if (financeReportSupported !== false && await hydrateFinanceReport(range, force)) return true;
+      if (financeReportSupported !== false) return false;
       await Promise.all([
         hydrateServerFinanceSummary(range, force),
         hydrateServerFinanceSummary(range.previous, force),
@@ -1310,7 +1399,7 @@
 
   function scheduleFinanceRefresh(delayMs = FINANCE_REFRESH_MS) {
     clearTimeout(serverFinanceRefreshTimer);
-    if (!adminAuthenticated || serverFinanceDenied || document.hidden) return;
+    if (!adminAuthenticated || serverFinanceDenied || document.hidden || !financeVisible()) return;
     const jitter = delayMs >= FINANCE_REFRESH_MS
       ? Math.floor(Math.random() * Math.min(5_000, delayMs * 0.1))
       : 0;
@@ -1321,7 +1410,7 @@
   }
 
   async function refreshFinanceFromServer(force = true) {
-    if (!adminAuthenticated || serverFinanceDenied || document.hidden) return;
+    if (!adminAuthenticated || serverFinanceDenied || document.hidden || !financeVisible()) return;
     financeLastAttemptAt = Date.now();
     const ok = await hydrateAuthoritativeFinance(currentRange(), force);
     if (ok) {
@@ -1545,6 +1634,12 @@
         void hydrateAuthoritativeFinance(range);
       }
       const unavailable = serverFinanceDenied || financeSummaryError(range);
+      ["dart-financial-chart", "dart-returning-chart", "dart-goals-chart"].forEach((id) => {
+        const canvas = document.getElementById(id);
+        if (canvas) canvas.hidden = true;
+      });
+      const reportStatus = document.getElementById("dart-financial-empty");
+      if (reportStatus) { reportStatus.hidden = false; reportStatus.innerHTML = financeSummaryStatusMarkup(range); }
       [
         [".sales-cont", unavailable ? "Unavailable" : "Loading…"],
         [".cost-cont", unavailable ? "Unavailable" : "Loading…"],
@@ -1614,8 +1709,19 @@
   function replaceChart(key, canvasId, config) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !chartAvailable()) return null;
-    if (state.charts[key]?.destroy) state.charts[key].destroy();
-    state.charts[key] = new root.Chart(canvas.getContext("2d"), config);
+    const binding = chartBindings.get(key), chart = state.charts[key];
+    // Tooltip callbacks close over previous-period data, which JSON omits.
+    const signature = `${financeChartGeneration}:${JSON.stringify(config)}`;
+    if (chart && binding?.canvas === canvas && binding.signature === signature) return chart;
+    if (chart?.update && binding?.canvas === canvas && binding.type === config.type) {
+      chart.data = config.data;
+      chart.options = config.options;
+      chart.update("none");
+    } else {
+      chart?.destroy?.();
+      state.charts[key] = new root.Chart(canvas.getContext("2d"), config);
+    }
+    chartBindings.set(key, { canvas, signature, type: config.type });
     return state.charts[key];
   }
 
@@ -1724,39 +1830,23 @@
 
   function financialBuckets(data, range) {
     void data;
-    const totalDays = daysInclusive(range.start, range.end);
-    const step = Math.max(1, Math.ceil(totalDays / 12));
-    const buckets = [];
-    const missing = [];
-    let cursor = startOfDay(range.start);
-    while (cursor <= range.end) {
-      const bucketStart = startOfDay(cursor);
-      const bucketEnd = endOfDay(addDays(bucketStart, step - 1));
-      if (bucketEnd > range.end) bucketEnd.setTime(range.end.getTime());
-      const bucketRange = { start: bucketStart, end: bucketEnd };
-      const summary = authoritativeSummary(bucketRange);
-      if (!summary) {
-        missing.push(hydrateServerFinanceSummary(bucketRange));
-      } else {
-        buckets.push({
-          label: step === 1
-            ? bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })
-            : `${bucketStart.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}–${bucketEnd.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
-          revenue: summary.netRevenue,
-          cost: summary.brandTotalCost,
-          profit: summary.brandNetProfit,
-        });
-      }
-      cursor = startOfDay(addDays(bucketEnd, 1));
-    }
+    const periods = financeBucketRanges(range);
+    const missing = periods.filter((period) => !authoritativeSummary(period));
     if (missing.length) {
-      void Promise.allSettled(missing).then(() => {
-        renderBrandFinance();
-        if (state.financeTab === "overview") renderFinanceSection();
-      });
+      if (financeReportSupported !== false) {
+        if (!financeSummaryError(range)) void hydrateAuthoritativeFinance(range);
+      } else if (!missing.some(financeSummaryError)) {
+        void Promise.allSettled(missing.map((period) => hydrateServerFinanceSummary(period))).then(scheduleFinanceRender);
+      }
       return null;
     }
-    return buckets;
+    return periods.map((period) => {
+      const summary = authoritativeSummary(period);
+      const label = period.start.toLocaleDateString("en-EG", { day: "numeric", month: "short" });
+      return { label: dateInputValue(period.start) === dateInputValue(period.end) ? label
+          : `${label}–${period.end.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
+        revenue: summary.netRevenue, cost: summary.brandTotalCost, profit: summary.brandNetProfit };
+    });
   }
 
   function renderFinancialChart(data, range, summary) {
@@ -1781,7 +1871,8 @@
       const loading = document.getElementById("dart-financial-empty");
       if (loading) {
         loading.hidden = false;
-        loading.textContent = "Loading authoritative finance series…";
+        loading.textContent = financeBucketRanges(range).some(financeSummaryError)
+          ? "Finance series could not be loaded. Use Retry to try again." : "Loading authoritative finance series…";
       }
       return;
     }
@@ -2001,6 +2092,8 @@
         ? sectionToolbar("Marketing Analytics", "Saved campaign records", financeAddButton("marketing", "Add Marketing Record"))
         : "";
       content.innerHTML = toolbar + financeSummaryStatusMarkup(range);
+      financeContentHost = null;
+      financeContentMarkup = "";
       document.querySelectorAll("[data-finance-tab]").forEach((button) =>
         button.classList.toggle("active", button.dataset.financeTab === state.financeTab),
       );
@@ -2021,14 +2114,21 @@
       alerts: () => renderAlerts(data, range, current),
       drawlog: () => renderDrawLog(),
     };
-    content.innerHTML = (renderers[state.financeTab] || renderers.overview)();
+    const markup = (renderers[state.financeTab] || renderers.overview)();
+    if (financeContentHost !== content || financeContentMarkup !== markup) {
+      content.innerHTML = markup;
+      financeContentHost = content;
+      financeContentMarkup = markup;
+    }
     document.querySelectorAll("[data-finance-tab]").forEach((button) => button.classList.toggle("active", button.dataset.financeTab === state.financeTab));
   }
 
   function renderAllFinance() {
-    renderBrandFinance();
-    renderFinanceSection();
-    enhanceCustomerDrawControls();
+    if (document.hidden) return;
+    const section = document.querySelector(".dashboard-section.active-section")?.id;
+    if (!section || section === "brand") renderBrandFinance();
+    if (!section || section === "finance") renderFinanceSection();
+    if (!section || section === "customers") enhanceCustomerDrawControls();
   }
 
   function resourceRecord(resource, id) {
@@ -2473,20 +2573,25 @@
       if (Object.values(STORAGE_KEYS).includes(event.key) || ["dart_orders", "dart_returns", "dart_items", "dart_models", "dart_customers", "dart_damage"].includes(event.key)) renderAllFinance();
     });
     root.addEventListener("dart:domain-hydrated", (event) => {
-      if (
-        ["finance_expenses","finance_budgets","finance_invoices","finance_goals","finance_marketing","finance_settlements","finance_audit","draw_audit","customers","returns","damage"].includes(event.detail?.domain)
-      ) {
+      if (["finance_expenses", "finance_settlements", "finance_marketing", "returns", "damage"].includes(event.detail?.domain)) {
         invalidateAuthoritativeFinance();
-        renderAllFinance();
       }
+      scheduleFinanceRender();
     });
-    root.addEventListener("dart:orders-hydrated", () => {
-      invalidateAuthoritativeFinance();
-      renderAllFinance();
+    root.addEventListener("dart:orders-hydrated", () => { invalidateAuthoritativeFinance(); scheduleFinanceRender(); });
+    root.addEventListener("dart:catalog-hydrated", () => { invalidateAuthoritativeFinance(); scheduleFinanceRender(); });
+    root.addEventListener("dart:dashboard-section-activated", () => {
+      scheduleFinanceRender();
+      if (financeVisible()) void refreshFinanceFromServer(Date.now() - financeLastAttemptAt >= FINANCE_REFRESH_MS);
+      else clearTimeout(serverFinanceRefreshTimer);
     });
-    root.addEventListener("dart:catalog-hydrated", () => {
+    root.addEventListener("dart:admin-logged-out", () => {
+      adminAuthenticated = false;
+      financeReportSupported = null;
       invalidateAuthoritativeFinance();
-      renderAllFinance();
+      chartBindings.clear();
+      Object.values(state.charts).forEach((chart) => chart?.destroy?.());
+      state.charts = {};
     });
   }
 
@@ -2496,7 +2601,7 @@
         const previousRefresh = dartRefreshAll;
         const wrapped = function (...args) {
           const result = previousRefresh.apply(this, args);
-          root.setTimeout(renderAllFinance, 0);
+          scheduleFinanceRender();
           return result;
         };
         wrapped.dartFinanceWrapped = true;
@@ -2549,6 +2654,7 @@
   root.addEventListener("dart:admin-authenticated", () => {
     adminAuthenticated = true;
     serverFinanceDenied = false;
+    invalidateAuthoritativeFinance();
     financeBackoffMs = 5_000;
     financeWarnedBackoffMs = 0;
     void refreshFinanceFromServer(true);

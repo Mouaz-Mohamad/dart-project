@@ -15,13 +15,14 @@ function fixture(admin = false) {
   const root = new EventTarget(), section = element(), body = element(), message = element(), retry = element(), item = element();
   const scripts = [], observers = [];
   const link = { closest: () => item };
-  root.document = {
+  root.document = Object.assign(new EventTarget(), {
     body,
     getElementById: id => id === (admin ? "news" : "dart-news") ? section : id === "news-message" ? message : id === "news-retry" ? retry : null,
     querySelectorAll: () => [link],
     createElement: () => ({ remove() { this.removed = true; } }),
     head: { appendChild: script => scripts.push(script) },
-  };
+  });
+  root.setTimeout = (run) => run();
   section.querySelector = selector => selector === "[data-news-status]" ? message : retry;
   root.MutationObserver = root.IntersectionObserver = class {
     constructor(callback) { this.callback = callback; observers.push(this); }
@@ -55,6 +56,12 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   assert.match(publicPage.scripts[3].src, /dart-news-runtime/, "retry must reuse its loaded URL helper");
   publicPage.scripts[3].onload(); await settle();
   assert.equal(publicPage.scripts.length, 4, "storefront must never download News management");
+
+  const background = fixture();
+  background.root.document.dispatchEvent(new Event("dart:critical-ready"));
+  assert.equal(background.scripts.length, 1, "off-screen News prepares automatically after critical content");
+  background.observers[0].callback([{ isIntersecting: true }]);
+  assert.equal(background.scripts.length, 1, "viewport and background preparation share one download");
 
   const staff = fixture(true);
   assert.equal(staff.item.hidden, true);

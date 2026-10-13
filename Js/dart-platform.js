@@ -45,10 +45,9 @@
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;
   try {
-    apiUserCache = JSON.parse(sessionStorage.getItem(API_USER_CACHE_KEY) || "null");
-  } catch {
     sessionStorage.removeItem(API_USER_CACHE_KEY);
-  }
+    sessionStorage.removeItem(CART_UI_CACHE_KEY);
+  } catch {}
   const CART_RESERVATION_MS = 15 * 60 * 1000;
   const configuredBirthdayPercent = Number(
     window.DartSiteSettings?.get?.().birthdayDiscountPercent,
@@ -63,10 +62,6 @@
   const read = (key, fallback) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
     window.DartState?.write?.(key, value, { source: "platform" });
-    if (key === "dart_cart") {
-      try { sessionStorage.setItem(CART_UI_CACHE_KEY, JSON.stringify(Array.isArray(value) ? value : [])); }
-      catch {}
-    }
     if (
       [
         KEYS.items,
@@ -791,9 +786,6 @@
       serverReviewEligible = null;
       serverPurchaseStats = null;
     }
-    if (apiUserCache)
-      sessionStorage.setItem(API_USER_CACHE_KEY, JSON.stringify(apiUserCache));
-    else sessionStorage.removeItem(API_USER_CACHE_KEY);
     window.dispatchEvent?.(
       new CustomEvent("dart:customer-session-changed", { detail: { user: apiUserCache } }),
     );
@@ -1434,6 +1426,7 @@
       CART_UI_CACHE_KEY,
     ].forEach((key) => sessionStorage.removeItem(key));
     if (typeof cartData !== "undefined") cartData = [];
+    window.DartSets?.clearDrafts?.();
   }
 
   async function logout() {
@@ -1889,12 +1882,12 @@
     }
   }
 
-  async function hydrateCustomerCart() {
+  async function hydrateCustomerCart({ claimLocal = true } = {}) {
     if (!API_BASE) return read("dart_cart", []);
     let payload;
     if (currentUser()) {
       const localCart = read("dart_cart", []);
-      if (Array.isArray(localCart) && localCart.length) {
+      if (claimLocal && Array.isArray(localCart) && localCart.length) {
         await claimGuestCartAfterAuth();
       }
       payload = await apiRequest("/api/v1/me/cart");
@@ -1906,8 +1899,8 @@
     }
     const remote = payload?.cart || null;
     if (!remote) {
-      write("dart_cart", []);
       if (typeof cartData !== "undefined") cartData = [];
+      write("dart_cart", []);
       if (typeof renderCart === "function") renderCart();
       if (typeof updateCartCount === "function") updateCartCount();
       return [];
@@ -1943,8 +1936,8 @@
           : {}),
       };
     });
-    write("dart_cart", hydrated);
     if (typeof cartData !== "undefined") cartData = hydrated;
+    write("dart_cart", hydrated);
     if (typeof renderCart === "function") renderCart();
     if (typeof updateCartCount === "function") updateCartCount();
     updateCartReservationTimer();
@@ -3904,6 +3897,9 @@
 
   bindAuth();
   document.addEventListener("DOMContentLoaded", async () => {
+    if (document.prerendering) {
+      await new Promise((resolve) => document.addEventListener("prerenderingchange", resolve, { once: true }));
+    }
     if (API_BASE) {
       try {
         await hydrateApiSession();
@@ -3989,6 +3985,7 @@
     } catch {}
   });
   setInterval(() => {
+    if (document.hidden || document.prerendering) return;
     void cleanupCartReservations();
     updateCartReservationTimer();
   }, 1000);
@@ -4012,6 +4009,29 @@
       void hydrateCustomerCommerce();
       void hydrateWaiting(true);
     }
+  });
+  // A restored document retains UI selections, but its account/cart projection must be fresh.
+  let pageRestorePending = false;
+  window.addEventListener("pageshow", async (event) => {
+    if (!event.persisted || pageRestorePending || document.prerendering) return;
+    pageRestorePending = true;
+    window.DartSets?.clearDrafts?.();
+    cacheApiUser(null);
+    [KEYS.customers, KEYS.orders, KEYS.returns, KEYS.cards, KEYS.birthdayRewards,
+      KEYS.birthdayMessages, "user_last_address", "dart_cart"].forEach((key) =>
+      window.DartState?.remove?.(key, { source: "page-restore" }));
+    if (typeof cartData !== "undefined") cartData = [];
+    if (typeof updateCartCount === "function") updateCartCount();
+    setCartReservationId(sessionStorage.getItem("dart_cart_reservation_id") || uid("CART"));
+    try {
+      await hydrateApiSession();
+      await Promise.all([window.DartCatalog?.hydrate?.(), hydrateCustomerCart({ claimLocal: false })]);
+      updateCartReservationTimer();
+      renderBirthdayExperience();
+      wireAccountLink();
+    } catch {
+      window.dispatchEvent(new CustomEvent("dart:platform-unavailable", { detail: { code: "RESTORE_REFRESH_FAILED" } }));
+    } finally { pageRestorePending = false; }
   });
   window.addEventListener("dart:data-changed", (event) => {
     if (
@@ -4098,7 +4118,9 @@
     track: trackAnalyticsEvent,
     trackCartIncrease,
   });
-  queueMicrotask(() => void trackAnalyticsEvent("visit"));
+  const trackVisit = () => queueMicrotask(() => void trackAnalyticsEvent("visit"));
+  if (document.prerendering) document.addEventListener("prerenderingchange", trackVisit, { once: true });
+  else trackVisit();
 })();
 
 

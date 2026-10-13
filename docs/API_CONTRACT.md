@@ -5,12 +5,21 @@
 ## Authority
 
 - كل Business State الحقيقي في PostgreSQL.
-- Browser storage مسموح به للـUI/cache فقط.
+- Browser storage مسموح به لتفضيلات الواجهة ومعرّفات الجلسة والتنقّل المؤقتة فقط؛ بيانات السلة والحساب ومجموعات Sets تبقى في الذاكرة وتُستعاد من API.
 - Inventory, prices, discounts, Birthday, Dart Card, permissions, finance and order workflow لا تُحسم في المتصفح.
 - Money داخل الخادم بوحدة `minor` (piastres) متى كان الحقل ماليًا typed.
 - State-changing authenticated requests تستخدم Secure HttpOnly session + CSRF.
 - Admin permissions deny-by-default وStaff actions الحساسة تحتاج الصلاحية المناسبة.
 - العمليات الحساسة تستخدم Transactions/locks/idempotency حيث يلزم.
+
+## Finance report snapshot
+
+- `GET /api/v1/admin/finance/report?start=YYYY-MM-DD&end=YYYY-MM-DD&previousStart=YYYY-MM-DD&previousEnd=YYYY-MM-DD&buckets=12` يعيد `allowedSections` و`periods[{start,end,summary}]`.
+- Current وPrevious والرسم تُحسب من snapshot واحدة باستخدام تسع قراءات داخل `REPEATABLE READ READ ONLY`. الحسابات الجزئية تنفّذ بعد تحرير الاتصال. لا توجد migrations أو كتابات على سجلات الإنتاج.
+- `finance.read` يمنح التقرير الكامل؛ الصلاحيات الجزئية تعيد اتحاد الحقول المسموح بها فقط. Staff/MFA والصلاحيات تُفحص مركزيًا قبل القراءة، وكل الردود المالية `no-store`.
+- `archivedAt` و`isArchived` و`isDeleted` تستبعد السجل من الحسابات. تواريخ المصروف والاستحقاق والتحصيل ومشتريات المخزون تبقى كما في العقد السابق. الأيام تشمل حدود منتصف الليل في `Africa/Cairo`.
+- `buckets` من 0 إلى 12؛ الفترة الكلية من أول Start إلى آخر End لا تتجاوز 3660 يومًا. المدخلات غير الصحيحة تعيد 422. مسارات Summary/Section/Export القديمة ما زالت متاحة.
+- الواجهة تجمع الطلبات المتزامنة، ترفض الاستجابات القديمة بعد التعديل أو Logout، وتعيد المحاولة بمهلة متزايدة أو بزر Retry. فشل الرسم لا ينشئ دورة طلبات.
 
 ## Promotion campaigns
 

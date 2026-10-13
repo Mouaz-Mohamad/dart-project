@@ -2,7 +2,7 @@
 // الغرض: يثبت عزل حقول Finance حسب صلاحية القسم وعدم تسريب أرقام مالية أخرى.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { financeSummarySection } from "../src/modules/finance/finance.routes.js";
+import { financeReportRanges, financeSummarySection } from "../src/modules/finance/finance.routes.js";
 import type { FinanceSummary } from "../src/modules/finance/finance.service.js";
 
 const fixture = {
@@ -49,6 +49,19 @@ const fixture = {
 } as FinanceSummary;
 
 describe("finance field-level permissions", () => {
+  it("bounds the chart to twelve contiguous periods without dropping its last day", () => {
+    const current = { start: "2026-10-01", end: "2026-10-31" };
+    const previous = { start: "2026-09-01", end: "2026-09-30" };
+    const ranges = financeReportRanges(current, previous, 12);
+    expect(ranges.slice(0, 2)).toEqual([current, previous]);
+    expect(ranges.length).toBeLessThanOrEqual(14);
+    expect(ranges[2]?.start).toBe(current.start);
+    expect(ranges.at(-1)?.end).toBe(current.end);
+    for (let index = 3; index < ranges.length; index++) {
+      expect(Date.parse(ranges[index]!.start) - Date.parse(ranges[index - 1]!.end)).toBe(86400000);
+    }
+    expect(financeReportRanges(current, previous, 0)).toEqual([current, previous]);
+  });
   it("returns revenue metrics without leaking cost or profit", () => {
     const section = financeSummarySection(fixture, "revenue");
     expect(section.netRevenue).toBe(900);

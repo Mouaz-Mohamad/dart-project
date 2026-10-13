@@ -7,6 +7,7 @@
     "cache-revalidation-contract.cjs",
     "catalog-category-contract.js",
     "dart-finance-unit.js",
+    "dashboard-refresh-runtime.cjs",
     "database-authoritative-storage.cjs",
     "finance-dashboard-contract.js",
     "finance-persistence-contract.js",
@@ -35,6 +36,7 @@
   "ciBrowser": [
     "full-site-browser.js",
     "home-storefront-browser.js",
+    "navigation-browser.cjs",
     "news-browser.cjs",
     "product-waiting-browser.js",
     "sets-admin-browser.js",

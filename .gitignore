@@ -2,6 +2,7 @@
 backend/node_modules/
 backend/dist/
 backend/coverage/
+public/
 
 # Local environment files
 .env

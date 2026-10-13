@@ -60,24 +60,20 @@
   }
   // END API transport.
 
-  // BEGIN Set group session projection: the server reservation remains authoritative.
+  // BEGIN Set group memory projection: the server reservation remains authoritative.
+  let cartGroupProjection = [];
+  try { root.sessionStorage?.removeItem(DRAFT_KEY); } catch {}
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
 
   function readDrafts() {
-    try {
-      const value = JSON.parse(root.sessionStorage?.getItem(DRAFT_KEY) || "[]");
-      return Array.isArray(value) ? value : [];
-    } catch {
-      try { root.sessionStorage?.removeItem(DRAFT_KEY); } catch {}
-      return [];
-    }
+    return clone(cartGroupProjection);
   }
 
   function writeDrafts(groups) {
     const safe = Array.isArray(groups) ? clone(groups) : [];
-    try { root.sessionStorage?.setItem(DRAFT_KEY, JSON.stringify(safe)); } catch {}
+    cartGroupProjection = safe;
     root.dispatchEvent?.(new CustomEvent("dart:set-cart-draft-changed", { detail: { groups: safe } }));
     return safe;
   }

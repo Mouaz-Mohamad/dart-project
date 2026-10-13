@@ -135,7 +135,7 @@ for (const [label, expected] of Object.entries(singletonPaths)) {
   (function walk(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const full = path.join(directory, entry.name);
-      if (entry.isDirectory()) walk(full);
+      if (entry.isDirectory() && !['public', 'node_modules', '.git'].includes(entry.name)) walk(full);
       else if (entry.name === basename) matches.push(path.relative(root, full));
     }
   })(root);

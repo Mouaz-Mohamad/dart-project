@@ -586,6 +586,9 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("dart_active_section", targetId);
     if (targetId === "live-operations") void dartLoadLiveOperations();
     if (targetId === "brand" || targetId === "finance") void dartLoadFinance();
+    if (targetId === "brand") void dartLoadTrafficAnalytics();
+    dartRefreshAll();
+    window.dispatchEvent(new CustomEvent("dart:dashboard-section-activated", { detail: { id: targetId } }));
   }
 
   // تفعيل القسم المخزن أو الافتراضي عند التحميل
@@ -593,6 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // إضافة الأحداث لكل الروابط
   menuLinks.forEach((link) => {
+    link.dataset.dartNavBound = "1";
     link.addEventListener("click", (e) => {
       e.preventDefault();
       const targetId = link.getAttribute("data-target");
@@ -668,12 +672,8 @@ window.addEventListener("dart:orders-refresh-failed", () => {
 window.addEventListener("dart:data-changed", (event) => {
   if (event.detail?.key === "dart_orders" &&
       ["orders:hydrate", "orders:authoritative", "orders:sync-confirmed", "orders:selection"].includes(event.detail?.source)) return;
-  try {
-    loadAllDataFromStorage(false);
-    dartRefreshAll();
-  } catch (error) {
-    console.warn("Dashboard sync failed", error);
-  }
+  dartDashboardReloadQueued = true;
+  dartRefreshAll();
 });
 
 window.addEventListener("dart:audit-hydrated", (event) => {
@@ -2284,31 +2284,32 @@ function dartRenderSection(key) {
   sec.render(filtered);
   dartUpdateMasterCheckbox(key, filtered);
 }
+// BEGIN Scoped dashboard refresh: one frame per burst, no hidden table construction.
+let dartDashboardRenderQueued = false;
+let dartDashboardReloadQueued = false;
 function dartRefreshAll() {
-  // Render owner-facing sections first; defer hidden row construction to idle time.
-  dartRenderSection("models");
-  dartRenderSection("items");
-  updateBrandAnalytics();
-  renderNotifications();
-  updateOrderCards();
-  const active = document.querySelector(
-    ".dashboard-section.active-section",
-  )?.id;
-  if (active && sectionsMap[active] && !["models", "items"].includes(active))
-    dartRenderSection(active);
-  clearTimeout(window.dartBackgroundRender);
-  window.dartBackgroundRender = setTimeout(() => {
-    const keys = Object.keys(sectionsMap).filter(
-      (k) => !["models", "items", active].includes(k),
-    );
-    const next = () => {
-      const key = keys.shift();
-      if (key) dartRenderSection(key);
-      if (keys.length) setTimeout(next, 0);
-    };
-    next();
-  }, 30);
+  if (dartDashboardRenderQueued || document.hidden) return;
+  dartDashboardRenderQueued = true;
+  const render = () => {
+    dartDashboardRenderQueued = false;
+    if (document.hidden) return;
+    if (dartDashboardReloadQueued) {
+      dartDashboardReloadQueued = false;
+      try { loadAllDataFromStorage(false); }
+      catch { console.warn("Dashboard data could not be refreshed."); return; }
+    }
+    const active = document.querySelector(".dashboard-section.active-section")?.id;
+    if (active && sectionsMap[active]) dartRenderSection(active);
+    if (active === "brand") updateBrandAnalytics();
+    if (active === "orders" || active === "brand") updateOrderCards();
+    if (document.getElementById("notificationFeed")?.closest(".dashboard-section.active-section")) renderNotifications();
+    window.DartFinance?.render?.();
+  };
+  if (window.requestAnimationFrame) window.requestAnimationFrame(render);
+  else setTimeout(render, 0);
 }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) dartRefreshAll(); });
+// END Scoped dashboard refresh.
 function renderAllSections() {
   dartRefreshAll();
 }
@@ -3429,6 +3430,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (id === "brand" || id === "finance") void dartLoadFinance();
     if (id === "brand") void dartLoadTrafficAnalytics();
     if (sectionsMap[id]) dartRenderSection(id);
+    dartRefreshAll();
+    window.dispatchEvent(new CustomEvent("dart:dashboard-section-activated", { detail: { id } }));
   }
   links.forEach((l) => {
     if (!l.dataset.dartNavBound) {

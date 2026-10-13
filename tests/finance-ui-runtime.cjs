@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const html = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 const callbacks = new Map(), nodes = new Map();
+const rootCallbacks = new Map();
 let document;
 function node(id = "") {
   const classes = new Set();
@@ -42,25 +43,37 @@ document = {
 };
 let failSummary = false, requests = 0;
 const window = {
-  document, structuredClone, dispatchEvent() {}, addEventListener() {}, setTimeout() { return 1; },
+  document, structuredClone, dispatchEvent() {}, addEventListener(name, handler) {
+    const list = rootCallbacks.get(name) || []; list.push(handler); rootCallbacks.set(name, list);
+  }, setTimeout() { return 1; },
   localStorage: { getItem() { return null; }, setItem() {} },
   DartAdminAccess: { can() { return true; }, list() { return ["finance.read"]; } },
-  DartAdminApi: { async request() {
+  DartAdminApi: { async request(url) {
     requests++;
     if (failSummary) throw new Error("offline");
     const data = window.DartFinance.dashboardData();
-    return { summary: window.DartFinance.calculateSummary(data, window.DartFinance.periodRange("this_month")) };
+    return reportPayload(url, (range) => window.DartFinance.calculateSummary(data, range));
   } },
 };
+function reportPayload(url, makeSummary) {
+  const query = new URLSearchParams(url.split("?")[1]);
+  const range = { start: new Date(`${query.get("start")}T12:00:00`), end: new Date(`${query.get("end")}T12:00:00`) };
+  const previous = { start: new Date(`${query.get("previousStart")}T12:00:00`), end: new Date(`${query.get("previousEnd")}T12:00:00`) };
+  const key = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return { allowedSections: ["revenue", "cost", "profit", "cashflow", "inventory", "marketing"],
+    periods: [range, previous, ...window.DartFinance.bucketRanges(range)].map((period) =>
+      ({ start: key(period.start), end: key(period.end), summary: makeSummary(period) })) };
+}
 const context = vm.createContext({ window, globalThis: window, document, console, CustomEvent: class {}, clearTimeout() {}, URLSearchParams, FormData: class { constructor(f) { this.f = f; } entries() { return Object.entries(this.f.payload); } } });
 vm.runInContext(fs.readFileSync("Js/dart-state.js", "utf8"), context);
 let finance = fs.readFileSync("Eye/dart-finance.js", "utf8");
-finance = finance.replace('})(typeof window !== "undefined" ? window : globalThis);', 'root.__financeUi = { state, openResourceModal, closeFinanceModal, renderFinanceSection, saveFinanceForm, invalidateAuthoritativeFinance }; })(typeof window !== "undefined" ? window : globalThis);');
+finance = finance.replace('})(typeof window !== "undefined" ? window : globalThis);', 'root.__financeUi = { state, openResourceModal, closeFinanceModal, renderFinanceSection, saveFinanceForm, invalidateAuthoritativeFinance, financialBuckets, replaceChart }; })(typeof window !== "undefined" ? window : globalThis);');
 vm.runInContext(finance, context);
 const ui = window.__financeUi;
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function main() {
   await window.DartFinance.hydrateAuthoritativeFinance();
+  assert.equal(requests, 1, "current, previous and chart buckets use one HTTP request");
   for (const tab of tabs) {
     await callbacks.get("click")({ target: { closest(selector) { return selector === "[data-finance-tab]" ? tab : null; } } });
     assert.equal(ui.state.financeTab, tab.dataset.financeTab);
@@ -111,6 +124,10 @@ async function main() {
     assert.equal(submit.disabled, false);
   }
   // A failing report must display Retry and stop immediate error/re-render loops.
+  ui.state.financeTab = "pnl";
+  await window.DartFinance.hydrateAuthoritativeFinance(undefined, true);
+  ui.renderFinanceSection();
+  const priorMarkup = nodes.get("dart-finance-content").innerHTML;
   failSummary = true; ui.invalidateAuthoritativeFinance();
   ui.state.financeTab = "pnl"; ui.renderFinanceSection();
   await tick(); await tick();
@@ -122,19 +139,66 @@ async function main() {
   await callbacks.get("click")({ target: { closest(selector) { return selector === "[data-finance-retry]" ? {} : null; } } });
   await tick(); await tick();
   assert.match(nodes.get("dart-finance-content").innerHTML, /Profit &amp; Loss|Profit & Loss/);
+  assert.equal(nodes.get("dart-finance-content").innerHTML, priorMarkup, "recovery must replace an error even when successful markup is unchanged");
   // A summary requested before a finance edit must not replace the newer totals.
   let releaseOld;
   const oldGate = new Promise((resolve) => { releaseOld = resolve; });
   const summary = window.DartFinance.calculateSummary(window.DartFinance.dashboardData(), window.DartFinance.periodRange("this_month"));
-  window.DartAdminApi.request = async () => { await oldGate; return { summary: { ...summary, netRevenue: 100 } }; };
+  window.DartAdminApi.request = async (url) => { await oldGate; return reportPayload(url, () => ({ ...summary, netRevenue: 100 })); };
   ui.invalidateAuthoritativeFinance();
   const oldRefresh = window.DartFinance.hydrateAuthoritativeFinance();
   await tick();
-  window.DartAdminApi.request = async () => ({ summary: { ...summary, netRevenue: 200 } });
+  window.DartAdminApi.request = async (url) => reportPayload(url, () => ({ ...summary, netRevenue: 200 }));
   ui.invalidateAuthoritativeFinance();
   await window.DartFinance.hydrateAuthoritativeFinance();
   releaseOld(); await oldRefresh;
   assert.equal(window.DartFinance.authoritativeSummary(window.DartFinance.periodRange("this_month")).netRevenue, 200);
+
+  // Reuse canvas/chart instances. Previous-period callback changes must not be lost in JSON signatures.
+  let created = 0, updated = 0, destroyed = 0;
+  window.Chart = class { constructor(_context, config) { created++; this.options = config.options; } update() { updated++; } destroy() { destroyed++; } };
+  nodes.get("dart-financial-chart").getContext = () => ({});
+  const config = (prior) => ({ type: "line", data: { labels: ["Oct"], datasets: [{ data: [200] }] },
+    options: { plugins: { tooltip: { callbacks: { label: () => String(prior) } } } } });
+  ui.replaceChart("financial", "dart-financial-chart", config(7));
+  ui.replaceChart("financial", "dart-financial-chart", config(7));
+  assert.equal(created, 1); assert.equal(updated, 0); assert.equal(destroyed, 0);
+  await window.DartFinance.hydrateAuthoritativeFinance(undefined, true);
+  ui.replaceChart("financial", "dart-financial-chart", config(7));
+  assert.equal(updated, 0, "unchanged reports must not redraw the chart");
+  window.DartAdminApi.request = async (url) => reportPayload(url, () => ({ ...summary, netRevenue: 201 }));
+  await window.DartFinance.hydrateAuthoritativeFinance(undefined, true);
+  ui.replaceChart("financial", "dart-financial-chart", config(8));
+  assert.equal(updated, 1); assert.equal(created, 1); assert.equal(destroyed, 0);
+  assert.equal(ui.state.charts.financial.options.plugins.tooltip.callbacks.label(), "8");
+
+  // A previous API can fall back once; permanent bucket failures never restart on each render.
+  const range = window.DartFinance.periodRange("this_month"), previous = range.previous;
+  const day = (value) => `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}-${String(value.getDate()).padStart(2,"0")}`;
+  let legacyCalls = 0;
+  window.DartAdminApi.request = async (url) => {
+    legacyCalls++;
+    if (url.includes("/report?")) throw Object.assign(new Error("old deployment"), { status: 404 });
+    const query = new URLSearchParams(url.split("?")[1]);
+    if ([range, previous].some(period => query.get("start") === day(period.start) && query.get("end") === day(period.end))) return { summary };
+    throw Object.assign(new Error("offline bucket"), { status: 503 });
+  };
+  ui.invalidateAuthoritativeFinance(); await window.DartFinance.hydrateAuthoritativeFinance();
+  ui.financialBuckets({}, range); await tick(); await tick();
+  const failedBucketCalls = legacyCalls;
+  ui.financialBuckets({}, range); await tick();
+  assert.equal(legacyCalls, failedBucketCalls, "legacy failed buckets must stop until timed/manual retry");
+
+  // Logout invalidates pending reports before their response can populate memory.
+  let releaseLoggedOut;
+  const logoutGate = new Promise(resolve => { releaseLoggedOut = resolve; });
+  window.DartAdminApi.request = async () => { await logoutGate; return { summary }; };
+  ui.invalidateAuthoritativeFinance();
+  const pendingAtLogout = window.DartFinance.hydrateAuthoritativeFinance();
+  await tick();
+  rootCallbacks.get("dart:admin-logged-out").forEach(handler => handler({}));
+  releaseLoggedOut(); await pendingAtLogout;
+  assert.equal(window.DartFinance.authoritativeSummary(range), null);
   console.log("PASS Finance UI runtime: all 12 tabs, six forms, focus/close, pending-save guard, failed save, summary error/retry without request loop");
 }
 main().catch((e) => { console.error(e); process.exitCode = 1; });

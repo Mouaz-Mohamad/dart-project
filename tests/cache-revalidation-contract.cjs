@@ -27,8 +27,11 @@ assert.match(recovery, /key\.startsWith\("dart-static-"\)/);
 assert.match(recovery, /6500/,
   'Recovery must run again after deferred legacy registration can fire');
 
-assert.match(ui, /dart_fragment_v3:/);
-assert.match(ui, /html !== cached/);
+assert.match(ui, /const dartFragmentMemory = new Map\(\)/);
+assert.match(ui, /key\.startsWith\('dart_fragment_'\)/);
+assert.match(ui, /container\.dataset\.dartStatic/);
+assert.doesNotMatch(ui, /localStorage\.setItem\(fragmentCacheKey/,
+  'Static fragments must not survive releases in unversioned browser storage');
 assert.doesNotMatch(ui, /cache:\s*'force-cache'/,
   'Storefront fragment/navigation warming must revalidate rather than force stale browser cache');
 assert.doesNotMatch(homeUi, /cache:\s*["']force-cache["']/,
@@ -58,12 +61,13 @@ function cacheControlFor(source) {
   return headers.find((header) => header.key === 'Cache-Control')?.value || '';
 }
 
-assert.match(cacheControlFor('/'), /no-store/,
-  'Homepage navigation must never reuse stale HTML from browser/disk cache');
-assert.match(cacheControlFor('/(.*).html'), /no-store/,
-  'Static HTML documents must always be fetched fresh');
-assert.match(cacheControlFor('/products'), /no-store/,
-  'Rewritten products HTML route must always be fetched fresh');
+for (const source of ['/', '/(.*).html', '/products', '/sets/:setId']) {
+  assert.match(cacheControlFor(source), /no-cache.*must-revalidate/,
+    'Public HTML must revalidate on a new request while permitting native document restoration');
+}
+assert.match(cacheControlFor('/Eye/(.*)'), /no-store/);
+assert.match(cacheControlFor('/(cart-checkout|profile|Sign Up modern|track|rep|pdf).html'), /no-store/);
+assert.match(staging, /inlineSharedShell\(\)/);
 assert.match(cacheControlFor('/manifest.json'), /no-store/,
   'PWA manifest must refresh instead of pinning stale launch metadata');
 assert.equal(manifest.start_url, '/',
@@ -74,4 +78,4 @@ assert.match(cacheControlFor('/sw.js'), /no-store/,
 assert.match(cacheControlFor('/Js/dart-cache-recovery.js'), /no-store/,
   'Cache recovery script must bypass browser/CDN caches during migration');
 
-console.log('PASS Fresh Delivery V3: HTML stays fresh while local CSS/JS receive content versions');
+console.log('PASS public HTML revalidation, private no-store, static shell and content-versioned delivery');

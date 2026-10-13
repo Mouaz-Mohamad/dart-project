@@ -64,6 +64,25 @@ function versionHtmlAssets() {
   return versionedReferences;
 }
 
+function inlineSharedShell() {
+  let inlined = 0;
+  for (const htmlPath of collectHtmlFiles(OUTPUT_DIR)) {
+    if (path.dirname(htmlPath) !== OUTPUT_DIR) continue;
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    for (const [id, partial] of [['header-container', 'Nav-Bar.html'], ['footer', 'footer.html']]) {
+      const markup = fs.readFileSync(path.join(OUTPUT_DIR, 'sections', partial), 'utf8');
+      const pattern = new RegExp(`(<(?:header|footer|div)\\b[^>]*\\bid=["']${id}["'][^>]*)(>\\s*</(?:header|footer|div)>)`, 'i');
+      html = html.replace(pattern, (_match, opening, ending) => {
+        inlined += 1;
+        return `${opening} data-dart-static="${contentVersion(path.join(OUTPUT_DIR, 'sections', partial))}">${markup}${ending.slice(ending.indexOf('</'))}`;
+      });
+    }
+    fs.writeFileSync(htmlPath, html);
+  }
+  if (!inlined) throw new Error('Shared storefront shell was not inlined');
+  return inlined;
+}
+
 fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
@@ -86,5 +105,6 @@ for (const required of ['index.html', 'products.html', 'CSS/home.min.css', 'Js/d
   }
 }
 
+const inlined = inlineSharedShell();
 const versionedReferences = versionHtmlAssets();
-console.log(`Vercel static output staged safely in public/ with ${versionedReferences} versioned CSS/JS references.`);
+console.log(`Vercel static output staged in public/: ${inlined} shared sections and ${versionedReferences} versioned CSS/JS references.`);

@@ -78,25 +78,16 @@ async function hydratePublicReviews() {
     }
 }
 
-const DART_CART_UI_CACHE_KEY = 'dart_cart_ui_cache_v1';
 function readFastCartSnapshot() {
-    const memory = window.DartState?.read?.('dart_cart', []) || [];
-    if (Array.isArray(memory) && memory.length) return memory;
-    try {
-        const cached = JSON.parse(sessionStorage.getItem(DART_CART_UI_CACHE_KEY) || '[]');
-        return Array.isArray(cached) ? cached : [];
-    } catch {
-        sessionStorage.removeItem(DART_CART_UI_CACHE_KEY);
-        return [];
-    }
+    const memory = window.DartState?.read?.("dart_cart", []) || [];
+    return Array.isArray(memory) ? memory : [];
 }
-function cacheFastCartSnapshot(value) {
-    try {
-        sessionStorage.setItem(DART_CART_UI_CACHE_KEY, JSON.stringify(Array.isArray(value) ? value : []));
-    } catch {}
+function cacheFastCartSnapshot() {
+    // Retire old cart snapshots. Reservation contents are rehydrated from PostgreSQL.
+    try { sessionStorage.removeItem("dart_cart_ui_cache_v1"); } catch {}
 }
+cacheFastCartSnapshot();
 let cartData = readFastCartSnapshot();
-if (cartData.length) window.DartState?.write?.('dart_cart', cartData, { source: 'cart-ui-cache', emit: false });
 let appliedDiscountRate = 0;
 
 let selectedSize = null;
@@ -278,31 +269,30 @@ function getProductTemplate() {
 let dartPageUnloading = false;
 window.addEventListener('pagehide', () => {
     dartPageUnloading = true;
-}, { once: true });
+});
+window.addEventListener('pageshow', () => { dartPageUnloading = false; });
 
-const DART_FRAGMENT_CACHE_PREFIX = 'dart_fragment_v3:';
+// BEGIN Shared static section loader (also compiled into the curated Home runtime).
+const dartFragmentMemory = new Map();
+const dartFragmentPending = new Map();
+const dartFragmentControllers = new Set();
+window.addEventListener('pagehide', () => dartFragmentControllers.forEach((controller) => controller.abort('dart-page-navigation')));
 
 function purgeLegacyFragmentCaches() {
     try {
         Object.keys(localStorage)
-            .filter(key => key.startsWith('dart_fragment_') && !key.startsWith(DART_FRAGMENT_CACHE_PREFIX))
+            .filter(key => key.startsWith('dart_fragment_'))
             .forEach(key => localStorage.removeItem(key));
     } catch {}
 }
 purgeLegacyFragmentCaches();
 
-function fragmentCacheKey(filePath) {
-    return DART_FRAGMENT_CACHE_PREFIX + String(filePath || '');
-}
-
 function readFragmentCache(filePath) {
-    try { return localStorage.getItem(fragmentCacheKey(filePath)) || ''; }
-    catch { return ''; }
+    return dartFragmentMemory.get(filePath) || '';
 }
 
 function writeFragmentCache(filePath, html) {
-    try { localStorage.setItem(fragmentCacheKey(filePath), html); }
-    catch {}
+    dartFragmentMemory.set(filePath, html);
 }
 
 function emitSectionLoaded(containerId, filePath, cached = false) {
@@ -313,6 +303,7 @@ function emitSectionLoaded(containerId, filePath, cached = false) {
 
 async function fetchStaticFragment(filePath, timeoutMs = 8000) {
     const controller = new AbortController();
+    dartFragmentControllers.add(controller);
     const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetch(filePath, {
@@ -326,37 +317,43 @@ async function fetchStaticFragment(filePath, timeoutMs = 8000) {
         return html;
     } finally {
         window.clearTimeout(timeout);
+        dartFragmentControllers.delete(controller);
     }
 }
 
 async function loadSection(containerId, filePath, timeoutMs = 8000) {
     const container = document.getElementById(containerId);
     if (!container) return false;
+    if (container.dataset.dartStatic || container.dataset.dartSectionLoaded === '1') {
+        emitSectionLoaded(containerId, filePath, true);
+        return true;
+    }
+    if (dartFragmentPending.has(containerId)) return dartFragmentPending.get(containerId);
+    const pending = populateSection(container, containerId, filePath, timeoutMs)
+        .finally(() => dartFragmentPending.delete(containerId));
+    dartFragmentPending.set(containerId, pending);
+    return pending;
+}
 
+async function populateSection(container, containerId, filePath, timeoutMs) {
     const cached = readFragmentCache(filePath);
     if (cached) {
         container.innerHTML = cached;
+        container.dataset.dartSectionLoaded = '1';
         emitSectionLoaded(containerId, filePath, true);
-        try {
-            const html = await fetchStaticFragment(filePath, timeoutMs);
-            if (html !== cached && !dartPageUnloading && container.isConnected) {
-                container.innerHTML = html;
-                emitSectionLoaded(containerId, filePath, false);
-            }
-        } catch {
-            // Stay on the cached fragment only when the network is unavailable.
-        }
         return true;
     }
 
     setUiState(container, 'loading', 'Loading', 'Preparing this section…');
     try {
         const html = await fetchStaticFragment(filePath, timeoutMs);
+        if (dartPageUnloading || !container.isConnected) return false;
         container.innerHTML = html;
+        container.dataset.dartSectionLoaded = '1';
         emitSectionLoaded(containerId, filePath, false);
         return true;
     } catch (error) {
-        if (dartPageUnloading) return false;
+        if (dartPageUnloading || error === 'dart-page-navigation') return false;
         console.error(`Failed to load (${filePath}):`, error);
         setUiState(
             container,
@@ -370,6 +367,39 @@ async function loadSection(containerId, filePath, timeoutMs = 8000) {
         );
         return false;
     }
+}
+// END Shared static section loader.
+
+function idleSectionTask(run) {
+    if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 1200 });
+    else window.setTimeout(run, 60);
+}
+
+function preloadPageSections(sections) {
+    const queue = sections.filter(([id]) => document.getElementById(id));
+    let active = 0;
+    const pump = () => {
+        if (dartPageUnloading) return;
+        while (active < 2 && queue.length) {
+            const entry = queue.shift();
+            active += 1;
+            idleSectionTask(() => void loadSection(...entry).finally(() => {
+                active -= 1;
+                if (!queue.length && !active) document.dispatchEvent(new CustomEvent('dart:sections-loaded'));
+                else pump();
+            }));
+        }
+    };
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            sections.forEach((entry) => {
+                const host = document.getElementById(entry[0]);
+                if (host && !host.dataset.dartSectionLoaded && !host.dataset.dartStatic && !queue.some(([id]) => id === entry[0])) queue.push(entry);
+            });
+            pump();
+        }
+    });
+    idleSectionTask(pump);
 }
 
 
@@ -437,7 +467,7 @@ function initHeader() {
             !iconMenu.contains(event.target)) closeMenu();
     });
 
-    window.addEventListener('pagehide', closeMenu, { once: true });
+    window.addEventListener('pagehide', closeMenu);
 }
 
 function renderProductsLogic() {
@@ -1608,7 +1638,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 document.addEventListener('DOMContentLoaded', async () => {
     initCartAndCheckoutEvents();
-    await loadSection('header-container', 'sections/Nav-Bar.html', 5000);
+    await Promise.all([loadSection('header-container', 'sections/Nav-Bar.html', 5000), loadSection('footer', 'sections/footer.html', 5000)]);
     initHeader();
     const optionalSections = [
         ['leaderboard-card', 'sections/leaderboard-card.html'],
@@ -1640,73 +1670,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.DartAddress?.initReturnRequest?.();
     updateCartCount();
     if (!navigator.onLine) updateConnectivityBanner();
-    const optionalQueue = [];
-    const queuedOptionalIds = new Set();
-    const completedOptionalIds = new Set();
-    let optionalQueueBusy = false;
-    let optionalSectionsFinished = false;
-    const finishOptionalSections = () => {
-        if (optionalSectionsFinished || completedOptionalIds.size < optionalSections.length) return;
-        optionalSectionsFinished = true;
-        document.dispatchEvent(new CustomEvent('dart:sections-loaded'));
-    };
-    const scheduleOptionalQueue = () => {
-        if (optionalQueueBusy || !optionalQueue.length) return;
-        const run = async () => {
-            if (optionalQueueBusy || !optionalQueue.length) return;
-            optionalQueueBusy = true;
-            const [containerId, filePath] = optionalQueue.shift();
-            try {
-                await loadSection(containerId, filePath);
-            } finally {
-                completedOptionalIds.add(containerId);
-                optionalQueueBusy = false;
-                finishOptionalSections();
-                if (optionalQueue.length) {
-                    window.requestAnimationFrame(() => window.setTimeout(scheduleOptionalQueue, 0));
-                }
-            }
-        };
-        if ('requestIdleCallback' in window) {
-            window.requestIdleCallback(() => { void run(); }, { timeout: 1000 });
-        } else {
-            window.setTimeout(() => { void run(); }, 60);
-        }
-    };
-    const queueOptionalSection = (entry) => {
-        const [containerId] = entry;
-        if (queuedOptionalIds.has(containerId) || completedOptionalIds.has(containerId)) return;
-        queuedOptionalIds.add(containerId);
-        optionalQueue.push(entry);
-        scheduleOptionalQueue();
-    };
-    const observableSections = optionalSections.filter(([containerId]) => {
-        if (document.getElementById(containerId)) return true;
-        completedOptionalIds.add(containerId);
-        return false;
-    });
-    finishOptionalSections();
-    if ('IntersectionObserver' in window) {
-        const optionalObserver = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                if (!entry.isIntersecting) return;
-                const match = optionalSections.find(([containerId]) => containerId === entry.target.id);
-                if (!match) return;
-                optionalObserver.unobserve(entry.target);
-                queueOptionalSection(match);
-            });
-        }, { rootMargin: '700px 0px', threshold: 0.01 });
-        observableSections.forEach(([containerId]) => optionalObserver.observe(document.getElementById(containerId)));
-        window.setTimeout(() => {
-            observableSections.forEach((entry, index) => {
-                window.setTimeout(() => queueOptionalSection(entry), index * 220);
-            });
-        }, 6500);
-    } else {
-        observableSections.forEach((entry, index) => {
-            window.setTimeout(() => queueOptionalSection(entry), index * 180);
-        });
-    }
+    document.dispatchEvent(new CustomEvent('dart:critical-ready'));
+    preloadPageSections(optionalSections);
 });
 function initAccountModeToggle() {
     const container = document.querySelector('.container');
@@ -1715,26 +1680,6 @@ function initAccountModeToggle() {
     if (!container || !registerButton || !loginButton) return;
     registerButton.addEventListener('click', () => container.classList.add('active'));
     loginButton.addEventListener('click', () => container.classList.remove('active'));
-}
-function warmInternalPageCache() {
-    const seen = new Set();
-    const warm = (link) => {
-        try {
-            const url = new URL(link.href, location.href);
-            if (url.origin !== location.origin || url.pathname.startsWith('/Eye/') ||
-                ['/profile.html','/cart-checkout.html','/track.html','/rep.html','/Sign%20Up%20modern.html'].includes(url.pathname)) return;
-            if (!/\.html$|\/$/i.test(url.pathname) || seen.has(url.href)) return;
-            seen.add(url.href);
-            void fetch(url.href, { credentials: 'same-origin', cache: 'no-cache' }).catch(() => {});
-        } catch {}
-    };
-    document.querySelectorAll('a[href]').forEach(link => {
-        link.addEventListener('pointerenter', () => warm(link), { once: true, passive: true });
-        link.addEventListener('touchstart', () => warm(link), { once: true, passive: true });
-    });
-    const idleWarm = () => document.querySelectorAll('a[href]').forEach(warm);
-    if ('requestIdleCallback' in window) window.requestIdleCallback(idleWarm, { timeout: 1500 });
-    else window.setTimeout(idleWarm, 500);
 }
 document.addEventListener('DOMContentLoaded', () => {
     initAccountModeToggle();

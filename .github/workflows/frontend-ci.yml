@@ -53,7 +53,10 @@ jobs:
         with:
           node-version: "24"
       - name: Rebuild homepage CSS delivery bundle
-        run: node scripts/build-home-css.cjs
+        run: |
+          node scripts/build-home-css.cjs
+          node scripts/build-home-runtime.cjs
+          node scripts/stage-vercel-public.cjs
       - name: Check browser JavaScript syntax
         shell: bash
         run: |
@@ -82,6 +85,7 @@ jobs:
           node tests/finance-persistence-contract.js
           node tests/finance-state-integration.cjs
           node tests/finance-ui-runtime.cjs
+          node tests/dashboard-refresh-runtime.cjs
           node tests/server-authority-contract.js
           node tests/settings-and-groups-unit.js
           node tests/settings-reset-unit.js
@@ -103,7 +107,10 @@ jobs:
         with:
           node-version: "24"
       - name: Rebuild homepage CSS delivery bundle
-        run: node scripts/build-home-css.cjs
+        run: |
+          node scripts/build-home-css.cjs
+          node scripts/build-home-runtime.cjs
+          node scripts/stage-vercel-public.cjs
       - name: Cache Playwright Chromium
         uses: actions/cache@v4
         with:
@@ -123,3 +130,4 @@ jobs:
           node tests/news-browser.cjs
           node tests/storefront-settings-regression.js
           node tests/full-site-browser.js
+          node tests/navigation-browser.cjs
