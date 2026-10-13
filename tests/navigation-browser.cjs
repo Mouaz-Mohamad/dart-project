@@ -74,7 +74,7 @@ const server = http.createServer((req, res) => {
     assert.ok(requests.some((req) => req.path === '/about.html'), 'other public documents preload automatically');
     const beforeVisit = requests.filter((req) => req.path === '/api/v1/analytics/events').length;
     await page.click('[data-go-products]');
-    await page.waitForURL(/products(?:\.html)?$/);
+    await page.waitForURL(/products(?:\.html)?$/, { waitUntil: "commit" });
     await page.waitForFunction(() => !!window.DartNavigation && !!document.querySelector('.product-card[data-id="DW-NAV"]'));
     const productsToken = await page.evaluate(() => window.__documentToken);
     await page.click('#toggleProductFilters');
@@ -82,14 +82,14 @@ const server = http.createServer((req, res) => {
     await page.selectOption('#productSortSelect', 'price-high');
     await page.evaluate(() => window.scrollTo(0, 400));
     await page.evaluate(() => document.querySelector('.side-menu a[href="/index.html"]').click());
-    await page.waitForURL(origin + '/');
+    await page.waitForURL(origin + '/', { waitUntil: 'commit' });
     const nativeRestore = await page.evaluate(() => window.__documentToken) === homeToken;
     const unsupportedLocalShell = process.env.DART_TEST_HEADLESS_SHELL === '1' && restoreReasons.includes('BackForwardCacheDisabledForDelegate');
     assert.ok(nativeRestore || unsupportedLocalShell, 'Home must restore its document in full Chromium');
     if (nativeRestore) assert.equal(await page.evaluate(() => window.__restored), true);
     cartExists = false;
     await page.evaluate(() => window.DartNavigation.go('/products.html'));
-    await page.waitForURL(/products(?:\.html)?$/);
+    await page.waitForURL(/products(?:\.html)?$/, { waitUntil: "commit" });
     if (nativeRestore) {
       assert.equal(await page.evaluate(() => window.__documentToken), productsToken, 'Products reuses its original document');
       assert.equal(await page.inputValue('#productSearchInput'), 'Navigation');
@@ -98,8 +98,8 @@ const server = http.createServer((req, res) => {
     }
     await page.waitForFunction(() => window.DartState.read('dart_cart', []).length === 0);
     if (nativeRestore) assert.ok(requests.filter((req) => req.path === '/api/v1/analytics/events').length <= beforeVisit + 1, 'restoration and prerendering do not invent visits');
-    await page.goBack(); await page.waitForURL(origin + '/');
-    await page.goForward(); await page.waitForURL(/products(?:\.html)?$/);
+    await page.goBack({ waitUntil: "commit" }); await page.waitForURL(origin + '/', { waitUntil: 'commit' });
+    await page.goForward({ waitUntil: "commit" }); await page.waitForURL(/products(?:\.html)?$/, { waitUntil: "commit" });
     if (nativeRestore) assert.equal(await page.evaluate(() => window.__documentToken), productsToken);
     assert.deepEqual(errors, []);
 
@@ -113,7 +113,7 @@ const server = http.createServer((req, res) => {
     await low.waitForTimeout(250);
     assert.equal(requests.slice(marker).filter((req) => req.context === 'low-data' && req.path === '/about.html').length, 0);
     await low.evaluate(() => window.DartNavigation.go('/products.html'));
-    await low.waitForURL(/products\.html$/);
+    await low.waitForURL(/products\.html$/, { waitUntil: 'commit' });
     if (unsupportedLocalShell) console.log('SKIP native document/filter retention locally: headless-shell delegate disables BFCache. Full Chromium CI requires it.');
     console.log(nativeRestore
       ? 'PASS staged navigation: immediate shell, background content, native document/filter restoration, Back/Forward, fresh cart and save-data fallback'
