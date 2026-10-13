@@ -70,6 +70,7 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-news-runtime.js",
   "Js/dart-news-links.js",
   "Eye/dart-news-admin.js",
+  "Eye/dart-catalog-admin.js",
 ]);
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 const dashboardRuntime = fs.readFileSync("Eye/dart.js", "utf8");

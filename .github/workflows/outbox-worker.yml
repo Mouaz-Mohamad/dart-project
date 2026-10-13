@@ -1,0 +1,47 @@
+name: Durable outbox worker
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dart-outbox-worker
+  cancel-in-progress: false
+jobs:
+  process:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Process committed events and bounded maintenance
+        env:
+          DART_OUTBOX_CRON_SECRET: ${{ secrets.DART_OUTBOX_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$DART_OUTBOX_CRON_SECRET"
+          response_file="$(mktemp)"
+          trap 'rm -f -- "$response_file"' EXIT
+          deadline=$((SECONDS + 90))
+          for batch in $(seq 1 12); do
+            remaining=$((deadline - SECONDS))
+            if (( remaining < 1 )); then break; fi
+            timeout=$((remaining < 50 ? remaining : 50))
+            curl --silent --show-error --fail --max-time "$timeout" --request POST \
+              --header "Authorization: Bearer $DART_OUTBOX_CRON_SECRET" \
+              --output "$response_file" \
+              "https://dart-api-dusky.vercel.app/api/v1/internal/outbox/process?limit=5"
+            claimed="$(node - "$response_file" <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          for (const field of ['claimed', 'published', 'failed']) {
+            if (!Number.isInteger(result[field]) || result[field] < 0 || result[field] > 5) {
+              throw new Error('Invalid outbox worker result');
+            }
+          }
+          if (result.failed > 0) throw new Error('Outbox provider delivery failed');
+          process.stdout.write(String(result.claimed));
+          NODE
+            )"
+            if (( claimed == 0 )); then break; fi
+          done

@@ -73,11 +73,19 @@ export async function decryptArchive(source, target, password) {
   }
 }
 
+let operationStage = "configuration";
 async function main() {
   const [command, filePath] = process.argv.slice(2);
   if (!["create", "restore-verify"].includes(command) || !filePath) {
     throw new Error("Usage: encrypted-database-backup.mjs create <output.dump.enc> | restore-verify <backup.dump.enc>");
   }
+  const sourceUrl = process.env.DATABASE_URL;
+  if (!sourceUrl) throw new Error("Backup database connection is missing");
+  const database = new URL(sourceUrl);
+  if (!database.password || /^(?:\*+|\[?redacted\]?|hidden)$/i.test(decodeURIComponent(database.password))) {
+    throw new Error("Backup database connection must contain usable credentials");
+  }
+  if (database.hostname.includes("-pooler.")) throw new Error("Backup requires the direct database connection");
   const password = process.env.DART_BACKUP_ENCRYPTION_PASSWORD;
   if (!password || password.length < 32) throw new Error("DART_BACKUP_ENCRYPTION_PASSWORD must contain at least 32 characters");
   const target = resolve(filePath);
@@ -88,12 +96,16 @@ async function main() {
   try {
     if (command === "create") {
       await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+      operationStage = "database-dump";
       await createBackup(archive);
+      operationStage = "archive-encryption";
       await encryptArchive(archive, target, password);
       process.stdout.write(`Encrypted PostgreSQL backup created (${(await stat(target)).size} bytes)\n`);
     } else {
       // Authentication must finish before any PostgreSQL restore process starts.
+      operationStage = "archive-authentication";
       await decryptArchive(target, archive, password);
+      operationStage = "isolated-restore";
       await restoreBackupForVerification(archive);
       process.stdout.write("Encrypted backup authenticated and restored into the isolated recovery database\n");
     }
@@ -102,7 +114,7 @@ async function main() {
 
 if (import.meta.url === (process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : "")) {
   main().catch(() => {
-    process.stderr.write("Encrypted backup operation failed; no verified recovery result was produced\n");
+    process.stderr.write(`Encrypted backup operation failed; no verified recovery result was produced (stage=${operationStage})\n`);
     process.exitCode = 1;
   });
 }

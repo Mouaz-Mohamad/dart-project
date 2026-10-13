@@ -25,6 +25,18 @@
   let sessionEpoch = 0;
   let refreshPromise = null;
   let refreshAgain = false;
+  let adminModule;
+  function adminAdapter() {
+    if (window.DartCatalogAdmin) return Promise.resolve(window.DartCatalogAdmin);
+    if (!adminModule) adminModule = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "dart-catalog-admin.js";
+      script.onload = () => resolve(window.DartCatalogAdmin);
+      script.onerror = () => { adminModule = null; reject(new Error("Catalogue editor could not load")); };
+      document.head.append(script);
+    });
+    return adminModule;
+  }
 
   function normalizeStockKey(modelId, color, size) {
     return JSON.stringify([
@@ -102,25 +114,27 @@
   }
 
   async function syncAdminState() {
+    return (await adminAdapter()).flush(persistAdminState, () => catalogDirty && serverVersion > 0);
+  }
+  async function persistAdminState() {
     if (!IS_ADMIN || !API_BASE || !serverVersion) return;
     const revision = catalogRevision;
     const session = sessionEpoch;
-    const payload = await api("/api/v1/admin/catalog-state", {
-      method: "PUT",
-      body: {
-        expectedVersion: serverVersion,
-        models: read("dart_models", []),
-        items: read("dart_items", []),
-      },
-    });
+    const adapter = window.DartCatalogAdmin || await adminAdapter();
+    if (session !== sessionEpoch) return;
+    const previousVersion = serverVersion;
+    const payload = await adapter.save(api, {
+      version: serverVersion, models: read("dart_models", []), items: read("dart_items", []),
+    }, () => session === sessionEpoch);
     if (session !== sessionEpoch) return;
     const version = Number(payload.version || serverVersion);
     if (version >= serverVersion) {
       serverVersion = version;
       if (revision === catalogRevision) {
         catalogDirty = false;
-        cacheWrite("dart_models", payload.models || []);
-        cacheWrite("dart_items", payload.items || []);
+        cacheWrite("dart_models", payload.partial ? adapter.merge(read("dart_models", []), payload.models || [], "modelId") : payload.models || []);
+        cacheWrite("dart_items", payload.partial ? adapter.merge(read("dart_items", []), payload.items || [], "id") : payload.items || []);
+        if (payload.partial && (payload.baseVersion !== previousVersion || version > payload.committedVersion)) await hydrateCatalog(true);
       }
     }
     window.dispatchEvent(new CustomEvent("dart:catalog-synced", { detail: { version: serverVersion } }));
@@ -156,12 +170,15 @@
     const revision = catalogRevision;
     const session = sessionEpoch;
     if (IS_ADMIN) {
+      const adapter = window.DartCatalogAdmin || await adminAdapter();
+      if (session !== sessionEpoch) return;
       const state = await api("/api/v1/admin/catalog-state");
       const version = Number(state.version || 1);
       if (session !== sessionEpoch || revision !== catalogRevision || version < serverVersion ||
           (catalogDirty && !_force)) return;
       serverVersion = version;
       catalogDirty = false;
+      adapter.capture(state);
       cacheWrite("dart_models", state.models || []);
       cacheWrite("dart_items", state.items || []);
       remoteStock = null;
@@ -589,6 +606,7 @@
   window.addEventListener("dart:data-changed", (event) => {
     if (!IS_ADMIN || event.detail?.key !== "dart_orders" || event.detail?.source !== "logout") return;
     sessionEpoch += 1;
+    window.DartCatalogAdmin?.reset();
     catalogRevision += 1;
     serverVersion = 0;
     remoteStock = null;

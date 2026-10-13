@@ -1,7 +1,9 @@
+import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
 // DART CODE GUIDE | backend/src/modules/commerce/commerce.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import { AppError } from "../../http/app-error.js";
@@ -270,7 +272,7 @@ export function createCommerceRouter(
     },
   );
 
-  router.put("/cart/reservation", rateLimit({ windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+  router.put("/cart/reservation", rateLimit({ store: sharedRateLimitStore(config, "commerce-1"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const body = reserveSchema.parse(request.body);
     const ownerHash = guestCartOwnerHash(request, response, config, true);
     if (!ownerHash) {
@@ -288,7 +290,7 @@ export function createCommerceRouter(
 
   router.get(
     "/cart/reservation/:reservationId",
-    rateLimit({ windowMs: 600000, limit: 80, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ store: sharedRateLimitStore(config, "commerce-2"), windowMs: 600000, limit: 80, standardHeaders: "draft-8", legacyHeaders: false }),
     async (request, response) => {
       const id = reservationId.parse(request.params.reservationId);
       const ownerHash = guestCartOwnerHash(request, response, config, true);
@@ -301,7 +303,7 @@ export function createCommerceRouter(
     },
   );
 
-  router.delete("/cart/reservation/:reservationId", rateLimit({ windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+  router.delete("/cart/reservation/:reservationId", rateLimit({ store: sharedRateLimitStore(config, "commerce-3"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const id = reservationId.parse(request.params.reservationId);
     const ownerHash = guestCartOwnerHash(request, response, config, false);
     if (ownerHash) await commerce.releaseCart(id, ownerHash);
@@ -609,7 +611,7 @@ export function createCommerceRouter(
 
   router.post(
     "/admin/live-operations/route",
-    rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ store: sharedRateLimitStore(config, "commerce-4"), windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("staff"),
@@ -679,7 +681,7 @@ export function createCommerceRouter(
 
   router.get(
     "/me/tracking/live",
-    rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ store: sharedRateLimitStore(config, "commerce-5"), windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     requireAccountType("customer"),
     async (request, response) => {
@@ -712,7 +714,7 @@ export function createCommerceRouter(
 
   router.put(
     "/representatives/location",
-    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ store: sharedRateLimitStore(config, "commerce-6"), windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
@@ -735,7 +737,7 @@ export function createCommerceRouter(
 
   router.post(
     "/representatives/orders/:orderCode/action",
-    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ store: sharedRateLimitStore(config, "commerce-7"), windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
@@ -749,14 +751,14 @@ export function createCommerceRouter(
           orderCode,
           body.action,
         );
-      await outbox?.processBatch(10).catch(() => undefined);
+      await dispatchOutbox(outbox, 10);
       response.status(200).json({ order });
     },
   );
 
   router.post(
     "/representatives/returns/:returnRef/action",
-    rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({ store: sharedRateLimitStore(config, "commerce-8"), windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
@@ -770,7 +772,7 @@ export function createCommerceRouter(
           returnRef,
           body.action,
         );
-      await outbox?.processBatch(10).catch(() => undefined);
+      await dispatchOutbox(outbox, 10);
       response.status(200).json({ return: result });
     },
   );
@@ -795,7 +797,7 @@ export function createCommerceRouter(
         guestCartOwnerHash(request, response, config, false) ?? undefined,
         idempotencyKey,
       );
-      await outbox?.processBatch(10).catch(() => undefined);
+      await dispatchOutbox(outbox, 10);
       response.status(201).json({ order: result });
     },
   );

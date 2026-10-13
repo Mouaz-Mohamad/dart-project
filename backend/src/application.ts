@@ -74,6 +74,7 @@ export interface AppDependencies extends HealthDependencies {
   financeService?: FinanceService;
   trafficAnalyticsService?: TrafficAnalyticsService;
   outboxService?: OutboxService;
+  maintenanceJob?: () => Promise<void>;
   waitingService?: WaitingService;
   operationalAlerts?: Pick<OperationalAlertService, "report">;
 }
@@ -336,7 +337,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   }
 
   if (dependencies.outboxService) {
-    app.use("/api/v1", createOutboxRouter(dependencies.outboxService, config));
+    app.use("/api/v1", createOutboxRouter(dependencies.outboxService, config, dependencies.maintenanceJob));
   }
 
   app.use(notFoundHandler);

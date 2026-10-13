@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/outbox/outbox.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router, type Request, type Response } from "express";
+import { z } from "zod";
 import { timingSafeEqual } from "node:crypto";
 import type { AppConfig } from "../../config/env.js";
 import type { OutboxService } from "./outbox.service.js";
@@ -14,6 +15,7 @@ function safeTokenEquals(actual: string, expected: string): boolean {
 export function createOutboxRouter(
   outbox: OutboxService,
   config: Pick<AppConfig, "outboxCronSecret">,
+  maintenance?: () => Promise<void>,
 ): Router {
   const router = Router();
 
@@ -32,7 +34,9 @@ export function createOutboxRouter(
       });
       return;
     }
-    response.status(200).json(await outbox.processBatch());
+    const query = z.object({ limit: z.coerce.number().int().min(1).max(10).default(5) }).parse(request.query);
+    await maintenance?.();
+    response.status(200).json(await outbox.processBatch(query.limit));
   }
 
   router.post("/internal/outbox/process", process);

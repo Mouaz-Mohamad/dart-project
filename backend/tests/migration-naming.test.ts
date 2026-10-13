@@ -11,9 +11,9 @@ describe("migration naming policy", () => {
       .filter((name) => name.endsWith(".sql"))
       .sort();
 
-    expect(names).toHaveLength(59);
+    expect(names).toHaveLength(60);
     expect(names.map((name) => name.slice(0, 4))).toEqual(
-      Array.from({ length: 59 }, (_, index) => String(index + 1).padStart(4, "0")),
+      Array.from({ length: 60 }, (_, index) => String(index + 1).padStart(4, "0")),
     );
     expect(() => assertMigrationNamingPolicy(names)).not.toThrow();
   });
