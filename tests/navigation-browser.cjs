@@ -8,6 +8,9 @@ const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../public');
 const requests = [];
 let cartExists = true;
+const snapshots = [];
+let scenarioPhase = 0, resolveScenario, rejectScenario;
+const scenarioFinished = new Promise((resolve, reject) => { resolveScenario = resolve; rejectScenario = reject; });
 const model = { id: 'model-navigation', modelId: 'DW-NAV', name: 'Navigation Jeans', category: 'Jeans',
   selling: 800, discount: 0, active: true, sizeOptions: [{ name: 'M', active: true }],
   colorOptions: [{ name: 'Black', active: true, images: [{ url: '/Photos/Logos/01_Dart_original_transparent_240.webp' }] }] };
@@ -16,6 +19,24 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://test');
   requests.push({ path: url.pathname, method: req.method, purpose: req.headers['sec-purpose'] || '',
     context: req.headers.cookie?.includes('navigation-low-data=1') ? 'low-data' : 'main' });
+  if (url.pathname === '/__dart_test/navigation') {
+    res.setHeader('Content-Type', 'application/json'); res.setHeader('Cache-Control', 'no-store');
+    if (req.method === 'GET') { res.end(JSON.stringify({ phase: scenarioPhase })); return; }
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const snapshot = JSON.parse(body);
+        if (snapshot.error) throw new Error(snapshot.error);
+        assert.equal(snapshot.phase, scenarioPhase, 'the native scenario advances in order');
+        snapshots.push(snapshot); scenarioPhase += 1;
+        if (snapshot.phase === 2) cartExists = false;
+        res.end('{}');
+        if (snapshot.phase === 5) resolveScenario(snapshots);
+      } catch (error) { res.statusCode = 500; res.end('{}'); rejectScenario(error); }
+    });
+    return;
+  }
   if (url.pathname.startsWith('/api/')) {
     res.setHeader('Content-Type', 'application/json'); res.setHeader('Cache-Control', 'no-store');
     let payload = {};
@@ -44,71 +65,141 @@ const server = http.createServer((req, res) => {
   res.end(content);
 });
 
+// Playwright does not support keeping Page synchronized through BFCache restores:
+// https://github.com/microsoft/playwright/blob/main/docs/src/navigations.md#backforward-cache-bfcache
+// Drive this scenario in the real documents and report observations to the fixture server.
+// No request interception, SPA replacement, or browser cache emulation is used.
+function nativeScenario(origin) {
+  window.__documentToken = crypto.randomUUID();
+  window.__restored = false;
+  const errors = [];
+  let lastPhase = -1;
+  window.addEventListener('error', (event) => errors.push(event.message));
+  window.addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
+  document.addEventListener('dart:critical-ready', () => { window.__criticalReady = true; });
+  const wait = async (condition) => {
+    const deadline = Date.now() + 10000;
+    while (!condition()) {
+      if (Date.now() > deadline) throw new Error('Native scenario timed out: ' + location.pathname + ', phase ' + lastPhase);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  };
+  const cart = () => window.DartState?.read('dart_cart', []) || [];
+  const report = async (phase) => {
+    const panel = document.getElementById('productFiltersPanel');
+    const snapshot = { phase, url: location.href, token: window.__documentToken, restored: window.__restored,
+      headerCount: document.querySelectorAll('#header-container .side-menu').length,
+      footerCount: document.querySelectorAll('#footer .footer-continear').length,
+      search: document.getElementById('productSearchInput')?.value,
+      sort: document.getElementById('productSortSelect')?.value,
+      filtersVisible: !!panel && panel.getBoundingClientRect().height > 0,
+      scrollY: window.scrollY,
+      cartLength: cart().length, errors: [...errors] };
+    const response = await fetch(origin + '/__dart_test/navigation', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot),
+    });
+    if (!response.ok) throw new Error('Native scenario report rejected');
+  };
+  async function run() {
+    if (document.prerendering || document.visibilityState !== 'visible') return;
+    try {
+      const { phase } = await (await fetch(origin + '/__dart_test/navigation', { cache: 'no-store' })).json();
+      if (phase === lastPhase || phase > 5) return;
+      lastPhase = phase;
+      if (phase === 0) {
+        await wait(() => window.__criticalReady && cart().length === 1 && document.getElementById('why')?.dataset.dartSectionLoaded === '1');
+        await report(phase);
+        document.querySelector('[data-go-products]').click();
+      } else if (phase === 1) {
+        await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]'));
+        document.getElementById('toggleProductFilters').click();
+        const search = document.getElementById('productSearchInput');
+        search.value = 'Navigation'; search.dispatchEvent(new Event('input', { bubbles: true }));
+        const sort = document.getElementById('productSortSelect');
+        sort.value = 'price-high'; sort.dispatchEvent(new Event('change', { bubbles: true }));
+        window.scrollTo(0, 400);
+        await wait(() => document.getElementById('productFiltersPanel').getBoundingClientRect().height > 0);
+        await report(phase);
+        document.querySelector('.side-menu a[href="/index.html"]').click();
+      } else if (phase === 2) {
+        await wait(() => window.DartNavigation && window.__criticalReady && cart().length === 1);
+        await report(phase);
+        window.DartNavigation.go('/products.html');
+      } else if (phase === 3) {
+        await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]') && cart().length === 0);
+        await report(phase);
+        window.history.back();
+      } else if (phase === 4) {
+        await wait(() => window.DartNavigation && window.__criticalReady);
+        await report(phase);
+        window.history.forward();
+      } else if (phase === 5) {
+        await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]') && cart().length === 0);
+        await report(phase);
+      }
+    } catch (error) {
+      await fetch(origin + '/__dart_test/navigation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: error.stack || String(error) }) });
+    }
+  }
+  window.addEventListener('pageshow', (event) => { window.__restored = event.persisted; void run(); });
+  document.addEventListener('prerenderingchange', () => { void run(); });
+}
+
 (async () => {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE || chromium.executablePath(), ignoreDefaultArgs: ['--disable-back-forward-cache'], args: ['--no-sandbox'] });
   try {
     const context = await browser.newContext({ viewport: { width: 900, height: 700 } });
-    await context.addInitScript(() => {
-      window.__documentToken = crypto.randomUUID();
-      window.__restored = false;
-      window.addEventListener('pageshow', (event) => { window.__restored = event.persisted; });
-      document.addEventListener('dart:critical-ready', () => { window.__criticalReady = true; });
-    });
+    await context.addInitScript({ content: `(${nativeScenario.toString()})(${JSON.stringify(origin)});` });
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
     await cdp.send('Page.enable');
-    let restoreReasons = [];
-    cdp.on('Page.backForwardCacheNotUsed', (event) => { restoreReasons = event.notRestoredExplanations.map(row => row.reason); });
+    const restoreReasons = new Set();
+    cdp.on('Page.backForwardCacheNotUsed', (event) => {
+      event.notRestoredExplanations.forEach(row => restoreReasons.add(row.reason));
+    });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
-    assert.equal(await page.locator('#header-container .side-menu').count(), 1, 'header is present in the initial document');
-    assert.equal(await page.locator('#footer .footer-continear').count(), 1, 'footer is present in the initial document');
-    await page.waitForFunction(() => window.__criticalReady && window.DartState.read('dart_cart', []).length === 1);
-    const homeToken = await page.evaluate(() => window.__documentToken);
-    await page.waitForFunction(() => document.querySelector('#why [data-dart-section-loaded]') || document.getElementById('why')?.dataset.dartSectionLoaded === '1');
+    let timeout;
+    const observed = await Promise.race([scenarioFinished, new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error('Native navigation scenario did not finish; completed phases: ' + snapshots.map(row => row.phase).join(','))), 35000);
+    })]).finally(() => clearTimeout(timeout));
+    const [home, products, homeReturn, productsReturn, back, forward] = observed;
+    for (const row of observed) {
+      assert.equal(row.headerCount, 1, 'each document contains one header');
+      assert.equal(row.footerCount, 1, 'each document contains one footer');
+      assert.deepEqual(row.errors, [], 'no page exceptions through native restoration');
+    }
     assert.equal(requests.filter((req) => /\/sections\/(Nav-Bar|footer)\.html/.test(req.path)).length, 0, 'no extra shell HTTP requests');
     assert.ok(requests.some((req) => req.path === '/api/v1/reviews'), 'reviews prepare without scrolling');
     assert.ok(requests.some((req) => req.path === '/about.html'), 'other public documents preload automatically');
-    const beforeVisit = requests.filter((req) => req.path === '/api/v1/analytics/events').length;
-    await page.click('[data-go-products]');
-    await page.waitForURL(/products(?:\.html)?$/, { waitUntil: "commit" });
-    await page.waitForFunction(() => !!window.DartNavigation && !!document.querySelector('.product-card[data-id="DW-NAV"]'));
-    const productsToken = await page.evaluate(() => window.__documentToken);
-    await page.click('#toggleProductFilters');
-    await page.fill('#productSearchInput', 'Navigation');
-    await page.selectOption('#productSortSelect', 'price-high');
-    await page.evaluate(() => window.scrollTo(0, 400));
-    await page.evaluate(() => document.querySelector('.side-menu a[href="/index.html"]').click());
-    await page.waitForURL(origin + '/', { waitUntil: 'commit' });
-    const nativeRestore = await page.evaluate(() => window.__documentToken) === homeToken;
-    const unsupportedLocalShell = process.env.DART_TEST_HEADLESS_SHELL === '1' && restoreReasons.includes('BackForwardCacheDisabledForDelegate');
-    assert.ok(nativeRestore || unsupportedLocalShell, 'Home must restore its document in full Chromium');
-    if (nativeRestore) assert.equal(await page.evaluate(() => window.__restored), true);
-    cartExists = false;
-    await page.evaluate(() => window.DartNavigation.go('/products.html'));
-    await page.waitForURL(/products(?:\.html)?$/, { waitUntil: "commit" });
+    const nativeRestore = homeReturn.token === home.token;
+    // The local headless-shell delegate has no BFCache support. Never skip native
+    // assertions for a full Chromium binary, including the required GitHub CI run.
+    const unsupportedLocalShell = process.env.DART_TEST_HEADLESS_SHELL === '1' &&
+      path.basename(process.env.CHROMIUM_EXECUTABLE || '') === 'headless_shell';
+    assert.ok(nativeRestore || unsupportedLocalShell,
+      'Home must restore its document in full Chromium; reasons: ' + [...restoreReasons].join(','));
     if (nativeRestore) {
-      assert.equal(await page.evaluate(() => window.__documentToken), productsToken, 'Products reuses its original document');
-      assert.equal(await page.inputValue('#productSearchInput'), 'Navigation');
-      assert.equal(await page.inputValue('#productSortSelect'), 'price-high');
-      assert.equal(await page.locator('#productFiltersPanel').isVisible(), true);
+      assert.equal(homeReturn.restored, true);
+      for (const row of [productsReturn, forward]) {
+        assert.equal(row.token, products.token, 'Products reuses its original document');
+        assert.equal(row.restored, true);
+        assert.equal(row.search, 'Navigation');
+        assert.equal(row.sort, 'price-high');
+        assert.equal(row.filtersVisible, true);
+        assert.ok(Math.abs(row.scrollY - products.scrollY) <= 1, 'Products retains its scroll position');
+      }
+      assert.equal(back.token, home.token, 'Back restores the original Home document');
+      assert.equal(back.restored, true);
+      assert.ok(requests.filter((req) => req.path === '/api/v1/analytics/events').length <= 2, 'restoration and prerendering do not invent visits');
     }
-    await page.waitForFunction(() => window.DartState.read('dart_cart', []).length === 0);
-    if (nativeRestore) assert.ok(requests.filter((req) => req.path === '/api/v1/analytics/events').length <= beforeVisit + 1, 'restoration and prerendering do not invent visits');
-    // Read history in the active document after native restoration. A restored document
-    // emits pageshow, not a new load, and CDP's navigation-history cursor may lag behind it.
-    await page.evaluate(() => { setTimeout(() => history.back(), 0); });
-    await page.waitForFunction((url) => location.href === url, origin + '/');
-    if (nativeRestore) {
-      assert.equal(await page.evaluate(() => window.__documentToken), homeToken, 'Back restores the original Home document');
-      assert.equal(await page.evaluate(() => window.__restored), true);
-    }
-    await page.evaluate(() => { setTimeout(() => history.forward(), 0); });
-    await page.waitForFunction(() => /\/products(?:\.html)?$/.test(location.pathname));
-    if (nativeRestore) assert.equal(await page.evaluate(() => window.__documentToken), productsToken);
+    assert.equal(homeReturn.url, origin + '/'); assert.equal(back.url, origin + '/');
+    assert.match(productsReturn.url, /\/products(?:\.html)?$/); assert.match(forward.url, /\/products(?:\.html)?$/);
+    assert.equal(productsReturn.cartLength, 0); assert.equal(forward.cartLength, 0);
     assert.deepEqual(errors, []);
 
     // Low-data connections keep normal navigation while skipping speculative requests.

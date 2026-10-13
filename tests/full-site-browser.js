@@ -141,6 +141,9 @@ const server = http.createServer((request, response) => {
     args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
   });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    document.addEventListener('dart:sections-loaded', () => { window.__sectionsLoaded = true; });
+  });
   const failures = [];
   await context.route("**/*", (route) =>
     route.request().url().startsWith(origin) ? route.continue() : route.abort(),
@@ -197,6 +200,7 @@ const server = http.createServer((request, response) => {
     assert.equal(await page.locator("#header-container .icon-menu").count(), 1);
     assert.equal(await page.locator("#header-container .social-icons svg").count(), 5);
     assert.equal(await page.locator("#footer .footer-continear").count(), 1);
+    if (relativeUrl === 'index.html') await page.waitForFunction(() => window.__sectionsLoaded);
     await page.close();
   }
 
@@ -206,6 +210,7 @@ const server = http.createServer((request, response) => {
   assert.equal(await home.locator("#header-container .side-menu").evaluate((node) => node.classList.contains("active")), true);
   await home.locator("main").click({ position: { x: 2, y: 2 } });
   assert.equal(await home.locator("#header-container .side-menu").evaluate((node) => node.classList.contains("active")), false);
+  await home.waitForFunction(() => window.__sectionsLoaded);
   await home.close();
 
   const products = await open("products.html");
