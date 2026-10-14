@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import type { AppConfig } from "../../config/env.js";
 import { authenticate, csrfProtection, requireAccountType, requireAnyPermission, requireMfa, requirePermission } from "../../middleware/authentication.js";
@@ -22,7 +23,7 @@ export function createNewsRouter(news: NewsService, assets: CatalogAssetService,
     const { newsId, ...body } = newsCreateSchema.parse(req.body);
     res.status(201).json(await news.save(req.auth!.userId, newsId, body, null, String(req.id)));
   });
-  router.put("/admin/news/assets", ...write, rateLimit({ windowMs: 15 * 60_000, limit: 30,
+  router.put("/admin/news/assets", ...write, rateLimit({ store: sharedRateLimitStore(config, "news-upload-1"), windowMs: 15 * 60_000, limit: 30,
     standardHeaders: "draft-8", legacyHeaders: false }), async (req, res) => {
     const body = newsAssetSchema.parse(req.body);
     res.json(await assets.put({ ...body, actorId: req.auth!.userId }));

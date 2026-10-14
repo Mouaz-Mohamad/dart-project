@@ -281,6 +281,7 @@ const server = http.createServer((request, response) => {
     await page.locator(".home-set-card").first().waitFor();
     assert.equal(await cards.count(), 2, "Retry also recovers a failed lazy-loaded script");
     await context.unroute("**/Js/dart-sets.js*");
+    await page.close();
 
     // A copied spotlight needs its presenter on Products as well as the homepage.
     const products = await context.newPage();

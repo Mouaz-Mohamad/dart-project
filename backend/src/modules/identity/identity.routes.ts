@@ -1,6 +1,8 @@
+import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
 // DART CODE GUIDE | backend/src/modules/identity/identity.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router, type Request, type Response } from "express";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -65,8 +67,9 @@ function metadata(request: Request): RequestMetadata {
   };
 }
 
-function authLimiter() {
+function authLimiter(config: object, scope: string) {
   return rateLimit({
+    store: sharedRateLimitStore(config, scope),
     windowMs: 15 * 60_000,
     limit: 10,
     standardHeaders: "draft-8",
@@ -129,7 +132,7 @@ export function createIdentityRouter(
   const signedIn = authenticate(service, config);
   const csrf = csrfProtection(config);
 
-  router.post("/auth/register", authLimiter(), async (request, response) => {
+  router.post("/auth/register", authLimiter(config, "identity-1"), async (request, response) => {
     const session = await service.registerCustomer(
       registerCustomerSchema.parse(request.body),
       metadata(request),
@@ -141,17 +144,17 @@ export function createIdentityRouter(
     });
   });
 
-  router.post("/auth/verify-email", authLimiter(), async (request, response) => {
+  router.post("/auth/verify-email", authLimiter(config, "identity-2"), async (request, response) => {
     const body = z.object({ challengeId: uuid, code: z.string().regex(/^\d{6}$/) }).parse(request.body);
     const session = await service.verifyCustomerEmail(body.challengeId, body.code, metadata(request));
     setSessionCookies(response, config, session);
     response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
   });
 
-  router.post("/auth/resend-verification", authLimiter(), async (request, response) => {
+  router.post("/auth/resend-verification", authLimiter(config, "identity-3"), async (request, response) => {
     const body = z.object({ challengeId: uuid }).parse(request.body);
     const result = await service.resendCustomerVerification(body.challengeId, metadata(request));
-    await outbox?.processBatch(5).catch(() => undefined);
+    await dispatchOutbox(outbox, 5);
     response.status(202).json({
       status: "verification_required",
       challengeId: result.challengeId,
@@ -159,28 +162,28 @@ export function createIdentityRouter(
     });
   });
 
-  router.post("/auth/login", authLimiter(), async (request, response) => {
+  router.post("/auth/login", authLimiter(config, "identity-4"), async (request, response) => {
     const body = loginSchema.parse(request.body);
     const session = await service.login("customer", body.identifier, body.password, metadata(request));
     setSessionCookies(response, config, session);
     response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
   });
 
-  router.post("/representatives/register", authLimiter(), async (request, response) => {
+  router.post("/representatives/register", authLimiter(config, "identity-5"), async (request, response) => {
     const body = registerRepresentativeSchema.parse(request.body);
     const result = await service.registerRepresentative(body, metadata(request));
-    await outbox?.processBatch(5).catch(() => undefined);
+    await dispatchOutbox(outbox, 5);
     response.status(202).json(result);
   });
 
-  router.post("/representatives/login", authLimiter(), async (request, response) => {
+  router.post("/representatives/login", authLimiter(config, "identity-6"), async (request, response) => {
     const body = loginSchema.parse(request.body);
     const session = await service.login("representative", body.identifier, body.password, metadata(request));
     setSessionCookies(response, config, session);
     response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
   });
 
-  router.post("/auth/forgot-password", authLimiter(), async (request, response) => {
+  router.post("/auth/forgot-password", authLimiter(config, "identity-7"), async (request, response) => {
     const body = z
       .object({
         identifier: z.string().trim().min(3).max(254),
@@ -192,7 +195,7 @@ export function createIdentityRouter(
       body.identifier,
       metadata(request),
     );
-    await outbox?.processBatch(5).catch(() => undefined);
+    await dispatchOutbox(outbox, 5);
     response.status(202).json({
       message: "If the account exists, a verification code has been sent to its registered email",
       challengeId: result.challengeId,
@@ -200,7 +203,7 @@ export function createIdentityRouter(
     });
   });
 
-  router.post("/auth/reset-password", authLimiter(), async (request, response) => {
+  router.post("/auth/reset-password", authLimiter(config, "identity-8"), async (request, response) => {
     const body = z
       .object({
         challengeId: uuid,
@@ -553,7 +556,7 @@ export function createIdentityRouter(
         body.temporaryPassword,
         metadata(request),
       );
-      await outbox?.processBatch(5).catch(() => undefined);
+      await dispatchOutbox(outbox, 5);
       response.status(204).end();
     },
   );

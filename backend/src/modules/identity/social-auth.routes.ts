@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/identity/social-auth.routes.ts
 // الغرض: HTTP routes لتسجيل عميل Dart عبر Google/Facebook بدون كشف أي OAuth secret للمتصفح.
 import { Router, type Request, type Response } from "express";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -38,8 +39,9 @@ function metadata(request: Request): RequestMetadata {
   };
 }
 
-function authLimiter(limit = 20) {
+function authLimiter(config: object, scope: string, limit = 20) {
   return rateLimit({
+    store: sharedRateLimitStore(config, scope),
     windowMs: 15 * 60_000,
     limit,
     standardHeaders: "draft-8",
@@ -93,7 +95,7 @@ export function createSocialAuthRouter(
 
   router.get(
     "/auth/social/:provider/start",
-    authLimiter(),
+    authLimiter(config, "social-1"),
     async (request, response) => {
       const provider = providerFromRequest(request);
       const destination = destinationSchema.parse(request.query.next);
@@ -105,7 +107,7 @@ export function createSocialAuthRouter(
 
   router.get(
     "/auth/social/:provider/callback",
-    authLimiter(),
+    authLimiter(config, "social-2"),
     async (request, response) => {
       const provider = providerFromRequest(request);
       response.setHeader("Referrer-Policy", "no-referrer");
@@ -136,7 +138,7 @@ export function createSocialAuthRouter(
 
   router.post(
     "/auth/social/challenge",
-    authLimiter(30),
+    authLimiter(config, "social-3",30),
     async (request, response) => {
       const body = z.object({ token: z.string().min(40).max(500) }).parse(request.body);
       response.status(200).json(await service.challenge(body.token));
@@ -145,7 +147,7 @@ export function createSocialAuthRouter(
 
   router.post(
     "/auth/social/complete",
-    authLimiter(),
+    authLimiter(config, "social-4"),
     async (request, response) => {
       const body = completionSchema.parse(request.body);
       const session = await service.complete(body, metadata(request));

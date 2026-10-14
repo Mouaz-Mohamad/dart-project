@@ -22,7 +22,7 @@ const outboxService = readFileSync(
 
 describe("production event delivery contracts", () => {
   it("attempts immediate delivery for identity events that still require external notification", () => {
-    expect(identityRoutes.match(/outbox\?\.processBatch\(5\)/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(identityRoutes.match(/dispatchOutbox\(outbox, 5\)/g)?.length).toBeGreaterThanOrEqual(3);
     const registerStart = identityRoutes.indexOf('router.post("/auth/register"');
     const registerEnd = identityRoutes.indexOf('router.post("/auth/verify-email"', registerStart);
     expect(identityRoutes.slice(registerStart, registerEnd)).not.toContain("processBatch");
@@ -30,7 +30,7 @@ describe("production event delivery contracts", () => {
   });
 
   it("attempts immediate delivery for checkout and courier workflow events", () => {
-    expect(commerceRoutes.match(/outbox\?\.processBatch\(10\)/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(commerceRoutes.match(/dispatchOutbox\(outbox, 10\)/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it("targets the exact Staff email verification event", () => {

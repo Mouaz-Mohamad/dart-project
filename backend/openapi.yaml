@@ -22,7 +22,79 @@ tags:
   - name: Sets
   - name: News
   - name: Finance
+  - name: Catalog
 paths:
+  /catalog/version:
+    get:
+      tags: [Catalog]
+      operationId: readCatalogVersion
+      responses:
+        "200": { description: Current PostgreSQL catalog version. No-store; expired reservations may be released. }
+  /catalog:
+    get:
+      tags: [Catalog]
+      operationId: readPublicCatalog
+      description: Without query parameters preserves the legacy full catalog. Explicit paging returns only selected models and their fresh stock plus pagination.total for the complete filter. Never returns physical item IDs, acquisition cost or customer data. Stable model_id ordering breaks ties. No-store.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+        - { name: q, in: query, schema: { type: string, maxLength: 160 } }
+        - { name: category, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, price-low, price-high, name] } }
+      responses:
+        "200": { description: Versioned public models, current stock, and optional pagination. Display prices retain the existing EGP API representation; database money remains integer piastres. }
+        "422": { description: Invalid bounded paging input }
+  /admin/catalog-state:
+    get:
+      tags: [Catalog]
+      operationId: readAdminCatalogState
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff, satisfied MFA when required, and catalog.manage or catalog.read. No-store. Optional page/limit/q pages models and physical items independently with totalModels and totalItems over their full matching sets. category and sort are not supported for this admin projection.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+        - { name: q, in: query, schema: { type: string, maxLength: 160 } }
+      responses:
+        "200": { description: Versioned models and physical items with optional independent totals }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { description: Staff permission or MFA denied }
+        "422": { description: Invalid or unsupported admin query }
+    patch:
+      tags: [Catalog]
+      operationId: patchAdminCatalogRecords
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Requires Staff, satisfied MFA when required, and catalog.manage or catalog.edit. Updates only supplied rows; omitted rows remain unchanged. Per-record versions reject stale edits, with zero only for a new record. Protected inventory identity/state and acquisition costs remain server-authoritative. Returns changed rows with baseVersion, committedVersion and observed version. Clients rehydrate when a version gap is observed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion, models, items, recordVersions]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                models: { type: array, maxItems: 500, items: { type: object, additionalProperties: true } }
+                items: { type: array, maxItems: 1000, items: { type: object, additionalProperties: true } }
+                recordVersions:
+                  type: object
+                  required: [models, items]
+                  properties:
+                    models: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+                    items: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+      responses:
+        "200": { description: Changed records committed and audited; baseVersion/committedVersion/observed version supplied for safe reconciliation }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { description: Staff permission, MFA or CSRF denied }
+        "409": { description: Stale record, protected state or immutable acquisition cost }
+        "422": { description: Invalid, empty or oversized changed-record payload }
+    put:
+      tags: [Catalog]
+      operationId: replaceAdminCatalogState
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Existing complete replacement contract remains available for legacy clients and explicit bulk operations. Requires catalog.manage or catalog.edit, Staff MFA when required, CSRF and an exact global expectedVersion. Omitted eligible rows are soft-deleted; do not use as a retry fallback after a PATCH conflict or server failure.
+      responses:
+        "200": { description: Complete catalog snapshot after an audited replacement }
+        "409": { description: Global catalog version conflict }
   /admin/finance/report:
     get:
       tags: [Finance]
@@ -884,17 +956,13 @@ paths:
         "200": { description: Previous Cairo month draw result }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /internal/outbox/process:
-    get:
-      tags: [Internal Jobs]
-      operationId: processOutboxGet
-      security: [{ internalBearer: [] }]
-      responses:
-        "200": { description: Outbox batch result }
-        "401": { $ref: "#/components/responses/Unauthorized" }
     post:
       tags: [Internal Jobs]
       operationId: processOutboxPost
       security: [{ internalBearer: [] }]
+      description: Processes a bounded durable queue batch after optional reservation cleanup and shared limiter pruning. Immediate dispatch remains separate from the hourly recovery worker. GET is not supported.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
       responses:
         "200": { description: Outbox batch result }
         "401": { $ref: "#/components/responses/Unauthorized" }

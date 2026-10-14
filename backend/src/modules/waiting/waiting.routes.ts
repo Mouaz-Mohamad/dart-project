@@ -1,6 +1,8 @@
+import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
 // DART CODE GUIDE | backend/src/modules/waiting/waiting.routes.ts
 // الغرض: HTTP API لنظام Waiting للعملاء والموظفين مع صلاحيات دقيقة لكل Action.
 import { Router } from "express";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -79,7 +81,7 @@ export function createWaitingRouter(
 
   router.post(
     "/me/waiting",
-    rateLimit({
+    rateLimit({ store: sharedRateLimitStore(config, "waiting-1"),
       windowMs: 10 * 60 * 1000,
       limit: 20,
       standardHeaders: "draft-8",
@@ -95,7 +97,7 @@ export function createWaitingRouter(
         body,
         String(request.id),
       );
-      await outbox?.processBatch(10).catch(() => undefined);
+      await dispatchOutbox(outbox, 10);
       response.status(201).json({ entry });
     },
   );
@@ -213,7 +215,7 @@ export function createWaitingRouter(
 
   router.post(
     "/admin/waiting/reconcile",
-    rateLimit({
+    rateLimit({ store: sharedRateLimitStore(config, "waiting-2"),
       windowMs: 60 * 1000,
       limit: 20,
       standardHeaders: "draft-8",
@@ -229,14 +231,14 @@ export function createWaitingRouter(
         request.auth!.userId,
         String(request.id),
       );
-      await outbox?.processBatch(20).catch(() => undefined);
+      await dispatchOutbox(outbox, 20);
       response.status(200).json(result);
     },
   );
 
   router.post(
     "/admin/waiting/:entryId/action",
-    rateLimit({
+    rateLimit({ store: sharedRateLimitStore(config, "waiting-3"),
       windowMs: 60 * 1000,
       limit: 60,
       standardHeaders: "draft-8",
@@ -259,7 +261,7 @@ export function createWaitingRouter(
         request.auth!.userId,
         String(request.id),
       );
-      await outbox?.processBatch(10).catch(() => undefined);
+      await dispatchOutbox(outbox, 10);
       response.status(200).json({ entry });
     },
   );

@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const catalogSource = readFileSync(new URL("../../Js/dart-catalog.js", import.meta.url), "utf8");
+const adminCatalogSource = readFileSync(new URL("../../scripts/catalog-admin.source.js", import.meta.url), "utf8");
 const domainSource = readFileSync(new URL("../../Eye/dart-domain-state.js", import.meta.url), "utf8");
 const response = (payload: unknown) => ({ ok: true, status: 200, json: async () => payload });
 type ReadResponse = ReturnType<typeof response>;
@@ -37,6 +38,7 @@ function runtime(source: string) {
     dispatchEvent: (event: { type: string; detail?: unknown }) => { listeners.get(event.type)?.forEach((fn) => fn(event)); },
     setInterval: vi.fn(),
   };
+  runInNewContext(adminCatalogSource, { window });
   runInNewContext(source, { window, location: { origin: "https://dart.test", pathname: "/Eye/dart.html" },
     document: { cookie: "", hidden: false, addEventListener() {} },
     CustomEvent: class { constructor(public type: string, public options?: unknown) {} },
