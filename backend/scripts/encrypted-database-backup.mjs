@@ -73,27 +73,51 @@ export async function decryptArchive(source, target, password) {
   }
 }
 
+let operationStage = "configuration";
+function configurationFailure(reason, message) {
+  const error = new Error(message);
+  error.backupReason = reason;
+  throw error;
+}
+
 async function main() {
   const [command, filePath] = process.argv.slice(2);
   if (!["create", "restore-verify"].includes(command) || !filePath) {
     throw new Error("Usage: encrypted-database-backup.mjs create <output.dump.enc> | restore-verify <backup.dump.enc>");
   }
+  const sourceUrl = process.env.DATABASE_URL;
+  if (!sourceUrl) configurationFailure("missing-database-url", "Backup database connection is missing");
+  let database;
+  try { database = new URL(sourceUrl); }
+  catch { configurationFailure("invalid-database-url", "Backup database connection must be a PostgreSQL URL"); }
+  if (!["postgres:", "postgresql:"].includes(database.protocol)) {
+    configurationFailure("invalid-database-protocol", "Backup database connection must use PostgreSQL");
+  }
+  if (!database.password || /^(?:\*+|\[?redacted\]?|hidden)$/i.test(decodeURIComponent(database.password))) {
+    configurationFailure("missing-or-masked-database-password", "Backup database connection must contain usable credentials");
+  }
+  if (database.hostname.includes("-pooler.")) configurationFailure("pooled-database-url", "Backup requires the direct database connection");
   const password = process.env.DART_BACKUP_ENCRYPTION_PASSWORD;
-  if (!password || password.length < 32) throw new Error("DART_BACKUP_ENCRYPTION_PASSWORD must contain at least 32 characters");
+  if (!password || password.length < 32) configurationFailure("invalid-encryption-key", "DART_BACKUP_ENCRYPTION_PASSWORD must contain at least 32 characters");
   const target = resolve(filePath);
   const tempRoot = resolve(process.env.DART_BACKUP_TMP_ROOT || tmpdir());
+  operationStage = "temporary-workspace";
   await mkdir(tempRoot, { recursive: true, mode: 0o700 });
   const workspace = await mkdtemp(join(tempRoot, "dart-backup-"));
   const archive = join(workspace, "database.dump");
   try {
     if (command === "create") {
       await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+      operationStage = "database-dump";
       await createBackup(archive);
+      operationStage = "archive-encryption";
       await encryptArchive(archive, target, password);
       process.stdout.write(`Encrypted PostgreSQL backup created (${(await stat(target)).size} bytes)\n`);
     } else {
       // Authentication must finish before any PostgreSQL restore process starts.
+      operationStage = "archive-authentication";
       await decryptArchive(target, archive, password);
+      operationStage = "isolated-restore";
       await restoreBackupForVerification(archive);
       process.stdout.write("Encrypted backup authenticated and restored into the isolated recovery database\n");
     }
@@ -101,8 +125,11 @@ async function main() {
 }
 
 if (import.meta.url === (process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : "")) {
-  main().catch(() => {
-    process.stderr.write("Encrypted backup operation failed; no verified recovery result was produced\n");
+  main().catch((error) => {
+    // Only our fixed reason labels or standard filesystem codes may reach logs.
+    // Native error messages can contain a credential-bearing URL.
+    const reason = error.backupReason || (["EACCES", "EPERM", "ENOENT", "EEXIST"].includes(error.code) ? error.code : "operation-error");
+    process.stderr.write(`Encrypted backup operation failed; no verified recovery result was produced (stage=${operationStage}, reason=${reason})\n`);
     process.exitCode = 1;
   });
 }

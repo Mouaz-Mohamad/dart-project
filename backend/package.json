@@ -22,6 +22,7 @@
     "test:integration": "vitest run tests/database.integration.test.ts",
     "test:load": "node ../scripts/load-store.mjs",
     "bench:orders": "node --import tsx scripts/benchmark-order-refresh.ts",
+    "bench:scale": "node --import tsx scripts/benchmark-store-scale.ts",
     "test:watch": "vitest",
     "check": "npm run check:vercel && npm run lint && npm run typecheck && npm test",
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/database/migrate.ts",
@@ -35,6 +36,7 @@
   },
   "dependencies": {
     "@sentry/node": "10.75.2",
+    "@vercel/functions": "3.9.11",
     "argon2": "0.44.0",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",

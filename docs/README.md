@@ -13,6 +13,8 @@
 - `DEPLOYMENT_BATCHING.md` — قواعد batching فقط؛ النشر نفسه إجراء منفصل ولا يحدث لمجرد وجود كود جديد.
 - `ORDER_PERFORMANCE.md` — compact order responses, safe related refresh, isolated measurements and bounded load commands.
 - `FINANCE_NAVIGATION_PERFORMANCE.md` — archived expenses, combined finance snapshots, visible rendering, public preloading and native page restoration.
+- `CATALOG_SCALE.md` — paged catalog reads, changed-record writes, shared limits, bounded worker and rollout checks.
+- `SCALE_QUALITY_2026-10-13_AR.md` — verification evidence and outstanding production readiness gates for the unpublished scale batch.
 - `NEWS.md` — News behavior, API/migration references, end-to-end checks and quality review.
 - `IMAGE_DESCRIPTIONS.md` — وصف الأصول البصرية.
 

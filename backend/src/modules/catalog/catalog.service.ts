@@ -7,6 +7,15 @@ export interface CatalogState {
   version: number;
   models: Record<string, unknown>[];
   items: Record<string, unknown>[];
+  baseVersion?: number; committedVersion?: number;
+  pagination?: { page: number; limit: number; totalModels: number; totalItems: number };
+}
+export interface CatalogPageQuery {
+  page: number; limit: number; q?: string | undefined; category?: string | undefined;
+  sort?: "newest" | "price-low" | "price-high" | "name" | undefined;
+}
+export interface CatalogPatchVersions {
+  models: Record<string, number>; items: Record<string, number>;
 }
 
 interface PublicCatalogModelRow {
@@ -102,6 +111,13 @@ function text(value: unknown, fallback = ""): string {
   return result || fallback;
 }
 
+function timestamp(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = value instanceof Date ? value : new Date(String(value));
+  if (!Number.isFinite(parsed.getTime())) throw new AppError(422, "CATALOG_DATE_INVALID", "Invalid catalogue date");
+  return parsed.toISOString();
+}
+
 function activeOptionNames(value: unknown): Set<string> {
   return new Set(
     (Array.isArray(value) ? value : [])
@@ -169,6 +185,7 @@ export function validateCatalogReplacement(
 }
 
 export class CatalogService {
+  private readonly publicModelCache = new Map<string, { version: number; rows: PublicCatalogModelRow[]; total: number; until: number }>();
   constructor(private readonly pool: Pool) {}
 
   async version(): Promise<number> {
@@ -189,32 +206,53 @@ export class CatalogService {
     }
   }
 
-  async publicCatalog(): Promise<{ version: number; models: Record<string, unknown>[]; stock: Record<string, number> }> {
+  async publicCatalog(page?: CatalogPageQuery, retry = 0): Promise<{
+    version: number; models: Record<string, unknown>[]; stock: Record<string, number>;
+    pagination?: { page: number; limit: number; total: number };
+  }> {
     const client = await this.pool.connect();
     try {
-      await client.query("BEGIN");
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
       await this.releaseExpiredReservations(client);
       const versionResult = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
       );
-      const modelResult = await client.query<PublicCatalogModelRow>(
+      const query = page?.q || "", category = page?.category || "";
+      const where = `active AND NOT is_archived AND NOT is_deleted
+        AND ($1='' OR strpos(lower(model_id || ' ' || name || ' ' || category),lower($1))>0)
+        AND ($2='' OR lower(category)=lower($2))`;
+      const ordering = page?.sort === "price-low" ? "selling_minor*(100-discount_percent) ASC" :
+        page?.sort === "price-high" ? "selling_minor*(100-discount_percent) DESC" :
+        page?.sort === "name" ? "name ASC" : "created_at DESC";
+      const version = Number(versionResult.rows[0]?.version || 1);
+      const cacheKey = JSON.stringify(page || null);
+      const cached = this.publicModelCache.get(cacheKey);
+      const reusable = cached?.version === version && cached.until > Date.now();
+      const modelResult = reusable ? { rows: cached.rows } : await client.query<PublicCatalogModelRow>(
         `SELECT model_id, name, category, description, selling_minor, discount_percent,
                 low_stock_limit, size_options, color_options, size_chart, created_at, updated_at
            FROM catalog_models
-          WHERE active AND NOT is_archived AND NOT is_deleted
-          ORDER BY created_at DESC`,
+          WHERE ${where}
+          ORDER BY ${ordering}, model_id ASC ${page ? "LIMIT $3 OFFSET $4" : ""}`,
+        page ? [query, category, page.limit, (page.page-1)*page.limit] : [query, category],
       );
       const stockResult = await client.query<{ model_id: string; color: string; size: string; quantity: string }>(
         `SELECT model_id, color, size, count(*)::text AS quantity
            FROM inventory_items
           WHERE active AND NOT is_archived AND NOT is_deleted AND lower(status) = 'in stock'
+            AND model_id=ANY($1::text[])
           GROUP BY model_id, color, size`,
+        [modelResult.rows.map((row) => row.model_id)],
       );
       const stock: Record<string, number> = {};
       for (const row of stockResult.rows) {
         stock[JSON.stringify([row.model_id, row.color, row.size])] = Number(row.quantity);
       }
+      const total = page ? reusable ? { rows: [{ total: String(cached.total) }] } : await client.query<{ total: string }>(
+        `SELECT count(*)::text AS total FROM catalog_models WHERE ${where}`, [query, category],
+      ) : undefined;
       const payload = {
+        ...(page ? { pagination: { page: page.page, limit: page.limit, total: Number(total?.rows[0]?.total || 0) } } : {}),
         version: Number(versionResult.rows[0]?.version || 1),
         models: modelResult.rows.map((row) => ({
           modelId: row.model_id,
@@ -233,9 +271,17 @@ export class CatalogService {
         stock,
       };
       await client.query("COMMIT");
+      if (!reusable && Buffer.byteLength(JSON.stringify(modelResult.rows)) <= 128 * 1024) {
+        for (const [key, value] of this.publicModelCache) if (value.version !== version || value.until <= Date.now()) this.publicModelCache.delete(key);
+        if (this.publicModelCache.size >= 20) this.publicModelCache.delete(this.publicModelCache.keys().next().value!);
+        this.publicModelCache.set(cacheKey, { version, rows: modelResult.rows,
+          total: Number(total?.rows[0]?.total || modelResult.rows.length), until: Date.now()+10_000 });
+      }
       return payload;
     } catch (error) {
       await client.query("ROLLBACK");
+      if (retry < 1 && error && typeof error === "object" && "code" in error &&
+        ["40001", "40P01"].includes(String(error.code))) return this.publicCatalog(page, retry+1);
       throw error;
     } finally {
       client.release();
@@ -429,7 +475,7 @@ export class CatalogService {
     }
   }
 
-  async adminState(): Promise<CatalogState> {
+  async adminState(selection?: { modelIds?: string[]; itemIds?: string[]; page?: CatalogPageQuery }, retry = 0): Promise<CatalogState> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
@@ -437,11 +483,16 @@ export class CatalogService {
       const versionResult = await client.query<{ version: string }>(
         "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'",
       );
+      const paging = selection?.page, query = paging?.q || "";
       const models = await client.query<AdminCatalogModelRow>(
         `SELECT model_id, name, category, description, cost_minor, selling_minor, discount_percent,
                 low_stock_limit, size_options, color_options, size_chart, active, is_archived,
                 is_deleted, legacy, version, created_at, updated_at
-           FROM catalog_models ORDER BY created_at DESC`,
+           FROM catalog_models
+          WHERE ($1::text[] IS NULL OR model_id=ANY($1::text[]))
+            AND ($2='' OR strpos(lower(model_id || ' ' || name),lower($2))>0)
+          ORDER BY created_at DESC, model_id ASC ${paging ? "LIMIT $3 OFFSET $4" : ""}`,
+        paging ? [selection?.modelIds ?? null, query, paging.limit, (paging.page-1)*paging.limit] : [selection?.modelIds ?? null, query],
       );
       const items = await client.query<AdminInventoryItemRow>(
         `SELECT i.id, i.item_code, i.model_id, i.color, i.size, i.status, i.active, i.is_archived, i.is_deleted,
@@ -455,9 +506,19 @@ export class CatalogService {
            FROM inventory_items i
            LEFT JOIN orders o ON o.order_code=i.order_id
            LEFT JOIN customers c ON c.user_id=o.customer_user_id
-          ORDER BY i.created_at DESC`,
+          WHERE ($1::text[] IS NULL OR i.id=ANY($1::text[]))
+            AND ($2='' OR strpos(lower(i.item_code || ' ' || i.model_id || ' ' || i.color || ' ' || i.size),lower($2))>0)
+          ORDER BY i.created_at DESC, i.id ASC ${paging ? "LIMIT $3 OFFSET $4" : ""}`,
+        paging ? [selection?.itemIds ?? null, query, paging.limit, (paging.page-1)*paging.limit] : [selection?.itemIds ?? null, query],
       );
+      const totals = paging ? await client.query<{ models: string; items: string }>(
+        `SELECT
+          (SELECT count(*)::text FROM catalog_models WHERE $1='' OR strpos(lower(model_id || ' ' || name),lower($1))>0) AS models,
+          (SELECT count(*)::text FROM inventory_items WHERE $1='' OR strpos(lower(item_code || ' ' || model_id || ' ' || color || ' ' || size),lower($1))>0) AS items`, [query],
+      ) : undefined;
       const state = {
+        ...(paging ? { pagination: { page: paging.page, limit: paging.limit,
+          totalModels: Number(totals?.rows[0]?.models || 0), totalItems: Number(totals?.rows[0]?.items || 0) } } : {}),
         version: Number(versionResult.rows[0]?.version || 1),
         models: models.rows.map((row) => ({
           ...row.legacy,
@@ -509,28 +570,88 @@ export class CatalogService {
       return state;
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
+      if (retry < 1 && error && typeof error === "object" && "code" in error &&
+        ["40001", "40P01"].includes(String(error.code))) return this.adminState(selection, retry+1);
       throw error;
     } finally {
       client.release();
     }
   }
 
-  async replaceState(expectedVersion: number, models: Record<string, unknown>[], items: Record<string, unknown>[], actorId: string, requestId: string): Promise<CatalogState> {
+  async replaceState(expectedVersion: number, models: Record<string, unknown>[], items: Record<string, unknown>[], actorId: string, requestId: string, patch?: CatalogPatchVersions): Promise<CatalogState> {
     const client = await this.pool.connect();
+    let committedVersion = 0;
     try {
       await client.query("BEGIN");
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtext('dart:admin-state-bulk-write'))",
       );
-      validateCatalogReplacement(models, items);
+      const referenced = [...new Set([...models.map((row) => text(row.modelId)), ...items.map((row) => text(row.modelId))])];
+      let validationModels = models;
+      let previousRecords: Record<string, unknown> | undefined;
+      if (patch) {
+        const existingModels = await client.query<AdminCatalogModelRow>(
+          "SELECT * FROM catalog_models WHERE model_id=ANY($1::text[]) ORDER BY model_id FOR UPDATE", [referenced],
+        );
+        const currentModels = new Map(existingModels.rows.map((row) => [row.model_id, row]));
+        for (const raw of models) {
+          if (patch.models[text(raw.modelId)] !== Number(currentModels.get(text(raw.modelId))?.version || 0)) {
+            throw new AppError(409, "CATALOG_VERSION_CONFLICT", "A model changed; reload and retry");
+          }
+        }
+        const existingItems = await client.query<AdminInventoryItemRow>(
+          "SELECT * FROM inventory_items WHERE id=ANY($1::text[]) ORDER BY id FOR UPDATE", [items.map((row) => text(row.id))],
+        );
+        const currentItems = new Map(existingItems.rows.map((row) => [row.id, row]));
+        for (const raw of items) {
+          const current = currentItems.get(text(raw.id));
+          if (patch.items[text(raw.id)] !== Number(current?.version || 0)) {
+            throw new AppError(409, "CATALOG_VERSION_CONFLICT", "A physical item changed; reload and retry");
+          }
+          if (!current && (text(raw.status, "In stock").toLowerCase() !== "in stock" || raw.orderId || raw.cartReservationId || raw.reservationUntil)) {
+            throw new AppError(422, "ITEM_STATE_INVALID", "New inventory must start in stock without an order or reservation");
+          }
+          if (current && raw.costSnapshot !== undefined && minor(raw.costSnapshot) !== Number(current.cost_snapshot_minor)) {
+            throw new AppError(409, "ITEM_COST_IMMUTABLE", "A physical item's acquisition cost is immutable");
+          }
+          if (current && (current.order_id || current.cart_reservation_id ||
+            ["sold", "processing/held", "return inspection", "cart reserved"].includes(current.status.toLowerCase())) &&
+            (bool(raw.active, true) !== current.active || bool(raw.isArchived) !== current.is_archived || bool(raw.isDeleted) !== current.is_deleted)) {
+            throw new AppError(409, "ITEM_STATE_PROTECTED", "Reserved or historical inventory must use its workflow action");
+          }
+        }
+        previousRecords = {
+          models: existingModels.rows.filter((row) => models.some((raw) => text(raw.modelId)===row.model_id)).map(({ legacy: _legacy, ...row }) => row),
+          items: existingItems.rows.map(({ legacy: _legacy, ...row }) => row),
+        };
+        validationModels = [...existingModels.rows.filter((row) => !models.some((raw) => text(raw.modelId)===row.model_id)).map((row) => ({
+          modelId: row.model_id, cost: money(row.cost_minor), selling: money(row.selling_minor), discount: row.discount_percent,
+          lowStockLimit: row.low_stock_limit, sizeOptions: row.size_options, colorOptions: row.color_options,
+        })), ...models];
+        const changedVariants = models.filter((raw) => {
+          const current = currentModels.get(text(raw.modelId));
+          return current && (JSON.stringify(raw.colorOptions || []) !== JSON.stringify(current.color_options || []) ||
+            JSON.stringify(raw.sizeOptions || []) !== JSON.stringify(current.size_options || []));
+        }).map((raw) => text(raw.modelId));
+        if (changedVariants.length) {
+          const related = await client.query<{ id: string; item_code: string; model_id: string; color: string; size: string }>(
+            "SELECT id,item_code,model_id,color,size FROM inventory_items WHERE model_id=ANY($1::text[]) ORDER BY id FOR UPDATE", [changedVariants],
+          );
+          validateCatalogReplacement(validationModels, [...related.rows.filter((row) => !items.some((raw) => text(raw.id)===row.id)).map((row) => ({
+            id: row.id, itemCode: row.item_code, modelId: row.model_id, color: row.color, size: row.size,
+          })), ...items]);
+        }
+      }
+      validateCatalogReplacement(validationModels, items);
       const versionSnapshot = await client.query<{ version: string }>(
-        "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory' FOR UPDATE",
+        patch ? "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory'" :
+          "SELECT version::text FROM domain_state_versions WHERE domain = 'catalog_inventory' FOR UPDATE",
       );
       const currentVersion = Number(versionSnapshot.rows[0]?.version || 1);
-      if (currentVersion !== expectedVersion) {
+      if (!patch && currentVersion !== expectedVersion) {
         throw new AppError(409, "CATALOG_VERSION_CONFLICT", "Catalogue changed on another device; reload and retry");
       }
-      const previousCounts = await client.query<{
+      const previousCounts = patch ? undefined : await client.query<{
         model_count: string;
         item_count: string;
       }>(
@@ -539,8 +660,8 @@ export class CatalogService {
            (SELECT count(*)::text FROM inventory_items) AS item_count`,
       );
 
-      const modelIds = new Set<string>();
-      const modelCosts = new Map<string, number>();
+      const modelIds = new Set<string>(patch ? validationModels.map((row) => text(row.modelId)) : []);
+      const modelCosts = new Map<string, number>(patch ? validationModels.map((row) => [text(row.modelId), minor(row.cost)]) : []);
       for (const raw of models) {
         const modelId = text(raw.modelId);
         if (!modelId) throw new AppError(422, "MODEL_ID_REQUIRED", "Model code is required");
@@ -569,17 +690,17 @@ export class CatalogService {
             JSON.stringify(Array.isArray(raw.colorOptions) ? raw.colorOptions : []),
             JSON.stringify(raw.sizeChart ?? null),
             bool(raw.active, true), bool(raw.isArchived), bool(raw.isDeleted),
-            JSON.stringify(raw), raw.createdAt ? String(raw.createdAt) : null,
+            JSON.stringify(raw), timestamp(raw.createdAt),
           ],
         );
       }
 
-      if (modelIds.size) {
+      if (!patch && modelIds.size) {
         await client.query(
           "UPDATE catalog_models SET is_deleted=true, active=false, version=version+1, updated_at=now() WHERE NOT (model_id = ANY($1::text[]))",
           [[...modelIds]],
         );
-      } else {
+      } else if (!patch) {
         await client.query("UPDATE catalog_models SET is_deleted=true, active=false, version=version+1, updated_at=now()");
       }
 
@@ -663,19 +784,19 @@ export class CatalogService {
             id,itemCode,modelId,text(raw.color),text(raw.size),status,
             bool(raw.active,true),bool(raw.isArchived),bool(raw.isDeleted),
             hasReservation ? String(raw.cartReservationId) : null,
-            hasReservation ? String(raw.reservationUntil) : null,
+            hasReservation ? timestamp(raw.reservationUntil) : null,
             raw.orderId ? String(raw.orderId) : null,
-            raw.purchaseDate ? String(raw.purchaseDate) : null,
+            timestamp(raw.purchaseDate),
             physicalItemCostSnapshotMinor(
               raw.costSnapshot,
               modelCosts.get(modelId) ?? 0,
             ),
-            JSON.stringify(raw), raw.createdAt ? String(raw.createdAt) : null,
+            JSON.stringify(raw), timestamp(raw.createdAt),
           ],
         );
       }
 
-      if (itemIds.size) {
+      if (!patch && itemIds.size) {
         await client.query(
           `UPDATE inventory_items
               SET is_deleted=true, active=false, version=version+1, updated_at=now()
@@ -685,7 +806,7 @@ export class CatalogService {
               AND lower(status) NOT IN ('sold','processing/held','return inspection','cart reserved')`,
           [[...itemIds]],
         );
-      } else {
+      } else if (!patch) {
         await client.query(
           `UPDATE inventory_items
               SET is_deleted=true, active=false, version=version+1, updated_at=now()
@@ -699,9 +820,9 @@ export class CatalogService {
         `UPDATE domain_state_versions
             SET version=version+1, updated_at=now()
           WHERE domain='catalog_inventory'
-            AND version=$1
+            AND ($2::boolean OR version=$1)
           RETURNING version::text`,
-        [expectedVersion],
+        [expectedVersion, Boolean(patch)],
       );
       if (!versionUpdate.rows[0]) {
         throw new AppError(
@@ -716,32 +837,52 @@ export class CatalogService {
            actor_type, actor_id, action, entity_type, entity_id, request_id,
            old_values, new_values, metadata
          ) VALUES (
-           'staff',$1,'CATALOG_STATE_REPLACED','catalog_inventory','catalog_inventory',$2,
+           'staff',$1,$6,'catalog_inventory','catalog_inventory',$2,
            $3::jsonb,$4::jsonb,$5::jsonb
          )`,
         [
           actorId,
           requestId,
           JSON.stringify({
-            version: currentVersion,
-            modelCount: Number(previousCounts.rows[0]?.model_count || 0),
-            itemCount: Number(previousCounts.rows[0]?.item_count || 0),
+            version: currentVersion, ...(previousRecords || {}),
+            modelCount: Number(previousCounts?.rows[0]?.model_count || 0),
+            itemCount: Number(previousCounts?.rows[0]?.item_count || 0),
           }),
-          JSON.stringify({ version: next, modelCount: models.length, itemCount: items.length }),
-          JSON.stringify({ source: "dashboard_catalog_sync" }),
+          JSON.stringify({ version: next, modelCount: models.length, itemCount: items.length, ...(patch ? { models, items } : {}) }),
+          JSON.stringify({ source: patch ? "dashboard_catalog_patch" : "dashboard_catalog_sync" }),
+          patch ? "CATALOG_RECORDS_PATCHED" : "CATALOG_STATE_REPLACED",
         ],
       );
       await client.query("COMMIT");
-      return this.adminState();
+      committedVersion = next;
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
     } finally {
       client.release();
     }
+    const result = await this.adminState(patch ? {
+      modelIds: models.map((row) => text(row.modelId)), itemIds: items.map((row) => text(row.id)),
+    } : undefined);
+    return patch ? { ...result, baseVersion: committedVersion-1, committedVersion } : result;
+  }
+
+  async cleanupReservations(): Promise<void> {
+    const client = await this.pool.connect();
+    try { await client.query("BEGIN"); await this.releaseExpiredReservations(client); await client.query("COMMIT"); }
+    catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
   }
 
   private async releaseExpiredReservations(client: PoolClient): Promise<void> {
+    const due = await client.query<{ due: boolean }>(
+      "SELECT EXISTS (SELECT 1 FROM inventory_items WHERE lower(status)='cart reserved' AND reservation_until<=now()) AS due",
+    );
+    if (!due.rows[0]?.due) return;
+    const locked = await client.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_xact_lock(hashtext('dart:reservation-cleanup')) AS locked",
+    );
+    if (!locked.rows[0]?.locked) return;
     const result = await client.query(
       `UPDATE inventory_items
           SET status='In stock', cart_reservation_id=NULL, reservation_until=NULL,

@@ -110,6 +110,10 @@ It executes the previous Cairo month and is safe to retry because `dart_card_dra
 
 ## Migrations
 
+The catalog scale foundation and release checklist are documented in `../docs/CATALOG_SCALE.md`. Public/admin optional paging preserves the legacy query-free response; changed-record `PATCH /api/v1/admin/catalog-state` avoids full replacements for small dashboard edits. `RATE_LIMIT_STORE=memory` remains the default; enable `postgres` only after verifying migration `0060_scale_foundation.sql`. The fixed operator flag is `DART_APPLY_SCALE_FOUNDATION_MIGRATION=0060_scale_foundation`. Existing initial browser hydration is still full and must not be represented as server-paged.
+
+Run the synthetic local-only scale diagnostic with `TEST_DATABASE_URL=<local-test-database-url> npm run bench:scale`. It never reads production `DATABASE_URL`. Immediate outbox dispatch is capped at ten events in Vercel; the recovery workflow runs hourly at minute 7 with at most twelve batches of five and a 90-second total budget. This does not certify 1,000 simultaneous production customers.
+
 - Apply all pending migrations: `npm run db:migrate`.
 - Apply exactly the next pending migration: `npm run db:migrate:one -- <migration-name>`.
 

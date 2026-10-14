@@ -16,7 +16,8 @@ concurrency:
 
 jobs:
   backup:
-    if: github.ref == 'refs/heads/main'
+    # One reviewed immutable tag permits the pre-release recovery drill.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/tags/dart-review-scale-20261014-backup'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:

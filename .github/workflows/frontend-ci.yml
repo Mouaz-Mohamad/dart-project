@@ -5,6 +5,7 @@ name: Frontend CI
 on:
   push:
     branches: [main, full-code-cleanup]
+    tags: [dart-review-*]
     paths:
       - "*.html"
       - "Eye/**"

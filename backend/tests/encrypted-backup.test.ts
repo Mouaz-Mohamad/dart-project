@@ -3,6 +3,8 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 const password = "synthetic-backup-test-password-32-characters";
@@ -24,6 +26,22 @@ afterEach(async () => {
 });
 
 describe("authenticated database backup encryption", () => {
+  it.each([
+    ["psql 'postgresql://owner:synthetic-secret@localhost/dart_test'", "invalid-database-url"],
+    ["https://owner:synthetic-secret@localhost/dart_test", "invalid-database-protocol"],
+    ["postgresql://owner:***@localhost/dart_test", "missing-or-masked-database-password"],
+    ["postgresql://owner:synthetic-secret@ep-live-pooler.example.neon.tech/dart_test", "pooled-database-url"],
+  ])("reports a safe reason for unusable configuration without exposing %s", (databaseUrl, reason) => {
+    const result = spawnSync(process.execPath, [
+      fileURLToPath(new URL("../scripts/encrypted-database-backup.mjs", import.meta.url)),
+      "create", "unused-test-backup.dump.enc",
+    ], { encoding: "utf8", env: { ...process.env, DATABASE_URL: databaseUrl, DART_BACKUP_ENCRYPTION_PASSWORD: password } });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`stage=configuration, reason=${reason}`);
+    expect(result.stderr).not.toContain(databaseUrl);
+    expect(result.stderr).not.toContain("synthetic-secret");
+    expect(result.stdout).toBe("");
+  });
   it("round-trips a streamed archive and creates private encrypted and plaintext files", async () => {
     const f = await fixture();
     await f.decryptArchive(f.encrypted, f.decrypted, password);
