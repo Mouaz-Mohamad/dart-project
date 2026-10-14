@@ -11,6 +11,7 @@
   "use strict";
 
   const STORAGE_KEY = "dart_site_settings";
+  const FOUNDER_FALLBACK_SRC = "/Photos/me.png?v=founder-png-v10";
   const PUBLIC_CACHE_KEY = "dart_public_site_settings_v2";
   const API_BASE = String(root.DART_API_BASE_URL || root.location?.origin || "").replace(/\/$/, "");
   const IS_ADMIN = /\/Eye\//i.test(root.location?.pathname || "");
@@ -19,6 +20,7 @@
   let syncTimer = 0;
   let publicSettingsEtag = "";
   let lastSettingsCheckAt = 0;
+  let founderMediaRequest = 0;
   const SETTINGS_POLL_MS = 60_000;
   const defaults = Object.freeze({
     version: 1,
@@ -310,6 +312,8 @@
 
   async function applyPublicMedia() {
     const settings = get();
+    const founder = root.document?.getElementById("dart-founder-image");
+    const founderRequest = ++founderMediaRequest;
     const hero = root.document?.querySelector(".hero > img[data-dart-hero]");
     if (hero) {
       const isDay = cairoParts().hour >= 6 && cairoParts().hour < 18;
@@ -328,9 +332,14 @@
       hero.dataset.timeMode = isDay ? "day" : "night";
       hero.dataset.dartMediaReady = "true";
     }
-    const founder = root.document?.getElementById("dart-founder-image");
-    if (founder && settings.founderImage)
-      founder.src = await resolveImage(settings.founderImage, founder.getAttribute("src") || "/Photos/me.png");
+    if (founder) {
+      const source = await resolveImage(settings.founderImage, FOUNDER_FALLBACK_SRC);
+      if (founderRequest !== founderMediaRequest || root.document?.getElementById("dart-founder-image") !== founder) return;
+      founder.closest("picture")?.querySelectorAll("source").forEach((alternative) => alternative.remove());
+      founder.removeAttribute("srcset");
+      founder.removeAttribute("sizes");
+      if (founder.getAttribute("src") !== source) founder.src = source;
+    }
   }
 
   const siteSettingsApi = {
