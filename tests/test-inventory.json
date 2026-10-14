@@ -13,6 +13,7 @@
     "finance-persistence-contract.js",
     "finance-state-integration.cjs",
     "finance-ui-runtime.cjs",
+    "founder-media-runtime.cjs",
     "home-performance-contract.cjs",
     "modal-placement-contract.cjs",
     "news-loader.cjs",

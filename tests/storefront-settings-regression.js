@@ -93,6 +93,8 @@ let settingsVersion = 1;
 let savedSettings = { ...seededSettings };
 let settingsPutCount = 0;
 let lastSettingsPut = null;
+const uploadedAssets = new Map();
+let assetPutCount = 0;
 
 function json(response, status, payload) {
   response.statusCode = status;
@@ -105,6 +107,27 @@ const server = http.createServer(async (request, response) => {
   const pathname = decodeURIComponent(url.pathname);
 
   if (pathname.startsWith("/api/")) {
+    if (request.method === "PUT" && pathname === "/api/v1/admin/catalog/assets") {
+      let raw = "";
+      for await (const chunk of request) raw += chunk;
+      const body = JSON.parse(raw || "{}");
+      assert.match(body.assetId, /^[0-9a-f-]{36}$/i);
+      assert.equal(body.contentType, "image/webp");
+      const bytes = Buffer.from(body.base64, "base64");
+      assert.equal(bytes.toString("ascii", 0, 4), "RIFF");
+      assert.equal(bytes.toString("ascii", 8, 12), "WEBP");
+      uploadedAssets.set(body.assetId, { bytes, contentType: body.contentType });
+      assetPutCount += 1;
+      return json(response, 200, { urlPath: `/api/v1/catalog/assets/${body.assetId}` });
+    }
+
+    if (pathname.startsWith("/api/v1/catalog/assets/")) {
+      const asset = uploadedAssets.get(pathname.split("/").pop());
+      if (!asset) return json(response, 404, { error: { code: "ASSET_NOT_FOUND" } });
+      response.setHeader("Content-Type", asset.contentType);
+      return response.end(asset.bytes);
+    }
+
     if (request.method === "PUT" && pathname === "/api/v1/admin/site-settings") {
       let raw = "";
       for await (const chunk of request) raw += chunk;
@@ -268,11 +291,82 @@ const server = http.createServer(async (request, response) => {
   assert.equal(lastSettingsPut.settings.dartCardDiscountPercent, 41);
   assert.equal(lastSettingsPut.settings.defaultMarkupPercent, 55);
 
+  // Use the real upload/compression form and a fresh About page. A null-only
+  // settings fixture cannot detect the historical PNG-locking observer.
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7aUAAAAASUVORK5CYII=", "base64");
+  async function uploadFounder(name, expectedPuts) {
+    await dashboard.locator("#settings-founder-image").setInputFiles({ name, mimeType: "image/png", buffer: png });
+    await dashboard.locator('#settings-media-form button[type="submit"]').click();
+    await dashboard.waitForFunction(({ name, version }) =>
+      window.DartSiteSettings.serverVersion() === version && window.DartSiteSettings.get().founderImage?.name === name,
+    { name, version: expectedPuts + 1 });
+    await dashboard.waitForFunction(() => {
+      const preview = document.getElementById("settings-founder-preview");
+      return preview?.complete && preview.naturalWidth > 0;
+    });
+    assert.equal(settingsPutCount, expectedPuts, "founder save must issue exactly one settings PUT");
+    assert.equal(lastSettingsPut.settings.founderImage.name, name);
+    assert.equal(dashboard.url(), initialUrl, "founder upload must not navigate the dashboard");
+    return lastSettingsPut.settings.founderImage.id;
+  }
+  const firstFounder = await uploadFounder("founder-first.png", 2);
+  assert.equal(assetPutCount, 1);
+  const about = await context.newPage();
+  await about.goto(`${origin}/about.html`, { waitUntil: "domcontentloaded" });
+  async function expectFounder(id) {
+    await about.waitForFunction((path) => {
+      const image = document.getElementById("dart-founder-image");
+      return image && new URL(image.src).pathname === path && image.complete && image.naturalWidth > 0;
+    }, id ? `/api/v1/catalog/assets/${id}` : "/Photos/me.png");
+  }
+  await expectFounder(firstFounder);
+  await about.evaluate(() => {
+    window.dispatchEvent(new Event("pageshow"));
+    document.dispatchEvent(new CustomEvent("dart:sections-loaded"));
+  });
+  await expectFounder(firstFounder);
+
+  const secondFounder = await uploadFounder("founder-second.png", 3);
+  assert.notEqual(secondFounder, firstFounder);
+  assert.equal(assetPutCount, 2);
+  await about.evaluate(() => window.DartSiteSettings.hydrate(true));
+  await expectFounder(secondFounder);
+  await about.reload({ waitUntil: "domcontentloaded" });
+  await expectFounder(secondFounder);
+
+  // Re-injected historical <picture> markup must not shadow saved Settings.
+  await about.evaluate(() => {
+    const current = document.getElementById("dart-founder-image");
+    const picture = document.createElement("picture");
+    const alternative = document.createElement("source");
+    alternative.srcset = "/Photos/me.webp";
+    const replacement = document.createElement("img");
+    replacement.id = "dart-founder-image";
+    replacement.src = "/Photos/me.webp";
+    replacement.srcset = "/Photos/me.webp 2x";
+    picture.append(alternative, replacement);
+    current.replaceWith(picture);
+    document.dispatchEvent(new CustomEvent("dart:section-loaded"));
+  });
+  await expectFounder(secondFounder);
+  assert.equal(await about.locator("#dart-founder-image").evaluate((image) => image.closest("picture").querySelectorAll("source").length), 0);
+  assert.equal(await about.locator("#dart-founder-image").getAttribute("srcset"), null);
+
+  await dashboard.locator("#clear-media-settings").click();
+  await dashboard.waitForFunction(() => window.DartSiteSettings.serverVersion() === 5 && window.DartSiteSettings.get().founderImage === null);
+  assert.equal(settingsPutCount, 4);
+  assert.equal(lastSettingsPut.settings.founderImage, null);
+  await about.evaluate(() => window.DartSiteSettings.hydrate(true));
+  await expectFounder(null);
+  await about.reload({ waitUntil: "domcontentloaded" });
+  await expectFounder(null);
+
+  await about.close();
   await dashboard.close();
   await context.close();
   await browser.close();
   server.close();
-  console.log("PASS navbar Font Awesome icons, product modal opening/options, and dashboard settings PUT without reload");
+  console.log("PASS navbar/icons, product modal, settings PUT, founder PNG upload/compression/save/preview, About refresh/reload, legacy picture and reset to original");
 })().catch((error) => {
   console.error(error.stack || error);
   server.close();
