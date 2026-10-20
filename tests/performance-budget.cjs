@@ -123,10 +123,11 @@ for (const file of jsFiles) {
   }
 }
 // This is the repository aggregate, not the bytes loaded on one page. The
-// scoped refresh/session guards fit a 912 KiB source ceiling; page budgets stay unchanged.
-if (coreJsBytes > 912 * 1024) {
-  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 912KB`);
+// The dashboard-only details adapter adds 11 KiB; public page delivery budgets stay unchanged.
+if (coreJsBytes > 928 * 1024) {
+  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 928KB`);
 }
+if (fs.statSync('Eye/dart-dashboard-ui.js').size > 14 * 1024) failures.push('Dashboard details adapter exceeds its 14 KiB source budget');
 // Combined finance hydration and public navigation add 14 KiB of source. Home delivery still fits 225 KiB.
 if (lazyJsBytes > 445 * 1024) {
   failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 445KB`);

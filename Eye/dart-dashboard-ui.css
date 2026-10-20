@@ -1,0 +1,72 @@
+/* Dart Eye operational layout. Scoped here; storefront appearance is unchanged. */
+body { --dart-surface:#fff; --dart-canvas:#f6f5f3; --dart-ink:#222126; --dart-muted:#5d5960; --dart-line:#dfdce0; background:var(--dart-canvas); color:var(--dart-ink); }
+body [hidden] { display:none !important; }
+.cont-menu,.nav-tow { background:#381724; background-image:none; color:#fff; }
+.order-bulk-actions { display:flex; flex-wrap:wrap; overflow:visible; }
+main { min-width:0; }
+.dashboard-section { color:var(--dart-ink); }
+.dashboard-section .first,.dashboard-section .second { flex-wrap:wrap; gap:10px; }
+.dashboard-section .filter-bar { position:relative; align-items:center; padding:14px; background:#fff; border:1px solid var(--dart-line); border-radius:10px; }
+.dashboard-section .filter-bar .search-box { flex:1 1 230px; min-width:0; }
+.dashboard-section input:not([type="checkbox"]):not([type="color"]),.dashboard-section textarea,.dashboard-section select,.modal input:not([type="checkbox"]):not([type="color"]),.modal select,.modal textarea { color:#252129; background:#fff; border-color:#bcb7be; min-height:42px; }
+.dashboard-section option,.modal option,dialog option { color:#252129; background:#fff; }
+.dashboard-section input::placeholder,.modal input::placeholder,.dashboard-section textarea::placeholder,.modal textarea::placeholder { color:#68616b; opacity:1; }
+button { touch-action:manipulation; }
+.dashboard-section button:focus-visible,.modal button:focus-visible,dialog button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible { outline:3px solid #ab012b; outline-offset:3px; }
+.dashboard-section button:disabled,.modal button:disabled,dialog button:disabled { opacity:1; cursor:not-allowed; background:#e8e5e9; border-color:#c9c4cc; color:#5d5662; }
+.dashboard-section .add-btn,.modal .btn-done,.modal .btn-submit { background:#ab012b; color:#fff; min-height:42px; border:1px solid #ab012b; }
+.dashboard-section .cont-titel { width:100%; min-width:0; overflow:visible; background:transparent; }
+.dart-compact-heading-row { min-width:0 !important; width:100% !important; padding:12px 16px; display:flex !important; gap:12px; color:#514b55; background:transparent !important; }
+.dart-compact-heading-row > :not(input):not(.dart-compact-heading) { display:none; }
+.dart-compact-heading { font-size:12px; font-weight:600; }
+.dart-compact-record { display:block !important; width:100% !important; min-width:0 !important; height:auto !important; max-height:none !important; margin:0 0 10px; padding:0 !important; overflow:visible !important; border:1px solid var(--dart-line); border-radius:10px; background:#fff; color:var(--dart-ink); }
+.dart-record-main { display:flex; align-items:center; gap:14px; padding:16px; min-width:0; }
+.dart-record-main > input[type="checkbox"] { flex:none; width:18px; height:18px; accent-color:#ab012b; }
+.dart-record-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); align-items:start; flex:1; gap:12px; min-width:0; }
+.dart-record-field { min-width:0; display:grid; gap:4px; }
+.dart-record-field small { color:var(--dart-muted); font-size:11px; line-height:1.4; }
+.dart-record-field strong { color:var(--dart-ink); font-size:13px; font-weight:650; overflow-wrap:anywhere; line-height:1.5; }
+.dart-record-field img { width:46px; height:56px; object-fit:cover; border-radius:5px; }
+.dart-record-controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:7px; flex:0 0 155px; }
+.dart-record-controls button,.dart-record-close { min-height:40px; padding:8px 12px; border-radius:7px; border:1px solid #b9afb9; background:#fff; color:#74102b; font-size:12px; font-weight:700; cursor:pointer; }
+.dart-record-controls .dart-record-next { background:#ab012b; border-color:#ab012b; color:#fff; }
+.dart-record-open:hover,.dart-record-close:hover { background:#f7eaf0; color:#74102b; }
+.dart-record-dialog { position:fixed; inset:0 0 0 auto; width:min(780px,94vw); max-width:none; height:100dvh; max-height:100dvh; margin:0; padding:0 22px 28px; border:0; border-left:1px solid var(--dart-line); border-radius:0; overflow:auto; background:#fff; color:var(--dart-ink); box-shadow:-14px 0 50px #28121a22; text-align:start; }
+.dart-record-dialog::backdrop { background:#25131e88; }
+.dart-record-dialog-head { display:flex; position:sticky; top:0; z-index:2; justify-content:space-between; align-items:center; gap:15px; padding:22px 0 16px; margin-bottom:18px; background:#fff; border-bottom:1px solid var(--dart-line); }
+.dart-record-dialog-head h2 { font-size:20px; line-height:1.4; margin:0; color:#3d1e2a; overflow-wrap:anywhere; }
+.dart-record-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 20px; }
+.dart-record-detail-field { min-width:0; padding-bottom:14px; border-bottom:1px solid #efebef; color:var(--dart-ink); }
+.dart-record-detail-field > h3 { font-size:12px; color:#615762; font-weight:600; margin:0 0 7px; }
+.dart-record-detail-field > :not(h3) { width:auto !important; min-width:0 !important; max-width:100%; height:auto !important; white-space:normal; overflow-wrap:anywhere; color:inherit; }
+.dart-record-detail-field .text-item { display:block; padding:0; font-size:14px; overflow:visible; }
+.dart-record-detail-actions { grid-column:1/-1; }
+.dart-record-detail-actions .button,.dart-record-detail-actions .row-action-btns { display:flex; flex-wrap:wrap; gap:8px; padding:0; }
+.dart-record-detail-actions button { min-height:38px; }
+.dart-record-dialog .dart-kpi-inline { display:block; color:#5d5662; }
+.dart-record-dialog .status-pill { display:inline-flex; }
+.dart-record-dialog .dart-status-actions { display:flex; flex-wrap:wrap; gap:7px; }
+.modal .modal-content { max-height:calc(100dvh - 32px); overflow-y:auto; color:#252129; }
+.modal label,.modal h2,.modal h3 { color:#332b36; }
+.modal .close-modal { color:#4b2332; background:#f7edf1; }
+.dashboard-section .dart-empty-state { padding:28px 18px; color:#615762; background:#fff; border:1px dashed #bdb3bf; border-radius:8px; }
+@media(max-width:1000px) { .dart-record-main { flex-wrap:wrap; } .dart-record-fields { grid-template-columns:repeat(3,minmax(0,1fr)); } .dart-record-controls { flex:1 0 100%; } }
+@media(max-width:767px) {
+  body { height:auto; min-height:100dvh; }
+  main { margin-left:0 !important; padding:14px 12px 100px !important; width:100% !important; }
+  .dashboard-section .filter-bar { padding:12px; }
+  .dashboard-section .filter-bar > .select-box { flex:1 1 145px; min-width:0; max-width:100%; }
+  .dashboard-section .filter-bar select { width:100%; }
+  .dashboard-section .filter-bar .add-btn { flex:1 1 160px; }
+  .dart-record-main { gap:11px; padding:13px; align-items:flex-start; }
+  .dart-record-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dart-record-main > input[type="checkbox"] { margin-top:3px; }
+  .dart-record-controls { justify-content:flex-start; padding-top:10px; border-top:1px solid #eee8ee; }
+  .dart-record-controls button { flex:1; min-height:44px; }
+  .dart-record-dialog { width:100%; padding:0 16px 24px; }
+  .dart-record-dialog-head { padding-top:16px; }
+  .dart-record-detail-grid { grid-template-columns:1fr; gap:13px; }
+  .modal { padding:10px; }
+  .modal .modal-content { width:100%; max-width:100%; max-height:calc(100dvh - 20px); padding:20px 14px; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }

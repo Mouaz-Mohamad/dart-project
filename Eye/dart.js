@@ -2283,6 +2283,7 @@ function dartRenderSection(key) {
   const filtered = dartApplyFilters(key, sec.data);
   sec.render(filtered);
   dartUpdateMasterCheckbox(key, filtered);
+  window.DartDashboardUI?.refresh?.();
 }
 // BEGIN Scoped dashboard refresh: one frame per burst, no hidden table construction.
 let dartDashboardRenderQueued = false;

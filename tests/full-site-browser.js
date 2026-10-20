@@ -368,6 +368,30 @@ const server = http.createServer((request, response) => {
     document.querySelector('#orders-container [data-id="order-b"] .status-pill')?.textContent === 'Accepted');
   assert.equal(await rowB.locator(".status-pill").textContent(), "Accepted");
   assert.equal(await dashboard.evaluate(() => window.DartOrdersApi.serverVersion()), 4);
+  // Compact rendering retains every original action and field in the owning row.
+  await dashboard.waitForSelector('#orders-container .dart-record-open');
+  assert.equal(await rowA.locator('.btn-edit').count(), 1);
+  assert.equal(await rowA.locator('.btn-delete').count(), 1);
+  assert.equal(await rowA.locator('.btn-hard-delete').count(), 1);
+  assert.equal(await rowA.locator('.dart-history-btn').count(), 1);
+  await rowA.locator('.dart-record-open').click();
+  assert.equal(await rowA.locator('dialog').evaluate(node => node.open), true);
+  assert.equal(await rowA.locator('.btn-edit').isVisible(), true);
+  assert.equal(await rowA.locator('.dart-history-btn').isVisible(), true);
+  assert(await rowA.locator('.dart-record-detail-field').count() >= 25, 'all original order fields stay in Details');
+  assert.equal(await rowA.locator('.order-final-amount').textContent(), '600 EGP');
+  await dashboard.keyboard.press('Escape');
+  assert.equal(await rowA.locator('dialog').evaluate(node => node.open), false);
+  assert.equal(await rowA.locator('.dart-record-open').evaluate(node => node === document.activeElement), true);
+  for (const width of [390, 1366]) {
+    await dashboard.setViewportSize({width, height:900});
+    await dashboard.waitForSelector('#orders-container [data-id="order-a"] .dart-record-fields', {state:'visible'});
+    assert.match(await rowA.locator('.dart-record-fields').textContent(), /Accepted/);
+    assert.equal(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `no dashboard overflow at ${width}px`);
+    const output = path.join(root, '..', 'checks');
+    fs.mkdirSync(output, {recursive:true});
+    await dashboard.screenshot({path:path.join(output, `dashboard-orders-${width}.png`), fullPage:true});
+  }
   await dashboard.close();
 
   for (const endpoint of ["manifest.json", "sw.js", "sitemap.xml", "robots.txt"]) {
