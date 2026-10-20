@@ -53,6 +53,7 @@ const seededSettings = {
           { text: "For You", color: "#ffffff", size: 50, weight: 400 },
         ],
       },
+      { hold: 1500, words: [{text:'Egyptian',color:'#e7dfe4',size:32,weight:600},{text:'Quality',color:'#f4c76a',size:40,weight:700}] },
     ],
   },
 };
@@ -361,12 +362,60 @@ const server = http.createServer(async (request, response) => {
   await about.reload({ waitUntil: "domcontentloaded" });
   await expectFounder(null);
 
+  await dashboard.locator('[data-settings-tab="hero"]').click();
+  const scenes=dashboard.locator('[data-typing-scene]');
+  assert.equal(await scenes.count(),2,'each original scene is a sentence group');
+  assert.equal(await scenes.nth(0).locator('[data-typing-row]').count(),2);
+  assert.equal(await scenes.nth(0).locator('.dart-typing-preview').textContent(),'Dart | For You');
+  const firstWord=scenes.nth(0).locator('[data-typing-row]').first();
+  await firstWord.locator('.dart-typing-word-settings summary').click();
+  assert.equal(await firstWord.locator('[data-typing-field="color"]').inputValue(),'#ab012b');
+  assert.equal(await firstWord.locator('[data-typing-field="size"]').inputValue(),'50');
+  assert.equal(await firstWord.locator('[data-typing-field="weight"]').inputValue(),'600');
+  await scenes.nth(0).locator('[data-typing-field="text"]').nth(1).fill('For Everyone');
+  await firstWord.locator('[data-typing-action="word-down"]').click();
+  assert.equal(await scenes.nth(0).locator('.dart-typing-preview').textContent(),'For Everyone Dart |');
+  assert.equal(await scenes.nth(1).locator('.dart-typing-preview').textContent(),'Egyptian Quality','word movement stays within its sentence');
+  await scenes.nth(0).locator('[data-scene-hold]').fill('3100');
+  await scenes.nth(1).locator('[data-typing-action="scene-up"]').click();
+  assert.equal(await scenes.nth(0).locator('.dart-typing-preview').textContent(),'Egyptian Quality');
+  await dashboard.locator('#add-typing-scene').click();
+  await scenes.nth(2).locator('[data-typing-field="text"]').fill('Made with care');
+  await scenes.nth(2).locator('[data-typing-action="word-add"]').click();
+  await scenes.nth(2).locator('[data-typing-row]').last().locator('[data-typing-remove]').click();
+  await dashboard.locator('#add-typing-word').click();
+  const addedWord=scenes.nth(2).locator('[data-typing-row]').last();
+  await addedWord.locator('[data-typing-field="text"]').fill('Today');
+  await addedWord.locator('.dart-typing-word-settings summary').click();
+  await addedWord.locator('[data-typing-field="scene"]').fill('2');
+  await addedWord.locator('[data-typing-field="scene"]').press('Tab');
+  assert.equal(await scenes.nth(1).locator('.dart-typing-preview').textContent(),'For Everyone Dart | Today');
+  await dashboard.evaluate(()=>window.dispatchEvent(new CustomEvent('dart:site-settings-changed',{detail:window.DartSiteSettings.get()})));
+  assert.equal(await scenes.count(),3,'background settings refresh preserves unsaved sentence structure');
+  const checks=path.join(root,'..','checks');fs.mkdirSync(checks,{recursive:true});
+  for(const width of [390,1366]){
+    await dashboard.setViewportSize({width,height:900});
+    await dashboard.locator('#settings-typing-card').scrollIntoViewIfNeeded();
+    await dashboard.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await dashboard.screenshot({path:path.join(checks,`dashboard-hero-${width}.png`)});
+    assert.equal(await dashboard.locator('#settings-typing-card').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`hero editor fits ${width}px`);
+  }
+  await dashboard.locator('#save-typing-settings').click();
+  await dashboard.waitForFunction(()=>window.DartSiteSettings.serverVersion()===6);
+  assert.equal(settingsPutCount,5,'grouped hero save issues one settings PUT');
+  assert.deepEqual(lastSettingsPut.settings.typing.scenes.map(scene=>scene.words.map(word=>word.text)),[['Egyptian','Quality'],['For Everyone','Dart |','Today'],['Made with care']]);
+  assert.equal(lastSettingsPut.settings.typing.scenes[1].hold,3100);
+  assert.deepEqual(lastSettingsPut.settings.typing.scenes[1].words[1],{text:'Dart |',color:'#ab012b',size:50,weight:600});
+  await dashboard.reload({waitUntil:'domcontentloaded'});
+  await dashboard.waitForFunction(()=>document.querySelectorAll('[data-typing-scene]').length===3);
+  assert.equal(await dashboard.locator('[data-typing-scene]').nth(1).locator('.dart-typing-preview').textContent(),'For Everyone Dart | Today','saved sentence grouping survives reload');
+
   await about.close();
   await dashboard.close();
   await context.close();
   await browser.close();
   server.close();
-  console.log("PASS navbar/icons, product modal, settings PUT, founder PNG upload/compression/save/preview, About refresh/reload, legacy picture and reset to original");
+  console.log("PASS navbar/icons, product modal, settings PUT, founder PNG lifecycle, grouped hero preview/reorder/move/save/reload");
 })().catch((error) => {
   console.error(error.stack || error);
   server.close();

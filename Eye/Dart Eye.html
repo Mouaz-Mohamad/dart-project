@@ -2213,7 +2213,7 @@
                     <div class="dart-settings-card-copy">
                         <span>HERO WORDS</span>
                         <h2>Typing animation</h2>
-                        <p>كل صف كلمة. رقم المشهد يحدد الكلمات التي تظهر معًا وترتيب الصفوف يحدد ترتيبها.</p>
+                        <p>كل مجموعة جملة تظهر وتتمسح معًا. رتّب الجمل والكلمات من الأزرار، وافتح Word settings لتعديل تنسيق كل كلمة أو نقلها لجملة أخرى.</p>
                     </div>
                     <form id="settings-typing-form" class="dart-settings-fields">
                         <label for="settings-typing-speed">Typing speed ms<input id="settings-typing-speed" type="number" min="10" step="1"></label>
@@ -2222,9 +2222,22 @@
                         <label for="settings-scene-delay">Next scene delay ms<input id="settings-scene-delay" type="number" min="0" step="1"></label>
                         <div id="settings-typing-rows" class="dart-settings-typing-rows dart-settings-field-wide"></div>
                         <button id="add-typing-word" type="button" class="dart-settings-secondary">Add word</button>
+                        <button id="add-typing-scene" type="button" class="dart-settings-secondary">Add sentence</button>
                         <button id="save-typing-settings" type="submit" class="dart-settings-save">Save animation</button>
                     </form>
-                    <template id="settings-typing-row-template"><div class="dart-settings-typing-row" data-typing-row><label>Scene<input data-typing-field="scene" type="number" min="1" step="1" required></label><label>Hold ms<input data-typing-field="hold" type="number" min="0" step="1" required></label><label>Text<input data-typing-field="text" type="text" maxlength="80" required></label><label>Color<input data-typing-field="color" type="color" required></label><label>Size px<input data-typing-field="size" type="number" min="10" max="120" required></label><label>Weight<input data-typing-field="weight" type="number" min="100" max="900" step="100" required></label><button type="button" data-typing-remove aria-label="Delete word"><i class="fa-solid fa-trash"></i></button></div></template>
+                    <template id="settings-typing-row-template">
+                        <div class="dart-settings-typing-row" data-typing-row>
+                            <label class="dart-typing-word-text">Text<input data-typing-field="text" type="text" maxlength="80" dir="auto" required></label>
+                            <div class="dart-typing-word-actions"><button type="button" data-typing-action="word-up" aria-label="Move word up">Up</button><button type="button" data-typing-action="word-down" aria-label="Move word down">Down</button><button type="button" data-typing-remove aria-label="Delete word">Delete word</button></div>
+                            <details class="dart-typing-word-settings"><summary>Word settings</summary><div>
+                                <label>Scene<input data-typing-field="scene" type="number" min="1" step="1" required></label>
+                                <label>Hold ms<input data-typing-field="hold" type="number" min="0" step="1" required></label>
+                                <label>Color<input data-typing-field="color" type="color" required></label>
+                                <label>Size px<input data-typing-field="size" type="number" min="10" max="120" required></label>
+                                <label>Weight<input data-typing-field="weight" type="number" min="100" max="900" step="100" required></label>
+                            </div></details>
+                        </div>
+                    </template>
                 </article>
 
                 <article id="settings-model-cards-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">

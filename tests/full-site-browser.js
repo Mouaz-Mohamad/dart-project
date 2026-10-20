@@ -350,8 +350,11 @@ const server = http.createServer((request, response) => {
   const staffChecks=path.join(root,'..','checks');fs.mkdirSync(staffChecks,{recursive:true});
   for(const width of [390,1366]){
     await dashboard.setViewportSize({width,height:900});
+    await dashboard.locator('#settings-staff-access-card').scrollIntoViewIfNeeded();
+    await dashboard.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await dashboard.screenshot({path:path.join(staffChecks,`dashboard-staff-${width}.png`)});
     assert.equal(await dashboard.locator('#settings-staff-access-card').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`staff fits ${width}px`);
+    if(width===390)assert.equal(await dashboard.locator('.nav-tow').evaluate(node=>Math.abs(node.getBoundingClientRect().bottom-window.innerHeight)<2),true,'mobile navigation stays at the viewport bottom');
   }
   await dashboard.locator('[data-staff-id="owner"] [data-staff-action="view"]').click();
   assert.equal(await dashboard.locator('[data-staff-id="owner"] [data-staff-permissions]').count(),0,'owner permissions stay protected');
@@ -381,6 +384,18 @@ const server = http.createServer((request, response) => {
       true,
       `dashboard navigation must activate ${target}`,
     );
+    await dashboard.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
+    const unreadable=await dashboard.evaluate(()=>{
+      const rgb=value=>(value.match(/[\d.]+/g)||[]).map(Number),white=value=>value.length>=3&&value.slice(0,3).every(channel=>channel>=245);
+      return [...document.querySelectorAll('.active-section *')].filter(node=>{
+        if(![...node.childNodes].some(child=>child.nodeType===3&&child.textContent.trim())||!node.checkVisibility())return false;
+        const style=getComputedStyle(node);if(!white(rgb(style.color)))return false;
+        let background=[255,255,255];
+        for(let parent=node;parent;parent=parent.parentElement){const css=getComputedStyle(parent);if(css.backgroundImage!=='none')return false;const color=rgb(css.backgroundColor);if(color.length===3||color[3]>=0.99){background=color;break;}}
+        return white(background);
+      }).map(node=>node.textContent.trim().slice(0,100));
+    });
+    assert.deepEqual(unreadable,[],`${target} must not display white text on a white background`);
   }
   // The order editor keeps every original field and permits phone/name-only client contact.
   await dashboard.evaluate(() => document.querySelector('a[data-target="orders"]').click());

@@ -536,3 +536,19 @@ body[data-dart-density="compact"] .dart-compact-record { margin-bottom:6px; }
 .dart-staff-permission strong,.dart-staff-permission small { overflow-wrap:anywhere; }
 @media(max-width:600px){.dart-staff-permission-options{grid-template-columns:1fr;}.dart-staff-member-head .dart-staff-badges{width:100%;}}
 @media(max-width:600px){.dart-settings-form-card{padding:14px;}.dart-settings-form-card .dart-settings-fields{grid-template-columns:1fr;}.dart-settings-save,.dart-settings-secondary{min-height:44px;}}
+/* A complete typed sentence is one editable group; word styles stay available. */
+.dart-settings-typing-rows { gap:20px; min-width:0; }
+.dart-typing-scene { border:1px solid #d7c4ce; border-radius:10px; padding:15px; min-width:0; background:#fcfafc; }
+.dart-typing-scene legend { padding:0 8px; color:#731631; font-size:16px; font-weight:800; }
+.dart-typing-scene-tools { display:flex; align-items:end; flex-wrap:wrap; gap:8px; }
+.dart-typing-scene-tools label { flex:1 1 140px; max-width:230px; }
+.dart-typing-scene button { min-height:38px; border:1px solid #d6c5c9; border-radius:7px; background:#fff; color:#75112e; padding:8px 11px; font-weight:700; }
+.dart-typing-preview { background:#23171e; color:#e7dfe4; border-radius:8px; padding:18px; margin:15px 0; line-height:1.6; overflow-wrap:anywhere; }
+.dart-typing-words { display:grid; gap:10px; margin-bottom:12px; }
+.dart-typing-scene .dart-settings-typing-row { grid-template-columns:minmax(150px,1fr) auto; padding:12px; background:#fff; }
+.dart-typing-word-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.dart-typing-word-settings { grid-column:1/-1; border-top:1px solid #e8dfe5; padding-top:9px; }
+.dart-typing-word-settings > summary { color:#6b3b51; cursor:pointer; font-size:12px; font-weight:750; padding:5px 0; }
+.dart-typing-word-settings > div { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; padding-top:8px; }
+.dart-typing-word-settings:not([open]) > div { display:none; }
+@media(max-width:600px){.dart-typing-scene{padding:11px;}.dart-typing-scene .dart-settings-typing-row{grid-template-columns:1fr;}.dart-typing-word-settings > div{grid-template-columns:repeat(2,minmax(0,1fr));}.dart-typing-word-actions button,.dart-typing-scene-tools button{min-height:44px;}.dart-typing-scene-tools label{max-width:none;flex-basis:100%;}}

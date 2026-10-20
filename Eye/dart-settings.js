@@ -289,9 +289,44 @@
     }
   }
 
+  function typingScenes(){return [...$('settings-typing-rows').querySelectorAll('[data-typing-scene]')];}
+
+  function addTypingScene(hold=2000){
+    const scene=document.createElement('fieldset');scene.className='dart-typing-scene';scene.dataset.typingScene='';
+    scene.innerHTML='<legend data-scene-title></legend><div class="dart-typing-scene-tools"><label>Sentence hold ms<input data-scene-hold type="number" min="0" step="1" required></label><button type="button" data-typing-action="scene-up">Move up</button><button type="button" data-typing-action="scene-down">Move down</button><button type="button" data-typing-action="scene-remove">Delete sentence</button></div><p class="dart-typing-preview" dir="auto" aria-label="Sentence preview"></p><div class="dart-typing-words"></div><button type="button" data-typing-action="word-add">Add word to this sentence</button>';
+    scene.querySelector('[data-scene-hold]').value=hold;
+    $('settings-typing-rows').append(scene);return scene;
+  }
+
+  function syncTypingScenes(){
+    const scenes=typingScenes();
+    scenes.forEach((scene,index)=>{
+      scene.querySelector('[data-scene-title]').textContent=`Sentence ${index+1}`;
+      scene.querySelector('[data-typing-action="scene-up"]').disabled=index===0;
+      scene.querySelector('[data-typing-action="scene-down"]').disabled=index===scenes.length-1;
+      const rows=[...scene.querySelectorAll('[data-typing-row]')],preview=scene.querySelector('.dart-typing-preview');
+      preview.replaceChildren();
+      rows.forEach((row,wordIndex)=>{
+        row.querySelector('[data-typing-field="scene"]').value=index+1;
+        row.querySelector('[data-typing-field="hold"]').value=scene.querySelector('[data-scene-hold]').value;
+        row.querySelector('[data-typing-action="word-up"]').disabled=wordIndex===0;
+        row.querySelector('[data-typing-action="word-down"]').disabled=wordIndex===rows.length-1;
+        const span=document.createElement('span');span.textContent=row.querySelector('[data-typing-field="text"]').value;
+        span.style.color=row.querySelector('[data-typing-field="color"]').value;
+        span.style.fontSize=`${Math.min(120,Math.max(10,Number(row.querySelector('[data-typing-field="size"]').value)||36))}px`;
+        span.style.fontWeight=row.querySelector('[data-typing-field="weight"]').value;
+        if(wordIndex)preview.append(document.createTextNode(' '));preview.append(span);
+      });
+      if(!rows.length)preview.textContent='Add a word to preview this sentence.';
+    });
+  }
+
+  function typingChanged(){syncTypingScenes();$('settings-typing-form').dispatchEvent(new Event('input',{bubbles:true}));}
+
   function addTypingRow(scene, hold, word) {
-    const template = $("settings-typing-row-template"), container = $("settings-typing-rows");
-    if (!template || !container) return;
+    const template = $("settings-typing-row-template");
+    if (!template) return;
+    const group=typingScenes()[scene-1]||addTypingScene(hold);
     const fragment = template.content.cloneNode(true), row = fragment.querySelector("[data-typing-row]");
     row.querySelector('[data-typing-field="scene"]').value = scene;
     row.querySelector('[data-typing-field="hold"]').value = hold;
@@ -299,7 +334,8 @@
     row.querySelector('[data-typing-field="color"]').value = word?.color || "#ffffff";
     row.querySelector('[data-typing-field="size"]').value = Number(word?.size) || 36;
     row.querySelector('[data-typing-field="weight"]').value = Number(word?.weight) || 400;
-    container.appendChild(fragment);
+    group.querySelector('.dart-typing-words').appendChild(fragment);
+    return row;
   }
 
   function renderTyping(settings) {
@@ -309,9 +345,11 @@
     $("settings-word-delay").value = typing.wordDelay;
     $("settings-scene-delay").value = typing.nextSceneDelay;
     $("settings-typing-rows").replaceChildren();
-    typing.scenes.forEach((scene, index) =>
-      (scene.words || []).forEach((word) => addTypingRow(index + 1, scene.hold || 0, word)),
-    );
+    typing.scenes.forEach((scene, index) => {
+      addTypingScene(scene.hold||0);
+      (scene.words || []).forEach((word) => addTypingRow(index+1,scene.hold||0,word));
+    });
+    syncTypingScenes();
   }
 
   function renderModelCards(settings) {
@@ -652,21 +690,34 @@
   $("cancel-announcement-edit")?.addEventListener("click", resetAnnouncementForm);
 
   $("add-typing-word")?.addEventListener("click", () => {
-    const rows = [...document.querySelectorAll("[data-typing-row]")];
-    addTypingRow(Math.max(1, Number(rows.at(-1)?.querySelector('[data-typing-field="scene"]')?.value) || 1), 2000, null);
+    const row=addTypingRow(Math.max(1,typingScenes().length),2000,null);typingChanged();row?.querySelector('[data-typing-field="text"]').focus();
   });
-  $("settings-typing-rows")?.addEventListener("click", (event) => event.target.closest("[data-typing-remove]")?.closest("[data-typing-row]")?.remove());
+  $('add-typing-scene')?.addEventListener('click',()=>{addTypingScene();const row=addTypingRow(typingScenes().length,2000,null);typingChanged();row.querySelector('[data-typing-field="text"]').focus();});
+  $('settings-typing-rows')?.addEventListener('input',event=>{if(!['scene','hold'].includes(event.target.dataset.typingField))syncTypingScenes();});
+  $('settings-typing-rows')?.addEventListener('change',event=>{
+    const field=event.target.dataset.typingField,row=event.target.closest('[data-typing-row]');
+    if(!row||!['scene','hold'].includes(field)||!event.target.checkValidity())return;
+    if(field==='hold')row.closest('[data-typing-scene]').querySelector('[data-scene-hold]').value=event.target.value;
+    else {const index=Math.min(typingScenes().length+1,Math.max(1,Number(event.target.value)||1));const group=typingScenes()[index-1]||addTypingScene(row.querySelector('[data-typing-field="hold"]').value);group.querySelector('.dart-typing-words').append(row);}
+    typingChanged();
+  });
+  $('settings-typing-rows')?.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-typing-action],[data-typing-remove]');if(!button)return;
+    const scene=button.closest('[data-typing-scene]'),row=button.closest('[data-typing-row]'),action=button.dataset.typingAction;
+    if(button.hasAttribute('data-typing-remove'))row.remove();
+    else if(action==='word-add'){const added=addTypingRow(typingScenes().indexOf(scene)+1,2000,null);added.querySelector('[data-typing-field="text"]').focus();}
+    else if(action==='scene-remove'){if(!await root.DartDialog.confirm('Delete this sentence and its words? The change takes effect after Save animation.'))return;scene.remove();}
+    else {const node=action.startsWith('scene-')?scene:row;if(action.endsWith('-up')){if(node.previousElementSibling)node.previousElementSibling.before(node);}else if(node.nextElementSibling)node.nextElementSibling.after(node);}
+    typingChanged();
+  });
   $("settings-typing-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
-    const grouped = new Map();
-    document.querySelectorAll("[data-typing-row]").forEach((row) => {
-      const scene = Math.max(1, Number(row.querySelector('[data-typing-field="scene"]').value) || 1);
-      if (!grouped.has(scene)) grouped.set(scene, { hold: Math.max(0, Number(row.querySelector('[data-typing-field="hold"]').value) || 0), words: [] });
-      grouped.get(scene).words.push({ text: row.querySelector('[data-typing-field="text"]').value.trim(), color: row.querySelector('[data-typing-field="color"]').value, size: Math.max(10, Number(row.querySelector('[data-typing-field="size"]').value) || 36), weight: Math.min(900, Math.max(100, Number(row.querySelector('[data-typing-field="weight"]').value) || 400)) });
-    });
-    if (!grouped.size) return announce("أضف كلمة واحدة على الأقل للهيرو.", true);
+    if(!$('settings-typing-form').reportValidity())return;
+    const scenes=typingScenes().map(scene=>({hold:Math.max(0,Number(scene.querySelector('[data-scene-hold]').value)||0),words:[...scene.querySelectorAll('[data-typing-row]')].map(row=>({text:row.querySelector('[data-typing-field="text"]').value.trim(),color:row.querySelector('[data-typing-field="color"]').value,size:Math.min(120,Math.max(10,Number(row.querySelector('[data-typing-field="size"]').value)||36)),weight:Math.min(900,Math.max(100,Number(row.querySelector('[data-typing-field="weight"]').value)||400))}))})).filter(scene=>scene.words.length);
+    if (!scenes.length) return announce("أضف كلمة واحدة على الأقل للهيرو.", true);
+    if(scenes.some(scene=>scene.words.some(word=>!word.text)))return announce('أدخل نصًا لكل كلمة قبل الحفظ.',true);
     const next = root.DartSiteSettings.get();
-    next.typing = { typingSpeed: Math.max(10, number("settings-typing-speed", 70)), deletingSpeed: Math.max(5, number("settings-deleting-speed", 10)), wordDelay: Math.max(0, number("settings-word-delay", 100)), nextSceneDelay: Math.max(0, number("settings-scene-delay", 400)), scenes: [...grouped.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1]) };
+    next.typing = { typingSpeed: Math.max(10, number("settings-typing-speed", 70)), deletingSpeed: Math.max(5, number("settings-deleting-speed", 10)), wordDelay: Math.max(0, number("settings-word-delay", 100)), nextSceneDelay: Math.max(0, number("settings-scene-delay", 400)), scenes };
     saveSettings(next, "Hero typing animation updated");
   });
 
