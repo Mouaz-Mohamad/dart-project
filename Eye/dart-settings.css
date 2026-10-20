@@ -491,3 +491,24 @@
   }
 }
 /* END settings internal navigation */
+/* Structured settings keep the existing General / Hero / Staff tabs. */
+.dart-settings-utility { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+.dart-settings-utility label { display:grid; flex:1 1 230px; gap:6px; font-size:12px; color:#514956; }
+.dart-settings-utility input,.dart-settings-utility select { width:100%; background:#fff; color:#252129; border:1px solid #c7bcc8; border-radius:7px; padding:10px; }
+.dart-settings-search-hidden { display:none !important; }
+.dart-settings-form-card { display:grid; grid-template-columns:40px minmax(0,1fr); padding:20px; gap:12px; box-shadow:none; border-radius:10px; }
+.dart-settings-form-card > form,.dart-settings-form-card > .dart-settings-field-wide,.dart-settings-form-card > .dart-settings-list { grid-column:1/-1; }
+.dart-settings-form-card .dart-settings-card-copy h2 { font-size:18px; }
+.dart-settings-form-card .dart-settings-card-copy p { color:#615966; font-size:12px; line-height:1.7; }
+.dart-settings-form-card .dart-settings-fields { grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; padding-top:8px; }
+.dart-settings-fields label { font-size:12px; line-height:1.5; }
+.dart-settings-fields input,.dart-settings-fields select { min-height:43px; }
+.dart-settings-draft-note { color:#704211; background:#fff6de; padding:9px 12px; border-radius:6px; font-size:12px; }
+#settings-display-columns { display:grid; gap:6px; padding:12px; border:1px solid #dbd3dc; border-radius:7px; }
+.dart-display-column { display:flex; align-items:center; gap:9px; min-height:38px; }
+.dart-display-column label { display:flex; align-items:center; gap:9px; flex:1; }
+.dart-display-column input[type="checkbox"] { width:18px; min-height:18px; accent-color:#ab012b; }
+.dart-display-column button { padding:4px 9px; border:1px solid #d8cbd7; background:#fff; color:#75112d; border-radius:5px; }
+body[data-dart-density="compact"] .dart-record-main { padding:10px 13px; gap:10px; }
+body[data-dart-density="compact"] .dart-compact-record { margin-bottom:6px; }
+@media(max-width:600px){.dart-settings-form-card{padding:14px;}.dart-settings-form-card .dart-settings-fields{grid-template-columns:1fr;}.dart-settings-save,.dart-settings-secondary{min-height:44px;}}

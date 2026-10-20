@@ -107,6 +107,7 @@
     cells.forEach((cell,index) => {
       if (cell === checkbox) return;
       const wrapper = doc.createElement("div"); wrapper.className = "dart-record-detail-field";
+      wrapper.dataset.recordColumn=String(index);
       const label = doc.createElement("h3"); label.textContent = labels[index] || (cell.querySelector("button") ? "Actions" : `Field ${index + 1}`);
       if (cell.querySelector("button")) wrapper.classList.add("dart-record-detail-actions");
       wrapper.append(label,cell); grid.append(wrapper);
@@ -180,6 +181,6 @@
     root.addEventListener("dart:admin-logged-out", () => { openRecord=null; doc.querySelectorAll(".dart-record-dialog[open]").forEach(dialog=>dialog.close()); });
     schedule();
   }
-  root.DartDashboardUI = Object.freeze({refresh,notify});
+  root.DartDashboardUI = Object.freeze({refresh,notify,columnIndices:(section,labels)=>primaryColumns(section,labels,labels.map(()=>doc.createElement('span')))});
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded",start,{once:true}); else start();
 })(window);

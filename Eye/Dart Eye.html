@@ -2048,6 +2048,7 @@
                 <i class="fa-solid fa-gear" aria-hidden="true"></i>
             </header>
 
+            <div class="dart-settings-utility"><label for="settings-search">Search settings<input id="settings-search" type="search" placeholder="Find a setting in this tab"></label><label for="settings-jump">Jump to<select id="settings-jump"><option value="">Choose a settings group</option></select></label><p id="settings-search-status" role="status" aria-live="polite"></p></div>
             <nav class="dart-settings-tabs" aria-label="Settings sections">
                 <button type="button" class="dart-settings-tab is-active" data-settings-tab="general" aria-selected="true">
                     <i class="fa-solid fa-sliders" aria-hidden="true"></i>
@@ -2064,6 +2065,17 @@
             </nav>
 
             <div id="settings-content" class="dart-settings-grid" data-active-settings-tab="general">
+                <article id="settings-display-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-table-columns"></i></div>
+                    <div class="dart-settings-card-copy"><h2>Dashboard display</h2><p>Choose the summary columns and spacing for this browser. Every field and action remains available in Details.</p></div>
+                    <form id="settings-display-form" class="dart-settings-fields">
+                        <label>Row spacing<select id="settings-display-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+                        <label>Section<select id="settings-display-section"><option value="orders">Orders</option><option value="customers">Clients</option><option value="models">Models</option><option value="items">Items</option><option value="returns">Returns</option><option value="damage">Damage</option><option value="representative">Representatives</option><option value="review">Reviews</option><option value="card">Dart Card</option><option value="news">News</option></select></label>
+                        <fieldset id="settings-display-columns" class="dart-settings-field-wide"><legend>Summary columns — choose up to seven</legend></fieldset>
+                        <button type="submit" class="dart-settings-save">Save display</button><button type="button" id="settings-display-reset" class="dart-settings-secondary">Reset display</button>
+                        <p id="settings-display-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
+                    </form>
+                </article>
                 <article id="settings-commerce-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-calculator"></i></div>
                     <div class="dart-settings-card-copy">
@@ -2361,5 +2373,6 @@
     <script src="dart-staff.js"></script>
     <script src="../Js/dart-news.js?v=20261008-news-v1" defer></script>
 <script src="dart-dashboard-ui.js"></script>
+<script src="dart-display-preferences.js"></script>
 </body>
 </html>

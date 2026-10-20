@@ -295,6 +295,19 @@ const server = http.createServer((request, response) => {
     control?.click();
   });
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "general");
+  await dashboard.locator('#settings-search').fill('Order verification policy');
+  assert.equal(await dashboard.locator('#settings-cod-risk-card').isVisible(),true);
+  assert.equal(await dashboard.locator('#settings-commerce-card').isVisible(),false);
+  await dashboard.locator('#settings-search').fill('');
+  await dashboard.locator('#settings-default-markup').fill('57');
+  await dashboard.evaluate(()=>window.dispatchEvent(new CustomEvent('dart:site-settings-changed',{detail:window.DartSiteSettings.get()})));
+  assert.equal(await dashboard.locator('#settings-default-markup').inputValue(),'57','background settings refresh preserves an unsaved field');
+  await dashboard.locator('#settings-display-density').selectOption('compact');
+  await dashboard.locator('#settings-display-form [type="submit"]').click();
+  assert.equal(await dashboard.locator('body').getAttribute('data-dart-density'),'compact');
+  assert.equal(await dashboard.evaluate(()=>window.DartDisplayPreferences.get().density),'compact');
+  await dashboard.locator('#settings-display-reset').click();
+  assert.equal(await dashboard.locator('body').getAttribute('data-dart-density'),'comfortable');
   await dashboard.evaluate(() => {
     document.querySelector('[data-settings-tab="hero"]')?.click();
   });

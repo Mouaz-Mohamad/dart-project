@@ -200,6 +200,11 @@
   }
 
   async function saveSettings(next, note) {
+    const form=document.activeElement?.closest?.('#settings form');
+    if(form?.dataset.settingsSaving==='true')return null;
+    const revision=Number(form?.dataset.editRevision||0);
+    const submit=form?.querySelector('[type="submit"]');
+    if(form){form.dataset.settingsSaving='true';form.setAttribute('aria-busy','true');if(submit)submit.disabled=true;}
     const before = clone(root.DartSiteSettings.get());
     try {
       const saved = root.DartSiteSettings.sync
@@ -207,13 +212,16 @@
         : root.DartSiteSettings.save(next);
       void before;
       void note;
-      await root.DartDomainState?.hydrateAudit?.().catch(() => {});
+      void root.DartDomainState?.hydrateAudit?.().catch(() => {});
+      if(form&&Number(form.dataset.editRevision||0)===revision){delete form.dataset.dirty;form.querySelector('.dart-settings-draft-note')?.remove();}
       announce("تم حفظ الإعدادات في قاعدة البيانات وتطبيقها على الواجهة العامة.");
       return saved;
     } catch (error) {
       await root.DartSiteSettings.hydrate?.(true).catch(() => {});
       announce(error.message || "تعذر حفظ الإعدادات في قاعدة البيانات.", true);
       return null;
+    } finally {
+      if(form){delete form.dataset.settingsSaving;form.setAttribute('aria-busy','false');if(submit)submit.disabled=false;}
     }
   }
 
@@ -676,11 +684,13 @@
   });
 
   function renderSettings(settings = root.DartSiteSettings.get()) {
+    const drafts=[...document.querySelectorAll('#settings form[data-dirty="true"] input,#settings form[data-dirty="true"] select,#settings form[data-dirty="true"] textarea')].map(node=>({node,value:node.value,checked:node.checked}));
     fillGeneral(settings);
-    renderMedia(settings);
+    if($('settings-media-form')?.dataset.dirty!=='true')renderMedia(settings);
     renderAnnouncements(settings);
-    renderTyping(settings);
-    renderModelCards(settings);
+    if($('settings-typing-form')?.dataset.dirty!=='true')renderTyping(settings);
+    if($('settings-model-cards-form')?.dataset.dirty!=='true')renderModelCards(settings);
+    drafts.forEach(({node,value,checked})=>{if(node.isConnected&&node.type!=='file'){node.value=value;if(node.type==='checkbox')node.checked=checked;}});
   }
 
   async function init() {
@@ -692,7 +702,14 @@
     }
     renderSettings(settings);
   }
-  document.addEventListener("DOMContentLoaded", () => { void init(); });
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById('settings')?.addEventListener('input',event=>{
+      const form=event.target.closest('form');if(!form||['settings-display-form','settings-staff-invite-form'].includes(form.id))return;
+      form.dataset.dirty='true';form.dataset.editRevision=String(Number(form.dataset.editRevision||0)+1);
+      if(!form.querySelector('.dart-settings-draft-note')){const note=document.createElement('p');note.className='dart-settings-draft-note dart-settings-field-wide';note.textContent='Unsaved changes';note.setAttribute('role','status');form.append(note);}
+    });
+    void init();
+  });
   root.addEventListener("dart:admin-authenticated", () => { void loadPromotions(); });
   root.addEventListener("dart:site-settings-changed", (event) => {
     renderSettings(event.detail || root.DartSiteSettings.get());
@@ -732,8 +749,11 @@
   }
 
   tabs.forEach((tab) => {
+    tab.setAttribute('role','tab');tab.id=tab.id||`settings-tab-${tab.dataset.settingsTab}`;tab.setAttribute('aria-controls','settings-content');
     tab.addEventListener("click", () => activateSettingsTab(tab.dataset.settingsTab));
+    tab.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const available=tabs.filter(item=>!item.hidden);const index=available.indexOf(tab);const next=event.key==='Home'?available[0]:event.key==='End'?available.at(-1):available[(index+(event.key==='ArrowRight'?1:-1)+available.length)%available.length];next?.click();next?.focus();});
   });
+  document.querySelector('.dart-settings-tabs')?.setAttribute('role','tablist');
 
   let initial = "general";
   try {
