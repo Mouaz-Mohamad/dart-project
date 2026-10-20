@@ -50,6 +50,8 @@ const server = http.createServer((request, response) => {
                 "orders.read",
                 "dashboard_state.read",
                 "finance.read",
+                "staff.read",
+                "staff.manage",
               ],
             }
           : pathname.startsWith("/api/v1/admin/finance/summary")
@@ -314,6 +316,54 @@ const server = http.createServer((request, response) => {
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "hero");
   assert.equal(await dashboard.locator("#settings-typing-card").isVisible(), true);
   assert.equal(await dashboard.locator("#settings-commerce-card").isVisible(), false);
+  // Staff stays inside Settings; account details and permissions open only on selection.
+  const staffFixture={permissions:[{key:'orders.read',description:'View orders'},{key:'orders.manage',description:'Manage orders'},{key:'profile.read_own',description:'View own profile'}],staff:[
+    {id:'staff-a',name:'Fixture A',email:'a@example.test',staffCode:'STA',status:'Active',permissions:['orders.read'],emailVerified:true},
+    {id:'staff-b',name:'Fixture B',email:'b@example.test',staffCode:'STB',status:'Active',permissions:[],emailVerified:true},
+    {id:'owner',name:'Protected Owner',email:'owner@example.test',staffCode:'OWNER',status:'Active',permissions:[],isOwner:true,emailVerified:true}
+  ],invitations:[{id:'pending-a',email:'pending@example.test',role:'staff',accessMode:'email_otp',status:'pending'}]};
+  let staffWrites=0;
+  await dashboard.route('**/api/v1/admin/staff',route=>route.fulfill({contentType:'application/json',body:JSON.stringify(staffFixture)}));
+  await dashboard.route('**/api/v1/admin/staff/staff-a/permissions',async route=>{
+    staffWrites+=1;assert.equal(route.request().method(),'PUT');
+    staffFixture.staff[0].permissions=route.request().postDataJSON().permissionKeys;
+    await route.fulfill({contentType:'application/json',body:'{}'});
+  });
+  await dashboard.evaluate(()=>window.dispatchEvent(new Event('dart:admin-authenticated')));
+  await dashboard.waitForFunction(()=>document.querySelectorAll('#settings-staff-list [data-staff-id]').length===3);
+  await dashboard.locator('[data-settings-tab="staff"]').click();
+  assert.equal(await dashboard.locator('.dart-staff-member-body').count(),0);
+  assert.equal(await dashboard.locator('#settings-staff-invite-form').isVisible(),false);
+  await dashboard.locator('[data-staff-id="staff-a"] [data-staff-action="view"]').click();
+  assert.equal(await dashboard.locator('.dart-staff-member-body').count(),1);
+  const staffA=dashboard.locator('[data-staff-id="staff-a"]');
+  for(const action of ['permissions','toggle-access','revoke-sessions'])assert.equal(await staffA.locator(`[data-staff-action="${action}"]`).count(),1);
+  await staffA.locator('.dart-staff-permission-group summary').first().click();
+  await staffA.locator('input[value="orders.manage"]').check();
+  await dashboard.locator('[data-staff-id="staff-b"] [data-staff-action="view"]').click();
+  assert.equal(await dashboard.locator('.dart-staff-member-body').count(),1);
+  await dashboard.locator('[data-staff-id="staff-a"] [data-staff-action="view"]').click();
+  assert.equal(await staffA.locator('input[value="orders.manage"]').isChecked(),true,'employee drafts stay with the correct employee');
+  await staffA.locator('[data-staff-action="permissions"]').click();
+  await dashboard.waitForFunction(()=>document.querySelector('[data-staff-id="staff-a"]')?.getAttribute('aria-busy')==='false');
+  assert.equal(staffWrites,1);assert.ok(staffFixture.staff[0].permissions.includes('orders.manage'));
+  const staffChecks=path.join(root,'..','checks');fs.mkdirSync(staffChecks,{recursive:true});
+  for(const width of [390,1366]){
+    await dashboard.setViewportSize({width,height:900});
+    await dashboard.screenshot({path:path.join(staffChecks,`dashboard-staff-${width}.png`)});
+    assert.equal(await dashboard.locator('#settings-staff-access-card').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`staff fits ${width}px`);
+  }
+  await dashboard.locator('[data-staff-id="owner"] [data-staff-action="view"]').click();
+  assert.equal(await dashboard.locator('[data-staff-id="owner"] [data-staff-permissions]').count(),0,'owner permissions stay protected');
+  await dashboard.locator('#settings-staff-search').fill('Fixture B');
+  assert.equal(await dashboard.locator('#settings-staff-list [data-staff-id]').count(),1);
+  await dashboard.locator('#settings-staff-search').fill('');
+  await dashboard.locator('[data-staff-directory="pending"]').click();
+  assert.equal(await dashboard.locator('#settings-staff-invitations [data-remove-allowance]').isVisible(),true);
+  await dashboard.locator('#settings-staff-add > summary').click();
+  for(const id of ['settings-staff-email','settings-staff-role','settings-staff-invite-permissions'])assert.equal(await dashboard.locator(`#${id}`).isVisible(),true);
+  await dashboard.locator('#settings-staff-add > summary').click();
+  await dashboard.locator('[data-settings-tab="hero"]').click();
   const dashboardTargets = await dashboard.locator("a[data-target]").evaluateAll((links) =>
     [...new Set(links.map((link) => link.dataset.target))],
   );

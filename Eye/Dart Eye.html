@@ -2244,6 +2244,7 @@
                         <h2>Dashboard access &amp; API permissions</h2>
                         <p>أضف الإيميل وحدد نوع الحساب. عند أول دخول يثبت صاحب الإيميل ملكيته بكود واحد، وبعدها يعتمد النظام على جلسة Dart الآمنة بدون Password أو Google Login.</p>
                     </div>
+                    <details id="settings-staff-add" class="dart-settings-field-wide"><summary>Add Staff</summary>
                     <form id="settings-staff-invite-form" class="dart-settings-fields">
                         <label for="settings-staff-email">Allowed email<input id="settings-staff-email" type="email" maxlength="254" required></label>
                         <label for="settings-staff-role">Role
@@ -2258,12 +2259,14 @@
                         </div>
                         <button type="submit" class="dart-settings-save">Allow email</button>
                     </form>
+                    </details>
                     <p id="settings-staff-status" class="dart-settings-status" role="status" aria-live="polite"></p>
-                    <div class="dart-settings-field-wide">
+                    <div class="dart-staff-directory-toolbar dart-settings-field-wide"><input id="settings-staff-search" type="search" placeholder="Search staff by name, email or code" aria-label="Search staff"><button type="button" data-staff-directory="accounts" aria-pressed="true">Accounts</button><button type="button" data-staff-directory="pending" aria-pressed="false">Pending invitations</button></div>
+                    <div class="dart-settings-field-wide" data-staff-directory-panel="accounts">
                         <h3>Active dashboard accounts</h3>
                         <div id="settings-staff-list" class="dart-settings-list"></div>
                     </div>
-                    <div class="dart-settings-field-wide">
+                    <div class="dart-settings-field-wide" data-staff-directory-panel="pending" hidden>
                         <h3>Waiting for email verification</h3>
                         <div id="settings-staff-invitations" class="dart-settings-list"></div>
                     </div>

@@ -37,6 +37,9 @@
     invitations: [],
     staff: [],
   };
+  let selectedStaffId=null;
+  let directoryRevision=0;
+  const permissionDrafts=new Map(),pendingMembers=new Set();
 
   const protectedBasics = new Set([
     "profile.read_own",
@@ -82,7 +85,7 @@
           type="checkbox"
           value="${esc(permission.key)}"
           ${checked ? "checked" : ""}
-          ${protectedBasics.has(permission.key) ? "disabled" : ""}
+          ${protectedBasics.has(permission.key) || !can('staff.manage') ? "disabled" : ""}
         >
         <span>
           <strong>${esc(permission.key)}</strong>
@@ -91,7 +94,7 @@
       </label>`;
   }
 
-  function renderInvitePermissions() {
+  function groupedPermissions(selected=new Set()) {
     const groups = new Map();
     directory.permissions.forEach((permission) => {
       const group = permissionGroup(permission.key);
@@ -99,15 +102,19 @@
       groups.get(group).push(permission);
     });
 
-    invitePermissions.innerHTML = [...groups.entries()]
+    return [...groups.entries()]
       .map(
         ([group, permissions]) => `
-          <fieldset class="dart-staff-permission-group">
-            <legend>${esc(group)}</legend>
-            ${permissions.map((permission) => permissionLabel(permission)).join("")}
-          </fieldset>`,
+          <details class="dart-staff-permission-group">
+            <summary>${esc(group)} <small>${permissions.filter(permission=>selected.has(permission.key)||protectedBasics.has(permission.key)).length} / ${permissions.length}</small></summary>
+            <div class="dart-staff-permission-options">${permissions.map((permission) => permissionLabel(permission,selected)).join("")}</div>
+          </details>`,
       )
       .join("");
+  }
+  function renderInvitePermissions(){
+    const selected=new Set([...invitePermissions.querySelectorAll('input:checked')].map(input=>input.value));
+    invitePermissions.innerHTML=groupedPermissions(selected);
   }
 
   function syncRoleUi() {
@@ -116,7 +123,7 @@
     invitePermissions
       .querySelectorAll('input[type="checkbox"]')
       .forEach((input) => {
-        input.disabled = owner || protectedBasics.has(input.value);
+        input.disabled = owner || protectedBasics.has(input.value) || !can('staff.manage');
       });
   }
 
@@ -128,12 +135,10 @@
           Owner access and permissions are protected.
         </div>`;
     }
-    const selected = new Set(member.permissions || []);
+    const selected = permissionDrafts.get(String(member.id)) || new Set(member.permissions || []);
     return `
       <div class="dart-staff-member-permissions" data-staff-permissions>
-        ${directory.permissions
-          .map((permission) => permissionLabel(permission, selected))
-          .join("")}
+        ${groupedPermissions(selected)}
         ${can("staff.manage")
           ? '<button type="button" class="dart-settings-save" data-staff-action="permissions">Save permissions</button>'
           : ""}
@@ -161,25 +166,30 @@
       return;
     }
 
-    staffList.innerHTML = directory.staff
+    const query=String(document.getElementById('settings-staff-search')?.value||'').trim().toLowerCase();
+    const members=directory.staff.filter(member=>[member.name,member.email,member.staffCode].some(value=>String(value||'').toLowerCase().includes(query)));
+    if(!members.length){staffList.innerHTML='<div class="dart-empty-state">No accounts match this search.</div>';return;}
+    staffList.innerHTML = `<p class="dart-staff-selection-hint">${selectedStaffId?'Only the selected account is open.':'Choose an account to view its details and permissions.'}</p>`+members
       .map((member) => `
-        <details
+        <article
           class="dart-settings-list-row dart-staff-member"
           data-staff-id="${esc(member.id)}"
           data-staff-active="${member.status === "Active" ? "true" : "false"}"
           data-staff-owner="${member.isOwner ? "true" : "false"}"
         >
-          <summary>
+          <header class="dart-staff-member-head">
             <div>
-              <strong>${esc(member.email)}</strong>
+              <strong>${esc(member.name || member.email)}</strong><small>${esc(member.email)}</small>
               <small>${esc(member.staffCode || "")} · ${member.isOwner ? "Owner" : "Staff"}</small>
             </div>
             <div class="dart-staff-badges">
               <span>${esc(member.status)}</span>
               <span>${member.emailVerified ? "Email verified" : "Email pending"}</span>
             </div>
-          </summary>
-          <div class="dart-staff-member-body">
+            <button type="button" class="dart-settings-secondary" data-staff-action="view" aria-expanded="${String(selectedStaffId)===String(member.id)}">${String(selectedStaffId)===String(member.id)?'Close details':'Details'}</button>
+          </header>
+          ${String(selectedStaffId)===String(member.id)?`<div class="dart-staff-member-body">
+            <h3>${esc(member.email)} · ${esc(member.staffCode || '')}</h3>
             <p>Role: <strong>${member.isOwner ? "Owner" : "Staff"}</strong></p>
             <p>Last login: <strong>${esc(displayDate(member.lastLoginAt))}</strong></p>
             ${member.disabledReason
@@ -187,10 +197,11 @@
               : ""}
             ${staffActions(member)}
             ${staffPermissionEditor(member)}
-          </div>
-        </details>`,
+          </div>`:''}
+        </article>`,
       )
       .join("");
+    staffList.querySelectorAll('[data-staff-id]').forEach(row=>{const pending=pendingMembers.has(row.dataset.staffId);row.setAttribute('aria-busy',String(pending));if(pending)row.querySelectorAll('input,button:not([data-staff-action="view"])').forEach(node=>{node.disabled=true;});});
   }
 
   function renderAllowances() {
@@ -219,7 +230,8 @@
       .join("");
   }
 
-  async function load() {
+  async function load(preserveStatus=false) {
+    const revision=++directoryRevision;
     if (!can("staff.read") || !window.DartAdminApi?.request) {
       card.hidden = true;
       if (staffTab) staffTab.hidden = true;
@@ -229,14 +241,18 @@
     card.hidden = false;
     if (staffTab) staffTab.hidden = false;
     window.DartSettingsTabs?.refresh?.();
+    if(preserveStatus!==true)setStatus('Loading Staff accounts…');
     try {
-      directory = await window.DartAdminApi.request("/api/v1/admin/staff");
+      const response = await window.DartAdminApi.request("/api/v1/admin/staff");
+      if(revision!==directoryRevision||!can('staff.read'))return;
+      directory = response;
       renderInvitePermissions();
       syncRoleUi();
       renderStaff();
       renderAllowances();
-      setStatus("");
+      if(preserveStatus!==true)setStatus("");
     } catch (error) {
+      if(revision!==directoryRevision||!can('staff.read'))return;
       setStatus(error.message || "Unable to load Staff access.", true);
     }
   }
@@ -245,6 +261,7 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if(form.dataset.saving==='true')return;
     if (!form.checkValidity()) {
       form.reportValidity();
       return;
@@ -265,6 +282,7 @@
           ].map((input) => input.value);
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
+    form.dataset.saving='true';form.setAttribute('aria-busy','true');
 
     try {
       await window.DartAdminApi.request("/api/v1/admin/staff/allowlist", {
@@ -281,11 +299,13 @@
       setStatus(
         "Email allowed. The account will activate after the owner of that email enters the verification code.",
       );
-      await load();
+      document.getElementById('settings-staff-add').open=false;
+      await load(true);
     } catch (error) {
       setStatus(error.message || "Unable to allow dashboard access.", true);
     } finally {
       submit.disabled = false;
+      delete form.dataset.saving;form.setAttribute('aria-busy','false');
     }
   });
 
@@ -306,7 +326,7 @@
         },
       );
       setStatus("Pending email access removed.");
-      await load();
+      await load(true);
     } catch (error) {
       setStatus(error.message || "Unable to remove Staff access.", true);
       button.disabled = false;
@@ -315,15 +335,19 @@
 
   staffList.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-staff-action]");
-    if (!button || !can("staff.manage")) return;
+    if (!button) return;
 
     const memberRow = button.closest("[data-staff-id]");
     const staffId = memberRow?.dataset.staffId;
+    if(button.dataset.staffAction==='view'){selectedStaffId=String(selectedStaffId)===String(staffId)?null:staffId;renderStaff();return;}
+    if(!can('staff.manage')||pendingMembers.has(staffId))return;
     const isOwner = memberRow?.dataset.staffOwner === "true";
     if (!staffId || isOwner) return;
 
     const action = button.dataset.staffAction;
     button.disabled = true;
+    pendingMembers.add(staffId);memberRow.setAttribute('aria-busy','true');
+    memberRow.querySelectorAll('input,button:not([data-staff-action="view"])').forEach(node=>{node.disabled=true;});
     try {
       if (action === "permissions") {
         const container = memberRow.querySelector("[data-staff-permissions]");
@@ -337,6 +361,7 @@
             body: { permissionKeys: selected },
           },
         );
+        permissionDrafts.delete(staffId);
         setStatus(
           "Staff permissions updated. Existing sessions were revoked so the new permissions take effect.",
         );
@@ -368,13 +393,18 @@
         );
         setStatus("All sessions for this Staff account were revoked.");
       }
-      await load();
+      await load(true);
     } catch (error) {
       setStatus(error.message || "Unable to update Staff access.", true);
     } finally {
       button.disabled = false;
+      pendingMembers.delete(staffId);renderStaff();
     }
   });
+  staffList.addEventListener('change',event=>{if(!event.target.matches('[data-staff-permissions] input'))return;const row=event.target.closest('[data-staff-id]');permissionDrafts.set(row.dataset.staffId,new Set([...row.querySelectorAll('[data-staff-permissions] input:checked')].map(input=>input.value)));const group=event.target.closest('.dart-staff-permission-group');if(group)group.querySelector('summary small').textContent=`${group.querySelectorAll('input:checked').length} / ${group.querySelectorAll('input').length}`;});
+  document.getElementById('settings-staff-search')?.addEventListener('input',renderStaff);
+  card.querySelectorAll('[data-staff-directory]').forEach(button=>button.addEventListener('click',()=>{card.querySelectorAll('[data-staff-directory]').forEach(node=>node.setAttribute('aria-pressed',String(node===button)));card.querySelectorAll('[data-staff-directory-panel]').forEach(panel=>{panel.hidden=panel.dataset.staffDirectoryPanel!==button.dataset.staffDirectory;});}));
+  window.addEventListener('dart:admin-logged-out',()=>{directoryRevision+=1;selectedStaffId=null;permissionDrafts.clear();pendingMembers.clear();directory={staff:[],invitations:[],permissions:[]};staffList.replaceChildren();invitationsList.replaceChildren();invitePermissions.replaceChildren();card.hidden=true;if(staffTab)staffTab.hidden=true;});
 
   window.addEventListener("dart:admin-authenticated", load);
   document.addEventListener("DOMContentLoaded", () => {

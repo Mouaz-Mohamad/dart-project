@@ -498,6 +498,7 @@
 .dart-settings-search-hidden { display:none !important; }
 .dart-settings-form-card { display:grid; grid-template-columns:40px minmax(0,1fr); padding:20px; gap:12px; box-shadow:none; border-radius:10px; }
 .dart-settings-form-card > form,.dart-settings-form-card > .dart-settings-field-wide,.dart-settings-form-card > .dart-settings-list { grid-column:1/-1; }
+.dart-settings-form-card > .dart-settings-status { grid-column:1/-1; }
 .dart-settings-form-card .dart-settings-card-copy h2 { font-size:18px; }
 .dart-settings-form-card .dart-settings-card-copy p { color:#615966; font-size:12px; line-height:1.7; }
 .dart-settings-form-card .dart-settings-fields { grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; padding-top:8px; }
@@ -511,4 +512,27 @@
 .dart-display-column button { padding:4px 9px; border:1px solid #d8cbd7; background:#fff; color:#75112d; border-radius:5px; }
 body[data-dart-density="compact"] .dart-record-main { padding:10px 13px; gap:10px; }
 body[data-dart-density="compact"] .dart-compact-record { margin-bottom:6px; }
+#settings-staff-add { grid-column:1/-1; border:1px solid #dcd2dc; border-radius:8px; background:#fff; }
+#settings-staff-add > summary { padding:13px; cursor:pointer; color:#75112d; font-weight:750; }
+#settings-staff-add > form { padding:0 14px 14px; }
+#settings-staff-add:not([open]) > form { display:none; }
+.dart-staff-directory-toolbar { display:flex; gap:8px; flex-wrap:wrap; }
+.dart-staff-directory-toolbar input { flex:1 1 220px; min-width:0; }
+.dart-staff-directory-toolbar button { padding:9px 12px; border:1px solid #d4c5d2; border-radius:7px; background:#fff; color:#75112d; }
+.dart-staff-directory-toolbar button[aria-pressed="true"] { background:#ab012b; color:#fff; }
+.dart-staff-selection-hint { padding:12px; background:#f8f4f7; color:#625568; font-size:13px; }
+.dart-staff-member { display:block; padding:0; }
+.dart-staff-member-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px; flex-wrap:wrap; }
+.dart-staff-member-head > div:first-child { flex:1; min-width:0; overflow-wrap:anywhere; }
+.dart-staff-member-head small { display:block; color:#655b69; font-size:12px; margin-top:3px; }
+.dart-staff-member-body { padding:16px; border-top:1px solid #e5dce5; background:#fcfafc; }
+.dart-staff-member-body h3 { overflow-wrap:anywhere; font-size:16px; color:#60243b; margin:0 0 14px; }
+.dart-staff-member-permissions,.dart-staff-permissions { display:grid; grid-template-columns:1fr; gap:9px; }
+.dart-staff-permission-group { padding:0; border:1px solid #d9ced9; border-radius:7px; min-width:0; background:#fff; }
+.dart-staff-permission-group > summary { cursor:pointer; padding:12px; display:flex; justify-content:space-between; color:#4d3144; font-weight:700; }
+.dart-staff-permission-group:not([open]) > .dart-staff-permission-options { display:none; }
+.dart-staff-permission-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:10px; border-top:1px solid #e4dce5; }
+.dart-staff-permission { min-width:0; padding:10px; border:1px solid #e7e0e7; background:#fff; color:#342b38; border-radius:6px; }
+.dart-staff-permission strong,.dart-staff-permission small { overflow-wrap:anywhere; }
+@media(max-width:600px){.dart-staff-permission-options{grid-template-columns:1fr;}.dart-staff-member-head .dart-staff-badges{width:100%;}}
 @media(max-width:600px){.dart-settings-form-card{padding:14px;}.dart-settings-form-card .dart-settings-fields{grid-template-columns:1fr;}.dart-settings-save,.dart-settings-secondary{min-height:44px;}}
