@@ -89,9 +89,85 @@ if (typeof dartMoney === 'function') {
     if (orderForm) { orderForm.dataset.dartAddressSource = ''; orderForm.dataset.dartAddressReady = 'false'; }
   }
 
+  // Layout only: move existing fields and controls; their IDs and command handlers are preserved.
+  function organizeOrderForm() {
+    if (orderForm.dataset.layoutReady) return;
+    orderForm.dataset.layoutReady = '1';
+    const original = orderForm.querySelector('.modal-grid');
+    if (!original) return;
+    const layout = document.createElement('div'); layout.className = 'dart-order-layout';
+    const groups = {};
+    [['customer','Customer'],['products','Products'],['delivery','Delivery'],['payment','Discounts & payment'],['summary','Review & save']].forEach(([key,title]) => {
+      const group = document.createElement('fieldset'); group.className = `dart-order-group dart-order-group-${key}`;
+      const legend = document.createElement('legend'); legend.textContent = title; group.append(legend); layout.append(group); groups[key] = group;
+    });
+    const moved = new Set();
+    const move = (key, ids) => ids.forEach(id => {
+      const input = field(id); const node = input?.closest('.form-group') || input;
+      if (node && !moved.has(node)) { groups[key].append(node); moved.add(node); }
+    });
+    const search = field('orderSearchInput');
+    if (search) {
+      const label = document.createElement('label'); label.textContent = 'Find an existing client'; label.htmlFor = search.id;
+      search.placeholder = 'Name, phone, email or client code'; search.autocomplete = 'off';
+      const results = document.createElement('div'); results.id = 'order-client-results'; results.className = 'dart-order-client-results'; results.hidden = true;
+      groups.customer.append(label,search,results);
+      search.addEventListener('input', () => {
+        const query = search.value.trim().toLowerCase(); results.replaceChildren();
+        const matches = query.length >= 2 && typeof customersData !== 'undefined' ? customersData.filter(customer =>
+          !dartIsArchived(customer) && [customer.clientId,customer.clientName,customer.phone1,customer.phone2,customer.email].some(text => String(text || '').toLowerCase().includes(query))).slice(0,8) : [];
+        matches.forEach(customer => {
+          const choice = document.createElement('button'); choice.type = 'button';
+          choice.textContent = `${customer.clientName} · ${customer.clientId} · ${customer.phone1 || ''}`;
+          choice.addEventListener('click', () => {
+            Object.entries({clientId:customer.clientId,clientName:customer.clientName,phone1:customer.phone1,phone2:customer.phone2,email:customer.email}).forEach(([id,text]) => { if(field(id)) field(id).value = text && text !== '-' ? text : ''; });
+            search.value = customer.clientName || ''; results.hidden = true;
+          }); results.append(choice);
+        }); results.hidden = matches.length === 0;
+      });
+      const clear = document.createElement('button'); clear.type = 'button'; clear.className = 'dart-order-contact-clear'; clear.textContent = 'Enter another client';
+      clear.addEventListener('click', () => { ['clientId','clientName','phone1','phone2','email'].forEach(id => { field(id).value = ''; }); search.value = ''; results.hidden = true; field('clientName').focus(); }); groups.customer.append(clear);
+    }
+    move('customer',['clientName','clientId','phone1','phone2','email']);
+    move('products',['orderModelCode','productsInputCode','modal-order-edit-id']);
+    move('delivery',['orderCountry','governorate','orderArea','orderStreetName','orderBuildingNumber','orderFloor','deliveryNotes','orderAddress']);
+    ['dashboard-order-map','dashboard-address-status','orderLatitude','orderLongitude','orderFullAddress','dashboard-locate-manual-address'].forEach(id => { const node=field(id); if(node) groups.delivery.append(node); });
+    original.querySelectorAll('.dart-delivery-zone-note').forEach(node=>groups.delivery.append(node));
+    move('payment',['deductions','customDiscount','paymentMethod','paymentStatus','amountPaid','amountRefunded','orderSource']);
+    const note=document.createElement('p'); note.className='dart-order-hint'; note.textContent='Prices and availability are confirmed when the order is saved. Paid sets the received amount to the total; Unpaid sets it to zero.'; groups.payment.append(note);
+    ['.price-summary','.btn-done'].forEach(selector=>{ const node=original.querySelector(selector); if(node) groups.summary.append(node); });
+    original.querySelectorAll('.column').forEach(column=>[...column.children].forEach(node=>groups.summary.append(node)));
+    const title=document.createElement('h2'); title.id='order-modal-title'; title.textContent='Order details'; field('orderModal').querySelector('.modal-content').prepend(title);
+    field('orderModal').setAttribute('aria-labelledby',title.id);
+    orderForm.replaceChildren(layout);
+    ['clientId','email'].forEach(id=>field(id).required=false);
+    [['clientId','Client Code (optional)'],['email','Email (optional)'],['phone2','Additional phone (optional)']].forEach(([id,text])=>{const label=orderForm.querySelector(`label[for="${id}"]`);if(label)label.textContent=text;});
+    [['orderModelCode','Model Code'],['orderItemColor','Color'],['orderItemSize','Size'],['orderItemQty','Quantity']].forEach(([id,text])=>field(id).setAttribute('aria-label',text));
+    field('clientName').minLength=2;
+    ['phone1','phone2'].forEach(id=>{ const input=field(id); input.type='tel'; input.maxLength=22; input.setAttribute('inputmode','tel'); input.pattern='[+0-9٠-٩۰-۹ ()-]{7,22}'; });
+    ['amountPaid','amountRefunded'].forEach(id=>{ field(id).step='0.01'; field(id).setAttribute('inputmode','decimal'); });
+    orderForm.addEventListener('invalid', event=>{
+      const input=event.target; input.setAttribute('aria-invalid','true');
+      let error=input.parentElement.querySelector('.dart-field-error'); if(!error){error=document.createElement('small');error.className='dart-field-error';input.parentElement.append(error);} error.textContent=input.validationMessage;
+    },true);
+    orderForm.addEventListener('input', event=>{ event.target.removeAttribute('aria-invalid'); event.target.parentElement?.querySelector('.dart-field-error')?.remove(); });
+    orderForm.addEventListener('reset',()=>{ orderForm.querySelectorAll('[aria-invalid]').forEach(input=>input.removeAttribute('aria-invalid')); orderForm.querySelectorAll('.dart-field-error').forEach(node=>node.remove()); if(field('order-client-results'))field('order-client-results').hidden=true; });
+    const availability=document.createElement('p');availability.id='order-available-stock';availability.className='dart-order-hint';field('autoAllocateProductBtn').after(availability);
+    const colorList=document.createElement('datalist');colorList.id='order-colors-list';const sizeList=document.createElement('datalist');sizeList.id='order-sizes-list';groups.products.append(colorList,sizeList);
+    field('orderItemColor').setAttribute('list',colorList.id);field('orderItemSize').setAttribute('list',sizeList.id);
+    function variants() {
+      const model=value('orderModelCode');const rows=typeof itemsData!=='undefined'?itemsData.filter(item=>!dartIsArchived(item)&&String(item.modelId).toLowerCase()===model.toLowerCase()&&String(item.status).toLowerCase()==='in stock'):[];
+      [colorList,sizeList].forEach((list,index)=>{list.replaceChildren();[...new Set(rows.map(item=>String(item[index?'size':'color']||'')).filter(Boolean))].forEach(text=>{const option=document.createElement('option');option.value=text;list.append(option);});});
+      const count=rows.filter(item=>(!value('orderItemColor')||String(item.color).toLowerCase()===value('orderItemColor').toLowerCase())&&(!value('orderItemSize')||String(item.size).toLowerCase()===value('orderItemSize').toLowerCase())).length;
+      availability.textContent=model?`${count} available physical piece(s) for this selection`: 'Select a model to see available colors, sizes and stock.';
+    }
+    ['orderModelCode','orderItemColor','orderItemSize'].forEach(id=>field(id).addEventListener('input',variants));variants();
+  }
+
   function bindOrderModal() {
     if (!orderForm || orderForm.dataset.dartOperationsBound) return;
     orderForm.dataset.dartOperationsBound = '1';
+    organizeOrderForm();
     let selected = [];
     const selectedList = field('selectedProductsList');
     const codeInput = field('productsInputCode');
@@ -116,21 +192,24 @@ if (typeof dartMoney === 'function') {
         } : current;
       });
       // END Immutable prices.
-      const subtotal = snapshot.reduce((sum, line) => sum + (Number(line.finalUnitPrice) || 0) * (Number(line.qty) || 1), 0);
+      const subtotalMinor = snapshot.reduce((sum, line) => sum + Math.round((Number(line?.finalUnitPrice) || 0) * 100) * (Number(line?.qty) || 1), 0);
+      const subtotal = subtotalMinor / 100;
       const discountPercent = Math.min(100, Math.max(0, Number(value('deductions')) || 0));
-      const discountAmount = subtotal * discountPercent / 100;
-      const finalAmount = Math.max(0, subtotal - discountAmount);
-      if (field('subtotalVal')) field('subtotalVal').textContent = dartMoney(subtotal);
-      if (field('discountVal')) field('discountVal').textContent = dartMoney(discountAmount);
-      if (field('totalVal')) field('totalVal').textContent = dartMoney(finalAmount);
-      if (field('customDiscount')) field('customDiscount').value = Math.trunc(discountAmount);
+      const discountAmount = Math.round(subtotalMinor * discountPercent / 100) / 100;
+      const finalAmount = Math.max(0, subtotalMinor - Math.round(discountAmount * 100)) / 100;
+      const money = amount => `${Number(amount).toLocaleString('en-EG',{maximumFractionDigits:2})} EGP`;
+      if (field('subtotalVal')) field('subtotalVal').textContent = money(subtotal);
+      if (field('discountVal')) field('discountVal').textContent = money(discountAmount);
+      if (field('totalVal')) field('totalVal').textContent = money(finalAmount);
+      if (field('customDiscount')) field('customDiscount').value = discountAmount;
       return { snapshot, subtotal, discountPercent, discountAmount, finalAmount };
     }
 
     function renderSelected() {
-      if (selectedList) selectedList.innerHTML = selected.map((code, index) =>
-        `<span class="order-item-chip"><b>${dartEsc(code)}</b><button type="button" class="remove-item-btn" data-index="${index}" aria-label="Remove ${dartEsc(code)}">&times;</button></span>`
-      ).join('');
+      if (selectedList) selectedList.innerHTML = selected.map((code, index) => {
+        const item = dartFindItemByCode(code);
+        return `<div class="order-item-chip"><div><b>${dartEsc(code)}</b><small>${dartEsc([item?.modelId,item?.color,item?.size].filter(Boolean).join(' · '))}</small></div><button type="button" class="remove-item-btn" data-index="${index}" aria-label="Remove ${dartEsc(code)}">&times;</button></div>`;
+      }).join('');
       calculate();
     }
 
@@ -174,6 +253,7 @@ if (typeof dartMoney === 'function') {
 
     orderForm.addEventListener('submit', async event => {
       event.preventDefault();
+      if (!orderForm.checkValidity()) { orderForm.reportValidity(); return; }
       if (!selected.length) return window.DartDialog.alert('Add at least one physical item.');
 
       const address = initDashboardAddress()?.validate();

@@ -319,6 +319,30 @@ const server = http.createServer((request, response) => {
       `dashboard navigation must activate ${target}`,
     );
   }
+  // The order editor keeps every original field and permits phone/name-only client contact.
+  await dashboard.evaluate(() => document.querySelector('a[data-target="orders"]').click());
+  await dashboard.locator('#openModalBtn').click();
+  assert.equal(await dashboard.locator('#orderForm fieldset').count(), 5);
+  for (const id of ['clientId','email','phone2']) assert.equal(await dashboard.locator(`#${id}`).evaluate(node=>node.required), false);
+  for (const id of ['clientName','phone1']) assert.equal(await dashboard.locator(`#${id}`).evaluate(node=>node.required), true);
+  for (const id of ['paymentMethod','paymentStatus','amountPaid','amountRefunded','deductions','customDiscount','orderSource','orderLatitude','orderLongitude','productsInputCode','autoAllocateProductBtn','addProductBtn']) assert.equal(await dashboard.locator(`#${id}`).count(), 1, `${id} must be preserved`);
+  await dashboard.evaluate(() => { customersData=[{id:'client-test',clientId:'CI-1',clientName:'Synthetic Client',phone1:'01000000000',email:''}]; });
+  await dashboard.locator('#orderSearchInput').fill('Synthetic');
+  await dashboard.locator('#order-client-results button').click();
+  assert.equal(await dashboard.locator('#clientId').inputValue(), 'CI-1');
+  assert.equal(await dashboard.locator('#phone1').inputValue(), '01000000000');
+  await dashboard.locator('.dart-order-contact-clear').click();
+  assert.equal(await dashboard.locator('#clientId').inputValue(), '');
+  await dashboard.locator('#clientName').fill('Phone Only');
+  await dashboard.locator('#phone1').fill('01000000000');
+  assert.equal(await dashboard.locator('#email').evaluate(node=>node.checkValidity()), true);
+  const orderChecks=path.join(root,'..','checks'); fs.mkdirSync(orderChecks,{recursive:true});
+  for(const width of [390,1366]) {
+    await dashboard.setViewportSize({width,height:900});
+    await dashboard.screenshot({path:path.join(orderChecks,`dashboard-order-form-${width}.png`)});
+    assert.equal(await dashboard.locator('#orderModal .modal-content').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`order form fits ${width}px`);
+  }
+  await dashboard.locator('#closeModalBtn').click();
   // Real DOM regression: two independent order commands, pending rows and reversed responses.
   const orderFixture = [
     { id: "order-a", orderId: "TEST-A", status: "New", clientName: "Synthetic A", phone1: "", items: [], totalPrice: 600 },

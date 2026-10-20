@@ -123,9 +123,9 @@ for (const file of jsFiles) {
   }
 }
 // This is the repository aggregate, not the bytes loaded on one page. The
-// The dashboard-only details adapter adds 11 KiB; public page delivery budgets stay unchanged.
-if (coreJsBytes > 928 * 1024) {
-  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 928KB`);
+// Dashboard details and field-preserving order layout add 19 KiB; public delivery budgets stay unchanged.
+if (coreJsBytes > 938 * 1024) {
+  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 938KB`);
 }
 if (fs.statSync('Eye/dart-dashboard-ui.js').size > 14 * 1024) failures.push('Dashboard details adapter exceeds its 14 KiB source budget');
 // Combined finance hydration and public navigation add 14 KiB of source. Home delivery still fits 225 KiB.

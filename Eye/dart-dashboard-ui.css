@@ -49,6 +49,34 @@ button { touch-action:manipulation; }
 .modal .modal-content { max-height:calc(100dvh - 32px); overflow-y:auto; color:#252129; }
 .modal label,.modal h2,.modal h3 { color:#332b36; }
 .modal .close-modal { color:#4b2332; background:#f7edf1; }
+#orderModal .modal-content { width:min(1080px,96vw); max-width:1080px; padding:25px; }
+#order-modal-title { font-size:23px; margin:0 45px 20px 0; }
+.dart-order-layout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.dart-order-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; border:1px solid #ded6de; border-radius:9px; padding:16px; min-width:0; align-content:start; }
+.dart-order-group legend { font-size:15px; font-weight:750; padding:0 7px; color:#75112c; }
+.dart-order-group .form-group { margin:0; min-width:0; display:grid; gap:6px; align-content:start; }
+.dart-order-group .form-group input,.dart-order-group .form-group select,.dart-order-group .form-group textarea { width:100%; min-width:0; }
+.dart-order-group label { font-size:12px; font-weight:650; }
+.dart-order-group-products,.dart-order-group-delivery { grid-column:1/-1; }
+.dart-order-group-customer { grid-column:1/-1; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.dart-order-group-products > .form-group { grid-column:1/-1; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.dart-order-group-products > .form-group > label,.dart-order-group-products #selectedProductsList { grid-column:1/-1; }
+.dart-order-group-products #productsInputCode { grid-column:1/4; }
+.dart-order-group #dashboard-order-map,.dart-order-group .dart-address-status,.dart-order-group .dart-delivery-zone-note,.dart-order-hint { grid-column:1/-1; }
+.dart-order-group #dashboard-order-map { min-height:240px; width:100%; }
+.dart-order-group #orderSearchInput,.dart-order-client-results,.dart-order-contact-clear { grid-column:1/-1; }
+.dart-order-client-results { display:grid; gap:5px; }
+.dart-order-client-results button,.dart-order-contact-clear { padding:9px; text-align:start; border:1px solid #d7cbd6; border-radius:6px; background:#fcf8fa; color:#63102b; font-size:12px; }
+.dart-order-group-summary { align-self:start; grid-column:1/-1; background:#fff; }
+.dart-order-group-summary .price-summary { grid-column:1/-1; margin:0; display:grid; gap:9px; }
+.dart-order-group-summary .price-summary p { display:flex; justify-content:space-between; gap:16px; font-size:14px; color:#352b36; }
+.dart-order-group-summary .btn-done { grid-column:1/-1; }
+.dart-order-hint { color:#625767; font-size:12px; line-height:1.6; }
+.dart-field-error { color:#9d182b; font-size:12px; }
+[aria-invalid="true"] { border-color:#a51a2d !important; }
+#selectedProductsList { display:grid; gap:7px; }
+#selectedProductsList .order-item-chip { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:#f9f4f7; border:1px solid #e0d2dc; color:#362535; }
+#selectedProductsList .order-item-chip small { display:block; color:#625767; margin-top:3px; }
 .dashboard-section .dart-empty-state { padding:28px 18px; color:#615762; background:#fff; border:1px dashed #bdb3bf; border-radius:8px; }
 @media(max-width:1000px) { .dart-record-main { flex-wrap:wrap; } .dart-record-fields { grid-template-columns:repeat(3,minmax(0,1fr)); } .dart-record-controls { flex:1 0 100%; } }
 @media(max-width:767px) {
@@ -68,5 +96,11 @@ button { touch-action:manipulation; }
   .dart-record-detail-grid { grid-template-columns:1fr; gap:13px; }
   .modal { padding:10px; }
   .modal .modal-content { width:100%; max-width:100%; max-height:calc(100dvh - 20px); padding:20px 14px; }
+  #orderModal .modal-content { width:100%; padding:20px 14px; }
+  .dart-order-layout { grid-template-columns:1fr; gap:16px; }
+  .dart-order-group { grid-column:1/-1; padding:12px; gap:11px; }
+  .dart-order-group-customer { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dart-order-group-products > .form-group { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dart-order-group-products #productsInputCode { grid-column:1/-1; }
 }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
