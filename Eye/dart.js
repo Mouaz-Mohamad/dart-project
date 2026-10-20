@@ -2284,6 +2284,7 @@ function dartRenderSection(key) {
   sec.render(filtered);
   dartUpdateMasterCheckbox(key, filtered);
   window.DartDashboardUI?.refresh?.();
+  if (typeof dartUpdateFilterSummary === 'function') dartUpdateFilterSummary(key, filtered.length, sec.data.length);
 }
 // BEGIN Scoped dashboard refresh: one frame per burst, no hidden table construction.
 let dartDashboardRenderQueued = false;
@@ -4575,7 +4576,7 @@ function renderTopClients() {
   if (monthFilter) {
     const previous = monthFilter.value || "current";
     monthFilter.innerHTML =
-      '<option value="current">This Month</option><option value="none">None</option>' +
+      '<option value="all">All dates</option><option value="current">This Month</option><option value="none">None</option>' +
       monthKeys
         .filter((key) => key !== currentMonth)
         .map((key) => {
@@ -4596,7 +4597,7 @@ function renderTopClients() {
   if (yearFilter) {
     const previous = yearFilter.value || "none";
     yearFilter.innerHTML =
-      '<option value="none">None</option>' +
+      '<option value="all">All years</option><option value="none">None</option>' +
       years.map((year) => `<option value="${year}">${year}</option>`).join("");
     yearFilter.value = [...yearFilter.options].some(
       (option) => option.value === previous,
@@ -4635,6 +4636,7 @@ function renderTopClients() {
           return false;
         const date = new Date(order.deliveredAt || order.createdAt || 0);
         if (Number.isNaN(date.getTime())) return false;
+        if (selectedYear === 'all' || selectedMonth === 'all') return true;
         if (selectedYear !== "none")
           return date.getFullYear() === Number(selectedYear);
         return (
@@ -5785,6 +5787,22 @@ function setupOrderModal() {
   });
 }
 
+function dartUpdateFilterSummary(key, count, total) {
+  const section=document.getElementById(key), panel=section?.querySelector('.dart-filter-summary');
+  if(!panel)return;
+  panel.replaceChildren();
+  const status=document.createElement('span');status.className='dart-filter-count';status.textContent=`${count} of ${total} records`;panel.append(status);
+  const state=dartFilterState[key]||{};
+  const search=section.querySelector('.search-box input,.search-bar input');
+  if(state.search){const chip=document.createElement('button');chip.type='button';chip.textContent=`Search: ${search.value} ×`;chip.addEventListener('click',()=>{search.value='';search.dispatchEvent(new Event('input',{bubbles:true}));});panel.append(chip);}
+  section.querySelectorAll('.filter-bar select[data-filter-key]').forEach(select=>{
+    const filter=select.dataset.filterKey,value=select.value;
+    if(!value||value==='all'||(filter==='archive'&&value==='active'))return;
+    const chip=document.createElement('button');chip.type='button';chip.textContent=`${select.selectedOptions[0]?.textContent||value} ×`;chip.setAttribute('aria-label',`Clear ${select.getAttribute('aria-label')||filter}`);
+    chip.addEventListener('click',()=>{select.value=filter==='archive'?'active':select.dataset.dartAllValue??'all';select.dispatchEvent(new Event('change',{bubbles:true}));});panel.append(chip);
+  });
+}
+
 function setupSearchFilter() {
   document.querySelectorAll(".dashboard-section").forEach((sec) => {
     const key = sec.id;
@@ -5827,6 +5845,16 @@ function setupSearchFilter() {
         ?.insertBefore(wrap, sec.querySelector(".filter-bar .add-btn"));
     }
     sec.querySelectorAll(".filter-bar select").forEach((sel) => {
+      const keyLabel={date:'Dates',status:'Statuses',category:'Categories',size:'Sizes',sizeProfile:'Size systems',color:'Colors',priceRange:'Prices',dartCard:'Dart Cards',birthday:'Birthdays',reason:'Reasons',source:'Sources',archive:'Records',rating:'Rating order',monthlyOrders:'Order count sorting',totalPrice:'Amount sorting'}[sel.dataset.filterKey]||'Options';
+      sel.setAttribute('aria-label',keyLabel);
+      if(sel.dataset.filterKey!=='archive'){
+        let all=[...sel.options].find(option=>!option.disabled&&(option.value==='all'||option.value===''));
+        if(!all){all=new Option(`All ${keyLabel.toLowerCase()}`,'all');sel.add(all,0);if(!dartFilterState[key][sel.dataset.filterKey])sel.value='all';}
+        if(/^None$/i.test(all.textContent.trim()))all.textContent=`All ${keyLabel.toLowerCase()}`;
+        sel.dataset.dartAllValue=all.value;
+      }
+      sel.querySelector('option[value="up"]')?.replaceChildren(document.createTextNode(/sorting|order/.test(keyLabel)?'Highest first':'Ascending'));
+      sel.querySelector('option[value="low"]')?.replaceChildren(document.createTextNode(/sorting|order/.test(keyLabel)?'Lowest first':'Descending'));
       if (sel.dataset.dartBound) return;
       sel.dataset.dartBound = "1";
       sel.addEventListener("change", () => {
@@ -5837,6 +5865,19 @@ function setupSearchFilter() {
         dartRenderSection(key);
       });
     });
+    const bar=sec.querySelector('.filter-bar');
+    if(bar&&!bar.querySelector('.dart-clear-filters')){
+      const clear=document.createElement('button');clear.type='button';clear.className='dart-clear-filters';clear.textContent='Clear Filters';bar.append(clear);
+      const summary=document.createElement('div');summary.className='dart-filter-summary';summary.setAttribute('aria-live','polite');bar.after(summary);
+      clear.addEventListener('click',()=>{
+        dartFilterState[key]={archive:'active'};
+        if(search)search.value='';
+        sec.querySelectorAll('.filter-bar select[data-filter-key]').forEach(select=>{const field=select.dataset.filterKey;select.value=field==='archive'?'active':select.dataset.dartAllValue??'all';dartFilterState[key][field]=select.value;});
+        if(key==='items')dartPopulateItemSizeFilter('all');
+        dartRenderSection(key);
+      });
+    }
+    if(search)search.placeholder={orders:'Search order, client, phone or item code',customers:'Search client, phone or email',models:'Search model name or code',items:'Search item or model code'}[key]||`Search ${key}`;
   });
   dartPopulateItemSizeFilter(
     document.getElementById("item-size-profile-filter")?.value || "all",

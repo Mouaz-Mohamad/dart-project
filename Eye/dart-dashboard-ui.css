@@ -8,6 +8,10 @@ main { min-width:0; }
 .dashboard-section .first,.dashboard-section .second { flex-wrap:wrap; gap:10px; }
 .dashboard-section .filter-bar { position:relative; align-items:center; padding:14px; background:#fff; border:1px solid var(--dart-line); border-radius:10px; }
 .dashboard-section .filter-bar .search-box { flex:1 1 230px; min-width:0; }
+.dart-clear-filters,.dart-filter-summary button { min-height:38px; padding:7px 11px; border:1px solid #c8b7c4; border-radius:7px; color:#75112d; background:#fff; cursor:pointer; font:inherit; font-size:12px; }
+.dart-filter-summary { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px 2px; color:#5e5662; font-size:12px; }
+.dart-filter-summary button { background:#f5eaf0; }
+.dart-filter-count { margin-right:8px; }
 .dashboard-section input:not([type="checkbox"]):not([type="color"]),.dashboard-section textarea,.dashboard-section select,.modal input:not([type="checkbox"]):not([type="color"]),.modal select,.modal textarea { color:#252129; background:#fff; border-color:#bcb7be; min-height:42px; }
 .dashboard-section option,.modal option,dialog option { color:#252129; background:#fff; }
 .dashboard-section input::placeholder,.modal input::placeholder,.dashboard-section textarea::placeholder,.modal textarea::placeholder { color:#68616b; opacity:1; }

@@ -378,6 +378,11 @@
     searchTimer = setTimeout(() => void hydrate(true),250);
   });
 
+  $('waiting-clear-filters')?.addEventListener('click',()=>{
+    clearTimeout(searchTimer);
+    ['waiting-search','waiting-model-filter','waiting-color-filter','waiting-size-filter','waiting-status-filter','waiting-from-filter','waiting-to-filter'].forEach(id=>{if($(id))$(id).value='';});
+    void hydrate(true);
+  });
   root.addEventListener("dart:admin-authenticated",applyAccess);
   document.addEventListener("DOMContentLoaded",applyAccess);
 

@@ -1460,6 +1460,7 @@
 
   function syncPeriodInputs() {
     document.querySelectorAll("[data-period-preset]").forEach((select) => { select.value = state.period.preset; });
+    document.querySelectorAll('.dart-period-control').forEach(control=>{if(control.querySelector('[data-reset-period]'))return;const reset=document.createElement('button');reset.type='button';reset.className='dart-clear-filters';reset.dataset.resetPeriod='1';reset.textContent='Reset period';reset.addEventListener('click',()=>setPeriod({preset:'this_month',start:'',end:''}));control.append(reset);});
     document.querySelectorAll("[data-period-start]").forEach((input) => { input.value = state.period.start || ""; });
     document.querySelectorAll("[data-period-end]").forEach((input) => { input.value = state.period.end || ""; });
     document.querySelectorAll(".dart-custom-period").forEach((box) => box.classList.toggle("is-visible", state.period.preset === "custom"));

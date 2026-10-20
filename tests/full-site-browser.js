@@ -392,6 +392,19 @@ const server = http.createServer((request, response) => {
     document.querySelector('#orders-container [data-id="order-b"] .status-pill')?.textContent === 'Accepted');
   assert.equal(await rowB.locator(".status-pill").textContent(), "Accepted");
   assert.equal(await dashboard.evaluate(() => window.DartOrdersApi.serverVersion()), 4);
+  const filters=dashboard.locator('#orders .filter-bar');
+  await filters.locator('select[data-filter-key="date"]').selectOption('today');
+  await filters.locator('.search-box input').fill('no matching order');
+  assert.equal(await dashboard.locator('#orders-container .model-row').count(),0);
+  assert(await dashboard.locator('#orders .dart-filter-summary button').count()>=2);
+  const beforeClear=dashboard.url();
+  await filters.locator('.dart-clear-filters').click();
+  assert.equal(dashboard.url(),beforeClear);
+  assert.equal(await filters.locator('select[data-filter-key="date"]').inputValue(),'all');
+  assert.equal(await filters.locator('.search-box input').inputValue(),'');
+  await dashboard.waitForSelector('#orders-container [data-id="order-a"]');
+  assert.equal(await dashboard.locator('#orders-container .model-row').count(),2);
+  assert.equal(await dashboard.locator('#orders .dart-filter-summary button').count(),0);
   // Compact rendering retains every original action and field in the owning row.
   await dashboard.waitForSelector('#orders-container .dart-record-open');
   assert.equal(await rowA.locator('.btn-edit').count(), 1);

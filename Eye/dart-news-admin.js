@@ -197,6 +197,9 @@
   byId("news-retry").addEventListener("click", () => void load(false));
   byId("news-search").addEventListener("input", () => { ++generation; root.clearTimeout(searchTimer); searchTimer = root.setTimeout(() => void load(true), 250); });
   ["news-status", "news-archive"].forEach(id => byId(id).addEventListener("change", () => void load(true)));
+  const clearFilters=doc.createElement('button');clearFilters.type='button';clearFilters.className='dart-clear-filters';clearFilters.textContent='Clear Filters';
+  byId('news-search').closest('.first').append(clearFilters);
+  clearFilters.addEventListener('click',()=>{root.clearTimeout(searchTimer);byId('news-search').value='';byId('news-status').value='all';byId('news-archive').value='active';void load(true);});
   byId("news-page-prev").addEventListener("click", () => { if (!busy) { offset = Math.max(0, offset - 50); selected.clear(); void load(false); } });
   byId("news-page-next").addEventListener("click", () => { if (!busy && nextOffset !== null) { offset = nextOffset; selected.clear(); void load(false); } });
   function applyAccess() {
