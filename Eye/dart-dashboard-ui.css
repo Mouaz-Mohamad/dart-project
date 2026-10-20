@@ -12,6 +12,12 @@ main { min-width:0; }
 .dart-filter-summary { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px 2px; color:#5e5662; font-size:12px; }
 .dart-filter-summary button { background:#f5eaf0; }
 .dart-filter-count { margin-right:8px; }
+#dart-operation-notices { position:fixed; right:18px; bottom:22px; z-index:13000; width:min(420px,calc(100vw - 32px)); display:grid; gap:8px; }
+.dart-operation-notice { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px; border:1px solid #86a895; border-left:4px solid #246946; border-radius:8px; background:#f1faf4; color:#174c31; box-shadow:0 8px 25px #29122218; font-size:13px; }
+.dart-operation-notice.is-warning { color:#704211; background:#fff8e8; border-color:#cbab6a; }
+.dart-notice-close { background:transparent; color:inherit; border:0; padding:4px; font-size:23px; cursor:pointer; }
+.dart-compact-record[aria-busy="true"] { border-left:4px solid #ab012b; }
+button[aria-busy="true"]::after { content:'…'; margin-left:5px; }
 .dashboard-section input:not([type="checkbox"]):not([type="color"]),.dashboard-section textarea,.dashboard-section select,.modal input:not([type="checkbox"]):not([type="color"]),.modal select,.modal textarea { color:#252129; background:#fff; border-color:#bcb7be; min-height:42px; }
 .dashboard-section option,.modal option,dialog option { color:#252129; background:#fff; }
 .dashboard-section input::placeholder,.modal input::placeholder,.dashboard-section textarea::placeholder,.modal textarea::placeholder { color:#68616b; opacity:1; }
@@ -84,6 +90,7 @@ button { touch-action:manipulation; }
 .dashboard-section .dart-empty-state { padding:28px 18px; color:#615762; background:#fff; border:1px dashed #bdb3bf; border-radius:8px; }
 @media(max-width:1000px) { .dart-record-main { flex-wrap:wrap; } .dart-record-fields { grid-template-columns:repeat(3,minmax(0,1fr)); } .dart-record-controls { flex:1 0 100%; } }
 @media(max-width:767px) {
+  #dart-operation-notices { bottom:82px; right:12px; }
   body { height:auto; min-height:100dvh; }
   main { margin-left:0 !important; padding:14px 12px 100px !important; width:100% !important; }
   .dashboard-section .filter-bar { padding:12px; }

@@ -20,6 +20,15 @@
   let openRecord = null;
   let queued = false;
   let serial = 0;
+  function notify(message,type='success') {
+    let region=doc.getElementById('dart-operation-notices');
+    if(!region){region=doc.createElement('div');region.id='dart-operation-notices';region.setAttribute('aria-live','polite');doc.body.append(region);}
+    const notice=doc.createElement('div');notice.className=`dart-operation-notice is-${type}`;
+    const text=doc.createElement('span');text.textContent=message;
+    const close=button('×','dart-notice-close');close.setAttribute('aria-label','Dismiss notification');close.addEventListener('click',()=>notice.remove());notice.append(text,close);region.append(notice);
+    while(region.children.length>3)region.firstElementChild.remove();
+    root.setTimeout(()=>notice.remove(),type==='warning'?10000:5000);
+  }
 
   function button(text, className) {
     const node = doc.createElement("button");
@@ -111,7 +120,10 @@
     trigger.addEventListener("click", event => { event.stopPropagation(); showDetails(state); });
     close.addEventListener("click", event => { event.stopPropagation(); closeDetails(state); });
     dialog.addEventListener("cancel", () => { openRecord = null; });
-    dialog.addEventListener("close", () => { trigger.setAttribute("aria-expanded","false"); if (trigger.isConnected) trigger.focus({preventScroll:true}); });
+    dialog.addEventListener("close", () => {
+      trigger.setAttribute("aria-expanded","false");
+      root.requestAnimationFrame(()=>{if(doc.querySelector('.modal.active,dialog[open]'))return;const current=[...section.querySelectorAll('.dart-compact-record')].map(node=>states.get(node)).find(item=>item?.key===state.key);if(current?.trigger.isConnected)current.trigger.focus({preventScroll:true});});
+    });
     dialog.addEventListener("scroll", () => { if (openRecord?.key === state.key) openRecord.scroll = dialog.scrollTop; });
     dialog.addEventListener("click", event => {
       if (event.target === dialog) { const bounds = dialog.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closeDetails(state); }
@@ -150,11 +162,24 @@
   function start() {
     const main = doc.querySelector("main"); if (!main) return;
     new MutationObserver(schedule).observe(main,{childList:true,subtree:true});
+    doc.querySelectorAll('.modal .close-modal').forEach(close=>{close.setAttribute('role','button');close.tabIndex=0;close.setAttribute('aria-label','Close');close.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();close.click();}});});
+    doc.addEventListener('keydown',event=>{
+      if(doc.querySelector('dialog[open]'))return;
+      const modal=[...doc.querySelectorAll('.modal.active')].filter(node=>node.getClientRects().length).at(-1);
+      if(!modal||modal.id==='dart-finance-modal')return;
+      if(event.key==='Escape'){event.preventDefault();if(typeof closeModal==='function')closeModal(modal);}
+      if(event.key==='Tab'){
+        const controls=[...modal.querySelectorAll('button,input:not([type="hidden"]),select,textarea,a[href],[tabindex="0"]')].filter(node=>!node.disabled&&node.getClientRects().length);
+        if(!controls.length)return;const first=controls[0],last=controls.at(-1);
+        if(event.shiftKey&&doc.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&doc.activeElement===last){event.preventDefault();first.focus();}
+      }
+    });
     root.addEventListener("dart:dashboard-section-activated", () => { openRecord = null; schedule(); });
     root.addEventListener("dart:orders-busy", () => { doc.querySelectorAll(".dart-compact-record").forEach(row => { const state=states.get(row); if(state) syncBusy(state); }); });
+    root.addEventListener('dart:order-command-confirmed',event=>notify(event.detail?.refreshing?'Order saved. Refreshing details…':'Order saved.'));
     root.addEventListener("dart:admin-logged-out", () => { openRecord=null; doc.querySelectorAll(".dart-record-dialog[open]").forEach(dialog=>dialog.close()); });
     schedule();
   }
-  root.DartDashboardUI = Object.freeze({refresh});
+  root.DartDashboardUI = Object.freeze({refresh,notify});
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded",start,{once:true}); else start();
 })(window);

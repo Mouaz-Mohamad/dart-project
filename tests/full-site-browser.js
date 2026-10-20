@@ -321,6 +321,8 @@ const server = http.createServer((request, response) => {
   }
   // The order editor keeps every original field and permits phone/name-only client contact.
   await dashboard.evaluate(() => document.querySelector('a[data-target="orders"]').click());
+  // Address calculations have their own suite; this fixture isolates editor submission state.
+  await dashboard.evaluate(()=>{window.DartAddress={...window.DartAddress,create:()=>({validate:()=>({ok:true}),invalidate(){},clear(){}})};});
   await dashboard.locator('#openModalBtn').click();
   assert.equal(await dashboard.locator('#orderForm fieldset').count(), 5);
   for (const id of ['clientId','email','phone2']) assert.equal(await dashboard.locator(`#${id}`).evaluate(node=>node.required), false);
@@ -342,7 +344,25 @@ const server = http.createServer((request, response) => {
     await dashboard.screenshot({path:path.join(orderChecks,`dashboard-order-form-${width}.png`)});
     assert.equal(await dashboard.locator('#orderModal .modal-content').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`order form fits ${width}px`);
   }
+  await dashboard.evaluate(()=>{
+    modelsData=[{modelId:'TEST-M',name:'Fixture',selling:600,cost:400,discount:0}];
+    itemsData=[{id:'item-test',itemCode:'TEST-I',modelId:'TEST-M',color:'Burgundy',size:'M',status:'In stock'}];
+    window.__createCalls=0;window.__originalCreate=window.DartOrdersApi.createManual;
+    window.DartOrdersApi.createManual=()=>{window.__createCalls+=1;return new Promise(resolve=>{window.__finishCreate=resolve;});};
+  });
+  await dashboard.locator('#productsInputCode').fill('TEST-I');await dashboard.locator('#addProductBtn').click();
+  for(const id of ['orderArea','orderStreetName','orderBuildingNumber','orderFloor'])await dashboard.locator(`#${id}`).fill('1');
+  await dashboard.locator('#governorate').selectOption('Cairo');
+  await dashboard.evaluate(()=>{document.getElementById('orderForm').requestSubmit();document.getElementById('orderForm').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+  const submissionDiagnostics=await dashboard.evaluate(()=>({invalid:[...document.querySelectorAll('#orderForm :invalid')].map(node=>({id:node.id,message:node.validationMessage})),selected:document.getElementById('selectedProductsList').textContent,dialog:document.querySelector('.dart-dialog-message')?.textContent}));
+  assert.equal(await dashboard.evaluate(()=>window.__createCalls),1,JSON.stringify(submissionDiagnostics));
+  assert.equal(await dashboard.locator('#orderForm').getAttribute('aria-busy'),'true');
   await dashboard.locator('#closeModalBtn').click();
+  assert.equal(await dashboard.locator('#orderModal').isVisible(),true,'pending editor stays open');
+  await dashboard.evaluate(()=>window.__finishCreate([]));
+  await dashboard.waitForFunction(()=>!document.getElementById('orderModal').classList.contains('active'));
+  assert.equal(await dashboard.locator('#clientName').isDisabled(),false,'confirmed save restores fields');
+  await dashboard.evaluate(()=>{window.DartOrdersApi.createManual=window.__originalCreate;});
   // Real DOM regression: two independent order commands, pending rows and reversed responses.
   const orderFixture = [
     { id: "order-a", orderId: "TEST-A", status: "New", clientName: "Synthetic A", phone1: "", items: [], totalPrice: 600 },
@@ -419,6 +439,7 @@ const server = http.createServer((request, response) => {
   assert.equal(await rowA.locator('.order-final-amount').textContent(), '600 EGP');
   await dashboard.keyboard.press('Escape');
   assert.equal(await rowA.locator('dialog').evaluate(node => node.open), false);
+  await dashboard.waitForFunction(()=>document.querySelector('#orders-container [data-id="order-a"] .dart-record-open')===document.activeElement);
   assert.equal(await rowA.locator('.dart-record-open').evaluate(node => node === document.activeElement), true);
   for (const width of [390, 1366]) {
     await dashboard.setViewportSize({width, height:900});

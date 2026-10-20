@@ -171,6 +171,14 @@ if (typeof dartMoney === 'function') {
     let selected = [];
     const selectedList = field('selectedProductsList');
     const codeInput = field('productsInputCode');
+    let submitting = false;
+    let disabledBefore = [];
+    function setSubmitting(pending) {
+      submitting=pending;orderForm.setAttribute('aria-busy',String(pending));
+      const save=orderForm.querySelector('[type="submit"]');
+      if(pending){disabledBefore=[...orderForm.querySelectorAll('input,select,textarea,button')].map(node=>[node,node.disabled]);disabledBefore.forEach(([node])=>{node.disabled=true;});if(save){save.dataset.idleLabel=save.textContent;save.textContent='Saving…';}}
+      else {disabledBefore.forEach(([node,disabled])=>{node.disabled=disabled;});disabledBefore=[];if(save){save.textContent=save.dataset.idleLabel||'DONE';delete save.dataset.idleLabel;}}
+    }
 
     function calculate() {
       const existing=ordersData.find(order=>String(order.id)===value('modal-order-edit-id'));
@@ -253,6 +261,7 @@ if (typeof dartMoney === 'function') {
 
     orderForm.addEventListener('submit', async event => {
       event.preventDefault();
+      if(submitting)return;
       if (!orderForm.checkValidity()) { orderForm.reportValidity(); return; }
       if (!selected.length) return window.DartDialog.alert('Add at least one physical item.');
 
@@ -308,6 +317,7 @@ if (typeof dartMoney === 'function') {
       }
 
       if (window.DartOrdersApi?.createManual && window.DartOrdersApi?.updateManual) {
+        setSubmitting(true);
         try {
           if (existing) {
             await window.DartOrdersApi.updateManual(
@@ -318,12 +328,9 @@ if (typeof dartMoney === 'function') {
             await window.DartOrdersApi.createManual(apiPayload);
           }
 
-          await Promise.allSettled([
-            window.DartOrdersApi.hydrate?.(true),
-            window.DartCatalog?.hydrate?.(true),
-            window.DartDomainState?.hydrateAudit?.(),
-          ]);
-
+          // The API client already coalesces related reads and recovers stale versions.
+          // Confirmed writes must not wait for duplicate catalog/order/audit downloads.
+          setSubmitting(false);
           dartRefreshAll();
           closeModal(field('orderModal'));
           orderForm.reset();
@@ -331,7 +338,10 @@ if (typeof dartMoney === 'function') {
           resetOrderAddress();
           renderSelected();
         } catch (error) {
+          setSubmitting(false);
           window.DartDialog.alert(error.message || 'Order could not be saved to the database.');
+        } finally {
+          if(submitting)setSubmitting(false);
         }
         return;
       }

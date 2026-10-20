@@ -55,14 +55,20 @@ function saveDataToStorage(key, data) {
 // التحكم للنوافذ المنبثقة
 function openModal(modal) {
   if (!modal) return;
+  modal.dartPreviousFocus = document.activeElement;
   modal.style.display = "block";
   modal.classList.add("active");
+  modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-hidden','false');
+  setTimeout(()=>{if(modal.classList.contains('active')&&!modal.contains(document.activeElement))modal.querySelector('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled),button:not(:disabled),[tabindex="0"]')?.focus();},0);
 }
 
 function closeModal(modal) {
   if (!modal) return;
+  if (modal.id === 'orderModal' && document.getElementById('orderForm')?.getAttribute('aria-busy') === 'true') return;
   modal.style.display = "none";
   modal.classList.remove("active");
+  modal.setAttribute('aria-hidden','true');
+  if(modal.dartPreviousFocus?.isConnected)modal.dartPreviousFocus.focus({preventScroll:true});
 }
 
 // تحديث قائمة الموديلات داخل Datalist للقطع
@@ -655,16 +661,19 @@ function dartRefreshOrderBusyUi() {
       if (busy && !button.disabled) {
         button.dataset.dartOrderBusy = "1";
         button.disabled = true;
+        button.setAttribute('aria-busy','true');
       } else if (!busy && button.dataset.dartOrderBusy) {
         delete button.dataset.dartOrderBusy;
         button.disabled = false;
+        button.removeAttribute('aria-busy');
       }
     });
   });
 }
 window.addEventListener("dart:orders-busy", dartRefreshOrderBusyUi);
 window.addEventListener("dart:orders-refresh-failed", () => {
-  window.DartDialog?.alert?.("تعذّر تحديث بعض البيانات المرتبطة. جارٍ إعادة محاولة قراءة البيانات، دون إعادة تنفيذ العملية.");
+  const message="تم حفظ العملية، وتعذّر تحديث بعض البيانات المرتبطة. جارٍ إعادة محاولة عرضها.";
+  if(window.DartDashboardUI?.notify)window.DartDashboardUI.notify(message,'warning');else window.DartDialog?.alert?.(message);
 });
 // END Per-order pending actions.
 
@@ -707,14 +716,13 @@ window.addEventListener("dart:domain-hydrated", (event) => {
 // ===========================================
 
 document.addEventListener("click", (e) => {
+  if(e.target.closest('#dart-finance-modal'))return;
   if (
     e.target.classList.contains("close-modal") ||
-    (e.target.tagName === "SPAN" && e.target.closest(".modal")) ||
     e.target.classList.contains("modal")
   ) {
     const modal = e.target.closest(".modal") || e.target;
-    modal.style.display = "none";
-    modal.classList.remove("active");
+    closeModal(modal);
   }
 });
 

@@ -224,6 +224,7 @@
       const applied = applySnapshot(payload, "orders:authoritative");
       reconcile ||= !applied && Number(payload.version || 0) >= serverVersion;
       scheduleRelatedRefresh();
+      if (!returnPayload) window.dispatchEvent(new CustomEvent('dart:order-command-confirmed', { detail: { refreshing: reconcile } }));
       return returnPayload ? payload : readLocal();
     } catch (error) {
       reconcile = error.code === "ORDER_RESULT_UNKNOWN" || error.status === 409;
