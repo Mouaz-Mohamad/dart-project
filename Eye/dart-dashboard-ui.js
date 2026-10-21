@@ -92,6 +92,7 @@
     let proxy;
     if (primary) {
       proxy = button(primary.textContent.trim() || primary.title || "Next action", "dart-record-next");
+      proxy.dartPermissionSource = primary;
       proxy.addEventListener("click", event => { event.stopPropagation(); if (!primary.disabled && !primary.hidden) primary.click(); });
       controls.append(proxy);
     }

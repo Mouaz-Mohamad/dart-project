@@ -10,8 +10,9 @@ interface Adapter {
   flush(persist: () => Promise<void>, dirty: () => boolean): Promise<void>;
   save(api: (path: string, options: Record<string, unknown>) => Promise<State>, state: State, current: () => boolean): Promise<State & { partial: boolean }>;
 }
-function adapter(): Adapter {
-  const window: { DartCatalogAdmin?: Adapter } = {};
+function adapter(permissions?: string[]): Adapter {
+  const window: { DartCatalogAdmin?: Adapter; DartAdminAccess?: { can(key: string): boolean } } = permissions
+    ? { DartAdminAccess: { can: key => permissions.includes(key) } } : {};
   runInNewContext(readFileSync(new URL("../../scripts/catalog-admin.source.js", import.meta.url), "utf8"), { window });
   return window.DartCatalogAdmin!;
 }
@@ -19,6 +20,20 @@ const baseline = (): State => ({ version: 1, models: [{ modelId: "M-1", version:
   items: [{ id: "I-1", modelId: "M-1", version: 1, regDate: "old" }, { id: "I-2", modelId: "M-1", version: 1 }] });
 
 describe("in-memory changed-record catalogue editor", () => {
+  it("sends large inventory-only edits as versioned record patches without models", async () => {
+    const editor = adapter(["inventory.manage"]), state = baseline(); editor.capture(state);
+    const items = Array.from({ length: 1001 }, (_, index) => ({ id: `new-${index}`, modelId: "M-1" }));
+    const api = vi.fn().mockResolvedValue({ version: 2, models: [], items });
+    const result = await editor.save(api, { ...state, items: [...state.items, ...items] }, () => true);
+    expect(api.mock.calls[0]![1]).toMatchObject({ method: "PUT", body: { models: [], items, recordVersions: { models: {} } } });
+    expect(result.partial).toBe(true);
+  });
+  it("refuses model edits for inventory-only access before sending a write", async () => {
+    const editor = adapter(["inventory.manage"]), state = baseline(); editor.capture(state);
+    const api = vi.fn();
+    await expect(editor.save(api, { ...state, models: [{ ...state.models[0], selling: 1 }] }, () => true)).rejects.toMatchObject({ status: 403 });
+    expect(api).not.toHaveBeenCalled();
+  });
   it("ignores selection-only changes and sends one physical item with its stored version", async () => {
     const editor = adapter(), state = baseline(); editor.capture(state);
     const api = vi.fn().mockResolvedValue({ version: 2, models: [], items: [{ ...state.items[0], version: 2 }] });

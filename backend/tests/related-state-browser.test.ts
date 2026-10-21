@@ -11,7 +11,7 @@ type CatalogApi = { hydrate: (force?: boolean) => Promise<void>; refreshChanged:
   write: (key: string, data: unknown[]) => void; serverVersion: () => number };
 type DomainApi = { hydrateDomain: (domain: string) => Promise<unknown[]>; refreshChanged: () => Promise<void>;
   write: (key: string, data: unknown[]) => void; writeAndSync: (key: string, data: unknown[]) => Promise<unknown[]>;
-  version: (domain: string) => number; hydrateAudit: () => Promise<unknown[]> };
+  version: (domain: string) => number; hydrateAudit: () => Promise<unknown[]>; syncNow: (domain: string) => Promise<unknown[]> };
 
 function runtime(source: string) {
   const state = new Map<string, unknown[]>();
@@ -30,6 +30,8 @@ function runtime(source: string) {
     throw new Error(`Unexpected read: ${path}`);
   });
   const window = {
+    DartAdminAccess: { can: () => true, list: () => ["catalog.manage", "dashboard_state.read"] },
+    DartAdminPermissions: { domainRead: () => true },
     DART_API_BASE_URL: "https://dart.test", DartCatalog: undefined as unknown as CatalogApi,
     DartDomainState: undefined as unknown as DomainApi,
     DartState: { read: (key: string, fallback: unknown) => state.get(key) ?? fallback,
@@ -53,6 +55,32 @@ function runtime(source: string) {
 describe("read-only related state refresh", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
+  it("skips unchanged shared saves and serializes feedback edits using committed related versions", async () => {
+    const f = runtime(domainSource), api = f.window.DartDomainState;
+    f.remote.domains.reviews = { version: 3, data: [{ id: "review" }] };
+    f.remote.domains.contacts = { version: 4, data: [{ id: "contact", recordType: "contact" }] };
+    await api.hydrateDomain("reviews"); await api.hydrateDomain("contacts"); f.fetch.mockClear();
+    api.write("dart_reviews", [{ id: "review" }]); await api.syncNow("reviews");
+    expect(f.fetch).not.toHaveBeenCalled();
+    api.write("dart_reviews", [{ id: "review-edited" }]);
+    api.write("dart_contact_messages", [{ id: "contact-edited", recordType: "contact" }]);
+    const expected: number[] = [];
+    f.fetch.mockImplementation(async (url, options) => {
+      const domain = url.split("/").at(-1)!;
+      const body = JSON.parse((options as { body: string }).body) as { expectedVersion: number; data: unknown[] };
+      expected.push(body.expectedVersion);
+      const row = f.remote.domains[domain]!;
+      expect(body.expectedVersion).toBe(row.version);
+      row.version += 1; row.data = body.data;
+      if (domain === "reviews") f.remote.domains.contacts!.version += 1;
+      return response({ ...row, relatedVersions: { reviews: f.remote.domains.reviews!.version, contacts: f.remote.domains.contacts!.version } });
+    });
+    await Promise.all([api.syncNow("reviews"), api.syncNow("contacts")]);
+    expect(expected).toEqual([3, 5]);
+    expect(f.state.get("dart_reviews")).toEqual([{ id: "review-edited" }]);
+    expect(f.state.get("dart_contact_messages")).toEqual([{ id: "contact-edited", recordType: "contact" }]);
+  });
 
   it("reads domain versions once and fetches only changed allowed domains", async () => {
     const f = runtime(domainSource); const api = f.window.DartDomainState;

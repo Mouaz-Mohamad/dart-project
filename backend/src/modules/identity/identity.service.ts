@@ -691,6 +691,7 @@ export class IdentityService {
   public async staffDirectory(
     account: AuthenticatedAccount,
   ): Promise<{
+    canManageStaff: boolean;
     permissions: Array<{ key: string; description: string }>;
     invitations: Array<Record<string, unknown>>;
     staff: Array<Record<string, unknown>>;
@@ -785,6 +786,7 @@ export class IdentityService {
       });
     }
     return {
+      canManageStaff: staffResult.rows.some((row) => row.user_id === account.userId && row.is_owner),
       permissions: permissionsResult.rows,
       invitations: invitationsResult.rows.map((row) => ({
         id: row.id,

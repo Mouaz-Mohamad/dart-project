@@ -240,3 +240,7 @@
 | `vercel.json` | ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله. |
 
 تم توليد هذا الدليل بواسطة `scripts/add-arabic-code-comments.mjs`.
+
+## Staff permission delivery sources
+
+`Eye/dart-staff.js` is generated from `scripts/staff-admin.source.js`. `Eye/dart-permissions.js` is generated from `scripts/staff-permissions.source.js`. Edit these readable sources and run `node scripts/build-home-runtime.cjs` before staging. The shared policy controls dashboard presentation, bootstrap/polling and shared-save scopes; server authorization remains mandatory.

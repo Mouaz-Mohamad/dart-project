@@ -3,6 +3,7 @@ import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
 import { z } from "zod";
+import { AppError } from "../../http/app-error.js";
 import type { AppConfig } from "../../config/env.js";
 import {
   authenticate,
@@ -38,6 +39,16 @@ const patchSchema = stateSchema.extend({
     items: z.record(z.string(), z.number().int().nonnegative()),
   }),
 }).refine((body) => body.models.length+body.items.length>0, "At least one record change is required");
+
+function inventoryOnly(permissions: string[]): boolean {
+  return !permissions.some((key) => key === "catalog.manage" || key === "catalog.edit");
+}
+
+function protectModels(permissions: string[], models: unknown[]): void {
+  if (inventoryOnly(permissions) && models.length) {
+    throw new AppError(403, "FORBIDDEN", "Inventory access cannot modify models or model prices");
+  }
+}
 
 export function createCatalogRouter(
   catalog: CatalogService,
@@ -102,7 +113,7 @@ export function createCatalogRouter(
     signedIn,
     requireAccountType("staff"),
     requireMfa,
-    requireAnyPermission("catalog.manage", "catalog.read"),
+    requireAnyPermission("catalog.manage", "catalog.read", "inventory.manage"),
     async (request, response) => {
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json(await catalog.adminState(
@@ -114,9 +125,10 @@ export function createCatalogRouter(
   router.patch(
     "/admin/catalog-state",
     signedIn, csrf, requireAccountType("staff"), requireMfa,
-    requireAnyPermission("catalog.manage", "catalog.edit"),
+    requireAnyPermission("catalog.manage", "catalog.edit", "inventory.manage"),
     async (request, response) => {
       const body = patchSchema.parse(request.body);
+      protectModels(request.auth!.permissions, body.models);
       const result = await catalog.replaceState(
         body.expectedVersion, body.models, body.items, request.auth!.userId,
         String(request.id), body.recordVersions,
@@ -132,15 +144,23 @@ export function createCatalogRouter(
     csrf,
     requireAccountType("staff"),
     requireMfa,
-    requireAnyPermission("catalog.manage", "catalog.edit"),
+    requireAnyPermission("catalog.manage", "catalog.edit", "inventory.manage"),
     async (request, response) => {
-      const body = stateSchema.parse(request.body);
+      const body = stateSchema.extend({ recordVersions: patchSchema.shape.recordVersions.optional() }).parse(request.body);
+      protectModels(request.auth!.permissions, body.models);
+      // Inventory-only writes always patch explicit records, including large edits.
+      // Omitted models/items must never be archived by a legacy full replacement.
+      const patch = inventoryOnly(request.auth!.permissions) ? body.recordVersions : undefined;
+      if (inventoryOnly(request.auth!.permissions) && !patch) {
+        throw new AppError(422, "INVENTORY_VERSIONS_REQUIRED", "Inventory edits require record versions");
+      }
       const result = await catalog.replaceState(
         body.expectedVersion,
         body.models,
         body.items,
         request.auth!.userId,
         String(request.id),
+        ...(patch ? [patch] : []),
       );
       await dispatchOutbox(outbox, 20);
       response.status(200).json(result);

@@ -56,16 +56,14 @@ Refer to `Codex_Master_Prompt.md` for the full phased roadmap (Phase 1–5) and 
 - Inspect the current implementation before adding anything so the project does not gain duplicate flows, screens, state, or logic.
 - Ask before proceeding whenever the existing implementation and the requested behavior are unclear or contradictory.
 
-## GitHub + Vercel batching discipline
+## GitHub + Vercel publishing discipline
 
-- Do **not** push one commit per small fix to `main`.
-- Accumulate **exactly 7 completed logical changes** before publishing a normal production batch.
-- Publish those 7 changes as **one atomic Git commit** and **one push/ref update** to `main`; do not create seven remote commits.
-- Production batch commit messages must include both markers: `[batch:7]` and `[deploy]`.
+- Publish an approved, tested task as one coherent commit and one push/ref update to `main`.
+- There is no required change count, batch number, or commit-message deployment marker.
 - Run the relevant lint, typecheck and tests before the single batch push. Fix failures inside the same unpublished batch.
-- Do not use temporary remote staging branches for routine batching when they would trigger Vercel Preview builds. Keep work unpublished until the batch is ready.
+- Do not create temporary remote staging branches that trigger unnecessary Preview builds. Keep work unpublished until the approved release is ready.
 - Vercel must build an affected project at most once per approved batch. Frontend-only batches skip API builds; backend-only batches skip storefront builds; mixed batches build each affected project once.
-- A non-batch commit reaching GitHub must be treated as non-deployable by Vercel. Only an explicit user instruction to deploy before seven changes may override the normal batching rule.
+- Ordinary commits on `main` are deployable without editing their messages or any marker file. Initial builds, redeploys and unavailable comparison history build conservatively.
 - After every batch push, verify GitHub status plus the production aliases for both `dart-project` and `dart-api` before calling the batch live.
 
 ## Database-only browser-state rule

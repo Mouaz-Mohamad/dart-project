@@ -115,3 +115,5 @@ button { touch-action:manipulation; }
   .dart-order-group-products #productsInputCode { grid-column:1/-1; }
 }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
+/* Permission visibility never overwrites the action's own busy/status state. */
+[data-dart-access-denied="true"] { display: none !important; }

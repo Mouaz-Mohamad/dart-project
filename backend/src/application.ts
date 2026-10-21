@@ -11,6 +11,7 @@ import { AppError } from "./http/app-error.js";
 import { createErrorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { requestContext } from "./middleware/request-context.js";
+import { representativeLocationAccess } from "./middleware/representative-location-access.js";
 import {
   createHealthRouter,
   type HealthDependencies,
@@ -141,6 +142,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   );
   app.use(express.json({ limit: "512kb", strict: true }));
   app.use(cookieParser());
+  app.use(representativeLocationAccess);
   app.use((_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("Pragma", "no-cache");

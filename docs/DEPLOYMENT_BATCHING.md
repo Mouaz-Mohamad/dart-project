@@ -1,30 +1,15 @@
-# GitHub + Vercel deployment batching
+# GitHub + Vercel publishing
 
-Dart uses a seven-change production batch to prevent one small edit from creating another GitHub commit and another pair of Vercel builds.
+Publish the approved, tested task on `main` without a required number of changes, a batch number, or commit-message markers. Do not edit marker files to make a release deployable.
 
-## Normal flow
+1. Finish the authorized task and run its relevant checks.
+2. Publish one coherent commit and update `main` once.
+3. Vercel evaluates changes since each project's previous deployment: storefront changes build the storefront, backend changes build the API, and mixed changes build both. Documentation-only changes can skip both.
+4. Initial deployments, repeated deployments of the same commit and unavailable comparison history build conservatively.
+5. Verify CI, deployment status and production aliases before calling the release live. Never force-push published history.
 
-1. Complete seven logical changes locally/in the working environment without moving the remote `main` ref.
-2. Run the relevant frontend checks and `cd backend && npm run check` when backend code changed.
-3. Publish the seven changes in one atomic commit.
-4. The commit message must contain `[batch:7]` and `[deploy]`.
-5. Push/update `main` once.
-6. Vercel's Ignored Build Step evaluates the batch. The storefront builds only when storefront/runtime files changed. The API builds only when backend files changed.
-7. Verify the resulting production aliases before calling the batch live.
-
-## Why this exists
-
-The previous workflow produced many tiny commits and therefore many automatic Vercel build attempts. The live storefront fell behind `main` after the account hit a build-rate limit. Batching reduces build pressure and keeps GitHub history easier to review.
-
-## Safety rules
-
-- Do not rewrite or force-squash old `main` history just to make it look cleaner.
-- Do not create routine remote staging commits that can trigger Preview deployments.
-- A commit without both required markers is intentionally skipped by Vercel.
-- Documentation-only and policy-only changes do not rebuild the storefront or API.
-- If a batch changes both frontend and backend, each affected Vercel project builds at most once for that batch.
-
+The project Ignored Build Step commands remain `bash scripts/vercel-ignore-frontend.sh` at the repository root and `bash scripts/vercel-ignore-backend.sh` inside `backend`. These scripts inspect changed paths only. They never require `[batch:7]`, `[deploy]`, or another commit-message marker.
 
 ## Backend cron guard
 
-The API project is currently constrained by Vercel Hobby cron scheduling. Its built-in Vercel Cron is a once-daily safety net, and `backend/scripts/check-vercel-config.mjs` rejects a more frequent schedule before a batch is considered healthy. Faster transactional retries can be driven by n8n through the protected outbox processor without creating additional Vercel deployments.
+`backend/scripts/check-vercel-config.mjs` keeps Vercel cron schedules Hobby-compatible. Database migrations remain an explicit operational step and never run inside the Vercel build.

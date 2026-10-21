@@ -21,6 +21,8 @@ if (require.main === module) for (const [source, output] of [
   ['Js/dart-platform.js', 'Js/dart-platform.home.min.js'],
   ['Js/dart-navigation.js', 'Js/dart-navigation.min.js'],
   ['scripts/catalog-admin.source.js', 'Eye/dart-catalog-admin.js'],
+  ['scripts/staff-admin.source.js', 'Eye/dart-staff.js'],
+  ['scripts/staff-permissions.source.js', 'Eye/dart-permissions.js'],
 ]) {
   const text = sourceText(source);
   const hash = crypto.createHash('sha256').update(text).digest('hex');

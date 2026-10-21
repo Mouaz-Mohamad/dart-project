@@ -13,6 +13,30 @@ export const DASHBOARD_DOMAINS = [
 
 export type DashboardDomain = typeof DASHBOARD_DOMAINS[number];
 
+function isContact(value: unknown): boolean {
+  const row = value as Record<string, unknown> | null;
+  return Boolean(row && (row.recordType === "contact" || row.source === "Contact Us"));
+}
+
+type FeedbackRow = { domain: "reviews" | "contacts"; version: string; data: unknown[] };
+function feedbackState(rows: FeedbackRow[]) {
+  const reviews = rows.find((row) => row.domain === "reviews");
+  const contacts = rows.find((row) => row.domain === "contacts");
+  if (!reviews || !contacts) throw new AppError(404, "DOMAIN_NOT_FOUND", "Dashboard domain not found");
+  return { reviews, contacts, versions: {
+    reviews: Number(reviews.version),
+    // Contact submissions historically append to reviews. Track both stores so
+    // an unseen incoming message can never be overwritten by a contact editor.
+    contacts: Number(reviews.version) + Number(contacts.version) - 1,
+  } };
+}
+
+function contactProjection(state: ReturnType<typeof feedbackState>): unknown[] {
+  return [...state.reviews.data.filter(isContact), ...state.contacts.data].map((value) => ({
+    ...(value as Record<string, unknown>), recordType: "contact", source: "Contact Us",
+  }));
+}
+
 export class DashboardStateService {
   constructor(private readonly pool: Pool) {}
 
@@ -29,6 +53,7 @@ export class DashboardStateService {
     for (const row of result.rows) {
       versions[row.domain] = Number(row.version || 1);
     }
+    versions.contacts += versions.reviews - 1;
     return versions;
   }
 
@@ -39,6 +64,15 @@ export class DashboardStateService {
   }
 
   async read(domain: DashboardDomain): Promise<{ domain: DashboardDomain; version: number; data: unknown[] }> {
+    if (domain === "reviews" || domain === "contacts") {
+      const result = await this.pool.query<FeedbackRow>(
+        "SELECT domain, version::text, data FROM dashboard_domain_state WHERE domain = ANY($1::text[])",
+        [["reviews", "contacts"]],
+      );
+      const state = feedbackState(result.rows);
+      return { domain, version: state.versions[domain], data: domain === "reviews"
+        ? state.reviews.data.filter((value) => !isContact(value)) : contactProjection(state) };
+    }
     const result = await this.pool.query<{ version: string; data: unknown[] }>(
       "SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1",
       [domain],
@@ -60,7 +94,10 @@ export class DashboardStateService {
     data: unknown[],
     actorId: string,
     requestId: string,
-  ): Promise<{ domain: DashboardDomain; version: number; data: unknown[] }> {
+  ): Promise<{ domain: DashboardDomain; version: number; data: unknown[]; relatedVersions?: Record<string, number> }> {
+    if (domain === "reviews" || domain === "contacts") {
+      return this.writeFeedback(domain, expectedVersion, data, actorId, requestId);
+    }
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -93,6 +130,57 @@ export class DashboardStateService {
     } finally {
       client.release();
     }
+  }
+
+  private async writeFeedback(domain: "reviews" | "contacts", expectedVersion: number,
+    data: unknown[], actorId: string, requestId: string) {
+    if (domain === "reviews" && data.some(isContact)) {
+      throw new AppError(403, "FORBIDDEN", "Contact messages require contacts.manage");
+    }
+    if (domain === "contacts" && data.some((value) => !value || typeof value !== "object" || Array.isArray(value))) {
+      throw new AppError(422, "INVALID_CONTACT", "Contact records must be objects");
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<FeedbackRow>(
+        `SELECT domain, version::text, data FROM dashboard_domain_state
+          WHERE domain = ANY($1::text[]) ORDER BY domain FOR UPDATE`, [["reviews", "contacts"]],
+      );
+      const state = feedbackState(result.rows), previousVersion = state.versions[domain];
+      if (previousVersion !== expectedVersion) {
+        throw new AppError(409, "DOMAIN_VERSION_CONFLICT", `${domain} changed on another device; reload and retry`);
+      }
+      const legacyContacts = state.reviews.data.filter(isContact);
+      const reviewData = domain === "reviews" ? [...data, ...legacyContacts]
+        : state.reviews.data.filter((value) => !isContact(value));
+      const contactData = domain === "contacts" ? data.map((value) => ({
+        ...(value as Record<string, unknown>), recordType: "contact", source: "Contact Us",
+      })) : state.contacts.data;
+      // Consolidation happens only inside a permitted contact save. Review
+      // writes preserve all existing contact messages, even if omitted by UI.
+      if (domain === "reviews" || legacyContacts.length) {
+        await client.query(`UPDATE dashboard_domain_state SET data=$2::jsonb, version=version+1,
+          updated_by=$3, updated_at=now() WHERE domain=$1`, ["reviews", JSON.stringify(reviewData), actorId]);
+        state.versions.reviews += 1;
+        state.versions.contacts += 1;
+      }
+      if (domain === "contacts") {
+        await client.query(`UPDATE dashboard_domain_state SET data=$2::jsonb, version=version+1,
+          updated_by=$3, updated_at=now() WHERE domain=$1`, ["contacts", JSON.stringify(contactData), actorId]);
+        state.versions.contacts += 1;
+      }
+      await client.query(`INSERT INTO audit_logs (
+        actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
+      ) VALUES ('staff',$1,'DASHBOARD_DOMAIN_UPDATED','dashboard_domain_state',$2,$3,$4::jsonb)`,
+      [actorId, domain, requestId, JSON.stringify({ previousVersion, newVersion: state.versions[domain], count: data.length })]);
+      await client.query("COMMIT");
+      return { domain, version: state.versions[domain], data: domain === "contacts" ? contactData : data,
+        relatedVersions: state.versions };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
   }
 
   async audit(input: {

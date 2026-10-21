@@ -260,6 +260,7 @@
   }
   async function check() {
     if (!adminPollingEnabled || document.hidden) return;
+    if (window.DartAdminAccess?.can?.("orders.read") !== true) return;
     if (activeMutations > 0 || polling) return;
     polling = true;
     try {
@@ -270,7 +271,8 @@
       if (epoch !== mutationEpoch || activeMutations > 0) return;
       if (Number(payload.version || 0) > serverVersion) await hydrate(true);
     } catch (error) {
-      if (error.status !== 401) console.warn("Dart order live refresh failed", error);
+      if ([401, 403].includes(error.status)) adminPollingEnabled = false;
+      else console.warn("Dart order live refresh failed", error);
     } finally {
       polling = false;
     }

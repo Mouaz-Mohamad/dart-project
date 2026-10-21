@@ -16,6 +16,8 @@
     window.DART_API_BASE_URL || location.origin,
   ).replace(/\/$/, "");
   const IS_ADMIN = /\/Eye\//i.test(location.pathname);
+  const canReadAdmin = () => ["catalog.manage", "catalog.read", "inventory.manage"].some(key => window.DartAdminAccess?.can?.(key) === true);
+  let adminReadDenied = false;
   let serverVersion = 0;
   let remoteStock = null;
   let syncTimer = 0;
@@ -157,6 +159,10 @@
   }
 
   const write = (key, data) => {
+    if (IS_ADMIN && ["dart_models", "dart_items"].includes(key) &&
+        !["catalog.manage", "catalog.edit", ...(key === "dart_items" ? ["inventory.manage"] : [])].some(permission => window.DartAdminAccess?.can?.(permission) === true)) {
+      throw Object.assign(new Error("Your Staff account cannot edit this catalogue data."), { status: 403, code: "FORBIDDEN" });
+    }
     cacheWrite(key, data);
     if (["dart_models", "dart_items"].includes(key)) {
       catalogRevision += 1;
@@ -167,6 +173,7 @@
 
   async function hydrateCatalog(_force = false) {
     if (!API_BASE) throw new Error("Catalogue API is not configured.");
+    if (IS_ADMIN && (!canReadAdmin() || adminReadDenied)) return;
     const revision = catalogRevision;
     const session = sessionEpoch;
     if (IS_ADMIN) {
@@ -563,6 +570,7 @@
 
   async function checkForServerChanges() {
     if (!API_BASE || versionCheckBusy || document.hidden) return;
+    if (IS_ADMIN && (!canReadAdmin() || adminReadDenied)) return;
     versionCheckBusy = true;
     const session = sessionEpoch;
     try {
@@ -585,7 +593,8 @@
         await hydrateCatalog(true);
       }
     } catch (error) {
-      if (session === sessionEpoch) console.warn("Dart catalogue live refresh failed", error);
+      if (session === sessionEpoch && IS_ADMIN && [401, 403].includes(error.status)) adminReadDenied = true;
+      else if (session === sessionEpoch) console.warn("Dart catalogue live refresh failed", error);
     } finally {
       if (session === sessionEpoch) versionCheckBusy = false;
     }
@@ -603,6 +612,7 @@
     if (IS_ADMIN && catalogDirty) scheduleAdminSync();
     checkForServerChanges();
   });
+  window.addEventListener("dart:admin-authenticated", () => { adminReadDenied = false; });
   window.addEventListener("dart:data-changed", (event) => {
     if (!IS_ADMIN || event.detail?.key !== "dart_orders" || event.detail?.source !== "logout") return;
     sessionEpoch += 1;

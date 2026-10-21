@@ -35,6 +35,7 @@ function runtime() {
   });
   const catalog = vi.fn().mockImplementation(() => new Promise(() => {}));
   const window = {
+    DartAdminAccess: { can: (key: string) => key === "orders.read" },
     DART_API_BASE_URL: "https://dart.test", DartState: { read: () => rows, write: (_key: string, value: Row[]) => { rows = value; } },
     DartCatalog: { hydrate: catalog, refreshChanged: catalog }, setInterval: vi.fn(),
     addEventListener: (type: string, fn: (event: unknown) => void) => { listeners.set(type, [...listeners.get(type) || [], fn]); },

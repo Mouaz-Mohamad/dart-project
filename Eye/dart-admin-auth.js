@@ -127,6 +127,7 @@
       Array.isArray(payload?.permissions) ? payload.permissions : [],
     );
     window.DartAdminAccess = Object.freeze({
+      userId: payload?.user?.id || null,
       can(permission) {
         return permissionSet.has(permission);
       },
@@ -250,7 +251,7 @@
           () => window.DartSiteSettings.hydrate(!can("settings.manage")),
         );
       }
-      if (can("catalog.manage") && window.DartCatalog?.hydrate) {
+      if ((can("catalog.manage") || can("catalog.read") || can("inventory.manage")) && window.DartCatalog?.hydrate) {
         await hydrateStage("catalog", () => window.DartCatalog.hydrate());
       } else {
         window.DartState?.remove?.("dart_models");

@@ -30,7 +30,15 @@
 // ==========================================
 
 // التخزين المحلي
-function saveDataToStorage(key, data) {
+function saveDataToStorage(key, data, feedbackSplit = false) {
+  if (key === "dart_reviews" && !feedbackSplit) {
+    const isContact = (row) => row.recordType === "contact" || row.source === "Contact Us";
+    saveDataToStorage("dart_reviews", data.filter((row) => !isContact(row)), true);
+    saveDataToStorage("dart_contact_messages", data.filter(isContact), true);
+    return;
+  }
+  // Legacy multi-section saves must never mark unrelated read-only domains dirty.
+  if (window.DartAdminPermissions?.canPersist?.(key) === false) return;
   if (
     window.DartCatalog &&
     ["dart_models", "dart_items"].includes(key)
@@ -58,6 +66,7 @@ function openModal(modal) {
   modal.dartPreviousFocus = document.activeElement;
   modal.style.display = "block";
   modal.classList.add("active");
+  window.DartAdminPermissions?.refresh?.(modal);
   modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-hidden','false');
   setTimeout(()=>{if(modal.classList.contains('active')&&!modal.contains(document.activeElement))modal.querySelector('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled),button:not(:disabled),[tabindex="0"]')?.focus();},0);
 }
@@ -698,7 +707,8 @@ window.addEventListener("dart:domain-hydrated", (event) => {
   const handlers = {
     customers: (value) => (customersData = value),
     returns: (value) => (returnsData = value),
-    reviews: (value) => (reviewsData = value),
+    reviews: () => (reviewsData = dartFeedbackRows()),
+    contacts: () => (reviewsData = dartFeedbackRows()),
     cards: (value) => (cardsData = value),
     representatives: (value) => (representativeData = value),
     damage: (value) => (damageData = value),
@@ -2391,6 +2401,14 @@ async function dartSyncBulkSection(key) {
     await window.DartCatalog?.hydrate?.(true);
     return;
   }
+  if (key === "review") {
+    for (const [domain, permission] of [["reviews", "reviews.manage"], ["contacts", "contacts.manage"]]) {
+      if (!window.DartAdminAccess?.can?.(permission)) continue;
+      await window.DartDomainState?.syncDomain?.(domain);
+      await window.DartDomainState?.hydrateDomain?.(domain, true);
+    }
+    return;
+  }
   const domainBySection = {
     customers: "customers",
     returns: "returns",
@@ -2409,6 +2427,12 @@ async function dartSyncBulkSection(key) {
 async function dartRollbackBulkSection(key) {
   if (["models", "items"].includes(key)) {
     await window.DartCatalog?.hydrate?.(true).catch(() => {});
+    return;
+  }
+  if (key === "review") {
+    for (const [domain, permission] of [["reviews", "reviews.read"], ["contacts", "contacts.read"]]) {
+      if (window.DartAdminAccess?.can?.(permission)) await window.DartDomainState?.hydrateDomain?.(domain, true).catch(() => {});
+    }
     return;
   }
   if (key === "orders") {
@@ -3521,6 +3545,11 @@ const DART_TOP_SIZES = [
 ];
 
 
+function dartFeedbackRows() {
+  return [...(window.DartState?.read?.("dart_reviews", []) || []),
+    ...(window.DartState?.read?.("dart_contact_messages", []) || [])];
+}
+
 function loadAllDataFromStorage(_persistMigrations = true) {
   const load = (key, fallback) => window.DartState?.read?.(key, fallback) ?? fallback;
   modelsData = load("dart_models", modelsData);
@@ -3528,7 +3557,7 @@ function loadAllDataFromStorage(_persistMigrations = true) {
   customersData = load("dart_customers", customersData);
   ordersData = load("dart_orders", ordersData);
   returnsData = load("dart_returns", returnsData);
-  reviewsData = load("dart_reviews", reviewsData);
+  reviewsData = dartFeedbackRows();
   cardsData = load("dart_cards", cardsData);
   representativeData = load("dart_representatives", representativeData);
   damageData = load("dart_damage", []);
@@ -3987,7 +4016,7 @@ function renderReviews(dataArray) {
         : `<button class="btn-toggle-review review-toggle-btn ${active ? "review-status-active" : "review-status-hidden"}">${active ? "Hide" : "Activate"}</button>`;
       c.insertAdjacentHTML(
         "beforeend",
-        `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>${visibilityButton}</div><span class="text-item w200">${dartEsc(new Date(r.createdAt).toLocaleString())}</span><span class="text-item w150">${dartEsc(source)}</span><span class="text-item w200">${dartEsc(r.clientName || "-")}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150 status-text" style="color:${isContact ? "#64748b" : active ? "green" : "red"}">${dartEsc(r.status || "-")}</span><span class="text-item w100">${isContact ? "-" : `${dartEsc(r.rating || "-")} / 5`}</span><span class="text-item w300">${dartEsc(r.title || "-")}</span><span class="text-item w500 overflow">${dartEsc(r.review || "-")}</span><span class="text-item w150">${dartEsc(r.phone1 || "-")}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w150">${dartEsc(r.email || "-")}</span></div>`,
+        `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}" data-permission-domain="${isContact ? "contacts" : "reviews"}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>${visibilityButton}</div><span class="text-item w200">${dartEsc(new Date(r.createdAt).toLocaleString())}</span><span class="text-item w150">${dartEsc(source)}</span><span class="text-item w200">${dartEsc(r.clientName || "-")}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150 status-text" style="color:${isContact ? "#64748b" : active ? "green" : "red"}">${dartEsc(r.status || "-")}</span><span class="text-item w100">${isContact ? "-" : `${dartEsc(r.rating || "-")} / 5`}</span><span class="text-item w300">${dartEsc(r.title || "-")}</span><span class="text-item w500 overflow">${dartEsc(r.review || "-")}</span><span class="text-item w150">${dartEsc(r.phone1 || "-")}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w150">${dartEsc(r.email || "-")}</span></div>`,
       );
     });
 }
@@ -5188,6 +5217,7 @@ function setupReviewModal() {
     .getElementById("openReviewModalBtn")
     ?.addEventListener("click", () => {
       form.reset();
+      form.dataset.permissionDomain = "reviews";
       document.getElementById("modal-review-edit-id").value = "";
       openModal(modal);
     });
@@ -5247,6 +5277,7 @@ function openEditModal(id, sectionKey) {
     x = info?.data.find((v) => String(v.id) === String(id));
   if (!x) return;
   if (sectionKey === "review") {
+    document.getElementById("customer-review-form").dataset.permissionDomain = x.recordType === "contact" || x.source === "Contact Us" ? "contacts" : "reviews";
     document.getElementById("modal-review-edit-id").value = x.id;
     document.getElementById("modal-cust-rev-name").value = x.clientName || "";
     document.getElementById("modal-cust-rating").value = x.rating || "5";

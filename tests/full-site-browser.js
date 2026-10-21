@@ -42,12 +42,13 @@ const server = http.createServer((request, response) => {
           ? { providers: { google: false, facebook: false } }
         : pathname === "/api/v1/me"
           ? {
-              user: { accountType: "staff", name: "CI Owner" },
+              user: { id: "owner", accountType: "staff", name: "CI Owner" },
               session: { mfaRequired: false, mfaSatisfied: true },
               permissions: [
                 "settings.manage",
                 "catalog.manage",
                 "orders.read",
+                "orders.manage",
                 "dashboard_state.read",
                 "finance.read",
                 "staff.read",
@@ -317,7 +318,7 @@ const server = http.createServer((request, response) => {
   assert.equal(await dashboard.locator("#settings-typing-card").isVisible(), true);
   assert.equal(await dashboard.locator("#settings-commerce-card").isVisible(), false);
   // Staff stays inside Settings; account details and permissions open only on selection.
-  const staffFixture={permissions:[{key:'orders.read',description:'View orders'},{key:'orders.manage',description:'Manage orders'},{key:'profile.read_own',description:'View own profile'}],staff:[
+  const staffFixture={canManageStaff:true,permissions:[{key:'orders.read',description:'View orders'},{key:'orders.manage',description:'Manage orders'},{key:'profile.read_own',description:'View own profile'}],staff:[
     {id:'staff-a',name:'Fixture A',email:'a@example.test',staffCode:'STA',status:'Active',permissions:['orders.read'],emailVerified:true},
     {id:'staff-b',name:'Fixture B',email:'b@example.test',staffCode:'STB',status:'Active',permissions:[],emailVerified:true},
     {id:'owner',name:'Protected Owner',email:'owner@example.test',staffCode:'OWNER',status:'Active',permissions:[],isOwner:true,emailVerified:true}
@@ -366,6 +367,13 @@ const server = http.createServer((request, response) => {
   await dashboard.locator('#settings-staff-add > summary').click();
   for(const id of ['settings-staff-email','settings-staff-role','settings-staff-invite-permissions'])assert.equal(await dashboard.locator(`#${id}`).isVisible(),true);
   await dashboard.locator('#settings-staff-add > summary').click();
+  staffFixture.canManageStaff=false;
+  await dashboard.evaluate(()=>window.dispatchEvent(new Event('dart:admin-authenticated')));
+  await dashboard.waitForFunction(()=>document.getElementById('settings-staff-add').hidden);
+  await dashboard.locator('[data-staff-directory]').first().click();
+  await dashboard.locator('[data-staff-id="staff-a"] [data-staff-action="view"]').click();
+  assert.equal(await dashboard.locator('[data-staff-action="permissions"]').count(),0,'a non-owner cannot manage staff even with staff.manage');
+  assert.equal(staffWrites,1);
   await dashboard.locator('[data-settings-tab="hero"]').click();
   const dashboardTargets = await dashboard.locator("a[data-target]").evaluateAll((links) =>
     [...new Set(links.map((link) => link.dataset.target))],
@@ -529,6 +537,78 @@ const server = http.createServer((request, response) => {
     await dashboard.screenshot({path:path.join(output, `dashboard-orders-${width}.png`), fullPage:true});
   }
   await dashboard.close();
+
+  // Real browser checks for independently granted Staff access.
+  for (const permissions of [['catalog.read'], ['inventory.manage'], ['orders.read']]) {
+    const page = await context.newPage(), stockWrites = [];
+    const model = {modelId:'M-PERM',name:'Permission fixture',category:'Hoodies',cost:100,selling:150,discount:0,
+      active:true,isArchived:false,isDeleted:false,version:1,sizeOptions:[{name:'M',active:true}],colorOptions:[{name:'Black',active:true,images:[]}]};
+    await page.route('**/api/v1/me',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
+      user:{id:'synthetic-staff',accountType:'staff'},session:{mfaRequired:false,mfaSatisfied:true},permissions})}));
+    await page.route('**/api/v1/admin/catalog-state',async route=>{
+      const write=route.request().method()!=='GET';
+      const body=write?route.request().postDataJSON():null;
+      if(write)stockWrites.push(body);
+      await route.fulfill({contentType:'application/json',body:JSON.stringify(write
+        ?{version:2,baseVersion:1,committedVersion:2,models:[],items:body.items.map(row=>({...row,version:1}))}
+        :{version:1,models:[model],items:[]})});
+    });
+    await page.goto(`${origin}/Eye/Dart%20Eye.html`,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.DartAdminHydration?.ready===true);
+    const hidden = selector=>page.locator(selector).first().evaluate(node=>getComputedStyle(node).display==='none');
+    assert.equal(await hidden('#models .add-btn'),true,'catalog read/inventory grants never edit models');
+    assert.equal(await hidden('#orders #openModalBtn'),true,'reading orders never grants order creation');
+    if(permissions.includes('inventory.manage')){
+      await page.evaluate(()=>document.querySelector('a[data-target="items"]').click());
+      assert.equal(await hidden('#items .add-btn'),false);
+      await page.locator('#items .add-btn').click();
+      await page.locator('#modal-item-model-id').fill('M-PERM');
+      await page.locator('#modal-item-code-pic').fill('I-PERM-NEW');
+      await page.locator('#modal-item-color').selectOption('Black');
+      await page.locator('#modal-item-size').selectOption('M');
+      await page.locator('#item-add-form').evaluate(form=>form.requestSubmit());
+      await page.waitForFunction(()=>window.DartCatalog?.serverVersion()>=2);
+      assert.equal(stockWrites.length,1);assert.deepEqual(stockWrites[0].models,[]);
+      assert.equal(stockWrites[0].items[0].itemCode,'I-PERM-NEW');
+      assert.equal(await page.evaluate(()=>window.DartCatalog.models()[0].selling),150);
+    }else{
+      assert.equal(await hidden('#items .add-btn'),true);
+      await page.locator('#models .add-btn').evaluate(button=>button.click());
+      assert.equal(await page.locator('#model-modal').evaluate(node=>node.classList.contains('active')),false);
+      assert.equal(stockWrites.length,0);
+    }
+    if(permissions.includes('catalog.read'))assert.equal(await page.evaluate(()=>window.DartCatalog.models().length),1,'read-only catalogue data must hydrate');
+    await page.close();
+  }
+
+  for (const domain of ['contacts','reviews']) {
+    const page=await context.newPage(), writes=[];
+    const row={id:`${domain}-fixture`,clientName:'Synthetic feedback',review:'Original message',email:'fixture@example.test',
+      phone1:'01012345678',status:'Active',createdAt:'2026-10-21T12:00:00Z',
+      ...(domain==='contacts'?{recordType:'contact',source:'Contact Us'}:{recordType:'review',rating:5})};
+    await page.route('**/api/v1/me',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
+      user:{id:'synthetic-feedback-staff',accountType:'staff'},session:{mfaRequired:false,mfaSatisfied:true},permissions:[`${domain}.read`,`${domain}.manage`]})}));
+    await page.route('**/api/v1/admin/domain-state',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({domains:[{domain,version:1,data:[row]}]})}));
+    await page.route('**/api/v1/admin/domain-state/*',async route=>{
+      const actual=new URL(route.request().url()).pathname.split('/').at(-1);
+      assert.equal(actual,domain,'a limited feedback account must never save the other domain');
+      if(route.request().method()==='PUT')writes.push(route.request().postDataJSON());
+      await route.fulfill({contentType:'application/json',body:JSON.stringify({domain,version:2,data:writes.at(-1)?.data||[row]})});
+    });
+    await page.goto(`${origin}/Eye/Dart%20Eye.html`,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.DartAdminHydration?.ready===true);
+    await page.evaluate(()=>document.querySelector('a[data-target="review"]').click());
+    const record=page.locator(`#review-container [data-id="${row.id}"]`);
+    await record.locator('.dart-record-open').click();
+    await record.locator('.btn-edit').click();
+    assert.equal(await page.locator('#customer-review-form').getAttribute('data-permission-domain'),domain);
+    await page.locator('#modal-cust-review').fill(`Updated ${domain} message`);
+    await page.locator('#customer-review-form').evaluate(form=>form.requestSubmit());
+    await page.waitForFunction(domain=>window.DartDomainState.version(domain)===2,domain);
+    assert.equal(writes.length,1);
+    assert.equal(writes[0].data[0].review,`Updated ${domain} message`);
+    await page.close();
+  }
 
   for (const endpoint of ["manifest.json", "sw.js", "sitemap.xml", "robots.txt"]) {
     const response = await context.request.get(`${origin}/${endpoint}`);

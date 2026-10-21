@@ -124,13 +124,18 @@ for (const file of jsFiles) {
 }
 // This is the repository aggregate, not the bytes loaded on one page. The
 // Dashboard details, editor, feedback and display choices add scoped source; public delivery budgets stay unchanged.
-if (coreJsBytes > 958 * 1024) {
-  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 958KB`);
+// Permission presentation and scoped feedback saves add under 5 KiB to the core aggregate after minifying Staff delivery.
+if (fs.statSync("Eye/dart-permissions.js").size > 6 * 1024) failures.push("Staff permission adapter exceeds its 6 KiB delivery budget");
+if (fs.statSync("Eye/dart-staff.js").size > 14 * 1024) failures.push("Staff directory exceeds its 14 KiB delivery budget");
+if (coreJsBytes > 963 * 1024) {
+  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 963KB`);
 }
 if (fs.statSync('Eye/dart-dashboard-ui.js').size > 14 * 1024) failures.push('Dashboard details adapter exceeds its 14 KiB source budget');
 // Combined finance hydration and public navigation add 14 KiB of source. Home delivery still fits 225 KiB.
-if (lazyJsBytes > 445 * 1024) {
-  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 445KB`);
+// Versioned inventory-only writes add under 0.5 KiB of scoped delivery code.
+if (fs.statSync("Eye/dart-catalog-admin.js").size > 3 * 1024) failures.push("Catalog editor exceeds its 3 KiB delivery budget");
+if (lazyJsBytes > 446 * 1024) {
+  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 446KB`);
 }
 
 // Platform delivery is still an exact minified derivative of dart-platform.js.
@@ -153,7 +158,7 @@ const generatedPlatformRuntime = ["Js/dart-platform.js", "Js/dart-platform.home.
 
 // Homepage UI is now a curated page-scoped runtime, not a minified copy of dart-ui.js.
 const curatedHomeUi = "Js/dart-ui.home.min.js";
-for (const [input, output] of [['scripts/home-ui.source.js', curatedHomeUi], ['Js/dart-navigation.js', 'Js/dart-navigation.min.js']]) {
+for (const [input, output] of [['scripts/home-ui.source.js', curatedHomeUi], ['Js/dart-navigation.js', 'Js/dart-navigation.min.js'], ['scripts/staff-admin.source.js', 'Eye/dart-staff.js'], ['scripts/staff-permissions.source.js', 'Eye/dart-permissions.js']]) {
   const text = require('../scripts/build-home-runtime.cjs').sourceText(input);
   const hash = crypto.createHash('sha256').update(text).digest('hex');
   if (!fs.readFileSync(output, 'utf8').startsWith(`/* source-sha256:${hash}; terser:5.44.0 */`)) {

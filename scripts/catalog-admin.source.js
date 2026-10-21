@@ -46,12 +46,19 @@
       const models = changes(state.models, baseline.models, "modelId");
       const items = changes(state.items, baseline.items, "id");
       if (!models.rows.length && !items.rows.length) return { ...state, partial: false };
+      const can = (key) => window.DartAdminAccess?.can?.(key) === true;
+      const inventoryOnly = can("inventory.manage") && !can("catalog.manage") && !can("catalog.edit");
+      if (inventoryOnly && models.rows.length) {
+        throw Object.assign(new Error("Inventory access cannot modify models or model prices."), { status: 403, code: "FORBIDDEN" });
+      }
       const sent = clone(state);
-      let result, partial = models.rows.length <= 500 && items.rows.length <= 1000;
+      let result, partial = inventoryOnly || (models.rows.length <= 500 && items.rows.length <= 1000);
       const legacy = () => api("/api/v1/admin/catalog-state", {
-        method: "PUT", body: { expectedVersion: state.version, models: sent.models, items: sent.items },
+        method: "PUT", body: inventoryOnly
+          ? { expectedVersion: state.version, models: [], items: items.rows, recordVersions: { models: {}, items: items.versions } }
+          : { expectedVersion: state.version, models: sent.models, items: sent.items },
       });
-      if (partial) {
+      if (partial && items.rows.length <= 1000) {
         try {
           result = await api("/api/v1/admin/catalog-state", { method: "PATCH", body: {
             expectedVersion: state.version, models: models.rows, items: items.rows,
@@ -59,7 +66,7 @@
           } });
         } catch (error) {
           if (![404, 405].includes(error.status)) throw error;
-          result = await legacy(); partial = false;
+          result = await legacy(); partial = inventoryOnly;
         }
       } else result = await legacy();
       if (isCurrent()) {

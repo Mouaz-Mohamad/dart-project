@@ -152,12 +152,12 @@
       if(event.target.closest("[data-set-state]")) void toggleState(row);
     });
 
-    if(!can("sets.read")&&!can("sets.manage"))setsButton.hidden=true;
+    if(!can("sets.read"))setsButton.hidden=true;
     setActiveView("models");
   }
 
   async function loadSets() {
-    if(!can("sets.read")&&!can("sets.manage"))return;
+    if(!can("sets.read"))return;
     const container=root.document.querySelector("[data-set-rows]"); if(container)container.innerHTML='<div class="dart-sets-loading">Loading Sets…</div>';
     try{
       const payload=await api("/api/v1/admin/sets"); rows=Array.isArray(payload?.sets)?payload.sets:[];
@@ -340,7 +340,7 @@
     if(!initialized)return;
     const controls=dashboardControls();
     const setsButton=controls.second?.querySelector?.('[data-model-set-view="sets"]');
-    const readable=can("sets.read")||can("sets.manage");
+    const readable=can("sets.read");
     if(setsButton)setsButton.hidden=!readable;
     if(currentView==="sets"&&!readable)setActiveView("models");
     if(currentView==="sets"&&controls.add){

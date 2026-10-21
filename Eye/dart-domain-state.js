@@ -39,6 +39,7 @@
   const queues = new Map();
   const revisions = new Map();
   const deniedDomains = new Set();
+  const confirmedData = new Map();
   let adminPollingEnabled = false;
   let polling = false;
   let sessionEpoch = 0;
@@ -51,6 +52,7 @@
 
   function cache(storageKey, data, domain) {
     const value = Array.isArray(data) ? data : [];
+    confirmedData.set(domain, JSON.stringify(value));
     window.DartState?.write?.(storageKey, value, { source: `domain:${domain}` });
     window.dispatchEvent(
       new CustomEvent("dart:domain-hydrated", {
@@ -133,7 +135,7 @@
   async function syncDomain(domain) {
     const storageKey = STORAGE_BY_DOMAIN[domain];
     const version = versions.get(domain);
-    if (!storageKey || !version) return readLocal(storageKey);
+    if (!storageKey || !version || !dirty.has(domain)) return readLocal(storageKey);
     const revision = revisions.get(domain) || 0;
     const session = sessionEpoch;
     const snapshot = structuredClone(readLocal(storageKey));
@@ -150,6 +152,10 @@
     const responseVersion = Number(payload.version || version);
     if (responseVersion < (versions.get(domain) || 0)) return readLocal(storageKey);
     versions.set(domain, responseVersion);
+    for (const [related, version] of Object.entries(payload.relatedVersions || {})) {
+      if (versions.has(related) && Number(version) > versions.get(related)) versions.set(related, Number(version));
+    }
+    confirmedData.set(domain, JSON.stringify(payload.data || []));
     if (revision === (revisions.get(domain) || 0)) {
       dirty.delete(domain);
       cache(storageKey, payload.data || [], domain);
@@ -164,10 +170,11 @@
 
   function syncNow(domain) {
     clearTimeout(timers.get(domain));
-    const chain = queues.get(domain) || Promise.resolve();
+    const queueKey = ["reviews", "contacts"].includes(domain) ? "feedback" : domain;
+    const chain = queues.get(queueKey) || Promise.resolve();
     const session = sessionEpoch;
     const next = chain.then(() => session === sessionEpoch ? syncDomain(domain) : []);
-    queues.set(domain, next.catch(() => undefined));
+    queues.set(queueKey, next.catch(() => undefined));
     return next;
   }
 
@@ -273,6 +280,7 @@
       );
       return false;
     }
+    if (!dirty.has(domain) && confirmedData.get(domain) === JSON.stringify(Array.isArray(data) ? data : [])) return true;
     revisions.set(domain, (revisions.get(domain) || 0) + 1);
     window.DartState?.write?.(storageKey, Array.isArray(data) ? data : [], { source: `domain:${domain}:edit` });
     dirty.add(domain);
@@ -327,6 +335,7 @@
       deniedDomains.add(domain);
       const storageKey = STORAGE_BY_DOMAIN[domain];
       versions.delete(domain);
+      confirmedData.delete(domain);
       dirty.delete(domain);
       window.DartState?.remove?.(storageKey, { source: "permission" });
       window.dispatchEvent(
@@ -396,6 +405,7 @@
 
   async function checkAll() {
     if (!adminPollingEnabled || document.hidden || polling) return;
+    if (window.DartAdminPermissions?.domainRead?.() !== true) return;
     polling = true;
     const session = sessionEpoch;
     try {
@@ -405,7 +415,8 @@
         [...dirty].map((domain) => checkDomain(domain)),
       );
     } catch (error) {
-      if (session === sessionEpoch && error.status !== 401) console.warn("Dart dashboard live refresh failed", error);
+      if (session === sessionEpoch && [401, 403].includes(error.status)) adminPollingEnabled = false;
+      else if (session === sessionEpoch) console.warn("Dart dashboard live refresh failed", error);
     } finally {
       if (session === sessionEpoch) polling = false;
     }
@@ -420,6 +431,7 @@
     adminPollingEnabled = polling = refreshAgain = false;
     refreshPromise = null;
     versions.clear();
+    confirmedData.clear();
     dirty.clear();
     revisions.clear();
     deniedDomains.clear();

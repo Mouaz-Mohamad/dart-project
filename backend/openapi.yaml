@@ -23,7 +23,50 @@ tags:
   - name: News
   - name: Finance
   - name: Catalog
+  - name: Dashboard
 paths:
+  /admin/domain-state:
+    get:
+      tags: [Dashboard]
+      operationId: readDashboardDomains
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff and satisfied MFA when required. Returns only domains granted by their specific read permissions. reviews excludes Contact Us messages; contacts includes both current and legacy messages and requires contacts.read. Dashboard_state.read does not replace sensitive domain grants.
+      responses:
+        "200": { description: Readable domains with version and data }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { description: Staff permission or MFA denied }
+  /admin/domain-state/{domain}:
+    parameters:
+      - { name: domain, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Dashboard]
+      operationId: readDashboardDomain
+      security: [{ sessionCookie: [] }]
+      description: Requires the domain's specific read grant. Reviews and private Contact Us messages are separate projections. Contacts versions include changes to the legacy reviews store.
+      responses:
+        "200": { description: Domain, version and data }
+        "403": { description: Staff permission or MFA denied }
+    put:
+      tags: [Dashboard]
+      operationId: writeDashboardDomain
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff, satisfied MFA when required, CSRF and the domain's specific write grant. Reviews writes preserve unseen contact messages and reject contact injection. Contact writes preserve reviews. Feedback writes lock both stores and return relatedVersions for previously readable browser state. Finance settlements require their dedicated command endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion, data]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                data: { type: array, maxItems: 20000, items: {} }
+      responses:
+        "200": { description: Committed domain, version, data and optional relatedVersions }
+        "403": { description: Staff permission or MFA denied }
+        "405": { description: Dedicated Finance settlement endpoint required }
+        "409": { description: Domain changed; reload and retry without dropping concurrent records }
+        "422": { description: Invalid version or domain data }
   /catalog/version:
     get:
       tags: [Catalog]
@@ -49,7 +92,7 @@ paths:
       tags: [Catalog]
       operationId: readAdminCatalogState
       security: [{ sessionCookie: [] }]
-      description: Requires Staff, satisfied MFA when required, and catalog.manage or catalog.read. No-store. Optional page/limit/q pages models and physical items independently with totalModels and totalItems over their full matching sets. category and sort are not supported for this admin projection.
+      description: Requires Staff, satisfied MFA when required, and catalog.manage, catalog.read or inventory.manage. No-store. Optional page/limit/q pages models and physical items independently with totalModels and totalItems over their full matching sets. category and sort are not supported for this admin projection.
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
@@ -63,7 +106,7 @@ paths:
       tags: [Catalog]
       operationId: patchAdminCatalogRecords
       security: [{ sessionCookie: [], csrfToken: [] }]
-      description: Requires Staff, satisfied MFA when required, and catalog.manage or catalog.edit. Updates only supplied rows; omitted rows remain unchanged. Per-record versions reject stale edits, with zero only for a new record. Protected inventory identity/state and acquisition costs remain server-authoritative. Returns changed rows with baseVersion, committedVersion and observed version. Clients rehydrate when a version gap is observed.
+      description: Requires Staff, satisfied MFA when required, and catalog.manage, catalog.edit or inventory.manage. Inventory-only requests must have an empty models array; model and model-price changes return 403. Updates only supplied rows; omitted rows remain unchanged. Per-record versions reject stale edits, with zero only for a new record. Protected inventory identity/state and acquisition costs remain server-authoritative. Returns changed rows with baseVersion, committedVersion and observed version. Clients rehydrate when a version gap is observed.
       requestBody:
         required: true
         content:
@@ -91,7 +134,7 @@ paths:
       tags: [Catalog]
       operationId: replaceAdminCatalogState
       security: [{ sessionCookie: [], csrfToken: [] }]
-      description: Existing complete replacement contract remains available for legacy clients and explicit bulk operations. Requires catalog.manage or catalog.edit, Staff MFA when required, CSRF and an exact global expectedVersion. Omitted eligible rows are soft-deleted; do not use as a retry fallback after a PATCH conflict or server failure.
+      description: Existing complete replacement contract remains available for catalog.manage or catalog.edit, Staff MFA when required, CSRF and an exact global expectedVersion. Inventory-only requests are also accepted with inventory.manage, an empty models array and recordVersions; those requests always patch explicit items and never delete omitted records. Only the legacy complete replacement soft-deletes omitted eligible rows; do not use as a retry fallback after a PATCH conflict or server failure.
       responses:
         "200": { description: Complete catalog snapshot after an audited replacement }
         "409": { description: Global catalog version conflict }
@@ -679,7 +722,7 @@ paths:
       operationId: listStaffAccess
       security: [{ sessionCookie: [] }]
       responses:
-        "200": { description: Staff directory and permission catalogue }
+        "200": { description: Staff directory and permission catalogue with canManageStaff for the signed-in Owner. Staff mutations still require the protected Owner service check. }
   /admin/staff/allowlist:
     post:
       tags: [Staff Auth]
@@ -746,6 +789,7 @@ paths:
     get:
       tags: [Orders]
       summary: Read active representatives, assigned delivery stops, and unassigned map orders.
+      description: Requires orders.read or live_map.read. Representative coordinates additionally require representative_location.read. Staff responses without that grant have representative location fields set to null across live snapshots, order snapshots, domain records and mutation responses; customer-address pins remain available.
       operationId: getAdminLiveOperations
       security: [{ sessionCookie: [] }]
       responses:
