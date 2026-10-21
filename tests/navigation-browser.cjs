@@ -6,6 +6,8 @@ const path = require('node:path');
 const http = require('node:http');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../public');
+const csp = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../vercel.json'), 'utf8'))
+  .headers.flatMap(rule => rule.headers).find(header => header.key.toLowerCase() === 'content-security-policy').value;
 const requests = [];
 let cartExists = true;
 const snapshots = [];
@@ -59,6 +61,7 @@ const server = http.createServer((req, res) => {
   res.setHeader('Cache-Control', path.extname(file) === '.html' ? 'public, no-cache, max-age=0, must-revalidate' : 'public, max-age=31536000');
   let content = fs.readFileSync(file);
   if (file.endsWith('.html')) {
+    res.setHeader('Content-Security-Policy', csp);
     // External fonts/maps do not participate in the document/history contract.
     content = content.toString().replace(/<(?:script|link)\b[^>]*(?:src|href)=["']https:\/\/[^>]*>(?:<\/script>)?/g, '');
   }
@@ -76,6 +79,7 @@ function nativeScenario(origin) {
   let lastPhase = -1;
   window.addEventListener('error', (event) => errors.push(event.message));
   window.addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
+  document.addEventListener('securitypolicyviolation', (event) => errors.push(`CSP ${event.effectiveDirective}: ${event.blockedURI}`));
   document.addEventListener('dart:critical-ready', () => { window.__criticalReady = true; });
   const wait = async (condition) => {
     const deadline = Date.now() + 10000;
@@ -214,6 +218,24 @@ function nativeScenario(origin) {
     assert.equal(requests.slice(marker).filter((req) => req.context === 'low-data' && req.path === '/about.html').length, 0);
     await low.evaluate(() => window.DartNavigation.go('/products.html'));
     await low.waitForURL(/products\.html$/, { waitUntil: 'commit' });
+
+    // The two approved JSON hashes must not authorize unrelated inline code.
+    const probe = await context.newPage();
+    await probe.goto(origin + '/about.html', { waitUntil: 'domcontentloaded' });
+    await probe.evaluate(() => {
+      window.__inlineProbeRan = false;
+      window.__inlineProbeBlocked = false;
+      document.addEventListener('securitypolicyviolation', (event) => {
+        if (event.blockedURI === 'inline' && event.effectiveDirective.startsWith('script-src'))
+          window.__inlineProbeBlocked = true;
+      });
+      const script = document.createElement('script');
+      script.textContent = 'window.__inlineProbeRan = true;';
+      document.head.appendChild(script);
+    });
+    await probe.waitForFunction(() => window.__inlineProbeBlocked);
+    assert.equal(await probe.evaluate(() => window.__inlineProbeRan), false, 'Unapproved inline JavaScript remains blocked by production CSP');
+    await probe.close();
     if (unsupportedLocalShell) console.log('SKIP native document/filter retention locally: headless-shell delegate disables BFCache. Full Chromium CI requires it.');
     console.log(nativeRestore
       ? 'PASS staged navigation: immediate shell, background content, native document/filter restoration, Back/Forward, fresh cart and save-data fallback'

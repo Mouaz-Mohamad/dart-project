@@ -2,6 +2,8 @@
 // الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const crypto = require("node:crypto");
+const { runInNewContext } = require("node:vm");
 
 const sw = fs.readFileSync("sw.js", "utf8");
 const state = fs.readFileSync("Js/dart-state.js", "utf8");
@@ -83,6 +85,38 @@ for (const file of sourceFiles) {
       !source.includes(secretName),
       `${file} must not embed server secret configuration: ${secretName}`,
     );
+  }
+}
+
+// Verify the exact runtime JSON, including both Home and non-Home variants,
+// against the production allowlist. Do not rely on inline-speculation-rules alone.
+const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
+const csp = vercel.headers.flatMap((rule) => rule.headers)
+  .find((header) => header.key.toLowerCase() === "content-security-policy").value;
+const scriptPolicy = csp.split(";").find((directive) => directive.trim().startsWith("script-src "));
+assert.doesNotMatch(scriptPolicy, /'unsafe-inline'|'unsafe-eval'/, "Navigation must keep strict script authorization");
+assert.match(csp, /script-src-attr 'none'/, "Inline event handlers remain blocked");
+for (const file of ["Js/dart-navigation.js", "Js/dart-navigation.min.js"]) {
+  for (const page of ["/", "/index.html", "/products.html", "/about.html"]) {
+    const scripts = [];
+    const document = {
+      hidden: false, prerendering: false, querySelectorAll: () => [], addEventListener() {},
+      createElement: () => ({}), head: { appendChild: (script) => scripts.push(script) },
+    };
+    const window = {
+      document, location: { origin: "https://dart.test", href: `https://dart.test${page}` },
+      navigator: { onLine: true }, HTMLScriptElement: { supports: () => true },
+      setTimeout: () => 0, clearTimeout() {}, addEventListener() {}, fetch: async () => ({ ok: false }),
+    };
+    runInNewContext(fs.readFileSync(file, "utf8"), { window, URL, AbortController });
+    window.DartNavigation.start();
+    assert.equal(scripts.length, 1, `${file} ${page} installs one speculation rules block`);
+    assert.equal(scripts[0].type, "speculationrules");
+    const hash = crypto.createHash("sha256").update(scripts[0].textContent).digest("base64");
+    assert.ok(scriptPolicy.split(/\s+/).includes(`'sha256-${hash}'`),
+      `${file} ${page}: runtime speculation rules hash missing from production CSP`);
+    window.DartNavigation.start();
+    assert.equal(scripts.length, 1, "Repeated starts must not duplicate speculative navigation");
   }
 }
 
