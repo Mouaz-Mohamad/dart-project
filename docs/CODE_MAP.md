@@ -75,4 +75,15 @@
 - `Js/dart-password-visibility.js` — accessible password visibility plus Customer 6+ UI normalization for signup/change/reset/social forms.
 - `Js/dart-site-settings.js` — Settings normalization/cache for the Vanilla frontend.
 
+## Dashboard groups and private content
+
+- `Eye/dart.js` — compact date/location order groups; authorized Sets preparation after dashboard hydration.
+- `Eye/dart-inventory.js` / `Eye/dart-inventory.css` — Model/Color/Size group cards with a label beside every lifecycle count.
+- `Eye/dart-waiting.js` — Queue/Demand rows own their field labels; neither needs a `thead`.
+- `scripts/dashboard-ui.source.js` → `Eye/dart-dashboard-ui.js` — record summaries/details, owning-panel labels and Waiting layout.
+- `scripts/news-admin.source.js` → `Eye/dart-news-admin.js` — authenticated in-memory News projection, query/pagination and stale-response protection.
+- `scripts/sets-admin.source.js` → `Eye/dart-sets-admin.js` — authenticated in-memory Sets projection and the existing editors/actions.
+- Build these delivery modules with `node scripts/build-home-runtime.cjs`. Edit the readable sources; generated `Eye` files carry their source SHA256.
+- `tests/dashboard-groups-browser.cjs` — production renderers with isolated fixtures: responsive groups, Waiting details/actions, private prefetch, retries, concurrent reads and logout.
+
 Business decisions must remain in the backend/DB. Frontend code may display state and send intents, but cannot manufacture inventory availability, discounts, rewards, permissions or financial truth.

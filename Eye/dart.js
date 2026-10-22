@@ -3886,8 +3886,8 @@ function dartRenderOrderGroups(container, orders) {
         `<span class="dart-order-group-status"><b>${Number(count)}</b> ${dartEsc(status)}</span>`,
       )
       .join("");
-    const orderRefs = (group.orderRefs || [])
-      .map((orderRef) => `<span class="dart-order-group-ref">${dartEsc(orderRef)}</span>`)
+    const orderRefs = group.records
+      .map((order) => `<span class="dart-order-group-ref"><b>${dartEsc(order.orderId || order.id || "-")}</b><span>${dartEsc(order.status || "Unknown")}</span></span>`)
       .join("");
     const location = group.location?.classified
       ? [first.country || "Egypt", first.governorate, first.area].filter(Boolean).join(" · ")
@@ -3901,12 +3901,18 @@ function dartRenderOrderGroups(container, orders) {
           <div><small>Orders</small><strong>${group.records.length}</strong></div>
           <div><small>Statuses</small><strong>${Object.keys(group.statusCounts || {}).length}</strong></div>
         </header>
-        <section><h3>Order numbers</h3><div class="dart-order-group-refs">${orderRefs}</div></section>
-        <section><h3>Status breakdown</h3><div class="dart-order-group-statuses">${statusSummary}</div></section>
+        <article class="dart-order-group-block"><h3>Status breakdown</h3><div class="dart-order-group-statuses">${statusSummary}</div></article>
+        <article class="dart-order-group-block"><details class="dart-order-group-details"><summary>Order numbers · ${group.records.length}</summary><div class="dart-order-group-refs">${orderRefs}</div></details></article>
       </article>`,
     );
   });
 }
+
+// Prepare authorized Sets in the dashboard without adding work to storefront pages.
+window.addEventListener("dart:admin-authenticated", () => {
+  if (window.DartAdminHydration?.ready === true && window.DartAdminAccess?.can?.("sets.read") === true)
+    document.dispatchEvent(new Event("dart:sets-load-request"));
+});
 
 function dartAppendOperationGroupHeading(container, type, count, noun, record, note, groupKey = "") {
   const template = document.getElementById("dashboard-operation-group-template");

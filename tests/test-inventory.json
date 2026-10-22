@@ -35,6 +35,7 @@
     "test-inventory-contract.cjs"
   ],
   "ciBrowser": [
+    "dashboard-groups-browser.cjs",
     "full-site-browser.js",
     "home-storefront-browser.js",
     "navigation-browser.cjs",

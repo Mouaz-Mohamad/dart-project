@@ -166,7 +166,7 @@ const generatedPlatformRuntime = ["Js/dart-platform.js", "Js/dart-platform.home.
 
 // Homepage UI is now a curated page-scoped runtime, not a minified copy of dart-ui.js.
 const curatedHomeUi = "Js/dart-ui.home.min.js";
-for (const [input, output] of [['scripts/home-ui.source.js', curatedHomeUi], ['Js/dart-navigation.js', 'Js/dart-navigation.min.js'], ['scripts/staff-admin.source.js', 'Eye/dart-staff.js'], ['scripts/staff-permissions.source.js', 'Eye/dart-permissions.js']]) {
+for (const [input, output] of [['scripts/home-ui.source.js', curatedHomeUi], ['Js/dart-navigation.js', 'Js/dart-navigation.min.js'], ['scripts/staff-admin.source.js', 'Eye/dart-staff.js'], ['scripts/staff-permissions.source.js', 'Eye/dart-permissions.js'], ['scripts/dashboard-ui.source.js','Eye/dart-dashboard-ui.js'], ['scripts/news-admin.source.js','Eye/dart-news-admin.js'], ['scripts/sets-admin.source.js','Eye/dart-sets-admin.js']]) {
   const text = require('../scripts/build-home-runtime.cjs').sourceText(input);
   const hash = crypto.createHash('sha256').update(text).digest('hex');
   if (!fs.readFileSync(output, 'utf8').startsWith(`/* source-sha256:${hash}; terser:5.44.0 */`)) {

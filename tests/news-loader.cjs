@@ -69,7 +69,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   staff.permissions(["news.read"]);
   staff.root.dispatchEvent(new Event("dart:admin-authenticated"));
   assert.equal(staff.item.hidden, false);
-  assert.equal(staff.scripts.length, 0, "authorization alone must not download News");
+  assert.equal(staff.scripts.length, 1, "authorized hydrated Staff prepare News before opening the section");
   staff.section.classes.add("active-section"); staff.observers[0].callback();
   staff.observers[0].callback();
   assert.equal(staff.scripts.length, 1, "repeated activation must share one download");

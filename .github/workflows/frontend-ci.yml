@@ -124,6 +124,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Full storefront and dashboard Chromium smoke
         run: |
+          node tests/dashboard-groups-browser.cjs
           node tests/navigation-browser.cjs
           node tests/product-waiting-browser.js
           node tests/sets-admin-browser.js

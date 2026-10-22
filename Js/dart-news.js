@@ -1,5 +1,5 @@
 // DART CODE GUIDE | Js/dart-news.js
-// Load News only near its carousel or when an authorized Staff member opens News.
+// Prepare private News after Staff hydration; public News stays deferred until critical content.
 (function (root) {
   "use strict";
   const doc = root.document, section = doc.getElementById("dart-news"), admin = doc.getElementById("news");
@@ -34,7 +34,7 @@
         (can?.("news.read") === true || can?.("news.manage") === true);
       doc.querySelectorAll('[data-target="news"]').forEach(link => { link.closest("li").hidden = !allowed; });
       admin.hidden = !allowed;
-      if (allowed && admin.classList.contains("active-section")) void boot();
+      if (allowed) void boot();
     }
     root.addEventListener("dart:admin-authenticated", access);
     root.addEventListener("dart:admin-logged-out", access);

@@ -56,6 +56,10 @@ button { touch-action:manipulation; }
 .dart-record-dialog .dart-kpi-inline { display:block; color:#5d5662; }
 .dart-record-dialog .status-pill { display:inline-flex; }
 .dart-record-dialog .dart-status-actions { display:flex; flex-wrap:wrap; gap:7px; }
+#waiting .dart-waiting-table-wrap { height:auto; max-height:70dvh; }
+#waiting .dart-waiting-table,#waiting .dart-waiting-table > tbody { display:block; width:100%; min-width:0; }
+#waiting .dart-waiting-table td.dart-record-main { display:flex; width:100%; box-sizing:border-box; border:0; }
+#waiting .dart-waiting-table td[data-column-label] { display:block; width:auto; min-width:0; padding:0; border:0; }
 .modal .modal-content { max-height:calc(100dvh - 32px); overflow-y:auto; color:#252129; }
 .modal label,.modal h2,.modal h3 { color:#332b36; }
 .modal .close-modal { color:#4b2332; background:#f7edf1; }
