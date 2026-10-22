@@ -1678,7 +1678,7 @@ section{
 #orders .row-action-btns{width:500px;min-width:500px;}
 #representative .row-action-btns{width:300px;min-width:300px;}
 
-.dart-item-thumb{width:16px!important;height:20px!important;min-width:16px;max-width:16px;object-fit:cover!important;cursor:zoom-in;border-radius:2px;border:1px solid #ddd;margin:auto;}
+.dart-item-thumb{width:36px!important;height:25px!important;min-width:16px;max-width:36px;object-fit:cover!important;cursor:zoom-in;border-radius:2px;border:1px solid #ddd;margin:auto;}
 .dart-image-preview-content{max-width:min(900px,94vw)!important;display:flex;align-items:center;justify-content:center;padding:40px!important;background:#fff!important;}
 #full-item-image{max-width:85vw;max-height:80vh;width:auto;height:auto;object-fit:contain;border-radius:10px;}
 
