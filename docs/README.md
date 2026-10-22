@@ -16,6 +16,7 @@
 - `CATALOG_SCALE.md` — paged catalog reads, changed-record writes, shared limits, bounded worker and rollout checks.
 - `SCALE_QUALITY_2026-10-13_AR.md` — verification evidence and outstanding production readiness gates for the unpublished scale batch.
 - `NEWS.md` — News behavior, API/migration references, end-to-end checks and quality review.
+- `DASHBOARD_STATUS_COLORS.md` — shared status palette, row coverage and browser verification.
 - `TRAFFIC_ANALYTICS.md` — stable visit-N guest codes, identity persistence, shared chart periods and verification.
 - `IMAGE_DESCRIPTIONS.md` — وصف الأصول البصرية.
 

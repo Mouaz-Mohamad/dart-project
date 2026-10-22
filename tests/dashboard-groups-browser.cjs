@@ -121,6 +121,61 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.dart-news-row,.dart-set-row').count(),0,'late private responses must stay discarded after logout');
   assert.deepEqual(errors,[]);
   if(process.env.DART_DASHBOARD_SCREENSHOT_DIR){fs.mkdirSync(process.env.DART_DASHBOARD_SCREENSHOT_DIR,{recursive:true});await page.evaluate(()=>{document.body.classList.remove('dart-admin-locked');activate('items');});await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(process.env.DART_DASHBOARD_SCREENSHOT_DIR,'inventory-groups-phone.png')});}
+  // Verify visible colors across every operational section, including in-place status updates.
+  const palettePage=await browser.newPage();
+  const paletteErrors=[];palettePage.on('pageerror',error=>paletteErrors.push(error.message));
+  const cases={
+    orders:[['New','info'],['Accepted','processing'],['Preparing','processing'],['Out With Representative','warning'],['Representative On The Way','warning'],['Delivered','success'],['Refused','danger'],['Cancelled','danger'],['Needs Attention','danger']],
+    items:[['In stock','success'],['Reserved','warning'],['Processing/Held','processing'],['Sold','success'],['Damaged','danger']],
+    models:[['Available','success'],['Out of stock','danger']],
+    customers:[['active','success'],['suspended','danger']],
+    returns:[['Under Review','warning'],['Approved','success'],['Return Received','success'],['Rejected','danger']],
+    damage:[['Damaged','danger'],['Destroyed','danger'],['Repaired','success']],
+    review:[['Active','success'],['Hidden','neutral']],
+    representative:[['Active','success'],['Pending Approval','warning'],['Suspended','danger']],
+    card:[['Active','success'],['Used','success'],['Expired','neutral'],['Exhausted','neutral']],
+    news:[['published','success'],['draft','neutral']],
+    waiting:[['waiting','warning'],['reserved','warning'],['converted','success'],['expired','neutral']],
+    finance:[['Paid','success'],['Unpaid','warning'],['Settled','success'],['Awaiting Settlement','warning'],['Partial','warning'],['Partially Paid · Overdue','danger'],['Refunded','returned'],['Void','neutral'],['Unknown status','neutral']]
+  };
+  const colors={success:'rgba(74, 222, 128, 0.4)',processing:'rgba(163, 230, 153, 0.4)',info:'rgba(96, 165, 250, 0.4)',warning:'rgba(250, 204, 21, 0.4)',danger:'rgba(248, 113, 113, 0.4)',returned:'rgba(192, 163, 245, 0.4)',neutral:'rgba(148, 163, 184, 0.4)'};
+  const sampleRows=(entries)=>entries.map(([status],index)=>`<div class="model-row" data-id="case-${index}" data-case="${index}"><span>ROW-${index}</span><span>Fixture record</span><span class="fixture-status">${status}</span></div>`).join('');
+  await palettePage.setContent(`<!doctype html><html><head><meta charset="utf-8"></head><body><main>${Object.entries(cases).map(([section,entries])=>`<section id="${section}" class="dashboard-section"><div class="cont-titel"><div class="title-name"><h2>Code</h2><h2>Name</h2><h2>Status</h2></div>${sampleRows(entries)}</div></section>`).join('')}
+  <section id="settings" class="dashboard-section"><article class="dart-settings-list-row" id="staff-active"><div class="dart-staff-badges"><span>Active</span></div><button>Details</button></article><article class="dart-settings-list-row" id="staff-disabled"><div class="dart-staff-badges"><span>Disabled</span></div></article><div class="dart-settings-list-row" data-allowance-id="invitation" id="staff-pending">Waiting for verification</div><div class="dart-settings-list-row" data-status="paused" id="campaign-paused">Paused campaign</div></section>
+  <section id="live-operations" class="dashboard-section"><button class="dart-live-rep-card is-selected" id="live-online"><span class="dart-live-pill">Online</span></button><div class="dart-live-stop" id="live-delivery" data-status="Representative On The Way">On the way</div></section>
+  <section id="status-groups" class="dashboard-section"><article class="dart-order-group-card" id="same-group"><header>Delivered group</header><article class="dart-order-group-block"><span class="dart-order-group-ref"><b>ORDER-1</b><span>Delivered</span></span></article></article><article class="dart-order-group-card" id="mixed-group"><span class="dart-order-group-ref" id="mixed-new"><b>ORDER-2</b><span>New</span></span><span class="dart-order-group-ref" id="mixed-refused"><b>ORDER-3</b><span>Refused</span></span><span class="dart-order-group-status"><b>1</b> New</span></article><article class="group-row" id="stock-group"><span class="stock-badge">Low Stock</span><div data-inventory-metric="sold"><dt>Sold</dt><dd>4</dd></div></article><article class="dart-goal-card" id="goal-done" data-status="Achieved">Achieved</article></section>
+  <section id="cod-test" class="dashboard-section"><table class="dart-finance-table"><thead><tr><th>Order</th><th>Order Status</th><th>Settlement</th></tr></thead><tbody><tr id="cod-unpaid"><td>COD-1</td><td>Delivered</td><td><span class="dart-status-chip">Awaiting Settlement</span></td></tr></tbody></table></section>
+  </main></body></html>`);
+  await palettePage.addStyleTag({content:['dart.css','dart-inventory.css','dart-finance.css','dart-settings.css','dart-live-operations.css','dart-dashboard-ui.css'].map(name=>fs.readFileSync(path.join(root,'Eye',name),'utf8')).join('\n')});
+  await palettePage.addScriptTag({content:fs.readFileSync(path.join(root,'Eye/dart-dashboard-ui.js'),'utf8')});
+  const show=async section=>{await palettePage.evaluate(id=>{document.querySelectorAll('.dashboard-section').forEach(node=>node.classList.toggle('active-section',node.id===id));window.DartDashboardUI.refresh();},section);await palettePage.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));};
+  const background=selector=>palettePage.locator(selector).evaluate(node=>getComputedStyle(node).backgroundColor);
+  for(const width of [370,480,767,768,1440]){
+    await palettePage.setViewportSize({width,height:900});
+    for(const [section,entries] of Object.entries(cases)){
+      await show(section);
+      for(const [index,[status,tone]] of entries.entries()){
+        assert.equal(await background(`#${section} [data-case="${index}"]`),colors[tone],`${section} / ${status} at ${width}px`);
+        assert.equal(await palettePage.locator(`#${section} [data-case="${index}"]`).evaluate(node=>getComputedStyle(node).opacity),'1','status tint must not fade text or controls');
+      }
+      assert.equal(await palettePage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`status rows fit ${section} at ${width}px`);
+    }
+  }
+  await show('orders');
+  await palettePage.locator('#orders [data-case="0"] .fixture-status').evaluate(node=>{node.textContent='Delivered';});
+  await palettePage.waitForFunction(()=>document.querySelector('#orders [data-case="0"]').dataset.dartTone==='success');
+  assert.equal(await background('#orders [data-case="0"]'),colors.success);
+  assert.equal(await palettePage.locator('#orders [data-case="0"] .dart-record-field[data-column="2"] strong').textContent(),'Delivered','summary status must follow an in-place update');
+  await palettePage.locator('#orders [data-case="0"]').evaluate(node=>node.classList.add('row-deleted'));
+  await palettePage.waitForFunction(()=>document.querySelector('#orders [data-case="0"]').dataset.dartTone==='neutral');
+  assert.equal(await background('#orders [data-case="0"]'),colors.neutral,'archive display overrides the previous lifecycle color');
+  for(const [section,checks] of [['settings',[['#staff-active','success'],['#staff-disabled','danger'],['#staff-pending','warning'],['#campaign-paused','neutral']]],['live-operations',[['#live-online','success'],['#live-delivery','warning']]],['status-groups',[['#same-group','success'],['#mixed-group','neutral'],['#mixed-new','info'],['#mixed-refused','danger'],['#stock-group','warning'],['[data-inventory-metric="sold"]','success'],['#goal-done','success']]],['cod-test',[['#cod-unpaid','warning']]]]){
+    await show(section);for(const [selector,tone] of checks)assert.equal(await background(selector),colors[tone],selector);
+  }
+  await show('orders');await palettePage.setViewportSize({width:390,height:844});
+  if(process.env.DART_DASHBOARD_SCREENSHOT_DIR)await palettePage.screenshot({path:path.join(process.env.DART_DASHBOARD_SCREENSHOT_DIR,'status-colors-phone.png'),fullPage:true});
+  assert.deepEqual(paletteErrors,[]);await palettePage.close();
+  console.log('PASS shared row status colors, 40% backgrounds, all operational sections, settings, live operations, grouped rows, COD priority, responsive widths and live state changes.');
   console.log('PASS dashboard group sizes, labeled inventory, headerless Waiting/actions, Sets field ownership, private prefetch, tab reuse, stale reads, retry and logout isolation.');
  }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
