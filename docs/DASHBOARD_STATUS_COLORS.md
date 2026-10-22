@@ -1,6 +1,6 @@
 # Dashboard status colors
 
-Rows and their status labels share a 40% alpha background. Text, controls and archived rows retain full opacity; archived rows retain their existing strike-through. Status text remains visible.
+Rows and their status labels share a 15% alpha background. Text, controls and archived rows retain full opacity; archived rows retain their existing strike-through. Status text remains visible. In Items, only Sold pieces receive the green tint; all unsold pieces retain their original white surface and unfilled status text.
 
 | Color | Examples |
 | --- | --- |
@@ -23,7 +23,8 @@ Readable display-preference code now lives in `scripts/display-preferences.sourc
 ## Verification
 
 - All 31 frontend CI static suites, all browser JS syntax checks, delivery build and static production staging passed.
-- Existing dashboard groups browser suite extended with 49 status cases across 12 operational sections, plus Staff, live routes, goal and inventory/order group checks; exact 40% computed background colors and full text opacity verified at 370, 480, 767, 768 and 1440 px.
+- Existing dashboard groups browser suite extended with 49 status cases across 12 operational sections, plus Staff, live routes, goal and inventory/order group checks; exact 15% computed background colors and full text opacity verified at 370, 480, 767, 768 and 1440 px.
+- Sold and unsold Items are checked separately, including Sold → In stock → Sold updates. Unsold pieces and their labels are uncolored.
 - In-place status updates change the summary and row; archive overrides its old lifecycle color. COD settlement color takes precedence over a delivered order.
 - Full-site Chromium smoke passed for storefront pages and dashboard navigation/settings/actions.
 - Manual check: open each section, change an authorized record status, inspect its summary and Details, then switch tabs and archive/restore a record.

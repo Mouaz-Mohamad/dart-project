@@ -123,6 +123,7 @@ const server=http.createServer((req,res)=>{
   if(process.env.DART_DASHBOARD_SCREENSHOT_DIR){fs.mkdirSync(process.env.DART_DASHBOARD_SCREENSHOT_DIR,{recursive:true});await page.evaluate(()=>{document.body.classList.remove('dart-admin-locked');activate('items');});await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(process.env.DART_DASHBOARD_SCREENSHOT_DIR,'inventory-groups-phone.png')});}
   // Verify visible colors across every operational section, including in-place status updates.
   const palettePage=await browser.newPage();
+  await palettePage.route('https://**/*',route=>route.fulfill({status:200,contentType:'text/css',body:''}));
   const paletteErrors=[];palettePage.on('pageerror',error=>paletteErrors.push(error.message));
   const cases={
     orders:[['New','info'],['Accepted','processing'],['Preparing','processing'],['Out With Representative','warning'],['Representative On The Way','warning'],['Delivered','success'],['Refused','danger'],['Cancelled','danger'],['Needs Attention','danger']],
@@ -138,7 +139,7 @@ const server=http.createServer((req,res)=>{
     waiting:[['waiting','warning'],['reserved','warning'],['converted','success'],['expired','neutral']],
     finance:[['Paid','success'],['Unpaid','warning'],['Settled','success'],['Awaiting Settlement','warning'],['Partial','warning'],['Partially Paid · Overdue','danger'],['Refunded','returned'],['Void','neutral'],['Unknown status','neutral']]
   };
-  const colors={success:'rgba(74, 222, 128, 0.4)',processing:'rgba(163, 230, 153, 0.4)',info:'rgba(96, 165, 250, 0.4)',warning:'rgba(250, 204, 21, 0.4)',danger:'rgba(248, 113, 113, 0.4)',returned:'rgba(192, 163, 245, 0.4)',neutral:'rgba(148, 163, 184, 0.4)'};
+  const colors={success:'rgba(74, 222, 128, 0.15)',processing:'rgba(163, 230, 153, 0.15)',info:'rgba(96, 165, 250, 0.15)',warning:'rgba(250, 204, 21, 0.15)',danger:'rgba(248, 113, 113, 0.15)',returned:'rgba(192, 163, 245, 0.15)',neutral:'rgba(148, 163, 184, 0.15)'};
   const sampleRows=(entries)=>entries.map(([status],index)=>`<div class="model-row" data-id="case-${index}" data-case="${index}"><span>ROW-${index}</span><span>Fixture record</span><span class="fixture-status">${status}</span></div>`).join('');
   await palettePage.setContent(`<!doctype html><html><head><meta charset="utf-8"></head><body><main>${Object.entries(cases).map(([section,entries])=>`<section id="${section}" class="dashboard-section"><div class="cont-titel"><div class="title-name"><h2>Code</h2><h2>Name</h2><h2>Status</h2></div>${sampleRows(entries)}</div></section>`).join('')}
   <section id="settings" class="dashboard-section"><article class="dart-settings-list-row" id="staff-active"><div class="dart-staff-badges"><span>Active</span></div><button>Details</button></article><article class="dart-settings-list-row" id="staff-disabled"><div class="dart-staff-badges"><span>Disabled</span></div></article><div class="dart-settings-list-row" data-allowance-id="invitation" id="staff-pending">Waiting for verification</div><div class="dart-settings-list-row" data-status="paused" id="campaign-paused">Paused campaign</div></section>
@@ -155,12 +156,18 @@ const server=http.createServer((req,res)=>{
     for(const [section,entries] of Object.entries(cases)){
       await show(section);
       for(const [index,[status,tone]] of entries.entries()){
-        assert.equal(await background(`#${section} [data-case="${index}"]`),colors[tone],`${section} / ${status} at ${width}px`);
+        assert.equal(await background(`#${section} [data-case="${index}"]`),section==='items'&&status!=='Sold'?'rgb(255, 255, 255)':colors[tone],`${section} / ${status} at ${width}px`);
         assert.equal(await palettePage.locator(`#${section} [data-case="${index}"]`).evaluate(node=>getComputedStyle(node).opacity),'1','status tint must not fade text or controls');
       }
       assert.equal(await palettePage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`status rows fit ${section} at ${width}px`);
     }
   }
+  await show('items');
+  await palettePage.locator('#items [data-case="3"] .fixture-status').evaluate(node=>{node.textContent='In stock';});
+  await palettePage.waitForFunction(()=>getComputedStyle(document.querySelector('#items [data-case="3"]')).backgroundColor==='rgb(255, 255, 255)');
+  assert.equal(await background('#items [data-case="3"] .dart-record-field[data-column="2"] strong'),'rgba(0, 0, 0, 0)','unsold status labels must also lose the sale tint');
+  await palettePage.locator('#items [data-case="3"] .fixture-status').evaluate(node=>{node.textContent='Sold';});
+  await palettePage.waitForFunction(()=>getComputedStyle(document.querySelector('#items [data-case="3"]')).backgroundColor==='rgba(74, 222, 128, 0.15)');
   await show('orders');
   await palettePage.locator('#orders [data-case="0"] .fixture-status').evaluate(node=>{node.textContent='Delivered';});
   await palettePage.waitForFunction(()=>document.querySelector('#orders [data-case="0"]').dataset.dartTone==='success');
@@ -175,7 +182,7 @@ const server=http.createServer((req,res)=>{
   await show('orders');await palettePage.setViewportSize({width:390,height:844});
   if(process.env.DART_DASHBOARD_SCREENSHOT_DIR)await palettePage.screenshot({path:path.join(process.env.DART_DASHBOARD_SCREENSHOT_DIR,'status-colors-phone.png'),fullPage:true});
   assert.deepEqual(paletteErrors,[]);await palettePage.close();
-  console.log('PASS shared row status colors, 40% backgrounds, all operational sections, settings, live operations, grouped rows, COD priority, responsive widths and live state changes.');
+  console.log('PASS shared row status colors, 15% backgrounds, all operational sections, settings, live operations, grouped rows, COD priority, responsive widths and live state changes.');
   console.log('PASS dashboard group sizes, labeled inventory, headerless Waiting/actions, Sets field ownership, private prefetch, tab reuse, stale reads, retry and logout isolation.');
  }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
