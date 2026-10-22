@@ -4835,6 +4835,8 @@ button,
 .dart-profile-password-form[hidden]{display:none}
 .dart-profile-password-form label{display:grid;gap:6px;font-weight:600}
 .dart-profile-password-form input{width:100%;min-height:44px;border:1px solid rgba(0,0,0,.15);border-radius:10px;padding:9px 12px;background:#fff}
+.dart-whatsapp-consent label{display:flex;align-items:flex-start;gap:10px;line-height:1.6}
+.dart-whatsapp-consent input[type="checkbox"]{flex:0 0 auto;width:22px;height:22px;min-height:22px;margin-top:3px;padding:0;accent-color:#ab012b}
 /* END Dart account security */
 
 

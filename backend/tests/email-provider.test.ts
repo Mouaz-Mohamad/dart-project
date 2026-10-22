@@ -66,10 +66,10 @@ describe("SMTP email provider", () => {
     );
   });
 
-  it("retries transient SMTP failures before succeeding", async () => {
+  it("retries an explicit temporary SMTP rejection before succeeding", async () => {
     vi.useFakeTimers();
     const transient = Object.assign(new Error("temporary SMTP failure"), {
-      code: "ETIMEDOUT",
+      responseCode: 451,
     });
     mocks.sendMail
       .mockRejectedValueOnce(transient)
@@ -80,6 +80,12 @@ describe("SMTP email provider", () => {
     await sending;
 
     expect(mocks.sendMail).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a timeout with an uncertain delivery outcome", async () => {
+    mocks.sendMail.mockRejectedValueOnce(Object.assign(new Error("timeout"), { code: "ETIMEDOUT" }));
+    await expect(provider().send(message)).rejects.toThrow("timeout");
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry permanent SMTP authentication failures", async () => {

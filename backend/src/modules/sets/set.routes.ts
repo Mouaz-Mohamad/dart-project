@@ -81,6 +81,7 @@ export function createSetRouter(
     "/admin/sets",
     signedIn,
     requireAccountType("staff"),
+    requireMfa,
     requirePermission("sets.read"),
     async (_request, response) => {
       response.setHeader("Cache-Control", "no-store");
@@ -154,6 +155,7 @@ export function createSetRouter(
     "/admin/sets/settings",
     signedIn,
     requireAccountType("staff"),
+    requireMfa,
     requirePermission("sets.read"),
     async (_request, response) => {
       response.status(200).json({ settings: await sets.discountSettings() });

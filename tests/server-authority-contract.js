@@ -98,13 +98,13 @@ assert.match(
 );
 assert.match(
   dashboardRuntime,
-  /DartDomainState\.write\(['"]dart_message_queue['"]/,
-  "birthday message queue must persist through server domain state",
+  /DartAdminApi\.request\(["']\/api\/v1\/admin\/messaging\/birthdays["']/,
+  "birthday messages must use the transactional messaging command",
 );
 assert.match(
   dashboardRuntime,
-  /DartDomainState\.write\(['"]dart_birthday_messages['"]/,
-  "birthday message history must persist through server domain state",
+  /\["birthday_messages","message_queue"\].*hydrateDomain/,
+  "birthday projections must rehydrate after the command succeeds",
 );
 assert.match(
   operations,

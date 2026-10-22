@@ -49,7 +49,7 @@ const environmentSchema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:4173"),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
-  RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
+  RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).optional(),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
@@ -85,6 +85,7 @@ const environmentSchema = z.object({
   WHATSAPP_OWNER_PHONE: z.string().default(""),
   WHATSAPP_STAFF_OTP_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_otp"),
   WHATSAPP_STAFF_INVITE_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_invite"),
+  WHATSAPP_BIRTHDAY_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
   OUTBOX_CRON_SECRET: z.string().trim().default(""),
   CRON_SECRET: z.string().trim().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
@@ -126,6 +127,7 @@ export interface AppConfig {
   whatsappOwnerPhone?: string | null;
   whatsappStaffOtpTemplate?: string;
   whatsappStaffInviteTemplate?: string;
+  whatsappBirthdayTemplate?: string;
   outboxCronSecret: string | null;
   outboxBatchSize: number;
 }
@@ -215,7 +217,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxyHops: parsed.data.TRUST_PROXY_HOPS,
     rateLimitWindowMs: parsed.data.RATE_LIMIT_WINDOW_MS,
     rateLimitMax: parsed.data.RATE_LIMIT_MAX,
-    rateLimitStore: parsed.data.RATE_LIMIT_STORE,
+    rateLimitStore: parsed.data.RATE_LIMIT_STORE || (parsed.data.NODE_ENV === "production" ? "postgres" : "memory"),
     logLevel: parsed.data.LOG_LEVEL,
     allowDevelopmentSeed: parsed.data.ALLOW_DEVELOPMENT_SEED,
     authPepper: parsed.data.AUTH_PEPPER,
@@ -241,6 +243,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     whatsappOwnerPhone: whatsappOwnerPhone || null,
     whatsappStaffOtpTemplate: parsed.data.WHATSAPP_STAFF_OTP_TEMPLATE,
     whatsappStaffInviteTemplate: parsed.data.WHATSAPP_STAFF_INVITE_TEMPLATE,
+    whatsappBirthdayTemplate: parsed.data.WHATSAPP_BIRTHDAY_TEMPLATE,
     outboxCronSecret: outboxCronSecret || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
   };

@@ -3574,7 +3574,7 @@ function renderModels(dataArray) {
       out = d.count === 0 ? "Out of stock" : m.status || "Active";
     c.insertAdjacentHTML(
       "beforeend",
-      `<div class="${getRowClass(m)}" data-id="${dartEsc(m.id)}"><input type="checkbox" class="model-checkbox" ${m.isChecked ? "checked" : ""} ${dartIsArchived(m) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete" title="${dartIsArchived(m) ? "استعادة" : "شطب"}"><i class="bx ${dartIsArchived(m) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete" title="حذف نهائي"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit" title="تعديل"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-history-entity="models" title="Audit History"><i class="bx bx-history"></i></button></div><div class="w100"><img src="${dartEsc(d.img || "https://via.placeholder.com/50")}" class="product-img model-img"></div><span class="text-item w150">${dartEsc(m.modelId)}</span><span class="text-item w150">${dartEsc(m.name)}</span><span class="text-item w150">${dartEsc(m.category)}</span><span class="text-item w200">${dartEsc(m.description)}</span><span class="text-item w150">${d.count}</span><span class="text-item w150">${d.total}</span><span class="text-item w150">${d.sold}</span><span class="text-item w150">${d.damaged}</span><span class="text-item w150">${dartMoney(m.cost)}</span><span class="text-item w150">${dartMoney(m.selling)}</span><span class="text-item w150">${Number(m.discount) || 0}%</span><span class="text-item w150">${dartMoney(m.discountedPrice ?? m.selling)}</span><span class="text-item w300">${dartEsc(d.colors.join(", ") || "-")}</span><span class="text-item w300">${dartEsc(d.sizes.join(", ") || "-")}</span><span class="text-item w150">• ${dartEsc(out)}</span><span class="text-item w150">${dartEsc(m.date || "-")}</span></div>`,
+      `<div class="${getRowClass(m)}" data-id="${dartEsc(m.id)}"><input type="checkbox" class="model-checkbox" ${m.isChecked ? "checked" : ""} ${dartIsArchived(m) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete" title="${dartIsArchived(m) ? "استعادة" : "شطب"}"><i class="bx ${dartIsArchived(m) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete" title="حذف نهائي"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit" title="تعديل"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-history-entity="models" title="Audit History"><i class="bx bx-history"></i></button></div><div class="w100"><img src="${dartEsc(d.img || "https://via.placeholder.com/50")}" class="product-img model-img"></div><span class="text-item w150">${dartEsc(m.modelId)}</span><span class="text-item w150">${dartEsc(m.name)}</span><span class="text-item w150">${dartEsc(m.category)}</span><span class="text-item w200">${dartEsc(m.description)}</span><span class="text-item w150">${d.count}</span><span class="text-item w150">${d.total}</span><span class="text-item w150">${d.sold}</span><span class="text-item w150">${d.damaged}</span><span class="text-item w150">${m.cost === undefined ? "Restricted" : dartMoney(m.cost)}</span><span class="text-item w150">${dartMoney(m.selling)}</span><span class="text-item w150">${Number(m.discount) || 0}%</span><span class="text-item w150">${dartMoney(m.discountedPrice ?? m.selling)}</span><span class="text-item w300">${dartEsc(d.colors.join(", ") || "-")}</span><span class="text-item w300">${dartEsc(d.sizes.join(", ") || "-")}</span><span class="text-item w150">• ${dartEsc(out)}</span><span class="text-item w150">${dartEsc(m.date || "-")}</span></div>`,
     );
   });
 }
@@ -4436,7 +4436,7 @@ function dartBirthdayMessageBatch(reference = new Date()) {
     }),
     sent = new Set(
       history
-        .filter((row) => row.birthdayDate === key)
+        .filter((row) => row.birthdayDate === key && Boolean(row.outboxEventId))
         .flatMap((row) => [String(row.customerRecordId || ""), String(row.clientId || "")]),
     ),
     rows = all.filter(
@@ -4467,7 +4467,7 @@ function renderBirthdayWidget() {
           `<div class="bday-item overflow" data-client-id="${dartEsc(c.id)}" data-birthday-date="${dartEsc(batch.key)}"><input type="checkbox" class="bday-checkbox"><span class="bday-date w100">${dartEsc(c.birthday)}</span><span class="bday-name w150">${dartEsc(c.clientName)}</span><span class="bday-age w100">${dartEsc(dartClientAgeLabel(c.birthday))}</span><span class="bday-phone w100">${dartEsc(c.phone1)}</span><span class="orders w100">${dartCurrentMonthlyOrders(c.clientId)} Order</span><span class="from w100">${dartEsc(c.governorate || c.country || "-")}</span></div>`,
       )
       .join("");
-  if (send) send.disabled = !rows.length;
+  if (send) send.disabled = !rows.length || Boolean(send.dataset.saving);
   const master = document.getElementById("selectAllBirthdays");
   if (master) {
     master.disabled = !rows.length;
@@ -4484,88 +4484,38 @@ function renderBirthdayWidget() {
 }
 
 /* BEGIN Brand — birthday message queue action */
+async function dartBirthdayDeliveryHealth() {
+  if (!window.DartAdminAccess?.can?.("messaging.read")) return;
+  const feed=document.getElementById("birthday-feed");
+  if (!feed) return;
+  let status=document.getElementById("birthdayDeliveryStatus");
+  if(!status){status=document.createElement("p");status.id="birthdayDeliveryStatus";status.setAttribute("role","status");feed.after(status);}
+  try {
+    const {queue}=await window.DartAdminApi.request("/api/v1/admin/messaging/delivery-health");
+    status.textContent=`Message queue: ${queue.pending} pending · ${queue.uncertain} require review · ${queue.terminal+queue.exhausted} failed · oldest ${queue.oldestSeconds}s`;
+  } catch(error){status.textContent=error.message || "Delivery status unavailable";}
+}
 function setupBirthdayMessageActions() {
-  const send = document.getElementById("sendBdayBtn");
-  if (!send || send.dataset.dartBirthdayBound) return;
-  send.dataset.dartBirthdayBound = "1";
-
-  send.addEventListener("click", async () => {
-    const selected = [...document.querySelectorAll("#birthday-feed .bday-checkbox:checked")]
-      .map((box) => box.closest("[data-client-id]"))
-      .filter(Boolean);
-    if (!selected.length) {
-      window.DartDialog.alert("Select at least one customer.");
-      return;
-    }
-
-    const queue = structuredClone(
-      window.DartState?.read?.("dart_message_queue", []) || [],
-    );
-    const history = structuredClone(
-      window.DartState?.read?.("dart_birthday_messages", []) || [],
-    );
-    const birthdayDiscountPercent = Math.max(
-      0,
-      Math.min(
-        100,
-        Number(window.DartSiteSettings?.get?.().birthdayDiscountPercent) || 30,
-      ),
-    );
-
-    selected.forEach((row, index) => {
-      const recordId = row.dataset.clientId;
-      const birthdayDate = row.dataset.birthdayDate;
-      const customer = customersData.find(
-        (item) => String(item.id) === String(recordId),
-      );
-      const alreadyQueued = history.some(
-        (item) =>
-          item.birthdayDate === birthdayDate &&
-          (String(item.customerRecordId) === String(recordId) ||
-            String(item.clientId) === String(customer?.clientId)),
-      );
-      if (!customer || alreadyQueued) return;
-
-      const messageId = `BDAY-${birthdayDate}-${customer.clientId}`;
-      queue.unshift({
-        id: `${messageId}-${Date.now()}-${index}`,
-        messageKey: messageId,
-        customerId: customer.clientId,
-        customerName: customer.clientName,
-        phone: customer.phone1,
-        birthdayDate,
-        type: "birthday-discount",
-        discountPercent: birthdayDiscountPercent,
-        rewardDays: 7,
-        status: "Pending API",
-        createdAt: new Date().toISOString(),
-      });
-      history.unshift({
-        id: messageId,
-        customerRecordId: recordId,
-        clientId: customer.clientId,
-        birthdayDate,
-        queuedAt: new Date().toISOString(),
-        status: "Queued for Backend",
-      });
-    });
-
-    if (!window.DartDomainState?.write) {
-      window.DartDialog.alert("Birthday messaging requires the secure server state.");
-      return;
-    }
-
-    window.DartDomainState.write("dart_message_queue", queue);
-    window.DartDomainState.write("dart_birthday_messages", history);
-    await Promise.all([
-      window.DartDomainState.syncDomain?.("message_queue"),
-      window.DartDomainState.syncDomain?.("birthday_messages"),
-    ]);
-    renderBirthdayWidget();
-    window.DartDialog.alert(
-      `Birthday discount messages (${birthdayDiscountPercent}%) were queued for backend delivery.`,
-    );
+  const send=document.getElementById("sendBdayBtn");
+  if(!send || send.dataset.dartBirthdayBound)return;
+  send.dataset.dartBirthdayBound="1";
+  send.addEventListener("click",async()=>{
+    if(send.dataset.saving)return;
+    const selected=[...document.querySelectorAll("#birthday-feed .bday-checkbox:checked")].map(box=>box.closest("[data-client-id]")).filter(Boolean);
+    if(!selected.length){window.DartDialog.alert("Select at least one customer.");return;}
+    send.dataset.saving="1";send.disabled=true;
+    try {
+      const result=await window.DartAdminApi.request("/api/v1/admin/messaging/birthdays",{method:"POST",body:{
+        customerRefs:selected.map(row=>row.dataset.clientId),birthdayDate:selected[0].dataset.birthdayDate,
+      }});
+      await Promise.all(["birthday_messages","message_queue"].map(domain=>window.DartDomainState.hydrateDomain(domain,true)));
+      renderBirthdayWidget();
+      await dartBirthdayDeliveryHealth();
+      window.DartDialog.alert(`${result.queued} birthday messages queued; ${result.alreadyQueued} already queued; ${result.skipped.length} without recorded consent. Queued is not delivery confirmation.`);
+    }catch(error){window.DartDialog.alert(error.message || "Unable to queue birthday messages. Please retry.");}
+    finally{delete send.dataset.saving;renderBirthdayWidget();}
   });
+  void dartBirthdayDeliveryHealth();
 }
 /* END Brand — birthday message queue action */
 

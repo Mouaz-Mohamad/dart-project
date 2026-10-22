@@ -31,6 +31,7 @@ import { FinanceService } from "./modules/finance/finance.service.js";
 import { TrafficAnalyticsService } from "./modules/analytics/traffic-analytics.service.js";
 import { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { OutboxService } from "./modules/outbox/outbox.service.js";
+import { BirthdayMessagingService } from "./modules/outbox/birthday-messaging.service.js";
 import { WaitingService } from "./modules/waiting/waiting.service.js";
 import { PromotionService } from "./modules/promotions/promotion.service.js";
 import { DartCardDrawService } from "./modules/loyalty/dart-card-draw.service.js";
@@ -139,6 +140,7 @@ export function createRuntimeApplication(
     financeService,
     trafficAnalyticsService,
     outboxService,
+    birthdayMessagingService: new BirthdayMessagingService(database,config.whatsappBirthdayTemplate || ""),
     maintenanceJob: async () => {
       await catalogService.cleanupReservations();
       if (config.rateLimitStore === "postgres") await pruneRateLimits(database);

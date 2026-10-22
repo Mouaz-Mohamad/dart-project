@@ -12,6 +12,8 @@ import { createErrorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { requestContext } from "./middleware/request-context.js";
 import { representativeLocationAccess } from "./middleware/representative-location-access.js";
+import { staffFieldAccess } from "./middleware/staff-field-access.js";
+import { sharedRateLimitStore } from "./security/shared-rate-limit.js";
 import {
   createHealthRouter,
   type HealthDependencies,
@@ -43,6 +45,8 @@ import type { TrafficAnalyticsService } from "./modules/analytics/traffic-analyt
 import type { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { createOutboxRouter } from "./modules/outbox/outbox.routes.js";
 import type { OutboxService } from "./modules/outbox/outbox.service.js";
+import type { BirthdayMessagingService } from "./modules/outbox/birthday-messaging.service.js";
+import { createBirthdayMessagingRouter } from "./modules/outbox/birthday-messaging.routes.js";
 import { createWaitingRouter } from "./modules/waiting/waiting.routes.js";
 import type { WaitingService } from "./modules/waiting/waiting.service.js";
 import { createPromotionRouter } from "./modules/promotions/promotion.routes.js";
@@ -75,6 +79,7 @@ export interface AppDependencies extends HealthDependencies {
   financeService?: FinanceService;
   trafficAnalyticsService?: TrafficAnalyticsService;
   outboxService?: OutboxService;
+  birthdayMessagingService?: BirthdayMessagingService;
   maintenanceJob?: () => Promise<void>;
   waitingService?: WaitingService;
   operationalAlerts?: Pick<OperationalAlertService, "report">;
@@ -105,6 +110,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   );
   app.use(
     rateLimit({
+      store: sharedRateLimitStore(config, "application"),
+      skip: request => request.path === "/api/v1/health/live",
       windowMs: config.rateLimitWindowMs,
       limit: config.rateLimitMax,
       standardHeaders: "draft-8",
@@ -143,6 +150,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   app.use(express.json({ limit: "512kb", strict: true }));
   app.use(cookieParser());
   app.use(representativeLocationAccess);
+  app.use(staffFieldAccess);
   app.use((_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("Pragma", "no-cache");
@@ -151,6 +159,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
 
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
+    if (dependencies.birthdayMessagingService && dependencies.outboxService) app.use("/api/v1",
+      createBirthdayMessagingRouter(dependencies.birthdayMessagingService,dependencies.identityService,config,dependencies.outboxService));
     app.use(
       "/api/v1",
       createIdentityRouter(

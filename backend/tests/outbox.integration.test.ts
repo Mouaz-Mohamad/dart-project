@@ -38,7 +38,7 @@ class FakeEmailProvider implements EmailProvider {
   public fail = false;
   public configured(): boolean { return true; }
   public async send(message: EmailMessage): Promise<void> {
-    if (this.fail) throw new Error("SMTP rejected user@example.com 201001234567");
+    if (this.fail) throw Object.assign(new Error("SMTP rejected user@example.com 201001234567"), { responseCode: 451 });
     this.messages.push(message);
   }
 }

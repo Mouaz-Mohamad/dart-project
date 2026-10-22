@@ -15,16 +15,6 @@ export interface EmailProvider {
   send(message: EmailMessage): Promise<void>;
 }
 
-const TRANSIENT_SMTP_CODES = new Set([
-  "ECONNECTION",
-  "ECONNRESET",
-  "EHOSTUNREACH",
-  "ENETUNREACH",
-  "ESOCKET",
-  "ETIMEDOUT",
-  "EAI_AGAIN",
-]);
-
 function smtpFailure(error: unknown): { code: string; responseCode: number | null } {
   if (!error || typeof error !== "object") {
     return { code: "", responseCode: null };
@@ -44,7 +34,7 @@ function isTransientSmtpFailure(error: unknown): boolean {
   if (failure.responseCode && failure.responseCode >= 400 && failure.responseCode < 500) {
     return true;
   }
-  return TRANSIENT_SMTP_CODES.has(failure.code);
+  return false;
 }
 
 function delay(milliseconds: number): Promise<void> {

@@ -43,7 +43,15 @@ export async function readRelationalDashboardDomain(
 
   if (domain === "birthday_messages" || domain === "message_queue") {
     const result = await db.query<{ payload: unknown }>(
-      "SELECT payload FROM message_records WHERE domain=$1 ORDER BY position, record_id",
+      `SELECT CASE WHEN e.id IS NULL THEN m.payload ELSE m.payload || jsonb_build_object(
+          'status',CASE a.state WHEN 'accepted' THEN 'Accepted' WHEN 'suppressed' THEN 'Suppressed'
+            WHEN 'terminal' THEN 'Failed' WHEN 'unknown' THEN 'Requires Review' WHEN 'executing' THEN 'Processing'
+            ELSE CASE WHEN e.attempts>=12 THEN 'Failed' WHEN e.status='failed' THEN 'Retry Pending' ELSE 'Queued' END END,
+          'providerMessageId',a.provider_message_id) END AS payload
+        FROM message_records m LEFT JOIN outbox_events e ON e.id::text=m.payload->>'outboxEventId'
+        LEFT JOIN LATERAL (SELECT state,provider_message_id FROM outbox_delivery_attempts
+          WHERE event_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1) a ON true
+        WHERE m.domain=$1 ORDER BY m.position,m.record_id`,
       [domain],
     );
     return result.rows.map((row) => row.payload);

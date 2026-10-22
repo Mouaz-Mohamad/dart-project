@@ -578,7 +578,7 @@ export class CatalogService {
     }
   }
 
-  async replaceState(expectedVersion: number, models: Record<string, unknown>[], items: Record<string, unknown>[], actorId: string, requestId: string, patch?: CatalogPatchVersions): Promise<CatalogState> {
+  async replaceState(expectedVersion: number, models: Record<string, unknown>[], items: Record<string, unknown>[], actorId: string, requestId: string, patch?: CatalogPatchVersions, costWritable = true): Promise<CatalogState> {
     const client = await this.pool.connect();
     let committedVersion = 0;
     try {
@@ -587,6 +587,20 @@ export class CatalogService {
         "SELECT pg_advisory_xact_lock(hashtext('dart:admin-state-bulk-write'))",
       );
       const referenced = [...new Set([...models.map((row) => text(row.modelId)), ...items.map((row) => text(row.modelId))])];
+      if (!costWritable) {
+        const costs = await client.query<{ model_id: string; cost_minor: string }>(
+          "SELECT model_id,cost_minor::text FROM catalog_models WHERE model_id=ANY($1::text[]) ORDER BY model_id FOR UPDATE", [referenced],
+        );
+        const byId = new Map(costs.rows.map(row => [row.model_id, Number(row.cost_minor)]));
+        models = models.map(raw => {
+          const saved = byId.get(text(raw.modelId));
+          if (saved === undefined) throw new AppError(403, "MODEL_COST_PERMISSION_REQUIRED", "Cost access is required to create a model");
+          return { ...raw, cost: money(saved) };
+        });
+        // Acquisition costs are server-derived for new stock and immutable for
+        // existing pieces. A redacted browser projection can never zero them.
+        items = items.map(raw => { const next = { ...raw }; delete next.costSnapshot; return next; });
+      }
       let validationModels = models;
       let previousRecords: Record<string, unknown> | undefined;
       if (patch) {

@@ -37,6 +37,44 @@ function contactProjection(state: ReturnType<typeof feedbackState>): unknown[] {
   }));
 }
 
+const RETURN_PRESENTATION_KEYS = new Set(["isArchived", "isDeleted", "archivedAt", "isChecked", "updatedAt"]);
+function unchangedProjection(candidate: unknown, stored: unknown): boolean {
+  if (Array.isArray(candidate)) return Array.isArray(stored) && candidate.length === stored.length && candidate.every((value, index) => unchangedProjection(value, stored[index]));
+  if (candidate && typeof candidate === "object") return Boolean(stored && typeof stored === "object" &&
+    Object.entries(candidate).every(([key, value]) => key in stored && unchangedProjection(value, (stored as Record<string, unknown>)[key])));
+  return candidate === stored;
+}
+
+// Only presentation metadata may use the legacy array adapter. Workflow state,
+// money, identities and inventory must use transactional Commerce commands.
+export function protectReturnSnapshots(data: unknown[], stored: unknown[]): unknown[] {
+  const id = (row: Record<string, unknown>) => String(row.id || row.returnId || "");
+  const previous = new Map(stored.map(value => [id(value as Record<string, unknown>), value as Record<string, unknown>]));
+  const selected = new Map<string, Record<string, unknown>>();
+  for (const value of data) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new AppError(422, "RETURN_RECORD_INVALID", "Return records must be objects");
+    const row = value as Record<string, unknown>, key = id(row), before = previous.get(key);
+    if (!key || selected.has(key)) throw new AppError(422, "RETURN_RECORD_INVALID", "Return identifiers must be unique");
+    if (!before || Object.entries(row).some(([field, current]) => !RETURN_PRESENTATION_KEYS.has(field) &&
+      (!(field in before) || !unchangedProjection(current, before[field])))) {
+      throw new AppError(405, "RETURN_COMMAND_REQUIRED", "Use the return create, edit or workflow command for operational changes");
+    }
+    const next = { ...before };
+    for (const field of ["isArchived", "isDeleted"] as const) {
+      if (row[field] !== undefined && typeof row[field] !== "boolean") throw new AppError(422, "RETURN_RECORD_INVALID", "Archive flags must be boolean");
+      if (row[field] !== undefined) next[field] = row[field];
+    }
+    next.archivedAt = next.isArchived || next.isDeleted ? before.archivedAt || new Date().toISOString() : null;
+    selected.set(key, next);
+  }
+  // Preserve the operational history when an old client removes a row from its
+  // array. The dashboard's existing delete/restore controls remain functional.
+  return stored.map(value => {
+    const row = value as Record<string, unknown>;
+    return selected.get(id(row)) || { ...row, isDeleted: true, isArchived: true, archivedAt: row.archivedAt || new Date().toISOString() };
+  });
+}
+
 export class DashboardStateService {
   constructor(private readonly pool: Pool) {}
 
@@ -95,6 +133,9 @@ export class DashboardStateService {
     actorId: string,
     requestId: string,
   ): Promise<{ domain: DashboardDomain; version: number; data: unknown[]; relatedVersions?: Record<string, number> }> {
+    if (domain === "message_queue" || domain === "birthday_messages") {
+      throw new AppError(405, "BIRTHDAY_COMMAND_REQUIRED", "Use the birthday messaging command to queue messages");
+    }
     if (domain === "reviews" || domain === "contacts") {
       return this.writeFeedback(domain, expectedVersion, data, actorId, requestId);
     }
@@ -108,6 +149,10 @@ export class DashboardStateService {
       const version = Number(current.rows[0]?.version || 1);
       if (version !== expectedVersion) {
         throw new AppError(409, "DOMAIN_VERSION_CONFLICT", `${domain} changed on another device; reload and retry`);
+      }
+      if (domain === "returns") {
+        const before = await client.query<{ payload: unknown }>("SELECT payload FROM return_requests ORDER BY position,record_id FOR UPDATE");
+        data = protectReturnSnapshots(data, before.rows.map(row => row.payload));
       }
       const next = version + 1;
       await client.query(

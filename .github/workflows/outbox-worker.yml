@@ -1,7 +1,7 @@
 name: Durable outbox worker
 on:
   schedule:
-    - cron: "7 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,7 @@ jobs:
           response_file="$(mktemp)"
           trap 'rm -f -- "$response_file"' EXIT
           deadline=$((SECONDS + 90))
+          delivery_issues=0
           for batch in $(seq 1 12); do
             remaining=$((deadline - SECONDS))
             if (( remaining < 1 )); then break; fi
@@ -31,17 +32,23 @@ jobs:
               --header "Authorization: Bearer $DART_OUTBOX_CRON_SECRET" \
               --output "$response_file" \
               "https://dart-api-dusky.vercel.app/api/v1/internal/outbox/process?limit=5"
-            claimed="$(node - "$response_file" <<'NODE'
+            result="$(node - "$response_file" <<'NODE'
           const fs = require('node:fs');
           const result = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-          for (const field of ['claimed', 'published', 'failed']) {
+          for (const field of ['claimed', 'published', 'failed', 'uncertain', 'terminal']) {
+            result[field] ??= 0;
             if (!Number.isInteger(result[field]) || result[field] < 0 || result[field] > 5) {
               throw new Error('Invalid outbox worker result');
             }
           }
-          if (result.failed > 0) throw new Error('Outbox provider delivery failed');
-          process.stdout.write(String(result.claimed));
+          process.stdout.write(`${result.claimed} ${result.failed + result.uncertain + result.terminal}`);
           NODE
             )"
+            read -r claimed issues <<< "$result"
+            delivery_issues=$((delivery_issues + issues))
             if (( claimed == 0 )); then break; fi
           done
+          if (( delivery_issues > 0 )); then
+            echo "Outbox completed with $delivery_issues delivery issues requiring review"
+            exit 1
+          fi

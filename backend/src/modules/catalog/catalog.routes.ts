@@ -16,6 +16,7 @@ import type { IdentityService } from "../identity/identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 import { buildProductSitemap } from "./catalog.seo.js";
 import type { CatalogService } from "./catalog.service.js";
+import { canReadCosts } from "../../middleware/staff-field-access.js";
 
 const stateSchema = z.object({
   expectedVersion: z.number().int().positive(),
@@ -131,7 +132,7 @@ export function createCatalogRouter(
       protectModels(request.auth!.permissions, body.models);
       const result = await catalog.replaceState(
         body.expectedVersion, body.models, body.items, request.auth!.userId,
-        String(request.id), body.recordVersions,
+        String(request.id), body.recordVersions, canReadCosts(request.auth!.permissions),
       );
       await dispatchOutbox(outbox, 10);
       response.status(200).json(result);
@@ -160,7 +161,8 @@ export function createCatalogRouter(
         body.items,
         request.auth!.userId,
         String(request.id),
-        ...(patch ? [patch] : []),
+        patch,
+        canReadCosts(request.auth!.permissions),
       );
       await dispatchOutbox(outbox, 20);
       response.status(200).json(result);

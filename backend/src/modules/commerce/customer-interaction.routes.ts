@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/commerce/customer-interaction.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
+import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -11,20 +12,6 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CustomerInteractionService } from "./customer-interaction.service.js";
-
-const contactLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 8,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-});
-
-const customerInteractionLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 30,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-});
 
 const contactSchema = z.object({
   fullName: z.string().trim().min(2).max(160),
@@ -69,6 +56,22 @@ export function createCustomerInteractionRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
+
+  const contactLimiter = rateLimit({
+    store: sharedRateLimitStore(config, "contact"),
+    windowMs: 15 * 60_000,
+    limit: 8,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+  });
+
+  const customerInteractionLimiter = rateLimit({
+    store: sharedRateLimitStore(config, "customer-interaction"),
+    windowMs: 15 * 60_000,
+    limit: 30,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+  });
 
   router.post("/contact", contactLimiter, async (request, response) => {
     const body = contactSchema.parse(request.body);

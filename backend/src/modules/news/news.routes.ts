@@ -11,7 +11,7 @@ import { newsAssetSchema, newsCreateSchema, newsIdSchema, newsListSchema, newsSt
 export function createNewsRouter(news: NewsService, assets: CatalogAssetService, identity: IdentityService,
   config: Pick<AppConfig, "sessionCookieName" | "authPepper">): Router {
   const router = Router();
-  const read = [authenticate(identity, config), requireAccountType("staff"), requireAnyPermission("news.read", "news.manage")];
+  const read = [authenticate(identity, config), requireAccountType("staff"), requireMfa, requireAnyPermission("news.read", "news.manage")];
   const write = [authenticate(identity, config), csrfProtection(config), requireAccountType("staff"), requireMfa, requirePermission("news.manage")];
   router.get("/news", async (req, res) => {
     const { limit, offset } = newsListSchema.pick({ limit: true, offset: true }).parse(req.query);

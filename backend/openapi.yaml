@@ -24,7 +24,69 @@ tags:
   - name: Finance
   - name: Catalog
   - name: Dashboard
+  - name: Messaging
 paths:
+  /me/preferences/whatsapp:
+    get:
+      tags: [Messaging]
+      operationId: readOwnWhatsAppPreference
+      security: [{ sessionCookie: [] }]
+      description: Customer only. Birthday marketing is opt-in, tied to the current primary phone and consent version. Defaults to false.
+      responses:
+        "200": { description: birthdayMarketing boolean and consentVersion }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      tags: [Messaging]
+      operationId: saveOwnWhatsAppPreference
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Customer changes only their own preference. Audited atomically; unknown keys are rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [birthdayMarketing, consentVersion]
+              properties:
+                birthdayMarketing: { type: boolean }
+                consentVersion: { type: string, const: birthday-whatsapp-v1 }
+      responses:
+        "200": { description: Committed own preference }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { description: Invalid preference or missing primary phone }
+  /admin/messaging/birthdays:
+    post:
+      tags: [Messaging]
+      operationId: queueBirthdayMessages
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Requires Staff, messaging.manage and satisfied MFA when required. Requires configured WhatsApp credentials and approved birthday template. Validates active customers, birthday and recorded consent. One outbox event per customer and Cairo birthday date, with atomic history and audit. Today's batch is allowed; tomorrow is allowed after 20:00 Cairo and scheduled for midnight. A 202 confirms queue persistence, never delivery.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [customerRefs, birthdayDate]
+              properties:
+                customerRefs: { type: array, minItems: 1, maxItems: 100, items: { type: string, minLength: 1, maxLength: 160 } }
+                birthdayDate: { type: string, format: date }
+      responses:
+        "202": { description: queued and alreadyQueued counts; skipped customer references }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { description: Invalid date or no eligible opted-in customers }
+        "503": { description: WhatsApp or birthday template is not configured; no event is created }
+  /admin/messaging/delivery-health:
+    get:
+      tags: [Messaging]
+      operationId: readMessageDeliveryHealth
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff, messaging.read and satisfied MFA when required. Returns pending, exhausted, uncertain, terminal and oldestSeconds queue counters plus up to 50 events. Recipients are masked. accepted means provider acceptance; unknown requires reconciliation and is never automatically retried.
+      responses:
+        "200": { description: Queue health and recent event/attempt statuses with providerMessageId when available }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/domain-state:
     get:
       tags: [Dashboard]
@@ -64,7 +126,7 @@ paths:
       responses:
         "200": { description: Committed domain, version, data and optional relatedVersions }
         "403": { description: Staff permission or MFA denied }
-        "405": { description: Dedicated Finance settlement endpoint required }
+        "405": { description: Dedicated operational command required for Finance settlements, return workflow changes or birthday/message queues }
         "409": { description: Domain changed; reload and retry without dropping concurrent records }
         "422": { description: Invalid version or domain data }
   /catalog/version:
@@ -92,7 +154,7 @@ paths:
       tags: [Catalog]
       operationId: readAdminCatalogState
       security: [{ sessionCookie: [] }]
-      description: Requires Staff, satisfied MFA when required, and catalog.manage, catalog.read or inventory.manage. No-store. Optional page/limit/q pages models and physical items independently with totalModels and totalItems over their full matching sets. category and sort are not supported for this admin projection.
+      description: Requires Staff, satisfied MFA when required, and catalog.manage, catalog.read or inventory.manage. Acquisition costs require finance.read, finance.manage or finance.view_cost; profit fields require finance.read, finance.manage or finance.view_profit; buyer identity requires customers.read. Projection applies to reads and mutation replies including nested legacy fields. No-store. Optional page/limit/q pages models and physical items independently with totalModels and totalItems. category and sort are not supported for this admin projection.
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
@@ -324,7 +386,7 @@ paths:
       tags: [News]
       operationId: listAdminNews
       security: [{ sessionCookie: [] }]
-      description: Requires Staff news.read or news.manage. Includes draft, archive, full text and version metadata.
+      description: Requires Staff news.read or news.manage and satisfied MFA when required. Includes draft, archive, full text and version metadata.
       parameters:
         - { in: query, name: q, schema: { type: string, maxLength: 160 } }
         - { in: query, name: status, schema: { type: string, enum: [all, draft, published], default: all } }
@@ -357,7 +419,7 @@ paths:
       security: [{ sessionCookie: [] }]
       parameters:
         - { $ref: "#/components/parameters/NewsId" }
-      description: Requires Staff news.read or news.manage; permits draft and archived previews.
+      description: Requires Staff news.read or news.manage and satisfied MFA when required; permits draft and archived previews.
       responses:
         "200": { description: Complete News and version metadata }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -430,6 +492,14 @@ paths:
         "200": { description: Set detail including shortDescription, showOnHomepage and homepageOrder }
         "404": { description: Set does not exist or is unavailable for public viewing }
   /admin/sets:
+    get:
+      tags: [Sets]
+      operationId: readAdminSets
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff sets.read or sets.manage and satisfied MFA when required. Cost and profit fields follow independent Finance grants.
+      responses:
+        "200": { description: Private Sets projection }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Sets]
       operationId: createSet
@@ -444,6 +514,15 @@ paths:
         "201": { description: Created Set }
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/sets/settings:
+    get:
+      tags: [Sets]
+      operationId: readAdminSetSettings
+      security: [{ sessionCookie: [] }]
+      description: Requires Staff sets.read or sets.manage and satisfied MFA when required.
+      responses:
+        "200": { description: Set discount settings }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/sets/{setId}:
     put:
       tags: [Sets]
@@ -1004,11 +1083,11 @@ paths:
       tags: [Internal Jobs]
       operationId: processOutboxPost
       security: [{ internalBearer: [] }]
-      description: Processes a bounded durable queue batch after optional reservation cleanup and shared limiter pruning. Immediate dispatch remains separate from the hourly recovery worker. GET is not supported.
+      description: Processes a bounded durable queue batch after optional reservation cleanup and shared limiter pruning. Immediate dispatch remains separate from the five-minute recovery worker. Durable attempts prevent automatic retries after acceptance or an ambiguous outcome. Only definite temporary rejections are retryable. GET is not supported.
       parameters:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
       responses:
-        "200": { description: Outbox batch result }
+        "200": { description: configured plus exclusive claimed outcome counters published, failed, uncertain and terminal. published includes safely suppressed events. }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
 components:

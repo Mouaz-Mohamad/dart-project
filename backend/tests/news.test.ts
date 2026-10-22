@@ -17,7 +17,7 @@ const cookie = `dart_session=123e4567-e89b-12d3-a456-426614174000.${"a".repeat(4
 const input = { title: "Dart News", excerpt: "Short copy", body: "First paragraph.\n\nSecond paragraph.",
   coverAssetId: "NEWSIMG-cover1234", status: "draft" as const, sortOrder: null };
 
-function fixture(permissions = ["news.read", "news.manage"], accountType = "staff") {
+function fixture(permissions = ["news.read", "news.manage"], accountType = "staff", pendingMfa = false) {
   const records = new Map<string, Record<string, unknown>>(), audits: unknown[] = [];
   let clock = 0;
   const query = vi.fn(async (sql: string, values: unknown[] = []) => {
@@ -60,7 +60,7 @@ function fixture(permissions = ["news.read", "news.manage"], accountType = "staf
   const client = { query, release: vi.fn() };
   const pool = { query, connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
   const news = new NewsService(pool);
-  const account = { userId: actor, accountType, permissions, mfaRequired: false, mfaSatisfied: true,
+  const account = { userId: actor, accountType, permissions, mfaRequired: pendingMfa, mfaSatisfied: !pendingMfa,
     csrfTokenHash: hashCsrfToken(csrf, config.authPepper) } as AuthenticatedAccount;
   const identity = { authenticate: vi.fn().mockResolvedValue(account) } as unknown as IdentityService;
   const assets = { put: vi.fn().mockResolvedValue({ id: "NEWSIMG-asset1234" }) } as unknown as CatalogAssetService;
@@ -72,6 +72,15 @@ function post(db: ReturnType<typeof fixture>, data: object) {
   return request(db.app).post("/api/v1/admin/news").set("Cookie", cookie).set("X-CSRF-Token", csrf).send(data);
 }
 describe("News HTTP and server authority", () => {
+  it("blocks private list and detail until required MFA is satisfied, while public reads remain available", async () => {
+    const db = fixture(["news.read"], "staff", true);
+    for (const path of ["/api/v1/admin/news", "/api/v1/admin/news/NEWS-1"]) {
+      const response = await request(db.app).get(path).set("Cookie", cookie);
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe("MFA_REQUIRED");
+    }
+    await request(db.app).get("/api/v1/news").expect(200);
+  });
   it("keeps drafts private, publishes plain text, orders manually, archives and restores with audit", async () => {
     const db = fixture();
     await post(db, { newsId: "NEWS-1", ...input }).expect(201);

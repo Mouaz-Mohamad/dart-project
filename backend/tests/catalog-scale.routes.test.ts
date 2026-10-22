@@ -74,6 +74,6 @@ describe("catalogue scale HTTP boundaries", () => {
   it("writes only the supplied rows through the versioned service", async () => {
     const { app, service } = application();
     expect((await request(app).patch("/api/v1/admin/catalog-state").set("Cookie", cookie).set("X-CSRF-Token", csrf).send(body)).status).toBe(200);
-    expect(service.replaceState).toHaveBeenCalledWith(1, [], body.items, expect.any(String), expect.any(String), body.recordVersions);
+    expect(service.replaceState).toHaveBeenCalledWith(1, [], body.items, expect.any(String), expect.any(String), body.recordVersions, false);
   });
 });

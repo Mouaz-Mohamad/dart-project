@@ -55,7 +55,7 @@ describe("Staff inventory permission", () => {
     const { app, catalog } = fixture(["inventory.manage"]);
     const response = await request(app)[method]("/api/v1/admin/catalog-state").set("Cookie", cookie).set("X-CSRF-Token", csrf).send(edit);
     expect(response.status).toBe(200);
-    expect(catalog.replaceState).toHaveBeenCalledWith(1, [], edit.items, expect.any(String), expect.any(String), edit.recordVersions);
+    expect(catalog.replaceState).toHaveBeenCalledWith(1, [], edit.items, expect.any(String), expect.any(String), edit.recordVersions, false);
   });
   it.each(["patch", "put"] as const)("%s refuses model/price edits for inventory-only Staff", async method => {
     const { app, catalog } = fixture(["inventory.manage"]);

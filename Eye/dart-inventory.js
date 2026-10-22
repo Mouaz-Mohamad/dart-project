@@ -404,6 +404,7 @@
         colorOptions: structuredClone(draft.colors),
         updatedAt: stamp(),
       };
+      if (!["finance.read", "finance.manage", "finance.view_cost"].some(key => window.DartAdminAccess?.can?.(key))) delete payload.cost;
       payload.discountedPrice = C.modelPrice(payload);
       payload.colors = payload.colorOptions
         .filter(C.active)
@@ -596,6 +597,9 @@
       ])
         $(field).value =
           m?.[k] ?? (k === "discount" ? 0 : k === "lowStockLimit" ? 5 : "");
+      const costVisible = m ? m.cost !== undefined : ["finance.read", "finance.manage", "finance.view_cost"].some(key => window.DartAdminAccess?.can?.(key));
+      $("modal-cost").disabled = !costVisible;
+      $("modal-cost").placeholder = costVisible ? "" : "Restricted";
       $("modal-id").readOnly = Boolean(
         m &&
         (itemsData.some((i) => i.modelId === m.modelId) ||

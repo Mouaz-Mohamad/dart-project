@@ -170,6 +170,12 @@
                         <span class="value" id="user-birthday"></span>
                     </div>
 
+                    <form id="birthdayWhatsappPreference" class="dart-profile-password-form dart-whatsapp-consent">
+                        <label><input type="checkbox" name="birthdayMarketing" disabled> I want birthday greetings and discount offers from Dart on WhatsApp. Optional; you can opt out here at any time.</label>
+                        <button type="submit" class="dart-profile-security-btn" disabled>Save WhatsApp preference</button>
+                        <p class="form-status" role="status" aria-live="polite"></p>
+                    </form>
+
                     <div class="info-profile dart-account-security">
                         <span class="label">Password</span>
                         <button type="button" class="dart-profile-security-btn" data-change-password-toggle>Change Password</button>
@@ -305,5 +311,6 @@
     <script src="Js/dart-dialog.js"></script>
     <script  src="Js/dart-platform.js" defer></script>
     <script  src="Js/dart-profile-records.js" defer></script>
+    <script src="Js/dart-whatsapp-preferences.js" defer></script>
 </body>
 </html>
