@@ -122,20 +122,20 @@ button { touch-action:manipulation; }
 /* Permission visibility never overwrites the action's own busy/status state. */
 [data-dart-access-denied="true"] { display: none !important; }
 
-/* BEGIN Shared state palette. Color alpha is 15%; text and controls keep full opacity. */
-.dashboard-section [data-dart-tone] { --dart-state-rgb:148 163 184; --dart-state-ink:#283548; }
+/* BEGIN Shared state palette. Each tint blends 5% color over a solid surface so nested fills do not accumulate. */
+.dashboard-section [data-dart-tone] { --dart-state-rgb:148 163 184; --dart-state-ink:#283548; --dart-state-fill:linear-gradient(rgb(var(--dart-state-rgb) / .05),rgb(var(--dart-state-rgb) / .05)); }
 .dashboard-section [data-dart-tone="success"] { --dart-state-rgb:74 222 128; --dart-state-ink:#14532d; }
 .dashboard-section [data-dart-tone="processing"] { --dart-state-rgb:163 230 153; --dart-state-ink:#25531b; }
 .dashboard-section [data-dart-tone="info"] { --dart-state-rgb:96 165 250; --dart-state-ink:#123e79; }
 .dashboard-section [data-dart-tone="warning"] { --dart-state-rgb:250 204 21; --dart-state-ink:#624300; }
 .dashboard-section [data-dart-tone="danger"] { --dart-state-rgb:248 113 113; --dart-state-ink:#7f1d1d; }
 .dashboard-section [data-dart-tone="returned"] { --dart-state-rgb:192 163 245; --dart-state-ink:#502582; }
-.dashboard-section [data-dart-tone][data-dart-kind="record"] { background:rgb(var(--dart-state-rgb) / .15); border-color:rgb(var(--dart-state-rgb) / .15); }
-.dashboard-section [data-dart-tone][data-dart-kind="badge"] { color:var(--dart-state-ink); background:rgb(var(--dart-state-rgb) / .15); border:1px solid rgb(var(--dart-state-rgb) / .15); border-radius:6px; padding:3px 7px; line-height:1.5; }
+.dashboard-section [data-dart-tone][data-dart-kind="record"] { background:var(--dart-state-fill) var(--dart-surface); border-color:rgb(var(--dart-state-rgb) / .05); }
+.dashboard-section [data-dart-tone][data-dart-kind="badge"] { color:var(--dart-state-ink); background:var(--dart-state-fill) var(--dart-surface); border:1px solid rgb(var(--dart-state-rgb) / .05); border-radius:6px; padding:3px 7px; line-height:1.5; }
 .dashboard-section .dart-compact-record[data-dart-tone],.dashboard-section .row-deleted[data-dart-tone] { opacity:1; }
 .dashboard-section .dart-order-group-card[data-dart-tone] > header,.dashboard-section .dart-order-group-card[data-dart-tone] .dart-order-group-block,.dashboard-section .dart-order-group-ref[data-dart-tone] > span { background:transparent; }
 .dashboard-section .dart-live-rep-card[data-dart-tone].is-selected { outline:2px solid #ab012b; outline-offset:2px; }
-/* Unsold physical items retain their original surface, including their status text. */
-#items .model-row[data-dart-label]:not([data-dart-label="Sold" i]) { background:var(--dart-surface); border-color:var(--dart-line); }
-#items .model-row[data-dart-label]:not([data-dart-label="Sold" i]) [data-dart-kind="badge"] { color:inherit; background:transparent; border:0; border-radius:0; padding:0; }
+/* Clients and unsold physical items retain their original surface, including their status text. */
+#items .model-row[data-dart-label]:not([data-dart-label="Sold" i]),#customers .model-row[data-dart-tone] { background:var(--dart-surface); border-color:var(--dart-line); }
+#items .model-row[data-dart-label]:not([data-dart-label="Sold" i]) [data-dart-kind="badge"],#customers .model-row [data-dart-kind="badge"] { color:inherit; background:transparent; border:0; border-radius:0; padding:0; }
 /* END Shared state palette. */

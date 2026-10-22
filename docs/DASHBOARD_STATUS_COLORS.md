@@ -1,6 +1,6 @@
 # Dashboard status colors
 
-Rows and their status labels share a 15% alpha background. Text, controls and archived rows retain full opacity; archived rows retain their existing strike-through. Status text remains visible. In Items, only Sold pieces receive the green tint; all unsold pieces retain their original white surface and unfilled status text.
+Rows and their status labels use a 5% tint over a solid white surface. This backing prevents nested row, group and badge colors from accumulating. Text, controls and archived rows retain full opacity; archived rows retain their existing strike-through. Status text remains visible. Clients retain their ordinary untinted surface and unfilled status text in every account state. In Items, only Sold pieces receive the green tint; all unsold pieces retain their original white surface and unfilled status text.
 
 | Color | Examples |
 | --- | --- |
@@ -23,8 +23,9 @@ Readable display-preference code now lives in `scripts/display-preferences.sourc
 ## Verification
 
 - All 31 frontend CI static suites, all browser JS syntax checks, delivery build and static production staging passed.
-- Existing dashboard groups browser suite extended with 49 status cases across 12 operational sections, plus Staff, live routes, goal and inventory/order group checks; exact 15% computed background colors and full text opacity verified at 370, 480, 767, 768 and 1440 px.
+- Existing dashboard groups browser suite extended with 49 status cases across 12 operational sections, plus Staff, live routes, goal and inventory/order group checks; exact 5% computed background colors and full text opacity verified at 370, 480, 767, 768 and 1440 px.
 - Sold and unsold Items are checked separately, including Sold → In stock → Sold updates. Unsold pieces and their labels are uncolored.
+- Client surfaces and labels stay uncolored after account status changes. Nested groups and badges each use their own solid backing.
 - In-place status updates change the summary and row; archive overrides its old lifecycle color. COD settlement color takes precedence over a delivered order.
 - Full-site Chromium smoke passed for storefront pages and dashboard navigation/settings/actions.
 - Manual check: open each section, change an authorized record status, inspect its summary and Details, then switch tabs and archive/restore a record.
