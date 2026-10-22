@@ -14,8 +14,10 @@ fi
 
 if git diff --quiet "$base" HEAD -- . \
   ':(exclude)backend/**' \
+  ':(exclude)tests/**' \
   ':(exclude)docs/**' \
   ':(exclude).github/**' \
+  ':(exclude)scripts/vercel-ignore-frontend.sh' \
   ':(exclude)AGENTS.md'; then
   echo "Skipping frontend build: no frontend/runtime changes."
   exit 0

@@ -132,6 +132,9 @@ function nativeScenario(origin) {
         window.DartNavigation.go('/products.html');
       } else if (phase === 3) {
         await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]') && cart().length === 0);
+        // pageshow precedes the browser's persisted scroll restoration. Observe
+        // its completed result before reporting or immediately navigating away.
+        await wait(() => Math.abs(window.scrollY - 400) <= 1);
         await report(phase);
         window.history.back();
       } else if (phase === 4) {
@@ -140,6 +143,7 @@ function nativeScenario(origin) {
         window.history.forward();
       } else if (phase === 5) {
         await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]') && cart().length === 0);
+        await wait(() => Math.abs(window.scrollY - 400) <= 1);
         await report(phase);
       }
     } catch (error) {
