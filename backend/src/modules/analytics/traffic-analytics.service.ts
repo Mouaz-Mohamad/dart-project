@@ -46,6 +46,7 @@ interface OrderTotalsRow {
 
 interface VisitorRow {
   visitor_id: string;
+  visitor_number: string;
   customer_user_id: string | null;
   full_name: string | null;
   client_code: string | null;
@@ -306,9 +307,6 @@ export class TrafficAnalyticsService {
     if (!Number.isFinite(spanDays) || spanDays < 1 || spanDays > 3660) {
       throw new AppError(422, "ANALYTICS_RANGE_TOO_LARGE", "Analytics range must be 10 years or less");
     }
-    if (group === "hourly" && spanDays > 31) {
-      throw new AppError(422, "ANALYTICS_HOURLY_RANGE_TOO_LARGE", "Hourly analytics are limited to 31 days");
-    }
 
     const client = await this.pool.connect();
     try {
@@ -448,10 +446,11 @@ export class TrafficAnalyticsService {
              AND ${orderPeriodWhere}
            GROUP BY orders.customer_user_id
          )
-         SELECT stats.visitor_id, stats.customer_user_id, customers.full_name, customers.client_code,
+         SELECT stats.visitor_id, visitors.visitor_number::text, stats.customer_user_id, customers.full_name, customers.client_code,
            stats.visits, stats.add_events, stats.items_added, COALESCE(order_stats.orders,'0') AS orders,
            stats.first_visit, stats.last_visit
          FROM visitor_stats stats
+         JOIN traffic_analytics_visitors visitors ON visitors.visitor_id=stats.visitor_id::uuid
          LEFT JOIN customers ON customers.user_id=stats.customer_user_id::uuid
          LEFT JOIN order_stats ON order_stats.customer_user_id=stats.customer_user_id
          ORDER BY stats.visits::bigint DESC, stats.add_events::bigint DESC, stats.last_visit DESC NULLS LAST
@@ -509,8 +508,9 @@ export class TrafficAnalyticsService {
         series,
         visitors: visitorsResult.rows.map((row) => ({
           visitorId: row.visitor_id,
+          visitorCode: `visit-${row.visitor_number}`,
           customerUserId: row.customer_user_id,
-          name: row.full_name || `Guest ${row.visitor_id.slice(0, 8)}`,
+          name: row.full_name || `visit-${row.visitor_number}`,
           clientCode: row.client_code,
           type: row.customer_user_id ? "Customer" : "Guest",
           visits: count(row.visits),

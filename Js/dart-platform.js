@@ -93,6 +93,7 @@
   // BEGIN Website analytics identity — first-party anonymous ID + browser-session ID.
   // PostgreSQL remains authoritative; these IDs only let the server distinguish people/sessions.
   const ANALYTICS_VISITOR_COOKIE = "dart_vid";
+  const ANALYTICS_VISITOR_SESSION_KEY = "dart_analytics_visitor_id";
   const ANALYTICS_SESSION_KEY = "dart_analytics_session_id";
   const ANALYTICS_SESSION_SEEN_KEY = "dart_analytics_session_seen_at";
   const ANALYTICS_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -101,33 +102,47 @@
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0"));
-    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return hex.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
   };
   const validAnalyticsUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
   const analyticsCookieValue = () => {
-    const match = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${ANALYTICS_VISITOR_COOKIE}=`));
-    return match ? decodeURIComponent(match.slice(ANALYTICS_VISITOR_COOKIE.length + 1)) : "";
+    try {
+      return decodeURIComponent(document.cookie.match(/(?:^|;\s*)dart_vid=([^;]*)/)?.[1] || "");
+    } catch { return ""; }
   };
-  let ANALYTICS_VISITOR_ID = analyticsCookieValue();
-  if (!validAnalyticsUuid(ANALYTICS_VISITOR_ID)) {
-    ANALYTICS_VISITOR_ID = uuidV4();
+  function readAnalyticsSessionValue(key) {
+    try { return sessionStorage.getItem(key) || ""; } catch { return ""; }
+  }
+  function writeAnalyticsSessionValue(key, value) {
+    try { sessionStorage.setItem(key, value); } catch {}
+  }
+  // Keep the existing cookie identity. A tab-scoped fallback survives navigation
+  // when cookies are unavailable; it stores no profile or analytics counters.
+  const cookieVisitorId = analyticsCookieValue();
+  const sessionVisitorId = readAnalyticsSessionValue(ANALYTICS_VISITOR_SESSION_KEY);
+  const ANALYTICS_VISITOR_ID = validAnalyticsUuid(cookieVisitorId) ? cookieVisitorId
+    : validAnalyticsUuid(sessionVisitorId) ? sessionVisitorId : uuidV4();
+  writeAnalyticsSessionValue(ANALYTICS_VISITOR_SESSION_KEY, ANALYTICS_VISITOR_ID);
+  try {
     const secure = location.protocol === "https:" ? "; Secure" : "";
     document.cookie = `${ANALYTICS_VISITOR_COOKIE}=${encodeURIComponent(ANALYTICS_VISITOR_ID)}; Max-Age=31536000; Path=/; SameSite=Lax${secure}`;
-  }
+  } catch {}
   let ANALYTICS_SESSION_ID = "";
+  let analyticsLastSeen = 0;
 
   function ensureAnalyticsSession() {
-    const storedSessionId = sessionStorage.getItem(ANALYTICS_SESSION_KEY) || "";
-    const lastSeen = Number(sessionStorage.getItem(ANALYTICS_SESSION_SEEN_KEY) || 0);
+    const storedSessionId = readAnalyticsSessionValue(ANALYTICS_SESSION_KEY) || ANALYTICS_SESSION_ID;
+    const lastSeen = Number(readAnalyticsSessionValue(ANALYTICS_SESSION_SEEN_KEY) || analyticsLastSeen);
     const currentTime = Date.now();
     const started =
       !validAnalyticsUuid(storedSessionId) ||
       !lastSeen ||
       currentTime - lastSeen > ANALYTICS_SESSION_TIMEOUT_MS;
     ANALYTICS_SESSION_ID = started ? uuidV4() : storedSessionId;
-    if (started) sessionStorage.setItem(ANALYTICS_SESSION_KEY, ANALYTICS_SESSION_ID);
-    sessionStorage.setItem(ANALYTICS_SESSION_SEEN_KEY, String(currentTime));
+    if (started) writeAnalyticsSessionValue(ANALYTICS_SESSION_KEY, ANALYTICS_SESSION_ID);
+    analyticsLastSeen = currentTime;
+    writeAnalyticsSessionValue(ANALYTICS_SESSION_SEEN_KEY, String(currentTime));
     return { sessionId: ANALYTICS_SESSION_ID, started };
   }
 
@@ -785,6 +800,9 @@
       customerCommercePromise = null;
       serverReviewEligible = null;
       serverPurchaseStats = null;
+      // The server links this browser's guest history to the authenticated
+      // account. The existing visit key makes this safe to repeat after login.
+      if (nextId) void trackAnalyticsEvent("visit");
     }
     window.dispatchEvent?.(
       new CustomEvent("dart:customer-session-changed", { detail: { user: apiUserCache } }),

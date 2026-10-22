@@ -336,6 +336,12 @@
       const previousMonthLastDay = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0).getDate();
       previousEnd = endOfDay(new Date(now.getFullYear() - 1, now.getMonth(), Math.min(now.getDate(), previousMonthLastDay)));
       label = `${now.getFullYear()} to date`;
+    } else if (preset === "last_year") {
+      start = new Date(now.getFullYear() - 1, 0, 1);
+      end = endOfDay(new Date(now.getFullYear() - 1, 11, 31));
+      previousStart = new Date(now.getFullYear() - 2, 0, 1);
+      previousEnd = endOfDay(new Date(now.getFullYear() - 2, 11, 31));
+      label = String(now.getFullYear() - 1);
     } else if (preset === "custom") {
       start = startOfDay(custom.start || now);
       end = endOfDay(custom.end || custom.start || now);
@@ -1194,7 +1200,7 @@
 
   function loadPeriodState() {
     const saved = readJSON(STORAGE_KEYS.period, {});
-    const preset = ["this_month", "last_month", "this_quarter", "this_year", "last_7", "last_30", "custom"].includes(saved.preset)
+    const preset = ["this_month", "last_month", "this_quarter", "this_year", "last_year", "last_7", "last_30", "custom"].includes(saved.preset)
       ? saved.preset
       : "this_month";
     state.period = {

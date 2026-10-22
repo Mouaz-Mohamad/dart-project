@@ -43,7 +43,8 @@ describe("OpenAPI current Dart contracts", () => {
     expect(text).toContain("eventType: { type: string, enum: [visit, add_to_cart] }");
     expect(text).toContain("reservationId:");
     expect(text).toContain("enum: [hourly, daily, weekly, monthly, yearly]");
-    expect(text).toContain("Hourly grouping is limited to a 31-day range.");
+    expect(text).toContain("Hourly returns 24 Cairo hour-of-day buckets across that period.");
+    expect(text).toContain("stable visit-N guest codes");
   });
 
   it("documents Google/Facebook customer completion and the multi-winner Dart Card rule", async () => {

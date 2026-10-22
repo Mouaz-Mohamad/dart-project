@@ -53,6 +53,7 @@ const server = http.createServer((request, response) => {
                 "finance.read",
                 "staff.read",
                 "staff.manage",
+                "analytics.read",
               ],
             }
           : pathname.startsWith("/api/v1/admin/finance/summary")
@@ -94,6 +95,13 @@ const server = http.createServer((request, response) => {
                         : pathname === "/api/v1/reviews"
                           ? { reviews: [] }
                           : {};
+    if (pathname === "/api/v1/admin/analytics/traffic") {
+      const query = new URL(request.url, "http://test").searchParams;
+      response.end(JSON.stringify({ start:query.get('start'),end:query.get('end'),group:query.get('group'),
+        summary:{uniqueVisitors:1,visits:2},series:[],visitors:[{name:'visit-1',type:'Guest',visits:2,
+          firstVisit:'2026-01-01T12:00:00Z',lastVisit:'2026-10-22T12:00:00Z'}] }));
+      return;
+    }
     if (pathname === "/api/v1/admin/finance/report") {
       const query = new URL(request.url, "http://test").searchParams;
       const current = { start: query.get("start"), end: query.get("end") };
@@ -405,6 +413,31 @@ const server = http.createServer((request, response) => {
     });
     assert.deepEqual(unreadable,[],`${target} must not display white text on a white background`);
   }
+  // Real period controls and late-loaded analytics must agree for yearly/custom Hours.
+  await dashboard.evaluate(()=>document.querySelector('a[data-target="brand"]').click());
+  await dashboard.waitForSelector('#trafficVisitorDetailsTow tr');
+  await dashboard.locator('[data-chart-period-tow="hourly"]').click();
+  for (const preset of ['this_year','last_year']) {
+    await dashboard.locator('#brand-period-preset').selectOption(preset);
+    await dashboard.waitForFunction(()=>{
+      const range=window.DartFinance.currentRangeSelection();
+      const text=document.getElementById('trafficPeriodLabelTow').textContent;
+      return text.includes(range.start+' → '+range.end)&&text.includes('hourly');
+    });
+    assert.equal(await dashboard.locator('#finance-period-preset').inputValue(),preset);
+    assert.match(await dashboard.locator('#trafficVisitorDetailsTow').textContent(),/visit-1/);
+  }
+  await dashboard.locator('#brand-period-preset').selectOption('custom');
+  await dashboard.locator('#brand-period-start').fill('2024-01-01');
+  await dashboard.locator('#brand-period-end').fill('2026-10-22');
+  await dashboard.waitForFunction(()=>document.getElementById('trafficPeriodLabelTow').textContent.includes('2024-01-01 → 2026-10-22'));
+  assert.equal(await dashboard.locator('#trafficHourWindowTow').count(),0);
+  for(const width of [390,1366]) {
+    await dashboard.setViewportSize({width,height:900});
+    await dashboard.locator('.chart-box-tow').scrollIntoViewIfNeeded();
+    assert.equal(await dashboard.locator('.chart-box-tow').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`traffic chart fits ${width}px`);
+  }
+  await dashboard.locator('#brand-period-preset').selectOption('this_month');
   // The order editor keeps every original field and permits phone/name-only client contact.
   await dashboard.evaluate(() => document.querySelector('a[data-target="orders"]').click());
   // Address calculations have their own suite; this fixture isolates editor submission state.
