@@ -10,10 +10,13 @@ Codex reads this file automatically before every task, so the rules below apply 
 
 ## Commands
 
-- Install: `cd backend && npm install`
+- Install frontend build/check tools: `npm ci --ignore-scripts --no-audit --no-fund`
+- Install backend: `cd backend && npm install`
 - Build storefront CSS delivery bundle: `node scripts/build-home-css.cjs`
 - Build Home and navigation JavaScript delivery bundles: `node scripts/build-home-runtime.cjs`
 - Build all frontend delivery assets: `npm run build` (composes `src/runtime-layout.json` before the existing JavaScript minification stage).
+- Audit covered CSS declarations without changing files: `npm run audit:css` (`-- --check` fails on redundant overrides; `-- --json` lists values and winners).
+- Compare source/staged CSS to a reviewed Git revision: `DART_CSS_BASE_REF=HEAD node tests/css-cascade-browser.cjs` (requires Playwright/Chromium).
 - Check browser source ownership, formatting, syntax and generated-runtime freshness: `npm run check:source`
 - Run all maintained frontend static checks: `npm run test:frontend`
 - Stage production HTML with its shared shell and content-versioned assets: `node scripts/stage-vercel-public.cjs`

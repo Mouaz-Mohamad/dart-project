@@ -6,6 +6,7 @@
     "auth-contract.js",
     "cache-revalidation-contract.cjs",
     "catalog-category-contract.js",
+    "css-cascade-contract.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",
     "database-authoritative-storage.cjs",
@@ -36,6 +37,7 @@
     "test-inventory-contract.cjs"
   ],
   "ciBrowser": [
+    "css-cascade-browser.cjs",
     "dashboard-groups-browser.cjs",
     "full-site-browser.js",
     "home-storefront-browser.js",

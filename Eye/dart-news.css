@@ -1,54 +1,270 @@
-
 /* DART CODE GUIDE | Eye/dart-news.css — scoped to News management. */
-#news[hidden], #news [hidden], .dart-news-editor [hidden] { display: none !important; }
-.dart-news-table { height: auto; max-height: calc(100dvh - 260px); }
-.dart-news-row .news-checkbox { width: 25px; height: 25px; flex-shrink: 0; margin-right: 50px; }
-.dart-news-row > div { overflow-wrap: anywhere; }
-.dart-news-row img { object-fit: cover; border-radius: 5px; }
-.dart-news-row.is-archived { background: #f5f0ec; opacity: .85; }
-.dart-news-admin-message { padding: 0 16px; min-height: 20px; }
-.dart-news-admin-message.is-error, #news-form-message.is-error { color: #ab012b; }
-.dart-news-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 12px; }
-.dart-news-pagination button, .dart-news-editor-actions > button, #news-reload-record, #news-retry { border: 1px solid #d5c8bd; border-radius: 6px; background: #fbf8f4; color: #151515; padding: 9px 14px; cursor: pointer; }
-#news button:disabled, .dart-news-editor button:disabled { opacity: .5; cursor: wait; }
-.dart-news-editor { width: min(780px,calc(100% - 32px)); max-height: 90vh; max-height: 90dvh; overflow: auto; overscroll-behavior: contain; margin: auto; padding: 40px 24px 24px; border: 1px solid #e4dcd5; border-radius: 14px; color: #151515; background: #fbf8f4; scrollbar-color: #ab012b #e8e0d9; }
-.dart-news-editor:not([open]) { display: none; }
-.dart-news-editor::backdrop { background: rgba(0,0,0,.6); }
-.dart-news-editor form { display: grid; gap: 16px; }
-.dart-news-editor label { display: grid; gap: 7px; font-size: 14px; }
-.dart-news-editor label span { color: #666; font-size: 12px; line-height: 1.5; }
-.dart-news-editor input, .dart-news-editor textarea, .dart-news-editor select { box-sizing: border-box; width: 100%; border: 1px solid #d5c8bd; border-radius: 6px; background: #fff; padding: 10px; font: inherit; }
-.dart-news-editor textarea { resize: vertical; }
-.dart-news-editor img { object-fit: cover; border-radius: 7px; }
-.dart-news-editor-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.dart-news-editor-actions { display: flex; justify-content: flex-end; gap: 12px; }
-.dart-news-editor-actions #news-save { background: #ab012b; color: #fff; }
-.dart-news-editor button:focus-visible { outline: 2px solid #ab012b; outline-offset: 2px; }
-@media(max-width: 640px) { .dart-news-editor-options { grid-template-columns: 1fr; } }
+#news[hidden],
+#news [hidden],
+.dart-news-editor [hidden] {
+  display: none !important;
+}
+.dart-news-table {
+  height: auto;
+  max-height: calc(100dvh - 260px);
+}
+.dart-news-row .news-checkbox {
+  width: 25px;
+  height: 25px;
+  flex-shrink: 0;
+  margin-right: 50px;
+}
+.dart-news-row > div {
+  overflow-wrap: anywhere;
+}
+.dart-news-row img {
+  object-fit: cover;
+  border-radius: 5px;
+}
+.dart-news-row.is-archived {
+  background: #f5f0ec;
+  opacity: 0.85;
+}
+.dart-news-admin-message {
+  padding: 0 16px;
+  min-height: 20px;
+}
+.dart-news-admin-message.is-error,
+#news-form-message.is-error {
+  color: #ab012b;
+}
+.dart-news-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 12px;
+}
+.dart-news-pagination button,
+.dart-news-editor-actions > button,
+#news-reload-record,
+#news-retry {
+  border: 1px solid #d5c8bd;
+  border-radius: 6px;
+  background: #fbf8f4;
+  color: #151515;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+#news button:disabled,
+.dart-news-editor button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.dart-news-editor {
+  width: min(780px, calc(100% - 32px));
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: auto;
+  padding: 40px 24px 24px;
+  border: 1px solid #e4dcd5;
+  border-radius: 14px;
+  color: #151515;
+  background: #fbf8f4;
+  scrollbar-color: #ab012b #e8e0d9;
+}
+.dart-news-editor:not([open]) {
+  display: none;
+}
+.dart-news-editor::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.dart-news-editor form {
+  display: grid;
+  gap: 16px;
+}
+.dart-news-editor label {
+  display: grid;
+  gap: 7px;
+  font-size: 14px;
+}
+.dart-news-editor label span {
+  color: #666;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dart-news-editor input,
+.dart-news-editor textarea,
+.dart-news-editor select {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #d5c8bd;
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px;
+  font: inherit;
+}
+.dart-news-editor textarea {
+  resize: vertical;
+}
+.dart-news-editor img {
+  object-fit: cover;
+  border-radius: 7px;
+}
+.dart-news-editor-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.dart-news-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.dart-news-editor-actions #news-save {
+  background: #ab012b;
+  color: #fff;
+}
+.dart-news-editor button:focus-visible {
+  outline: 2px solid #ab012b;
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .dart-news-editor-options {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* BEGIN News details — independent of Model and Set dialogs. */
-.dart-news-dialog { width: 90vw; max-width: 90vw; height: 90vh; height: 90dvh; max-height: 90vh; max-height: 90dvh; margin: auto; padding: 56px clamp(18px,4vw,56px) 24px; box-sizing: border-box; border: 1px solid #e4dcd5; border-radius: 18px; background: #fbf8f4; color: #151515; overflow: auto; overscroll-behavior-y: contain; scrollbar-color: #ab012b #efe7e0; box-shadow: 0 20px 80px rgba(0,0,0,.2); }
-.dart-news-dialog:not([open]) { display: none; }
-.dart-news-dialog::backdrop { background: rgba(0,0,0,.6); }
-.dart-news-close { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #fbf8f4; color: #ab012b; font: 32px/1 Arial,sans-serif; cursor: pointer; display: grid; place-items: center; }
-.dart-news-article { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 24px; align-items: start; }
-.dart-news-article > img { display: block; width: min(100%,calc(70dvh * 3 / 4)); height: auto; margin-inline: auto; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; }
-.dart-news-article-copy { min-width: 0; }
-.dart-news-article-copy h2 { margin: 14px 0 24px; font-size: clamp(26px,3vw,42px); line-height: 1.3; overflow-wrap: anywhere; }
-.dart-news-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(15px,1.3vw,18px); line-height: 1.9; max-width: 68ch; }
-.dart-news-dialog-footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e4dcd5; }
-.dart-news-dialog-footer button { width: 100%; min-height: 44px; border: 0; border-radius: 7px; background: #ab012b; color: #fff; font: inherit; cursor: pointer; }
-.dart-news-dialog [hidden] { display: none !important; }
-.dart-news-dialog button:focus-visible { outline: 2px solid #ab012b; outline-offset: 3px; }
-.dart-news-retry { padding: 9px 16px; background: #ab012b; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+.dart-news-dialog {
+  width: 90vw;
+  max-width: 90vw;
+  height: 90vh;
+  height: 90dvh;
+  max-height: 90vh;
+  max-height: 90dvh;
+  margin: auto;
+  padding: 56px clamp(18px, 4vw, 56px) 24px;
+  box-sizing: border-box;
+  border: 1px solid #e4dcd5;
+  border-radius: 18px;
+  background: #fbf8f4;
+  color: #151515;
+  overflow: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-color: #ab012b #efe7e0;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.2);
+}
+.dart-news-dialog:not([open]) {
+  display: none;
+}
+.dart-news-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.dart-news-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #fbf8f4;
+  color: #ab012b;
+  font:
+    32px/1 Arial,
+    sans-serif;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.dart-news-article {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 24px;
+  align-items: start;
+}
+.dart-news-article > img {
+  display: block;
+  width: min(100%, calc(70dvh * 3 / 4));
+  height: auto;
+  margin-inline: auto;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.dart-news-article-copy {
+  min-width: 0;
+}
+.dart-news-article-copy h2 {
+  margin: 14px 0 24px;
+  font-size: clamp(26px, 3vw, 42px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.dart-news-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: clamp(15px, 1.3vw, 18px);
+  line-height: 1.9;
+  max-width: 68ch;
+}
+.dart-news-dialog-footer {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid #e4dcd5;
+}
+.dart-news-dialog-footer button {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 7px;
+  background: #ab012b;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.dart-news-dialog [hidden] {
+  display: none !important;
+}
+.dart-news-dialog button:focus-visible {
+  outline: 2px solid #ab012b;
+  outline-offset: 3px;
+}
+.dart-news-retry {
+  padding: 9px 16px;
+  background: #ab012b;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
 /* END News details. */
-.dart-news-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: #68605c; font-size: 12px; line-height: 1.6; }
-.dart-news-meta > span:first-child { color: #ab012b; font-weight: 700; letter-spacing: .04em; }
+.dart-news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  color: #68605c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.dart-news-meta > span:first-child {
+  color: #ab012b;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
 
 /* BEGIN News details — mobile inset reader. */
 @media (max-width: 760px) {
-  .dart-news-dialog { padding: 54px 18px 22px; border-radius: 14px; }
-  .dart-news-article { grid-template-columns: minmax(0,1fr); gap: 20px; }
-  .dart-news-article > img { width: min(100%,300px); margin-inline: auto; }
+  .dart-news-dialog {
+    padding: 54px 18px 22px;
+    border-radius: 14px;
+  }
+  .dart-news-article {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .dart-news-article > img {
+    width: min(100%, 300px);
+    margin-inline: auto;
+  }
 }
 /* END News details — mobile. */
