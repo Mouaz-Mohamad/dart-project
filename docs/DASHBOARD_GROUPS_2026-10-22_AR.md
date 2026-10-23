@@ -15,9 +15,9 @@
 
 | المصدر المقروء | ملف التشغيل المُولّد |
 |---|---|
-| `scripts/dashboard-ui.source.js` | `Eye/dart-dashboard-ui.js` |
-| `scripts/news-admin.source.js` | `Eye/dart-news-admin.js` |
-| `scripts/sets-admin.source.js` | `Eye/dart-sets-admin.js` |
+| `src/dashboard/dashboard-ui.js` | `Eye/dart-dashboard-ui.js` |
+| `src/dashboard/news-admin.js` | `Eye/dart-news-admin.js` |
+| `src/dashboard/sets-admin.js` | `Eye/dart-sets-admin.js` |
 
 البناء بنفس Terser 5.44.0 المستخدم في المشروع: `node scripts/build-home-runtime.cjs`، ثم `node scripts/stage-vercel-public.cjs`. فحص الأداء يتحقق من بصمة المصدر والملف المولد، دون رفع حدود الحجم. حجم المصدر التشغيلي الإجمالي بعد الضغط: Core نحو 960KiB وScoped نحو 437KiB؛ هذه مجاميع ملفات المستودع، وليست حجم تحميل صفحة واحدة. حد Home المباشر يظل 225KiB.
 

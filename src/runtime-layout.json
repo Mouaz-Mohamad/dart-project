@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "bundles": [
+    {
+      "output": "Eye/dart.js",
+      "scope": "global",
+      "sources": [
+        "src/dashboard/core/bootstrap.js",
+        "src/dashboard/core/loyalty-cards.js",
+        "src/dashboard/core/navigation-events.js",
+        "src/dashboard/core/sales-chart.js",
+        "src/dashboard/core/customer-autofill.js",
+        "src/dashboard/core/shared-state.js",
+        "src/dashboard/core/record-deletion.js",
+        "src/dashboard/core/order-workflow.js",
+        "src/dashboard/core/return-workflow.js",
+        "src/dashboard/core/section-rendering.js",
+        "src/dashboard/core/section-actions.js",
+        "src/dashboard/core/operations-modals.js",
+        "src/dashboard/core/startup-final.js",
+        "src/dashboard/core/catalog-customers.js",
+        "src/dashboard/core/orders-returns.js",
+        "src/dashboard/core/crm.js",
+        "src/dashboard/core/filters.js",
+        "src/dashboard/core/notifications.js",
+        "src/dashboard/core/birthdays.js",
+        "src/dashboard/core/brand-analytics.js",
+        "src/dashboard/core/record-editors.js",
+        "src/dashboard/core/order-editor-search.js",
+        "src/dashboard/core/analytics-series.js",
+        "src/dashboard/core/return-editor.js",
+        "src/dashboard/core/inventory-filters.js"
+      ]
+    },
+    {
+      "output": "Js/dart-platform.js",
+      "scope": "platform",
+      "sources": [
+        "src/storefront/platform/state.js",
+        "src/storefront/platform/analytics-identity.js",
+        "src/storefront/platform/shared.js",
+        "src/storefront/platform/birthday-rewards.js",
+        "src/storefront/platform/api-client.js",
+        "src/storefront/platform/waiting.js",
+        "src/storefront/platform/customer-state.js",
+        "src/storefront/platform/authentication.js",
+        "src/storefront/platform/checkout.js",
+        "src/storefront/platform/cart.js",
+        "src/storefront/platform/feedback-leaderboard.js",
+        "src/storefront/platform/profile-helpers.js",
+        "src/storefront/platform/serial-lookup.js",
+        "src/storefront/platform/birthday-ui.js",
+        "src/storefront/platform/return-form.js",
+        "src/storefront/platform/auth-forms.js",
+        "src/storefront/platform/profile.js",
+        "src/storefront/platform/tracking.js",
+        "src/storefront/platform/lifecycle.js",
+        "src/storefront/platform/public-api.js"
+      ]
+    }
+  ]
+}

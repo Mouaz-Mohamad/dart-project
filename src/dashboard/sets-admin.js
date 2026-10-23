@@ -1,4 +1,4 @@
-// DART CODE GUIDE | scripts/sets-admin.source.js (builds Eye/dart-sets-admin.js)
+// DART CODE GUIDE | src/dashboard/sets-admin.js (builds Eye/dart-sets-admin.js)
 // Additive Dart Eye Sets management. Existing Models UI and catalog behavior remain intact.
 (function (root) {
   "use strict";

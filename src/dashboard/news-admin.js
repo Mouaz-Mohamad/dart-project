@@ -1,4 +1,4 @@
-// DART CODE GUIDE | scripts/news-admin.source.js (builds Eye/dart-news-admin.js)
+// DART CODE GUIDE | src/dashboard/news-admin.js (builds Eye/dart-news-admin.js)
 // News management uses dedicated API writes, version checks and server-confirmed archiving.
 (function (root) {
   "use strict";

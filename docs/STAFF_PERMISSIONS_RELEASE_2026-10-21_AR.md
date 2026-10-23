@@ -6,10 +6,10 @@
 
 | الجزء | النتيجة | الملفات الأساسية |
 | --- | --- | --- |
-| المخزون | `inventory.manage` يقرأ سياق المخزون ويكتب القطع فقط؛ لا يعدّل الموديلات أو أسعارها، ولا يحذف السجلات غير المرسلة عند الحفظ الكبير | `backend/src/modules/catalog/catalog.routes.ts`, `scripts/catalog-admin.source.js` |
-| القراءة والواجهة | `catalog.read` يحمّل البيانات؛ الأزرار والنماذج والحفظ المشترك ومؤقتات التحديث تتبع الصلاحيات الفعلية | `scripts/staff-permissions.source.js`, `Eye/dart-admin-auth.js`, `Eye/dart.js`, `Eye/dart-domain-state.js`, `Eye/dart-orders-api.js`, `Js/dart-catalog.js` |
+| المخزون | `inventory.manage` يقرأ سياق المخزون ويكتب القطع فقط؛ لا يعدّل الموديلات أو أسعارها، ولا يحذف السجلات غير المرسلة عند الحفظ الكبير | `backend/src/modules/catalog/catalog.routes.ts`, `src/dashboard/catalog-admin.js` |
+| القراءة والواجهة | `catalog.read` يحمّل البيانات؛ الأزرار والنماذج والحفظ المشترك ومؤقتات التحديث تتبع الصلاحيات الفعلية | `src/dashboard/staff-permissions.js`, `Eye/dart-admin-auth.js`, `Eye/dart.js`, `Eye/dart-domain-state.js`, `Eye/dart-orders-api.js`, `Js/dart-catalog.js` |
 | مواقع المندوبين | منع الإحداثيات الحية بدون `representative_location.read` في الردود الكاملة والجزئية والمتداخلة، مع إبقاء دبابيس عنوان العميل وتتبع العميل لطلبه | `backend/src/middleware/representative-location-access.ts` |
-| إدارة الموظفين | الواجهة تستخدم `canManageStaff` من الخادم لإظهار إجراءات Owner؛ تبقى حماية Owner الخادمية قائمة | `backend/src/modules/identity/identity.service.ts`, `scripts/staff-admin.source.js` |
+| إدارة الموظفين | الواجهة تستخدم `canManageStaff` من الخادم لإظهار إجراءات Owner؛ تبقى حماية Owner الخادمية قائمة | `backend/src/modules/identity/identity.service.ts`, `src/dashboard/staff-admin.js` |
 | التواصل والتقييمات | فصل القراءة والحفظ حسب `contacts.*` و`reviews.*`، مع إتاحة رسائل التواصل القديمة وحماية التقييمات والرسائل غير المرئية من الحذف | `backend/src/modules/dashboard/dashboard-state.service.ts`, `Eye/dart-domain-state.js`, `Eye/dart.js` |
 | النشر | مقارنة الملفات المتأثرة فقط؛ الرسالة العادية وRedeploy وبداية المشروع لا تتطلب تغيير Batch | `scripts/vercel-ignore-frontend.sh`, `backend/scripts/vercel-ignore-backend.sh`, `AGENTS.md`, `docs/DEPLOYMENT_BATCHING.md` |
 

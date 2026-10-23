@@ -32,6 +32,7 @@
     "sets-runtime-contract.cjs",
     "settings-and-groups-unit.js",
     "settings-reset-unit.js",
+    "source-layout-contract.cjs",
     "test-inventory-contract.cjs"
   ],
   "ciBrowser": [

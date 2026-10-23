@@ -12,13 +12,13 @@ Rows and their status labels use a 5% tint over a solid white surface. This back
 | Purple | Refunded, Partially Refunded, Returned |
 | Gray | Draft, Inactive, Expired, Archived, mixed groups and records without a recognized status |
 
-`rowStatus` and `colorSection` in `scripts/dashboard-ui.source.js` own the display mapping; `Eye/dart-dashboard-ui.css` owns the palette. The compact adapter retains original cells so in-place updates recolor the row and its summary. It uses the existing animation-frame refresh and observes relevant status and section attributes. COD rows follow Settlement while Order Status remains independently labeled. Mixed order groups are gray; each order and status breakdown keeps its own color. Inventory groups follow availability, with individually labeled colored counts.
+`rowStatus` and `colorSection` in `src/dashboard/dashboard-ui.js` own the display mapping; `Eye/dart-dashboard-ui.css` owns the palette. The compact adapter retains original cells so in-place updates recolor the row and its summary. It uses the existing animation-frame refresh and observes relevant status and section attributes. COD rows follow Settlement while Order Status remains independently labeled. Mixed order groups are gray; each order and status breakdown keeps its own color. Inventory groups follow availability, with individually labeled colored counts.
 
 Coverage includes Orders, Models/Sets, Items/groups, Clients, Returns, Damage, Reviews/Contact, Representatives, Dart Cards, News, Waiting, Finance tables/goals/alerts, Staff/invitations, announcements/campaigns and Live Operations. Pure report rows without a lifecycle remain neutral.
 
 The customer, goal, promotion and route renderers expose already-displayed status using `data-status` where a dedicated status column is absent. No state transition, calculation, storage, API, permission, migration or production record is changed.
 
-Readable display-preference code now lives in `scripts/display-preferences.source.js` and is built with the existing pinned Terser pipeline. This offsets the added palette runtime and preserves the existing performance budgets. Do not edit its generated `Eye/dart-display-preferences.js` directly.
+Readable display-preference code now lives in `src/dashboard/display-preferences.js` and is built with the existing pinned Terser pipeline. This offsets the added palette runtime and preserves the existing performance budgets. Do not edit its generated `Eye/dart-display-preferences.js` directly.
 
 ## Verification
 

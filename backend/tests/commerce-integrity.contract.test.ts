@@ -7,6 +7,14 @@ const service = readFileSync(
   new URL("../src/modules/commerce/commerce.service.ts", import.meta.url),
   "utf8",
 );
+const customerQueries = readFileSync(
+  new URL("../src/modules/commerce/commerce.customer-queries.ts", import.meta.url),
+  "utf8",
+);
+const commerceTypes = readFileSync(
+  new URL("../src/modules/commerce/commerce.types.ts", import.meta.url),
+  "utf8",
+);
 const routes = readFileSync(
   new URL("../src/modules/commerce/commerce.routes.ts", import.meta.url),
   "utf8",
@@ -80,9 +88,9 @@ describe("commerce concurrency and representative safety contracts", () => {
   });
 
   it("keeps leaderboard relational reads sequential and excludes only usable active Dart Cards", () => {
-    const leaderboardStart = service.indexOf("public async publicLeaderboard");
-    const leaderboardEnd = service.indexOf("public async validatePromotionCode", leaderboardStart);
-    const leaderboardSource = service.slice(leaderboardStart, leaderboardEnd);
+    const leaderboardStart = customerQueries.indexOf("export async function readPublicLeaderboard");
+    const leaderboardEnd = customerQueries.indexOf("export async function readCustomerLiveTracking", leaderboardStart);
+    const leaderboardSource = customerQueries.slice(leaderboardStart, leaderboardEnd);
 
     expect(leaderboardSource).not.toMatch(/Promise\.all\([\s\S]*readRelationalDashboardDomain\(client/);
     expect(leaderboardSource).toContain(
@@ -122,9 +130,9 @@ describe("commerce concurrency and representative safety contracts", () => {
 
 
   it("returns explicit Set identity on cart lines instead of variant guessing", () => {
-    expect(service).toContain("export interface CartReservationLine");
-    expect(service).toContain("setGroupId?: string");
-    expect(service).toContain("setCartComponentId?: string");
+    expect(commerceTypes).toContain("export interface CartReservationLine");
+    expect(commerceTypes).toContain("setGroupId?: string");
+    expect(commerceTypes).toContain("setCartComponentId?: string");
     expect(service).toContain("LEFT JOIN LATERAL (");
     expect(service).toContain("JOIN cart_set_groups g ON g.id=c.group_id");
     expect(service).toContain("WHERE c.inventory_item_id=i.id");
@@ -150,13 +158,13 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(liveRoute).toBeGreaterThan(-1);
     expect(routes.slice(liveRoute, liveRoute + 260)).toContain("limit: 120");
     expect(service).toContain("public async customerLiveTracking(");
-    expect(service).toContain("payload->>'clientId'=$1");
-    expect(service).toContain("status='Representative On The Way'");
-    const customerLiveStart = service.indexOf("public async customerLiveTracking(");
-    const customerLiveEnd = service.indexOf("public async customerSnapshot(", customerLiveStart);
-    const customerLiveSource = service.slice(customerLiveStart, customerLiveEnd);
+    expect(customerQueries).toContain("payload->>'clientId'=$1");
+    expect(customerQueries).toContain("status='Representative On The Way'");
+    const customerLiveStart = customerQueries.indexOf("export async function readCustomerLiveTracking(");
+    const customerLiveEnd = customerQueries.indexOf("export async function readCustomerSnapshot(", customerLiveStart);
+    const customerLiveSource = customerQueries.slice(customerLiveStart, customerLiveEnd);
     expect(customerLiveSource).not.toContain("AND o.delivery_started_at IS NOT NULL");
-    expect(service).toContain("payload->>'status'='Pickup On The Way'");
+    expect(customerQueries).toContain("payload->>'status'='Pickup On The Way'");
 
     const locationRoute = routes.indexOf('"/representatives/location"');
     expect(locationRoute).toBeGreaterThan(-1);

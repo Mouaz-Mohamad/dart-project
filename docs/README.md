@@ -9,6 +9,8 @@
 - `CODE_MAP.md` — أماكن تنفيذ الأنظمة الأساسية داخل الكود.
 - `PROJECT_STRUCTURE.md` — شكل المشروع.
 - `CODE_GUIDE_AR.md` — دليل قراءة وصيانة الكود.
+- `../src/README.md` — مصادر المتصفح القابلة للتعديل، ملفات التشغيل المولدة وترتيب بنائها.
+- `CODE_CLEANUP_2026-10-23_AR.md` — نطاق التنظيف والمحافظة على السلوك ودليل التحقق.
 - `CHANGELOG.md` — سجل التغييرات التاريخي.
 - `DEPLOYMENT_BATCHING.md` — قواعد batching فقط؛ النشر نفسه إجراء منفصل ولا يحدث لمجرد وجود كود جديد.
 - `ORDER_PERFORMANCE.md` — compact order responses, safe related refresh, isolated measurements and bounded load commands.

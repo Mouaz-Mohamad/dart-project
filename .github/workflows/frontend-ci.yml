@@ -13,6 +13,8 @@ on:
       - "api/**"
       - "CSS/**"
       - "scripts/**"
+      - "src/**"
+      - "package.json"
       - "sections/**"
       - "sw.js"
       - "manifest.json"
@@ -30,6 +32,8 @@ on:
       - "api/**"
       - "CSS/**"
       - "scripts/**"
+      - "src/**"
+      - "package.json"
       - "sections/**"
       - "sw.js"
       - "manifest.json"
@@ -66,6 +70,8 @@ jobs:
           node --check sw.js
       - name: Frontend regression contracts
         run: |
+          node scripts/check-source-layout.cjs
+          node tests/source-layout-contract.cjs
           node tests/database-authoritative-storage.cjs
           node tests/cache-revalidation-contract.cjs
           node tests/auth-contract.js

@@ -3,11 +3,12 @@
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
+const { buildSourceRuntimes } = require('./build-source-runtime.cjs');
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
 function sourceText(source) {
   const text = fs.readFileSync(source, 'utf8');
-  if (source !== 'scripts/home-ui.source.js') return text;
+  if (source !== 'src/storefront/home-ui.js') return text;
   const shared = fs.readFileSync('Js/dart-ui.js', 'utf8');
   const start = shared.indexOf('// BEGIN Shared static section loader');
   const end = shared.indexOf('\n\nfunction ensureAboutImages()', start);
@@ -16,17 +17,18 @@ function sourceText(source) {
 }
 
 module.exports = { sourceText };
+if (require.main === module) buildSourceRuntimes();
 if (require.main === module) for (const [source, output] of [
-  ['scripts/home-ui.source.js', 'Js/dart-ui.home.min.js'],
+  ['src/storefront/home-ui.js', 'Js/dart-ui.home.min.js'],
   ['Js/dart-platform.js', 'Js/dart-platform.home.min.js'],
   ['Js/dart-navigation.js', 'Js/dart-navigation.min.js'],
-  ['scripts/catalog-admin.source.js', 'Eye/dart-catalog-admin.js'],
-  ['scripts/staff-admin.source.js', 'Eye/dart-staff.js'],
-  ['scripts/staff-permissions.source.js', 'Eye/dart-permissions.js'],
-  ['scripts/dashboard-ui.source.js', 'Eye/dart-dashboard-ui.js'],
-  ['scripts/display-preferences.source.js', 'Eye/dart-display-preferences.js'],
-  ['scripts/news-admin.source.js', 'Eye/dart-news-admin.js'],
-  ['scripts/sets-admin.source.js', 'Eye/dart-sets-admin.js'],
+  ['src/dashboard/catalog-admin.js', 'Eye/dart-catalog-admin.js'],
+  ['src/dashboard/staff-admin.js', 'Eye/dart-staff.js'],
+  ['src/dashboard/staff-permissions.js', 'Eye/dart-permissions.js'],
+  ['src/dashboard/dashboard-ui.js', 'Eye/dart-dashboard-ui.js'],
+  ['src/dashboard/display-preferences.js', 'Eye/dart-display-preferences.js'],
+  ['src/dashboard/news-admin.js', 'Eye/dart-news-admin.js'],
+  ['src/dashboard/sets-admin.js', 'Eye/dart-sets-admin.js'],
 ]) {
   const text = sourceText(source);
   const hash = crypto.createHash('sha256').update(text).digest('hex');

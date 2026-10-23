@@ -1,3 +1,4 @@
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:16d8262226ab334f962e2330e10247ce91d18b5417e4e91f0b2e53361d2295a4 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -29,7 +30,7 @@
 // 1. الدوال العامة والمساعدة (Global Helpers & Utilities)
 // ==========================================
 
-// التخزين المحلي
+// In-memory projections; durable writes use the existing API adapters.
 function saveDataToStorage(key, data, feedbackSplit = false) {
   if (key === "dart_reviews" && !feedbackSplit) {
     const isContact = (row) => row.recordType === "contact" || row.source === "Contact Us";
@@ -57,8 +58,6 @@ function saveDataToStorage(key, data, feedbackSplit = false) {
   }
   window.DartState?.write?.(key, data, { source: "dashboard" });
 }
-
-// تنسيق الصفوف والترتيب
 
 // التحكم للنوافذ المنبثقة
 function openModal(modal) {
@@ -93,18 +92,12 @@ document.getElementById("add-btn")?.addEventListener("click", () => {
 // البيانات الأولية للموديلات
 let modelsData = [];
 
-// عرض الموديلات
-
-// النافذة المنبثقة للموديلات
-
 // ==========================================
 // 3. قسم القطع (Items Module)
 // ==========================================
 
 // البيانات الأولية للقطع
 let itemsData = [];
-
-// عرض القطع
 
 // ==========================================
 // 4. قسم العملاء (Customers Module)
@@ -113,22 +106,13 @@ let itemsData = [];
 // البيانات الأولية للعملاء
 let customersData = [];
 
-// عرض العملاء
-
-// النافذة المنبثقة للعملاء
-
 // ==========================================
 // 5. قسم الطلبات (Orders Module)
 // ==========================================
 
-
 // البيانات الأولية للطلبات
 let ordersData = [];
 let dartOrdersView = "all";
-
-// عرض الطلبات
-
-// النافذة المنبثقة للطلبات
 
 // ==========================================
 // 6. قسم المرتجعات (Returns Module)
@@ -137,20 +121,12 @@ let dartOrdersView = "all";
 // البيانات الأولية للمرتجعات
 let returnsData = [];
 
-// عرض المرتجعات
-
-// النافذة المنبثقة للمرتجعات
-
 // ==========================================
 // 7. قسم التقييمات (Reviews Module)
 // ==========================================
 
 // البيانات الأولية للتقييمات
 let reviewsData = [];
-
-// عرض التقييمات
-
-// النافذة المنبثقة للتقييمات
 
 // ==========================================
 // 8. قسم المندوبين (Representative Module)

@@ -13,6 +13,9 @@ Codex reads this file automatically before every task, so the rules below apply 
 - Install: `cd backend && npm install`
 - Build storefront CSS delivery bundle: `node scripts/build-home-css.cjs`
 - Build Home and navigation JavaScript delivery bundles: `node scripts/build-home-runtime.cjs`
+- Build all frontend delivery assets: `npm run build` (composes `src/runtime-layout.json` before the existing JavaScript minification stage).
+- Check browser source ownership, formatting, syntax and generated-runtime freshness: `npm run check:source`
+- Run all maintained frontend static checks: `npm run test:frontend`
 - Stage production HTML with its shared shell and content-versioned assets: `node scripts/stage-vercel-public.cjs`
 - Run storefront dev server: run the CSS build command after storefront CSS changes, then `python3 -m http.server 4173`
 - Run backend dev server: `cd backend && npm run dev`
@@ -50,6 +53,8 @@ Codex reads this file automatically before every task, so the rules below apply 
 Refer to `Codex_Master_Prompt.md` for the full phased roadmap (Phase 1–5) and the four specification PDFs for feature detail. Do not start a phase before the previous one has been reviewed and approved.
 
 ## Existing-feature awareness
+
+- Browser source ownership is documented in `src/README.md`. `Eye/dart.js` and `Js/dart-platform.js` are composed from the ordered units in `src/runtime-layout.json`; edit those sources and rebuild rather than editing their generated copies.
 
 - Some features already exist and only need improvement.
 - Some features already exist but still need integration.

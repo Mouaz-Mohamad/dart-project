@@ -13,7 +13,7 @@ interface Adapter {
 function adapter(permissions?: string[]): Adapter {
   const window: { DartCatalogAdmin?: Adapter; DartAdminAccess?: { can(key: string): boolean } } = permissions
     ? { DartAdminAccess: { can: key => permissions.includes(key) } } : {};
-  runInNewContext(readFileSync(new URL("../../scripts/catalog-admin.source.js", import.meta.url), "utf8"), { window });
+  runInNewContext(readFileSync(new URL("../../src/dashboard/catalog-admin.js", import.meta.url), "utf8"), { window });
   return window.DartCatalogAdmin!;
 }
 const baseline = (): State => ({ version: 1, models: [{ modelId: "M-1", version: 1 }],

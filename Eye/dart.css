@@ -20,7 +20,7 @@ body::-webkit-scrollbar,
 
 :root {
   color-scheme: light;
-  
+
   /* Colors */
   --bragnte: #AB012B;
   --secondary: #2196f3;
@@ -39,7 +39,7 @@ body::-webkit-scrollbar,
   --spacing-lg: 1rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
-  
+
   /* Transitions */
   --transition-fast: 0.2s ease;
 }
@@ -1487,7 +1487,7 @@ section{
         padding: 2px 4px;
     }
 
-  
+
 }
 /* =========================================================
    DART OPERATIONS V2 — additive styles only

@@ -21,6 +21,11 @@
 
 - `backend/src/modules/commerce/commerce.routes.ts` — cart/order/returns/customer commerce routes.
 - `backend/src/modules/commerce/commerce.service.ts` — authoritative inventory reservation, checkout, pricing, reward priority and order transitions.
+- `backend/src/modules/commerce/commerce.types.ts` — shared input, item and order projection types; existing service type exports remain compatible.
+- `backend/src/modules/commerce/commerce.pricing.ts` / `commerce.rewards.ts` / `commerce.routing.ts` — extracted pure calculations and route ordering, with their original behavior.
+- `backend/src/modules/commerce/commerce.customer-queries.ts` — public leaderboard and private customer snapshot/live tracking reads.
+- `backend/src/modules/commerce/commerce.operations-queries.ts` — live operations and assigned representative work reads.
+- `backend/src/modules/commerce/commerce.order-queries.ts` — versioned read-only order snapshots.
 - `backend/src/modules/commerce/cod-risk.ts` — COD risk decision engine.
 
 ## Birthday integrity
@@ -70,6 +75,10 @@
 
 ## Frontend compatibility
 
+- `src/runtime-layout.json` — ordered sources for `Eye/dart.js` and `Js/dart-platform.js`. Edit the source units, then run `npm run build:js`; their existing URLs, scopes and startup sequence are preserved.
+- `src/README.md` — source ownership and generated-runtime map.
+- `scripts/build-source-runtime.cjs` — deterministic composition and syntax validation before the existing Home minification build.
+
 - `Js/dart-platform.js` — API-backed storefront/customer projections, including Birthday UI state.
 - `Js/dart-auth-social.js` — Customer Google/Facebook UI completion; no provider secret/token persistence.
 - `Js/dart-password-visibility.js` — accessible password visibility plus Customer 6+ UI normalization for signup/change/reset/social forms.
@@ -80,9 +89,9 @@
 - `Eye/dart.js` — compact date/location order groups; authorized Sets preparation after dashboard hydration.
 - `Eye/dart-inventory.js` / `Eye/dart-inventory.css` — Model/Color/Size group cards with a label beside every lifecycle count.
 - `Eye/dart-waiting.js` — Queue/Demand rows own their field labels; neither needs a `thead`.
-- `scripts/dashboard-ui.source.js` → `Eye/dart-dashboard-ui.js` — record summaries/details, owning-panel labels and Waiting layout.
-- `scripts/news-admin.source.js` → `Eye/dart-news-admin.js` — authenticated in-memory News projection, query/pagination and stale-response protection.
-- `scripts/sets-admin.source.js` → `Eye/dart-sets-admin.js` — authenticated in-memory Sets projection and the existing editors/actions.
+- `src/dashboard/dashboard-ui.js` → `Eye/dart-dashboard-ui.js` — record summaries/details, owning-panel labels and Waiting layout.
+- `src/dashboard/news-admin.js` → `Eye/dart-news-admin.js` — authenticated in-memory News projection, query/pagination and stale-response protection.
+- `src/dashboard/sets-admin.js` → `Eye/dart-sets-admin.js` — authenticated in-memory Sets projection and the existing editors/actions.
 - Build these delivery modules with `node scripts/build-home-runtime.cjs`. Edit the readable sources; generated `Eye` files carry their source SHA256.
 - `tests/dashboard-groups-browser.cjs` — production renderers with isolated fixtures: responsive groups, Waiting details/actions, private prefetch, retries, concurrent reads and logout.
 

@@ -1,9 +1,4 @@
-// DART CODE GUIDE | Js/dart-platform.js
-// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
-// DART | MODULE: dart-platform.js
-// Customer auth/session, cart reservation, checkout, rewards, and site-wide platform behavior.
-// BEGIN MODULE
-
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:4ea3262a74f51b5b6194e7fc710f2dfdd9b382a374b0ff7625f70a1ca6e777ee */
 (function () {
   "use strict";
 
@@ -4140,6 +4135,3 @@
   if (document.prerendering) document.addEventListener("prerenderingchange", trackVisit, { once: true });
   else trackVisit();
 })();
-
-
-// END MODULE

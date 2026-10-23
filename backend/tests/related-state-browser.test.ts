@@ -3,7 +3,7 @@ import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const catalogSource = readFileSync(new URL("../../Js/dart-catalog.js", import.meta.url), "utf8");
-const adminCatalogSource = readFileSync(new URL("../../scripts/catalog-admin.source.js", import.meta.url), "utf8");
+const adminCatalogSource = readFileSync(new URL("../../src/dashboard/catalog-admin.js", import.meta.url), "utf8");
 const domainSource = readFileSync(new URL("../../Eye/dart-domain-state.js", import.meta.url), "utf8");
 const response = (payload: unknown) => ({ ok: true, status: 200, json: async () => payload });
 type ReadResponse = ReturnType<typeof response>;
