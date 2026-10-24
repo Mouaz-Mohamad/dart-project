@@ -22,11 +22,11 @@
   let serial = 0;
   // BEGIN Shared status colors. Display-only: status text remains the source for row colors.
   const statusGroups = {
-    success: "active|sold|delivered|completed|good|repaired|available|in stock|published|paid|settled|received|converted|eligible|verified|used|achieved|online|connected|approved|return received|return completed|completed return|refund completed|exchange completed|returned|refunded|fully refunded|delivered successfully",
-    processing: "accepted|preparing|processing|processing/held|in progress|repairing|packing|being prepared|under preparation",
+    success: "active|sold|delivered|completed|good|repaired|available|in stock|published|paid|settled|received|converted|eligible|verified|used|achieved|online|connected|approved|return received|return completed|refund completed|exchange completed|returned|refunded",
+    processing: "accepted|preparing|processing|processing/held|in progress|repairing",
     info: "new|new order|new request|scheduled|expected|upcoming",
-    warning: "waiting|pending|pending request|under review|pending inspection|pending approval|reserved|hold|held|out with representative|representative on the way|on the way|delivering|representative assigned|approved - awaiting representative|awaiting settlement|open|unpaid|partial|partially paid|low stock|email pending|return pending|exchange pending|partially refunded|partially returned|awaiting confirmation",
-    danger: "refused|rejected|cancelled|canceled|order cancelled|order canceled|cancelled order|canceled order|damaged|bad|destroyed|suspended|disabled|blocked|failed|delivery failed|failed delivery|delivery failure|unsuccessful delivery|delivery unsuccessful|failed to deliver|delivery attempt failed|undelivered|not delivered|delivery refused|delivery rejected|return rejected|rejected return|fulfillment failed|verification failed|cod failed|failed to complete|not completed|expired|error|overdue|needs attention|problem|out of stock|sold out|over budget",
+    warning: "waiting|pending|pending request|under review|pending inspection|pending approval|reserved|hold|held|out with representative|representative on the way|on the way|delivering|representative assigned|approved - awaiting representative|awaiting settlement|open|unpaid|partial|partially paid|low stock|email pending|return pending|exchange pending|partially refunded",
+    danger: "refused|rejected|cancelled|canceled|order cancelled|order canceled|cancelled order|canceled order|damaged|bad|destroyed|suspended|disabled|blocked|failed|delivery failed|failed delivery|delivery failure|unsuccessful delivery|delivery unsuccessful|failed to deliver|undelivered|not delivered|delivery refused|return rejected|verification failed|failed to complete|expired|error|overdue|needs attention|problem|out of stock|sold out|over budget",
   };
   const statusKey = value => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const tones = new Map(Object.entries(statusGroups).flatMap(([tone, values]) => values.split("|").map(value => [statusKey(value), tone])));
