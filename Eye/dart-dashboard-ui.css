@@ -690,11 +690,15 @@ dialog button:disabled {
   display: none !important;
 }
 
-/* BEGIN Shared state palette. Each tint blends 5% color over a solid surface so nested fills do not accumulate. */
+/* BEGIN Shared state palette. Records blend 25% over their own surface; badges retain their existing 5% tint. */
 .dashboard-section [data-dart-tone] {
   --dart-state-rgb: 148 163 184;
   --dart-state-ink: #283548;
   --dart-state-fill: linear-gradient(
+    rgb(var(--dart-state-rgb) / 0.25),
+    rgb(var(--dart-state-rgb) / 0.25)
+  );
+  --dart-badge-fill: linear-gradient(
     rgb(var(--dart-state-rgb) / 0.05),
     rgb(var(--dart-state-rgb) / 0.05)
   );
@@ -719,17 +723,18 @@ dialog button:disabled {
   --dart-state-rgb: 248 113 113;
   --dart-state-ink: #7f1d1d;
 }
-.dashboard-section [data-dart-tone="returned"] {
-  --dart-state-rgb: 192 163 245;
-  --dart-state-ink: #502582;
-}
 .dashboard-section [data-dart-tone][data-dart-kind="record"] {
   background: var(--dart-state-fill) var(--dart-surface);
-  border-color: rgb(var(--dart-state-rgb) / 0.05);
+  border-color: rgb(var(--dart-state-rgb) / 0.25);
+}
+/* Unknown, mixed, and archived records keep their original uncolored surface. */
+.dashboard-section [data-dart-tone="neutral"][data-dart-kind="record"] {
+  background: var(--dart-surface);
+  border-color: var(--dart-line);
 }
 .dashboard-section [data-dart-tone][data-dart-kind="badge"] {
   color: var(--dart-state-ink);
-  background: var(--dart-state-fill) var(--dart-surface);
+  background: var(--dart-badge-fill) var(--dart-surface);
   border: 1px solid rgb(var(--dart-state-rgb) / 0.05);
   border-radius: 6px;
   padding: 3px 7px;
@@ -750,8 +755,8 @@ dialog button:disabled {
   outline: 2px solid #ab012b;
   outline-offset: 2px;
 }
-/* Clients and unsold physical items retain their original surface, including their status text. */
-#items .model-row[data-dart-label]:not([data-dart-label="Sold" i]),
+/* Clients and unsold in-stock items stay neutral; failed/damaged items still show their negative state. */
+#items .model-row:is([data-dart-label="In Stock" i], [data-dart-label="Available" i]),
 #customers .model-row[data-dart-tone] {
   background: var(--dart-surface);
   border-color: var(--dart-line);
