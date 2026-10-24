@@ -73,11 +73,14 @@ const server=http.createServer((req,res)=>{
    if(width===370&&process.env.DART_DASHBOARD_SCREENSHOT_DIR){fs.mkdirSync(process.env.DART_DASHBOARD_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.DART_DASHBOARD_SCREENSHOT_DIR,'order-groups-phone.png')});}
    await card.locator('summary').click();assert.equal(await card.locator('.dart-order-group-ref').count(),65);await card.locator('summary').click();
    await page.evaluate(()=>activate('items'));
+   const groupImageStyle=await page.locator('#items .group-row .product-img').first().evaluate(node=>({height:getComputedStyle(node).height,fit:getComputedStyle(node).objectFit}));
+   assert.deepEqual(groupImageStyle,{height:'70px',fit:'cover'},'group thumbnail keeps 70px crop at '+width+'px');
    assert.deepEqual(await page.locator('[data-inventory-metric]').evaluateAll(nodes=>nodes.map(node=>[node.querySelector('dt').textContent,node.querySelector('dd').textContent])),[['Total','36'],['In Stock','1'],['Reserved','2'],['Processing','3'],['With Rep','4'],['Sold','5'],['Refused / Inspection','6'],['Damaged / Repair','15']]);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'groups must fit viewport '+width);
    await page.locator('.group-row').focus();await page.keyboard.press('Enter');
    await page.locator('#items-container .dart-record-open').waitFor();
    assert.equal(await page.locator('#items-container [data-id="piece-1"]').count(),1);
+   assert.equal(await page.locator('#items-container .dart-item-thumb').evaluate(node=>getComputedStyle(node).height),'60px','individual Item thumbnail must remain 60px');
    await page.locator('#back-to-groups').click();
    await page.evaluate(()=>activate('waiting'));
    await page.locator('#waiting-table .dart-record-open').waitFor();
