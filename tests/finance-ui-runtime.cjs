@@ -74,12 +74,24 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function main() {
   await window.DartFinance.hydrateAuthoritativeFinance();
   assert.equal(requests, 1, "current, previous and chart buckets use one HTTP request");
+  const headerlessTabs = new Set(["expenses", "budgets", "invoices", "cod", "models", "drawlog"]);
   for (const tab of tabs) {
     await callbacks.get("click")({ target: { closest(selector) { return selector === "[data-finance-tab]" ? tab : null; } } });
     assert.equal(ui.state.financeTab, tab.dataset.financeTab);
-    assert.ok(nodes.get("dart-finance-content").innerHTML.length > 50, tab.dataset.financeTab + " renderer must produce content");
+    const markup = nodes.get("dart-finance-content").innerHTML;
+    assert.ok(markup.length > 50, tab.dataset.financeTab + " renderer must produce content");
+    if (headerlessTabs.has(tab.dataset.financeTab)) {
+      assert.doesNotMatch(markup, /<thead\b/i, tab.dataset.financeTab + " must not render a thead");
+      assert.match(markup, /<tbody>/i, tab.dataset.financeTab + " must retain its table body");
+    } else if (tab.dataset.financeTab === "marketing") {
+      assert.match(markup, /<thead\b/i, "Marketing retains its original headings");
+    }
   }
   assert.equal(tabs.length, 12);
+  const thumbRule = fs.readFileSync("Eye/dart.css", "utf8").match(/\.dart-item-thumb\s*\{([^}]*)\}/)?.[1] || "";
+  for (const property of ["width: 48px !important;", "height: 60px !important;", "max-width: 48px;", "margin: 0;"]) {
+    assert.ok(thumbRule.includes(property), "Item thumbnail must retain " + property);
+  }
   const trigger = document.activeElement;
   for (const section of fieldsets) {
     ui.openResourceModal(section.dataset.financeFormResource);
@@ -122,6 +134,15 @@ async function main() {
     assert.equal(modal.style.display, "none", resource + " success must close the form");
     assert.equal(window.DartFinance.repository.list(resource).length, 1);
     assert.equal(submit.disabled, false);
+  }
+  // Removing thead must keep labels available to the compact Details/status adapter.
+  for (const key of ["expenses", "budgets", "invoices"]) {
+    ui.state.financeTab = key;
+    ui.renderFinanceSection();
+    const markup = nodes.get("dart-finance-content").innerHTML;
+    assert.doesNotMatch(markup, /<thead\b/i, key + " keeps thead removed when records exist");
+    assert.match(markup, /<td data-column-label="[^"]+"/, key + " keeps field names on body cells");
+    assert.match(markup, /data-finance-(?:edit|delete)=/, key + " record actions remain available");
   }
   // A failing report must display Retry and stop immediate error/re-render loops.
   ui.state.financeTab = "pnl";

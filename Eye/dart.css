@@ -1991,15 +1991,15 @@ section {
 }
 
 .dart-item-thumb {
-  width: 16px !important;
-  height: 20px !important;
-  min-width: 16px;
-  max-width: 16px;
+  width: 48px !important;
+  height: 60px !important;
+  min-width: 48px;
+  max-width: 48px;
   object-fit: cover !important;
   cursor: zoom-in;
   border-radius: 2px;
   border: 1px solid #ddd;
-  margin: auto;
+  margin: 0;
 }
 .dart-image-preview-content {
   max-width: min(900px, 94vw) !important;
