@@ -477,6 +477,7 @@
       const basis = campaign.limitBasis === "customers" ? "customers" : "orders";
       const limit = Number(campaign.totalUsageLimit || 0);
       const analytics = campaign.analytics || {};
+      row.dataset.status = campaign.status;
       details.textContent = `${campaign.code} · ${campaign.status} · ${campaign.audience} · ${limit ? `first ${limit} ${basis}` : `unlimited ${basis}`} · reserved ${Number(analytics.reservations || 0)} · used ${Number(analytics.usages || 0)} · remaining ${analytics.remaining ?? "∞"}`;
       copy.append(title, details);
       const status = document.createElement("span");

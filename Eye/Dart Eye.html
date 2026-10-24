@@ -166,6 +166,7 @@
                             <option value="last_month">Last Month</option>
                             <option value="this_quarter">This Quarter</option>
                             <option value="this_year">This Year</option>
+                            <option value="last_year">Last Year</option>
                             <option value="last_7">Last 7 Days</option>
                             <option value="last_30">Last 30 Days</option>
                             <option value="custom">Custom</option>
@@ -394,21 +395,13 @@
                             <button type="button" class="filter-btn-tow" data-chart-period-tow="monthly">Monthly</button>
                             <button type="button" class="filter-btn-tow" data-chart-period-tow="yearly">Yearly</button>
                         </div>
-                        <label id="trafficHourWindowWrapTow" class="traffic-hour-window-tow" for="trafficHourWindowTow" hidden>
-                            <span>Hourly window</span>
-                            <select id="trafficHourWindowTow">
-                                <option value="1">Today</option>
-                                <option value="7" selected>Last 7 Days</option>
-                                <option value="30">Last 30 Days</option>
-                            </select>
-                        </label>
                     </div>
                 </div>
 
                 <div class="traffic-kpi-grid-tow" aria-label="Website conversion funnel summary">
-                    <article class="traffic-kpi-card-tow"><span>Unique Visitors</span><strong id="trafficUniqueVisitorsTow">—</strong><small>Different people in the selected period</small></article>
+                    <article class="traffic-kpi-card-tow"><span>Unique Visitors</span><strong id="trafficUniqueVisitorsTow">—</strong><small>Accounts or guest browsers in the selected period</small></article>
                     <article class="traffic-kpi-card-tow"><span>Total Visits</span><strong id="trafficVisitsTow">—</strong><small>Browser sessions / entries</small></article>
-                    <article class="traffic-kpi-card-tow"><span>Cart Visitors</span><strong id="trafficCartVisitorsTow">—</strong><small>Different people who added to cart</small></article>
+                    <article class="traffic-kpi-card-tow"><span>Cart Visitors</span><strong id="trafficCartVisitorsTow">—</strong><small>Accounts or guest browsers that added to cart</small></article>
                     <article class="traffic-kpi-card-tow"><span>Add Events</span><strong id="trafficAddEventsTow">—</strong><small>Successful Add to Cart actions</small></article>
                     <article class="traffic-kpi-card-tow"><span>Items Added</span><strong id="trafficItemsAddedTow">—</strong><small>Total quantity added to carts</small></article>
                     <article class="traffic-kpi-card-tow"><span>Orders Placed</span><strong id="trafficOrdersTow">—</strong><small>Successful website checkouts from the Orders database</small></article>
@@ -1920,6 +1913,7 @@
                             <option value="last_month">Last Month</option>
                             <option value="this_quarter">This Quarter</option>
                             <option value="this_year">This Year</option>
+                            <option value="last_year">Last Year</option>
                             <option value="last_7">Last 7 Days</option>
                             <option value="last_30">Last 30 Days</option>
                             <option value="custom">Custom</option>

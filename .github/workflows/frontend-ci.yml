@@ -13,6 +13,9 @@ on:
       - "api/**"
       - "CSS/**"
       - "scripts/**"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
       - "sections/**"
       - "sw.js"
       - "manifest.json"
@@ -30,6 +33,9 @@ on:
       - "api/**"
       - "CSS/**"
       - "scripts/**"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
       - "sections/**"
       - "sw.js"
       - "manifest.json"
@@ -49,10 +55,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Install frontend build tools
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Rebuild homepage CSS delivery bundle
         run: |
           node scripts/build-home-css.cjs
@@ -66,6 +76,9 @@ jobs:
           node --check sw.js
       - name: Frontend regression contracts
         run: |
+          node scripts/check-source-layout.cjs
+          node tests/source-layout-contract.cjs
+          node tests/css-cascade-contract.cjs
           node tests/database-authoritative-storage.cjs
           node tests/cache-revalidation-contract.cjs
           node tests/auth-contract.js
@@ -104,10 +117,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Install frontend build tools
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Rebuild homepage CSS delivery bundle
         run: |
           node scripts/build-home-css.cjs
@@ -124,6 +141,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Full storefront and dashboard Chromium smoke
         run: |
+          DART_CSS_BASE_REF=HEAD^ node tests/css-cascade-browser.cjs
+          node tests/dashboard-groups-browser.cjs
           node tests/navigation-browser.cjs
           node tests/product-waiting-browser.js
           node tests/sets-admin-browser.js

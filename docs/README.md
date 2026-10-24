@@ -9,6 +9,9 @@
 - `CODE_MAP.md` — أماكن تنفيذ الأنظمة الأساسية داخل الكود.
 - `PROJECT_STRUCTURE.md` — شكل المشروع.
 - `CODE_GUIDE_AR.md` — دليل قراءة وصيانة الكود.
+- `../src/README.md` — مصادر المتصفح القابلة للتعديل، ملفات التشغيل المولدة وترتيب بنائها.
+- `CSS_CLEANUP_2026-10-23_AR.md` — تنظيف القيم الملغاة في CSS، حفظ الشكل، سجل الحذف وطرق التحقق.
+- `CODE_CLEANUP_2026-10-23_AR.md` — نطاق التنظيف والمحافظة على السلوك ودليل التحقق.
 - `CHANGELOG.md` — سجل التغييرات التاريخي.
 - `DEPLOYMENT_BATCHING.md` — قواعد batching فقط؛ النشر نفسه إجراء منفصل ولا يحدث لمجرد وجود كود جديد.
 - `ORDER_PERFORMANCE.md` — compact order responses, safe related refresh, isolated measurements and bounded load commands.
@@ -16,6 +19,8 @@
 - `CATALOG_SCALE.md` — paged catalog reads, changed-record writes, shared limits, bounded worker and rollout checks.
 - `SCALE_QUALITY_2026-10-13_AR.md` — verification evidence and outstanding production readiness gates for the unpublished scale batch.
 - `NEWS.md` — News behavior, API/migration references, end-to-end checks and quality review.
+- `DASHBOARD_STATUS_COLORS.md` — shared status palette, row coverage and browser verification.
+- `TRAFFIC_ANALYTICS.md` — stable visit-N guest codes, identity persistence, shared chart periods and verification.
 - `IMAGE_DESCRIPTIONS.md` — وصف الأصول البصرية.
 
 ## Rewards / Discounts authority

@@ -7,7 +7,6 @@
 
 const ctxTow = document.getElementById("analyticsChartTow")?.getContext("2d") || null;
 let trafficAggregationTow = "daily";
-let trafficHourlyWindowTow = 7;
 let trafficRequestGenerationTow = 0;
 let trafficReportTow = null;
 
@@ -89,38 +88,6 @@ function trafficRangeTow() {
 
 function trafficNumberTow(value) {
   return new Intl.NumberFormat("en-EG").format(Math.max(0, Number(value) || 0));
-}
-
-function trafficCairoTodayTow() {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Africa/Cairo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function trafficShiftDateTow(date, days) {
-  const value = new Date(`${date}T12:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
-
-function trafficHourlyRangeTow() {
-  const end = trafficCairoTodayTow();
-  const days = [1, 7, 30].includes(Number(trafficHourlyWindowTow)) ? Number(trafficHourlyWindowTow) : 7;
-  return { start: trafficShiftDateTow(end, -(days - 1)), end };
-}
-
-function effectiveTrafficRangeTow(range = trafficRangeTow()) {
-  return trafficAggregationTow === "hourly" ? trafficHourlyRangeTow() : range;
-}
-
-function syncTrafficHourlyControlsTow() {
-  const wrapper = document.getElementById("trafficHourWindowWrapTow");
-  if (wrapper) wrapper.hidden = trafficAggregationTow !== "hourly";
 }
 
 function setTrafficKpiTow(id, value) {
@@ -262,7 +229,7 @@ function renderTrafficErrorTow(message) {
 }
 
 async function refreshTrafficAnalyticsTow(range = trafficRangeTow()) {
-  const selectedRange = effectiveTrafficRangeTow(range);
+  const selectedRange = range;
   if (!selectedRange?.start || !selectedRange?.end || !window.DartAdminApi?.request) return;
   const generation = ++trafficRequestGenerationTow;
   renderTrafficLoadingTow();
@@ -284,7 +251,6 @@ function updateChartTow(period, btn) {
   document.querySelectorAll(".filter-btn-tow").forEach((button) => {
     button.classList.toggle("active-tow", button === btn);
   });
-  syncTrafficHourlyControlsTow();
   void refreshTrafficAnalyticsTow();
 }
 
@@ -305,22 +271,20 @@ document.querySelectorAll("[data-chart-period-tow]").forEach((button) => {
     updateChartTow(String(button.dataset.chartPeriodTow || "daily"), button);
   });
 });
-document.getElementById("trafficHourWindowTow")?.addEventListener("change", (event) => {
-  const days = Number(event.target?.value || 7);
-  trafficHourlyWindowTow = [1, 7, 30].includes(days) ? days : 7;
-  if (trafficAggregationTow === "hourly") void refreshTrafficAnalyticsTow();
-});
-syncTrafficHourlyControlsTow();
 document.getElementById("exportChartTowBtn")?.addEventListener("click", exportChartPNGTow);
 window.addEventListener("dart:finance-period-changed", (event) => {
-  if (trafficAggregationTow !== "hourly") {
-    void refreshTrafficAnalyticsTow(event.detail || trafficRangeTow());
-  }
+  void refreshTrafficAnalyticsTow(event.detail || trafficRangeTow());
 });
 window.addEventListener("dart:admin-authenticated", () => {
   window.setTimeout(() => void refreshTrafficAnalyticsTow(), 0);
 });
-document.addEventListener("DOMContentLoaded", () => {
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    window.setTimeout(() => void refreshTrafficAnalyticsTow(), 0);
+  }, { once: true });
+} else {
+  // Brand loads this module after DOMContentLoaded; do not wait for an event
+  // that already fired when the shared Finance period is ready.
   window.setTimeout(() => void refreshTrafficAnalyticsTow(), 0);
-});
+}
 })(window);

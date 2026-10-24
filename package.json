@@ -1,0 +1,23 @@
+{
+  "name": "dart-storefront",
+  "private": true,
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "build:js": "node scripts/build-home-runtime.cjs",
+    "build:css": "node scripts/build-home-css.cjs",
+    "build": "npm run build:css && npm run build:js && node scripts/stage-vercel-public.cjs",
+    "check:source": "node scripts/check-source-layout.cjs",
+    "test:frontend": "node scripts/run-frontend-checks.cjs",
+    "check": "npm run check:source && npm run test:frontend",
+    "audit:css": "node scripts/audit-css.cjs"
+  },
+  "devDependencies": {
+    "clean-css": "5.3.3",
+    "pixelmatch": "5.3.0",
+    "pngjs": "7.0.0",
+    "postcss": "8.5.28"
+  }
+}

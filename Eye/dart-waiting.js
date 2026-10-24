@@ -120,26 +120,22 @@
       target.innerHTML = '<div class="dart-waiting-empty">No Waiting records match these filters.</div>';
       return;
     }
-    target.innerHTML = `<table class="dart-waiting-table"><thead><tr>
-      <th>Actions</th><th>Customer</th><th>Client Code</th><th>Model</th><th>Color</th><th>Size</th>
-      <th>Requested</th><th>Queue</th><th>Status</th><th>Notified</th><th>Reservation expiry</th>
-      <th>Reserved item</th><th>Match</th><th>Order</th>
-    </tr></thead><tbody>${state.entries.map((entry) => {
+    target.innerHTML = `<table class="dart-waiting-table" aria-label="Waiting queue"><tbody>${state.entries.map((entry) => {
       const allocation = entry.allocation || {};
       return `<tr data-waiting-id="${escapeHtml(entry.id)}">
-        <td>${rowActions(entry)}</td>
-        <td>${escapeHtml(entry.customerName)}</td>
-        <td>${escapeHtml(entry.clientCode)}</td>
-        <td><strong>${escapeHtml(entry.modelId)}</strong><br><small>${escapeHtml(entry.modelName || "")}</small></td>
-        <td>${escapeHtml(entry.color)}</td><td>${escapeHtml(entry.size)}</td>
-        <td>${escapeHtml(formatDate(entry.requestedAt))}</td>
-        <td class="${entry.priorityOverride ? "dart-waiting-priority" : ""}">${entry.queuePosition ? `#${entry.queuePosition}` : "-"}${entry.priorityOverride ? " · override" : ""}</td>
-        <td><span class="dart-waiting-status">${escapeHtml(entry.status)}</span></td>
-        <td>${escapeHtml(formatDate(entry.notifiedAt))}</td>
-        <td>${escapeHtml(formatDate(entry.reservationExpiry))}</td>
-        <td>${escapeHtml(allocation.itemCode || "-")}<br><small>${escapeHtml(allocation.offeredColor || "")}</small></td>
-        <td>${escapeHtml(allocation.matchType || "-")}</td>
-        <td>${escapeHtml(entry.orderCode || "-")}</td>
+        <td data-column-label="Actions">${rowActions(entry)}</td>
+        <td data-column-label="Customer">${escapeHtml(entry.customerName)}</td>
+        <td data-column-label="Client Code">${escapeHtml(entry.clientCode)}</td>
+        <td data-column-label="Model"><strong>${escapeHtml(entry.modelId)}</strong><br><small>${escapeHtml(entry.modelName || "")}</small></td>
+        <td data-column-label="Color">${escapeHtml(entry.color)}</td><td data-column-label="Size">${escapeHtml(entry.size)}</td>
+        <td data-column-label="Requested">${escapeHtml(formatDate(entry.requestedAt))}</td>
+        <td data-column-label="Queue" class="${entry.priorityOverride ? "dart-waiting-priority" : ""}">${entry.queuePosition ? `#${entry.queuePosition}` : "-"}${entry.priorityOverride ? " · override" : ""}</td>
+        <td data-column-label="Status"><span class="dart-waiting-status">${escapeHtml(entry.status)}</span></td>
+        <td data-column-label="Notified">${escapeHtml(formatDate(entry.notifiedAt))}</td>
+        <td data-column-label="Reservation expiry">${escapeHtml(formatDate(entry.reservationExpiry))}</td>
+        <td data-column-label="Reserved item">${escapeHtml(allocation.itemCode || "-")}<br><small>${escapeHtml(allocation.offeredColor || "")}</small></td>
+        <td data-column-label="Match">${escapeHtml(allocation.matchType || "-")}</td>
+        <td data-column-label="Order">${escapeHtml(entry.orderCode || "-")}</td>
       </tr>`;
     }).join("")}</tbody></table>`;
   }
@@ -151,15 +147,12 @@
       target.innerHTML = '<div class="dart-waiting-empty">No demand data yet.</div>';
       return;
     }
-    target.innerHTML = `<table class="dart-waiting-table"><thead><tr>
-      <th>Model</th><th>Color</th><th>Size</th><th>Waiting</th><th>Reserved</th><th>Confirmed</th>
-      <th>Converted</th><th>Expired</th><th>Cancelled</th><th>Conversion</th>
-    </tr></thead><tbody>${state.demand.map((row) => `<tr>
-      <td><strong>${escapeHtml(row.modelId)}</strong><br><small>${escapeHtml(row.modelName || "")}</small></td>
-      <td>${escapeHtml(row.color)}</td><td>${escapeHtml(row.size)}</td>
-      <td>${Number(row.waiting || 0)}</td><td>${Number(row.reserved || 0)}</td><td>${Number(row.confirmed || 0)}</td>
-      <td>${Number(row.converted || 0)}</td><td>${Number(row.expired || 0)}</td><td>${Number(row.cancelled || 0)}</td>
-      <td>${Number(row.conversionRate || 0)}%</td>
+    target.innerHTML = `<table class="dart-waiting-table" aria-label="Waiting demand"><tbody>${state.demand.map((row) => `<tr data-waiting-demand="${escapeHtml(JSON.stringify([row.modelId,row.color,row.size]))}">
+      <td data-column-label="Model"><strong>${escapeHtml(row.modelId)}</strong><br><small>${escapeHtml(row.modelName || "")}</small></td>
+      <td data-column-label="Color">${escapeHtml(row.color)}</td><td data-column-label="Size">${escapeHtml(row.size)}</td>
+      <td data-column-label="Waiting">${Number(row.waiting || 0)}</td><td data-column-label="Reserved">${Number(row.reserved || 0)}</td><td data-column-label="Confirmed">${Number(row.confirmed || 0)}</td>
+      <td data-column-label="Converted">${Number(row.converted || 0)}</td><td data-column-label="Expired">${Number(row.expired || 0)}</td><td data-column-label="Cancelled">${Number(row.cancelled || 0)}</td>
+      <td data-column-label="Conversion">${Number(row.conversionRate || 0)}%</td>
     </tr>`).join("")}</tbody></table>`;
   }
 

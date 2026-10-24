@@ -3,6 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const CleanCSS = require('clean-css');
+const postcss = require('postcss');
 
 const OUTPUT_DIR = 'public';
 const OUTPUT_ROOT = path.resolve(OUTPUT_DIR);
@@ -14,7 +16,8 @@ const PUBLIC_ROOT_FILES = new Set([
   'sitemap-pages.xml',
   'sw.js',
 ]);
-const VERSIONABLE_ASSET_RE = /\b(src|href)\s*=\s*(["'])([^"'?#]+\.(?:css|js))(?:\?[^"'#]*)?(#[^"']*)?\2/gi;
+const VERSIONABLE_ASSET_RE =
+  /\b(src|href)\s*=\s*(["'])([^"'?#]+\.(?:css|js))(?:\?[^"'#]*)?(#[^"']*)?\2/gi;
 
 function copyEntry(source) {
   const destination = path.join(OUTPUT_DIR, source);
@@ -26,23 +29,66 @@ function collectHtmlFiles(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) htmlFiles.push(...collectHtmlFiles(fullPath));
-    else if (entry.isFile() && entry.name.endsWith('.html')) htmlFiles.push(fullPath);
+    else if (entry.isFile() && entry.name.endsWith('.html'))
+      htmlFiles.push(fullPath);
   }
   return htmlFiles;
 }
 
+// Keep maintained CSS readable while delivering compact files at the same URLs/order.
+function minifyStylesheets(directory) {
+  let saved = 0;
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) saved += minifyStylesheets(file);
+    else if (entry.name.endsWith('.css') && !entry.name.endsWith('.min.css')) {
+      const source = fs.readFileSync(file, 'utf8');
+      const parsed = postcss.parse(source, { from: file });
+      parsed.walkComments((comment) => {
+        if (!comment.text.startsWith('!')) comment.remove();
+      });
+      const result = new CleanCSS({
+        level: 0,
+        rebase: false,
+        inline: ['none'],
+      }).minify(parsed.toString());
+      if (result.errors.length)
+        throw new Error(
+          `CSS minification failed for ${file}: ${result.errors.join('; ')}`,
+        );
+      fs.writeFileSync(file, result.styles + '\n');
+      saved +=
+        Buffer.byteLength(source) - Buffer.byteLength(result.styles + '\n');
+    }
+  }
+  return saved;
+}
+
 function resolveLocalAsset(htmlPath, assetUrl) {
-  if (/^(?:https?:)?\/\//i.test(assetUrl) || /^(?:data|blob|javascript):/i.test(assetUrl)) return null;
+  if (
+    /^(?:https?:)?\/\//i.test(assetUrl) ||
+    /^(?:data|blob|javascript):/i.test(assetUrl)
+  )
+    return null;
   const candidate = assetUrl.startsWith('/')
     ? path.resolve(OUTPUT_DIR, `.${assetUrl}`)
     : path.resolve(path.dirname(htmlPath), assetUrl);
-  if (candidate !== OUTPUT_ROOT && !candidate.startsWith(`${OUTPUT_ROOT}${path.sep}`)) return null;
-  if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) return null;
+  if (
+    candidate !== OUTPUT_ROOT &&
+    !candidate.startsWith(`${OUTPUT_ROOT}${path.sep}`)
+  )
+    return null;
+  if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile())
+    return null;
   return candidate;
 }
 
 function contentVersion(filePath) {
-  return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex').slice(0, 16);
+  return crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(filePath))
+    .digest('hex')
+    .slice(0, 16);
 }
 
 function versionHtmlAssets() {
@@ -60,7 +106,8 @@ function versionHtmlAssets() {
     );
     if (next !== html) fs.writeFileSync(htmlPath, next);
   }
-  if (!versionedReferences) throw new Error('No local CSS/JS references were content-versioned');
+  if (!versionedReferences)
+    throw new Error('No local CSS/JS references were content-versioned');
   return versionedReferences;
 }
 
@@ -69,9 +116,18 @@ function inlineSharedShell() {
   for (const htmlPath of collectHtmlFiles(OUTPUT_DIR)) {
     if (path.dirname(htmlPath) !== OUTPUT_DIR) continue;
     let html = fs.readFileSync(htmlPath, 'utf8');
-    for (const [id, partial] of [['header-container', 'Nav-Bar.html'], ['footer', 'footer.html']]) {
-      const markup = fs.readFileSync(path.join(OUTPUT_DIR, 'sections', partial), 'utf8');
-      const pattern = new RegExp(`(<(?:header|footer|div)\\b[^>]*\\bid=["']${id}["'][^>]*)(>\\s*</(?:header|footer|div)>)`, 'i');
+    for (const [id, partial] of [
+      ['header-container', 'Nav-Bar.html'],
+      ['footer', 'footer.html'],
+    ]) {
+      const markup = fs.readFileSync(
+        path.join(OUTPUT_DIR, 'sections', partial),
+        'utf8',
+      );
+      const pattern = new RegExp(
+        `(<(?:header|footer|div)\\b[^>]*\\bid=["']${id}["'][^>]*)(>\\s*</(?:header|footer|div)>)`,
+        'i',
+      );
       html = html.replace(pattern, (_match, opening, ending) => {
         inlined += 1;
         return `${opening} data-dart-static="${contentVersion(path.join(OUTPUT_DIR, 'sections', partial))}">${markup}${ending.slice(ending.indexOf('</'))}`;
@@ -95,16 +151,26 @@ for (const directory of PUBLIC_DIRECTORIES) {
 
 for (const entry of fs.readdirSync('.', { withFileTypes: true })) {
   if (!entry.isFile()) continue;
-  if (!entry.name.endsWith('.html') && !PUBLIC_ROOT_FILES.has(entry.name)) continue;
+  if (!entry.name.endsWith('.html') && !PUBLIC_ROOT_FILES.has(entry.name))
+    continue;
   copyEntry(entry.name);
 }
 
-for (const required of ['index.html', 'products.html', 'CSS/home.min.css', 'Js/dart-cache-recovery.js', 'sw.js']) {
+for (const required of [
+  'index.html',
+  'products.html',
+  'CSS/home.min.css',
+  'Js/dart-cache-recovery.js',
+  'sw.js',
+]) {
   if (!fs.existsSync(path.join(OUTPUT_DIR, required))) {
     throw new Error(`Required Vercel output is missing: ${required}`);
   }
 }
 
+const cssBytesSaved = minifyStylesheets(OUTPUT_DIR);
 const inlined = inlineSharedShell();
 const versionedReferences = versionHtmlAssets();
-console.log(`Vercel static output staged in public/: ${inlined} shared sections and ${versionedReferences} versioned CSS/JS references.`);
+console.log(
+  `Vercel static output staged in public/: ${inlined} shared sections and ${versionedReferences} versioned CSS/JS references; ${cssBytesSaved} CSS bytes removed from delivery.`,
+);

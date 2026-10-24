@@ -1,16 +1,15 @@
 // DART CODE GUIDE | backend/tests/sql-parameter-contiguity.test.ts
 // الغرض: يمنع SQL placeholders غير المتصلة مثل استخدام $2/$3 بدون $1، لأنها تفشل في PostgreSQL بـ 42P18.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("commerce SQL parameter numbering", () => {
   it("keeps every client.query template placeholder sequence contiguous from $1", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "src/modules/commerce/commerce.service.ts"),
-      "utf8",
-    );
-    const queryPattern = /client\.query(?:<[^>]+>)?\(\s*`([\s\S]*?)`\s*,/g;
+    const directory = resolve(process.cwd(), "src/modules/commerce");
+    const source = readdirSync(directory).filter((name) => name.endsWith(".ts"))
+      .map((name) => readFileSync(resolve(directory, name), "utf8")).join("\n");
+    const queryPattern = /(?:client|pool)\.query(?:<[^>]+>)?\(\s*`([\s\S]*?)`\s*,/g;
     const failures: Array<{ line: number; placeholders: number[] }> = [];
 
     for (const match of source.matchAll(queryPattern)) {

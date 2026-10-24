@@ -8,7 +8,7 @@ This batch provides bounded APIs, smaller dashboard writes, conservative connect
 | --- | --- | --- |
 | 1. Backup diagnostics | `backend/scripts/encrypted-database-backup.mjs` | Rejects missing/masked/pooled credentials and reports only the failed stage; a verified restore remains required. |
 | 2. Paged reads | `catalog.routes.ts`, `catalog.service.ts`, OpenAPI | Optional public paging/filter/sort and independent admin model/item pages with full matching totals. |
-| 3. Changed-record writes | `catalog.service.ts`, `scripts/catalog-admin.source.js`, `Js/dart-catalog.js` | PATCH commits supplied rows, validates stored record versions and keeps omitted rows. The admin baseline is in memory. |
+| 3. Changed-record writes | `catalog.service.ts`, `src/dashboard/catalog-admin.js`, `Js/dart-catalog.js` | PATCH commits supplied rows, validates stored record versions and keeps omitted rows. The admin baseline is in memory. |
 | 4. Lighter reads | `catalog.service.ts` | Public model metadata cache checks PostgreSQL version; fresh stock is read on every request. Cleanup checks for expired reservations first. |
 | 5. Shared limits and pool lifecycle | `0060_scale_foundation.sql`, `shared-rate-limit.ts`, `pool.ts` | Optional PostgreSQL HMAC counters for sensitive routes and Vercel pool lifecycle integration. |
 | 6. Durable background delivery | `outbox.dispatch.ts`, `outbox.routes.ts`, `.github/workflows/outbox-worker.yml` | Immediate bounded dispatch plus an hourly bounded recovery worker; failures remain visible. |

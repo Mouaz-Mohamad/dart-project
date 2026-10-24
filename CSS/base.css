@@ -12,7 +12,9 @@
    ========================================================================== */
 
 /* BEGIN Reset & Design Tokens */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -21,7 +23,7 @@
 :root {
   color-scheme: light;
   /* Colors */
-  --bragnte: #AB012B;
+  --bragnte: #ab012b;
   --secondary: #2196f3;
   --bg-dark: #1e1e1e;
   --white: #ffffff;
@@ -30,13 +32,13 @@
   --border-color: #dee2e6;
 
   /* Typography */
-  --font-main: 'Readex Pro', sans-serif;
+  --font-main: "Readex Pro", sans-serif;
   --font-mono: SFMono-Regular, Consolas, monospace;
-  --font-itim: 'Cabin Condensed', sans-serif;
-  --font-cairo: 'Readex Pro', sans-serif;
-  --font-irish: 'Cabin Condensed', sans-serif;
-  --font-cabin: 'Cabin Condensed', sans-serif;
-  --font-inter: 'Readex Pro', sans-serif;
+  --font-itim: "Cabin Condensed", sans-serif;
+  --font-cairo: "Readex Pro", sans-serif;
+  --font-irish: "Cabin Condensed", sans-serif;
+  --font-cabin: "Cabin Condensed", sans-serif;
+  --font-inter: "Readex Pro", sans-serif;
 
   /* Spacing & Radius */
   --spacing-xs: 0.25rem;
@@ -45,7 +47,7 @@
   --spacing-lg: 1rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
-  
+
   /* Transitions */
   --transition-fast: 0.2s ease;
 }
@@ -82,12 +84,12 @@ body::-webkit-scrollbar {
 body.no-scroll {
   overflow: hidden;
 }
-main{
+main {
   display: flex;
   flex-direction: column;
   gap: 10px;
   position: relative;
-  overflow: hidden;   /* بيخفي أي عنصر يخرج بره حدوده ويمنع السكرول */
+  overflow: hidden; /* بيخفي أي عنصر يخرج بره حدوده ويمنع السكرول */
   max-width: 100%;
   background-color: var(--white) !important;
   padding: 0 10px;
@@ -112,29 +114,48 @@ main{
   display: none;
 }
 
-.margen2020{
+.margen2020 {
   margin: 20px 0;
 }
 
 /* END Global Document Setup */
 
 /* BEGIN Typography & Links */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 500;
   line-height: 1.2;
   margin-bottom: var(--spacing-xs);
   forced-color-adjust: none;
-  -webkit-text-fill-color: initial; 
+  -webkit-text-fill-color: initial;
 }
 
-h1 { font-size: clamp(1.3rem, 1vw, 3rem);}
-h2 { font-size: clamp(1.1rem, .8vw , 2.5rem);}
-h3 { font-size: clamp(1rem, .7vw , 1.85rem);}
-h4 { font-size: clamp(.9rem, .6vw , 1.5rem);}
-h5 { font-size: clamp(.8rem, 0.5vw , 1.25rem);}
-h6 { font-size: clamp(.6rem, 0.3vw , 1rem);}
+h1 {
+  font-size: clamp(1.3rem, 1vw, 3rem);
+}
+h2 {
+  font-size: clamp(1.1rem, 0.8vw, 2.5rem);
+}
+h3 {
+  font-size: clamp(1rem, 0.7vw, 1.85rem);
+}
+h4 {
+  font-size: clamp(0.9rem, 0.6vw, 1.5rem);
+}
+h5 {
+  font-size: clamp(0.8rem, 0.5vw, 1.25rem);
+}
+h6 {
+  font-size: clamp(0.6rem, 0.3vw, 1rem);
+}
 
-p { margin-bottom: var(--spacing-md); }
+p {
+  margin-bottom: var(--spacing-md);
+}
 
 a {
   color: var(--white);
@@ -142,25 +163,48 @@ a {
   transition: color var(--transition-fast);
 }
 
-a:hover { text-decoration: none; color: #2196f3;}
+a:hover {
+  text-decoration: none;
+  color: #2196f3;
+}
 
 /* END Typography & Links */
 
 /* BEGIN Media & Forms */
-img, picture, video, canvas, svg {
+img,
+picture,
+video,
+canvas,
+svg {
   display: block;
   max-width: 100%;
   height: auto;
 }
 
-input, button, textarea, select {
+input,
+button,
+textarea,
+select {
   font: inherit;
+}
+
+input,
+textarea,
+select {
   color: #000000;
-  font-size:small;
+}
+
+input,
+button,
+textarea,
+select {
+  font-size: small;
   font-weight: 400;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   background: transparent;
   border: 1px solid var(--bragnte);
   border-radius: var(--radius-sm);
@@ -177,16 +221,38 @@ button {
   transition: background-color var(--transition-fast);
 }
 
-button:hover { background-color: var(--bg-alt);color: var(--bragnte); }
-textarea { resize: vertical; }
+button:hover {
+  background-color: var(--bg-alt);
+  color: var(--bragnte);
+}
+textarea {
+  resize: vertical;
+}
 
 /* END Media & Forms */
 
 /* BEGIN Utility Classes */
-.flex-center, .dja { display: flex; align-items: center; justify-content: center; }
-.djasb { display: flex; align-items: center; justify-content: space-between; }
-.dja-flexdir { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.grid-center { display: grid; place-items: center; }
+.flex-center,
+.dja {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.djasb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dja-flexdir {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.grid-center {
+  display: grid;
+  place-items: center;
+}
 
 .container {
   width: 100%;
@@ -194,25 +260,32 @@ textarea { resize: vertical; }
   margin: 0 auto;
   padding: 0 var(--spacing-md);
 }
-.margin-top{ margin-top: 20px;}
-.pading10 { padding: 20px; }
-.hidden { display: none !important; }
+.margin-top {
+  margin-top: 20px;
+}
+.pading10 {
+  padding: 20px;
+}
+.hidden {
+  display: none !important;
+}
 
-section{
+section {
   background-color: var(--white);
 }
 
-.width100{
+.width100 {
   width: 100%;
 }
 
-.margen-top-20{
+.margen-top-20 {
   margin-top: 20px;
 }
 
 /* END Utility Classes */
 
-
 /* BEGIN WebP picture layout guard */
-picture.dart-picture { display: contents; }
+picture.dart-picture {
+  display: contents;
+}
 /* END WebP picture layout guard */

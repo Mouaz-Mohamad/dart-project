@@ -243,7 +243,10 @@ const server = http.createServer(async (req, res) => {
     failList = true; await admin.locator("#news-status").selectOption("published"); await admin.locator("#news-retry").waitFor();
     failList = false; await admin.locator("#news-retry").click(); await admin.locator(".dart-news-row").first().waitFor();
     await admin.evaluate(() => { window.fixturePermissions = ['news.read']; window.dispatchEvent(new CustomEvent('dart:admin-authenticated')); });
-    await admin.waitForFunction(() => document.getElementById("news-add").hidden); assert.equal(await admin.locator("#news-add").isHidden(), true); await admin.waitForFunction(() => document.querySelector('[data-news-action="edit"]').hidden); assert.equal(await admin.locator('[data-news-action="edit"]').first().isHidden(), true);
+    await admin.waitForFunction(() => document.getElementById("news-add").hidden); assert.equal(await admin.locator("#news-add").isHidden(), true);
+    // Permission changes reload the list; wait for its new row before checking the grant.
+    await admin.waitForFunction(() => document.querySelector('[data-news-action="edit"]')?.hidden === true);
+    assert.equal(await admin.locator('[data-news-action="edit"]').first().isHidden(), true);
     await admin.locator('[data-news-action="preview"]').first().click(); assert.equal(await admin.locator("#dart-news-dialog").evaluate(node => node.open), true);
     assert.equal(new URL(admin.url()).pathname, "/admin-fixture", "private preview must never use a public article URL");
     // Hold a native queued close until the next Forward entry is already open.

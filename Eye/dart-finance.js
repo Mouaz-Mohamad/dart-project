@@ -336,6 +336,12 @@
       const previousMonthLastDay = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0).getDate();
       previousEnd = endOfDay(new Date(now.getFullYear() - 1, now.getMonth(), Math.min(now.getDate(), previousMonthLastDay)));
       label = `${now.getFullYear()} to date`;
+    } else if (preset === "last_year") {
+      start = new Date(now.getFullYear() - 1, 0, 1);
+      end = endOfDay(new Date(now.getFullYear() - 1, 11, 31));
+      previousStart = new Date(now.getFullYear() - 2, 0, 1);
+      previousEnd = endOfDay(new Date(now.getFullYear() - 2, 11, 31));
+      label = String(now.getFullYear() - 1);
     } else if (preset === "custom") {
       start = startOfDay(custom.start || now);
       end = endOfDay(custom.end || custom.start || now);
@@ -1194,7 +1200,7 @@
 
   function loadPeriodState() {
     const saved = readJSON(STORAGE_KEYS.period, {});
-    const preset = ["this_month", "last_month", "this_quarter", "this_year", "last_7", "last_30", "custom"].includes(saved.preset)
+    const preset = ["this_month", "last_month", "this_quarter", "this_year", "last_year", "last_7", "last_30", "custom"].includes(saved.preset)
       ? saved.preset
       : "this_month";
     state.period = {
@@ -1903,8 +1909,18 @@
     return `<article class="dart-finance-kpi tone-${tone}"><div class="dart-finance-kpi-icon"><i class="${icon}"></i></div><div><p>${escapeHTML(title)}</p><strong>${escapeHTML(value)}</strong><small>${escapeHTML(subtitle)}</small>${comparisonMarkup}</div></article>`;
   }
 
-  function tableShell(headers, rows, emptyMessage = "No records in this view.") {
-    return `<div class="dart-finance-table-wrap"><table class="dart-finance-table"><thead><tr>${headers.map((header) => `<th>${escapeHTML(header)}</th>`).join("")}</tr></thead><tbody>${rows || `<tr><td colspan="${headers.length}" class="dart-finance-empty-cell">${escapeHTML(emptyMessage)}</td></tr>`}</tbody></table></div>`;
+  // Six compact Finance views do not show a table header. Preserve each
+  // column's label on its actual cell for Details and semantic status colors.
+  function tableShell(headers, rows, emptyMessage = "No records in this view.", showHeader = true) {
+    const bodyRows = showHeader ? rows : rows.replace(/<tr\b[^>]*>[\s\S]*?<\/tr>/g, (row) => {
+      let index = 0;
+      return row.replace(/<td(?=[\s>])/g, () =>
+        `<td data-column-label="${escapeHTML(headers[index++] || "")}"`);
+    });
+    const tableHead = showHeader
+      ? `<thead><tr>${headers.map((header) => `<th>${escapeHTML(header)}</th>`).join("")}</tr></thead>`
+      : "";
+    return `<div class="dart-finance-table-wrap"><table class="dart-finance-table">${tableHead}<tbody>${bodyRows || `<tr><td colspan="${headers.length}" class="dart-finance-empty-cell">${escapeHTML(emptyMessage)}</td></tr>`}</tbody></table></div>`;
   }
 
   function sectionToolbar(title, description, actions = "") {
@@ -1965,25 +1981,25 @@
     const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition is cash-only here and stays outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
-      ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.")}`;
+      ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.", false)}`;
   }
 
   function renderBudgets(data, range) {
     const budgets = budgetRows(data, range).filter((row) => row.visible);
     return `${sectionToolbar("Budgets", "Flexible category budgets with live utilization and warning thresholds.", `${financeExportButton("budgets")}${financeAddButton("budgets", "Add Budget")}`)}
-      ${tableShell(["Budget", "Category", "Period", "Limit", "Actual", "Remaining", "Used", "Actions"], budgets.map((row) => `<tr><td><strong>${escapeHTML(row.name)}</strong></td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.startDate)} → ${escapeHTML(row.endDate)}</td><td>${money(row.amount)}</td><td>${money(row.actual)}</td><td class="${row.remaining < 0 ? "is-negative" : ""}">${money(row.remaining)}</td><td><div class="dart-table-progress"><span style="width:${Math.min(100, Math.max(0, row.utilization))}%" class="${row.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(row.utilization)}</small></td><td>${actionButtons("budgets", row.id)}</td></tr>`).join(""), "No budgets overlap the selected period.")}`;
+      ${tableShell(["Budget", "Category", "Period", "Limit", "Actual", "Remaining", "Used", "Actions"], budgets.map((row) => `<tr><td><strong>${escapeHTML(row.name)}</strong></td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.startDate)} → ${escapeHTML(row.endDate)}</td><td>${money(row.amount)}</td><td>${money(row.actual)}</td><td class="${row.remaining < 0 ? "is-negative" : ""}">${money(row.remaining)}</td><td><div class="dart-table-progress"><span style="width:${Math.min(100, Math.max(0, row.utilization))}%" class="${row.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(row.utilization)}</small></td><td>${actionButtons("budgets", row.id)}</td></tr>`).join(""), "No budgets overlap the selected period.", false)}`;
   }
 
   function renderInvoices(data, range) {
     const rows = data.invoices.filter(active).filter((invoice) => within(invoice.issueDate, range)).sort((a, b) => String(b.issueDate).localeCompare(String(a.issueDate)));
     return `${sectionToolbar("Invoices", "Document control only. Sales stay linked to delivered orders and supplier invoices to expense records, preventing double counting.", `${financeExportButton("invoices")}${financeAddButton("invoices", "Add Invoice")}`)}
-      ${tableShell(["Invoice", "Type", "Issue", "Due", "Linked Record", "Total", "Paid", "Status", "Actions"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.number)}</strong></td><td>${escapeHTML(row.type)}</td><td>${escapeHTML(row.issueDate)}</td><td>${escapeHTML(row.dueDate)}</td><td>${escapeHTML(row.linkedId || "-")}</td><td>${money(row.total)}</td><td>${money(row.amountPaid)}</td><td><span class="dart-status-chip">${escapeHTML(invoiceStatus(row))}</span></td><td>${actionButtons("invoices", row.id)}</td></tr>`).join(""), "No invoices were issued in the selected period.")}`;
+      ${tableShell(["Invoice", "Type", "Issue", "Due", "Linked Record", "Total", "Paid", "Status", "Actions"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.number)}</strong></td><td>${escapeHTML(row.type)}</td><td>${escapeHTML(row.issueDate)}</td><td>${escapeHTML(row.dueDate)}</td><td>${escapeHTML(row.linkedId || "-")}</td><td>${money(row.total)}</td><td>${money(row.amountPaid)}</td><td><span class="dart-status-chip">${escapeHTML(invoiceStatus(row))}</span></td><td>${actionButtons("invoices", row.id)}</td></tr>`).join(""), "No invoices were issued in the selected period.", false)}`;
   }
 
   function renderGoals(data, range) {
     const goals = goalRows(data, range).filter((goal) => goal.visible);
     return `${sectionToolbar("Goals", "Add, edit or archive measurable goals. Actual values always come from saved dashboard and finance records.", `${financeExportButton("goals")}${financeAddButton("goals", "Add Goal")}`)}
-      <div class="dart-goal-grid">${goals.length ? goals.map((goal) => `<article class="dart-goal-card ${goal.achieved ? "is-achieved" : ""}"><div class="dart-goal-card-head"><div><span>${escapeHTML(goal.metricDefinition.label)}</span><h3>${escapeHTML(goal.name)}</h3></div>${actionButtons("goals", goal.id)}</div><div class="dart-goal-values"><strong>${goal.restricted ? "Restricted" : goal.loading ? "Loading…" : formatMetric(goal.actual, goal.metricDefinition)}</strong><span>of ${formatMetric(goal.target, goal.metricDefinition)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, goal.progress))}%"></span></div><div class="dart-goal-meta"><span>${goal.restricted ? "Metric access not granted" : goal.loading ? "Loading authoritative actual…" : `${percent(goal.progress)} progress`}</span><span>${escapeHTML(goal.startDate)} → ${escapeHTML(goal.endDate)}</span></div></article>`).join("") : '<div class="dart-finance-empty dart-finance-empty-large">No goals overlap the selected period. Add the first goal when you have a real target.</div>'}</div>`;
+      <div class="dart-goal-grid">${goals.length ? goals.map((goal) => `<article class="dart-goal-card ${goal.achieved ? "is-achieved" : ""}" data-status="${escapeHTML(goal.restricted ? "Restricted" : goal.loading ? "Loading" : goal.achieved ? "Achieved" : goal.status || "Active")}"><div class="dart-goal-card-head"><div><span>${escapeHTML(goal.metricDefinition.label)}</span><h3>${escapeHTML(goal.name)}</h3></div>${actionButtons("goals", goal.id)}</div><div class="dart-goal-values"><strong>${goal.restricted ? "Restricted" : goal.loading ? "Loading…" : formatMetric(goal.actual, goal.metricDefinition)}</strong><span>of ${formatMetric(goal.target, goal.metricDefinition)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, goal.progress))}%"></span></div><div class="dart-goal-meta"><span>${goal.restricted ? "Metric access not granted" : goal.loading ? "Loading authoritative actual…" : `${percent(goal.progress)} progress`}</span><span>${escapeHTML(goal.startDate)} → ${escapeHTML(goal.endDate)}</span></div></article>`).join("") : '<div class="dart-finance-empty dart-finance-empty-large">No goals overlap the selected period. Add the first goal when you have a real target.</div>'}</div>`;
   }
 
   function renderPnL(current, previous, range) {
@@ -2033,13 +2049,13 @@
   function renderCOD(data, range) {
     const rows = codRows(data, range);
     return `${sectionToolbar("Cash on Delivery", "Courier fee is retained once per order. It is shown for reconciliation only because it is already included inside item cost and must not reduce profit twice.", financeExportButton("cod"))}
-      ${tableShell(["Order", "Delivery Date", "Order Status", "Order Total", "Courier Due", "Due to Dart", "Received", "Remaining", "Settlement", "Action"], rows.map(({ order, orderTotal, courierDue, due, received, remaining, status }) => `<tr><td><strong>${escapeHTML(order.orderId || order.id)}</strong></td><td>${escapeHTML(dateInputValue(orderEventDate(order)) || "-")}</td><td>${escapeHTML(order.status || "-")}</td><td>${money(orderTotal)}</td><td>${money(courierDue)}</td><td><strong>${money(due)}</strong></td><td>${money(received)}</td><td class="${remaining > 0 ? "is-negative" : ""}">${money(remaining)}</td><td><span class="dart-status-chip">${escapeHTML(status)}</span></td><td>${String(order.status).toLowerCase() === "delivered" && remaining > 0.009 && financeCanManage("settlements") ? `<button type="button" class="dart-table-primary" data-cod-settle="${escapeHTML(order.orderId || order.id)}">Record receipt</button>` : "—"}</td></tr>`).join(""), "No COD orders fall in the selected period.")}`;
+      ${tableShell(["Order", "Delivery Date", "Order Status", "Order Total", "Courier Due", "Due to Dart", "Received", "Remaining", "Settlement", "Action"], rows.map(({ order, orderTotal, courierDue, due, received, remaining, status }) => `<tr><td><strong>${escapeHTML(order.orderId || order.id)}</strong></td><td>${escapeHTML(dateInputValue(orderEventDate(order)) || "-")}</td><td>${escapeHTML(order.status || "-")}</td><td>${money(orderTotal)}</td><td>${money(courierDue)}</td><td><strong>${money(due)}</strong></td><td>${money(received)}</td><td class="${remaining > 0 ? "is-negative" : ""}">${money(remaining)}</td><td><span class="dart-status-chip">${escapeHTML(status)}</span></td><td>${String(order.status).toLowerCase() === "delivered" && remaining > 0.009 && financeCanManage("settlements") ? `<button type="button" class="dart-table-primary" data-cod-settle="${escapeHTML(order.orderId || order.id)}">Record receipt</button>` : "—"}</td></tr>`).join(""), "No COD orders fall in the selected period.", false)}`;
   }
 
   function renderModels(data, range) {
     const rows = modelProfitability(data, range);
     return `${sectionToolbar("Model Profitability", "Gross contribution by model. Shared operating expenses are intentionally not allocated without a defined allocation rule.", financeExportButton("models"))}
-      ${tableShell(["Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.modelName)}</strong><small class="dart-table-sub">${escapeHTML(row.modelCode)}</small></td><td>${row.units}</td><td>${money(row.revenue)}</td><td>${money(row.cogs)}</td><td class="${row.profit < 0 ? "is-negative" : "is-positive"}">${money(row.profit)}</td><td>${percent(row.margin)}</td></tr>`).join(""), "No delivered model lines exist in the selected period.")}`;
+      ${tableShell(["Model", "Units", "Net Revenue", "COGS", "Gross Profit", "Gross Margin"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.modelName)}</strong><small class="dart-table-sub">${escapeHTML(row.modelCode)}</small></td><td>${row.units}</td><td>${money(row.revenue)}</td><td>${money(row.cogs)}</td><td class="${row.profit < 0 ? "is-negative" : "is-positive"}">${money(row.profit)}</td><td>${percent(row.margin)}</td></tr>`).join(""), "No delivered model lines exist in the selected period.", false)}`;
   }
 
   function renderMarketing(data, range, summary) {
@@ -2072,7 +2088,7 @@
   function renderDrawLog() {
     const rows = readJSON(STORAGE_KEYS.drawAudit, []);
     return `${sectionToolbar("Dart Card Draw Eligibility Log", "Every inclusion or exclusion change is recorded with its previous value, new value, reason and timestamp.", financeExportButton("drawlog"))}
-      ${tableShell(["Timestamp", "Client", "Previous", "New", "Reason", "Actor"], rows.map((row) => `<tr><td>${escapeHTML(new Date(row.timestamp).toLocaleString("en-EG"))}</td><td><strong>${escapeHTML(row.clientName || "-")}</strong><small class="dart-table-sub">${escapeHTML(row.clientId || "-")}</small></td><td>${row.before ? "Eligible" : "Excluded"}</td><td>${row.after ? "Eligible" : "Excluded"}</td><td>${escapeHTML(row.reason || "-")}</td><td>${escapeHTML(row.actorRole || "Admin")}</td></tr>`).join(""), "No draw eligibility changes have been recorded.")}`;
+      ${tableShell(["Timestamp", "Client", "Previous", "New", "Reason", "Actor"], rows.map((row) => `<tr><td>${escapeHTML(new Date(row.timestamp).toLocaleString("en-EG"))}</td><td><strong>${escapeHTML(row.clientName || "-")}</strong><small class="dart-table-sub">${escapeHTML(row.clientId || "-")}</small></td><td>${row.before ? "Eligible" : "Excluded"}</td><td>${row.after ? "Eligible" : "Excluded"}</td><td>${escapeHTML(row.reason || "-")}</td><td>${escapeHTML(row.actorRole || "Admin")}</td></tr>`).join(""), "No draw eligibility changes have been recorded.", false)}`;
   }
 
   function renderFinanceSection() {

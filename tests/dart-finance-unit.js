@@ -258,6 +258,20 @@ const september = finance.periodRange("custom", { start: "2026-09-01", end: "202
 assert.strictEqual(september.previous.start.getDate(), 22);
 assert.strictEqual(september.previous.end.getDate(), 31);
 
+for (const year of [2025, 2026]) {
+  const lastYear = finance.periodRange("last_year", {}, new Date(year, 9, 22, 12));
+  assert.strictEqual(lastYear.start.getFullYear(), year - 1);
+  assert.strictEqual(lastYear.start.getMonth(), 0);
+  assert.strictEqual(lastYear.start.getDate(), 1);
+  assert.strictEqual(lastYear.end.getFullYear(), year - 1);
+  assert.strictEqual(lastYear.end.getMonth(), 11);
+  assert.strictEqual(lastYear.end.getDate(), 31);
+  assert.strictEqual(lastYear.previous.start.getFullYear(), year - 2);
+  assert.strictEqual(lastYear.previous.end.getFullYear(), year - 2);
+  assert.strictEqual(lastYear.previous.end.getMonth(), 11);
+  assert.strictEqual(lastYear.previous.end.getDate(), 31);
+}
+
 const ownerCostScenario = finance.calculateSummary(baseData({
   models: [{ id: "M1", modelId: "M-1", cost: 400 }],
   items: [{ id: "I1", itemCode: "I-1", modelId: "M-1", costSnapshot: 400, createdAt: "2026-09-02", status: "Sold" }],

@@ -1,5 +1,13 @@
 # Dart Project changelog
 
+## Stable traffic visitor codes and shared hourly periods — 2026-10-22
+
+- Retained guest browser identities across navigation with a tab fallback for unavailable cookies. Customer sign-in links guest history without counting a duplicate visit.
+- Added database-owned visit-N guest codes, historical backfill and a compatible event insert trigger in migration 0062. Accounts keep their existing names/client codes.
+- Hours now follows the same general period as other traffic aggregations, accepts annual/custom ranges within the existing ten-year bound and returns 24 Cairo hour buckets.
+- Added Last Year to the shared Brand/Finance period selector with full-calendar-year comparisons.
+- Added browser-runtime and isolated PostgreSQL regression scenarios; preserved authentication, cart ownership, privacy and performance limits.
+
 ## Live Map route ownership and road routing — 2026-09-26
 
 - Separated Live Map ownership so the Reps layer owns each representative, their assigned order pins and their delivery route, while the Orders layer now contains unassigned orders only.

@@ -88,8 +88,8 @@ describe("dashboard action presentation and execution permissions", () => {
     expect(f.policy.canPersist("dart_models")).toBe(false);
     expect(f.policy.canPersist("dart_customers")).toBe(true);
     expect(f.policy.canPersist("dart_contact_messages")).toBe(false);
-    const source = read("Eye/dart.js");
-    const save = source.slice(source.indexOf("function saveDataToStorage("), source.indexOf("// تنسيق الصفوف"));
+    const source = read("src/dashboard/core/bootstrap.js");
+    const save = source.slice(source.indexOf("function saveDataToStorage("), source.indexOf("function openModal("));
     const write = vi.fn();
     const run = runInNewContext(save + "saveDataToStorage", { window: { DartAdminPermissions: f.policy, DartCatalog: { write } } }) as (key: string, rows: unknown[]) => void;
     run("dart_models", []); expect(write).not.toHaveBeenCalled();
@@ -97,8 +97,8 @@ describe("dashboard action presentation and execution permissions", () => {
   });
   it("routes shared feedback saves to the correct permission and durable domain", () => {
     const f = fixture(["contacts.read", "contacts.manage"]);
-    const source = read("Eye/dart.js"), write = vi.fn();
-    const save = source.slice(source.indexOf("function saveDataToStorage("), source.indexOf("// تنسيق الصفوف"));
+    const source = read("src/dashboard/core/bootstrap.js"), write = vi.fn();
+    const save = source.slice(source.indexOf("function saveDataToStorage("), source.indexOf("function openModal("));
     const run = runInNewContext(save + "saveDataToStorage", { window: { DartAdminPermissions: f.policy,
       DartDomainState: { domainForStorageKey: () => true, write } } }) as (key: string, rows: unknown[]) => void;
     const review = { id: "review" }, contact = { id: "contact", recordType: "contact" };

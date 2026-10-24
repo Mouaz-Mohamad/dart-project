@@ -688,7 +688,7 @@
       return Number(a.suggestedSequence || a.sequenceNumber || 9999) - Number(b.suggestedSequence || b.sequenceNumber || 9999);
     });
     return orders.map((order, index) => `
-      <div class="dart-live-stop" data-route-order="${esc(order.orderId)}">
+      <div class="dart-live-stop" data-route-order="${esc(order.orderId)}" data-status="${esc(order.status || stateLabel(order.routeState))}">
         <span class="dart-live-stop-index" style="border:2px solid ${COLORS[order.routeState] || COLORS.upcoming}">${index + 1}</span>
         <button type="button" class="dart-live-stop-copy" data-live-order="${esc(order.orderId)}" style="border:0;background:transparent;text-align:left;cursor:pointer">
           <strong>#${esc(order.orderId)} · ${esc(stateLabel(order.routeState))}</strong>

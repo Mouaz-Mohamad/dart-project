@@ -1,0 +1,3968 @@
+{
+  "storefront": [
+    {
+      "selector": ".dart-set-gallery>[data-set-cover]",
+      "condition": "@media (max-width:760px)",
+      "obsolete": {
+        "file": "CSS/responsive.css",
+        "line": 362,
+        "property": "object-fit",
+        "value": "contain",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/responsive.css",
+          "line": 363,
+          "property": "object-fit",
+          "value": "cover",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-gallery>[data-set-cover]",
+      "condition": "@media (max-width:760px)",
+      "obsolete": {
+        "file": "CSS/responsive.css",
+        "line": 362,
+        "property": "aspect-ratio",
+        "value": "4/3",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/responsive.css",
+          "line": 363,
+          "property": "aspect-ratio",
+          "value": "3/4",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".product-size-chart-dialog",
+      "condition": "@media (max-width:700px)",
+      "obsolete": {
+        "file": "CSS/responsive.css",
+        "line": 87,
+        "property": "padding",
+        "value": "20px 12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/responsive.css",
+          "line": 101,
+          "property": "padding",
+          "value": "18px 10px 12px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".product-filter-panel",
+      "condition": "@media (max-width:700px)",
+      "obsolete": {
+        "file": "CSS/responsive.css",
+        "line": 73,
+        "property": "width",
+        "value": "calc(100% - 18px)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/responsive.css",
+          "line": 92,
+          "property": "width",
+          "value": "calc(100% - 18px)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "button",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/base.css",
+        "line": 158,
+        "property": "color",
+        "value": "#000000",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/base.css",
+          "line": 176,
+          "property": "color",
+          "value": "var(--white)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-pricing",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "margin",
+        "value": "16px 0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4904,
+          "property": "margin",
+          "value": "16px 0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-pricing",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "gap",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4904,
+          "property": "gap",
+          "value": "6px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-pricing",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4904,
+          "property": "display",
+          "value": "grid",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-category",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "display",
+        "value": "inline-block",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4903,
+          "property": "display",
+          "value": "block",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-gallery>[data-set-cover]",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "aspect-ratio",
+        "value": "3/4",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4911,
+          "property": "aspect-ratio",
+          "value": "3/4",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-close",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "font-size",
+        "value": "28px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4902,
+          "property": "font-size",
+          "value": "40px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-close",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "height",
+        "value": "38px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4902,
+          "property": "height",
+          "value": "40px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-close",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 4895,
+        "property": "width",
+        "value": "38px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4902,
+          "property": "width",
+          "value": "40px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-input-box textarea",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3963,
+        "property": "min-height",
+        "value": "44px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3973,
+          "property": "min-height",
+          "value": "74px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".return-rep-name",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3779,
+        "property": "color",
+        "value": "#0f172a",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4806,
+          "property": "color",
+          "value": "#111",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".product-size-chart-table th:first-child",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3641,
+        "property": "z-index",
+        "value": "2",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3644,
+          "property": "z-index",
+          "value": "4",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".product-size-chart-table",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3409,
+        "property": "min-width",
+        "value": "520px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3629,
+          "property": "min-width",
+          "value": "max-content",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".product-size-chart-table-wrap",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3403,
+        "property": "overflow-x",
+        "value": "auto",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3623,
+          "property": "overflow",
+          "value": "auto",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".product-size-chart-dialog",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3379,
+        "property": "overflow",
+        "value": "auto",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3611,
+          "property": "overflow",
+          "value": "hidden",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".product-size-chart-dialog",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3377,
+        "property": "width",
+        "value": "min(820px, 96vw)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3609,
+          "property": "width",
+          "value": "min(310px, calc(100vw - 24px))",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".clear-product-filters",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3214,
+        "property": "color",
+        "value": "#111827",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3223,
+          "property": "color",
+          "value": "#8c1d2c",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".tracking-map-summary",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3149,
+        "property": "margin",
+        "value": "-20px 14px 14px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3713,
+          "property": "margin",
+          "value": "8px 14px 14px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#tracking-map",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3135,
+        "property": "background",
+        "value": "#e2e8f0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3689,
+          "property": "background",
+          "value": "#e2e8f0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".tracking-order-map",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3135,
+        "property": "background",
+        "value": "#e2e8f0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3689,
+          "property": "background",
+          "value": "#e2e8f0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-order-actions .rep-btn",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 3000,
+        "property": "margin",
+        "value": "0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4208,
+          "property": "margin",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-order-actions .rep-btn",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2999,
+        "property": "min-height",
+        "value": "38px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4207,
+          "property": "min-height",
+          "value": "42px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-order-actions .rep-btn",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2998,
+        "property": "align-items",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4210,
+          "property": "align-items",
+          "value": "center",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-order-actions .rep-btn",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2997,
+        "property": "justify-content",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4211,
+          "property": "justify-content",
+          "value": "center",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-order-actions .rep-btn",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2996,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4209,
+          "property": "display",
+          "value": "inline-flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-order-actions",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2993,
+        "property": "gap",
+        "value": "8px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4202,
+          "property": "gap",
+          "value": "9px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-order-actions",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2991,
+        "property": "display",
+        "value": "grid",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4200,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-total",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2988,
+        "property": "border-top",
+        "value": "1px solid #cbd5e1",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4141,
+          "property": "border-top",
+          "value": "1px solid #cbd5e1",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-total",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2987,
+        "property": "padding-top",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4140,
+          "property": "padding-top",
+          "value": "12px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-total",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2986,
+        "property": "margin-top",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4139,
+          "property": "margin-top",
+          "value": "10px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-total",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2985,
+        "property": "gap",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4138,
+          "property": "gap",
+          "value": "18px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-total",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2984,
+        "property": "justify-content",
+        "value": "space-between",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4137,
+          "property": "justify-content",
+          "value": "space-between",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-total",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2983,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4136,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-line",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2980,
+        "property": "font-size",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4133,
+          "property": "font-size",
+          "value": "13px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-line",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2979,
+        "property": "border-bottom",
+        "value": "1px dashed #e2e8f0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4132,
+          "property": "border-bottom",
+          "value": "1px dashed #e2e8f0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-line",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2978,
+        "property": "padding",
+        "value": "6px 0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4131,
+          "property": "padding",
+          "value": "8px 0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-line",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2977,
+        "property": "gap",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4130,
+          "property": "gap",
+          "value": "18px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-line",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2976,
+        "property": "justify-content",
+        "value": "space-between",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4129,
+          "property": "justify-content",
+          "value": "space-between",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-line",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2975,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4128,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-orders-list .rep-driver-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2968,
+        "property": "margin",
+        "value": "0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4106,
+          "property": "margin",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-orders-list .rep-driver-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2967,
+        "property": "max-width",
+        "value": "none",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4105,
+          "property": "max-width",
+          "value": "none",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-orders-list .rep-driver-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2966,
+        "property": "width",
+        "value": "auto",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4104,
+          "property": "width",
+          "value": "100%",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-orders-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2963,
+        "property": "gap",
+        "value": "18px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4101,
+          "property": "gap",
+          "value": "18px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-orders-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2961,
+        "property": "display",
+        "value": "grid",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4099,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2935,
+        "property": "margin-bottom",
+        "value": "20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4064,
+          "property": "margin-bottom",
+          "value": "14px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2934,
+        "property": "gap",
+        "value": "20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4063,
+          "property": "gap",
+          "value": "20px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2933,
+        "property": "align-items",
+        "value": "flex-start",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4061,
+          "property": "align-items",
+          "value": "center",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2932,
+        "property": "justify-content",
+        "value": "space-between",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4062,
+          "property": "justify-content",
+          "value": "space-between",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2931,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4060,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-upload-policy",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2917,
+        "property": "background",
+        "value": "#f8fafc",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4046,
+          "property": "background",
+          "value": "#f8fafc",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-upload-policy",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2916,
+        "property": "border-radius",
+        "value": "8px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4045,
+          "property": "border-radius",
+          "value": "7px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-upload-policy",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2915,
+        "property": "padding",
+        "value": "10px 12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4044,
+          "property": "padding",
+          "value": "8px 10px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-file img",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2912,
+        "property": "border-radius",
+        "value": "8px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4037,
+          "property": "border-radius",
+          "value": "7px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-file img",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2911,
+        "property": "object-fit",
+        "value": "cover",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4036,
+          "property": "object-fit",
+          "value": "cover",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-file img",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2910,
+        "property": "height",
+        "value": "170px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4035,
+          "property": "height",
+          "value": "90px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-file img",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2909,
+        "property": "width",
+        "value": "100%",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4034,
+          "property": "width",
+          "value": "100%",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-file",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2906,
+        "property": "border-radius",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4023,
+          "property": "border-radius",
+          "value": "9px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-file",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2905,
+        "property": "border",
+        "value": "1px dashed #cbd5e1",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4022,
+          "property": "border",
+          "value": "1px dashed #cbd5e1",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-file",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2904,
+        "property": "padding",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4019,
+          "property": "padding",
+          "value": "10px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-auth-form textarea",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2877,
+        "property": "min-height",
+        "value": "44px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2886,
+          "property": "min-height",
+          "value": "92px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2837,
+        "property": "box-shadow",
+        "value": "0 18px 55px rgba(15, 23, 42, 0.08)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4057,
+          "property": "box-shadow",
+          "value": "0 18px 55px rgba(15, 23, 42, 0.09)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2836,
+        "property": "background",
+        "value": "#fff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4056,
+          "property": "background",
+          "value": "#fff",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2835,
+        "property": "border-radius",
+        "value": "18px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4055,
+          "property": "border-radius",
+          "value": "18px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2834,
+        "property": "padding",
+        "value": "28px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4054,
+          "property": "padding",
+          "value": "24px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2833,
+        "property": "margin",
+        "value": "0 auto",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4053,
+          "property": "margin",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-dashboard",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2832,
+        "property": "max-width",
+        "value": "980px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4052,
+          "property": "max-width",
+          "value": "none",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-main",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2800,
+        "property": "margin",
+        "value": "0 auto 60px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3865,
+          "property": "margin",
+          "value": "0 auto",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-main",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2799,
+        "property": "width",
+        "value": "min(1180px, calc(100% - 28px))",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3864,
+          "property": "width",
+          "value": "min(1180px, calc(100% - 28px))",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-page",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2796,
+        "property": "color",
+        "value": "#111827",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3861,
+          "property": "color",
+          "value": "#0f172a",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-rep-page",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2795,
+        "property": "background",
+        "value": "#f5f5f4",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 3860,
+          "property": "background",
+          "value": "linear-gradient(90deg, #e2e2e2, #c9d6ff)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#results-list button",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2784,
+        "property": "text-align",
+        "value": "start",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4801,
+          "property": "text-align",
+          "value": "start",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#results-list button",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2783,
+        "property": "background",
+        "value": "#fff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4796,
+          "property": "background",
+          "value": "#fff",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": "#results-list button",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2780,
+        "property": "width",
+        "value": "100%",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4800,
+          "property": "width",
+          "value": "100%",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".serial-owner",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2597,
+        "property": "color",
+        "value": "#ab012b",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4347,
+          "property": "color",
+          "value": "#8c1d2c",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".serial-owner",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2595,
+        "property": "font-size",
+        "value": "clamp(17px, 3vw, 22px)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4348,
+          "property": "font-size",
+          "value": "17px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".serial-owner",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2594,
+        "property": "margin-top",
+        "value": "14px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4346,
+          "property": "margin-top",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".serial-result-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2552,
+        "property": "width",
+        "value": "min(92vw, 500px)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4305,
+          "property": "width",
+          "value": "100%",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#results-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2449,
+        "property": "background",
+        "value": "#fff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4796,
+          "property": "background",
+          "value": "#fff",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": "#map",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2148,
+        "property": "height",
+        "value": "280px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2440,
+          "property": "height",
+          "value": "300px",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": "#map",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2148,
+        "property": "width",
+        "value": "100%",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2441,
+          "property": "width",
+          "value": "100%",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".item-model-code",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2126,
+        "property": "width",
+        "value": "20%",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2133,
+          "property": "width",
+          "value": "20%",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".exp-issue-date",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2027,
+        "property": "margin-top",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4589,
+          "property": "margin",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-card-acount",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2015,
+        "property": "padding",
+        "value": "10px 20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4491,
+          "property": "padding",
+          "value": "clamp(10px, 4vw, 15px)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-card-acount",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2010,
+        "property": "border-radius",
+        "value": "20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4494,
+          "property": "border-radius",
+          "value": "20px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-card-acount",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 2009,
+        "property": "background",
+        "value": "linear-gradient(to right, #000000 0%, #8a0022 100%)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4495,
+          "property": "background",
+          "value": "#000",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".story .container-story",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 1726,
+        "property": "width",
+        "value": "90%",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 1732,
+          "property": "width",
+          "value": "92%",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".arrwo-for-other-adrees",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 1333,
+        "property": "cursor",
+        "value": "pointer",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2474,
+          "property": "cursor",
+          "value": "pointer",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".products-grid",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 957,
+        "property": "gap",
+        "value": "5px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2350,
+          "property": "gap",
+          "value": "12px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".products-grid",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 956,
+        "property": "grid-template-columns",
+        "value": "repeat(auto-fill, minmax(165px, 165px))",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2349,
+          "property": "grid-template-columns",
+          "value": "repeat(2, 1fr)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".products-grid",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 955,
+        "property": "display",
+        "value": "grid",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 2348,
+          "property": "display",
+          "value": "grid",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".cart-product-img",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 856,
+        "property": "border-radius",
+        "value": "8px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 1115,
+          "property": "border-radius",
+          "value": "8px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".model img",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 856,
+        "property": "border-radius",
+        "value": "8px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 1393,
+          "property": "border-radius",
+          "value": "20px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-item",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 363,
+        "property": "transition",
+        "value": "background-color 0.2s ease, transform 0.2s ease",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4395,
+          "property": "transition",
+          "value": "transform .2s ease, box-shadow .2s ease",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-item",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 362,
+        "property": "border-bottom",
+        "value": "1px solid #f1f5f9",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4391,
+          "property": "border",
+          "value": "1px solid rgba(15, 23, 42, .08)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-item",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 361,
+        "property": "padding",
+        "value": "12px 18px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4390,
+          "property": "padding",
+          "value": "12px 15px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-item",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 359,
+        "property": "align-items",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4388,
+          "property": "align-items",
+          "value": "center",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-item",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 358,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4385,
+          "property": "display",
+          "value": "grid",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 353,
+        "property": "box-shadow",
+        "value": "0 10px 25px rgba(0, 0, 0, 0.05)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4376,
+          "property": "box-shadow",
+          "value": "0 16px 38px rgba(30, 30, 30, .08)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 352,
+        "property": "border-radius",
+        "value": "16px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4374,
+          "property": "border-radius",
+          "value": "24px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 351,
+        "property": "border",
+        "value": "1px solid rgba(171, 1, 43, 0.2)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4373,
+          "property": "border",
+          "value": "1px solid rgba(140, 29, 44, .28)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 350,
+        "property": "background",
+        "value": "var(--white)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4375,
+          "property": "background",
+          "value": "linear-gradient(145deg, #fff 0%, #faf7f6 100%)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 349,
+        "property": "list-style",
+        "value": "none",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4377,
+          "property": "list-style",
+          "value": "none",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 347,
+        "property": "padding",
+        "value": "0",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4372,
+          "property": "padding",
+          "value": "18px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 346,
+        "property": "width",
+        "value": "min(92%, 480px)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4371,
+          "property": "width",
+          "value": "min(94%, 620px)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 296,
+        "property": "border-radius",
+        "value": "20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4374,
+          "property": "border-radius",
+          "value": "24px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 295,
+        "property": "border",
+        "value": "1px solid #AB012B",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4373,
+          "property": "border",
+          "value": "1px solid rgba(140, 29, 44, .28)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 294,
+        "property": "padding",
+        "value": "0 10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4372,
+          "property": "padding",
+          "value": "18px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-list",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 293,
+        "property": "width",
+        "value": "min(90%, 500px)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 4371,
+          "property": "width",
+          "value": "min(94%, 620px)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-card h1",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 289,
+        "property": "color",
+        "value": "var(--bg-dark)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 340,
+          "property": "color",
+          "value": "var(--bragnte)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".leaderboard-card h1",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 288,
+        "property": "font-family",
+        "value": "var(--font-main)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 339,
+          "property": "font-family",
+          "value": "var(--font-inter)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".side-menu",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 42,
+        "property": "flex-direction",
+        "value": "column",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 208,
+          "property": "flex-direction",
+          "value": "column",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".side-menu",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 41,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 207,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".model",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 41,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 1342,
+          "property": "display",
+          "value": "none",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-modal-close",
+      "condition": "all",
+      "obsolete": {
+        "file": "CSS/main.css",
+        "line": 35,
+        "property": "width",
+        "value": "100%",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "CSS/main.css",
+          "line": 1362,
+          "property": "width",
+          "value": "97%",
+          "important": false
+        }
+      ]
+    }
+  ],
+  "dashboard": [
+    {
+      "selector": ".dart-filter-summary button",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-dashboard-ui.css",
+        "line": 11,
+        "property": "background",
+        "value": "#fff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 13,
+          "property": "background",
+          "value": "#f5eaf0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-live-error",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-live-operations.css",
+        "line": 76,
+        "property": "color",
+        "value": "#6d6d6d",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-live-operations.css",
+          "line": 77,
+          "property": "color",
+          "value": "#9a3412",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-live-rep-marker",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-live-operations.css",
+        "line": 52,
+        "property": "box-shadow",
+        "value": "0 3px 12px rgba(0,0,0,.28)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-live-operations.css",
+          "line": 111,
+          "property": "box-shadow",
+          "value": "0 3px 10px rgba(20,28,35,.16)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-live-marker",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-live-operations.css",
+        "line": 50,
+        "property": "box-shadow",
+        "value": "0 3px 12px rgba(0,0,0,.25)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-live-operations.css",
+          "line": 111,
+          "property": "box-shadow",
+          "value": "0 3px 10px rgba(20,28,35,.16)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-live-legend",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-live-operations.css",
+        "line": 47,
+        "property": "box-shadow",
+        "value": "0 6px 16px rgba(0,0,0,.08)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-live-operations.css",
+          "line": 110,
+          "property": "box-shadow",
+          "value": "0 4px 14px rgba(25,32,38,.055)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-live-legend",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-live-operations.css",
+        "line": 47,
+        "property": "background",
+        "value": "rgba(255,255,255,.95)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-live-operations.css",
+          "line": 110,
+          "property": "background",
+          "value": "rgba(255,255,255,.92)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#dart-live-operations-map",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-live-operations.css",
+        "line": 43,
+        "property": "background",
+        "value": "#ece8e1",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-live-operations.css",
+          "line": 106,
+          "property": "background",
+          "value": "#f7f8f8",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-live-map-shell",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-live-operations.css",
+        "line": 28,
+        "property": "box-shadow",
+        "value": "0 8px 22px rgba(32,25,18,.05)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-live-operations.css",
+          "line": 109,
+          "property": "box-shadow",
+          "value": "0 5px 18px rgba(25,32,38,.045)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-typing-rows",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 111,
+        "property": "gap",
+        "value": "8px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 540,
+          "property": "gap",
+          "value": "20px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-model-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 109,
+        "property": "grid-template-columns",
+        "value": "minmax(180px,1fr) auto auto auto",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 114,
+          "property": "grid-template-columns",
+          "value": "minmax(170px,1fr) 180px 100px minmax(0,1.4fr)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-save",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 101,
+        "property": "color",
+        "value": "#6f1028",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 102,
+          "property": "color",
+          "value": "#fff",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-save",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 101,
+        "property": "background",
+        "value": "#fff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 102,
+          "property": "background",
+          "value": "#ab012b",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-fields input",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 97,
+        "property": "min-height",
+        "value": "38px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 506,
+          "property": "min-height",
+          "value": "43px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-fields select",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 97,
+        "property": "min-height",
+        "value": "38px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 506,
+          "property": "min-height",
+          "value": "43px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-fields label",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 96,
+        "property": "font-size",
+        "value": "11px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 505,
+          "property": "font-size",
+          "value": "12px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-settings-form-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 93,
+        "property": "grid-template-columns",
+        "value": "46px minmax(170px, .55fr) minmax(320px, 1.45fr)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 499,
+          "property": "grid-template-columns",
+          "value": "40px minmax(0,1fr)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-reset-kicker",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-settings.css",
+        "line": 67,
+        "property": "color",
+        "value": "var(--dart-settings-burgundy)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-settings.css",
+          "line": 247,
+          "property": "color",
+          "value": "var(--dart-settings-danger)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-finance-field textarea",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 164,
+        "property": "min-height",
+        "value": "39px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 865,
+          "property": "min-height",
+          "value": "84px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-link-btn",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 84,
+        "property": "padding",
+        "value": "8px 13px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 111,
+          "property": "padding",
+          "value": "6px 9px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-link-btn",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 82,
+        "property": "min-height",
+        "value": "38px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 110,
+          "property": "min-height",
+          "value": "auto",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-finance-actions",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 41,
+        "property": "justify-content",
+        "value": "space-between",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 401,
+          "property": "justify-content",
+          "value": "flex-end",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-finance-form-actions",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 41,
+        "property": "justify-content",
+        "value": "space-between",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 882,
+          "property": "justify-content",
+          "value": "flex-end",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-finance-section-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 40,
+        "property": "align-items",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 391,
+          "property": "align-items",
+          "value": "flex-start",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-panel-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 40,
+        "property": "align-items",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 263,
+          "property": "align-items",
+          "value": "flex-start",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-goal-card-head",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-finance.css",
+        "line": 40,
+        "property": "align-items",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-finance.css",
+          "line": 686,
+          "property": "align-items",
+          "value": "flex-start",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#items .group-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 230,
+        "property": "margin-bottom",
+        "value": "8px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 276,
+          "property": "margin",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#items .group-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 29,
+        "property": "border-bottom",
+        "value": "1px solid #eee",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 232,
+          "property": "border",
+          "value": "1px solid #ab012b",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#items .group-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 25,
+        "property": "min-width",
+        "value": "max-content",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 276,
+          "property": "min-width",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#items .groups .title-name",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 24,
+        "property": "padding",
+        "value": "12px 16px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 269,
+          "property": "padding",
+          "value": "12px 16px",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": "#items .group-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 24,
+        "property": "padding",
+        "value": "12px 16px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 269,
+          "property": "padding",
+          "value": "12px 16px",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": "#items .groups .title-name",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 23,
+        "property": "gap",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 268,
+          "property": "gap",
+          "value": "12px",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": "#items .group-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 23,
+        "property": "gap",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 268,
+          "property": "gap",
+          "value": "12px",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": "#items .group-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 21,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 276,
+          "property": "display",
+          "value": "grid",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "#items .title-name",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart-inventory.css",
+        "line": 16,
+        "property": "background",
+        "value": "#fff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 221,
+          "property": "background",
+          "value": "#ab012b",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-builder",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1964,
+        "property": "margin-top",
+        "value": "20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 2081,
+          "property": "margin",
+          "value": "0",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-set-settings-dialog",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1964,
+        "property": "width",
+        "value": "min(980px,100%)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1964,
+          "property": "width",
+          "value": "min(520px,100%)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-waiting-table th",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1939,
+        "property": "font-size",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1940,
+          "property": "font-size",
+          "value": "11px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-admin-auth-card output",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1793,
+        "property": "background",
+        "value": "#fff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1793,
+          "property": "background",
+          "value": "#faf7f2",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-card strong",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1675,
+        "property": "font-size",
+        "value": "18px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1718,
+          "property": "font-size",
+          "value": "20px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-card h6",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1674,
+        "property": "font-size",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1718,
+          "property": "font-size",
+          "value": "12px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1672,
+        "property": "min-height",
+        "value": "86px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1717,
+          "property": "min-height",
+          "value": "125px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1671,
+        "property": "padding",
+        "value": "13px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1717,
+          "property": "padding",
+          "value": "14px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1670,
+        "property": "border-radius",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1717,
+          "property": "border-radius",
+          "value": "14px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-card",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1669,
+        "property": "border",
+        "value": "1px solid rgba(0,0,0,.08)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1717,
+          "property": "border",
+          "value": "1px solid rgba(0,0,0,.06)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-grid",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1664,
+        "property": "gap",
+        "value": "12px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1716,
+          "property": "gap",
+          "value": "12px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-grid",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1663,
+        "property": "grid-template-columns",
+        "value": "repeat(4, minmax(0, 1fr))",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1716,
+          "property": "grid-template-columns",
+          "value": "repeat(auto-fit,minmax(175px,1fr))",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-analytics-grid",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1662,
+        "property": "display",
+        "value": "grid",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1716,
+          "property": "display",
+          "value": "grid",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-empty-state",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1645,
+        "property": "padding",
+        "value": "22px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-inventory.css",
+          "line": 215,
+          "property": "padding",
+          "value": "22px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-notification time",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1644,
+        "property": "font-size",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1703,
+          "property": "font-size",
+          "value": "11px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-notification",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1639,
+        "property": "cursor",
+        "value": "pointer",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1698,
+          "property": "cursor",
+          "value": "pointer",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-notification",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1637,
+        "property": "padding",
+        "value": "10px 4px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1698,
+          "property": "padding",
+          "value": "10px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-notification",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1636,
+        "property": "align-items",
+        "value": "start",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1698,
+          "property": "align-items",
+          "value": "center",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-notification",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1635,
+        "property": "gap",
+        "value": "9px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1698,
+          "property": "gap",
+          "value": "10px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-notification",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1634,
+        "property": "grid-template-columns",
+        "value": "auto 1fr auto",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1698,
+          "property": "grid-template-columns",
+          "value": "38px minmax(0,1fr) auto",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".dart-notification",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1633,
+        "property": "display",
+        "value": "grid",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1698,
+          "property": "display",
+          "value": "grid",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".order-bulk-actions",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1500,
+        "property": "flex-wrap",
+        "value": "wrap",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 5,
+          "property": "flex-wrap",
+          "value": "wrap",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".order-bulk-actions",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 1497,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 5,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 701,
+        "property": "gap",
+        "value": "20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1727,
+          "property": "gap",
+          "value": "14px",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 699,
+        "property": "align-items",
+        "value": "stretch",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1727,
+          "property": "align-items",
+          "value": "stretch",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 695,
+        "property": "padding",
+        "value": "10px 20px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 703,
+          "property": "padding",
+          "value": "20px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 694,
+        "property": "width",
+        "value": "100%",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 702,
+          "property": "width",
+          "value": "100%",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 693,
+        "property": "gap",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1727,
+          "property": "gap",
+          "value": "14px",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 692,
+        "property": "justify-content",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 700,
+          "property": "justify-content",
+          "value": "space-between",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 691,
+        "property": "align-items",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1727,
+          "property": "align-items",
+          "value": "stretch",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".chart-one",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 690,
+        "property": "display",
+        "value": "flex",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 698,
+          "property": "display",
+          "value": "flex",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".return-status-good",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 666,
+        "property": "border",
+        "value": "1px solid green",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1693,
+          "property": "border",
+          "value": "1px solid #86efac",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".return-status-good",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 665,
+        "property": "color",
+        "value": "green",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1693,
+          "property": "color",
+          "value": "#166534",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".model-row",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 330,
+        "property": "gap",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1901,
+          "property": "gap",
+          "value": "10px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".title-name input",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 313,
+        "property": "margin-right",
+        "value": "50px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1907,
+          "property": "margin-right",
+          "value": "0",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".model-checkbox",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 313,
+        "property": "margin-right",
+        "value": "50px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1907,
+          "property": "margin-right",
+          "value": "0",
+          "important": true
+        }
+      ]
+    },
+    {
+      "selector": ".title-name",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 303,
+        "property": "gap",
+        "value": "10px",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 1901,
+          "property": "gap",
+          "value": "10px",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".cont-menu",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 140,
+        "property": "color",
+        "value": "var(--white)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 4,
+          "property": "color",
+          "value": "#fff",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".cont-menu",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 139,
+        "property": "background-size",
+        "value": "contain",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 4,
+          "property": "background",
+          "value": "#381724",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".cont-menu",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 138,
+        "property": "background-repeat",
+        "value": "no-repeat",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 4,
+          "property": "background",
+          "value": "#381724",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".cont-menu",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 137,
+        "property": "background-position",
+        "value": "center",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 4,
+          "property": "background",
+          "value": "#381724",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": ".cont-menu",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 135,
+        "property": "background-color",
+        "value": "#19485f",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 4,
+          "property": "background",
+          "value": "#381724",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "button",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 91,
+        "property": "color",
+        "value": "inherit",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 112,
+          "property": "color",
+          "value": "var(--white)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "body",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 67,
+        "property": "overflow-x",
+        "value": "hidden",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart.css",
+          "line": 69,
+          "property": "overflow",
+          "value": "scroll",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "body",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 66,
+        "property": "background",
+        "value": "#ffffff",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 2,
+          "property": "background",
+          "value": "var(--dart-canvas)",
+          "important": false
+        }
+      ]
+    },
+    {
+      "selector": "body",
+      "condition": "all",
+      "obsolete": {
+        "file": "Eye/dart.css",
+        "line": 65,
+        "property": "color",
+        "value": "var(--text-main)",
+        "important": false
+      },
+      "winners": [
+        {
+          "file": "Eye/dart-dashboard-ui.css",
+          "line": 2,
+          "property": "color",
+          "value": "var(--dart-ink)",
+          "important": false
+        }
+      ]
+    }
+  ],
+  "about": [],
+  "news": []
+}

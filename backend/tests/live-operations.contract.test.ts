@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const service = readFileSync(
-  new URL("../src/modules/commerce/commerce.service.ts", import.meta.url),
-  "utf8",
-);
+// Follow the canonical owners after splitting read projections from write commands.
+const service = ["commerce.service.ts", "commerce.operations-queries.ts", "commerce.routing.ts"]
+  .map((file) => readFileSync(new URL(`../src/modules/commerce/${file}`, import.meta.url), "utf8"))
+  .join("\n");
 const routes = readFileSync(
   new URL("../src/modules/commerce/commerce.routes.ts", import.meta.url),
   "utf8",

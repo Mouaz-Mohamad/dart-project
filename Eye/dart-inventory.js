@@ -40,26 +40,8 @@
     const groups = document.createElement("div");
     groups.id = "groups-view";
     groups.className = "cont-titel groups";
-    const columns = [
-      "Photo",
-      "Model Code",
-      "Model Name",
-      "Color",
-      "Size",
-      "Total",
-      "In Stock",
-      "Reserved",
-      "Processing",
-      "With Rep",
-      "Sold",
-      "Refused / Inspection",
-      "Damaged / Repair",
-      "Low Stock",
-    ];
     groups.innerHTML =
-      '<div class="title-name">' +
-      columns.map((c) => `<h2 class="w150">${c}</h2>`).join("") +
-      '</div><div id="groups-container"></div>';
+      '<p class="inventory-groups-heading">Groups · select a Model / Color / Size to view its pieces.</p><div id="groups-container"></div>';
     const detail = document.createElement("div");
     detail.id = "items-groups-view";
     detail.className = "cont-titel items-groups";
@@ -166,7 +148,7 @@
           .slice(0, state.limit)
           .map(
             (g) =>
-              `<div class="group-row" role="button" tabindex="0" data-group-key="${esc(g.key)}"><div class="w150"><img loading="lazy" class="product-img" alt="${esc(g.color)}" src="${esc(g.image)}"></div>${["modelId", "name", "color", "size", "total", "stock", "reserved", "processing", "withRep", "sold", "refused", "damaged"].map((k) => `<span class="w150">${esc(g[k])}</span>`).join("")}<span class="w150"><span class="stock-badge ${g.stock === 0 ? "empty" : g.stock <= g.limit ? "low" : "normal"}">${g.stock === 0 ? "Sold Out" : g.stock <= g.limit ? "Low Stock" : "Available"}</span></span></div>`,
+              `<article class="group-row" role="button" tabindex="0" data-group-key="${esc(g.key)}" aria-label="View items: ${esc(g.modelId)} / ${esc(g.color)} / ${esc(g.size)}"><header class="inventory-group-identity"><img loading="lazy" class="product-img" alt="${esc(g.color)}" src="${esc(g.image)}"><div><strong>${esc(g.name || g.modelId)}</strong><span>Model: ${esc(g.modelId)}</span><span>Color: ${esc(g.color)} · Size: ${esc(g.size)}</span></div></header><dl class="inventory-group-metrics">${[["total","Total"],["stock","In Stock"],["reserved","Reserved"],["processing","Processing"],["withRep","With Rep"],["sold","Sold"],["refused","Refused / Inspection"],["damaged","Damaged / Repair"]].map(([key,label]) => `<div data-inventory-metric="${key}"><dt>${label}</dt><dd>${esc(g[key])}</dd></div>`).join("")}</dl><footer class="inventory-group-footer"><span class="stock-badge ${g.stock === 0 ? "empty" : g.stock <= g.limit ? "low" : "normal"}">${g.stock === 0 ? "Sold Out" : g.stock <= g.limit ? "Low Stock" : "Available"}</span><span>View items →</span></footer></article>`,
           )
           .join("") || '<p class="dart-empty-state">No item groups yet.</p>';
       if (groups.length > state.limit) addMore($("groups-container"));

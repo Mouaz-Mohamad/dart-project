@@ -1,4 +1,4 @@
-// DART CODE GUIDE | scripts/home-ui.source.js
+// DART CODE GUIDE | src/storefront/home-ui.js
 // Homepage-only storefront runtime. Keeps Home fast by excluding checkout/maps/profile/returns code.
 
 const DART_LOCAL_DEMO_MODE = ["localhost", "127.0.0.1"].includes(location.hostname);

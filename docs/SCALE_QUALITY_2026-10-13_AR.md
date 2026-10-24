@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 1. تشخيص النسخ الاحتياطي | رفض اتصال ناقص/مخفي/pooled، وإظهار مرحلة الفشل بدون كشف اتصال قاعدة البيانات | `backend/scripts/encrypted-database-backup.mjs` |
 | 2. صفحات الكتالوج | API يرجع عددًا محدودًا من الموديلات/القطع مع إجماليات صحيحة؛ العقد الكامل القديم مستمر | `backend/src/modules/catalog/catalog.routes.ts`, `catalog.service.ts` |
-| 3. تعديل السجلات المتغيرة | تعديل قطعة واحدة لا يرسل أو يعيد كتابة كامل المخزون؛ التعارض يرفض بـ409 | `scripts/catalog-admin.source.js`, `Eye/dart-catalog-admin.js`, `Js/dart-catalog.js` |
+| 3. تعديل السجلات المتغيرة | تعديل قطعة واحدة لا يرسل أو يعيد كتابة كامل المخزون؛ التعارض يرفض بـ409 | `src/dashboard/catalog-admin.js`, `Eye/dart-catalog-admin.js`, `Js/dart-catalog.js` |
 | 4. تخفيف القراءة | كاش محدود لبيانات الموديلات العامة مرتبط بإصدار PostgreSQL، والمخزون يُقرأ حديثًا | `catalog.service.ts` |
 | 5. الاتصالات والحدود المشتركة | إدارة عمر pool في Vercel، وإمكانية مشاركة حدود المسارات الحساسة بين نسخ الخادم بعد migration | `backend/src/database/pool.ts`, `backend/src/security/shared-rate-limit.ts`, `0060_scale_foundation.sql` |
 | 6. عامل الرسائل | إرسال فوري محدود بعد commit، وعامل استدراك كل ساعة محدود بالوقت وعدد الدفعات | `backend/src/modules/outbox/outbox.dispatch.ts`, `outbox.routes.ts`, `.github/workflows/outbox-worker.yml` |

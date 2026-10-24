@@ -1,0 +1,273 @@
+/* Dart Eye: compact records and accessible details. Original controls stay in their owning row. */
+(function (root) {
+  "use strict";
+  const doc = root.document;
+  if (!doc) return;
+  const preferred = {
+    orders: [/id order/i, /client name/i, /name area/i, /total products/i, /final amount/i, /^status$/i, /^representative$/i],
+    customers: [/client name/i, /id clinte/i, /^phone number$/i, /orders/i, /spent|spending/i, /dart card/i],
+    models: [/code|id model/i, /^name|model name/i, /selling|final price/i, /stock|quantity|status/i],
+    items: [/code|id item/i, /model/i, /^color|^size|^status$/i],
+    returns: [/id return|return id/i, /^client name|request type|item code|^status|inspection/i],
+    damage: [/code|model|status|condition|cost/i],
+    representative: [/^name|representative name|id rep|^phone number$|^status$/i],
+    review: [/client name|rating|date|status|source/i],
+    card: [/client name|id card|remaining|expiry|expiration|status/i],
+    waiting: [/customer|model|color|size|status|expiry|waiting|reserved|converted/i],
+    news: [/title|status|publish|date/i],
+  };
+  const states = new WeakMap();
+  let openRecord = null;
+  let queued = false;
+  let serial = 0;
+  // BEGIN Shared status colors. Display-only: status text remains the source for row colors.
+  const statusGroups = {
+    success: "active|sold|delivered|completed|good|repaired|available|in stock|published|paid|settled|received|converted|eligible|verified|used|achieved|online|connected|approved|return received|return completed|refund completed|exchange completed|returned|refunded",
+    processing: "accepted|preparing|processing|processing/held|in progress|repairing",
+    info: "new|new order|new request|scheduled|expected|upcoming",
+    warning: "waiting|pending|pending request|under review|pending inspection|pending approval|reserved|hold|held|out with representative|representative on the way|on the way|delivering|representative assigned|approved - awaiting representative|awaiting settlement|open|unpaid|partial|partially paid|low stock|email pending|return pending|exchange pending|partially refunded",
+    danger: "refused|rejected|cancelled|canceled|order cancelled|order canceled|cancelled order|canceled order|damaged|bad|destroyed|suspended|disabled|blocked|failed|delivery failed|failed delivery|delivery failure|unsuccessful delivery|delivery unsuccessful|failed to deliver|undelivered|not delivered|delivery refused|return rejected|verification failed|failed to complete|expired|error|overdue|needs attention|problem|out of stock|sold out|over budget",
+  };
+  const statusKey = value => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const tones = new Map(Object.entries(statusGroups).flatMap(([tone, values]) => values.split("|").map(value => [statusKey(value), tone])));
+  function toneFor(value) {
+    const key = statusKey(value);
+    return tones.get(key) || (key.endsWith("-overdue") ? "danger" : "neutral");
+  }
+  function paint(node, value, kind = "record") {
+    if (!node) return;
+    const label = String(value || "").replace(/^[\s•·]+/, "").trim();
+    const tone = toneFor(label);
+    if (node.dataset.dartTone !== tone) node.dataset.dartTone = tone;
+    if (node.dataset.dartLabel !== label) node.dataset.dartLabel = label;
+    if (node.dataset.dartKind !== kind) node.dataset.dartKind = kind;
+    // Older status cells use inline red/green text; the shared palette now owns those colors.
+    if (kind === "badge" && node.style.color) node.style.removeProperty("color");
+  }
+  function rowStatus(row, labels, cells) {
+    if (row.matches(".row-deleted,.is-archived")) return "Archived";
+    if (row.dataset.status) return row.dataset.status;
+    const column = ["settlement", "status", "account status", "availability", "available", "new"].map(label => labels.findIndex(value => value.toLowerCase() === label)).find(index => index >= 0);
+    if (column !== undefined) {
+      const cell = cells[column];
+      return (cell?.querySelector(".status-pill,.dart-status-chip") || cell)?.textContent || "";
+    }
+    return "";
+  }
+  function colorRow(row, section) {
+    const saved = states.get(row);
+    const cells = saved?.cells || [...row.children];
+    const labels = saved?.labels || labelsFor(row, section);
+    paint(row, rowStatus(row, labels, cells));
+    labels.forEach((label, index) => {
+      if (!/^(status|order status|payment status|settlement|inspection|availability|available|new)$/i.test(label)) return;
+      const cell = cells[index];
+      if (!cell) return;
+      const badge = cell.querySelector(".status-pill,.dart-status-chip") || cell;
+      paint(badge, badge.textContent, "badge");
+      const summary = row.querySelector(`.dart-record-field[data-column="${index}"] strong`);
+      if (summary) {
+        const text = badge.textContent.trim() || "—";
+        if (summary.textContent !== text) summary.textContent = text;
+        paint(summary, text, "badge");
+      }
+    });
+  }
+  function colorSection(section) {
+    section.querySelectorAll(".group-row").forEach(row => paint(row, row.querySelector(".stock-badge")?.textContent));
+    section.querySelectorAll("[data-inventory-metric]").forEach(metric => {
+      const labels = {stock:"In stock",reserved:"Reserved",processing:"Processing",withRep:"Out With Representative",sold:"Sold",refused:"Refused",damaged:"Damaged"};
+      paint(metric, labels[metric.dataset.inventoryMetric]);
+    });
+    section.querySelectorAll(".dart-order-group-ref").forEach(row => paint(row, row.lastElementChild?.textContent));
+    section.querySelectorAll(".dart-order-group-status").forEach(badge => paint(badge, [...badge.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join(""), "badge"));
+    section.querySelectorAll(".dart-order-group-card").forEach(row => {
+      const statuses = new Set([...row.querySelectorAll(".dart-order-group-ref")].map(node => node.dataset.dartLabel));
+      paint(row, statuses.size === 1 ? [...statuses][0] : "Mixed statuses");
+    });
+    section.querySelectorAll("[data-operation-group-heading]").forEach(heading => {
+      const statuses = new Set();
+      for (let row = heading.nextElementSibling; row && !row.matches("[data-operation-group-heading]"); row = row.nextElementSibling) {
+        if (row.matches(".model-row")) statuses.add(row.dataset.dartLabel || "");
+      }
+      paint(heading, statuses.size === 1 ? [...statuses][0] : "Mixed statuses");
+    });
+    section.querySelectorAll(".dart-settings-list-row,.dart-live-rep-card,.dart-live-stop,.dart-goal-card,.dart-alert").forEach(row => {
+      const badge = row.querySelector('.dart-staff-badges span,[data-announcement-field="status"],.dart-live-pill');
+      const status = row.dataset.status || badge?.textContent || (row.hasAttribute("data-allowance-id") ? "Pending" : row.matches(".is-achieved") ? "Achieved" : row.matches(".is-danger") ? "Error" : row.matches(".is-warning") ? "Pending" : "");
+      paint(row, status);
+    });
+    section.querySelectorAll(".status-pill,.dart-status-chip,.dart-waiting-status,.stock-badge,.dart-live-pill,.dart-staff-badges span,[data-return-field=\"status\"],[data-return-field=\"inspection\"],[data-announcement-field=\"status\"]").forEach(badge => paint(badge, badge.textContent, "badge"));
+  }
+  // END Shared status colors.
+  function notify(message,type='success') {
+    let region=doc.getElementById('dart-operation-notices');
+    if(!region){region=doc.createElement('div');region.id='dart-operation-notices';region.setAttribute('aria-live','polite');doc.body.append(region);}
+    const notice=doc.createElement('div');notice.className=`dart-operation-notice is-${type}`;
+    const text=doc.createElement('span');text.textContent=message;
+    const close=button('×','dart-notice-close');close.setAttribute('aria-label','Dismiss notification');close.addEventListener('click',()=>notice.remove());notice.append(text,close);region.append(notice);
+    while(region.children.length>3)region.firstElementChild.remove();
+    root.setTimeout(()=>notice.remove(),type==='warning'?10000:5000);
+  }
+
+  function button(text, className) {
+    const node = doc.createElement("button");
+    node.type = "button"; node.textContent = text; node.className = className;
+    return node;
+  }
+  function cleanLabel(node, index) {
+    return node?.textContent?.replace(/\s+/g, " ").trim() || `Field ${index + 1}`;
+  }
+  function labelsFor(row, section) {
+    const table = row.closest("table");
+    const head = table ? table.querySelector("thead tr") :
+      (row.closest(".cont-titel") || section).querySelector(".title-name, .dart-sets-head");
+    const headings = head ? [...head.children].map(cleanLabel) : [];
+    return [...row.children].map((cell,index) => cell.dataset.columnLabel || headings[index] || cleanLabel(null,index));
+  }
+  function keyFor(row) {
+    return row.dataset.id || row.dataset.newsId || row.dataset.waitingId || row.dataset.waitingDemand || row.dataset.setId || row.dataset.groupKey || row.textContent.trim().slice(0,100);
+  }
+  function primaryColumns(section, labels, cells) {
+    const patterns = preferred[section] || [/name|title|date|amount|status/i];
+    const indices = [];
+    patterns.forEach(pattern => labels.forEach((label, i) => {
+      if (pattern.test(label) && cells[i] && !cells[i].querySelector("button") && !indices.includes(i)) indices.push(i);
+    }));
+    cells.forEach((cell, i) => {
+      if (indices.length < 4 && !indices.includes(i) && !cell.matches('input[type="checkbox"]') && !cell.querySelector("button,input,select")) indices.push(i);
+    });
+    return indices.slice(0,7);
+  }
+  function closeDetails(state, keepSelection = false) {
+    if (!keepSelection) openRecord = null;
+    if (state?.dialog.open) state.dialog.close();
+  }
+  function showDetails(state) {
+    doc.querySelectorAll(".dart-record-dialog[open]").forEach(dialog => { if (dialog !== state.dialog) dialog.close(); });
+    openRecord = { section: state.section.id, key: state.key, scroll: openRecord?.scroll || 0 };
+    state.trigger.setAttribute("aria-expanded", "true");
+    state.dialog.showModal();
+    state.dialog.scrollTop = openRecord.scroll;
+  }
+  function decorate(row, section) {
+    if (states.has(row) || row.closest(".dart-record-dialog")) return;
+    const cells = [...row.children];
+    if (cells.length < 3) return;
+    const labels = labelsFor(row, section);
+    const isTableRow = row.tagName === "TR";
+    const checkbox = cells.find(cell => cell.matches?.('input[type="checkbox"]')) || cells[0]?.querySelector?.('input[type="checkbox"]');
+    const main = doc.createElement(isTableRow ? "td" : "div");
+    main.className = "dart-record-main";
+    if (isTableRow) main.colSpan = section.id === "waiting" ? 1 : Math.max(cells.length,1);
+    const fields = doc.createElement("div"); fields.className = "dart-record-fields";
+    primaryColumns(section.id, labels, cells).forEach(index => {
+      const field = doc.createElement("div"); field.className = "dart-record-field"; field.dataset.column = String(index);
+      const label = doc.createElement("small"); label.textContent = labels[index] || `Field ${index + 1}`;
+      const value = doc.createElement("strong");
+      const summary = (cells[index].querySelector('.status-pill') || cells[index]).cloneNode(true);
+      summary.querySelectorAll('br').forEach(node => node.replaceWith(' · '));
+      value.textContent = summary.textContent.trim() || "—";
+      const image = cells[index].querySelector("img");
+      if (image) { const preview = image.cloneNode(false); preview.removeAttribute("id"); preview.loading = "lazy"; value.replaceChildren(preview); }
+      field.append(label,value); fields.append(field);
+    });
+    const controls = doc.createElement("div"); controls.className = "dart-record-controls";
+    const primary = row.querySelector(".dart-status-btn, .return-accept-btn:not([hidden]), [data-waiting-action]");
+    let proxy;
+    if (primary) {
+      proxy = button(primary.textContent.trim() || primary.title || "Next action", "dart-record-next");
+      proxy.dartPermissionSource = primary;
+      proxy.addEventListener("click", event => { event.stopPropagation(); if (!primary.disabled && !primary.hidden) primary.click(); });
+      controls.append(proxy);
+    }
+    const trigger = button("Details", "dart-record-open"); controls.append(trigger);
+    const dialog = doc.createElement("dialog"); dialog.className = "dart-record-dialog"; dialog.id = `dart-record-dialog-${++serial}`;
+    const title = doc.createElement("h2"); title.id = `${dialog.id}-title`;
+    title.textContent = `${section.id.charAt(0).toUpperCase() + section.id.slice(1)} · ${fields.querySelector("strong")?.textContent || "Details"}`;
+    dialog.setAttribute("aria-labelledby",title.id);
+    trigger.setAttribute("aria-controls",dialog.id); trigger.setAttribute("aria-expanded","false");
+    const close = button("Close", "dart-record-close");
+    const header = doc.createElement("header"); header.className = "dart-record-dialog-head"; header.append(title,close);
+    const grid = doc.createElement("div"); grid.className = "dart-record-detail-grid";
+    cells.forEach((cell,index) => {
+      if (cell === checkbox) return;
+      const wrapper = doc.createElement("div"); wrapper.className = "dart-record-detail-field";
+      wrapper.dataset.recordColumn=String(index);
+      const label = doc.createElement("h3"); label.textContent = labels[index] || (cell.querySelector("button") ? "Actions" : `Field ${index + 1}`);
+      if (cell.querySelector("button,details")) wrapper.classList.add("dart-record-detail-actions");
+      wrapper.append(label,cell); grid.append(wrapper);
+    });
+    dialog.append(header,grid);
+    if (checkbox) main.append(checkbox);
+    main.append(fields,controls,dialog); row.replaceChildren(main);
+    row.classList.add("dart-compact-record");
+    const state = { row, section, cells, labels, key:keyFor(row), trigger, dialog, primary, proxy };
+    states.set(row,state);
+    trigger.addEventListener("click", event => { event.stopPropagation(); showDetails(state); });
+    close.addEventListener("click", event => { event.stopPropagation(); closeDetails(state); });
+    dialog.addEventListener("cancel", () => { openRecord = null; });
+    dialog.addEventListener("close", () => {
+      trigger.setAttribute("aria-expanded","false");
+      root.requestAnimationFrame(()=>{if(doc.querySelector('.modal.active,dialog[open]'))return;const current=[...section.querySelectorAll('.dart-compact-record')].map(node=>states.get(node)).find(item=>item?.key===state.key);if(current?.trigger.isConnected)current.trigger.focus({preventScroll:true});});
+    });
+    dialog.addEventListener("scroll", () => { if (openRecord?.key === state.key) openRecord.scroll = dialog.scrollTop; });
+    dialog.addEventListener("click", event => {
+      if (event.target === dialog) { const bounds = dialog.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closeDetails(state); }
+    });
+    // Close the detail layer before an original action opens its existing editor/confirmation.
+    dialog.addEventListener("click", event => {
+      if (event.target.closest("button,a") && !event.target.closest(".dart-record-dialog-head")) closeDetails(state);
+    },true);
+    syncBusy(state);
+  }
+  function syncBusy(state) {
+    if (!state.proxy || !state.primary) return;
+    state.proxy.disabled = state.primary.disabled;
+    state.proxy.hidden = state.primary.hidden;
+    state.proxy.textContent = state.primary.getAttribute("aria-busy") === "true" ? "Saving…" : state.primary.textContent.trim();
+    state.proxy.setAttribute("aria-busy",state.primary.getAttribute("aria-busy") || "false");
+  }
+  function refresh() {
+    queued = false;
+    const section = doc.querySelector(".dashboard-section.active-section");
+    if (!section) return;
+    const rows = section.querySelectorAll('.cont-titel .model-row, .dart-set-row, tr[data-waiting-id], tr[data-waiting-demand], .dart-finance-table tbody tr');
+    rows.forEach(row => { decorate(row,section); colorRow(row,section); });
+    colorSection(section);
+    section.querySelectorAll(".cont-titel .title-name, .dart-sets-head").forEach(header => {
+      if (!header.querySelector(".dart-compact-heading")) {
+        header.classList.add("dart-compact-heading-row");
+        const label = doc.createElement("strong"); label.className = "dart-compact-heading"; label.textContent = "Records · open Details for all fields and actions"; header.append(label);
+      }
+    });
+    if (openRecord?.section === section.id && !doc.querySelector(".dart-record-dialog[open]")) {
+      const match = [...rows].find(row => states.get(row)?.key === openRecord.key);
+      if (match) showDetails(states.get(match)); else openRecord = null;
+    }
+  }
+  function schedule() { if (!queued) { queued = true; root.requestAnimationFrame(refresh); } }
+  function start() {
+    const main = doc.querySelector("main"); if (!main) return;
+    new MutationObserver(schedule).observe(main,{childList:true,subtree:true,attributes:true,attributeFilter:["class","data-status","data-staff-active"]});
+    doc.querySelectorAll('.modal .close-modal').forEach(close=>{close.setAttribute('role','button');close.tabIndex=0;close.setAttribute('aria-label','Close');close.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();close.click();}});});
+    doc.addEventListener('keydown',event=>{
+      if(doc.querySelector('dialog[open]'))return;
+      const modal=[...doc.querySelectorAll('.modal.active')].filter(node=>node.getClientRects().length).at(-1);
+      if(!modal||modal.id==='dart-finance-modal')return;
+      if(event.key==='Escape'){event.preventDefault();if(typeof closeModal==='function')closeModal(modal);}
+      if(event.key==='Tab'){
+        const controls=[...modal.querySelectorAll('button,input:not([type="hidden"]),select,textarea,a[href],[tabindex="0"]')].filter(node=>!node.disabled&&node.getClientRects().length);
+        if(!controls.length)return;const first=controls[0],last=controls.at(-1);
+        if(event.shiftKey&&doc.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&doc.activeElement===last){event.preventDefault();first.focus();}
+      }
+    });
+    root.addEventListener("dart:dashboard-section-activated", () => { openRecord = null; schedule(); });
+    root.addEventListener("dart:orders-busy", () => { doc.querySelectorAll(".dart-compact-record").forEach(row => { const state=states.get(row); if(state) syncBusy(state); }); });
+    root.addEventListener('dart:order-command-confirmed',event=>notify(event.detail?.refreshing?'Order saved. Refreshing details…':'Order saved.'));
+    root.addEventListener("dart:admin-logged-out", () => { openRecord=null; doc.querySelectorAll(".dart-record-dialog[open]").forEach(dialog=>dialog.close()); });
+    schedule();
+  }
+  root.DartDashboardUI = Object.freeze({refresh,notify,columnIndices:(section,labels)=>primaryColumns(section,labels,labels.map(()=>doc.createElement('span')))});
+  if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded",start,{once:true}); else start();
+})(window);

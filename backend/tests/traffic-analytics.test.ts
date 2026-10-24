@@ -77,7 +77,7 @@ describe("traffic analytics", () => {
     expect(serviceSource).toContain("items.cart_reservation_id=reservation.id");
     expect(serviceSource).toContain("COALESCE(event.customer_user_id::text, 'guest:' || event.visitor_id::text)");
     expect(serviceSource).toContain("WHERE visitor_id=$1::uuid");
-    expect(serviceSource).toContain("Guest ${row.visitor_id.slice(0, 8)}");
+    expect(serviceSource).toContain("visit-${row.visitor_number}");
   });
 
   it("refreshes sessions on activity and renders a real hourly empty state", () => {
@@ -101,10 +101,11 @@ describe("traffic analytics", () => {
     expect(routesSource).toContain("analyticsEventLimiter");
   });
 
-  it("caps hourly analytics, clears stale dashboard data and indexes website order time queries", () => {
-    expect(serviceSource).toContain('group === "hourly" && spanDays > 31');
+  it("bounds all analytics periods, clears stale data and indexes website order time queries", () => {
+    expect(serviceSource).toContain('spanDays > 3660');
+    expect(serviceSource).not.toContain('ANALYTICS_HOURLY_RANGE_TOO_LARGE');
     expect(dashboardSource).toContain("function renderTrafficErrorTow(message)");
-    expect(dashboardSource).toContain('trafficAggregationTow !== "hourly"');
+    expect(dashboardSource).not.toContain('trafficAggregationTow !== "hourly"');
     expect(dashboardSource).toContain("audienceRows");
     expect(queryIndexMigrationSource).toContain("orders_website_created_idx");
     expect(queryIndexMigrationSource).toContain("order_source='Website'");

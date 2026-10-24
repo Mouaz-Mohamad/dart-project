@@ -1,3 +1,4 @@
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:16d8262226ab334f962e2330e10247ce91d18b5417e4e91f0b2e53361d2295a4 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -29,7 +30,7 @@
 // 1. الدوال العامة والمساعدة (Global Helpers & Utilities)
 // ==========================================
 
-// التخزين المحلي
+// In-memory projections; durable writes use the existing API adapters.
 function saveDataToStorage(key, data, feedbackSplit = false) {
   if (key === "dart_reviews" && !feedbackSplit) {
     const isContact = (row) => row.recordType === "contact" || row.source === "Contact Us";
@@ -57,8 +58,6 @@ function saveDataToStorage(key, data, feedbackSplit = false) {
   }
   window.DartState?.write?.(key, data, { source: "dashboard" });
 }
-
-// تنسيق الصفوف والترتيب
 
 // التحكم للنوافذ المنبثقة
 function openModal(modal) {
@@ -93,18 +92,12 @@ document.getElementById("add-btn")?.addEventListener("click", () => {
 // البيانات الأولية للموديلات
 let modelsData = [];
 
-// عرض الموديلات
-
-// النافذة المنبثقة للموديلات
-
 // ==========================================
 // 3. قسم القطع (Items Module)
 // ==========================================
 
 // البيانات الأولية للقطع
 let itemsData = [];
-
-// عرض القطع
 
 // ==========================================
 // 4. قسم العملاء (Customers Module)
@@ -113,22 +106,13 @@ let itemsData = [];
 // البيانات الأولية للعملاء
 let customersData = [];
 
-// عرض العملاء
-
-// النافذة المنبثقة للعملاء
-
 // ==========================================
 // 5. قسم الطلبات (Orders Module)
 // ==========================================
 
-
 // البيانات الأولية للطلبات
 let ordersData = [];
 let dartOrdersView = "all";
-
-// عرض الطلبات
-
-// النافذة المنبثقة للطلبات
 
 // ==========================================
 // 6. قسم المرتجعات (Returns Module)
@@ -137,20 +121,12 @@ let dartOrdersView = "all";
 // البيانات الأولية للمرتجعات
 let returnsData = [];
 
-// عرض المرتجعات
-
-// النافذة المنبثقة للمرتجعات
-
 // ==========================================
 // 7. قسم التقييمات (Reviews Module)
 // ==========================================
 
 // البيانات الأولية للتقييمات
 let reviewsData = [];
-
-// عرض التقييمات
-
-// النافذة المنبثقة للتقييمات
 
 // ==========================================
 // 8. قسم المندوبين (Representative Module)
@@ -3665,7 +3641,7 @@ function renderCustomers(dataArray) {
       monthly = dartCurrentMonthlyOrders(x.clientId);
     c.insertAdjacentHTML(
       "beforeend",
-      `<div class="${getRowClass(x)}" data-id="${dartEsc(x.id)}"><input type="checkbox" class="model-checkbox" ${x.isChecked ? "checked" : ""} ${dartIsArchived(x) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(x) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-client-profile="1" title="Client history"><i class="bx bx-history"></i></button><button class="dart-reset-password-btn" title="Reset Password"><i class="bx bx-key"></i></button></div><span class="text-item w150">${dartEsc(x.birthday || "-")}</span><span class="text-item w150">${dartEsc(x.clientName)}</span><span class="text-item w150">${dartEsc(x.clientId)}</span><span class="text-item w150">${dartEsc(x.phone1)}</span><span class="text-item w150">${dartEsc(x.phone2 || "-")}</span><span class="text-item w200">${dartEsc(x.email || "-")}</span><span class="text-item w150">${dartEsc(x.country || "Egypt")}</span><span class="text-item w200">${dartEsc(x.governorate || "-")}</span><span class="text-item w150">${monthly}</span><span class="text-item w150">${st.delivered}</span><span class="text-item w300">${dartMoney(st.spent)}<small class="dart-kpi-inline">${st.purchased} items · last ${dartEsc(st.lastPurchase)}</small></span><span class="text-item w200">${dartEsc(x.dartCard || "no")}</span><span class="text-item w100">${dartEsc(dartClientAge(x.birthday))}</span></div>`,
+      `<div class="${getRowClass(x)}" data-id="${dartEsc(x.id)}" data-status="${dartEsc(x.accountStatus || x.status || "Active")}"><input type="checkbox" class="model-checkbox" ${x.isChecked ? "checked" : ""} ${dartIsArchived(x) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(x) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-client-profile="1" title="Client history"><i class="bx bx-history"></i></button><button class="dart-reset-password-btn" title="Reset Password"><i class="bx bx-key"></i></button></div><span class="text-item w150">${dartEsc(x.birthday || "-")}</span><span class="text-item w150">${dartEsc(x.clientName)}</span><span class="text-item w150">${dartEsc(x.clientId)}</span><span class="text-item w150">${dartEsc(x.phone1)}</span><span class="text-item w150">${dartEsc(x.phone2 || "-")}</span><span class="text-item w200">${dartEsc(x.email || "-")}</span><span class="text-item w150">${dartEsc(x.country || "Egypt")}</span><span class="text-item w200">${dartEsc(x.governorate || "-")}</span><span class="text-item w150">${monthly}</span><span class="text-item w150">${st.delivered}</span><span class="text-item w300">${dartMoney(st.spent)}<small class="dart-kpi-inline">${st.purchased} items · last ${dartEsc(st.lastPurchase)}</small></span><span class="text-item w200">${dartEsc(x.dartCard || "no")}</span><span class="text-item w100">${dartEsc(dartClientAge(x.birthday))}</span></div>`,
     );
   });
 }
@@ -3886,8 +3862,8 @@ function dartRenderOrderGroups(container, orders) {
         `<span class="dart-order-group-status"><b>${Number(count)}</b> ${dartEsc(status)}</span>`,
       )
       .join("");
-    const orderRefs = (group.orderRefs || [])
-      .map((orderRef) => `<span class="dart-order-group-ref">${dartEsc(orderRef)}</span>`)
+    const orderRefs = group.records
+      .map((order) => `<span class="dart-order-group-ref"><b>${dartEsc(order.orderId || order.id || "-")}</b><span>${dartEsc(order.status || "Unknown")}</span></span>`)
       .join("");
     const location = group.location?.classified
       ? [first.country || "Egypt", first.governorate, first.area].filter(Boolean).join(" · ")
@@ -3901,12 +3877,18 @@ function dartRenderOrderGroups(container, orders) {
           <div><small>Orders</small><strong>${group.records.length}</strong></div>
           <div><small>Statuses</small><strong>${Object.keys(group.statusCounts || {}).length}</strong></div>
         </header>
-        <section><h3>Order numbers</h3><div class="dart-order-group-refs">${orderRefs}</div></section>
-        <section><h3>Status breakdown</h3><div class="dart-order-group-statuses">${statusSummary}</div></section>
+        <article class="dart-order-group-block"><h3>Status breakdown</h3><div class="dart-order-group-statuses">${statusSummary}</div></article>
+        <article class="dart-order-group-block"><details class="dart-order-group-details"><summary>Order numbers · ${group.records.length}</summary><div class="dart-order-group-refs">${orderRefs}</div></details></article>
       </article>`,
     );
   });
 }
+
+// Prepare authorized Sets in the dashboard without adding work to storefront pages.
+window.addEventListener("dart:admin-authenticated", () => {
+  if (window.DartAdminHydration?.ready === true && window.DartAdminAccess?.can?.("sets.read") === true)
+    document.dispatchEvent(new Event("dart:sets-load-request"));
+});
 
 function dartAppendOperationGroupHeading(container, type, count, noun, record, note, groupKey = "") {
   const template = document.getElementById("dashboard-operation-group-template");
