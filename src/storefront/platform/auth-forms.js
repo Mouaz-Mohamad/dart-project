@@ -107,33 +107,12 @@
             setStatus(form, error.message, true);
           }
         } else if (form.id === "checkoutForm") {
+          // The form handler owns price review; its address-wait capture handler
+          // must run before submission reaches that handler.
+          if (form.dataset.dartCheckoutHandler === "ui") return;
           event.preventDefault();
           event.stopImmediatePropagation();
-          if (checkoutSubmissionBusy) return;
-          checkoutSubmissionBusy = true;
-          form.setAttribute("aria-busy", "true");
-          const submit = form.querySelector('button[type="submit"], input[type="submit"]');
-          if (submit) submit.disabled = true;
-          let completed = false;
-          try {
-            const order = await checkout(form);
-            completed = true;
-            if (typeof showToast === "function")
-              showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
-            setTimeout(() => {
-              sessionStorage.setItem("dart_internal_navigation", "1");
-              location.assign("index.html");
-            }, 300);
-          } catch (error) {
-            if (typeof showToast === "function") showToast(error.message);
-            else setStatus(form, error.message, true);
-          } finally {
-            if (!completed) {
-              checkoutSubmissionBusy = false;
-              form.removeAttribute("aria-busy");
-              if (submit) submit.disabled = false;
-            }
-          }
+          setStatus(form, "تعذر تحميل إتمام الطلب. أعد تحميل الصفحة ثم حاول مرة أخرى.", true);
         } else if (form.id === "contactForm") {
           event.preventDefault();
           // BEGIN Contact Us -> dashboard Review inbox.
@@ -309,7 +288,7 @@
                 },
               });
               sessionStorage.setItem("dart_last_return_id", result.returnId);
-              await hydrateCustomerCommerce();
+              void Promise.resolve().then(hydrateCustomerCommerce).then(renderProfile).catch(() => {});
               form.reset();
               const trackingLink = document.getElementById("return-tracking-link");
               if (trackingLink) {
@@ -320,7 +299,6 @@
                 form,
                 `تم إنشاء الطلب ${result.returnId}. سيظهر تلقائيًا في صفحة تتبع طلبك.`,
               );
-              renderProfile();
             } catch (error) {
               setStatus(form, error.message, true);
             }

@@ -84,7 +84,7 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain('if (nextStatus === "Delivered")');
     expect(service).toContain('reward.status = "Used"');
     expect(service).toContain('["Cancelled", "Refused"].includes(nextStatus)');
-    expect(service).toContain('reward.status = String(reward.expiresAt || "") > cairoDateKey() ? "Active" : "Expired"');
+    expect(service).toContain('reward.status = String(reward.expiresAt || "") >= cairoDateKey() ? "Active" : "Expired"');
   });
 
   it("keeps leaderboard relational reads sequential and excludes only usable active Dart Cards", () => {
@@ -194,7 +194,8 @@ describe("commerce concurrency and representative safety contracts", () => {
 
   it("serializes customer return creation and preserves exchange-chain identity", () => {
     expect(customerInteractions).toContain('this.lockDomain(client, "returns")');
-    expect(customerInteractions).toContain("resolveExchangeChain(existingReturns, line.item_code)");
+    expect(customerInteractions).toContain("resolveExchangeChain(existingReturns.filter(");
+    expect(customerInteractions).toContain('String((raw as JsonRow).orderId || "") === line.order_code');
     expect(customerInteractions).toContain(
       '"SELECT version::text FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE"',
     );

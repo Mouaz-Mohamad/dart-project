@@ -130,7 +130,7 @@ const htmlFiles = fs
   .filter((file) => file.endsWith('.html'))
   .concat(['Eye/Dart Eye.html', 'api/news-template.html']);
 const injectedFiles = [
-  'Js/dart-profile-records.js',
+  'src/storefront/profile-records.js',
   'Js/dart-password-visibility.js',
   'Js/dart-set-modal-ui.js',
   'Js/dart-dialog.js',

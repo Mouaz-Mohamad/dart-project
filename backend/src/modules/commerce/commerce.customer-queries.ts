@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 import { cairoDateKey, flexibleDateExpiry } from "./commerce.rewards.js";
+import { orderBenefit, orderBenefits } from "./commerce.pricing.js";
 
 export async function readPublicLeaderboard(pool: Pool): Promise<{
     period: string;
@@ -494,8 +495,9 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
         amountRefunded: Number(row.amount_refunded_minor) / 100,
         discount: Number(row.promotion?.percent || 0),
         promotionType: String(row.promotion?.type || ""),
-        birthdayRewardId: row.promotion?.type === "Birthday" ? String(row.promotion?.rewardId || "") : "",
-        dartCardId: row.promotion?.type === "Dart Card" ? String(row.promotion?.cardId || "") : "",
+        birthdayRewardId: String(orderBenefit(row.promotion, "Birthday")?.rewardId || ""),
+        dartCardId: String(orderBenefit(row.promotion, "Dart Card")?.cardId || ""),
+        discountBenefits: orderBenefits(row.promotion),
         priceSnapshot: row.items,
         setGroups: row.set_groups || [],
         items: row.items.map((item) => item.itemCode),
@@ -537,7 +539,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
     });
 
     const customerReturns = onlyCustomer(stateByDomain.get("returns") || []);
-    const refundedItemCodes = new Set(
+    const refundedSales = new Set(
       customerReturns
         .filter((raw) => {
           const row = raw as Record<string, unknown>;
@@ -547,7 +549,10 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
             ["Completed", "Good", "Damaged", "Bad"].includes(status);
           return String(row.requestType || "") === "Refund" && completed;
         })
-        .map((raw) => String((raw as Record<string, unknown>).itemCode || ""))
+        .map((raw) => {
+          const row = raw as Record<string, unknown>;
+          return JSON.stringify([String(row.orderId || ""), String(row.itemCode || "")]);
+        })
         .filter(Boolean),
     );
     const cairoMonthKey = (value: unknown): string => {
@@ -569,7 +574,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
         (total, order) =>
           total +
           (Array.isArray(order.items) ? order.items : []).filter(
-            (itemCode) => !refundedItemCodes.has(String(itemCode)),
+            (itemCode) => !refundedSales.has(JSON.stringify([String(order.orderId), String(itemCode)])),
           ).length,
         0,
       );

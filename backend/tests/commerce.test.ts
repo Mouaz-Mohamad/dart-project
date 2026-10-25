@@ -293,6 +293,7 @@ describe("CommerceService relational customer snapshot", () => {
             payload: {
               id: "r1",
               clientId: "DR-1",
+              orderId: "K-1",
               requestType: "Refund",
               status: "Completed",
               itemCode: "I-2",

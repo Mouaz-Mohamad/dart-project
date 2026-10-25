@@ -1,6 +1,23 @@
 // Pure commerce rules, extracted without changing their calculations.
 import type { LockedItem } from "./commerce.types.js";
 
+export function orderBenefits(value: Record<string, unknown> | null): Record<string, unknown>[] {
+  return value && Array.isArray(value.benefits)
+    ? value.benefits.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+    : value ? [value] : [];
+}
+
+export function orderBenefit(value: Record<string, unknown> | null, type: string): Record<string, unknown> | null {
+  return orderBenefits(value).find((row) => row.type === type) || null;
+}
+
+export function campaignAppliesToItem(campaign: Record<string, unknown>, item: Pick<LockedItem, "item_code" | "model_id" | "category">): boolean {
+  const scope = campaign.productScope as { mode?: string; values?: string[] } | undefined;
+  if (!scope || scope.mode === "all") return true;
+  const value = scope.mode === "categories" ? item.category : scope.mode === "models" ? item.model_id : item.item_code;
+  return (scope.values || []).some((candidate) => String(candidate).toLowerCase() === String(value || "").toLowerCase());
+}
+
 export function finalModelPriceMinor(sellingMinor: number, discountPercent: number): number {
   return Math.max(0, Math.round(sellingMinor * (1 - Math.min(100, Math.max(0, discountPercent)) / 100)));
 }

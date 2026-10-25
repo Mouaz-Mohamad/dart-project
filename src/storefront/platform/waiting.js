@@ -171,7 +171,7 @@
             `<button type="button" class="dart-waiting-action is-danger" data-waiting-action="cancel" data-waiting-id="${escapeHtml(entry.id)}">Cancel Waiting</button>`,
           );
         }
-        return `<article class="profile-record-card dart-waiting-card">
+        return `<article class="profile-record-card dart-waiting-card" data-waiting-record-id="${escapeHtml(entry.id)}">
           <div class="profile-record-head">
             <strong>${escapeHtml(entry.modelName || entry.modelId)}</strong>
             <span class="profile-status">${escapeHtml(waitingStatusLabel(entry))}</span>

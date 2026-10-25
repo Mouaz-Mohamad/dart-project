@@ -24,6 +24,8 @@ import {
   finalModelPriceMinor,
   resolveItemDiscount,
   detectCartPriceChanges,
+  campaignAppliesToItem,
+  orderBenefit,
 } from "./commerce.pricing.js";
 import {
   cairoDateKey,
@@ -43,6 +45,8 @@ import {
   readRepresentativeWork,
 } from "./commerce.operations-queries.js";
 import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-queries.js";
+import { returnMatchesSale } from "./commerce.returns.js";
+import { queueOrderEmail } from "./commerce.notifications.js";
 
 // Keep imports used by existing routers, Set workflows and tests compatible.
 export type {
@@ -1399,7 +1403,7 @@ export class CommerceService {
 
       const itemResult = await client.query<LockedItem>(
         `SELECT i.id, i.item_code, i.model_id, i.color, i.size,
-                m.name AS model_name, i.cost_snapshot_minor::text,
+                m.name AS model_name, m.category, i.cost_snapshot_minor::text,
                 m.selling_minor::text, m.discount_percent::text
            FROM inventory_items i
            JOIN catalog_models m ON m.model_id=i.model_id
@@ -1488,6 +1492,9 @@ export class CommerceService {
 
       let promotion: Record<string, unknown> | null = null;
       let promotionPercent = 0;
+      let campaign: Record<string, unknown> | null = null;
+      let birthdayBenefit: Record<string, unknown> | null = null;
+      let cardBenefit: Record<string, unknown> | null = null;
       let birthdayReward: Record<string, unknown> | null = null;
       let appliedCard: Record<string, unknown> | null = null;
       let cardRemainingItems = 0;
@@ -1526,6 +1533,7 @@ export class CommerceService {
           );
         }
         promotionPercent = promotionPercentage(codePromotion);
+        campaign = codePromotion;
         promotion = {
           id: String(codePromotion.id || ""),
           type: "Promotion",
@@ -1535,7 +1543,7 @@ export class CommerceService {
       }
 
       const birthday = birthdayWindow(customerPromotion.birthday);
-      if (!promotion && hasUndiscountedItems && birthday) {
+      if (hasUndiscountedItems && birthday) {
         const rewardId = `BDAY-${customerPromotion.client_code}-${birthday.year}`;
         birthdayReward = (birthdayState.data as Record<string, unknown>[]).find(
           (row) => String(row.id || "") === rewardId,
@@ -1562,7 +1570,7 @@ export class CommerceService {
             100,
             Math.max(0, Number(birthdayReward.discountPercent) || 30),
           );
-          promotion = {
+          birthdayBenefit = {
             type: "Birthday",
             percent: promotionPercent,
             rewardId,
@@ -1570,7 +1578,7 @@ export class CommerceService {
         }
       }
 
-      if (!promotion && hasUndiscountedItems) {
+      if (hasUndiscountedItems) {
         const nowMs = Date.now();
         appliedCard = (cardState.data as Record<string, unknown>[]).find((row) => {
           if (
@@ -1598,7 +1606,7 @@ export class CommerceService {
               Number(appliedCard.discountPercent ?? settings.dartCardDiscountPercent) || 40,
             ),
           );
-          promotion = {
+          cardBenefit = {
             type: "Dart Card",
             percent: promotionPercent,
             cardId: String(appliedCard.cardId || appliedCard.id || ""),
@@ -1614,7 +1622,7 @@ export class CommerceService {
         const modelDiscountPercent = Number(row.discount_percent || 0);
         const resolvedDiscount = resolveItemDiscount(
           modelDiscountPercent,
-          promotion,
+          promotion && campaign && campaignAppliesToItem(campaign, row) ? promotion : birthdayBenefit || cardBenefit,
           cardRemainingItems - cardAppliedItems,
         );
         const effectiveDiscountPercent = resolvedDiscount.percent;
@@ -1640,7 +1648,18 @@ export class CommerceService {
       const benefitDiscountMinor = itemSnapshots
         .filter((snapshot) => snapshot.discountSource !== "Model" && snapshot.discountSource !== "None")
         .reduce((sum, snapshot) => sum + snapshot.discountMinor, 0);
-      if (promotion) promotion.discountMinor = benefitDiscountMinor;
+      const usedBenefits = [promotion, birthdayBenefit, cardBenefit].filter((benefit): benefit is Record<string, unknown> => {
+        if (!benefit) return false;
+        const source = benefit.type === "Promotion" ? "Campaign" : String(benefit.type);
+        const lines = itemSnapshots.filter((snapshot) => snapshot.discountSource === source);
+        if (!lines.length) return false;
+        benefit.discountMinor = lines.reduce((sum, snapshot) => sum + snapshot.discountMinor, 0);
+        return true;
+      });
+      promotion = usedBenefits.length > 1
+        ? { type: "Mixed", percent: 0, discountMinor: benefitDiscountMinor, benefits: usedBenefits }
+        : usedBenefits[0] || null;
+      promotionPercent = Number(promotion?.percent || 0);
       // The representative is paid once per order, not once per item.
       // Item cost already includes this allocation, so Finance must not add it again.
       const deliveryCostMinor = courierFeePerOrderMinor;
@@ -1664,9 +1683,9 @@ export class CommerceService {
           input.deliveryNotes || "",
           JSON.stringify({
             reservationId: input.reservationId,
-            birthdayRewardId: promotion?.type === "Birthday" ? promotion.rewardId : "",
-            dartCardId: promotion?.type === "Dart Card" ? promotion.cardId : "",
-            promotionCode: promotion?.type === "Promotion" ? promotion.code : "",
+            birthdayRewardId: orderBenefit(promotion, "Birthday")?.rewardId || "",
+            dartCardId: orderBenefit(promotion, "Dart Card")?.cardId || "",
+            promotionCode: orderBenefit(promotion, "Promotion")?.code || "",
           }),
         ],
       );
@@ -1686,7 +1705,7 @@ export class CommerceService {
         },
       );
 
-      if (promotion?.type === "Birthday" && birthdayReward) {
+      if (orderBenefit(promotion, "Birthday") && birthdayReward) {
         birthdayReward.status = "Reserved";
         birthdayReward.orderId = order.order_code;
         birthdayReward.reservedAt = new Date().toISOString();
@@ -1702,7 +1721,7 @@ export class CommerceService {
         );
       }
 
-      if (promotion?.type === "Dart Card" && appliedCard) {
+      if (orderBenefit(promotion, "Dart Card") && appliedCard) {
         const dartCardSnapshots = itemSnapshots.filter(
           (snapshot) => snapshot.discountSource === "Dart Card",
         );
@@ -1866,22 +1885,7 @@ export class CommerceService {
           JSON.stringify({ orderCode: order.order_code, itemCount: itemSnapshots.length }),
         ],
       );
-      await client.query(
-        `INSERT INTO outbox_events (
-           aggregate_type, aggregate_id, event_type, payload, deduplication_key
-         ) VALUES ('order',$1,'order.created',$2::jsonb,$3)
-         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
-        [
-          order.id,
-          JSON.stringify({
-            orderId: order.id,
-            orderCode: order.order_code,
-            customerUserId,
-            totalMinor: finalMinor,
-          }),
-          `order.created:${order.id}`,
-        ],
-      );
+      await queueOrderEmail(client, order.id, "order.created");
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
       );
@@ -1902,9 +1906,9 @@ export class CommerceService {
         courierFee: deliveryCostMinor / 100,
         courierFeePerOrder: courierFeePerOrderMinor / 100,
         promotionType: promotion?.type || "",
-        promotionCode: promotion?.type === "Promotion" ? String(promotion.code || "") : "",
-        birthdayRewardId: promotion?.type === "Birthday" ? String(promotion.rewardId || "") : "",
-        dartCardId: promotion?.type === "Dart Card" ? String(promotion.cardId || "") : "",
+        promotionCode: String(orderBenefit(promotion, "Promotion")?.code || ""),
+        birthdayRewardId: String(orderBenefit(promotion, "Birthday")?.rewardId || ""),
+        dartCardId: String(orderBenefit(promotion, "Dart Card")?.cardId || ""),
         paymentMethod: "Cash on Delivery",
         paymentStatus: "Unpaid",
         items: itemSnapshots.map((snapshot) => snapshot.row.item_code),
@@ -2766,8 +2770,7 @@ export class CommerceService {
       );
 
       if (
-        line.promotion?.type === "Dart Card" &&
-        line.promotion?.cardId &&
+        orderBenefit(line.promotion, "Dart Card")?.cardId &&
         line.discount_source === "Dart Card" &&
         !record.dartCardUsageReversed
       ) {
@@ -2782,7 +2785,7 @@ export class CommerceService {
         const card = cards.find(
           (row) =>
             String(row.cardId || row.id || "") ===
-            String(line.promotion?.cardId),
+            String(orderBenefit(line.promotion, "Dart Card")?.cardId),
         );
         if (card) {
           card.purchasedItems = String(
@@ -2917,6 +2920,8 @@ export class CommerceService {
         color: string;
         size: string;
         item_status: string;
+        current_order_code: string | null;
+        cart_reservation_id: string | null;
         order_db_id: string;
         order_code: string;
         customer_user_id: string;
@@ -2930,7 +2935,7 @@ export class CommerceService {
         discount_source: string;
       }>(
         `SELECT i.id AS item_id, oi.id::text AS order_item_id, i.item_code, i.model_id, i.color, i.size,
-                i.status AS item_status,
+                i.status AS item_status, i.order_id AS current_order_code, i.cart_reservation_id,
                 o.id::text AS order_db_id, o.order_code, o.customer_user_id::text,
                 o.final_minor::text, o.amount_refunded_minor::text,
                 o.payment_status, o.promotion, o.contact_snapshot,
@@ -2943,10 +2948,15 @@ export class CommerceService {
           WHERE lower(i.item_code)=lower($1)
             AND o.status='Delivered'
             AND NOT o.is_deleted
-          ORDER BY o.delivered_at DESC NULLS LAST, o.created_at DESC
+            AND ($2::text='' OR EXISTS (
+              SELECT 1 FROM return_requests rr
+               WHERE (rr.record_id=$2 OR rr.return_code=$2)
+                 AND rr.order_id=o.id AND rr.inventory_item_id=i.id
+            ))
+          ORDER BY (i.order_id=o.order_code) DESC NULLS LAST, o.delivered_at DESC NULLS LAST, o.created_at DESC
           LIMIT 1
           FOR UPDATE OF i, o`,
-        [input.itemCode.trim()],
+        [input.itemCode.trim(), String(input.existingReturnId || "").trim()],
       );
       const item = itemResult.rows[0];
       if (!item) {
@@ -2975,6 +2985,10 @@ export class CommerceService {
           )
         : null;
 
+      if (existingId && !existing) {
+        throw new AppError(404, "RETURN_NOT_FOUND", "The return being edited no longer exists");
+      }
+
       if (existing && !existing.manualAdmin) {
         throw new AppError(
           409,
@@ -2983,10 +2997,17 @@ export class CommerceService {
         );
       }
 
+      if (existing && !returnMatchesSale(existing, item.order_code, item.item_code, item.order_item_id)) {
+        throw new AppError(409, "RETURN_IDENTITY_IMMUTABLE", "The original order and item of a return cannot be changed");
+      }
+      if (!existing && (item.item_status !== "Sold" || item.current_order_code !== item.order_code || item.cart_reservation_id)) {
+        throw new AppError(409, "RETURN_ITEM_OWNERSHIP_CHANGED", "The item is no longer owned by this delivered sale");
+      }
+
       const duplicate = returnsRows.find(
         (row) =>
           row !== existing &&
-          String(row.itemCode || "").toLowerCase() === item.item_code.toLowerCase() &&
+          returnMatchesSale(row, item.order_code, item.item_code, item.order_item_id) &&
           !row.isDeleted &&
           !["Rejected", "Closed"].includes(String(row.status || "")),
       );
@@ -3008,7 +3029,9 @@ export class CommerceService {
       if (setLine.rowCount) requestedRefundMinor = Number(item.line_final_minor || 0);
       const currentRefundedMinor = Number(item.amount_refunded_minor || 0);
       const baseWithoutThisReturn = Math.max(0, currentRefundedMinor - previousRefundMinor);
-      const maxRemainingMinor = Math.max(0, Number(item.final_minor || 0) - baseWithoutThisReturn);
+      const maxRemainingMinor = Math.max(0, Math.min(
+        Number(item.line_final_minor || 0), Number(item.final_minor || 0) - baseWithoutThisReturn,
+      ));
       if (requestedRefundMinor > maxRemainingMinor) {
         throw new AppError(
           422,
@@ -3042,6 +3065,10 @@ export class CommerceService {
       const condition = input.condition === "Bad" ? "Damaged" : "Good";
       const contact = item.contact_snapshot || {};
 
+      const previousValues = existing ? {
+        condition: existing.condition || existing.inspectionStatus || "",
+        refundAmount: Number(existing.refundAmount || 0),
+      } : {};
       const record: Record<string, unknown> = existing || {};
       Object.assign(record, {
         id: recordId,
@@ -3062,6 +3089,7 @@ export class CommerceService {
         inspectionStatus: condition,
         status: condition,
         orderId: item.order_code,
+        orderItemId: item.order_item_id,
         isPostDeliveryReturn: true,
         refundAmount: requestedRefundMinor / 100,
         originalNetAmount: Number(item.line_final_minor || 0) / 100,
@@ -3079,7 +3107,7 @@ export class CommerceService {
         returnsRows.unshift(record);
       }
 
-      if (condition === "Good") {
+      if (!existing && condition === "Good") {
         await client.query(
           `UPDATE inventory_items
               SET status='In stock',
@@ -3096,7 +3124,7 @@ export class CommerceService {
             WHERE id=$1`,
           [item.item_id],
         );
-      } else {
+      } else if (!existing) {
         await client.query(
           `UPDATE inventory_items
               SET status='Damaged',
@@ -3185,8 +3213,7 @@ export class CommerceService {
       );
 
       if (
-        item.promotion?.type === "Dart Card" &&
-        item.promotion?.cardId &&
+        orderBenefit(item.promotion, "Dart Card")?.cardId &&
         item.discount_source === "Dart Card" &&
         !record.dartCardUsageReversed
       ) {
@@ -3200,7 +3227,7 @@ export class CommerceService {
         ) as Record<string, unknown>[];
         const card = cards.find(
           (row) =>
-            String(row.cardId || row.id || "") === String(item.promotion?.cardId),
+            String(row.cardId || row.id || "") === String(orderBenefit(item.promotion, "Dart Card")?.cardId),
         );
         if (card) {
           card.purchasedItems = String(
@@ -3268,14 +3295,7 @@ export class CommerceService {
           existing ? "MANUAL_RETURN_UPDATED" : "MANUAL_RETURN_CREATED",
           recordId,
           requestId,
-          JSON.stringify(
-            existing
-              ? {
-                  condition: existing.condition || existing.inspectionStatus || "",
-                  refundAmount: Number(existing.refundAmount || 0),
-                }
-              : {},
-          ),
+          JSON.stringify(previousValues),
           JSON.stringify({
             condition,
             refundAmount: requestedRefundMinor / 100,
@@ -3497,8 +3517,8 @@ export class CommerceService {
                       version=version+1,
                       updated_at=now()
                 WHERE item_code=$1
-                  AND status='Processing/Held'`,
-              [String(record.replacementItemCode)],
+                  AND status='Processing/Held' AND return_request_id=$2 AND order_id=$3`,
+              [String(record.replacementItemCode), String(record.id || returnRef), String(record.orderId || "")],
             );
             record.replacementItemCode = "";
             record.replacementItemId = "";
@@ -3539,8 +3559,8 @@ export class CommerceService {
         }
 
         const itemCode = String(record.itemCode || "");
-        const itemResult = await client.query<{ id: string; model_id: string; color: string; size: string }>(
-          `SELECT id, model_id, color, size
+        const itemResult = await client.query<{ id: string; model_id: string; color: string; size: string; status: string; return_request_id: string | null; order_id: string | null }>(
+          `SELECT id, model_id, color, size, status, return_request_id, order_id
              FROM inventory_items
             WHERE item_code=$1
             FOR UPDATE`,
@@ -3549,6 +3569,10 @@ export class CommerceService {
         const item = itemResult.rows[0];
         if (!item) {
           throw new AppError(409, "RETURN_ITEM_NOT_FOUND", "Returned physical item not found");
+        }
+        if (item.status !== "Return Inspection" || item.return_request_id !== String(record.id || returnRef)
+          || (item.order_id && item.order_id !== String(record.orderId || ""))) {
+          throw new AppError(409, "RETURN_ITEM_OWNERSHIP_CHANGED", "This item is no longer awaiting inspection for this return");
         }
 
         if (condition === "Good") {
@@ -3828,11 +3852,13 @@ export class CommerceService {
         const originalItemResult = await client.query<{
           id: string;
           status: string;
+          order_id: string | null;
+          cart_reservation_id: string | null;
           model_id: string;
           color: string;
           size: string;
         }>(
-          `SELECT id, status, model_id, color, size
+          `SELECT id, status, model_id, color, size, order_id, cart_reservation_id
              FROM inventory_items
             WHERE item_code=$1
             FOR UPDATE`,
@@ -3844,6 +3870,9 @@ export class CommerceService {
         }
 
         const orderCode = String(record.orderId || "");
+        if (originalItem.status !== "Sold" || originalItem.order_id !== orderCode || originalItem.cart_reservation_id) {
+          throw new AppError(409, "RETURN_ITEM_OWNERSHIP_CHANGED", "The original item no longer belongs to this delivered sale");
+        }
         const orderResult = await client.query<{
           id: string;
           final_minor: string;
@@ -3874,6 +3903,10 @@ export class CommerceService {
         );
         const returnedLine = discountLineResult.rows[0];
         if (!returnedLine) throw new AppError(409,"RETURN_ORDER_LINE_NOT_FOUND","Original order line could not be found");
+        if (record.orderItemId && String(record.orderItemId) !== returnedLine.id) {
+          throw new AppError(409, "RETURN_IDENTITY_IMMUTABLE", "The original order line of this return has changed");
+        }
+        record.orderItemId = returnedLine.id;
         const returnedDiscountSource = returnedLine.discount_source || "None";
 
         const requestType = String(record.requestType || "");
@@ -3914,8 +3947,7 @@ export class CommerceService {
           record.financialCompletionApplied = true;
 
           if (
-            order.promotion?.type === "Dart Card" &&
-            order.promotion?.cardId &&
+            orderBenefit(order.promotion, "Dart Card")?.cardId &&
             returnedDiscountSource === "Dart Card"
           ) {
             const cardStateResult = await client.query<{ version: string }>(
@@ -3927,7 +3959,7 @@ export class CommerceService {
               "cards",
             ) as Record<string, unknown>[];
             const card = cards.find(
-              (row) => String(row.cardId || row.id || "") === String(order.promotion?.cardId),
+              (row) => String(row.cardId || row.id || "") === String(orderBenefit(order.promotion, "Dart Card")?.cardId),
             );
             if (card && !record.dartCardUsageReversed) {
               card.purchasedItems = String(Math.max(0, Number(card.purchasedItems || 0) - 1));
@@ -4410,24 +4442,12 @@ export class CommerceService {
         "New",
       );
 
-      const totals = await client.query<{
-        subtotal_minor: string;
-      }>(
-        `SELECT COALESCE(sum(final_unit_minor),0)::text AS subtotal_minor
-           FROM order_items
-          WHERE order_id=$1`,
-        [order.id],
-      );
-      const subtotalMinor = Number(totals.rows[0]?.subtotal_minor || 0);
       const discountPercent = Math.min(
         100,
         Math.max(0, Number(input.discountPercent) || 0),
       );
-      const discountMinor = Math.min(
-        subtotalMinor,
-        Math.round((subtotalMinor * discountPercent) / 100),
-      );
-      const finalMinor = Math.max(0, subtotalMinor - discountMinor);
+      const { subtotalMinor, finalMinor } = await this.priceAdminOrderLines(client, order.id, discountPercent);
+      const discountMinor = Math.max(0, subtotalMinor - finalMinor);
       const amountPaidMinor = Math.min(
         finalMinor,
         Math.max(0, Math.round((Number(input.amountPaid) || 0) * 100)),
@@ -4514,23 +4534,7 @@ export class CommerceService {
           }),
         ],
       );
-      await client.query(
-        `INSERT INTO outbox_events (
-           aggregate_type, aggregate_id, event_type, payload, deduplication_key
-         ) VALUES ('order',$1,'order.created',$2::jsonb,$3)
-         ON CONFLICT (deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
-        [
-          order.id,
-          JSON.stringify({
-            orderId: order.id,
-            orderCode: order.order_code,
-            customerUserId,
-            totalMinor: finalMinor,
-            source: "Manual Admin",
-          }),
-          `order.created:${order.id}`,
-        ],
-      );
+      await queueOrderEmail(client, order.id, "order.created");
 
       const versionUpdate = await client.query<{ version: string }>(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders' RETURNING version::text",
@@ -4591,10 +4595,11 @@ export class CommerceService {
         final_minor: string;
         delivery_cost_minor: string;
         customer_user_id: string | null;
+        promotion: Record<string, unknown> | null;
       }>(
         `SELECT id::text, order_code, status, subtotal_minor::text,
                 order_discount_minor::text, final_minor::text,
-                delivery_cost_minor::text, customer_user_id::text
+                delivery_cost_minor::text, customer_user_id::text, promotion
            FROM orders
           WHERE (id::text=$1 OR order_code=$1)
             AND NOT is_deleted
@@ -4621,15 +4626,13 @@ export class CommerceService {
       const itemSetChanged =
         currentCodes.length !== itemCodes.length ||
         currentCodes.some((code) => !itemCodes.includes(code));
-      const financiallyLocked = ["Delivered", "Returned"].includes(existing.status);
-      const requestedDiscount = Math.min(
-        100,
-        Math.max(0, Number(input.discountPercent) || 0),
-      );
+      const hasReservedBenefit = ["Promotion", "Birthday", "Dart Card"].some((type) => orderBenefit(existing.promotion, type));
+      const financiallyLocked = ["Delivered", "Returned"].includes(existing.status) || hasReservedBenefit;
       const existingDiscountPercent =
-        Number(existing.subtotal_minor) > 0
+        existing.promotion ? Number(existing.promotion.percent || 0) : Number(existing.subtotal_minor) > 0
           ? (Number(existing.order_discount_minor) / Number(existing.subtotal_minor)) * 100
           : 0;
+      const requestedDiscount = Math.min(100, Math.max(0, Number(input.discountPercent ?? existingDiscountPercent) || 0));
 
       if (
         financiallyLocked &&
@@ -4638,7 +4641,7 @@ export class CommerceService {
         throw new AppError(
           409,
           "ORDER_FINANCIAL_SNAPSHOT_LOCKED",
-          "Delivered or returned orders keep their original items and price snapshot",
+          "Delivered, returned or reward-reserved orders keep their original items and price snapshot",
         );
       }
 
@@ -4652,6 +4655,10 @@ export class CommerceService {
           : { rows: [] as { user_id: string }[] };
       const customerUserId = customerResult.rows[0]?.user_id || null;
 
+      if (hasReservedBenefit && clientCode && clientCode !== "-" && customerUserId !== existing.customer_user_id) {
+        throw new AppError(409, "ORDER_BENEFIT_OWNER_IMMUTABLE", "An order with reserved discounts keeps its original customer");
+      }
+
       if (!financiallyLocked) {
         await this.syncAdminOrderItems(
           client,
@@ -4663,24 +4670,16 @@ export class CommerceService {
         );
       }
 
-      const totals = await client.query<{ subtotal_minor: string }>(
-        `SELECT COALESCE(sum(final_unit_minor),0)::text AS subtotal_minor
-           FROM order_items
-          WHERE order_id=$1`,
-        [existing.id],
-      );
+      const priced = !financiallyLocked ? await this.priceAdminOrderLines(client, existing.id, requestedDiscount) : null;
       const subtotalMinor = financiallyLocked
         ? Number(existing.subtotal_minor)
-        : Number(totals.rows[0]?.subtotal_minor || 0);
+        : priced!.subtotalMinor;
       const discountMinor = financiallyLocked
         ? Number(existing.order_discount_minor)
-        : Math.min(
-            subtotalMinor,
-            Math.round((subtotalMinor * requestedDiscount) / 100),
-          );
+        : Math.max(0, subtotalMinor - priced!.finalMinor);
       const finalMinor = financiallyLocked
         ? Number(existing.final_minor)
-        : Math.max(0, subtotalMinor - discountMinor);
+        : priced!.finalMinor;
 
       let updatedDeliveryCostMinor = Number(existing.delivery_cost_minor || 0);
       let updatedCourierFeePerOrderMinor = 0;
@@ -4940,6 +4939,21 @@ export class CommerceService {
           "ORDER_STATE_INVALID",
           `Invalid order transition: ${previousStatus} -> ${target}`,
         );
+      }
+
+      if (isBack && previousStatus === "Delivered") {
+        const effects = await client.query<{
+          amount_refunded_minor: string; cod_settled_minor: string; has_returns: boolean;
+        }>(
+          `SELECT amount_refunded_minor::text, cod_settled_minor::text,
+                  EXISTS(SELECT 1 FROM return_requests r WHERE r.order_id=orders.id
+                    AND NOT r.is_deleted AND r.status NOT IN ('Rejected','Closed')) AS has_returns
+             FROM orders WHERE id=$1`, [order.id],
+        );
+        const state = effects.rows[0];
+        if (state?.has_returns || Number(state?.amount_refunded_minor || 0) > 0 || Number(state?.cod_settled_minor || 0) > 0) {
+          throw new AppError(409, "DELIVERED_ORDER_LOCKED", "A delivered order with returns, refunds or COD settlements cannot be moved back");
+        }
       }
 
       if (
@@ -5471,6 +5485,27 @@ export class CommerceService {
     }
   }
 
+  private async priceAdminOrderLines(client: PoolClient, orderId: string, manualPercent: number): Promise<{ subtotalMinor: number; finalMinor: number }> {
+    await client.query(
+      `WITH priced AS (
+         SELECT id,original_unit_minor,
+                CASE WHEN model_discount_percent>0 THEN model_discount_percent ELSE $2::numeric END AS percent
+           FROM order_items WHERE order_id=$1
+       ), amounts AS (
+         SELECT *,GREATEST(0,round(original_unit_minor*(100-percent)/100))::bigint AS final_minor FROM priced
+       ) UPDATE order_items oi SET final_unit_minor=a.final_minor,
+           discount_percent=a.percent,discount_minor=a.original_unit_minor-a.final_minor,
+           discount_source=CASE WHEN oi.model_discount_percent>0 THEN 'Model' WHEN a.percent>0 THEN 'Campaign' ELSE 'None' END,
+           discount_reference=CASE WHEN oi.model_discount_percent>0 THEN oi.model_id WHEN a.percent>0 THEN 'MANUAL' ELSE NULL END
+         FROM amounts a WHERE oi.id=a.id`, [orderId, manualPercent],
+    );
+    const totals = await client.query<{ subtotal_minor: string; final_minor: string }>(
+      `SELECT COALESCE(sum(original_unit_minor),0)::text AS subtotal_minor,
+              COALESCE(sum(final_unit_minor),0)::text AS final_minor FROM order_items WHERE order_id=$1`, [orderId],
+    );
+    return { subtotalMinor: Number(totals.rows[0]?.subtotal_minor || 0), finalMinor: Number(totals.rows[0]?.final_minor || 0) };
+  }
+
   private async syncAdminOrderItems(
     client: PoolClient,
     orderId: string,
@@ -5732,8 +5767,7 @@ export class CommerceService {
 
     for (const usage of usages.rows) {
       const parentOwnsAggregate =
-        String(parentPromotion?.type || "") === "Dart Card" &&
-        String(parentPromotion?.cardId || "") === usage.card_code;
+        String(orderBenefit(parentPromotion, "Dart Card")?.cardId || "") === usage.card_code;
       const activePieces = Math.max(0, Number(usage.piece_count) - Number(usage.returned_piece_count));
       const shouldDeliver = nextStatus === "Delivered" && previousStatus !== "Delivered" && usage.status !== "Used";
       const shouldRelease = ["Cancelled", "Refused"].includes(nextStatus) && usage.status !== "Released";
@@ -5819,8 +5853,7 @@ export class CommerceService {
     );
 
     const parentAlreadyRestores =
-      String(parentPromotion?.type || "") === "Dart Card" &&
-      String(parentPromotion?.cardId || "") === usage.card_code;
+      String(orderBenefit(parentPromotion, "Dart Card")?.cardId || "") === usage.card_code;
     if (parentAlreadyRestores) return true;
 
     const cardResult = await client.query<{ record_id: string; payload: Record<string, unknown> }>(
@@ -5858,6 +5891,18 @@ export class CommerceService {
   ): Promise<void> {
     if (previousStatus === nextStatus) return;
 
+    const ownership = await client.query<{
+      item_code: string; order_id: string | null; status: string; cart_reservation_id: string | null;
+    }>(
+      `SELECT i.item_code,i.order_id,i.status,i.cart_reservation_id
+         FROM inventory_items i JOIN order_items oi ON oi.inventory_item_id=i.id
+        WHERE oi.order_id=$1 ORDER BY i.id FOR UPDATE OF i`, [orderId],
+    );
+    if (ownership.rows.some((item) => item.order_id !== orderCode || item.cart_reservation_id
+      || !["Processing/Held", "Sold"].includes(item.status))) {
+      throw new AppError(409, "ORDER_ITEM_OWNERSHIP_CHANGED", "An item belongs to another sale or return; refresh the order before changing its status");
+    }
+
     const itemRows = await client.query<{
       item_code: string;
       model_id: string;
@@ -5868,9 +5913,6 @@ export class CommerceService {
       "SELECT item_code, model_id, color, size, discount_source FROM order_items WHERE order_id=$1 ORDER BY created_at, id",
       [orderId],
     );
-    const itemCodes = itemRows.rows.map((row) => row.item_code);
-    const itemCount = itemCodes.length;
-
     let inventoryChanged = 0;
     if (nextStatus === "Delivered") {
       const updated = await client.query(
@@ -6022,8 +6064,9 @@ export class CommerceService {
       );
     }
 
-    const promotionType = String(promotion?.type || "");
-    if (promotionType === "Birthday" && promotion?.rewardId) {
+    const birthdayBenefit = orderBenefit(promotion, "Birthday");
+    const cardBenefit = orderBenefit(promotion, "Dart Card");
+    if (birthdayBenefit?.rewardId) {
       const stateResult = await client.query<{ version: string }>(
         "SELECT version::text FROM dashboard_domain_state WHERE domain='birthday_rewards' FOR UPDATE",
       );
@@ -6032,7 +6075,7 @@ export class CommerceService {
         client,
         "birthday_rewards",
       ) as Record<string, unknown>[];
-      const reward = data.find((row) => String(row.id || "") === String(promotion.rewardId));
+      const reward = data.find((row) => String(row.id || "") === String(birthdayBenefit.rewardId));
       if (reward) {
         if (nextStatus === "Delivered") {
           reward.status = "Used";
@@ -6040,7 +6083,7 @@ export class CommerceService {
           reward.usedAt = new Date().toISOString();
           reward.orderId = orderCode;
         } else if (["Cancelled", "Refused"].includes(nextStatus)) {
-          reward.status = String(reward.expiresAt || "") > cairoDateKey() ? "Active" : "Expired";
+          reward.status = String(reward.expiresAt || "") >= cairoDateKey() ? "Active" : "Expired";
           reward.usedCount = 0;
           reward.usedAt = null;
           reward.orderId = "";
@@ -6061,7 +6104,7 @@ export class CommerceService {
       }
     }
 
-    if (promotionType === "Dart Card" && promotion?.cardId) {
+    if (cardBenefit?.cardId) {
       const stateResult = await client.query<{ version: string }>(
         "SELECT version::text FROM dashboard_domain_state WHERE domain='cards' FOR UPDATE",
       );
@@ -6071,7 +6114,7 @@ export class CommerceService {
         "cards",
       ) as Record<string, unknown>[];
       const card = data.find(
-        (row) => String(row.cardId || row.id || "") === String(promotion.cardId),
+        (row) => String(row.cardId || row.id || "") === String(cardBenefit.cardId),
       );
       if (card) {
         const reservations = Array.isArray(card.reservedOrders)
@@ -6109,7 +6152,7 @@ export class CommerceService {
               reservedAt: new Date().toISOString(),
             });
             card.reservedOrders = reservations;
-            card.reservedItems = Number(card.reservedItems || 0) + itemCount;
+            card.reservedItems = Number(card.reservedItems || 0) + discountedItemRows.length;
           }
         }
 
@@ -6146,6 +6189,7 @@ export class CommerceService {
         JSON.stringify({ orderCode }),
       ],
     );
+    await queueOrderEmail(client, orderId, "order.status_changed");
   }
 
   public async customerLiveTracking(customerUserId: string): Promise<{

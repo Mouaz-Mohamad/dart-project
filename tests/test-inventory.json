@@ -6,6 +6,7 @@
     "auth-contract.js",
     "cache-revalidation-contract.cjs",
     "catalog-category-contract.js",
+    "council-browser-runtime.cjs",
     "css-cascade-contract.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",

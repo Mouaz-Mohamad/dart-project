@@ -13,6 +13,7 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `dashboard/display-preferences.js` | Dashboard display preferences | `Eye/dart-display-preferences.js` |
 | `dashboard/news-admin.js` | News management and authorized prefetch | `Eye/dart-news-admin.js` |
 | `dashboard/sets-admin.js` | Set editor and authorized prefetch | `Eye/dart-sets-admin.js` |
+| `storefront/profile-records.js` | Profile order, return and waiting summaries | `Js/dart-profile-records.js` |
 | `storefront/home-ui.js` | Curated Home UI | `Js/dart-ui.home.min.js` |
 
 `runtime-layout.json` is the ordered source list for the two large readable runtimes.

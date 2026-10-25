@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
+import { returnMatchesSale } from "./commerce.returns.js";
 
 type JsonRow = Record<string, unknown>;
 
@@ -270,6 +271,7 @@ export class CustomerInteractionService {
       const identity = await this.customerIdentity(client, customerUserId);
 
       const orderLine = await client.query<{
+        order_item_id: string;
         order_id: string;
         order_code: string;
         delivered_at: Date | null;
@@ -281,18 +283,21 @@ export class CustomerInteractionService {
         model_name: string;
         final_unit_minor: string;
       }>(
-        `SELECT o.id::text AS order_id, o.order_code, o.delivered_at,
+        `SELECT oi.id::text AS order_item_id, o.id::text AS order_id, o.order_code, o.delivered_at,
                 oi.inventory_item_id AS item_id, oi.item_code, oi.model_id,
                 oi.color, oi.size, oi.model_name, oi.final_unit_minor::text
            FROM orders o
            JOIN order_items oi ON oi.order_id=o.id
+           JOIN inventory_items i ON i.id=oi.inventory_item_id
           WHERE o.customer_user_id=$1
             AND o.status='Delivered'
             AND NOT o.is_deleted
             AND oi.item_code=$2
+            AND i.order_id=o.order_code AND i.status='Sold'
+            AND i.cart_reservation_id IS NULL
           ORDER BY o.delivered_at DESC NULLS LAST, o.created_at DESC
           LIMIT 1
-          FOR UPDATE OF o`,
+          FOR UPDATE OF o, oi, i`,
         [customerUserId, input.itemCode],
       );
       const line = orderLine.rows[0];
@@ -307,7 +312,7 @@ export class CustomerInteractionService {
       const existingReturns = returnsState.data;
       const hasOpen = existingReturns.some((raw) => {
         const row = raw as JsonRow;
-        return String(row.itemCode || "") === input.itemCode
+        return returnMatchesSale(row, line.order_code, line.item_code, line.order_item_id)
           && !row.isDeleted
           && !["Rejected","Closed","Completed","Good","Damaged","Bad"].includes(String(row.status || ""));
       });
@@ -316,7 +321,7 @@ export class CustomerInteractionService {
       }
       const alreadyRefunded = existingReturns.some((raw) => {
         const row = raw as JsonRow;
-        return String(row.itemCode || "") === input.itemCode
+        return returnMatchesSale(row, line.order_code, line.item_code, line.order_item_id)
           && String(row.requestType || "") === "Refund"
           && !row.isDeleted
           && ["Completed","Good","Damaged","Bad"].includes(String(row.status || ""));
@@ -362,7 +367,8 @@ export class CustomerInteractionService {
       const {
         exchangeChainId,
         completedExchangesBeforeRequest,
-      } = resolveExchangeChain(existingReturns, line.item_code);
+      } = resolveExchangeChain(existingReturns.filter((raw) =>
+        String((raw as JsonRow).orderId || "") === line.order_code), line.item_code);
       const settingsResult = await client.query<{ data: Record<string, unknown> }>(
         "SELECT data FROM site_settings WHERE id='main'",
       );
@@ -384,6 +390,7 @@ export class CustomerInteractionService {
         id,
         returnId,
         orderId: line.order_code,
+        orderItemId: line.order_item_id,
         clientId: identity.clientCode,
         clientName: identity.name,
         itemCode: line.item_code,

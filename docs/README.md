@@ -5,6 +5,7 @@
 ## العقود الحالية
 
 - `backend/openapi.yaml` — HTTP contract للأجزاء الحساسة والمعلنة: Auth, Orders, Settings, Promotions, Dart Card, internal jobs.
+- `COUNCIL_REPAIRS_2026-10-25_AR.md` — إصلاحات سلامة المرتجعات والخصومات وCheckout، الاختبارات ومراجعة الجودة.
 - `API_CONTRACT.md` — invariants والقواعد التي يجب أن تبقى server-authoritative.
 - `CODE_MAP.md` — أماكن تنفيذ الأنظمة الأساسية داخل الكود.
 - `PROJECT_STRUCTURE.md` — شكل المشروع.

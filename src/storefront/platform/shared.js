@@ -42,7 +42,7 @@
     );
   const dateGB = (value) =>
     new Date(value || Date.now()).toLocaleDateString("en-GB");
-  const money = (value) => `${Math.trunc(Number(value) || 0)} EGP`;
+  const money = (value) => `${(Number(value) || 0).toLocaleString("en-EG", { maximumFractionDigits: 2 })} EGP`;
   const orderNet = (order) =>
     Number.isFinite(Number(order?.finalAmount))
       ? Math.max(0, Number(order.finalAmount))

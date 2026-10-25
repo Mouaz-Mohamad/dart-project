@@ -299,9 +299,9 @@ export class SetCartService {
            FROM set_loyalty_usage slu
            JOIN orders o ON o.id=slu.order_id
           WHERE slu.card_code=$1 AND slu.status='Reserved'
-            AND NOT (
-              COALESCE(o.promotion->>'type','')='Dart Card'
-              AND COALESCE(o.promotion->>'cardId','')=$1
+            AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(COALESCE(o.promotion->'benefits',jsonb_build_array(o.promotion))) benefit
+               WHERE benefit->>'type'='Dart Card' AND benefit->>'cardId'=$1
             )`,
         [cardCode],
       );

@@ -26,13 +26,16 @@ function dartReturnReplacementCandidates(record) {
 }
 
 async function dartRefreshReturnServerState() {
-  if (window.DartDomainState?.hydrateDomain) {
-    await window.DartDomainState.hydrateDomain("returns", true);
-    await window.DartDomainState.hydrateDomain("damage", true);
+  const tasks = [
+    () => window.DartDomainState?.hydrateDomain?.("returns", true),
+  ];
+  if (window.DartAdminAccess?.can?.("damage.manage")) tasks.push(
+    () => window.DartDomainState?.hydrateDomain?.("damage", true),
+  );
+  if (["catalog.manage", "catalog.read", "inventory.manage"].some((key) => window.DartAdminAccess?.can?.(key))) {
+    tasks.push(() => window.DartCatalog?.hydrate?.(true));
   }
-  if (window.DartCatalog?.hydrate) {
-    await window.DartCatalog.hydrate(true);
-  }
+  return Promise.allSettled(tasks.map((task) => Promise.resolve().then(task)));
 }
 
 async function dartAdminReturnAction(record, body) {
@@ -41,7 +44,10 @@ async function dartAdminReturnAction(record, body) {
     `/api/v1/admin/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
     { method: "POST", body },
   );
-  await dartRefreshReturnServerState();
+  if (payload.return) Object.assign(record, payload.return);
+  void dartRefreshReturnServerState().then(() => {
+    if (typeof dartRefreshAll === "function") dartRefreshAll();
+  }).catch(() => {});
   return payload.return || null;
 }
 

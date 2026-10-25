@@ -129,7 +129,19 @@ Operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `between`, `in`, `notIn`.
 
 `promotion_usages` يحجز limit داخل order transaction، ويصبح `Used` عند `Delivered` أو `Released` عند `Cancelled/Refused`.
 
-الـCommerce الحالي يطبق Campaign percentage على مستوى الأوردر؛ لذلك Scoped campaign لا تمر إلا إذا كل خطوط السلة داخل الـScope. هذا اختيار حماية مقصود لمنع خصم Product غير مؤهل داخل mixed cart.
+كل قطعة تأخذ خصمًا واحدًا بالترتيب: Model/Piece ثم Campaign ثم Birthday ثم Dart Card. الحملة المختارة تُطبق على القطع داخل Scope فقط؛ min quantity/value محسوبان على هذه القطع. بقية السلة يمكن أن تستخدم Birthday أو Dart Card دون جمع خصمين على قطعة. الخصم اليدوي لا يُضاف فوق Model discount.
+
+`promotion` يبقى بالشكل القديم عند وجود benefit واحدة؛ عند وجود أكثر من benefit يكون `type: Mixed` مع `benefits[]`. كل benefit تحفظ `discountMinor` المخصص لها، وتعرض قراءة الأوردر `discountBenefits`. Migration `0063_mixed_line_discounts.sql` تجعل reservation/status/restore triggers تدعم الشكلين. المرتجع بعد Delivered لا يعيد استخدام Campaign؛ Birthday يعود فقط بعد رد جميع قطعه المخفضة وداخل نافذته؛ Dart Card يعيد عدد القطع المخفضة المرتجعة فقط.
+
+## Return identity and committed command results
+
+- هوية المرتجع مرتبطة بـOrder + Item + `orderItemId` عند توفره، وليست Item Code وحده. بيع القطعة مرة أخرى يسمح بمطالبة جديدة للمشتري الحالي فقط.
+- `POST /api/v1/admin/returns/manual` يقصر refund على صافي سطر البيع والمتبقي المالي للأوردر. `existingReturnId` يثبت عملية البيع والقطعة؛ تعديل المبلغ/البيانات لا يعيد تحرير المخزون أو لمس حجز لاحق.
+- `POST /api/v1/returns` يعيد التحقق من ملكية المستخدم والقطعة وحالتها تحت lock. الفحص والتسليم الخاص بالمرتجع يتحققان من ملكية نفس الطلب والمرتجع.
+- `POST /api/v1/admin/orders/:orderRef/workflow` يرفض Back من Delivered عند وجود returns/refund/COD settlement باستخدام `DELIVERED_ORDER_LOCKED`. تغير مالك المخزون يرفض بـ`ORDER_ITEM_OWNERSHIP_CHANGED`؛ تبقى الحركة العادية ممكنة إذا لم تتغير الملكية.
+- `PATCH /api/v1/admin/orders/:orderRef` يقفل التعديلات المالية عند Delivered/Returned أو وجود reward reservation؛ تفاصيل غير مالية تظل قابلة للتعديل.
+- نجاح POST هو حد نجاح Checkout/Return. فشل إعادة تحميل العرض بعد commit لا يحوله إلى فشل ولا يكرر الطلب. Price Changed يستلزم مراجعة واضحة قبل إعادة التأكيد، مع حفظ القروش.
+- أحداث إنشاء/تغيير حالة الأوردر الجديدة تُرسل عبر Email outbox بسجل deduplication. فشل SMTP يخضع للـretry ولا يعيد العملية التجارية. لا تُرسل أحداث تاريخية عند نشر هذا التحديث. Web Push ومركز إشعارات شامل ليسا ضمن هذه الدفعة.
 
 ## Dart Card monthly draw
 

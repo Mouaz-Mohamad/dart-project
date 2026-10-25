@@ -330,6 +330,7 @@ export function createCommerceRouter(
           orderResponseOptions(request),
         ),
       );
+      await dispatchOutbox(outbox, 5);
     },
   );
 
@@ -349,6 +350,7 @@ export function createCommerceRouter(
           String(request.id),
         ),
       );
+      await dispatchOutbox(outbox, 10);
     },
   );
 
@@ -508,6 +510,7 @@ export function createCommerceRouter(
           orderResponseOptions(request),
         ),
       );
+      await dispatchOutbox(outbox, 5);
     },
   );
 

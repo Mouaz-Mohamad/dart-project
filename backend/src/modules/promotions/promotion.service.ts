@@ -219,9 +219,10 @@ export class PromotionService {
         WHERE o.customer_user_id=$1 AND o.status='Delivered' AND NOT o.is_deleted
           AND NOT EXISTS (
             SELECT 1 FROM return_requests rr
-             WHERE rr.inventory_item_id=oi.inventory_item_id
+             WHERE rr.inventory_item_id=oi.inventory_item_id AND rr.order_id=o.id
                AND NOT rr.is_deleted
-               AND lower(rr.status) IN ('completed','returned','closed','done')
+               AND lower(rr.request_type) IN ('return','refund')
+               AND lower(rr.status) IN ('completed','returned','closed','done','good','damaged','bad')
           )`,
       [customerUserId],
     );
@@ -294,18 +295,16 @@ export class PromotionService {
   }
 
   private cartEligible(campaign: PromotionCampaignInput, cart: CartFact[]): boolean {
-    const undiscounted = cart.filter((item) => item.modelDiscountPercent <= 0);
-    if (!undiscounted.length || undiscounted.length < campaign.minQuantity) return false;
-    const subtotal = undiscounted.reduce((sum, item) => sum + item.sellingMinor, 0);
-    if (subtotal < campaign.minOrderMinor) return false;
     const scope = campaign.productScope;
-    if (scope.mode === "all") return true;
     const allowed = new Set(scope.values.map((value) => value.toLowerCase()));
-    // Commerce currently applies one order-level percentage. Requiring every line to be in
-    // the configured scope prevents an out-of-scope line from receiving the campaign.
-    if (scope.mode === "categories") return undiscounted.every((item) => allowed.has(item.category.toLowerCase()));
-    if (scope.mode === "models") return undiscounted.every((item) => allowed.has(item.modelId.toLowerCase()));
-    return undiscounted.every((item) => allowed.has(item.itemCode.toLowerCase()));
+    const eligible = cart.filter((item) => item.modelDiscountPercent <= 0 && (
+      scope.mode === "all" || allowed.has((scope.mode === "categories" ? item.category
+        : scope.mode === "models" ? item.modelId : item.itemCode).toLowerCase())
+    ));
+    if (!eligible.length || eligible.length < campaign.minQuantity) return false;
+    const subtotal = eligible.reduce((sum, item) => sum + item.sellingMinor, 0);
+    if (subtotal < campaign.minOrderMinor) return false;
+    return true;
   }
 
   private async loadCampaigns(client: PoolClient): Promise<Array<PromotionCampaignInput & { id: string; version: number }>> {

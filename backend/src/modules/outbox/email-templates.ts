@@ -82,6 +82,18 @@ export function renderOutboxEmail(
     subject = "A Dart alternative color is available";
     english = `Hi ${customerName}, your requested color ${requestedColor} is still unavailable, but ${availableColor} is available for ${modelName} in size ${size} and is reserved for you until ${expiry || "the reservation expires"}. Open My Account > My Waiting to accept or decline it.`;
     arabic = `أهلًا ${customerName}، اللون المطلوب ${requestedColor} لسه غير متاح، لكن لون ${availableColor} متاح لنفس ${modelName} مقاس ${size} وتم حجزه لك حتى ${expiry || "انتهاء مدة الحجز"}. افتح My Account ثم My Waiting للقبول أو الرفض.`;
+  } else if (eventType === "order.created" || eventType === "order.status_changed") {
+    const orderCode = parameters.orderCode || "-";
+    const status = parameters.status || "New";
+    const total = parameters.total || "0.00";
+    const statusArabic: Record<string, string> = {
+      New: "طلب جديد", Accepted: "تم قبول الطلب", Preparing: "جارٍ تجهيز الطلب",
+      "Out With Representative": "خرج الطلب مع المندوب", "Representative On The Way": "المندوب في الطريق إليك",
+      Delivered: "تم التسليم", Refused: "تم رفض الاستلام", Cancelled: "تم إلغاء الطلب", "Needs Attention": "الطلب يحتاج متابعة",
+    };
+    subject = eventType === "order.created" ? `Dart order ${orderCode} confirmed` : `Dart order ${orderCode}: ${status}`;
+    english = `Hi ${customerName}, order ${orderCode}: ${status}. Order total: ${total} EGP. Sign in to Dart to view the order and its tracking details.`;
+    arabic = `أهلًا ${customerName}، طلبك ${orderCode}: ${statusArabic[status] || status}. إجمالي الطلب: ${total} جنيه. سجّل الدخول إلى Dart لعرض تفاصيل الطلب وتتبع حالته.`;
   } else {
     throw new Error(`Unsupported email event type: ${eventType}`);
   }

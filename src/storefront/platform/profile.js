@@ -18,7 +18,7 @@
     };
     set(".hello .user-name", user.name.split(/\s+/)[0]);
     set(".hello .e-mail", user.email);
-    const refundedItemCodes = new Set(
+    const refundedSales = new Set(
       returns
         .filter((record) => {
           const status = String(record.status || "");
@@ -30,7 +30,7 @@
             completed
           );
         })
-        .map((record) => String(record.itemCode || ""))
+        .map((record) => JSON.stringify([String(record.orderId || ""), String(record.itemCode || "")]))
         .filter(Boolean),
     );
     const deliveredOrders = orders.filter((order) => order.status === "Delivered");
@@ -39,7 +39,7 @@
         (sum, order) =>
           sum +
           (Array.isArray(order.items) ? order.items : []).filter(
-            (itemCode) => !refundedItemCodes.has(String(itemCode)),
+            (itemCode) => !refundedSales.has(JSON.stringify([String(order.orderId), String(itemCode)])),
           ).length,
         0,
       );

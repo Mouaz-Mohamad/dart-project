@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:16d8262226ab334f962e2330e10247ce91d18b5417e4e91f0b2e53361d2295a4 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:3fb588650f90bc28af3f35b551a2058ee654e36f26eb0a4d254dc6cbb9da253c */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -1879,13 +1879,16 @@ function dartReturnReplacementCandidates(record) {
 }
 
 async function dartRefreshReturnServerState() {
-  if (window.DartDomainState?.hydrateDomain) {
-    await window.DartDomainState.hydrateDomain("returns", true);
-    await window.DartDomainState.hydrateDomain("damage", true);
+  const tasks = [
+    () => window.DartDomainState?.hydrateDomain?.("returns", true),
+  ];
+  if (window.DartAdminAccess?.can?.("damage.manage")) tasks.push(
+    () => window.DartDomainState?.hydrateDomain?.("damage", true),
+  );
+  if (["catalog.manage", "catalog.read", "inventory.manage"].some((key) => window.DartAdminAccess?.can?.(key))) {
+    tasks.push(() => window.DartCatalog?.hydrate?.(true));
   }
-  if (window.DartCatalog?.hydrate) {
-    await window.DartCatalog.hydrate(true);
-  }
+  return Promise.allSettled(tasks.map((task) => Promise.resolve().then(task)));
 }
 
 async function dartAdminReturnAction(record, body) {
@@ -1894,7 +1897,10 @@ async function dartAdminReturnAction(record, body) {
     `/api/v1/admin/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
     { method: "POST", body },
   );
-  await dartRefreshReturnServerState();
+  if (payload.return) Object.assign(record, payload.return);
+  void dartRefreshReturnServerState().then(() => {
+    if (typeof dartRefreshAll === "function") dartRefreshAll();
+  }).catch(() => {});
   return payload.return || null;
 }
 
@@ -6134,9 +6140,15 @@ function setupReturnModal() {
       return;
     }
 
-    const order = ordersData.find(
-      (o) => (o.items || []).includes(code) && o.status === "Delivered",
-    );
+    const existing = id ? returnsData.find((row) => String(row.id || row.returnId) === String(id)) : null;
+    if (existing && String(existing.itemCode).toLowerCase() !== code.toLowerCase()) {
+      window.DartDialog.alert("The original item of a saved return cannot be changed.");
+      return;
+    }
+    const order = ordersData.filter(
+      (o) => (o.items || []).includes(code) && o.status === "Delivered" &&
+        (!existing || String(o.orderId) === String(existing.orderId)),
+    ).sort((a, b) => new Date(b.deliveredAt || b.createdAt || 0) - new Date(a.deliveredAt || a.createdAt || 0))[0];
     if (!order) {
       window.DartDialog.alert("Manual return requires a delivered order containing this item.");
       return;
@@ -6144,14 +6156,17 @@ function setupReturnModal() {
 
     const refundAmount =
       Number(document.getElementById("modal-return-refund")?.value) || 0;
-    const remainingRefund = Math.max(
+    const originalLine = (order.priceSnapshot || []).find((line) => String(line.itemCode) === code);
+    const lineNet = Number(originalLine?.finalUnitPrice ?? existing?.originalNetAmount ?? dartOrderNet(order));
+    const remainingRefund = Math.min(lineNet, Math.max(
       0,
-      dartOrderNet(order) - (Number(order.amountRefunded) || 0),
-    );
+      dartOrderNet(order) - Math.max(0, (Number(order.amountRefunded) || 0) - (Number(existing?.refundAmount) || 0)),
+    ));
     const duplicateReturn = returnsData.some(
       (row) =>
         String(row.id) !== String(id || "") &&
         row.itemCode === code &&
+        String(row.orderId) === String(order.orderId) &&
         !["Rejected", "Closed"].includes(row.status),
     );
     if (duplicateReturn) {

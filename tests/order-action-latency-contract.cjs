@@ -30,6 +30,7 @@ let checkoutCalls = 0;
 let rejectCheckout;
 const submitButton = { tagName: "BUTTON", textContent: "Order", disabled: false };
 const checkoutForm = {
+  dataset: {},
   querySelector: () => submitButton,
   addEventListener(type, callback) { if (type === "submit") submitHandler = callback; },
   setAttribute(name, value) { this[name] = value; },

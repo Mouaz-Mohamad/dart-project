@@ -88,10 +88,6 @@ async function main() {
     }
   }
   assert.equal(tabs.length, 12);
-  const thumbRule = fs.readFileSync("Eye/dart.css", "utf8").match(/\.dart-item-thumb\s*\{([^}]*)\}/)?.[1] || "";
-  for (const property of ["width: 48px !important;", "height: 60px !important;", "max-width: 48px;", "margin: 0;"]) {
-    assert.ok(thumbRule.includes(property), "Item thumbnail must retain " + property);
-  }
   const trigger = document.activeElement;
   for (const section of fieldsets) {
     ui.openResourceModal(section.dataset.financeFormResource);

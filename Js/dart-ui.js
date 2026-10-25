@@ -1012,6 +1012,7 @@ function initCartAndCheckoutEvents() {
     }
     // BEGIN Checkout submission: one busy guard and one success path for normal and price-reviewed orders.
     if (checkoutForm) {
+        checkoutForm.dataset.dartCheckoutHandler = 'ui';
         let checkoutSubmitting = false;
         const checkoutSubmitButton = checkoutForm.querySelector('[type="submit"]');
         const checkoutSubmitLabel = checkoutSubmitButton?.tagName === 'INPUT'
@@ -1058,7 +1059,7 @@ function initCartAndCheckoutEvents() {
                         const summary = changes.length
                             ? changes
                                 .map(change =>
-                                    `${change.modelId} — ${change.color} / ${change.size}: EGP ${Math.trunc(Number(change.previousUnitPrice) || 0)} → EGP ${Math.trunc(Number(change.currentUnitPrice) || 0)}`
+                                    `${change.modelId} — ${change.color} / ${change.size}: EGP ${(Number(change.previousUnitPrice) || 0).toLocaleString('en-EG', { maximumFractionDigits: 2 })} → EGP ${(Number(change.currentUnitPrice) || 0).toLocaleString('en-EG', { maximumFractionDigits: 2 })}`
                                 )
                                 .join("\n")
                             : "One or more product prices changed.";

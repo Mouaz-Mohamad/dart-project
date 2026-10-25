@@ -125,8 +125,11 @@
       write("dart_cart", []);
       setCartReservationId(uid("CART"));
       window.dartAppliedPromotion = null;
-      try {
-        await saveCustomerAddress({
+      // The committed order is the success boundary. Projection/preference refresh
+      // cannot turn it into a failed checkout or hold up its confirmation.
+      sessionStorage.setItem("dart_last_order_id", response.order.orderId);
+      void Promise.allSettled([
+        Promise.resolve().then(() => saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
           lat: Number(details.latitude),
           lng: Number(details.longitude),
@@ -136,13 +139,9 @@
           street: details.street,
           building: details.building,
           floor: details.floor,
-        });
-      } catch {
-        // The order is already server-authoritative; address preference sync is best-effort.
-      }
-      await Promise.all([
-        window.DartCatalog?.checkForServerChanges?.(),
-        hydrateCustomerCommerce(),
+        })),
+        Promise.resolve().then(() => window.DartCatalog?.checkForServerChanges?.()),
+        Promise.resolve().then(hydrateCustomerCommerce),
       ]);
       return response.order;
     }

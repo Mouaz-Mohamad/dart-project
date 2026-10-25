@@ -27,7 +27,6 @@
   ).replace(/\/$/, "");
   const API_USER_CACHE_KEY = "dart_api_user_cache";
   const CART_UI_CACHE_KEY = "dart_cart_ui_cache_v1";
-  let checkoutSubmissionBusy = false;
   let serverReviewEligible = null;
   let serverPurchaseStats = null;
   let waitingEntriesCache = [];

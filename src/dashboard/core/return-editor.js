@@ -69,9 +69,15 @@ function setupReturnModal() {
       return;
     }
 
-    const order = ordersData.find(
-      (o) => (o.items || []).includes(code) && o.status === "Delivered",
-    );
+    const existing = id ? returnsData.find((row) => String(row.id || row.returnId) === String(id)) : null;
+    if (existing && String(existing.itemCode).toLowerCase() !== code.toLowerCase()) {
+      window.DartDialog.alert("The original item of a saved return cannot be changed.");
+      return;
+    }
+    const order = ordersData.filter(
+      (o) => (o.items || []).includes(code) && o.status === "Delivered" &&
+        (!existing || String(o.orderId) === String(existing.orderId)),
+    ).sort((a, b) => new Date(b.deliveredAt || b.createdAt || 0) - new Date(a.deliveredAt || a.createdAt || 0))[0];
     if (!order) {
       window.DartDialog.alert("Manual return requires a delivered order containing this item.");
       return;
@@ -79,14 +85,17 @@ function setupReturnModal() {
 
     const refundAmount =
       Number(document.getElementById("modal-return-refund")?.value) || 0;
-    const remainingRefund = Math.max(
+    const originalLine = (order.priceSnapshot || []).find((line) => String(line.itemCode) === code);
+    const lineNet = Number(originalLine?.finalUnitPrice ?? existing?.originalNetAmount ?? dartOrderNet(order));
+    const remainingRefund = Math.min(lineNet, Math.max(
       0,
-      dartOrderNet(order) - (Number(order.amountRefunded) || 0),
-    );
+      dartOrderNet(order) - Math.max(0, (Number(order.amountRefunded) || 0) - (Number(existing?.refundAmount) || 0)),
+    ));
     const duplicateReturn = returnsData.some(
       (row) =>
         String(row.id) !== String(id || "") &&
         row.itemCode === code &&
+        String(row.orderId) === String(order.orderId) &&
         !["Rejected", "Closed"].includes(row.status),
     );
     if (duplicateReturn) {

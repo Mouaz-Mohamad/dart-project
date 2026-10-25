@@ -1,5 +1,6 @@
 // Read-only commerce projections; SQL and returned field shapes are preserved.
 import type { Pool } from "pg";
+import { orderBenefit, orderBenefits } from "./commerce.pricing.js";
 import type { AdminOrdersState, AdminOrdersScope, AdminOrderRow } from "./commerce.types.js";
 
 export async function readAdminOrdersVersion(pool: Pool): Promise<number> {
@@ -157,12 +158,9 @@ export async function readAdminOrders(pool: Pool, scope?: AdminOrdersScope): Pro
             amountPaid: Number(row.amount_paid_minor || 0) / 100,
             amountRefunded: Number(row.amount_refunded_minor || 0) / 100,
             promotionType: row.promotion?.type || legacy.promotionType || "",
-            birthdayRewardId: row.promotion?.type === "Birthday"
-              ? String(row.promotion?.rewardId || legacy.birthdayRewardId || "")
-              : String(legacy.birthdayRewardId || ""),
-            dartCardId: row.promotion?.type === "Dart Card"
-              ? String(row.promotion?.cardId || legacy.dartCardId || "")
-              : String(legacy.dartCardId || ""),
+            birthdayRewardId: String(orderBenefit(row.promotion, "Birthday")?.rewardId || legacy.birthdayRewardId || ""),
+            dartCardId: String(orderBenefit(row.promotion, "Dart Card")?.cardId || legacy.dartCardId || ""),
+            discountBenefits: orderBenefits(row.promotion),
             discount: Number(row.promotion?.percent || legacy.discount || 0),
             country: address.country || legacy.country || "",
             governorate: address.governorate || legacy.governorate || "",

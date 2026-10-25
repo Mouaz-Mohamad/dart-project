@@ -1,5 +1,14 @@
 # Dart Project changelog
 
+## Sale integrity, mixed discounts and committed checkout — 2026-10-25
+
+- Bound returns to the original order line, capped manual refunds and prevented old history from changing a resold/reserved item.
+- Guarded delivered-order Back after returns/refunds/COD settlement while preserving safe unchanged-sale transitions.
+- Allocated scoped campaigns and Birthday/Card fallback per piece, protected model prices from manual stacking, and added compatible reward functions in migration 0063.
+- Kept committed checkout/return commands successful during refresh failures, restored price-change review and permission-scoped reads, and keyed Waiting summaries by record ID.
+- Routed new routine order events through the deduplicated email outbox; historical events are not replayed.
+- Added production-schema and browser-handler regression coverage, and minified profile delivery from its maintained source without changing page URLs or CSS.
+
 ## Stable traffic visitor codes and shared hourly periods — 2026-10-22
 
 - Retained guest browser identities across navigation with a tab fallback for unavailable cookies. Customer sign-in links guest history without counting a duplicate visit.

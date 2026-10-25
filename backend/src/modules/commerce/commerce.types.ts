@@ -72,6 +72,7 @@ export interface LockedItem {
   color: string;
   size: string;
   model_name: string;
+  category?: string;
   cost_snapshot_minor: string;
   selling_minor: string;
   discount_percent: string;

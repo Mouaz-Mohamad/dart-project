@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:4ea3262a74f51b5b6194e7fc710f2dfdd9b382a374b0ff7625f70a1ca6e777ee */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:55d39e47257fc3ab2dcaa62720353743de18205e1dff89560e79389866c49a8a */
 (function () {
   "use strict";
 
@@ -29,7 +29,6 @@
   ).replace(/\/$/, "");
   const API_USER_CACHE_KEY = "dart_api_user_cache";
   const CART_UI_CACHE_KEY = "dart_cart_ui_cache_v1";
-  let checkoutSubmissionBusy = false;
   let serverReviewEligible = null;
   let serverPurchaseStats = null;
   let waitingEntriesCache = [];
@@ -238,7 +237,7 @@
     );
   const dateGB = (value) =>
     new Date(value || Date.now()).toLocaleDateString("en-GB");
-  const money = (value) => `${Math.trunc(Number(value) || 0)} EGP`;
+  const money = (value) => `${(Number(value) || 0).toLocaleString("en-EG", { maximumFractionDigits: 2 })} EGP`;
   const orderNet = (order) =>
     Number.isFinite(Number(order?.finalAmount))
       ? Math.max(0, Number(order.finalAmount))
@@ -718,7 +717,7 @@
             `<button type="button" class="dart-waiting-action is-danger" data-waiting-action="cancel" data-waiting-id="${escapeHtml(entry.id)}">Cancel Waiting</button>`,
           );
         }
-        return `<article class="profile-record-card dart-waiting-card">
+        return `<article class="profile-record-card dart-waiting-card" data-waiting-record-id="${escapeHtml(entry.id)}">
           <div class="profile-record-head">
             <strong>${escapeHtml(entry.modelName || entry.modelId)}</strong>
             <span class="profile-status">${escapeHtml(waitingStatusLabel(entry))}</span>
@@ -1596,8 +1595,11 @@
       write("dart_cart", []);
       setCartReservationId(uid("CART"));
       window.dartAppliedPromotion = null;
-      try {
-        await saveCustomerAddress({
+      // The committed order is the success boundary. Projection/preference refresh
+      // cannot turn it into a failed checkout or hold up its confirmation.
+      sessionStorage.setItem("dart_last_order_id", response.order.orderId);
+      void Promise.allSettled([
+        Promise.resolve().then(() => saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
           lat: Number(details.latitude),
           lng: Number(details.longitude),
@@ -1607,13 +1609,9 @@
           street: details.street,
           building: details.building,
           floor: details.floor,
-        });
-      } catch {
-        // The order is already server-authoritative; address preference sync is best-effort.
-      }
-      await Promise.all([
-        window.DartCatalog?.checkForServerChanges?.(),
-        hydrateCustomerCommerce(),
+        })),
+        Promise.resolve().then(() => window.DartCatalog?.checkForServerChanges?.()),
+        Promise.resolve().then(hydrateCustomerCommerce),
       ]);
       return response.order;
     }
@@ -2934,33 +2932,12 @@
             setStatus(form, error.message, true);
           }
         } else if (form.id === "checkoutForm") {
+          // The form handler owns price review; its address-wait capture handler
+          // must run before submission reaches that handler.
+          if (form.dataset.dartCheckoutHandler === "ui") return;
           event.preventDefault();
           event.stopImmediatePropagation();
-          if (checkoutSubmissionBusy) return;
-          checkoutSubmissionBusy = true;
-          form.setAttribute("aria-busy", "true");
-          const submit = form.querySelector('button[type="submit"], input[type="submit"]');
-          if (submit) submit.disabled = true;
-          let completed = false;
-          try {
-            const order = await checkout(form);
-            completed = true;
-            if (typeof showToast === "function")
-              showToast(`تم إنشاء الطلب ${order.orderId} بنجاح.`);
-            setTimeout(() => {
-              sessionStorage.setItem("dart_internal_navigation", "1");
-              location.assign("index.html");
-            }, 300);
-          } catch (error) {
-            if (typeof showToast === "function") showToast(error.message);
-            else setStatus(form, error.message, true);
-          } finally {
-            if (!completed) {
-              checkoutSubmissionBusy = false;
-              form.removeAttribute("aria-busy");
-              if (submit) submit.disabled = false;
-            }
-          }
+          setStatus(form, "تعذر تحميل إتمام الطلب. أعد تحميل الصفحة ثم حاول مرة أخرى.", true);
         } else if (form.id === "contactForm") {
           event.preventDefault();
           // BEGIN Contact Us -> dashboard Review inbox.
@@ -3136,7 +3113,7 @@
                 },
               });
               sessionStorage.setItem("dart_last_return_id", result.returnId);
-              await hydrateCustomerCommerce();
+              void Promise.resolve().then(hydrateCustomerCommerce).then(renderProfile).catch(() => {});
               form.reset();
               const trackingLink = document.getElementById("return-tracking-link");
               if (trackingLink) {
@@ -3147,7 +3124,6 @@
                 form,
                 `تم إنشاء الطلب ${result.returnId}. سيظهر تلقائيًا في صفحة تتبع طلبك.`,
               );
-              renderProfile();
             } catch (error) {
               setStatus(form, error.message, true);
             }
@@ -3382,7 +3358,7 @@
     };
     set(".hello .user-name", user.name.split(/\s+/)[0]);
     set(".hello .e-mail", user.email);
-    const refundedItemCodes = new Set(
+    const refundedSales = new Set(
       returns
         .filter((record) => {
           const status = String(record.status || "");
@@ -3394,7 +3370,7 @@
             completed
           );
         })
-        .map((record) => String(record.itemCode || ""))
+        .map((record) => JSON.stringify([String(record.orderId || ""), String(record.itemCode || "")]))
         .filter(Boolean),
     );
     const deliveredOrders = orders.filter((order) => order.status === "Delivered");
@@ -3403,7 +3379,7 @@
         (sum, order) =>
           sum +
           (Array.isArray(order.items) ? order.items : []).filter(
-            (itemCode) => !refundedItemCodes.has(String(itemCode)),
+            (itemCode) => !refundedSales.has(JSON.stringify([String(order.orderId), String(itemCode)])),
           ).length,
         0,
       );

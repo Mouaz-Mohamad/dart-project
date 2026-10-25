@@ -254,6 +254,34 @@ paths:
       responses:
         "405": { description: ORDER_COMMAND_REQUIRED with Allow GET; no database write }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/returns/manual:
+    post:
+      tags: [Orders]
+      operationId: recordManualReturn
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      description: Requires Staff MFA and returns.manage or returns.create_manual. Locks the delivered sale and physical item. A new refund requires current Sold ownership and is capped by the net line and remaining order amount. Existing manual records keep their original sale identity; editing them never mutates current inventory. Duplicate completed refunds are rejected per sale, allowing a later buyer to return a resold piece.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemCode, reason, condition, refundAmount]
+              properties:
+                existingReturnId: { type: string, minLength: 1, maxLength: 120 }
+                itemCode: { type: string, minLength: 1, maxLength: 120 }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+                condition: { type: string, enum: [Good, Bad] }
+                refundAmount: { type: number, minimum: 0, maximum: 10000000, description: EGP input converted to integer Piastres by the server }
+                clientName: { type: string, maxLength: 160 }
+                phone1: { type: string, maxLength: 40 }
+                phone2: { type: string, maxLength: 40 }
+                email: { type: string, format: email, maxLength: 320 }
+      responses:
+        "200": { description: Committed return record; optional follow-up read failure must not retry the financial command }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /admin/orders/{orderRef}/workflow:
     post:
       tags: [Orders]
@@ -263,7 +291,7 @@ paths:
         - { in: path, name: orderRef, required: true, schema: { type: string, minLength: 1, maxLength: 160 } }
         - { $ref: "#/components/parameters/OrderResponseMode" }
         - { $ref: "#/components/parameters/OrderBaseVersion" }
-      description: Requires Staff orders.manage or orders.bulk_manage and configured MFA. The server locks the order and validates expectedStatus and transitions, inventory, rewards and COD eligibility in one audited transaction. Optional delta replies include affected-customer orders only at a contiguous version. After commit, a gap or failed snapshot refresh returns 200 with refreshRequired true; this is a committed command and must not be automatically retried.
+      description: Requires Staff orders.manage or orders.bulk_manage and configured MFA. The server locks the order and validates expectedStatus and transitions, inventory, rewards and COD eligibility in one audited transaction. Back from Delivered is blocked by returns, recorded refunds or COD settlements (DELIVERED_ORDER_LOCKED); changed physical ownership returns ORDER_ITEM_OWNERSHIP_CHANGED. Optional delta replies include affected-customer orders only at a contiguous version. After commit, a gap or failed snapshot refresh returns 200 with refreshRequired true; this is a committed command and must not be automatically retried.
       requestBody:
         required: true
         content:
@@ -298,7 +326,7 @@ paths:
       tags: [Orders]
       operationId: updateAdminOrderCommand
       security: [{ sessionCookie: [], csrfToken: [] }]
-      description: Existing manual-edit command. Requires orders.manage or orders.edit and configured MFA. Delivered/returned financial snapshots stay locked. A delta includes orders for both previous and current affected customers.
+      description: Existing manual-edit command. Requires orders.manage or orders.edit and configured MFA. Delivered/returned and reward-reserved financial snapshots stay locked. Manual percentages never stack over a model discount. A delta includes orders for both previous and current affected customers.
       parameters:
         - { in: path, name: orderRef, required: true, schema: { type: string, minLength: 1, maxLength: 120 } }
         - { $ref: "#/components/parameters/OrderResponseMode" }
@@ -988,7 +1016,7 @@ paths:
         - { in: query, name: reservationId, required: true, schema: { type: string, minLength: 16, maxLength: 160 } }
         - { in: query, name: code, required: false, schema: { type: string, minLength: 1, maxLength: 60 } }
       responses:
-        "200": { description: Highest-priority automatic campaign eligible for the reserved cart, or null }
+        "200": { description: Highest-priority eligible campaign or null. Scope and minimum quantity/value are evaluated on matching cart pieces; checkout applies the campaign to those pieces only }
         "409": { $ref: "#/components/responses/Conflict" }
   /admin/promotions:
     get:
