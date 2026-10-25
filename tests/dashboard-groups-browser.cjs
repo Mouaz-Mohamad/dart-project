@@ -80,7 +80,7 @@ const server=http.createServer((req,res)=>{
    await page.locator('.group-row').focus();await page.keyboard.press('Enter');
    await page.locator('#items-container .dart-record-open').waitFor();
    assert.equal(await page.locator('#items-container [data-id="piece-1"]').count(),1);
-   assert.equal(await page.locator('#items-container .dart-item-thumb').evaluate(node=>getComputedStyle(node).height),'60px','individual Item thumbnail must remain 60px');
+   assert.deepEqual(await page.locator('#items-container .dart-item-thumb').evaluate(node=>({width:getComputedStyle(node).width,height:getComputedStyle(node).height,fit:getComputedStyle(node).objectFit})),{width:'36px',height:'25px',fit:'cover'},'individual Item thumbnail must retain the reviewed compact size');
    await page.locator('#back-to-groups').click();
    await page.evaluate(()=>activate('waiting'));
    await page.locator('#waiting-table .dart-record-open').waitFor();

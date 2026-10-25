@@ -24,13 +24,15 @@
 قبل النشر:
 
 - Backend: `npm run check` — lint/typecheck/Vercel config ناجحة؛ **450 passed / 48 skipped** من أصل 498. الاختبارات المتخطاة تتطلب `TEST_DATABASE_URL`؛ تشمل اختبار طلبَي refund متزامنين.
+- GitHub Backend CI على commit `9429f43`: **498/498 passed** داخل 81 ملفًا، بما فيها معاملات PostgreSQL وطلبا refund المتزامنان. [سجل الفحص](https://github.com/Mouaz-Mohamad/dart-project/actions/runs/40204037124).
 - اختبارات الدفعة الجديدة تستخدم كل migrations/triggers الفعلية: PGlite محليًا، وPostgreSQL داخل schema معزول عند توفر `TEST_DATABASE_URL` في GitHub.
 - Frontend: `npm run check` — **34 فحصًا ناجحًا**، منها تشغيل handlers الفعلية داخل VM.
 - `npm run build` للواجهة وBackend build ناجحان.
 - Performance: **957 KiB core / 225 KiB homepage direct** ضمن الحدود الأصلية؛ لم تُرفع ميزانية الحجم.
 - CSS audit: **0** overridden selector/property عبر 4 delivery groups. لا تغيير في ملفات CSS بهذه الدفعة.
 - `git diff --check` ناجح.
-- Chromium المحلي: تعذر تشغيله لغياب executable؛ نتائج 11 browser suites تعتمد على GitHub Frontend CI لنفس commit قبل اعتبار الإصدار متحققًا.
+- Chromium: **185 مقارنة CSS ناجحة** على Full Chromium في GitHub. نجحت باقي 10 browser suites محليًا باستخدام Headless Shell بعد ضبط الاختبار على المقاس المعتمد لصورة القطعة: 36×25px وobject-fit: cover. لم تتغير CSS. اختبار native BFCache يبقى مطلوبًا في Full Chromium داخل GitHub؛ delegate المحلي لا يدعمه، ويعلن هذا الاستثناء صراحة.
+- الإصلاح المنشور: `9429f43`، المتجر والـAPI كلاهما READY. فحوص Home/Products/Cart/Profile وhealth/live وhealth/ready ناجحة، وقراءة الإدارة دون جلسة مرفوضة. متابعة تصحيح الاختبار والتوثيق لا تغير ملفات الإنتاج.
 
 السيناريوهات الحرجة المغطاة:
 
@@ -53,12 +55,12 @@
 | --- | --- | --- |
 | 1 | الحالات | Pass: loading/locks باقية، أخطاء الأمر منفصلة عن refresh، fallback آمن إذا لم يتحمل Checkout UI |
 | 2 | سلطة الخادم | Pass: المال والخصم والمخزون والأهلية محسوبة/مفحوصة على الخادم؛ الواجهة لا تمنح صلاحية مالية |
-| 3 | التزامن | Pass على مستوى الكود: معاملات وأقفال order/item/domain؛ اختبار PostgreSQL المتزامن جزء من CI، وليس مثبتًا بـPGlite |
+| 3 | التزامن | Pass: معاملات وأقفال order/item/domain؛ اختبار PostgreSQL المتزامن نجح داخل GitHub CI، وليس محاكاة PGlite |
 | 4 | الإدخال والصلاحيات | Pass: Zod وCSRF وMFA والصلاحيات المركزية القائمة؛ إضافة فحص ownership/sale identity؛ قراءات الواجهة مقيدة |
 | 5 | التكرار | Pass: checkout idempotency، منع refund مكرر لنفس البيع، outbox deduplication، no-op status لا يكرر الحدث |
 | 6 | التدقيق | Pass: حفظ معاملات المرتجع/الأوردر والقديم والجديد في Audit؛ تصحيح التقاط قيمة refund السابقة قبل mutation |
 | 7 | الخدمات والتكلفة | Pass للنطاق: لا تغيير WhatsApp؛ SMTP وOutbox القائمان يسجلان المحاولات والنتيجة؛ الاختبارات تستعمل provider وهميًا بلا رسائل حقيقية |
-| 8 | الرجوع الوظيفي | Pass محليًا للفحوص المعنية: لا تغيير تصميم/CSS أو حذف إجراءات؛ minification من source؛ browser CI بوابة إضافية |
+| 8 | الرجوع الوظيفي | Pass محليًا للفحوص المعنية: لا تغيير تصميم/CSS أو حذف إجراءات؛ minification من source؛ 185 مقارنة CSS ناجحة و10 browser suites محلية؛ Full Chromium CI يثبت BFCache |
 | 9 | الاختبارات | Pass: السيناريوهات أعلاه آلية؛ حدود PostgreSQL/Chromium المحلي موضحة، ولا توجد دعوى load/capacity من هذه الأرقام |
 | 10 | الأسرار | Pass: لا credentials جديدة أو مطبوعة أو مضافة للمتصفح/الـcommit؛ البريد والأسماء الاصطناعية في الاختبارات فقط |
 
