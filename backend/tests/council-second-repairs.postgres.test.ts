@@ -195,13 +195,17 @@ describe("second Council regressions on the production schema", () => {
   it("books dated gross COD receipts and refunds once regardless of event order, preserving closed periods", async () => {
     const finance = new FinanceService(store.pool);
     for (const refundFirst of [true, false]) {
-      const f = await fixture(); const order = await checkout(f); await deliver(order);
-      await store.pool.query("UPDATE orders SET final_minor=100000,delivery_cost_minor=10000,delivered_at='2025-01-15T12:00Z',amount_paid_minor=100000,payment_status='Paid' WHERE id=$1", [order.id]);
+      const f = await fixture({ ordinary: true });
+      // A partial discretionary refund is an ordinary-item scenario; Set returns
+      // use the full historical allocation by design.
+      await commerce.reserveCart(f.reservation, [{ modelId: f.models[2]!, color: "Black", size: "M", quantity: 1 }], f.user);
+      const order = await checkout(f); await deliver(order);
+      await store.pool.query("UPDATE orders SET delivered_at='2025-01-15T12:00Z',amount_paid_minor=100000,payment_status='Paid' WHERE id=$1", [order.id]);
       const receipt = () => finance.createCodSettlement(actor, { id: `COD-${randomUUID()}`, orderId: String(order.orderId), settlementDate: "2025-02-15", amountReceived: 900, fee: 0 }, "synthetic");
       const before = await finance.summary("2025-01-01", "2025-01-31"); expect(before.cashIn).toBe(0);
-      if (refundFirst) await refund(f.pieces[0]!, 500);
+      if (refundFirst) await refund(f.pieces[2]!, 500);
       const received = await receipt(); expect(received.outstandingMinor).toBe(0);
-      if (!refundFirst) await refund(f.pieces[0]!, 500);
+      if (!refundFirst) await refund(f.pieces[2]!, 500);
       await store.pool.query("UPDATE return_requests SET payload=payload || '{\"completedAt\":\"2025-02-16T12:00:00Z\"}'::jsonb WHERE order_code=$1", [order.orderId]);
       const after = await finance.summary("2025-01-01", "2025-01-31"); expect(after.cashIn).toBe(0);
     }

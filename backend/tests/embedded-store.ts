@@ -27,7 +27,7 @@ export async function embeddedStore(isolatedEmbeddedSchema = false) {
   const query = async (sql: string, params: unknown[] = []) => {
     const text = sql.replace("CREATE EXTENSION IF NOT EXISTS pgcrypto;", "");
     const result = params.length ? await db.query(text, params) : (await db.exec(text)).at(-1);
-    return { ...result, rows: result?.rows || [], rowCount: result?.affectedRows ?? result?.rows.length ?? 0 };
+    return { ...result, rows: result?.rows || [], rowCount: result?.affectedRows || result?.rows.length || 0 };
   };
   const pool = { query, connect: async () => ({ query, release() {} }) } as unknown as Pool;
   try { await (isolatedEmbeddedSchema ? runIsolatedMigrations : runMigrations)(pool, resolve(process.cwd(), "migrations")); }
