@@ -54,6 +54,7 @@ function setupReturnModal() {
   document.getElementById("add-return-btn")?.addEventListener("click", () => {
     form.reset();
     document.getElementById("modal-return-edit-id").value = "";
+    form.dataset.returnUpdatedAt = "";
     openModal(modal);
   });
 
@@ -110,7 +111,7 @@ function setupReturnModal() {
     const condition =
       document.getElementById("modal-item-condition").value || "Good";
     const payload = {
-      ...(id ? { existingReturnId: id } : {}),
+      ...(id ? { existingReturnId: id, expectedUpdatedAt: form.dataset.returnUpdatedAt || "" } : {}),
       itemCode: code,
       reason: document.getElementById("modal-item-reason").value || "Other",
       condition: condition === "Bad" ? "Bad" : "Good",

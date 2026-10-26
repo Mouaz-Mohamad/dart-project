@@ -80,7 +80,7 @@ describe("returns preserve each sale's inventory and money on the production sch
     await store.pool.query("INSERT INTO cart_reservations(id,customer_user_id,expires_at) VALUES($1,$2,now()+interval '15 minutes')", [cart, f.user]);
     await store.pool.query("UPDATE inventory_items SET status='In Cart',cart_reservation_id=$2,reservation_until=now()+interval '15 minutes' WHERE id=$1", [f.piece, cart]);
     const before = await ownership(f.piece);
-    await commerce.adminManualReturn(actor, manual(f.piece, { existingReturnId: String(returned.id), refundAmount: 450 }), "edit-return");
+    await commerce.adminManualReturn(actor, manual(f.piece, { existingReturnId: String(returned.id), expectedUpdatedAt: String(returned.updatedAt), refundAmount: 450 }), "edit-return");
     expect(await ownership(f.piece)).toEqual(before);
     expect(Number((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [next.id])).rows[0].amount_refunded_minor)).toBe(0);
     expect(Number((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [f.id])).rows[0].amount_refunded_minor)).toBe(45000);

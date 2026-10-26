@@ -456,10 +456,10 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
       preferencesResult,
       birthdayUsageResult,
     ] = await Promise.all([
-      readRelationalDashboardDomain(pool, "returns"),
-      readRelationalDashboardDomain(pool, "cards"),
-      readRelationalDashboardDomain(pool, "birthday_rewards"),
-      readRelationalDashboardDomain(pool, "birthday_messages"),
+      readRelationalDashboardDomain(pool, "returns", clientCode),
+      readRelationalDashboardDomain(pool, "cards", clientCode),
+      readRelationalDashboardDomain(pool, "birthday_rewards", clientCode),
+      readRelationalDashboardDomain(pool, "birthday_messages", clientCode),
       pool.query<{ last_address: Record<string, unknown> | null }>(
         "SELECT last_address FROM customer_preferences WHERE customer_user_id=$1",
         [customerUserId],

@@ -15,14 +15,14 @@ async function main() {
   const fields = { customer_name: "Synthetic", phone1: "+201000000001", email: "synthetic@example.test", country: "Egypt", governorate: "Cairo", area: "Nasr City", street: "Test", building: "1", floor: "1", latitude: "30.05", longitude: "31.35" };
   const form = { elements: { namedItem: (name) => ({ value: fields[name] || "" }) }, dataset: {} };
   const checkout = { window: { dartCheckoutAddress: { validate: () => ({ ok: true, zone: "cairo-giza" }) }, DartCatalog: { checkForServerChanges: async () => { throw new Error("refresh offline"); } } },
-    API_BASE: "https://synthetic.test", cartData: [{ id: "M1" }], CART_RESERVATION_ID: "CART-OLD", cleanupCartReservations() {},
-    currentUser: () => ({ name: "Synthetic", email: fields.email }), displayPhone: (x) => x, apiRequest: async (url) => url.includes("/cart/quote") ? ({ fingerprint: "a".repeat(64), totalMinor: 18000, subtotalMinor: 20000, discountMinor: 2000 }) : ({ order: { orderId: "K-CONFIRMED" } }),
+    API_BASE: "https://synthetic.test", cartData: [{ id: "M1", quantity: 1 }], CART_RESERVATION_ID: "CART-OLD", cleanupCartReservations() {},
+    currentUser: () => ({ name: "Synthetic", email: fields.email }), displayPhone: (x) => x, apiRequest: async (url) => url.includes("/cart/quote") ? ({ lines: [{ modelId: "M1" }], fingerprint: "a".repeat(64), totalMinor: 18000, subtotalMinor: 20000, discountMinor: 2000 }) : ({ order: { orderId: "K-CONFIRMED" } }),
     write() {}, uid: () => "CART-NEW", setCartReservationId() {}, sessionStorage: { setItem() {} },
     saveCustomerAddress: async () => { throw new Error("preference offline"); }, hydrateCustomerCommerce: async () => { throw new Error("profile offline"); } };
   vm.runInNewContext(fs.readFileSync("src/storefront/platform/checkout.js", "utf8") + "\nthis.runCheckout=checkout;", checkout);
   assert.equal((await checkout.runCheckout(form)).orderId, "K-CONFIRMED", "a failed refresh cannot hide a committed order");
   assert.equal(checkout.cartData.length, 0);
-  checkout.cartData = [{ id: "M1" }]; checkout.apiRequest = async () => { throw new Error("write failed"); };
+  checkout.cartData = [{ id: "M1", quantity: 1 }]; checkout.apiRequest = async () => { throw new Error("write failed"); };
   await assert.rejects(checkout.runCheckout(form), /write failed/);
   assert.equal(checkout.cartData.length, 1, "a failed POST retains the cart");
 
@@ -30,7 +30,7 @@ async function main() {
   checkout.window.dartDisplayedTotalMinor = 16000;
   let posted = 0, fingerprint = "b".repeat(64);
   checkout.apiRequest = async (url, options) => {
-    if (url.includes("/cart/quote")) return { fingerprint, totalMinor: 18000, subtotalMinor: 20000, discountMinor: 2000 };
+    if (url.includes("/cart/quote")) return { lines: [{ modelId: "M1" }], fingerprint, totalMinor: 18000, subtotalMinor: 20000, discountMinor: 2000 };
     posted++; assert.equal(options.body.quoteFingerprint, fingerprint); assert.equal(options.body.expectedTotalMinor, 18000);
     return { order: { orderId: "K-QUOTED" } };
   };

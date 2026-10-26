@@ -123,9 +123,9 @@ describe("commerce concurrency and representative safety contracts", () => {
     );
   });
 
-  it("refunds only an active delivered order", () => {
+  it("refunds only a non-deleted delivered order; archive is a presentation state", () => {
     expect(service).toMatch(
-      /WHERE order_code=\$1[\s\S]{0,120}AND status='Delivered'[\s\S]{0,120}AND NOT is_deleted[\s\S]{0,120}AND NOT is_archived/,
+      /WHERE order_code=\$1[\s\S]{0,120}AND status='Delivered'[\s\S]{0,120}AND NOT is_deleted[\s\S]{0,120}FOR UPDATE/,
     );
   });
 

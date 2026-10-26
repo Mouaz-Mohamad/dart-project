@@ -4,7 +4,7 @@ import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-function runWorker(mode: "empty" | "full" | "provider" | "network" | "uncertain" | "exhausted" | "missing-health") {
+function runWorker(mode: "empty" | "full" | "provider" | "network" | "uncertain" | "exhausted" | "missing-health" | "overdue" | "future" | "recovered-backlog") {
   const directory = mkdtempSync(join(tmpdir(), "dart-worker-test-"));
   try {
     const workflow = readFileSync(resolve(process.cwd(), "../.github/workflows/outbox-worker.yml"), "utf8");
@@ -19,11 +19,15 @@ const args = process.argv.slice(2);
 const target = args[args.indexOf('--output') + 1];
 const full = process.env.DART_TEST_MODE === 'full';
 const providerFailure = process.env.DART_TEST_MODE === 'provider' && fs.readFileSync(process.env.DART_TEST_COUNTER,'utf8').trim().split('\\n').length === 1;
-fs.writeFileSync(target, JSON.stringify({ configured: true, claimed: full || providerFailure ? 5 : 0,
-  published: full ? 5 : providerFailure ? 4 : 0, failed: providerFailure ? 1 : 0,
+const recovering = process.env.DART_TEST_MODE === 'recovered-backlog' && fs.readFileSync(process.env.DART_TEST_COUNTER,'utf8').trim().split('\\n').length === 1;
+fs.writeFileSync(target, JSON.stringify({ configured: true, claimed: full || providerFailure || recovering ? 5 : 0,
+  published: full || recovering ? 5 : providerFailure ? 4 : 0, failed: providerFailure ? 1 : 0,
   health: process.env.DART_TEST_MODE === 'missing-health' ? undefined : {
     uncertain: process.env.DART_TEST_MODE === 'uncertain' ? 2 : 0,
-    exhausted: process.env.DART_TEST_MODE === 'exhausted' ? 1 : 0, terminal: 0 } }));
+    exhausted: process.env.DART_TEST_MODE === 'exhausted' ? 1 : 0, terminal: 0,
+    pending: process.env.DART_TEST_MODE === 'future' ? 5000 : 0, oldestSeconds: 86400,
+    duePending: process.env.DART_TEST_MODE === 'overdue' || recovering ? 1 : 0,
+    oldestDueSeconds: process.env.DART_TEST_MODE === 'overdue' || recovering ? 901 : 0 } }));
 `, { mode: 0o700 });
     const result = spawnSync("bash", ["-c", script], { encoding: "utf8", timeout: 30000,
       env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, DART_OUTBOX_CRON_SECRET: "isolated-worker-secret".repeat(2),
@@ -46,7 +50,13 @@ describe("bounded durable outbox worker", () => {
   it("stops after an HTTP or network failure", () => {
     expect(runWorker("network")).toMatchObject({ status: 22, calls: 1 });
   });
-  it.each(["uncertain", "exhausted", "missing-health"] as const)("fails visibly for %s even when no new event is claimed", (mode) => {
+  it.each(["uncertain", "exhausted", "missing-health", "overdue"] as const)("fails visibly for %s even when no new event is claimed", (mode) => {
     expect(runWorker(mode)).toMatchObject({ status: 1, calls: 1 });
+  });
+  it("does not confuse future scheduled messages with overdue delivery", () => {
+    expect(runWorker("future")).toMatchObject({ status: 0, calls: 1 });
+  });
+  it("clears a backlog alert when the bounded drain actually recovers it", () => {
+    expect(runWorker("recovered-backlog")).toMatchObject({ status: 0, calls: 2 });
   });
 });

@@ -423,6 +423,7 @@ function openEditModal(id, sectionKey) {
     return;
   }
   if (sectionKey === "returns") {
+    document.getElementById("return-form").dataset.returnUpdatedAt = String(x.updatedAt || x.completedAt || x.createdAt || "");
     document.getElementById("modal-return-edit-id").value = x.id;
     document.getElementById("modal-return-name").value = x.clientName || "";
     document.getElementById("modal-return-item-code").value = x.itemCode || "";
@@ -430,12 +431,8 @@ function openEditModal(id, sectionKey) {
     document.getElementById("modal-return-model-id").value = x.modelId || "";
     document.getElementById("modal-return-phone2").value = x.phone2 || "";
     document.getElementById("modal-return-email").value = x.email || "";
-    document.getElementById("modal-item-condition").value = [
-      "Good",
-      "Bad",
-    ].includes(x.status)
-      ? x.status
-      : "Good";
+    document.getElementById("modal-item-condition").value =
+      ["Bad", "Damaged"].includes(x.condition || x.inspectionStatus || x.status) ? "Bad" : "Good";
     document.getElementById("modal-item-reason").value = x.reason || "سبب آخر";
     if (document.getElementById("modal-return-refund"))
       document.getElementById("modal-return-refund").value =
@@ -467,6 +464,7 @@ function openEditModal(id, sectionKey) {
     return;
   }
   if (sectionKey === "orders") {
+    document.getElementById("orderForm").dataset.orderVersion = String(x.version || 0);
     document.getElementById("modal-order-edit-id").value = x.id;
     document.getElementById("clientName").value = x.clientName || "";
     document.getElementById("clientId").value = x.clientId || "";

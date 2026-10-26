@@ -799,22 +799,22 @@
     platform.reserveCart=async function reserveCartWithSets(nextCart) {
       const previousCart=clone(root.DartState?.read?.("dart_cart",[])||[]);
       const previousGroups=clone(lastAttachedGroups.length?lastAttachedGroups:drafts());
-      const payload=await original(nextCart);
-      const target=drafts();
-      if (!target.length) { lastAttachedGroups=[]; return payload; }
-      try {
-        const attached=await root.DartSets.attachCartGroups(target,payload?.reservationId||root.DartSets.currentReservationId());
-        lastAttachedGroups=normalizeGroups(attached?.groups||target);
-        root.DartSets.writeDrafts(lastAttachedGroups);
-        return payload;
-      } catch (error) {
+      const target=clone(drafts());
+      return original(nextCart, { afterReservation: async (payload, restoreReservation) => {
+        if (!target.length) { lastAttachedGroups=[]; return; }
         try {
-          const restored=await original(previousCart);
-          if (previousGroups.length) await root.DartSets.attachCartGroups(previousGroups,restored?.reservationId||root.DartSets.currentReservationId());
-          root.DartSets.writeDrafts(previousGroups); lastAttachedGroups=previousGroups;
-        } catch {}
-        throw error;
-      }
+          const attached=await root.DartSets.attachCartGroups(target,payload?.reservationId||root.DartSets.currentReservationId());
+          lastAttachedGroups=normalizeGroups(attached?.groups||target);
+          root.DartSets.writeDrafts(lastAttachedGroups);
+        } catch (error) {
+          try {
+            const restored=await restoreReservation(previousCart);
+            if (previousGroups.length) await root.DartSets.attachCartGroups(previousGroups,restored?.reservationId||root.DartSets.currentReservationId());
+            root.DartSets.writeDrafts(previousGroups); lastAttachedGroups=previousGroups;
+          } catch {}
+          throw error;
+        }
+      } });
     };
   }
   // END Set purchase.

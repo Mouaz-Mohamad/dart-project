@@ -32,11 +32,13 @@ export function isRelationalDashboardDomain(
 export async function readRelationalDashboardDomain(
   db: Queryable,
   domain: RelationalDashboardDomain,
+  customerCode?: string,
 ): Promise<unknown[]> {
   const simple = SIMPLE_TABLES[domain];
   if (simple) {
     const result = await db.query<{ payload: unknown }>(
-      `SELECT payload FROM ${simple} ORDER BY position, record_id`,
+      `SELECT payload FROM ${simple}${customerCode === undefined ? "" : " WHERE customer_code=$1"} ORDER BY position, record_id`,
+      ...(customerCode === undefined ? [] : [[customerCode]]),
     );
     return result.rows.map((row) => row.payload);
   }
@@ -51,8 +53,8 @@ export async function readRelationalDashboardDomain(
         FROM message_records m LEFT JOIN outbox_events e ON e.id::text=m.payload->>'outboxEventId'
         LEFT JOIN LATERAL (SELECT state,provider_message_id FROM outbox_delivery_attempts
           WHERE event_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1) a ON true
-        WHERE m.domain=$1 ORDER BY m.position,m.record_id`,
-      [domain],
+        WHERE m.domain=$1${customerCode === undefined ? "" : " AND m.customer_code=$2"} ORDER BY m.position,m.record_id`,
+      customerCode === undefined ? [domain] : [domain, customerCode],
     );
     return result.rows.map((row) => row.payload);
   }

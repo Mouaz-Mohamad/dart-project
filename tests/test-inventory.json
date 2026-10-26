@@ -8,6 +8,7 @@
     "catalog-category-contract.js",
     "council-browser-runtime.cjs",
     "council-third-runtime.cjs",
+    "council-fourth-runtime.cjs",
     "css-cascade-contract.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",

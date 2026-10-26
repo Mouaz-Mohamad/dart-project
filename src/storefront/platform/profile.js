@@ -1,10 +1,28 @@
+  document.addEventListener?.("click", (event) => {
+    if (!event.target.closest?.("[data-profile-commerce-retry]")) return;
+    void (async () => {
+      if (!currentUser()) await hydrateApiSession();
+      await hydrateCustomerCommerce();
+      renderProfile();
+    })().catch(() => { renderProfile(); });
+  });
+
   function renderProfile() {
     if (!document.querySelector(".account")) return;
     const user = currentUser();
     if (!user) {
+      if (typeof apiSessionUnavailable !== "undefined" && apiSessionUnavailable) {
+        const host = document.getElementById("profileOrdersList");
+        if (host) host.innerHTML = '<div class="empty-state" role="status">Your session could not be verified. <button type="button" data-profile-commerce-retry>Retry</button></div>';
+        return;
+      }
       location.replace("Sign Up modern.html?next=profile");
       return;
     }
+    const commerceState = typeof customerCommerceStatus === "string" ? customerCommerceStatus : "ready";
+    const unavailable = '<div class="empty-state" role="status">Account records could not be refreshed. <button type="button" data-profile-commerce-retry>Retry</button></div>';
+    const emptyRecords = (message) => commerceState === "error" ? unavailable :
+      ["loading", "idle"].includes(commerceState) ? '<div class="empty-state" role="status">Loading account records...</div>' : `<div class="empty-state">${message}</div>`;
     const profileEdit = document.querySelector(".profile-details .edit");
     const preserveDraft = profileEdit?.dataset.mode === "edit" && profileEdit.dataset.customerId === String(user.id);
     const customer = syncCustomer(user),
@@ -115,7 +133,7 @@
     cardElement?.classList.toggle("is-inactive", cardStatus !== "Active");
     const orderList = document.getElementById("profileOrdersList");
     if (orderList) {
-      orderList.innerHTML =
+      orderList.innerHTML = (commerceState === "error" && orders.length ? unavailable : "") + (
         orders
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
           .map((o) => {
@@ -127,12 +145,12 @@
                   .join(", ");
             return `<article class="profile-record-card"><div class="profile-record-head"><strong>${escapeHtml(o.orderId)}</strong><span class="profile-status">${escapeHtml(o.status)}</span></div><div class="profile-record-grid">${profileField("Order date", `${o.date || "-"} ${o.time || ""}`)}${profileField("Subtotal", money(o.totalPrice))}${profileField("Discount", `${Number(o.discount) || 0}% · ${money(o.orderLevelDiscountAmount || 0)}`)}${profileField("Final total", money(net))}${profileField("Payment", `${o.paymentMethod || "Cash on Delivery"} · ${o.paymentStatus || "Unpaid"}`)}${profileField("Address", address || "-")}${profileField("Created", formatDateTime(o.createdAt))}${profileField("Accepted", formatDateTime(o.acceptedAt))}${profileField("Out for delivery", formatDateTime(o.outWithRepresentativeAt || o.representativeOnWayAt))}${profileField("Delivered", formatDateTime(o.deliveredAt))}</div><div class="profile-record-items">${(o.priceSnapshot || []).map((line, index) => `<div class="profile-record-item"><span>${escapeHtml(line.name || line.modelCode || "Item")}</span><span>Model: ${escapeHtml(line.modelCode || "-")}</span><span>Item: ${escapeHtml(line.itemCode || o.items?.[index] || "-")}</span><span>Size: ${escapeHtml(line.size || "-")}</span><span>Color: ${escapeHtml(line.color || "-")}</span><span>Price: ${escapeHtml(money(line.finalUnitPrice))}</span></div>`).join("") || '<div class="empty-state">No item details</div>'}</div></article>`;
           })
-          .join("") || '<div class="empty-state">No orders yet</div>';
+          .join("") || emptyRecords("No orders yet"));
     }
     renderProfileWaiting();
     const returnList = document.getElementById("profileReturnsList");
     if (returnList) {
-      returnList.innerHTML =
+      returnList.innerHTML = (commerceState === "error" && returns.length ? unavailable : "") + (
         returns
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
           .map((r) => {
@@ -167,7 +185,7 @@
             return `<article class="profile-record-card"><div class="profile-record-head"><strong>${escapeHtml(r.returnId)}</strong><span class="profile-status">${escapeHtml(publicStatus)}</span></div><div class="profile-record-grid">${profileField("Request type", r.requestType || "Return / Exchange")}${profileField("Order ID", r.orderId || "-")}${profileField("Request date", r.date || formatDateTime(r.createdAt))}${profileField("Reason", r.reason || "-")}${profileField("Rejection reason", r.rejectionReason || "-")}${profileField("Model", r.modelId || line.modelCode || "-")}${profileField("Original Item", r.itemCode || "-")}${profileField("Original Size / Color", `${line.size || "-"} / ${line.color || "-"}`)}${profileField("Replacement", replacement)}${profileField("Original net item price", money(Number(r.originalNetAmount) || 0))}${profileField("Refund", money(Number(r.refundAmount) || 0))}${profileField("Courier fee", fee)}${profileField("Pickup address", address)}${profileField("Representative", r.representativeName || "-")}${profileField("Internal progress", r.status || "-")}${profileField("Inspection", returnRules()?.inspectionStatus(r) || r.inspectionStatus || "Pending")}${profileField("Created", formatDateTime(r.createdAt))}${profileField("Completed", formatDateTime(r.completedAt))}${profileField("Inspected", formatDateTime(r.inspectedAt))}${profileField("Notes", r.notes || "-")}</div></article>`;
           })
           .join("") ||
-        '<div class="empty-state">No returns or exchanges yet</div>';
+        emptyRecords("No returns or exchanges yet"));
     }
     const cancel = document.querySelector(".profile-details .cancel-edit");
     if (cancel && !preserveDraft) cancel.remove();

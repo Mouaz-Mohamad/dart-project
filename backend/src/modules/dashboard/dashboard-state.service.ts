@@ -232,10 +232,16 @@ export class DashboardStateService {
     limit?: number;
     entityType?: string;
     entityId?: string;
+    allowedEntityTypes?: string[];
+    allowedDomains?: string[];
   } = {}): Promise<Record<string, unknown>[]> {
     const limit = Math.min(1500, Math.max(1, Number(input.limit) || 500));
     const values: unknown[] = [];
     const conditions: string[] = [];
+    if (input.allowedEntityTypes) {
+      values.push(input.allowedEntityTypes, input.allowedDomains || []);
+      conditions.push(`(entity_type=ANY($${values.length - 1}::text[]) OR (entity_type='dashboard_domain_state' AND entity_id=ANY($${values.length}::text[])))`);
+    }
     if (input.entityType) {
       values.push(input.entityType);
       conditions.push(`entity_type=$${values.length}`);

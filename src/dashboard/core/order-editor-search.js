@@ -48,6 +48,7 @@ function setupOrderModal() {
   document.getElementById("openModalBtn")?.addEventListener("click", () => {
     form.reset();
     document.getElementById("modal-order-edit-id").value = "";
+    delete form.dataset.orderVersion;
     selected = [];
     populate();
     renderSel();
@@ -181,6 +182,7 @@ function setupOrderModal() {
         await window.DartOrdersApi.updateManual(
           existing.orderId || existing.id,
           {
+            expectedVersion: Number(form.dataset.orderVersion),
             ...(selectedClientId && selectedClientId !== "-"
               ? { clientId: selectedClientId }
               : {}),

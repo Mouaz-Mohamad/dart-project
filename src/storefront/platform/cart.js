@@ -87,7 +87,26 @@
     return hydrated;
   }
 
-  async function releaseCartReservation(clearCart = true) {
+  let cartMutationQueue = Promise.resolve();
+  let latestCartMutation = null;
+  let cartMutationSequence = 0;
+  function enqueueCartMutation(operation) {
+    const sequence = ++cartMutationSequence;
+    const pending = cartMutationQueue.then(() => operation(sequence));
+    latestCartMutation = pending;
+    cartMutationQueue = pending.catch(() => undefined);
+    return pending;
+  }
+  async function settleCartMutations() {
+    let pending;
+    // Callers already report/roll back failed edits. A failed edit must not
+    // poison every later quote; checkout also compares the confirmed contents.
+    do { pending = latestCartMutation; await pending?.catch(() => undefined); } while (pending !== latestCartMutation);
+  }
+  function releaseCartReservation(clearCart = true) {
+    return API_BASE ? enqueueCartMutation(sequence => releaseCartReservationNow(clearCart, sequence)) : releaseCartReservationNow(clearCart);
+  }
+  async function releaseCartReservationNow(clearCart = true, sequence) {
     if (API_BASE) {
       try {
         await apiRequest(
@@ -99,7 +118,7 @@
       } catch (error) {
         if (![404, 409].includes(error.status)) throw error;
       }
-      if (clearCart) {
+      if (clearCart && (sequence === undefined || sequence === cartMutationSequence)) {
         write("dart_cart", []);
         if (typeof cartData !== "undefined") cartData = [];
       }
@@ -187,12 +206,24 @@
     timer.textContent = `القطع محجوزة لمدة ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 
-  async function reserveCart(cart) {
+  function reserveCart(cart, { afterReservation } = {}) {
+    const snapshot = cart.map(line => ({ ...line }));
+    const operation = async (sequence) => {
+      const payload = await reserveCartSnapshot(snapshot, sequence);
+      // Set attachment and its rollback belong to the same queued intent.
+      if (typeof afterReservation === "function") {
+        await afterReservation(payload, previous => reserveCartSnapshot(previous.map(line => ({ ...line })), sequence));
+      }
+      return payload;
+    };
+    return API_BASE ? enqueueCartMutation(operation) : operation();
+  }
+  async function reserveCartSnapshot(cart, sequence) {
     invalidateCartQuote();
     if (API_BASE) {
       if (!cart.length) {
-        await releaseCartReservation(false);
-        write("dart_cart", []);
+        await releaseCartReservationNow(false);
+        if (sequence === cartMutationSequence) { write("dart_cart", []); if (typeof cartData !== "undefined") cartData = []; }
         return { expiresAt: null };
       }
       const lines = cart.map((line) => ({
@@ -216,7 +247,10 @@
         line.reservationId = CART_RESERVATION_ID;
         line.reservationUntil = payload.expiresAt;
       });
-      write("dart_cart", cart);
+      if (sequence === cartMutationSequence) {
+        write("dart_cart", cart);
+        if (typeof cartData !== "undefined") cartData = cart;
+      }
       await window.DartCatalog?.checkForServerChanges?.();
       return payload;
     }

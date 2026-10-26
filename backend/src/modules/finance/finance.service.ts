@@ -188,6 +188,17 @@ function uniqueCompletedReturns(
   return [...unique.values()];
 }
 
+function refundAdjustments(row: JsonRow): { amountMinor: number; occurredAt: unknown }[] {
+  const unique = new Map<string, { amountMinor: number; occurredAt: unknown }>();
+  for (const entry of Array.isArray(row.refundAdjustments) ? row.refundAdjustments : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const value = entry as JsonRow;
+    if (typeof value.id !== "string" || !value.id || !Number.isSafeInteger(value.amountMinor) || !dateKey(value.occurredAt)) continue;
+    unique.set(value.id, { amountMinor: Number(value.amountMinor), occurredAt: value.occurredAt });
+  }
+  return [...unique.values()];
+}
+
 export interface FinanceRange { start: string; end: string; }
 
 interface AcquiredItemRow {
@@ -213,9 +224,11 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
   const periodReturns = uniqueCompletedReturns(returns, start, end);
   const refundsRows = periodReturns.filter((row) => !isExchange(row));
   const refundsMinor = refundsRows.reduce(
-    (sum, row) => sum + toMinor(row.refundAmount),
+    (sum, row) => sum + toMinor(row.refundAmount) - refundAdjustments(row).reduce((total, adjustment) => total + adjustment.amountMinor, 0),
     0,
-  );
+  ) + uniqueCompletedReturns(returns, "0001-01-01", "9999-12-31").filter((row) => !isExchange(row))
+    .flatMap(refundAdjustments).filter((adjustment) => inRange(adjustment.occurredAt, start, end))
+    .reduce((sum, adjustment) => sum + adjustment.amountMinor, 0);
 
   const cogsReversalMinor = refundsRows
     .filter((row) => inspection(row) === "Good")
@@ -774,7 +787,7 @@ export class FinanceService {
         `SELECT DISTINCT oi.item_code
            FROM order_items oi
            JOIN orders o ON o.id=oi.order_id
-          WHERE o.status='Delivered' AND NOT o.is_deleted`,
+          WHERE o.status='Delivered'`,
       );
       const deliveredCodes = new Set(
         deliveredCodesResult.rows.map((row) => row.item_code),

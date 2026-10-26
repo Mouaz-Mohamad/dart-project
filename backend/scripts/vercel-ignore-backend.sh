@@ -14,6 +14,8 @@ fi
 
 if git diff --quiet "$base" HEAD -- . \
   ':(exclude)tests/**' \
+  ':(exclude)scripts/verify-restored-store.ts' \
+  ':(exclude)scripts/recovery-schema.ts' \
   ':(exclude)scripts/vercel-ignore-backend.sh'; then
   echo "Skipping API build: no backend runtime changes."
   exit 0

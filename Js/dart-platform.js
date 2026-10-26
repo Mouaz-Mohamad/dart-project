@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:c33c0cdc22ffe1a5ee1fe0cc5cbd8b519f7daa3601574c48927edae040da1239 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:e12bd595c087c6c7bbc7e38a5c4a67bbeebcd38d72eed6926cc4cbaa0a53ff86 */
 (function () {
   "use strict";
 
@@ -35,6 +35,8 @@
   let waitingPromise = null;
   let customerCommercePromise = null;
   let customerCommerceGeneration = 0;
+  let customerCommerceStatus = "idle";
+  let apiSessionUnavailable = false;
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;
@@ -786,6 +788,7 @@
   }
 
   function cacheApiUser(profile) {
+    apiSessionUnavailable = false;
     const previousId = apiUserCache?.id || null;
     apiUserCache = adaptApiUser(profile);
     const nextId = apiUserCache?.id || null;
@@ -793,6 +796,7 @@
       if (typeof invalidateCartQuote === "function") invalidateCartQuote();
       customerCommerceGeneration += 1;
       customerCommercePromise = null;
+      customerCommerceStatus = "idle";
       serverReviewEligible = null;
       serverPurchaseStats = null;
       // The server links this browser's guest history to the authenticated
@@ -810,6 +814,8 @@
     if (customerCommercePromise) return customerCommercePromise;
     const generation = customerCommerceGeneration;
     const customerId = apiUserCache.id;
+    customerCommerceStatus = "loading";
+    if (typeof renderProfile === "function") renderProfile();
     const task = (async () => {
       const payload = await apiRequest("/api/v1/me/commerce");
       if (
@@ -837,6 +843,8 @@
         [KEYS.birthdayMessages, payload.birthdayMessages || []],
       ];
       snapshots.forEach(([key, value]) => { if (JSON.stringify(read(key, [])) !== JSON.stringify(value)) write(key, value); });
+      customerCommerceStatus = "ready";
+      if (typeof renderProfile === "function") renderProfile();
       if (payload.savedAddress) write("user_last_address", payload.savedAddress);
       else window.DartState?.remove?.("user_last_address", { source: "platform" });
       window.dispatchEvent(
@@ -849,6 +857,12 @@
     customerCommercePromise = task;
     try {
       return await task;
+    } catch (error) {
+      if (generation === customerCommerceGeneration && apiUserCache?.id === customerId) {
+        customerCommerceStatus = "error";
+        if (typeof renderProfile === "function") renderProfile();
+      }
+      throw error;
     } finally {
       if (customerCommercePromise === task) customerCommercePromise = null;
     }
@@ -935,6 +949,7 @@
       return user;
     } catch (error) {
       if (error.status === 401) return cacheApiUser(null);
+      apiSessionUnavailable = true;
       throw error;
     }
   }
@@ -1502,6 +1517,7 @@
   }
   async function quoteCart(options = {}) {
     if (!API_BASE || !currentUser()) return null;
+    if (typeof settleCartMutations === "function") await settleCartMutations();
     const signature = cartQuoteSignature();
     if (!options.force && cartQuoteCache?.signature === signature && Date.now() - cartQuoteCache.at < 2000) return cartQuoteCache.quote;
     if (cartQuotePending?.signature === signature) return cartQuotePending.task;
@@ -1560,7 +1576,8 @@
   }
 
   async function checkout(form, options = {}) {
-    cleanupCartReservations();
+    if (typeof settleCartMutations === "function") await settleCartMutations();
+    await cleanupCartReservations();
     const cart =
       typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
     if (!cart.length) {
@@ -1622,6 +1639,20 @@
       const previousQuote = currentCartQuote();
       const previousTotal = window.dartDisplayedTotalMinor;
       const quote = await quoteCart({ force: true });
+      if (!quote.completedOrder) {
+        const quantities = (lines, quoted) => {
+          const totals = new Map();
+          for (const line of lines) {
+            const key = JSON.stringify([String(quoted ? line.modelId : line.id), String(line.color).trim().toLowerCase(), String(line.size).trim().toLowerCase()]);
+            totals.set(key, (totals.get(key) || 0) + (quoted ? 1 : Number(line.quantity)));
+          }
+          return JSON.stringify([...totals].sort(([a], [b]) => a.localeCompare(b)));
+        };
+        if (!Array.isArray(quote.lines) || quantities(cart, false) !== quantities(quote.lines, true)) {
+          if (typeof hydrateCustomerCart === "function") await hydrateCustomerCart({ claimLocal: false });
+          throw Object.assign(new Error("Cart contents changed. Review the refreshed quantities before confirming."), { code: "CART_CONTENT_CHANGED" });
+        }
+      }
       if (!quote.completedOrder && (
         (previousQuote?.fingerprint && previousQuote.fingerprint !== quote.fingerprint) ||
         (Number.isFinite(previousTotal) && previousTotal !== quote.totalMinor)
@@ -2044,7 +2075,26 @@
     return hydrated;
   }
 
-  async function releaseCartReservation(clearCart = true) {
+  let cartMutationQueue = Promise.resolve();
+  let latestCartMutation = null;
+  let cartMutationSequence = 0;
+  function enqueueCartMutation(operation) {
+    const sequence = ++cartMutationSequence;
+    const pending = cartMutationQueue.then(() => operation(sequence));
+    latestCartMutation = pending;
+    cartMutationQueue = pending.catch(() => undefined);
+    return pending;
+  }
+  async function settleCartMutations() {
+    let pending;
+    // Callers already report/roll back failed edits. A failed edit must not
+    // poison every later quote; checkout also compares the confirmed contents.
+    do { pending = latestCartMutation; await pending?.catch(() => undefined); } while (pending !== latestCartMutation);
+  }
+  function releaseCartReservation(clearCart = true) {
+    return API_BASE ? enqueueCartMutation(sequence => releaseCartReservationNow(clearCart, sequence)) : releaseCartReservationNow(clearCart);
+  }
+  async function releaseCartReservationNow(clearCart = true, sequence) {
     if (API_BASE) {
       try {
         await apiRequest(
@@ -2056,7 +2106,7 @@
       } catch (error) {
         if (![404, 409].includes(error.status)) throw error;
       }
-      if (clearCart) {
+      if (clearCart && (sequence === undefined || sequence === cartMutationSequence)) {
         write("dart_cart", []);
         if (typeof cartData !== "undefined") cartData = [];
       }
@@ -2144,12 +2194,24 @@
     timer.textContent = `القطع محجوزة لمدة ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 
-  async function reserveCart(cart) {
+  function reserveCart(cart, { afterReservation } = {}) {
+    const snapshot = cart.map(line => ({ ...line }));
+    const operation = async (sequence) => {
+      const payload = await reserveCartSnapshot(snapshot, sequence);
+      // Set attachment and its rollback belong to the same queued intent.
+      if (typeof afterReservation === "function") {
+        await afterReservation(payload, previous => reserveCartSnapshot(previous.map(line => ({ ...line })), sequence));
+      }
+      return payload;
+    };
+    return API_BASE ? enqueueCartMutation(operation) : operation();
+  }
+  async function reserveCartSnapshot(cart, sequence) {
     invalidateCartQuote();
     if (API_BASE) {
       if (!cart.length) {
-        await releaseCartReservation(false);
-        write("dart_cart", []);
+        await releaseCartReservationNow(false);
+        if (sequence === cartMutationSequence) { write("dart_cart", []); if (typeof cartData !== "undefined") cartData = []; }
         return { expiresAt: null };
       }
       const lines = cart.map((line) => ({
@@ -2173,7 +2235,10 @@
         line.reservationId = CART_RESERVATION_ID;
         line.reservationUntil = payload.expiresAt;
       });
-      write("dart_cart", cart);
+      if (sequence === cartMutationSequence) {
+        write("dart_cart", cart);
+        if (typeof cartData !== "undefined") cartData = cart;
+      }
       await window.DartCatalog?.checkForServerChanges?.();
       return payload;
     }
@@ -3428,13 +3493,31 @@
     });
   }
 
+  document.addEventListener?.("click", (event) => {
+    if (!event.target.closest?.("[data-profile-commerce-retry]")) return;
+    void (async () => {
+      if (!currentUser()) await hydrateApiSession();
+      await hydrateCustomerCommerce();
+      renderProfile();
+    })().catch(() => { renderProfile(); });
+  });
+
   function renderProfile() {
     if (!document.querySelector(".account")) return;
     const user = currentUser();
     if (!user) {
+      if (typeof apiSessionUnavailable !== "undefined" && apiSessionUnavailable) {
+        const host = document.getElementById("profileOrdersList");
+        if (host) host.innerHTML = '<div class="empty-state" role="status">Your session could not be verified. <button type="button" data-profile-commerce-retry>Retry</button></div>';
+        return;
+      }
       location.replace("Sign Up modern.html?next=profile");
       return;
     }
+    const commerceState = typeof customerCommerceStatus === "string" ? customerCommerceStatus : "ready";
+    const unavailable = '<div class="empty-state" role="status">Account records could not be refreshed. <button type="button" data-profile-commerce-retry>Retry</button></div>';
+    const emptyRecords = (message) => commerceState === "error" ? unavailable :
+      ["loading", "idle"].includes(commerceState) ? '<div class="empty-state" role="status">Loading account records...</div>' : `<div class="empty-state">${message}</div>`;
     const profileEdit = document.querySelector(".profile-details .edit");
     const preserveDraft = profileEdit?.dataset.mode === "edit" && profileEdit.dataset.customerId === String(user.id);
     const customer = syncCustomer(user),
@@ -3545,7 +3628,7 @@
     cardElement?.classList.toggle("is-inactive", cardStatus !== "Active");
     const orderList = document.getElementById("profileOrdersList");
     if (orderList) {
-      orderList.innerHTML =
+      orderList.innerHTML = (commerceState === "error" && orders.length ? unavailable : "") + (
         orders
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
           .map((o) => {
@@ -3557,12 +3640,12 @@
                   .join(", ");
             return `<article class="profile-record-card"><div class="profile-record-head"><strong>${escapeHtml(o.orderId)}</strong><span class="profile-status">${escapeHtml(o.status)}</span></div><div class="profile-record-grid">${profileField("Order date", `${o.date || "-"} ${o.time || ""}`)}${profileField("Subtotal", money(o.totalPrice))}${profileField("Discount", `${Number(o.discount) || 0}% · ${money(o.orderLevelDiscountAmount || 0)}`)}${profileField("Final total", money(net))}${profileField("Payment", `${o.paymentMethod || "Cash on Delivery"} · ${o.paymentStatus || "Unpaid"}`)}${profileField("Address", address || "-")}${profileField("Created", formatDateTime(o.createdAt))}${profileField("Accepted", formatDateTime(o.acceptedAt))}${profileField("Out for delivery", formatDateTime(o.outWithRepresentativeAt || o.representativeOnWayAt))}${profileField("Delivered", formatDateTime(o.deliveredAt))}</div><div class="profile-record-items">${(o.priceSnapshot || []).map((line, index) => `<div class="profile-record-item"><span>${escapeHtml(line.name || line.modelCode || "Item")}</span><span>Model: ${escapeHtml(line.modelCode || "-")}</span><span>Item: ${escapeHtml(line.itemCode || o.items?.[index] || "-")}</span><span>Size: ${escapeHtml(line.size || "-")}</span><span>Color: ${escapeHtml(line.color || "-")}</span><span>Price: ${escapeHtml(money(line.finalUnitPrice))}</span></div>`).join("") || '<div class="empty-state">No item details</div>'}</div></article>`;
           })
-          .join("") || '<div class="empty-state">No orders yet</div>';
+          .join("") || emptyRecords("No orders yet"));
     }
     renderProfileWaiting();
     const returnList = document.getElementById("profileReturnsList");
     if (returnList) {
-      returnList.innerHTML =
+      returnList.innerHTML = (commerceState === "error" && returns.length ? unavailable : "") + (
         returns
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
           .map((r) => {
@@ -3597,7 +3680,7 @@
             return `<article class="profile-record-card"><div class="profile-record-head"><strong>${escapeHtml(r.returnId)}</strong><span class="profile-status">${escapeHtml(publicStatus)}</span></div><div class="profile-record-grid">${profileField("Request type", r.requestType || "Return / Exchange")}${profileField("Order ID", r.orderId || "-")}${profileField("Request date", r.date || formatDateTime(r.createdAt))}${profileField("Reason", r.reason || "-")}${profileField("Rejection reason", r.rejectionReason || "-")}${profileField("Model", r.modelId || line.modelCode || "-")}${profileField("Original Item", r.itemCode || "-")}${profileField("Original Size / Color", `${line.size || "-"} / ${line.color || "-"}`)}${profileField("Replacement", replacement)}${profileField("Original net item price", money(Number(r.originalNetAmount) || 0))}${profileField("Refund", money(Number(r.refundAmount) || 0))}${profileField("Courier fee", fee)}${profileField("Pickup address", address)}${profileField("Representative", r.representativeName || "-")}${profileField("Internal progress", r.status || "-")}${profileField("Inspection", returnRules()?.inspectionStatus(r) || r.inspectionStatus || "Pending")}${profileField("Created", formatDateTime(r.createdAt))}${profileField("Completed", formatDateTime(r.completedAt))}${profileField("Inspected", formatDateTime(r.inspectedAt))}${profileField("Notes", r.notes || "-")}</div></article>`;
           })
           .join("") ||
-        '<div class="empty-state">No returns or exchanges yet</div>';
+        emptyRecords("No returns or exchanges yet"));
     }
     const cancel = document.querySelector(".profile-details .cancel-edit");
     if (cancel && !preserveDraft) cancel.remove();

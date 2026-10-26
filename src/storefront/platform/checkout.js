@@ -31,6 +31,7 @@
   }
   async function quoteCart(options = {}) {
     if (!API_BASE || !currentUser()) return null;
+    if (typeof settleCartMutations === "function") await settleCartMutations();
     const signature = cartQuoteSignature();
     if (!options.force && cartQuoteCache?.signature === signature && Date.now() - cartQuoteCache.at < 2000) return cartQuoteCache.quote;
     if (cartQuotePending?.signature === signature) return cartQuotePending.task;
@@ -89,7 +90,8 @@
   }
 
   async function checkout(form, options = {}) {
-    cleanupCartReservations();
+    if (typeof settleCartMutations === "function") await settleCartMutations();
+    await cleanupCartReservations();
     const cart =
       typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
     if (!cart.length) {
@@ -151,6 +153,20 @@
       const previousQuote = currentCartQuote();
       const previousTotal = window.dartDisplayedTotalMinor;
       const quote = await quoteCart({ force: true });
+      if (!quote.completedOrder) {
+        const quantities = (lines, quoted) => {
+          const totals = new Map();
+          for (const line of lines) {
+            const key = JSON.stringify([String(quoted ? line.modelId : line.id), String(line.color).trim().toLowerCase(), String(line.size).trim().toLowerCase()]);
+            totals.set(key, (totals.get(key) || 0) + (quoted ? 1 : Number(line.quantity)));
+          }
+          return JSON.stringify([...totals].sort(([a], [b]) => a.localeCompare(b)));
+        };
+        if (!Array.isArray(quote.lines) || quantities(cart, false) !== quantities(quote.lines, true)) {
+          if (typeof hydrateCustomerCart === "function") await hydrateCustomerCart({ claimLocal: false });
+          throw Object.assign(new Error("Cart contents changed. Review the refreshed quantities before confirming."), { code: "CART_CONTENT_CHANGED" });
+        }
+      }
       if (!quote.completedOrder && (
         (previousQuote?.fingerprint && previousQuote.fingerprint !== quote.fingerprint) ||
         (Number.isFinite(previousTotal) && previousTotal !== quote.totalMinor)

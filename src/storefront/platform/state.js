@@ -33,6 +33,8 @@
   let waitingPromise = null;
   let customerCommercePromise = null;
   let customerCommerceGeneration = 0;
+  let customerCommerceStatus = "idle";
+  let apiSessionUnavailable = false;
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;

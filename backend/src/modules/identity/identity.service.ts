@@ -357,18 +357,26 @@ export class IdentityService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const owner = await client.query<{ status: string; deleted_at: Date | null }>(
+        `SELECT status,deleted_at FROM users WHERE id=(
+          SELECT user_id FROM email_verification_challenges WHERE id=$1) FOR UPDATE`, [previousChallengeId],
+      );
+      if (!owner.rows[0] || owner.rows[0].status !== "pending_verification" || owner.rows[0].deleted_at) {
+        throw new AppError(422, "VERIFICATION_NOT_AVAILABLE", "Verification cannot be resent for this challenge");
+      }
       const user = await client.query<{
         id: string;
         email: string;
         status: string;
         consumed_at: Date | null;
+        purpose: "register" | "change_email";
       }>(
         `SELECT users.id, users.email, users.status,
-          email_verification_challenges.consumed_at
+          email_verification_challenges.consumed_at,email_verification_challenges.purpose
          FROM email_verification_challenges
          JOIN users ON users.id = email_verification_challenges.user_id
          WHERE email_verification_challenges.id = $1
-           AND email_verification_challenges.purpose = 'register'
+           AND email_verification_challenges.purpose IN ('register','change_email')
            AND users.account_type = 'customer' AND users.deleted_at IS NULL
          FOR UPDATE OF email_verification_challenges`,
         [previousChallengeId],
@@ -385,31 +393,33 @@ export class IdentityService {
       const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
       const expiresAt = new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000);
       const encryptedOtp = encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64");
+      const changingEmail = row.purpose === "change_email";
       await client.query(
         `UPDATE email_verification_challenges SET consumed_at = now()
-         WHERE user_id = $1 AND purpose = 'register' AND consumed_at IS NULL`,
-        [row.id],
+         WHERE user_id = $1 AND purpose = $2 AND consumed_at IS NULL`,
+        [row.id, row.purpose],
       );
       await client.query(
         `INSERT INTO email_verification_challenges
           (id, user_id, purpose, code_hash, expires_at)
-         VALUES ($1, $2, 'register', $3, $4)`,
-        [challengeId, row.id, digest(`email-otp:${challengeId}:${otp}`, this.config.authPepper), expiresAt],
+         VALUES ($1, $2, $3, $4, $5)`,
+        [challengeId, row.id, row.purpose, digest(`email-otp:${challengeId}:${otp}`, this.config.authPepper), expiresAt],
       );
       await client.query(
         `INSERT INTO outbox_events (
           aggregate_type, aggregate_id, event_type, payload, deduplication_key
-        ) VALUES ('user', $1, 'EMAIL_VERIFICATION_REQUESTED', $2::jsonb, $3)`,
+        ) VALUES ('user', $1, $2, $3::jsonb, $4)`,
         [
           row.id,
+          changingEmail ? "EMAIL_CHANGE_VERIFICATION_REQUESTED" : "EMAIL_VERIFICATION_REQUESTED",
           JSON.stringify({
             channel: "email",
             to: row.email,
-            template: "customer_email_verification",
+            template: changingEmail ? "customer_email_change_verification" : "customer_email_verification",
             encryptedParameters: { otp: encryptedOtp },
             expiresAt: expiresAt.toISOString(),
           }),
-          `email-verification:${challengeId}`,
+          `${changingEmail ? "email-change-verification" : "email-verification"}:${challengeId}`,
         ],
       );
       await this.audit(client, "customer", row.id, "EMAIL_VERIFICATION_RESENT", "users", row.id, metadata);
@@ -2186,7 +2196,6 @@ export class IdentityService {
             SET email=$2,
                 email_normalized=$3,
                 email_verified_at=now(),
-                status=CASE WHEN status='deleted' THEN status ELSE 'active' END,
                 session_version=session_version + CASE WHEN $4 THEN 1 ELSE 0 END,
                 version=version+1,
                 updated_at=now()
