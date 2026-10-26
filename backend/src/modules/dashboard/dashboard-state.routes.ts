@@ -155,7 +155,29 @@ export function createDashboardStateRouter(
         limit?: number;
         entityType?: string;
         entityId?: string;
+        allowedEntityTypes?: string[];
+        allowedDomains?: string[];
       } = {};
+      // Full platform control can inspect the complete audit. Other roles see
+      // only the domains they may read, including command-result snapshots.
+      if (!request.auth!.permissions.includes("platform.reset")) {
+        const permissions = request.auth!.permissions;
+        const domains = readableDomains(permissions);
+        const resources: Record<string, string[]> = {
+          orders: ["orders.read"], order_items: ["orders.read"],
+          users: ["staff.read"], sessions: ["staff.read"], password_reset_requests: ["staff.read"],
+          staff_users: ["staff.read"], staff_invitations: ["staff.read"], staff_access: ["staff.read"],
+          catalog_inventory: ["catalog.read", "catalog.manage"], catalog_models: ["catalog.read", "catalog.manage"],
+          inventory_items: ["catalog.read", "catalog.manage"], catalog_assets: ["catalog.read", "catalog.manage"],
+          catalog_sets: ["catalog.read", "catalog.manage"], site_settings: ["settings.manage"],
+          news: ["news.read", "news.manage"], outbox_events: ["messaging.read"],
+        };
+        auditInput.allowedEntityTypes = [...new Set([
+          ...domains,
+          ...Object.entries(resources).filter(([, grants]) => grants.some(grant => permissions.includes(grant))).map(([entity]) => entity),
+        ])];
+        auditInput.allowedDomains = domains;
+      }
       if (query.limit !== undefined) auditInput.limit = query.limit;
       if (query.entityType !== undefined) auditInput.entityType = query.entityType;
       if (query.entityId !== undefined) auditInput.entityId = query.entityId;

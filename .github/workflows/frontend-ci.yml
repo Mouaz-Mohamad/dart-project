@@ -96,6 +96,7 @@ jobs:
           node tests/catalog-category-contract.js
           node tests/council-browser-runtime.cjs
           node tests/council-third-runtime.cjs
+          node tests/council-fourth-runtime.cjs
           node tests/dart-finance-unit.js
           node tests/finance-dashboard-contract.js
           node tests/finance-persistence-contract.js

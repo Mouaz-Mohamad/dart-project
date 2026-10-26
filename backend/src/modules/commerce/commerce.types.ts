@@ -11,6 +11,7 @@ export interface CartLineInput {
 export interface OrderResponseOptions {
   responseMode: "delta";
   baseVersion: number;
+  suppressOrders?: boolean;
 }
 
 export interface AdminOrdersState {

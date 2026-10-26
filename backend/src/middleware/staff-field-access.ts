@@ -24,11 +24,12 @@ export const staffFieldAccess: RequestHandler = (request, response, next) => {
             return json.call(this, body);
         const permissions = request.auth.permissions;
         const catalog = /^\/api\/v1\/admin\/catalog-state(?:\/|\?|$)/i.test(request.originalUrl);
+        const audit = /^\/api\/v1\/admin\/audit(?:\/|\?|$)/i.test(request.originalUrl);
         const costs = canReadCosts(permissions);
         const profit = ["finance.read", "finance.manage", "finance.view_profit"].some(key => permissions.includes(key));
         // Order/contact permissions have their own purpose; private catalog reads need
         // an explicit customer grant before attaching a buyer's identity to inventory.
-        const buyers = !catalog || permissions.includes("customers.read");
+        const buyers = !(catalog || audit) || permissions.includes("customers.read");
         if (costs && profit && buyers)
             return json.call(this, body);
         return json.call(this, project(body, costs, profit, buyers));

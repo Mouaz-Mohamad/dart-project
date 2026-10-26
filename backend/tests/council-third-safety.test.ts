@@ -48,6 +48,37 @@ describe("third Council account and delivery regressions", () => {
     expect(await identity.authenticate(id!, secret!)).toMatchObject({ userId: f.session.account.userId });
   });
 
+  it("resends an expired email-change challenge with the original purpose and verifies its replacement only", async () => {
+    const f = await emailChange();
+    await store.pool.query("UPDATE email_verification_challenges SET created_at=now()-interval '20 minutes',expires_at=now()-interval '1 minute' WHERE id=$1", [f.challenge]);
+    const replacement = await identity.resendCustomerVerification(f.challenge, metadata);
+    expect(replacement.challengeId).not.toBe(f.challenge);
+    const challenge = (await store.pool.query("SELECT purpose FROM email_verification_challenges WHERE id=$1", [replacement.challengeId])).rows[0];
+    expect(challenge.purpose).toBe("change_email");
+    const event = (await store.pool.query("SELECT event_type,payload FROM outbox_events WHERE deduplication_key=$1", [`email-change-verification:${replacement.challengeId}`])).rows[0];
+    expect(event.event_type).toBe("EMAIL_CHANGE_VERIFICATION_REQUESTED"); expect(event.payload.template).toBe("customer_email_change_verification");
+    await expect(identity.verifyCustomerEmail(f.challenge, f.code, metadata)).rejects.toMatchObject({ code: "OTP_INVALID" });
+    const code = decryptSecret(Buffer.from(event.payload.encryptedParameters.otp, "base64"), config.mfaEncryptionKey);
+    expect((await identity.verifyCustomerEmail(replacement.challengeId, code, metadata)).account.status).toBe("active");
+    await expect(identity.resendCustomerVerification(replacement.challengeId, metadata)).rejects.toMatchObject({ code: "VERIFICATION_NOT_AVAILABLE" });
+  });
+
+  it("does not activate a suspended customer when an administrator corrects their name", async () => {
+    const f = await register();
+    await identity.adminSetAccountState(actor, f.session.account.userId, "customer", "suspend", metadata);
+    const email = (await store.pool.query("SELECT email FROM users WHERE id=$1", [f.session.account.userId])).rows[0].email as string;
+    await identity.adminUpdateCustomer(actor, f.session.account.userId, { name: "Corrected Name", email, phone1: f.phone, birthday: "2000-01-02" }, metadata);
+    expect((await store.pool.query("SELECT status FROM users WHERE id=$1", [f.session.account.userId])).rows[0].status).toBe("suspended");
+    await expect(identity.login("customer", email, "SyntheticPassword123", metadata)).rejects.toMatchObject({ code: "ACCOUNT_UNAVAILABLE" });
+  });
+
+  it.each(["suspend", "delete"] as const)("cannot resend a pending challenge after %s", async (action) => {
+    const f = await emailChange();
+    if (action === "suspend") await store.pool.query("UPDATE users SET status='active',email_verified_at=now() WHERE id=$1", [f.session.account.userId]);
+    await identity.adminSetAccountState(actor, f.session.account.userId, "customer", action, metadata);
+    await expect(identity.resendCustomerVerification(f.challenge, metadata)).rejects.toMatchObject({ code: "VERIFICATION_NOT_AVAILABLE" });
+  });
+
   it("invalidates pending verification and sessions on deletion and never revives the identity", async () => {
     const f = await emailChange();
     await identity.adminSetAccountState(actor, f.session.account.userId, "customer", "delete", metadata);
@@ -144,5 +175,21 @@ describe("third Council account and delivery regressions", () => {
     const service = new OutboxService(store.pool, config, { configured: () => true, send: async () => { throw new Error("Must not send"); } });
     expect(await service.processBatch(1, id)).toMatchObject({ claimed: 0 });
     expect((await service.health()).uncertain).toBe(3);
+  });
+
+  it("measures due backlog from availability time and separates scheduled and freshly executing work", async () => {
+    const scheduled = await event();
+    await store.pool.query("UPDATE outbox_events SET created_at=now()-interval '3 days',available_at=now()+interval '1 day' WHERE id=$1", [scheduled]);
+    const service = new OutboxService(store.pool, config, { configured: () => true, send: async () => { throw new Error("Must not send"); } });
+    const baseline = await service.health(); expect(baseline.duePending).toBe(0);
+    const due = await event();
+    await store.pool.query("UPDATE outbox_events SET available_at=now()-interval '16 minutes' WHERE id=$1", [due]);
+    expect(await service.health()).toMatchObject({ duePending: 1, uncertain: baseline.uncertain });
+    expect((await service.health()).oldestDueSeconds).toBeGreaterThanOrEqual(960);
+    const attempt = randomUUID();
+    await store.pool.query("INSERT INTO outbox_delivery_attempts(id,event_id,state) VALUES($1,$2,'executing')", [attempt, due]);
+    expect(await service.health()).toMatchObject({ duePending: 0, uncertain: baseline.uncertain });
+    await store.pool.query("UPDATE outbox_delivery_attempts SET updated_at=now()-interval '6 minutes' WHERE id=$1", [attempt]);
+    expect((await service.health()).uncertain).toBe(baseline.uncertain! + 1);
   });
 });

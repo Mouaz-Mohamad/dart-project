@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:50e18ef22fe30c63702276633a11fe4824b1e77fb66b72688ff3f893c5c1d54f */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:a1491069f817b1c953de5e0e3b6ecc35c9cf94ed34bd2feafb5bbd5a9191ae4e */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -5265,6 +5265,7 @@ function openEditModal(id, sectionKey) {
     return;
   }
   if (sectionKey === "returns") {
+    document.getElementById("return-form").dataset.returnUpdatedAt = String(x.updatedAt || x.completedAt || x.createdAt || "");
     document.getElementById("modal-return-edit-id").value = x.id;
     document.getElementById("modal-return-name").value = x.clientName || "";
     document.getElementById("modal-return-item-code").value = x.itemCode || "";
@@ -5272,12 +5273,8 @@ function openEditModal(id, sectionKey) {
     document.getElementById("modal-return-model-id").value = x.modelId || "";
     document.getElementById("modal-return-phone2").value = x.phone2 || "";
     document.getElementById("modal-return-email").value = x.email || "";
-    document.getElementById("modal-item-condition").value = [
-      "Good",
-      "Bad",
-    ].includes(x.status)
-      ? x.status
-      : "Good";
+    document.getElementById("modal-item-condition").value =
+      ["Bad", "Damaged"].includes(x.condition || x.inspectionStatus || x.status) ? "Bad" : "Good";
     document.getElementById("modal-item-reason").value = x.reason || "سبب آخر";
     if (document.getElementById("modal-return-refund"))
       document.getElementById("modal-return-refund").value =
@@ -5309,6 +5306,7 @@ function openEditModal(id, sectionKey) {
     return;
   }
   if (sectionKey === "orders") {
+    document.getElementById("orderForm").dataset.orderVersion = String(x.version || 0);
     document.getElementById("modal-order-edit-id").value = x.id;
     document.getElementById("clientName").value = x.clientName || "";
     document.getElementById("clientId").value = x.clientId || "";
@@ -5527,6 +5525,7 @@ function setupOrderModal() {
   document.getElementById("openModalBtn")?.addEventListener("click", () => {
     form.reset();
     document.getElementById("modal-order-edit-id").value = "";
+    delete form.dataset.orderVersion;
     selected = [];
     populate();
     renderSel();
@@ -5660,6 +5659,7 @@ function setupOrderModal() {
         await window.DartOrdersApi.updateManual(
           existing.orderId || existing.id,
           {
+            expectedVersion: Number(form.dataset.orderVersion),
             ...(selectedClientId && selectedClientId !== "-"
               ? { clientId: selectedClientId }
               : {}),
@@ -6125,6 +6125,7 @@ function setupReturnModal() {
   document.getElementById("add-return-btn")?.addEventListener("click", () => {
     form.reset();
     document.getElementById("modal-return-edit-id").value = "";
+    form.dataset.returnUpdatedAt = "";
     openModal(modal);
   });
 
@@ -6181,7 +6182,7 @@ function setupReturnModal() {
     const condition =
       document.getElementById("modal-item-condition").value || "Good";
     const payload = {
-      ...(id ? { existingReturnId: id } : {}),
+      ...(id ? { existingReturnId: id, expectedUpdatedAt: form.dataset.returnUpdatedAt || "" } : {}),
       itemCode: code,
       reason: document.getElementById("modal-item-reason").value || "Other",
       condition: condition === "Bad" ? "Bad" : "Good",

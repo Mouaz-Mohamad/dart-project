@@ -256,7 +256,9 @@
     return runAuthoritativeMutation("/api/v1/admin/orders", order, ["__manual_create__"]);
   }
   function updateManual(orderRef, order) {
-    return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}`, order, [orderRef], false, "PATCH");
+    const version = order.expectedVersion ?? confirmedOrders.find(row =>
+      [row.id, row.orderId].map(String).includes(String(orderRef)))?.version;
+    return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}`, { ...order, expectedVersion: version }, [orderRef], false, "PATCH");
   }
   async function check() {
     if (!adminPollingEnabled || document.hidden) return;

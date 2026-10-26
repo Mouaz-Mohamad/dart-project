@@ -3011,6 +3011,7 @@ export class CommerceService {
     actorId: string,
     input: {
       existingReturnId?: string | undefined;
+      expectedUpdatedAt?: string | undefined;
       itemCode: string;
       reason: string;
       condition: "Good" | "Bad";
@@ -3103,6 +3104,11 @@ export class CommerceService {
         throw new AppError(404, "RETURN_NOT_FOUND", "The return being edited no longer exists");
       }
 
+      if (existing && input.expectedUpdatedAt !== undefined &&
+          input.expectedUpdatedAt !== String(existing.updatedAt || existing.completedAt || existing.createdAt || "")) {
+        throw new AppError(409, "RETURN_VERSION_CONFLICT", "The return changed after this form was opened. Reload it before saving.");
+      }
+
       if (existing && !existing.manualAdmin) {
         throw new AppError(
           409,
@@ -3141,6 +3147,9 @@ export class CommerceService {
         [item.order_item_id],
       );
       if (setLine.rowCount) requestedRefundMinor = Number(item.line_final_minor || 0);
+      if (existing && requestedRefundMinor !== previousRefundMinor && !input.expectedUpdatedAt) {
+        throw new AppError(409, "RETURN_VERSION_REQUIRED", "Reload the return before changing its refund amount.");
+      }
       const currentRefundedMinor = Number(item.amount_refunded_minor || 0);
       const baseWithoutThisReturn = Math.max(0, currentRefundedMinor - previousRefundMinor);
       const maxRemainingMinor = Math.max(0, Math.min(
@@ -3175,7 +3184,8 @@ export class CommerceService {
         returnId = `R-${seq.rows[0]!.value}`;
       }
       const recordId = String(existing?.id || randomUUID());
-      const now = new Date().toISOString();
+      const priorUpdatedAt = new Date(String(existing?.updatedAt || "")).getTime();
+      const now = new Date(Math.max(Date.now(), Number.isFinite(priorUpdatedAt) ? priorUpdatedAt + 1 : 0)).toISOString();
       const condition = input.condition === "Bad" ? "Damaged" : "Good";
       const contact = item.contact_snapshot || {};
 
@@ -3183,6 +3193,14 @@ export class CommerceService {
         condition: existing.condition || existing.inspectionStatus || "",
         refundAmount: Number(existing.refundAmount || 0),
       } : {};
+      const refundAdjustments = Array.isArray(existing?.refundAdjustments)
+        ? [...existing.refundAdjustments] : [];
+      if (existing && requestedRefundMinor !== previousRefundMinor) {
+        // Financial corrections are new dated postings. Never move or rewrite
+        // the completed return's original posting in a closed period.
+        refundAdjustments.push({ id: randomUUID(), amountMinor: requestedRefundMinor - previousRefundMinor,
+          occurredAt: now, actorId, reason: input.reason });
+      }
       const record: Record<string, unknown> = existing || {};
       Object.assign(record, {
         id: recordId,
@@ -3206,10 +3224,11 @@ export class CommerceService {
         orderItemId: item.order_item_id,
         isPostDeliveryReturn: true,
         refundAmount: requestedRefundMinor / 100,
+        refundAdjustments,
         originalNetAmount: Number(item.line_final_minor || 0) / 100,
         financialCompletionApplied: requestedRefundMinor > 0,
-        inspectedAt: now,
-        completedAt: now,
+        inspectedAt: String(existing?.inspectedAt || existing?.completedAt || now),
+        completedAt: String(existing?.completedAt || existing?.createdAt || now),
         updatedAt: now,
         isArchived: Boolean(existing?.isArchived),
         isDeleted: false,
@@ -4000,7 +4019,6 @@ export class CommerceService {
             WHERE order_code=$1
               AND status='Delivered'
               AND NOT is_deleted
-              AND NOT is_archived
             FOR UPDATE`,
           [orderCode],
         );
@@ -4177,6 +4195,7 @@ export class CommerceService {
             throw new AppError(409, "EXCHANGE_ORDER_LINE_NOT_FOUND", "Original order line could not be updated");
           }
           record.exchangeCompletionApplied = true;
+          await client.query("UPDATE orders SET version=version+1,updated_at=now() WHERE id=$1", [order.id]);
           record.exchangeHistoryEntry = {
             fromItemCode: itemCode,
             toItemCode: replacement.item_code,
@@ -4201,6 +4220,9 @@ export class CommerceService {
 
         await client.query(
           "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
+        );
+        await client.query(
+          "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders'",
         );
       }
 
@@ -4294,6 +4316,7 @@ export class CommerceService {
     orderIds: string[] = [],
     customerIds: string[] = [],
   ): Promise<AdminOrdersState> {
+    if (responseOptions?.suppressOrders) return { version, orders: [] };
     try {
       if (!responseOptions) return await this.adminOrders();
       const baseVersion = responseOptions.baseVersion;
@@ -4670,6 +4693,7 @@ export class CommerceService {
     actorId: string,
     orderRef: string,
     input: {
+      expectedVersion?: number | undefined;
       clientId?: string | undefined;
       clientName: string;
       phone1: string;
@@ -4720,12 +4744,13 @@ export class CommerceService {
         delivery_notes: string;
         order_source: string;
         legacy: Record<string, unknown> | null;
+        version: string;
       }>(
         `SELECT id::text, order_code, status, subtotal_minor::text,
                 order_discount_minor::text, final_minor::text,
                 delivery_cost_minor::text, customer_user_id::text, promotion,
                 payment_method,payment_status,amount_paid_minor::text,amount_refunded_minor::text,
-                contact_snapshot,delivery_address,delivery_notes,order_source,legacy,
+                contact_snapshot,delivery_address,delivery_notes,order_source,legacy,version::text,
                 EXISTS(SELECT 1 FROM order_set_groups g WHERE g.order_id=orders.id) AS has_set_groups
            FROM orders
           WHERE (id::text=$1 OR order_code=$1)
@@ -4736,6 +4761,9 @@ export class CommerceService {
       const existing = existingResult.rows[0];
       if (!existing) {
         throw new AppError(404, "ORDER_NOT_FOUND", "Order not found");
+      }
+      if (input.expectedVersion !== undefined && input.expectedVersion !== Number(existing.version)) {
+        throw new AppError(409, "ORDER_VERSION_CONFLICT", "The order changed after this form was opened; refresh it before saving");
       }
 
       const itemCodes = [...new Set(
@@ -4830,6 +4858,27 @@ export class CommerceService {
         amountPaidMinor,
         Math.max(0, Math.round(input.amountRefunded === undefined ? Number(existing.amount_refunded_minor) : input.amountRefunded * 100)),
       );
+      if ((amountPaidMinor !== Number(existing.amount_paid_minor) ||
+          amountRefundedMinor !== Number(existing.amount_refunded_minor) ||
+          (input.paymentStatus !== undefined && input.paymentStatus !== existing.payment_status)) && input.expectedVersion === undefined) {
+        throw new AppError(409, "ORDER_VERSION_REQUIRED", "Payment changes require the current order version");
+      }
+      const postedRefunds = await client.query<{ amount: string }>(
+        `SELECT COALESCE(sum(CASE WHEN COALESCE(payload->>'refundAmount','0') ~ '^[0-9]+([.][0-9]+)?$'
+          THEN round((payload->>'refundAmount')::numeric*100) ELSE 0 END),0)::text AS amount
+          FROM return_requests WHERE order_code=$1
+          AND lower(request_type) IN ('refund','return')
+          AND COALESCE(payload->>'isPostDeliveryReturn','false')='true'
+          AND (COALESCE(payload->>'completedAt','')<>'' OR lower(status) IN ('completed','good','damaged','bad'))`,
+        [existing.order_code],
+      );
+      if (amountRefundedMinor < Number(postedRefunds.rows[0]?.amount || 0)) {
+        throw new AppError(409, "ORDER_REFUND_LEDGER_CONFLICT", "The order cannot erase a completed refund; use the return workflow to correct its record");
+      }
+      if (amountRefundedMinor > 0 && input.paymentStatus !== undefined &&
+          !["Refunded", "Partially Refunded"].includes(input.paymentStatus)) {
+        throw new AppError(422, "ORDER_PAYMENT_STATE_INVALID", "A refunded order must retain its refund payment status");
+      }
 
       const contact = {
         name: String(input.clientName || "").trim(),
@@ -5363,6 +5412,7 @@ export class CommerceService {
       notes?: string | undefined;
     },
     requestId: string,
+    responseOptions?: OrderResponseOptions,
   ): Promise<{
     version: number;
     orders: Record<string, unknown>[];
@@ -5431,7 +5481,7 @@ export class CommerceService {
       }
     }
 
-    const state = await this.ordersAfterCommit(0);
+    const state = await this.ordersAfterCommit(0, responseOptions);
     return {
       ...state,
       result: {

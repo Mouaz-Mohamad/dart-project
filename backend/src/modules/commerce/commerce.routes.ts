@@ -30,6 +30,9 @@ function orderResponseOptions(request: Request): OrderResponseOptions | undefine
     responseMode: z.literal("delta").optional(),
     baseVersion: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
   }).parse(request.query);
+  if (!request.auth!.permissions.includes("orders.read")) {
+    return { responseMode: "delta", baseVersion: query.baseVersion ?? 0, suppressOrders: true };
+  }
   if (!query.responseMode) return undefined;
   return { responseMode: query.responseMode, baseVersion: query.baseVersion ?? 0 };
 }
@@ -362,6 +365,7 @@ export function createCommerceRouter(
           request.auth!.userId,
           body,
           String(request.id),
+          orderResponseOptions(request),
         ),
       );
       await dispatchOutbox(outbox, 10);
@@ -432,6 +436,7 @@ export function createCommerceRouter(
     async (request, response) => {
       const body = z.object({
         existingReturnId: z.string().trim().min(1).max(120).optional(),
+        expectedUpdatedAt: z.string().trim().min(1).max(64).optional(),
         itemCode: z.string().trim().min(1).max(120),
         reason: z.string().trim().min(1).max(500),
         condition: z.enum(["Good", "Bad"]),
@@ -440,6 +445,8 @@ export function createCommerceRouter(
         phone1: z.string().trim().max(40).optional(),
         phone2: z.string().trim().max(40).optional(),
         email: z.string().trim().email().max(320).optional(),
+      }).refine((value) => !value.existingReturnId || Boolean(value.expectedUpdatedAt), {
+        message: "Reload the return before editing it", path: ["expectedUpdatedAt"],
       }).parse(request.body);
       response.status(200).json({
         return: await commerce.adminManualReturn(
@@ -538,6 +545,7 @@ export function createCommerceRouter(
     async (request, response) => {
       const orderRef = z.string().trim().min(1).max(120).parse(request.params.orderRef);
       const body = z.object({
+        expectedVersion: z.number().int().min(1),
         clientId: z.string().trim().max(120).optional(),
         clientName: z.string().trim().min(2).max(160),
         phone1: z.string().trim().min(7).max(40),

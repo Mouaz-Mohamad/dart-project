@@ -18,6 +18,7 @@
   }
 
   function cacheApiUser(profile) {
+    apiSessionUnavailable = false;
     const previousId = apiUserCache?.id || null;
     apiUserCache = adaptApiUser(profile);
     const nextId = apiUserCache?.id || null;
@@ -25,6 +26,7 @@
       if (typeof invalidateCartQuote === "function") invalidateCartQuote();
       customerCommerceGeneration += 1;
       customerCommercePromise = null;
+      customerCommerceStatus = "idle";
       serverReviewEligible = null;
       serverPurchaseStats = null;
       // The server links this browser's guest history to the authenticated
@@ -42,6 +44,8 @@
     if (customerCommercePromise) return customerCommercePromise;
     const generation = customerCommerceGeneration;
     const customerId = apiUserCache.id;
+    customerCommerceStatus = "loading";
+    if (typeof renderProfile === "function") renderProfile();
     const task = (async () => {
       const payload = await apiRequest("/api/v1/me/commerce");
       if (
@@ -69,6 +73,8 @@
         [KEYS.birthdayMessages, payload.birthdayMessages || []],
       ];
       snapshots.forEach(([key, value]) => { if (JSON.stringify(read(key, [])) !== JSON.stringify(value)) write(key, value); });
+      customerCommerceStatus = "ready";
+      if (typeof renderProfile === "function") renderProfile();
       if (payload.savedAddress) write("user_last_address", payload.savedAddress);
       else window.DartState?.remove?.("user_last_address", { source: "platform" });
       window.dispatchEvent(
@@ -81,6 +87,12 @@
     customerCommercePromise = task;
     try {
       return await task;
+    } catch (error) {
+      if (generation === customerCommerceGeneration && apiUserCache?.id === customerId) {
+        customerCommerceStatus = "error";
+        if (typeof renderProfile === "function") renderProfile();
+      }
+      throw error;
     } finally {
       if (customerCommercePromise === task) customerCommercePromise = null;
     }
@@ -167,6 +179,7 @@
       return user;
     } catch (error) {
       if (error.status === 401) return cacheApiUser(null);
+      apiSessionUnavailable = true;
       throw error;
     }
   }

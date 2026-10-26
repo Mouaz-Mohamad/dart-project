@@ -337,13 +337,15 @@ function showCartBanner(productTitle) {
 }
 
 async function persistCartReservation(previous) {
+  const sequence = persistCartReservation.sequence = (persistCartReservation.sequence || 0) + 1;
   try {
     cacheFastCartSnapshot(cartData);
     if (!window.DartPlatform?.reserveCart) throw new Error("تعذر الاتصال بخدمة حجز السلة.");
     await window.DartPlatform.reserveCart(cartData);
-    window.DartAnalytics?.trackCartIncrease?.(previous, cartData);
+    if (sequence === persistCartReservation.sequence) window.DartAnalytics?.trackCartIncrease?.(previous, cartData);
     return true;
   } catch (error) {
+    if (sequence !== persistCartReservation.sequence) return false;
     cartData = previous;
     cacheFastCartSnapshot(previous);
     window.DartState?.write?.("dart_cart", previous, { source: "cart-rollback" });
