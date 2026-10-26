@@ -4,8 +4,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { runMigrations } from "../src/database/migrate.js";
-import { bindMigrationFunctionsToIsolatedTestSchema } from "./integration-schema.js";
+import { runIsolatedMigrations as runMigrations } from "./integration-schema.js";
 import { CommerceService } from "../src/modules/commerce/commerce.service.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -24,7 +23,6 @@ describe.skipIf(!databaseUrl)("order workflow with physical inventory", () => {
       options: `-c search_path=${schemaName},public`,
     });
     await runMigrations(testPool, migrationsPath);
-    await bindMigrationFunctionsToIsolatedTestSchema(testPool);
   });
 
   afterAll(async () => {

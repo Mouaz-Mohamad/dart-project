@@ -12,8 +12,10 @@ if [[ -z "$base" || "$base" == "$head_sha" ]] || ! git cat-file -e "${base}^{com
   exit 1
 fi
 
-if git diff --quiet "$base" HEAD -- .; then
-  echo "Skipping API build: no backend changes."
+if git diff --quiet "$base" HEAD -- . \
+  ':(exclude)tests/**' \
+  ':(exclude)scripts/vercel-ignore-backend.sh'; then
+  echo "Skipping API build: no backend runtime changes."
   exit 0
 fi
 

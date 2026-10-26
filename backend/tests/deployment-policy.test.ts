@@ -13,7 +13,7 @@ function fixture() {
     if (result.status !== 0) throw new Error(result.stderr);
     return result.stdout.trim();
   };
-  mkdirSync(join(root, "backend")); mkdirSync(join(root, "docs"));
+  mkdirSync(join(root, "backend")); mkdirSync(join(root, "backend", "tests")); mkdirSync(join(root, "backend", "scripts")); mkdirSync(join(root, "docs"));
   git("init", "-q"); git("config", "user.name", "Synthetic test"); git("config", "user.email", "test@example.invalid");
   writeFileSync(join(root, "index.html"), "initial"); writeFileSync(join(root, "backend", "server.ts"), "initial");
   git("add", "."); git("commit", "-qm", "initial"); const base = git("rev-parse", "HEAD");
@@ -29,6 +29,8 @@ describe("deployment policy without numbered batches", () => {
   it.each([
     [["index.html"], 1, 0], [["backend/server.ts"], 0, 1],
     [["index.html", "backend/server.ts"], 1, 1], [["docs/readme.md"], 0, 0],
+    [["backend/tests/regression.test.ts"], 0, 0], [["backend/scripts/vercel-ignore-backend.sh"], 0, 0],
+    [["backend/server.ts", "backend/tests/regression.test.ts"], 0, 1],
   ] as const)("evaluates affected paths %j", (files, frontend, backend) => {
     const f = fixture(); f.commit([...files]); expect(f.run(false)).toBe(frontend); expect(f.run(true)).toBe(backend);
   });

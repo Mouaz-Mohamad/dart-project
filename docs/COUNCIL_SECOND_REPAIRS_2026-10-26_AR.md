@@ -48,6 +48,8 @@
 
 نسخة backup والتحقق من الاستعادة قبل الترحيل نجحا: GitHub Actions run `40274275502` على `9548397`، بما فيه خطوة `Create encrypted backup and prove recovery`.
 
+متابعة CI: كشف إنشاء SQL functions في schema معزول أن مسار `public` الآمن للإنتاج يحتاج الربط بالـschema الاختباري وقت إنشاء الدالة، لا بعد انتهاء migrations فقط. `runIsolatedMigrations` يربط مسار الدوال بالـschema المعزول أثناء التهيئة، مع إبقاء `check_function_bodies=on` وملفات الإنتاج/checksums دون تغيير. اختبار `migration-isolation.test.ts` ينفذ الدالة التابعة فعليًا في schema معزول. تعديلات التهيئة والسياسة اللاحقة لا تغيّر runtime المنشور؛ Vercel يتجاهل تغييرات الاختبارات فقط.
+
 ## الترحيل والتحقق التشغيلي
 
 1. اكتمال الفحوص المحلية ثم commit ذري واحد وref update واحدة إلى main؛ بناء Frontend وAPI مرة واحدة لكل منهما.

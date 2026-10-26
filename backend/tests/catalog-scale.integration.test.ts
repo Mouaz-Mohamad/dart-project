@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { Pool } from "pg";
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
-import { runMigrations } from "../src/database/migrate.js";
-import { bindMigrationFunctionsToIsolatedTestSchema } from "./integration-schema.js";
+import { runIsolatedMigrations as runMigrations } from "./integration-schema.js";
 import { CatalogService } from "../src/modules/catalog/catalog.service.js";
 import { CommerceService } from "../src/modules/commerce/commerce.service.js";
 import { PostgresRateLimitStore, pruneRateLimits } from "../src/security/shared-rate-limit.js";
@@ -21,7 +20,6 @@ describe.skipIf(!url)("catalogue scaling preserves commerce authority", () => {
     await admin.query(`CREATE SCHEMA "${schema}"`);
     pool = new Pool({ connectionString: url, max: 8, options: `-c search_path=${schema},public` });
     await runMigrations(pool, resolve(process.cwd(), "migrations"));
-    await bindMigrationFunctionsToIsolatedTestSchema(pool);
     await pool.query(`INSERT INTO catalog_models(model_id,name,cost_minor,selling_minor,size_options,color_options)
       SELECT 'SCALE-'||n,'Model '||n,40000,60000,
         '[{"name":"M","active":true}]'::jsonb,'[{"name":"Black","active":true}]'::jsonb
