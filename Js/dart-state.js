@@ -36,6 +36,11 @@
     if (value === undefined || value === null) return value;
     return JSON.parse(JSON.stringify(value));
   }
+  function formatMoney(value) {
+    const amount = Number(value);
+    return (Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0)
+      .toLocaleString("en-EG", { maximumFractionDigits: 2, useGrouping: false });
+  }
   function read(key, fallback = null) {
     return values.has(key) ? values.get(key) : fallback;
   }
@@ -222,6 +227,7 @@
     read,
     write,
     clone,
+    formatMoney,
     isBusinessKey,
     remove,
     clearBusiness,

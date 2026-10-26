@@ -14,7 +14,7 @@ function outboxApp(secret: string | null) {
   const app = express();
   app.use(
     createOutboxRouter(
-      { processBatch } as unknown as OutboxService,
+      { processBatch, health: vi.fn().mockResolvedValue({ pending: 0, uncertain: 3, terminal: 0, exhausted: 0, oldestSeconds: 0 }) } as unknown as OutboxService,
       { outboxCronSecret: secret },
     ),
   );
@@ -47,6 +47,7 @@ describe("internal job authentication", () => {
       .post("/internal/outbox/process")
       .set("authorization", `Bearer ${secret}`);
     expect(response.status).toBe(200);
+    expect(response.body.health.uncertain).toBe(3);
     expect(processBatch).toHaveBeenCalledOnce();
   });
 

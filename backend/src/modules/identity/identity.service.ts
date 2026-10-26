@@ -56,6 +56,7 @@ interface SessionRow {
   account_type: AccountType;
   email: string;
   status: string;
+  deleted_at: Date | null;
   email_verified_at: Date | null;
   must_change_password: boolean;
   session_version: number;
@@ -276,6 +277,18 @@ export class IdentityService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // Match account administration's lock order: user, then challenges.
+      // Verification must never restore a deleted or suspended identity.
+      const owner = await client.query<{ status: string; deleted_at: Date | null }>(
+        `SELECT status, deleted_at FROM users
+          WHERE id=(SELECT user_id FROM email_verification_challenges WHERE id=$1)
+            AND account_type='customer' FOR UPDATE`,
+        [challengeId],
+      );
+      if (!owner.rows[0] || owner.rows[0].deleted_at ||
+          !["active", "pending_verification"].includes(owner.rows[0].status)) {
+        throw new AppError(422, "OTP_INVALID", "The verification code is invalid or already used");
+      }
       const result = await client.query<{
         user_id: string;
         code_hash: string;
@@ -1686,7 +1699,7 @@ export class IdentityService {
         sessions.csrf_token_hash, sessions.expires_at, sessions.revoked_at,
         sessions.replaced_by_session_id, sessions.user_session_version,
         sessions.mfa_verified_at, users.id, users.account_type, users.email,
-        users.status, users.email_verified_at, users.must_change_password,
+        users.status, users.deleted_at, users.email_verified_at, users.must_change_password,
         users.session_version, staff_users.mfa_required
        FROM sessions
        JOIN users ON users.id = sessions.user_id
@@ -1702,6 +1715,7 @@ export class IdentityService {
       row.revoked_at !== null ||
       row.expires_at.getTime() <= Date.now() ||
       row.status !== "active" ||
+      row.deleted_at !== null ||
       row.user_session_version !== row.session_version;
     if (invalid) {
       if (validHash && row.replaced_by_session_id) {
@@ -1720,6 +1734,7 @@ export class IdentityService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [account.userId]);
       const current = await client.query<{ revoked_at: Date | null; family_id: string }>(
         "SELECT revoked_at, family_id FROM sessions WHERE id = $1 FOR UPDATE",
         [account.sessionId],
@@ -1846,11 +1861,11 @@ export class IdentityService {
     try {
       await client.query("BEGIN");
       const locked = await client.query<{ email_normalized: string; email: string }>(
-        "SELECT email_normalized, email FROM users WHERE id = $1 FOR UPDATE",
+        "SELECT email_normalized, email FROM users WHERE id = $1 AND deleted_at IS NULL AND status='active' FOR UPDATE",
         [account.userId],
       );
       const current = locked.rows[0];
-      if (!current) throw new AppError(404, "ACCOUNT_NOT_FOUND", "The account was not found");
+      if (!current) throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
       const emailChanged = current.email_normalized !== emailNormalized;
       await client.query(
         `UPDATE customers SET full_name = $2, birthday = $3::date, updated_at = now()
@@ -2061,6 +2076,17 @@ export class IdentityService {
           WHERE user_id=$1 AND revoked_at IS NULL`,
         [targetUserId, `admin_${action}`],
       );
+
+      if (action === "delete" || action === "suspend") {
+        await client.query(
+          `UPDATE email_verification_challenges SET consumed_at=COALESCE(consumed_at,now())
+            WHERE user_id=$1 AND consumed_at IS NULL`, [targetUserId],
+        );
+        await client.query(
+          `UPDATE password_reset_requests SET consumed_at=COALESCE(consumed_at,now()),status='expired'
+            WHERE user_id=$1 AND consumed_at IS NULL`, [targetUserId],
+        );
+      }
 
       await this.audit(
         client,
@@ -2366,6 +2392,15 @@ export class IdentityService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const owner = await client.query<{ status: string; deleted_at: Date | null }>(
+        `SELECT status,deleted_at FROM users
+          WHERE id=(SELECT user_id FROM password_reset_requests WHERE id=$1)
+          FOR UPDATE`, [challengeId],
+      );
+      if (!owner.rows[0] || owner.rows[0].deleted_at ||
+          !["active", "pending_verification", "pending_approval"].includes(owner.rows[0].status)) {
+        throw new AppError(422, "OTP_INVALID", "The verification code is invalid or already used");
+      }
       const result = await client.query<{
         user_id: string | null;
         account_type: "customer" | "representative";
@@ -3306,11 +3341,12 @@ export class IdentityService {
         users.email_verified_at, users.must_change_password, users.session_version,
         staff_users.mfa_required
        FROM users LEFT JOIN staff_users ON staff_users.user_id = users.id
-       WHERE users.id = $1`,
+       WHERE users.id = $1 AND users.deleted_at IS NULL AND users.status='active'
+       FOR UPDATE OF users`,
       [userId],
     );
     const row = user.rows[0];
-    if (!row) throw new AppError(404, "ACCOUNT_NOT_FOUND", "The account was not found");
+    if (!row) throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
     const sessionId = randomUUID();
     const secret = createSessionSecret();
     const csrfToken = randomToken(24);

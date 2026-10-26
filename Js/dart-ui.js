@@ -716,12 +716,12 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
     if (activeCampaign) {
         appliedDiscountRate = Math.max(0, Math.min(1, Number(activeCampaign.discountPercent ?? activeCampaign.percent ?? 0) / 100));
         if (discountInput) {
-            discountInput.value = `${activeCampaign.code} · ${Math.round(appliedDiscountRate * 100)}%`;
+            discountInput.value = activeCampaign.code;
             discountInput.disabled = Boolean(activeCampaign.automatic);
         }
         if (discountBtn) {
             discountBtn.disabled = Boolean(activeCampaign.automatic);
-            discountBtn.textContent = 'Applied';
+            discountBtn.textContent = activeCampaign.automatic ? 'Applied' : 'Apply';
         }
         if (discountBox && !note) {
             note = document.createElement('p');
@@ -850,9 +850,9 @@ function renderCart() {
         card.querySelector('.cart-product-title').textContent = item.title;
         card.querySelector('.p-size').textContent = item.size;
         card.querySelector('.p-color').textContent = item.color;
-        card.querySelector('.cart-item-price').textContent = `${Math.trunc(Number(item.price) || 0)} EGP`;
+        card.querySelector('.cart-item-price').textContent = `${window.DartState.formatMoney(item.price)} EGP`;
         card.querySelector('.qty-value').textContent = item.quantity;
-        card.querySelector('.p-total').textContent = Math.trunc(item.price * item.quantity);
+        card.querySelector('.p-total').textContent = window.DartState.formatMoney(item.price * item.quantity);
         card.querySelector('.increase').addEventListener('click', async () => {
             const product = productsData.find(p => p.id === item.id);
             const availableStock = product ? getAvailableStock(product, item.size, item.color) : 0;
@@ -943,15 +943,16 @@ function initCartAndCheckoutEvents() {
     renderCart();
     if (discountBtn && discountInput) {
         discountBtn.addEventListener('click', async () => {
-            if (syncBirthdayCheckoutDiscount(true)) {
+            const code = discountInput.value.trim().toUpperCase();
+            const manualCampaign = window.dartAppliedPromotion?.type === 'Promotion' && !window.dartAppliedPromotion.automatic;
+            if (!manualCampaign && syncBirthdayCheckoutDiscount(true)) {
                 updateCartTotals();
                 return;
             }
-            const code = discountInput.value.trim().toUpperCase();
             if (!code) {
                 window.dartAppliedPromotion = null;
                 appliedDiscountRate = 0;
-                showToast("اكتب كود الخصم أولاً.");
+                showToast(manualCampaign ? "تمت إزالة كود الخصم." : "اكتب كود الخصم أولاً.");
                 updateCartTotals();
                 return;
             }

@@ -18,7 +18,7 @@
   let snapshotRefreshBusy = false;
   let liveTrackingUnsupported = false;
   const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
-  const money = (value) => `${Math.trunc(Number(value) || 0)} EGP`;
+  const money = (value) => `${window.DartState.formatMoney(value)} EGP`;
   const orderTotal = (order) => Number.isFinite(Number(order?.finalAmount))
     ? Math.max(0, Number(order.finalAmount))
     : Math.max(0, Number(order?.totalPrice || 0) - (Number(order?.orderLevelDiscountAmount) || Number(order?.totalPrice || 0) * Number(order?.discount || 0) / 100));

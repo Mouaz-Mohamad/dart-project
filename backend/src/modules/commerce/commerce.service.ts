@@ -1523,7 +1523,12 @@ export class CommerceService {
           };
           birthdayState.data.unshift(birthdayReward);
         }
-        if (String(birthdayReward.status || "Active") === "Active") {
+        const usage = await client.query<{ status: string }>(
+          `SELECT status FROM birthday_discount_usage WHERE customer_user_id=$1 AND reward_year=$2 FOR SHARE`,
+          [customerUserId, birthday.year],
+        );
+        const alreadyAllocated = usage.rows.some((row) => ["Used", "Reserved"].includes(row.status));
+        if (!alreadyAllocated && String(birthdayReward.status || "Active") === "Active") {
           promotionPercent = Math.min(
             100,
             Math.max(0, Number(birthdayReward.discountPercent) || 30),
@@ -4749,7 +4754,7 @@ export class CommerceService {
         currentCodes.length !== itemCodes.length ||
         currentCodes.some((code) => !itemCodes.includes(code));
       const hasReservedBenefit = ["Promotion", "Birthday", "Dart Card"].some((type) => orderBenefit(existing.promotion, type));
-      const financiallyLocked = ["Delivered", "Returned"].includes(existing.status) || hasReservedBenefit || existing.has_set_groups;
+      const financiallyLocked = ["Delivered", "Returned", "Cancelled", "Refused"].includes(existing.status) || hasReservedBenefit || existing.has_set_groups;
       // Match the admin editor's order-level rate. A Set/model line discount
       // is already in the immutable snapshot and is not a manual order discount.
       const existingDiscountPercent = Number(existing.promotion?.percent || existing.legacy?.discount || 0);
@@ -4761,7 +4766,7 @@ export class CommerceService {
         throw new AppError(
           409,
           "ORDER_FINANCIAL_SNAPSHOT_LOCKED",
-          "Delivered, returned or reward-reserved orders keep their original items and price snapshot",
+          "Completed, cancelled, refused or reward-reserved orders keep their original items and price snapshot",
         );
       }
 
@@ -5732,6 +5737,14 @@ export class CommerceService {
     const inventoryByCode = new Map(
       inventoryResult.rows.map((row) => [row.item_code, row]),
     );
+    // Historical order_items are not proof of current physical ownership.
+    for (const code of currentCodes) {
+      const item = inventoryByCode.get(code);
+      if (item && (item.order_id !== orderCode ||
+          !["processing/held", "sold"].includes(String(item.status).toLowerCase()))) {
+        throw new AppError(409, "ORDER_ITEM_OWNERSHIP_CHANGED", "An item belongs to another sale, cart or return; refresh the order before editing its items");
+      }
+    }
     const snapshotByCode = new Map(
       snapshots
         .map((row) => [String(row.itemCode || "").trim(), row] as const)
@@ -5824,8 +5837,9 @@ export class CommerceService {
                 version=version+1,
                 updated_at=now()
           WHERE item_code = ANY($1::text[])
+            AND order_id=$2
             AND lower(status) <> 'sold'`,
-        [desiredCodes],
+        [desiredCodes, orderCode],
       );
     } else if (nextStatus === "Refused") {
       await client.query(
@@ -6205,22 +6219,31 @@ export class CommerceService {
       ) as Record<string, unknown>[];
       const reward = data.find((row) => String(row.id || "") === String(birthdayBenefit.rewardId));
       if (reward) {
-        if (nextStatus === "Delivered") {
+        const usage = await client.query<{ status: string; order_code: string | null; used_at: Date | null }>(
+          `SELECT b.status,o.order_code,b.used_at FROM birthday_discount_usage b
+             LEFT JOIN orders o ON o.id=b.order_id
+            WHERE b.reward_record_id=$1 ORDER BY b.reward_year DESC LIMIT 1 FOR UPDATE OF b`,
+          [String(birthdayBenefit.rewardId)],
+        );
+        const ledger = usage.rows[0];
+        // A Back action is not a full return. Keep the projection consistent
+        // with the authoritative usage ledger, including another order's hold.
+        if (ledger?.status === "Used") {
           reward.status = "Used";
           reward.usedCount = 1;
-          reward.usedAt = new Date().toISOString();
-          reward.orderId = orderCode;
-        } else if (["Cancelled", "Refused"].includes(nextStatus)) {
+          reward.usedAt = ledger.used_at?.toISOString() || reward.usedAt;
+          reward.orderId = ledger.order_code || orderCode;
+        } else if (ledger?.status === "Released") {
           reward.status = String(reward.expiresAt || "") >= cairoDateKey() ? "Active" : "Expired";
           reward.usedCount = 0;
           reward.usedAt = null;
           reward.orderId = "";
           reward.reservedAt = null;
-        } else if (previousStatus === "Delivered" || ["Cancelled", "Refused"].includes(String(previousStatus || ""))) {
+        } else if (ledger?.status === "Reserved") {
           reward.status = "Reserved";
           reward.usedCount = 0;
           reward.usedAt = null;
-          reward.orderId = orderCode;
+          reward.orderId = ledger.order_code || orderCode;
           reward.reservedAt = new Date().toISOString();
         }
         await client.query(

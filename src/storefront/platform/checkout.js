@@ -10,6 +10,25 @@
     return cartQuoteCache?.signature === cartQuoteSignature() ? cartQuoteCache.quote : null;
   }
   function invalidateCartQuote() { cartQuoteCache = null; reviewedQuote = null; }
+  function finishApiCheckout(order) {
+    invalidateCartQuote();
+    if (typeof cartData !== "undefined") cartData = [];
+    write("dart_cart", []);
+    setCartReservationId(uid("CART"));
+    window.dartAppliedPromotion = null;
+    sessionStorage.setItem("dart_last_order_id", order.orderId);
+    return order;
+  }
+  async function recoverCompletedCheckout() {
+    if (!API_BASE || !currentUser()) return null;
+    try {
+      const quote = await quoteCart({ force: true });
+      return quote?.completedOrder ? finishApiCheckout(quote.completedOrder) : null;
+    } catch (error) {
+      if ([404, 409].includes(error.status)) return null;
+      throw error;
+    }
+  }
   async function quoteCart(options = {}) {
     if (!API_BASE || !currentUser()) return null;
     const signature = cartQuoteSignature();
@@ -73,7 +92,11 @@
     cleanupCartReservations();
     const cart =
       typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
-    if (!cart.length) throw new Error("السلة فارغة.");
+    if (!cart.length) {
+      const recovered = await recoverCompletedCheckout();
+      if (recovered) return recovered;
+      throw new Error("السلة فارغة.");
+    }
     const logged = currentUser();
     if (!logged)
       throw new Error("يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.");
@@ -184,14 +207,9 @@
         }
         throw error;
       }
-      invalidateCartQuote();
-      if (typeof cartData !== "undefined") cartData = [];
-      write("dart_cart", []);
-      setCartReservationId(uid("CART"));
-      window.dartAppliedPromotion = null;
+      finishApiCheckout(response.order);
       // The committed order is the success boundary. Projection/preference refresh
       // cannot turn it into a failed checkout or hold up its confirmation.
-      sessionStorage.setItem("dart_last_order_id", response.order.orderId);
       void Promise.allSettled([
         Promise.resolve().then(() => saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),

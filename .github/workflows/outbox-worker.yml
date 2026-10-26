@@ -41,7 +41,11 @@ jobs:
               throw new Error('Invalid outbox worker result');
             }
           }
-          process.stdout.write(`${result.claimed} ${result.failed + result.uncertain + result.terminal}`);
+          const health = result.health;
+          if (!health || ['uncertain', 'exhausted', 'terminal'].some(field => !Number.isInteger(health[field]) || health[field] < 0)) {
+            throw new Error('Missing outbox backlog health');
+          }
+          process.stdout.write(`${result.claimed} ${result.failed + result.uncertain + result.terminal + health.uncertain + health.exhausted + health.terminal}`);
           NODE
             )"
             read -r claimed issues <<< "$result"

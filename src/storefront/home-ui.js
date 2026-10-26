@@ -144,9 +144,9 @@ function createProductCard(item, template) {
   const finalPrice = Math.max(0, Number(item.price) || 0);
   const originalPrice = Math.max(finalPrice, Number(item.originalPrice) || finalPrice);
   const discount = Math.min(100, Math.max(0, Number(item.effectiveDiscountPercent) || 0));
-  if (currentPrice) currentPrice.textContent = `EGP ${Math.trunc(finalPrice)}`;
+  if (currentPrice) currentPrice.textContent = `EGP ${window.DartState.formatMoney(finalPrice)}`;
   if (oldPrice) {
-    oldPrice.textContent = `EGP ${Math.trunc(originalPrice)}`;
+    oldPrice.textContent = `EGP ${window.DartState.formatMoney(originalPrice)}`;
     oldPrice.hidden = !discount;
   }
   if (discountBadge) {

@@ -454,6 +454,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
       birthdayRewardRows,
       birthdayMessageRows,
       preferencesResult,
+      birthdayUsageResult,
     ] = await Promise.all([
       readRelationalDashboardDomain(pool, "returns"),
       readRelationalDashboardDomain(pool, "cards"),
@@ -461,6 +462,12 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
       readRelationalDashboardDomain(pool, "birthday_messages"),
       pool.query<{ last_address: Record<string, unknown> | null }>(
         "SELECT last_address FROM customer_preferences WHERE customer_user_id=$1",
+        [customerUserId],
+      ),
+      pool.query<{ reward_record_id: string; status: string; order_code: string | null; used_at: Date | null }>(
+        `SELECT b.reward_record_id,b.status,o.order_code,b.used_at
+           FROM birthday_discount_usage b LEFT JOIN orders o ON o.id=b.order_id
+          WHERE b.customer_user_id=$1 AND b.status IN ('Used','Reserved')`,
         [customerUserId],
       ),
     ]);
@@ -473,6 +480,13 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
     const onlyCustomer = (rows: unknown[]) => rows.filter((raw) => {
       const row = raw as Record<string, unknown>;
       return String(row.clientId || row.customerId || "") === clientCode && !row.isDeleted;
+    });
+    const birthdayUsage = new Map(birthdayUsageResult.rows.map((row) => [row.reward_record_id, row]));
+    const customerBirthdayRewards = onlyCustomer(birthdayRewardRows).map((raw) => {
+      const reward = raw as Record<string, unknown>;
+      const usage = birthdayUsage.get(String(reward.id || ""));
+      return usage ? { ...reward, status: usage.status, usedCount: usage.status === "Used" ? 1 : 0,
+        usedAt: usage.used_at?.toISOString() || null, orderId: usage.order_code || "" } : reward;
     });
 
     const orders = ordersResult.rows.map((row) => {
@@ -591,7 +605,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
       orders,
       returns: customerReturns,
       cards: onlyCustomer(stateByDomain.get("cards") || []),
-      birthdayRewards: onlyCustomer(stateByDomain.get("birthday_rewards") || []),
+      birthdayRewards: customerBirthdayRewards,
       birthdayMessages: onlyCustomer(stateByDomain.get("birthday_messages") || []),
       reviewEligible: ordersResult.rows.some((row) => row.status === "Delivered"),
       purchaseStats: { totalPieces, monthlyPieces },

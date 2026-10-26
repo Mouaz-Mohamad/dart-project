@@ -87,7 +87,7 @@
       .replace(/\D/g, "")
       .replace(/^0020/, "0")
       .replace(/^20(?=1)/, "0");
-  const money = (value) => `${Math.trunc(Number(value) || 0)} EGP`;
+  const money = (value) => `${window.DartState.formatMoney(value)} EGP`;
   const orderTotal = (order) =>
     Number.isFinite(Number(order?.finalAmount))
       ? Math.max(0, Number(order.finalAmount))

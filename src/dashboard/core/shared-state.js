@@ -30,7 +30,7 @@ function dartUid(prefix = "ID") {
   return `${prefix}-${randomPart}`;
 }
 function dartMoney(v) {
-  return `${Math.trunc(Number(v) || 0)} EGP`;
+  return `${window.DartState.formatMoney(v)} EGP`;
 }
 function dartEsc(v) {
   return String(v ?? "").replace(

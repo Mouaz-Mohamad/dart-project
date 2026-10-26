@@ -382,11 +382,17 @@
     if (!IS_ADMIN && remoteStock) {
       const exactKey = JSON.stringify([m.modelId, color, String(size)]);
       const normalizedKey = normalizeStockKey(m.modelId, color, size);
-      return Number(
+      const free = Number(
         remoteStock.get(exactKey) ??
           remoteStock.get(normalizedKey) ??
           0,
       );
+      const held = owner ? (window.DartState?.read?.("dart_cart", []) || [])
+        .filter((line) => String(line.id) === String(m.modelId) &&
+          norm(line.color) === norm(color) && String(line.size) === String(size) &&
+          line.reservationId === owner && Date.parse(line.reservationUntil) > Date.now())
+        .reduce((total, line) => total + Math.max(0, Number(line.quantity) || 0), 0) : 0;
+      return free + held;
     }
     return items().filter(
       (i) =>

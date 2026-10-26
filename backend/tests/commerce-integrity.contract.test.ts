@@ -40,9 +40,10 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(service).toContain("IDEMPOTENCY_KEY_REUSED");
     expect(service).toMatch(/SET status='completed', response_code=201, response_body=/);
     expect(platform).toContain('"Idempotency-Key": `checkout-${CART_RESERVATION_ID}`');
-    expect(platform.indexOf('setCartReservationId(uid("CART"))')).toBeGreaterThan(
+    expect(platform.indexOf('finishApiCheckout(response.order)')).toBeGreaterThan(
       platform.indexOf('await apiRequest("/api/v1/orders"'),
     );
+    expect(platform).toContain('setCartReservationId(uid("CART"))');
   });
 
   it("fails closed when a guest reservation has no matching owner proof", () => {

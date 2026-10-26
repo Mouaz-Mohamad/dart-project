@@ -36,6 +36,12 @@
     }
     const remote = payload?.cart || null;
     if (!remote) {
+      // Checkout consumes the reservation. Recover its committed reply before
+      // a reload can present that consumed cart as an unexplained empty cart.
+      const completedOrder = await recoverCompletedCheckout();
+      if (completedOrder) {
+        if (typeof showToast === "function") showToast(`تم تأكيد الطلب ${completedOrder.orderId}. يمكنك متابعته من حسابك.`);
+      }
       if (typeof cartData !== "undefined") cartData = [];
       write("dart_cart", []);
       if (typeof renderCart === "function") renderCart();

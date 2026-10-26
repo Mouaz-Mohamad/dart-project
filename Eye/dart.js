@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:3fb588650f90bc28af3f35b551a2058ee654e36f26eb0a4d254dc6cbb9da253c */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:50e18ef22fe30c63702276633a11fe4824b1e77fb66b72688ff3f893c5c1d54f */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -936,7 +936,7 @@ function dartUid(prefix = "ID") {
   return `${prefix}-${randomPart}`;
 }
 function dartMoney(v) {
-  return `${Math.trunc(Number(v) || 0)} EGP`;
+  return `${window.DartState.formatMoney(v)} EGP`;
 }
 function dartEsc(v) {
   return String(v ?? "").replace(

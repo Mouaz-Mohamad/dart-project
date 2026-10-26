@@ -10,6 +10,7 @@ import { PromotionService, promotionCampaignInputSchema } from "../src/modules/p
 import { createPromotionRouter } from "../src/modules/promotions/promotion.routes.js";
 import { SetCartService } from "../src/modules/sets/set-cart.service.js";
 import { FinanceService } from "../src/modules/finance/finance.service.js";
+import { DashboardStateService } from "../src/modules/dashboard/dashboard-state.service.js";
 import { hashCsrfToken } from "../src/security/session-token.js";
 import type { IdentityService } from "../src/modules/identity/identity.service.js";
 import type { AppError } from "../src/http/app-error.js";
@@ -211,5 +212,60 @@ describe("second Council regressions on the production schema", () => {
     }
     const february = await finance.summary("2025-02-01", "2025-02-28");
     expect(february.cashIn).toBe(1800); expect(february.refundCashOut).toBe(1000); expect(february.netCashFlow).toBe(800);
+  });
+
+  it("rejects financial edits of cancelled history without releasing another customer's cart", async () => {
+    const f = await fixture({ ordinary: true });
+    await commerce.reserveCart(f.reservation, [{ modelId: f.models[2]!, color: "Black", size: "M", quantity: 1 }], f.user);
+    const order = await checkout(f);
+    await commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "New", target: "Cancelled" }, "synthetic", false);
+    const reservation = `CART-NEXT-${randomUUID()}`;
+    await commerce.reserveCart(reservation, [{ modelId: f.models[2]!, color: "Black", size: "M", quantity: 1 }], f.user);
+    const before = (await store.pool.query("SELECT status,cart_reservation_id,version FROM inventory_items WHERE item_code=$1", [f.pieces[2]])).rows[0];
+    await expect(commerce.updateAdminOrder(actor, String(order.orderId), { clientName: "Historical", phone1: "+201000000001", itemCodes: [f.pieces[2]!], discountPercent: 10 }, "synthetic")).rejects.toMatchObject({ code: "ORDER_FINANCIAL_SNAPSHOT_LOCKED" });
+    await commerce.updateAdminOrder(actor, String(order.orderId), { clientName: "Metadata only", phone1: "+201000000001", itemCodes: [f.pieces[2]!] }, "synthetic");
+    expect((await store.pool.query("SELECT status,cart_reservation_id,version FROM inventory_items WHERE item_code=$1", [f.pieces[2]])).rows[0]).toEqual(before);
+    expect(await commerce.customerCartQuote(f.user, reservation)).toMatchObject({ totalMinor: 100000 });
+  });
+
+  it("preserves posted revenue, COGS and cash when a delivered order is archived", async () => {
+    const f = await fixture(); const order = await checkout(f); await deliver(order);
+    const finance = new FinanceService(store.pool);
+    const before = await finance.summary("2026-01-01", "2099-12-31");
+    await commerce.adminOrderStateAction(actor, String(order.orderId), "archive", "synthetic");
+    const after = await finance.summary("2026-01-01", "2099-12-31");
+    for (const key of ["grossRevenue", "grossCogs", "deliveredOrders", "netProfit", "cashIn"] as const) expect(after[key]).toEqual(before[key]);
+  });
+
+  it("preserves posted refund cash and COGS reversal when a completed return is archived", async () => {
+    const f = await fixture(); const order = await checkout(f); await deliver(order); await refund(f.pieces[0]!, 750);
+    const finance = new FinanceService(store.pool), state = new DashboardStateService(store.pool);
+    const before = await finance.summary("2026-01-01", "2099-12-31");
+    const domain = await state.read("returns");
+    await state.write("returns", domain.version, (domain.data as Record<string, unknown>[]).map((row) => String(row.orderId) === String(order.orderId) ? { ...row, isArchived: true } : row), actor, "synthetic");
+    const after = await finance.summary("2026-01-01", "2099-12-31");
+    for (const key of ["refunds", "cashOut", "cogsReversal", "netProfit"] as const) expect(after[key]).toEqual(before[key]);
+  });
+
+  it("keeps a consumed Birthday benefit consistent after Back and cancellation, then quotes the actual eligible price", async () => {
+    const f = await fixture({ birthday: true, ordinary: true });
+    await commerce.reserveCart(f.reservation, [{ modelId: f.models[2]!, color: "Black", size: "M", quantity: 1 }], f.user);
+    const order = await checkout(f); await deliver(order);
+    await commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "Delivered", target: "Representative On The Way" }, "synthetic", false);
+    const read = async () => (await store.pool.query(`SELECT u.status AS usage,r.status AS reward FROM birthday_discount_usage u
+      JOIN birthday_rewards r ON r.record_id=u.reward_record_id WHERE u.customer_user_id=$1`, [f.user])).rows[0];
+    expect(await read()).toMatchObject({ usage: "Used", reward: "Used" });
+    await commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "Representative On The Way", target: "Cancelled" }, "synthetic", false);
+    expect(await read()).toMatchObject({ usage: "Used", reward: "Used" });
+    const next = `CART-NEXT-${randomUUID()}`;
+    // A legacy stale projection must not overrule the usage ledger either.
+    await store.pool.query(`UPDATE birthday_rewards SET payload=payload || '{"status":"Active"}'::jsonb
+      WHERE record_id=(SELECT reward_record_id FROM birthday_discount_usage WHERE customer_user_id=$1)`, [f.user]);
+    const snapshot = await commerce.customerSnapshot(f.user);
+    expect(snapshot.birthdayRewards).toEqual(expect.arrayContaining([expect.objectContaining({ status: "Used" })]));
+    await commerce.reserveCart(next, [{ modelId: f.models[2]!, color: "Black", size: "M", quantity: 1 }], f.user);
+    expect(await commerce.customerCartQuote(f.user, next)).toMatchObject({ totalMinor: 100000 });
+    const placed = await commerce.checkout(f.user, { ...f.input, reservationId: next }, "synthetic", undefined, `checkout-${next}`);
+    expect(placed.finalAmount).toBe(1000);
   });
 });

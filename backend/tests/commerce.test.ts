@@ -223,6 +223,9 @@ describe("CommerceService relational customer snapshot", () => {
       if (sql.includes("FROM customer_preferences")) {
         return { rows: [{ last_address: null }] };
       }
+      if (sql.includes("FROM birthday_discount_usage")) {
+        return { rows: [{ reward_record_id: "b1", status: "Used", order_code: "K-OLD", used_at: new Date("2026-10-01T12:00Z") }] };
+      }
       throw new Error(`Unexpected query in customer snapshot test: ${sql}`);
     });
     const pool = { query } as unknown as Pool;
@@ -234,6 +237,7 @@ describe("CommerceService relational customer snapshot", () => {
     expect(snapshot.returns).toHaveLength(1);
     expect(snapshot.cards).toHaveLength(1);
     expect(snapshot.birthdayRewards).toHaveLength(1);
+    expect(snapshot.birthdayRewards[0]).toMatchObject({ id: "b1", status: "Used", usedCount: 1, orderId: "K-OLD" });
     expect(snapshot.birthdayMessages).toHaveLength(1);
     expect(snapshot.reviewEligible).toBe(false);
     expect(snapshot.purchaseStats).toEqual({ totalPieces: 0, monthlyPieces: 0 });
@@ -310,6 +314,7 @@ describe("CommerceService relational customer snapshot", () => {
         return { rows: [] };
       }
       if (sql.includes("FROM customer_preferences")) return { rows: [{ last_address: null }] };
+      if (sql.includes("FROM birthday_discount_usage")) return { rows: [] };
       throw new Error(`Unexpected query in review eligibility snapshot test: ${sql}`);
     });
     const pool = { query } as unknown as Pool;

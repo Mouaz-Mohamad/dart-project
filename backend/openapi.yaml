@@ -1156,7 +1156,7 @@ paths:
       parameters:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
       responses:
-        "200": { description: configured plus exclusive claimed outcome counters published, failed, uncertain and terminal. published includes safely suppressed events. }
+        "200": { description: configured plus exclusive claimed outcome counters published, failed, uncertain and terminal. published includes safely suppressed events. health reports the entire pending, exhausted, uncertain and terminal backlog plus oldestSeconds, including unresolved attempts from earlier batches. }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
 components:

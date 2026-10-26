@@ -148,7 +148,7 @@ function returnEventDate(row: JsonRow): unknown {
 function completedReturn(row: JsonRow): boolean {
   const status = String(row.status || "").toLowerCase();
   return (
-    active(row) &&
+    // Archiving or hiding a posted return is not a financial reversal.
     row.isPostDeliveryReturn === true &&
     Boolean(row.completedAt || ["completed", "good", "damaged", "bad"].includes(status))
   );
@@ -738,8 +738,6 @@ export class FinanceService {
            FROM orders o
            LEFT JOIN order_items oi ON oi.order_id=o.id
           WHERE o.status='Delivered'
-            AND NOT o.is_deleted
-            AND NOT o.is_archived
             AND COALESCE(o.delivered_at, o.updated_at) >=
                 ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
             AND COALESCE(o.delivered_at, o.updated_at) <

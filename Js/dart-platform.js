@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:bf1b947b5aa6e241b32ff1206f7774bdcfc3d6e49924c701c713fef43a030812 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:c33c0cdc22ffe1a5ee1fe0cc5cbd8b519f7daa3601574c48927edae040da1239 */
 (function () {
   "use strict";
 
@@ -1481,6 +1481,25 @@
     return cartQuoteCache?.signature === cartQuoteSignature() ? cartQuoteCache.quote : null;
   }
   function invalidateCartQuote() { cartQuoteCache = null; reviewedQuote = null; }
+  function finishApiCheckout(order) {
+    invalidateCartQuote();
+    if (typeof cartData !== "undefined") cartData = [];
+    write("dart_cart", []);
+    setCartReservationId(uid("CART"));
+    window.dartAppliedPromotion = null;
+    sessionStorage.setItem("dart_last_order_id", order.orderId);
+    return order;
+  }
+  async function recoverCompletedCheckout() {
+    if (!API_BASE || !currentUser()) return null;
+    try {
+      const quote = await quoteCart({ force: true });
+      return quote?.completedOrder ? finishApiCheckout(quote.completedOrder) : null;
+    } catch (error) {
+      if ([404, 409].includes(error.status)) return null;
+      throw error;
+    }
+  }
   async function quoteCart(options = {}) {
     if (!API_BASE || !currentUser()) return null;
     const signature = cartQuoteSignature();
@@ -1544,7 +1563,11 @@
     cleanupCartReservations();
     const cart =
       typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
-    if (!cart.length) throw new Error("السلة فارغة.");
+    if (!cart.length) {
+      const recovered = await recoverCompletedCheckout();
+      if (recovered) return recovered;
+      throw new Error("السلة فارغة.");
+    }
     const logged = currentUser();
     if (!logged)
       throw new Error("يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.");
@@ -1655,14 +1678,9 @@
         }
         throw error;
       }
-      invalidateCartQuote();
-      if (typeof cartData !== "undefined") cartData = [];
-      write("dart_cart", []);
-      setCartReservationId(uid("CART"));
-      window.dartAppliedPromotion = null;
+      finishApiCheckout(response.order);
       // The committed order is the success boundary. Projection/preference refresh
       // cannot turn it into a failed checkout or hold up its confirmation.
-      sessionStorage.setItem("dart_last_order_id", response.order.orderId);
       void Promise.allSettled([
         Promise.resolve().then(() => saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
@@ -1975,6 +1993,12 @@
     }
     const remote = payload?.cart || null;
     if (!remote) {
+      // Checkout consumes the reservation. Recover its committed reply before
+      // a reload can present that consumed cart as an unexplained empty cart.
+      const completedOrder = await recoverCompletedCheckout();
+      if (completedOrder) {
+        if (typeof showToast === "function") showToast(`تم تأكيد الطلب ${completedOrder.orderId}. يمكنك متابعته من حسابك.`);
+      }
       if (typeof cartData !== "undefined") cartData = [];
       write("dart_cart", []);
       if (typeof renderCart === "function") renderCart();

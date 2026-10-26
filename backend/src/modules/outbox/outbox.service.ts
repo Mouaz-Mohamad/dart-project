@@ -268,6 +268,14 @@ export class OutboxService {
       const code=(error as {responseCode?: number})?.responseCode;
       if (code && code>=400 && code<500) throw new DeliveryError("retryable", "SMTP temporarily rejected delivery");
       if (code && code>=500) throw new DeliveryError("terminal", "SMTP permanently rejected delivery");
+      // Nodemailer also labels later socket errors CONN. Only a definitive
+      // DNS/connect failure proves that no message could have been accepted.
+      const failure=error as {command?: string; code?: string; originalCode?: string; syscall?: string};
+      const networkCode=failure?.originalCode || failure?.code || "";
+      if (failure?.command === "CONN" && (failure.syscall === "connect" ||
+          ["ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", "ENOTFOUND", "EAI_AGAIN", "EDNS"].includes(networkCode))) {
+        throw new DeliveryError("retryable", "SMTP connection failed before message delivery");
+      }
       throw error; // Lost connection after SMTP DATA is an uncertain outcome.
     }
   }

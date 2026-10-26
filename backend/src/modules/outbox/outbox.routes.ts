@@ -36,7 +36,8 @@ export function createOutboxRouter(
     }
     const query = z.object({ limit: z.coerce.number().int().min(1).max(10).default(5) }).parse(request.query);
     await maintenance?.();
-    response.status(200).json(await outbox.processBatch(query.limit));
+    const result = await outbox.processBatch(query.limit);
+    response.status(200).json({ ...result, health: await outbox.health() });
   }
 
   router.post("/internal/outbox/process", process);
