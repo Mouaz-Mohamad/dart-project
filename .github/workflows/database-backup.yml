@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/database-backup.yml"
       - "backend/scripts/verify-restored-store.ts"
+      - "backend/scripts/recovery-schema.ts"
       - "backend/src/modules/monitoring/store-recovery-check.ts"
   schedule:
     - cron: "17 3 * * *"

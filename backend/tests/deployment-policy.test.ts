@@ -31,6 +31,7 @@ describe("deployment policy without numbered batches", () => {
     [["index.html", "backend/server.ts"], 1, 1], [["docs/readme.md"], 0, 0],
     [["backend/tests/regression.test.ts"], 0, 0], [["backend/scripts/vercel-ignore-backend.sh"], 0, 0],
     [["backend/server.ts", "backend/tests/regression.test.ts"], 0, 1],
+    [["backend/scripts/verify-restored-store.ts", "backend/scripts/recovery-schema.ts"], 0, 0],
   ] as const)("evaluates affected paths %j", (files, frontend, backend) => {
     const f = fixture(); f.commit([...files]); expect(f.run(false)).toBe(frontend); expect(f.run(true)).toBe(backend);
   });
