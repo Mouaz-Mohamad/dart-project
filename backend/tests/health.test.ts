@@ -5,6 +5,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/application.js";
 import type { AppConfig } from "../src/config/env.js";
+import { loadConfig } from "../src/config/env.js";
 
 const config: AppConfig = {
   nodeEnv: "test",
@@ -45,6 +46,18 @@ function appWith(databasePing: () => Promise<void>) {
 }
 
 describe("health API", () => {
+  it("accepts configured verified aliases with credentials and rejects a lookalike origin", async () => {
+    const aliases = loadConfig({ NODE_ENV: "test", DATABASE_URL: "postgresql://unused", CORS_ORIGINS: "https://original.example",
+      CORS_ADDITIONAL_ORIGINS: "https://dartofficial.com,https://www.dartofficial.com" });
+    const app = createApp({ ...config, corsOrigins: aliases.corsOrigins }, { databasePing: async () => undefined,
+      logger: pino({ level: "silent" }), startedAt: new Date(), version: "synthetic" });
+    for (const origin of aliases.corsOrigins) {
+      const response = await request(app).get("/api/v1/health/live").set("Origin", origin);
+      expect(response.status).toBe(200); expect(response.headers["access-control-allow-origin"]).toBe(origin);
+      expect(response.headers["access-control-allow-credentials"]).toBe("true");
+    }
+    expect((await request(app).get("/api/v1/health/live").set("Origin", "https://www.dartofficial.com.attacker.example")).status).toBe(403);
+  });
   it("reports liveness without depending on PostgreSQL", async () => {
     const response = await request(appWith(async () => Promise.reject(new Error("down")))).get(
       "/api/v1/health/live",

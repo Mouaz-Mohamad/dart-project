@@ -47,6 +47,10 @@ const environmentSchema = z.object({
   DATABASE_SSL: booleanFromString,
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   CORS_ORIGINS: z.string().default("http://localhost:4173"),
+  CORS_ADDITIONAL_ORIGINS: z.string().default("").refine((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean).every((origin) => {
+    try { const url = new URL(origin); return !origin.includes("*") && ["http:", "https:"].includes(url.protocol) && url.origin === origin; }
+    catch { return false; }
+  }), "Additional CORS entries must be explicit HTTP(S) origins"),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
   RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).optional(),
@@ -145,9 +149,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     CRON_SECRET: parsed.data.CRON_SECRET,
   });
 
-  const corsOrigins = parsed.data.CORS_ORIGINS.split(",")
+  const corsOrigins = [...new Set([parsed.data.CORS_ORIGINS, parsed.data.CORS_ADDITIONAL_ORIGINS].join(",").split(",")
     .map((origin) => origin.trim())
-    .filter(Boolean);
+    .filter(Boolean))];
 
   if (parsed.data.NODE_ENV === "production" && corsOrigins.length === 0) {
     invalidEnvironment("CORS_ORIGINS");

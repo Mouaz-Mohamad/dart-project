@@ -32,6 +32,14 @@ const productionEnvironment = {
 };
 
 describe("environment configuration", () => {
+  it("adds verified aliases without replacing the existing production origin list", () => {
+    const config = loadConfig({ ...baseEnvironment, CORS_ORIGINS: "https://original.example,https://retained.example",
+      CORS_ADDITIONAL_ORIGINS: "https://www.dartofficial.com, https://dartofficial.com, https://original.example" });
+    expect(config.corsOrigins).toEqual(["https://original.example", "https://retained.example", "https://www.dartofficial.com", "https://dartofficial.com"]);
+  });
+  it.each(["*", "https://*.example.test", "https://allowed.example/path", "https://user:password@example.test", "null", "javascript:alert(1)"])("rejects an unsafe additional CORS origin %s", (value) => {
+    expect(() => loadConfig({ ...baseEnvironment, CORS_ADDITIONAL_ORIGINS: value })).toThrow("CORS_ADDITIONAL_ORIGINS");
+  });
   it("loads safe defaults without exposing source values in errors", () => {
     const config = loadConfig(baseEnvironment);
     expect(config.nodeEnv).toBe("test");
