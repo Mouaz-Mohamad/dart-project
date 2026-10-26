@@ -63,7 +63,7 @@
   }
 
   function imageSource(value) {
-    if (typeof value === "string") return value.trim();
+    if (typeof value === "string") return root.DartCatalog?.imageSrc?.(value) || value.trim();
     if (!value) return "";
     const source = String(value.url || value.src || "").trim();
     if (!source && !value.id) return "";

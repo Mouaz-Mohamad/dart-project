@@ -31,8 +31,8 @@ describe("catalog SEO sitemap", () => {
     });
 
     expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
-    expect(xml).toContain("https://dart-project-psi.vercel.app/products/cairo-wide-leg-jeans--dw-101");
-    expect(xml).toContain(encodeURI("https://dart-project-psi.vercel.app/products/بنطلون-شبابي-عصري--dr-7"));
+    expect(xml).toContain("https://www.dartofficial.com/products/cairo-wide-leg-jeans--dw-101");
+    expect(xml).toContain(encodeURI("https://www.dartofficial.com/products/بنطلون-شبابي-عصري--dr-7"));
     expect(xml).toContain("<lastmod>2026-10-02T12:00:00.000Z</lastmod>");
     expect(xml).not.toContain("& عصري");
   });

@@ -118,7 +118,7 @@
   const identity = card => card?.querySelector(".profile-record-head strong")?.textContent?.trim() || "";
   const cardStatus = card => card?.querySelector(".profile-status")?.textContent?.trim() || "-";
   function imageFor(modelId, color, fallback = "") {
-    if (fallback) return fallback;
+    if (fallback) return root.DartCatalog?.imageSrc?.(fallback) || fallback;
     try { const model = root.DartCatalog?.model?.(modelId); return root.DartCatalog?.cover?.(model, color) || model?.image || model?.images?.[0] || "Photos/logo-1to1.png"; }
     catch { return "Photos/logo-1to1.png"; }
   }

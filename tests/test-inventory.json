@@ -10,6 +10,7 @@
     "council-third-runtime.cjs",
     "council-fourth-runtime.cjs",
     "css-cascade-contract.cjs",
+    "custom-domain-runtime.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",
     "database-authoritative-storage.cjs",

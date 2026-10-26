@@ -79,6 +79,7 @@ jobs:
           node scripts/check-source-layout.cjs
           node tests/source-layout-contract.cjs
           node tests/css-cascade-contract.cjs
+          node tests/custom-domain-runtime.cjs
           node tests/database-authoritative-storage.cjs
           node tests/cache-revalidation-contract.cjs
           node tests/auth-contract.js

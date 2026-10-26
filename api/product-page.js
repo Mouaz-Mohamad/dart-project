@@ -1,8 +1,11 @@
 // DART CODE GUIDE | api/product-page.js
 // الغرض: Server-render product deep-link SEO metadata from the authoritative public catalog while preserving the existing products UI.
 "use strict";
+const { createHash } = require("node:crypto");
+const BASE_CSP = require("../vercel.json").headers.find(entry => entry.source === "/(.*)")
+  .headers.find(header => header.key === "Content-Security-Policy").value;
 
-const PUBLIC_ORIGIN = "https://dart-project-psi.vercel.app";
+const PUBLIC_ORIGIN = "https://www.dartofficial.com";
 const CATALOG_URL = process.env.DART_CATALOG_URL || "https://dart-api-dusky.vercel.app/api/v1/catalog";
 const SOCIAL_URLS = Object.freeze([
   "https://www.instagram.com/dart.official.eg/",
@@ -60,7 +63,7 @@ function activeOptions(value) {
 function firstImage(model) {
   for (const color of activeOptions(model?.colorOptions)) {
     const image = (Array.isArray(color.images) ? color.images : []).find((entry) => String(entry?.url || "").trim());
-    if (image) return String(image.url).trim();
+    if (image) return imageUrl(image.url);
   }
   return `${PUBLIC_ORIGIN}/Photos/1080px.png`;
 }
@@ -68,6 +71,18 @@ function firstImage(model) {
 function stockQuantity(catalog, modelId, color, size) {
   const stock = catalog?.stock && typeof catalog.stock === "object" ? catalog.stock : {};
   return Math.max(0, Number(stock[JSON.stringify([modelId, color, size])]) || 0);
+}
+
+function imageUrl(value) {
+  const raw = String(value || "").trim();
+  try {
+    const url = new URL(raw, PUBLIC_ORIGIN);
+    if ([PUBLIC_ORIGIN, "https://dartofficial.com", "https://dart-project-psi.vercel.app", "https://dart-api-dusky.vercel.app"].includes(url.origin) &&
+      /^\/api\/v1\/catalog\/assets\/[A-Za-z0-9_-]{8,120}$/.test(url.pathname)) {
+      return `${PUBLIC_ORIGIN}${url.pathname}${url.search}`;
+    }
+    return url.href;
+  } catch { return `${PUBLIC_ORIGIN}/Photos/1080px.png`; }
 }
 
 function priceForModel(model) {
@@ -90,7 +105,7 @@ function buildProductGraph(catalog, model) {
   const price = priceForModel(model).toFixed(2);
   const variants = [];
   for (const color of colors) {
-    const image = (Array.isArray(color.images) ? color.images : []).find((entry) => String(entry?.url || "").trim())?.url || firstImage(model);
+    const image = imageUrl((Array.isArray(color.images) ? color.images : []).find((entry) => String(entry?.url || "").trim())?.url || firstImage(model));
     for (const size of sizes) {
       const quantity = stockQuantity(catalog, model.modelId, color.name, size.name);
       variants.push({
@@ -195,6 +210,12 @@ function renderNotFoundPage(template) {
   return html;
 }
 
+function productCsp(html) {
+  const hashes = [...html.matchAll(/<script\s+type="application\/ld\+json">([\s\S]*?)<\/script>/gi)]
+    .map(block => `'sha256-${createHash("sha256").update(block[1]).digest("base64")}'`);
+  return BASE_CSP.replace("script-src 'self'", `script-src 'self' ${hashes.join(" ")}`);
+}
+
 async function fetchText(url) {
   const response = await fetch(url, { headers: { Accept: "text/html,application/json;q=0.9" }, signal: AbortSignal.timeout(6000) });
   if (!response.ok) throw new Error(`Upstream ${response.status} for ${url}`);
@@ -223,7 +244,9 @@ async function handler(request, response) {
     }
     response.setHeader("Content-Type", "text/html; charset=utf-8");
     response.setHeader("Cache-Control", "public, max-age=0, s-maxage=120, stale-while-revalidate=900");
-    return response.status(200).send(renderProductPage(template, catalog, model));
+    const html = renderProductPage(template, catalog, model);
+    response.setHeader("Content-Security-Policy", productCsp(html));
+    return response.status(200).send(html);
   } catch (error) {
     console.error("Dart product SSR failed", error instanceof Error ? error.message : error);
     response.setHeader("Cache-Control", "no-store");
@@ -243,4 +266,5 @@ module.exports._test = {
   buildProductGraph,
   renderProductPage,
   renderNotFoundPage,
+  productCsp,
 };

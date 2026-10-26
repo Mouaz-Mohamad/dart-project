@@ -60,7 +60,7 @@
 
   function normalizeImage(value) {
     if (!value) return "";
-    if (typeof value === "string") return value;
+    if (typeof value === "string") return root.DartCatalog?.imageSrc?.(value) || value;
     try { return root.DartCatalog?.imageSrc?.(value) || ""; } catch { return ""; }
   }
 

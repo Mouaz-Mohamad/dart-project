@@ -2,13 +2,14 @@
 // الغرض: يثبت أن روابط المنتجات العميقة تحصل على Canonical/Metadata/ProductGroup من السيرفر قبل JavaScript.
 "use strict";
 const assert = require("assert");
+const { createHash } = require("node:crypto");
 const renderer = require("../api/product-page.js")._test;
 
 const template = `<!doctype html><html><head>
 <title>Collection</title>
 <meta name="description" content="collection">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://dart-project-psi.vercel.app/products">
+<link rel="canonical" href="https://www.dartofficial.com/products">
 <meta property="og:title" content="Collection"><meta property="og:description" content="collection">
 <meta property="og:image" content="logo.png"><meta property="og:image:secure_url" content="logo.png">
 <meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1080">
@@ -36,12 +37,15 @@ const path = renderer.productPathForModel(model);
 assert.equal(path, "/products/cairo-wide-leg-jeans--dw-101");
 assert.strictEqual(renderer.resolveModel(catalog, "old-title--dw-101"), model, "stable model code must resolve old title slugs");
 const html = renderer.renderProductPage(template, catalog, model);
-assert(html.includes(`rel="canonical" href="https://dart-project-psi.vercel.app${path}"`));
+assert(html.includes(`rel="canonical" href="https://www.dartofficial.com${path}"`));
 assert(html.includes("Cairo Wide Leg Jeans | Dart for you (دارت)"));
 assert(html.includes('property="og:type" content="product"'));
 assert(!html.includes('og:image:width'), "product response must not publish false static image dimensions");
 const jsonld = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)?.[1];
 assert(jsonld, "product JSON-LD must exist in initial HTML");
+assert(renderer.productCsp(html).includes(`'sha256-${createHash("sha256").update(jsonld).digest("base64")}'`),
+  "each rendered product graph must be allowed by the response CSP");
+assert(!/script-src[^;]*'unsafe-inline'/.test(renderer.productCsp(html)));
 const graph = JSON.parse(jsonld)["@graph"];
 const productGroup = graph.find((node) => node["@type"] === "ProductGroup");
 const breadcrumb = graph.find((node) => node["@type"] === "BreadcrumbList");
@@ -54,4 +58,13 @@ assert.equal(productGroup.hasVariant[1].offers.availability, "https://schema.org
 for (const url of renderer.SOCIAL_URLS) assert(organization.sameAs.includes(url));
 const notFound = renderer.renderNotFoundPage(template);
 assert(notFound.includes('content="noindex, follow"'));
+const migratedModel = { ...model, colorOptions: [{ name: "Black", images: [
+  { url: "https://dart-project-psi.vercel.app/api/v1/catalog/assets/fixture-image?v=content-version" },
+] }] };
+const migrated = renderer.renderProductPage(template, catalog, migratedModel);
+assert(!migrated.includes("dart-project-psi.vercel.app"), "SSR and social images must not retain the old origin");
+assert(migrated.includes("https://www.dartofficial.com/api/v1/catalog/assets/fixture-image?v=content-version"));
+const migratedGraph = JSON.parse(migrated.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)[1])["@graph"];
+assert.equal(migratedGraph.find(node => node["@type"] === "ProductGroup").hasVariant[0].image,
+  "https://www.dartofficial.com/api/v1/catalog/assets/fixture-image?v=content-version");
 console.log("PASS product SSR canonical, social metadata, ProductGroup variants, availability and 404 noindex");

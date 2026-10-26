@@ -9,4 +9,4 @@ Disallow: /track.html
 Disallow: /rep.html
 Disallow: /Sign%20Up%20modern.html
 
-Sitemap: https://dart-project-psi.vercel.app/sitemap.xml
+Sitemap: https://www.dartofficial.com/sitemap.xml

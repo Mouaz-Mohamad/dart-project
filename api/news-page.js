@@ -2,7 +2,7 @@
 "use strict";
 const fs = require("node:fs"), path = require("node:path"), crypto = require("node:crypto");
 const links = require("../Js/dart-news-links.js");
-const PUBLIC_ORIGIN = "https://dart-project-psi.vercel.app";
+const PUBLIC_ORIGIN = "https://www.dartofficial.com";
 const API_ORIGIN = "https://dart-api-dusky.vercel.app";
 const template = fs.readFileSync(path.join(__dirname, "news-template.html"), "utf8");
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);

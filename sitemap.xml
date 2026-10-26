@@ -3,12 +3,12 @@
      الغرض: فهرس خرائط الموقع؛ يفصل الصفحات الثابتة عن المنتجات الحية القادمة من قاعدة البيانات. -->
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
-    <loc>https://dart-project-psi.vercel.app/sitemap-pages.xml</loc>
+    <loc>https://www.dartofficial.com/sitemap-pages.xml</loc>
   </sitemap>
   <sitemap>
-    <loc>https://dart-project-psi.vercel.app/product-sitemap.xml</loc>
+    <loc>https://www.dartofficial.com/product-sitemap.xml</loc>
   </sitemap>
   <sitemap>
-    <loc>https://dart-project-psi.vercel.app/news-sitemap.xml</loc>
+    <loc>https://www.dartofficial.com/news-sitemap.xml</loc>
   </sitemap>
 </sitemapindex>

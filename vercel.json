@@ -147,7 +147,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self' 'inline-speculation-rules' 'sha256-Y7DedZ45D/0BFUtDI6Yaa8XBDXCsx/GLB7w1s5F5lbw=' 'sha256-/fLkpE7/LhcrMdne0F37Ua1Y9+vaIaIIyweWDrP7D+0=' 'sha256-kqOD0W2xmKXPVQjXC0ilniMPqFfMm8rzY19rhRMrOTI=' 'sha256-NZT0wpM8V2lEU09bIaXXe4xeG/CYBwOyF5SGGeNmvmk=' 'sha256-jmjVBYcOw+8aVURborlKrSwUDvU3eUy0zfIGfy/BcPk=' 'sha256-ekcTE5vQdKw0lDYiUZpXwQnPfrCKlhofJvNbxK9R+po=' 'sha256-vsGXAX93uUaQK4Vqry98C0OjExYxfzYPNd/l8oyQ9OM=' 'sha256-qV6bhliA9kxG+gx/V1yuK2WpuQTQTEpoBBzaWU46gm4=' 'sha256-8m6YABCko63QVvJGc2Z3/uhBcImVyrQDrcyJtZdGSEU=' https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https://unpkg.com https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://via.placeholder.com; connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self' 'sha256-9+ERHNA1gKCB3GrC87slEUTusHlcvpnPBvHV4khGDrw=' 'sha256-9s+EyZLIEFaUqA3pJVOu+dIyGfHbloZuhpKUakl5nGs=' 'sha256-Nk6/GQoTRObNBp+ym6SAu43WDnne9FD+Mt+i7a3Cl+A=' 'sha256-RaxmHr1QP7LYBtK+QliED9R0uthgAox4X1hQiMoq1S8=' 'sha256-RfCAEUcbmr61BlBUMq3t8pS7Gg1KcsN4DhQxMnJe6AQ=' 'sha256-k8JcBMtf+6dhB5grWYB+5fkN1nNLE+i0HXYx+r7P844=' 'sha256-rWIkadooUgQrYPURYG/Y5osM0QxKqAxxSiKKKD4QALo=' 'inline-speculation-rules' 'sha256-Y7DedZ45D/0BFUtDI6Yaa8XBDXCsx/GLB7w1s5F5lbw=' 'sha256-/fLkpE7/LhcrMdne0F37Ua1Y9+vaIaIIyweWDrP7D+0=' https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https://unpkg.com https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://via.placeholder.com; connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests"
         },
         {
           "key": "Cross-Origin-Opener-Policy",
@@ -165,6 +165,17 @@
     }
   ],
   "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "dart-project-psi.vercel.app"
+        }
+      ],
+      "destination": "https://www.dartofficial.com/:path*",
+      "permanent": true
+    },
     {
       "source": "/Photos/me.webp",
       "destination": "/Photos/me.png?v=founder-png-v10",

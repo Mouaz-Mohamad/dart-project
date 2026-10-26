@@ -1,7 +1,7 @@
 // Published, active News discovery; the public API excludes drafts and archived articles.
 "use strict";
 const links = require("../Js/dart-news-links.js");
-const PUBLIC_ORIGIN = "https://dart-project-psi.vercel.app";
+const PUBLIC_ORIGIN = "https://www.dartofficial.com";
 function build(rows) {
   const unique = new Map(rows.filter(row => links.validId(row.newsId)).map(row => [row.newsId, row]));
   const urls = [...unique.values()].map(row => `<url><loc>${PUBLIC_ORIGIN}${links.path(row)}</loc></url>`).join("\n");

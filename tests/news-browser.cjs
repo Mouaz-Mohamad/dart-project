@@ -203,7 +203,7 @@ const server = http.createServer(async (req, res) => {
     const direct = await articlePage.goto(origin + links.path(records[0]));
     assert.equal(direct.status(), 200); assert.equal(await articlePage.locator("h1").textContent(), records[0].title);
     assert.ok((await articlePage.locator(".news-page-body").textContent()).includes("Paragraph two"));
-    assert.equal(await articlePage.locator('link[rel="canonical"]').getAttribute("href"), "https://dart-project-psi.vercel.app" + links.path(records[0]));
+    assert.equal(await articlePage.locator('link[rel="canonical"]').getAttribute("href"), "https://www.dartofficial.com" + links.path(records[0]));
     records[0].isArchived = true;
     const archived = await articlePage.reload(); assert.equal(archived.status(), 404); assert.equal(await articlePage.locator(".news-page-body").count(), 0);
     assert.ok(!(await (await fetch(origin + "/news-sitemap.xml")).text()).includes(links.path(records[0])));

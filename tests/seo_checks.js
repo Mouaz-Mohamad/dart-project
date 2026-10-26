@@ -54,7 +54,7 @@ for (const page of publicPages) {
     [/<title>[^<]+<\/title>/i, "title"],
     [/<meta\s+name="description"\s+content="[^"]+"/i, "description"],
     [/<meta\s+name="robots"\s+content="[^"]*index/i, "index robots"],
-    [/<link\s+rel="canonical"\s+href="https:\/\/dart-project-psi\.vercel\.app\//i, "canonical"],
+    [/<link\s+rel="canonical"\s+href="https:\/\/www\.dartofficial\.com\//i, "canonical"],
     [/<meta\s+property="og:title"/i, "Open Graph title"],
     [/<meta\s+property="og:description"/i, "Open Graph description"],
     [/<meta\s+property="og:image"/i, "Open Graph image"],
@@ -157,10 +157,10 @@ const pageSitemap = read("sitemap-pages.xml");
 const robots = read("robots.txt");
 if (!/<sitemapindex\b/i.test(sitemapIndex))
   errors.push("sitemap.xml: root sitemap must be a sitemap index");
-for (const child of ["sitemap-pages.xml", "product-sitemap.xml"])
-  if (!sitemapIndex.includes(`https://dart-project-psi.vercel.app/${child}`))
+for (const child of ["sitemap-pages.xml", "product-sitemap.xml", "news-sitemap.xml"])
+  if (!sitemapIndex.includes(`https://www.dartofficial.com/${child}`))
     errors.push(`sitemap.xml: missing child sitemap ${child}`);
-if (!robots.includes("https://dart-project-psi.vercel.app/sitemap.xml"))
+if (!robots.includes("https://www.dartofficial.com/sitemap.xml"))
   errors.push("robots.txt: must advertise the root sitemap index");
 
 for (const page of publicPages) {
@@ -181,10 +181,26 @@ if (!productsRedirect || productsRedirect.destination !== "/products" || product
 
 const home = read("index.html");
 const products = read("products.html");
+const homeGraph = JSON.parse(home.match(/<script\s+type="application\/ld\+json">([\s\S]*?)<\/script>/i)[1])["@graph"];
+const website = homeGraph.filter(node => node["@type"] === "WebSite");
+if (website.length !== 1 || website[0].name !== "Dart" || website[0].url !== "https://www.dartofficial.com/")
+  errors.push("index.html: one WebSite must identify Dart at the canonical custom domain");
+if (!website[0]?.alternateName?.includes("دارت"))
+  errors.push("index.html: site name must include the recognized Arabic alternate");
+if (!home.includes('property="og:site_name" content="Dart"'))
+  errors.push("index.html: Open Graph must agree with the preferred site name");
+const oldDomainRedirect = (vercelConfig.redirects || []).find(entry =>
+  entry.has?.some(condition => condition.type === "host" && condition.value === "dart-project-psi.vercel.app"));
+if (oldDomainRedirect?.destination !== "https://www.dartofficial.com/:path*" || oldDomainRedirect.permanent !== true)
+  errors.push("vercel.json: old storefront host must permanently redirect while retaining the path");
+for (const page of structuredDataPages) {
+  if (read(page).includes("https://dart-project-psi.vercel.app"))
+    errors.push(`${page}: old storefront origin must not remain in public metadata`);
+}
 for (const term of ["Dart for you", "دارت", "لبس رجالي", "لبس شبابي"])
   if (!home.includes(term) && !products.includes(term))
     errors.push(`SEO discovery: missing natural brand/query term ${term}`);
-if (!products.includes('rel="canonical" href="https://dart-project-psi.vercel.app/products"'))
+if (!products.includes('rel="canonical" href="https://www.dartofficial.com/products"'))
   errors.push("products.html: canonical must use clean /products URL");
 
 if (errors.length) {

@@ -34,7 +34,7 @@ const model = {
     {
       name: "Black",
       active: true,
-      images: [{ id: "fixture-image", name: "fixture.jpg", url: "/Photos/products/1.jpg" }],
+      images: [{ id: "fixture-image", name: "fixture.jpg", url: "https://dart-project-psi.vercel.app/api/v1/catalog/assets/fixture-image?v=fixture-version" }],
     },
   ],
 };
@@ -68,6 +68,11 @@ const setFixture = {
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, "http://test");
   const pathname = decodeURIComponent(url.pathname);
+  if (pathname === "/api/v1/catalog/assets/fixture-image") {
+    response.setHeader("Content-Type", "image/jpeg");
+    response.end(fs.readFileSync(path.join(root, "Photos/products/1.jpg")));
+    return;
+  }
 
   if (pathname === "/sets-runtime-fixture.html") {
     response.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -228,6 +233,11 @@ const server = http.createServer((request, response) => {
   const card = page.locator('#productsContainer .product-card[data-id="DW-101"]').first();
   await card.waitFor({ state: "visible" });
   assert.match(await card.textContent(), /Cairo Wide Leg Jeans/);
+  const productImage = card.locator("img").first();
+  await productImage.evaluate(image => image.decode());
+  assert.equal(await productImage.getAttribute("src"), `${origin}/api/v1/catalog/assets/fixture-image?v=fixture-version`,
+    "saved Vercel image URLs must load through the current storefront origin");
+  assert(await productImage.evaluate(image => image.naturalWidth > 0));
 
   const setCard = page.locator('#productsContainer [data-dart-set-card="1"][data-dart-set-id="SET-DW-101"]');
   await setCard.waitFor({ state: "visible" });

@@ -159,7 +159,7 @@
 
   function firstImage(set) {
     return Array.isArray(set?.images) && set.images.length
-      ? String(set.images[0] || "")
+      ? root.DartCatalog?.imageSrc?.(set.images[0]) || String(set.images[0] || "")
       : "Photos/logo-1to1.png";
   }
   // END Set catalogue and reservation API.
@@ -638,7 +638,8 @@
   }
 
   function componentImages(set) {
-    const images = [...(Array.isArray(set.images) ? set.images : [])];
+    const images = (Array.isArray(set.images) ? set.images : [])
+      .map(image => root.DartCatalog?.imageSrc?.(image) || image);
     (set.components || []).forEach((component) => {
       const model = modelFor(component.modelId), color = activeOptions(component.colors)[0] || "";
       try { const image = root.DartCatalog?.cover?.(model, color); if (image) images.push(image); } catch {}

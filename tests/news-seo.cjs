@@ -6,7 +6,7 @@ const links = require("../Js/dart-news-links.js");
 const article = { newsId: "NEWS-stable--ID", title: 'إطلاق Dart <new> & "news"',
   excerpt: "First details & more.", body: "Complete news.\n\n<script>secret()</script> {{title}} $&\nFinal paragraph.",
   imageUrl: "/api/v1/catalog/assets/NEWSIMG-cover?v=abc123", publishedAt: "2026-10-08T08:00:00Z" };
-const origin = "https://dart-project-psi.vercel.app";
+const origin = "https://www.dartofficial.com";
 function response() {
   return { code: null, headers: {}, body: "", setHeader(key, value) { this.headers[key] = value; },
     status(code) { this.code = code; return this; }, send(body) { this.body = body; return this; },

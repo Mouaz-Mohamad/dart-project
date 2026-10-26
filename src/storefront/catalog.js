@@ -277,6 +277,16 @@
   function resolveAssetUrl(value, assetId = "") {
     const raw = String(value || "").trim();
     if (!raw) return assetId ? assetPath(assetId) : "";
+    // Saved Dart media follows the active API origin after a domain move.
+    // Retain the version query so immutable image caches remain correct.
+    try {
+      const url = new URL(raw, API_BASE || location.origin);
+      if ([location.origin, API_BASE, "https://dart-project-psi.vercel.app", "https://dart-api-dusky.vercel.app",
+        "https://dartofficial.com", "https://www.dartofficial.com"].includes(url.origin) &&
+        /^\/api\/v1\/catalog\/assets\/[A-Za-z0-9_-]{8,120}$/.test(url.pathname)) {
+        return `${API_BASE}${url.pathname}${url.search}`;
+      }
+    } catch { /* Keep the existing fallback for non-URL image references. */ }
     if (/^(?:https?:|data:|blob:)/i.test(raw)) return raw;
     if (raw.startsWith("/")) return API_BASE ? `${API_BASE}${raw}` : raw;
     return raw;
@@ -359,6 +369,7 @@
   }
   const imageSrc = (asset) => {
     if (!asset) return placeholder;
+    if (typeof asset === "string") return resolveAssetUrl(asset) || placeholder;
     const local = imageURLs.get(asset.id);
     if (local) return local;
     if (asset.url) return resolveAssetUrl(asset.url, asset.id);

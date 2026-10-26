@@ -1,7 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/catalog/catalog.seo.ts
 // الغرض: بناء خرائط منتجات SEO من الكتالوج العام الخادمي بدون الثقة في أي بيانات مرسلة من المتصفح.
 
-const DEFAULT_STOREFRONT_ORIGIN = "https://dart-project-psi.vercel.app";
+const DEFAULT_STOREFRONT_ORIGIN = "https://www.dartofficial.com";
 
 export interface SeoCatalogModel {
   modelId?: unknown;

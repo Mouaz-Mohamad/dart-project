@@ -845,7 +845,7 @@ function renderCart() {
         const card = template.cloneNode(true);
         card.removeAttribute('id');
         card.style.display = 'flex';
-        card.querySelector('.cart-product-img').src = item.image;
+        card.querySelector('.cart-product-img').src = window.DartCatalog?.imageSrc?.(item.image) || item.image;
         card.querySelector('.cart-product-img').alt = `${item.title} in ${item.color}, size ${item.size}`;
         card.querySelector('.cart-product-title').textContent = item.title;
         card.querySelector('.p-size').textContent = item.size;
