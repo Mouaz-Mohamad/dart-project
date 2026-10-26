@@ -181,6 +181,10 @@ if (!productsRedirect || productsRedirect.destination !== "/products" || product
 
 const home = read("index.html");
 const products = read("products.html");
+const lighthouseWorkflow = read(".github/workflows/lighthouse-production.yml");
+if (lighthouseWorkflow.includes("https://dart-project-psi.vercel.app/") ||
+    (lighthouseWorkflow.match(/lighthouse@latest "https:\/\/www\.dartofficial\.com\/"/g) || []).length !== 2)
+  errors.push("Lighthouse: mobile and desktop must audit the canonical custom domain directly");
 const homeGraph = JSON.parse(home.match(/<script\s+type="application\/ld\+json">([\s\S]*?)<\/script>/i)[1])["@graph"];
 const website = homeGraph.filter(node => node["@type"] === "WebSite");
 if (website.length !== 1 || website[0].name !== "Dart" || website[0].url !== "https://www.dartofficial.com/")

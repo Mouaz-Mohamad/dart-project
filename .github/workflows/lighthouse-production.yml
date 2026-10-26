@@ -51,7 +51,7 @@ jobs:
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.path }}
         run: |
-          npx --yes lighthouse@latest "https://dart-project-psi.vercel.app/" \
+          npx --yes lighthouse@latest "https://www.dartofficial.com/" \
             --quiet \
             --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
             --only-categories=performance,accessibility,best-practices,seo \
@@ -62,7 +62,7 @@ jobs:
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.path }}
         run: |
-          npx --yes lighthouse@latest "https://dart-project-psi.vercel.app/" \
+          npx --yes lighthouse@latest "https://www.dartofficial.com/" \
             --quiet \
             --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
             --preset=desktop \

@@ -4,7 +4,8 @@
   "use strict";
   if (root.DartProductLinks?.version) return;
 
-  const BRAND_NAME = "Dart | for you";
+  const BRAND_NAME = "Dart";
+  const PUBLIC_ORIGIN = "https://www.dartofficial.com";
   const BRAND_ALT_NAME = "Dart Wear";
   const BRAND_ARABIC_NAME = "دارت";
   const LIST_PATH = "/products";
@@ -149,12 +150,12 @@
     if (!kind || slugFromPath()) return;
     const isHome = kind === "home";
     const title = isHome
-      ? "Dart for you (دارت) | لبس رجالي وشبابي في مصر"
-      : "ملابس رجالي وشبابي | منتجات Dart for you - Dart Wear";
+      ? "Dart | دارت للملابس الرجالي والشبابي في مصر"
+      : "منتجات Dart | ملابس رجالي وشبابي في مصر";
     const description = isHome
-      ? "Dart for you أو Dart Wear (دارت) براند ملابس رجالي وشبابي في مصر. اكتشف موديلات وموضة رجالي عصرية، أسعار واضحة، مقاسات وألوان ومخزون حقيقي."
-      : "تسوق منتجات Dart for you وDart Wear: لبس رجالي ولبس شبابي وموضة رجالي عصرية في مصر، مع عرض السعر والمقاس واللون والتوفر لكل موديل.";
-    const canonicalUrl = isHome ? `${root.location.origin}/` : `${root.location.origin}${LIST_PATH}`;
+      ? "Dart (دارت) براند ملابس رجالي وشبابي في مصر. اكتشف موديلات عصرية، أسعار واضحة، ومقاسات وألوان متاحة من الكتالوج مباشرة."
+      : "تسوق منتجات Dart (دارت): لبس رجالي ولبس شبابي في مصر، مع الأسعار والألوان والمقاسات والتوفر المحدث لكل موديل.";
+    const canonicalUrl = isHome ? `${PUBLIC_ORIGIN}/` : `${PUBLIC_ORIGIN}${LIST_PATH}`;
 
     document.documentElement?.setAttribute("lang", "ar");
     document.title = title;
@@ -199,7 +200,7 @@
       price: Math.max(0, Number(product.price) || 0).toFixed(2),
       availability: available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
-      seller: { "@id": `${root.location.origin}/#organization` },
+      seller: { "@id": `${PUBLIC_ORIGIN}/#organization` },
     };
   }
 
@@ -272,8 +273,8 @@
           "@type": "BreadcrumbList",
           "@id": `${canonicalUrl}#breadcrumbs`,
           itemListElement: [
-            { "@type": "ListItem", position: 1, name: BRAND_NAME, item: `${root.location.origin}/` },
-            { "@type": "ListItem", position: 2, name: "منتجات Dart", item: `${root.location.origin}${LIST_PATH}` },
+            { "@type": "ListItem", position: 1, name: BRAND_NAME, item: `${PUBLIC_ORIGIN}/` },
+            { "@type": "ListItem", position: 2, name: "منتجات Dart", item: `${PUBLIC_ORIGIN}${LIST_PATH}` },
             { "@type": "ListItem", position: 3, name: product.title, item: canonicalUrl },
           ],
         },
@@ -288,7 +289,7 @@
     const robotsNode = document.head.querySelector('meta[name="robots"]');
     if (initialRobots?.existed && robotsNode) robotsNode.setAttribute("content", initialRobots.content);
     else if (robotsNode?.dataset.dartProductCreated === "1") robotsNode.remove();
-    const canonicalUrl = `${root.location.origin}${pathFor(product)}`;
+    const canonicalUrl = `${PUBLIC_ORIGIN}${pathFor(product)}`;
     const title = `${product.title} | ${BRAND_NAME}`;
     const description = generatedDescription(product);
     const image = absolute(product.images?.[0] || product.gallery?.[0]?.src || "");
@@ -507,7 +508,7 @@
   }
 
   root.DartProductLinks = Object.freeze({
-    version: "2.0.0",
+    version: "2.1.0",
     slugPart,
     slugFor,
     pathFor,

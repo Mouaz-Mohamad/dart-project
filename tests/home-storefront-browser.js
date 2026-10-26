@@ -233,6 +233,9 @@ const server = http.createServer((request, response) => {
   const card = page.locator('#productsContainer .product-card[data-id="DW-101"]').first();
   await card.waitFor({ state: "visible" });
   assert.match(await card.textContent(), /Cairo Wide Leg Jeans/);
+  assert.equal(await page.title(), "Dart | دارت للملابس الرجالي والشبابي في مصر",
+    "the dynamic discovery helper must preserve the approved home title");
+  assert.equal(await page.locator('link[rel="canonical"]').getAttribute("href"), "https://www.dartofficial.com/");
   const productImage = card.locator("img").first();
   await productImage.evaluate(image => image.decode());
   assert.equal(await productImage.getAttribute("src"), `${origin}/api/v1/catalog/assets/fixture-image?v=fixture-version`,
@@ -322,6 +325,8 @@ const server = http.createServer((request, response) => {
   await page.goBack();
   await page.waitForURL(/\/index\.html$/);
   await page.waitForFunction(() => getComputedStyle(document.getElementById("SectionModel")).display === "none");
+  assert.equal(await page.title(), "Dart | دارت للملابس الرجالي والشبابي في مصر",
+    "closing a product must restore the current branding");
 
   await page.goForward();
   await page.waitForURL(/\/products\/cairo-wide-leg-jeans--dw-101$/);

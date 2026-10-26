@@ -198,6 +198,6 @@
     (document.head || document.documentElement).appendChild(script);
   }
 
-  addScript("/Js/dart-product-links.js?v=2", "dartProductLinks");
+  addScript("/Js/dart-product-links.js?v=custom-domain-v3", "dartProductLinks");
   addScript("/Js/dart-product-route-fix.js?v=1.1", "dartProductRouteFix");
 })(window);

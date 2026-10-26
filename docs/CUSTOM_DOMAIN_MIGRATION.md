@@ -15,6 +15,8 @@ host redirects permanently to the same path on the custom domain.
   retain their previous behavior.
 - Public HTML canonical links, social metadata, structured data and the static,
   product and News sitemaps use the custom domain. Private pages remain `noindex`.
+- Client-side product navigation preserves the same page titles and canonical
+  identity; Mobile/Desktop Lighthouse audits target the custom domain directly.
 - Static JSON-LD CSP hashes were refreshed. Product SSR authorizes its actual
   rendered JSON-LD hash without enabling executable inline scripts.
 - The API upstream remains `dart-api-dusky.vercel.app`. Its existing custom-domain
