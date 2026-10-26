@@ -2012,9 +2012,10 @@
                   </fieldset>
 
                   <fieldset id="finance-settlement-fields" class="dart-finance-form-section" data-finance-form-resource="settlements" hidden disabled>
+                    <p class="dart-accounting-note">سجّل ما استلمته من المندوب قبل رسوم COD. مرتجعات Dart تُسجل منفصلة عند رد المال للعميل؛ لا تخصمها مرة أخرى من إيصال التحصيل.</p>
                     <label class="dart-finance-field"><span>Order</span><select id="finance-settlement-order" name="orderId" required></select></label>
                     <label class="dart-finance-field"><span>Receipt Date</span><input id="finance-settlement-date" name="settlementDate" type="date" required></label>
-                    <label class="dart-finance-field"><span>Amount Received (EGP)</span><input id="finance-settlement-amount" name="amountReceived" type="number" min="0.01" step="any" required></label>
+                    <label class="dart-finance-field"><span>Gross COD Receipt (EGP)</span><input id="finance-settlement-amount" name="amountReceived" type="number" min="0.01" step="any" required></label>
                     <label class="dart-finance-field"><span>COD Fee (EGP)</span><input id="finance-settlement-fee" name="fee" type="number" min="0" step="any" value="0" required></label>
                     <label class="dart-finance-field"><span>Receipt Reference</span><input id="finance-settlement-reference" name="reference" type="text"></label>
                     <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-settlement-notes" name="notes" rows="3"></textarea></label>

@@ -76,7 +76,8 @@ type CustomerFacts = {
   firstDeliveredAt: Date | null;
 };
 
-type CartFact = {
+export type CartFact = {
+  isSet?: boolean;
   itemCode: string;
   modelId: string;
   category: string;
@@ -241,9 +242,11 @@ export class PromotionService {
 
   private async cartFacts(client: PoolClient, customerUserId: string, reservationId: string): Promise<CartFact[]> {
     const result = await client.query<{
-      item_code: string; model_id: string; category: string; selling_minor: string; discount_percent: string;
+      item_code: string; model_id: string; category: string; selling_minor: string; discount_percent: string; is_set: boolean;
     }>(
-      `SELECT i.item_code,i.model_id,m.category,m.selling_minor::text,m.discount_percent::text
+      `SELECT i.item_code,i.model_id,m.category,m.selling_minor::text,m.discount_percent::text,
+              EXISTS(SELECT 1 FROM cart_set_components sc JOIN cart_set_groups sg ON sg.id=sc.group_id
+                WHERE sc.inventory_item_id=i.id AND sg.reservation_id=cr.id) AS is_set
          FROM cart_reservations cr
          JOIN inventory_items i ON i.cart_reservation_id=cr.id
          JOIN catalog_models m ON m.model_id=i.model_id
@@ -254,6 +257,7 @@ export class PromotionService {
       [reservationId, customerUserId],
     );
     return result.rows.map((row) => ({
+      isSet: row.is_set,
       itemCode: row.item_code,
       modelId: row.model_id,
       category: row.category,
@@ -297,7 +301,7 @@ export class PromotionService {
   private cartEligible(campaign: PromotionCampaignInput, cart: CartFact[]): boolean {
     const scope = campaign.productScope;
     const allowed = new Set(scope.values.map((value) => value.toLowerCase()));
-    const eligible = cart.filter((item) => item.modelDiscountPercent <= 0 && (
+    const eligible = cart.filter((item) => !item.isSet && item.modelDiscountPercent <= 0 && (
       scope.mode === "all" || allowed.has((scope.mode === "categories" ? item.category
         : scope.mode === "models" ? item.modelId : item.itemCode).toLowerCase())
     ));
@@ -318,8 +322,20 @@ export class PromotionService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const result = await this.resolveForCheckoutInTransaction(client, customerUserId, reservationId, requestedCode);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async resolveForCheckoutInTransaction(client: PoolClient, customerUserId: string, reservationId: string, requestedCode?: string, reservedItems?: CartFact[]): Promise<{ code: string | null; campaign: Record<string, unknown> | null }> {
       const facts = await this.customerFacts(client, customerUserId);
-      const cart = await this.cartFacts(client, customerUserId, reservationId);
+      const cart = reservedItems ?? await this.cartFacts(client, customerUserId, reservationId);
       if (!cart.length) throw new AppError(409, "RESERVATION_EMPTY", "No reserved items remain in this cart");
       const campaigns = await this.loadCampaigns(client);
       const normalizedCode = String(requestedCode || "").trim().toUpperCase();
@@ -332,7 +348,6 @@ export class PromotionService {
         if (!evaluateRule(campaign.customerRules, facts)) continue;
         if (!this.cartEligible(campaign, cart)) continue;
         if (!await this.campaignUsageAllowed(client, campaign, customerUserId)) continue;
-        await client.query("COMMIT");
         return {
           code: campaign.code,
           campaign: { id: campaign.id, name: campaign.name, code: campaign.code, discountPercent: campaign.discountPercent, automatic: campaign.automatic },
@@ -341,14 +356,7 @@ export class PromotionService {
       if (normalizedCode) {
         throw new AppError(409, "PROMOTION_NOT_ELIGIBLE", "Promotion is invalid, expired, exhausted, or not eligible for this account/cart");
       }
-      await client.query("COMMIT");
       return { code: null, campaign: null };
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
   }
 
   public async validateCode(customerUserId: string, code: string): Promise<Record<string, unknown>> {

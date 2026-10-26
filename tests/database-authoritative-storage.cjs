@@ -42,9 +42,9 @@ for (const file of roots.flatMap(walk)) {
   }
 }
 
-const catalog = fs.readFileSync("Js/dart-catalog.js", "utf8");
+const catalog = fs.readFileSync("src/storefront/catalog.js", "utf8");
 if (/indexedDB\s*\.\s*(?:open|deleteDatabase)\s*\(/.test(catalog)) {
-  failures.push("Js/dart-catalog.js: product media must be persisted through the API, never IndexedDB");
+  failures.push("src/storefront/catalog.js: product media must be persisted through the API, never IndexedDB");
 }
 
 const cart = fs.readFileSync("Js/dart-ui.js", "utf8");

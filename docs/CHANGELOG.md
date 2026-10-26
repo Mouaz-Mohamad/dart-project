@@ -1,5 +1,15 @@
 # Dart Project changelog
 
+## Second Council repairs — 2026-10-26
+
+- Preserved financial/reward snapshots and verified COD during metadata edits.
+- Shared authoritative Set and ordinary line pricing between quotes, checkout, outbox email and cached responses; bound price review to a server fingerprint.
+- Counted actual Card lines across Set reservations and ordinary items, restored legacy Set Birthday lifecycle in migration 0064, and removed preflight from completed HTTP retries.
+- Based COD cash flow on dated gross receipts with separate refunds; retained historical periods.
+- Removed customer cost fields, scoped leaderboard refunds to their sale, preserved profile drafts during polling, recovered failed catalog bootstrap and targeted password reset delivery.
+- Updated Nodemailer/Zod and patched transitive body-parser/ip-address; production npm audit reports zero known vulnerabilities.
+- Kept delivery URLs and performance limits stable by minifying catalog delivery from its maintained source.
+
 ## Sale integrity, mixed discounts and committed checkout — 2026-10-25
 
 - Bound returns to the original order line, capped manual refunds and prevented old history from changing a resold/reserved item.

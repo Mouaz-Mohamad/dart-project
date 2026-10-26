@@ -332,6 +332,7 @@ export class SetCartService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      if (customerUserId) await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:cart:${reservationId}`]);
       await this.reservationOwner(client, reservationId, customerUserId, guestOwnerHash);
 

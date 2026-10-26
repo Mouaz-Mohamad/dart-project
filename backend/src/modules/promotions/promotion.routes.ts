@@ -1,6 +1,6 @@
 // DART CODE GUIDE | backend/src/modules/promotions/promotion.routes.ts
-// الغرض: HTTP contract لمحرك Promotions مع preflight خادمي قبل Commerce checkout.
-import { Router, type NextFunction, type Request, type Response } from "express";
+// الغرض: HTTP contract لمحرك Promotions مع تحقق داخل معاملة Commerce checkout.
+import { Router } from "express";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import {
@@ -24,31 +24,6 @@ export function createPromotionRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
-
-  // Mounted before CommerceRouter. It only performs authoritative eligibility preflight,
-  // then forwards the request so the existing checkout transaction remains the writer.
-  router.post(
-    "/orders",
-    signedIn,
-    requireAccountType("customer"),
-    async (request: Request, _response: Response, next: NextFunction) => {
-      const body = z.object({
-        reservationId,
-        promotionCode: z.string().trim().min(1).max(60).optional(),
-      }).passthrough().parse(request.body);
-      const resolved = await promotions.resolveForCheckout(
-        request.auth!.userId,
-        body.reservationId,
-        body.promotionCode,
-      );
-      if (resolved.code) {
-        request.body = { ...request.body, promotionCode: resolved.code };
-      } else if (request.body && typeof request.body === "object") {
-        delete (request.body as Record<string, unknown>).promotionCode;
-      }
-      next();
-    },
-  );
 
   router.get(
     "/me/promotions/validate-v2",

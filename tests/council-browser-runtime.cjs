@@ -16,7 +16,7 @@ async function main() {
   const form = { elements: { namedItem: (name) => ({ value: fields[name] || "" }) }, dataset: {} };
   const checkout = { window: { dartCheckoutAddress: { validate: () => ({ ok: true, zone: "cairo-giza" }) }, DartCatalog: { checkForServerChanges: async () => { throw new Error("refresh offline"); } } },
     API_BASE: "https://synthetic.test", cartData: [{ id: "M1" }], CART_RESERVATION_ID: "CART-OLD", cleanupCartReservations() {},
-    currentUser: () => ({ name: "Synthetic", email: fields.email }), displayPhone: (x) => x, apiRequest: async () => ({ order: { orderId: "K-CONFIRMED" } }),
+    currentUser: () => ({ name: "Synthetic", email: fields.email }), displayPhone: (x) => x, apiRequest: async (url) => url.includes("/cart/quote") ? ({ fingerprint: "a".repeat(64), totalMinor: 18000, subtotalMinor: 20000, discountMinor: 2000 }) : ({ order: { orderId: "K-CONFIRMED" } }),
     write() {}, uid: () => "CART-NEW", setCartReservationId() {}, sessionStorage: { setItem() {} },
     saveCustomerAddress: async () => { throw new Error("preference offline"); }, hydrateCustomerCommerce: async () => { throw new Error("profile offline"); } };
   vm.runInNewContext(fs.readFileSync("src/storefront/platform/checkout.js", "utf8") + "\nthis.runCheckout=checkout;", checkout);
@@ -25,6 +25,43 @@ async function main() {
   checkout.cartData = [{ id: "M1" }]; checkout.apiRequest = async () => { throw new Error("write failed"); };
   await assert.rejects(checkout.runCheckout(form), /write failed/);
   assert.equal(checkout.cartData.length, 1, "a failed POST retains the cart");
+
+  // The actual platform requests per-line pricing before it submits, and binds acceptance to that quote.
+  checkout.window.dartDisplayedTotalMinor = 16000;
+  let posted = 0, fingerprint = "b".repeat(64);
+  checkout.apiRequest = async (url, options) => {
+    if (url.includes("/cart/quote")) return { fingerprint, totalMinor: 18000, subtotalMinor: 20000, discountMinor: 2000 };
+    posted++; assert.equal(options.body.quoteFingerprint, fingerprint); assert.equal(options.body.expectedTotalMinor, 18000);
+    return { order: { orderId: "K-QUOTED" } };
+  };
+  await assert.rejects(checkout.runCheckout(form), (error) => error.code === "PRICE_CHANGED");
+  assert.equal(posted, 0, "a mixed scoped cart must review 180 instead of submitting the estimated 160");
+  fingerprint = "c".repeat(64);
+  await assert.rejects(checkout.runCheckout(form, { acceptPriceChanges: true }), (error) => error.code === "PRICE_CHANGED");
+  assert.equal(posted, 0, "old acceptance cannot authorize changed discount sources");
+  checkout.window.dartDisplayedTotalMinor = 18000;
+  await checkout.runCheckout(form, { acceptPriceChanges: true }); assert.equal(posted, 1);
+  checkout.cartData = [{ id: "M1" }];
+  checkout.apiRequest = async (url) => {
+    assert.ok(url.includes("/cart/quote"), "a committed reply is recovered before attempting another POST");
+    return { completedOrder: { orderId: "K-ALREADY-COMMITTED" } };
+  };
+  assert.equal((await checkout.runCheckout(form)).orderId, "K-ALREADY-COMMITTED");
+
+  // A commerce poll refreshes statistics but retains the current customer's edit inputs and Cancel button.
+  const draftInput = { value: "Unsaved draft" }, editButton = { dataset: { mode: "edit", customerId: "customer-1" }, textContent: "Save", addEventListener() {} };
+  let removed = false, replaced = false;
+  const field = { querySelector: () => draftInput, set textContent(_value) { replaced = true; } };
+  const profileUser = { id: "customer-1", customerId: "DR-1", name: "Stored Name", email: "stored@example.test", phone1: "01000000001" };
+  const profileContext = { currentUser: () => profileUser, syncCustomer: () => ({}), read: () => [], KEYS: { orders: "orders", returns: "returns" },
+    serverPurchaseStats: { totalPieces: 2, monthlyPieces: 1 }, cairoParts: () => ({ year: 2026, month: 10 }), displayPhone: (x) => x,
+    renderProfileWaiting() {}, document: { getElementById: () => null,
+      querySelector: (selector) => selector === ".account" ? {} : selector === ".profile-details .edit" ? editButton :
+        selector === ".profile-details .cancel-edit" ? { remove() { removed = true; } } : selector === "#user-name" ? field : null } };
+  vm.runInNewContext(fs.readFileSync("src/storefront/platform/profile.js", "utf8") + "\nthis.render=renderProfile;", profileContext);
+  profileContext.render();
+  assert.equal(replaced, false); assert.equal(removed, false); assert.equal(editButton.dataset.mode, "edit"); assert.equal(draftInput.value, "Unsaved draft");
+  editButton.dataset.mode = ""; profileContext.render(); assert.equal(replaced, true); assert.equal(removed, true);
 
   const ui = fs.readFileSync("Js/dart-ui.js", "utf8");
   const block = ui.slice(ui.indexOf("// BEGIN Checkout submission:"), ui.indexOf("// END Checkout submission."));

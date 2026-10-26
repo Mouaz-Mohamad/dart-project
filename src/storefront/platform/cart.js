@@ -182,6 +182,7 @@
   }
 
   async function reserveCart(cart) {
+    invalidateCartQuote();
     if (API_BASE) {
       if (!cart.length) {
         await releaseCartReservation(false);

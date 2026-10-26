@@ -150,7 +150,7 @@ describe("identity HTTP boundaries", () => {
       "customer@example.com",
       expect.any(Object),
     );
-    expect(outbox.processBatch).toHaveBeenCalledWith(5);
+    expect(outbox.processBatch).toHaveBeenCalledWith(1, "password-reset-code:123e4567-e89b-12d3-a456-426614174009");
   });
 
   it("requires the OTP flow to finish by setting a new password", async () => {

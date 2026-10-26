@@ -787,6 +787,15 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
     note?.remove();
     return false;
 }
+function applyCartQuote(quote) {
+    if (!quote?.fingerprint || window.DartPlatform?.currentCartQuote?.()?.fingerprint !== quote.fingerprint) return false;
+    for (const [id, value] of [['subtotalVal', quote.subtotalMinor], ['discountVal', quote.discountMinor], ['totalVal', quote.totalMinor]]) {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = `${(value / 100).toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`; el.removeAttribute('aria-busy'); }
+    }
+    window.dartDisplayedTotalMinor = quote.totalMinor;
+    return true;
+}
 function updateCartTotals() {
     syncBirthdayCheckoutDiscount();
     const subtotalEl = document.getElementById('subtotalVal');
@@ -811,9 +820,15 @@ function updateCartTotals() {
         }
     });
     const discountAmount = Math.max(0, subtotal - finalTotal);
-    if (subtotalEl) subtotalEl.textContent = `${Math.trunc(subtotal)} EGP`;
-    if (discountEl) discountEl.textContent = `${Math.trunc(discountAmount)} EGP`;
-    if (totalEl) totalEl.textContent = `${Math.trunc(finalTotal)} EGP`;
+    if (subtotalEl) subtotalEl.textContent = `${subtotal.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
+    if (discountEl) discountEl.textContent = `${discountAmount.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
+    if (totalEl) totalEl.textContent = `${finalTotal.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
+    window.dartDisplayedTotalMinor = Math.round(finalTotal * 100);
+    applyCartQuote(window.DartPlatform?.currentCartQuote?.());
+    if (cartData.length && window.DartPlatform?.currentUser?.() && window.DartPlatform?.quoteCart) {
+        totalEl?.setAttribute('aria-busy', 'true');
+        void window.DartPlatform.quoteCart().then(applyCartQuote).catch(() => totalEl?.removeAttribute('aria-busy'));
+    }
 }
 function renderCart() {
     const container = document.getElementById('cartItemsContainer');

@@ -104,7 +104,7 @@ assert.strictEqual(cashSummary.netCashFlow, 850);
 const paidWithoutSettlement = finance.calculateSummary(baseData({
   orders: [{ ...deliveredOrder, paymentStatus: "Paid", amountPaid: 0, paidAt: "2026-09-02" }],
 }), range("2026-09-01", "2026-09-30"));
-assert.strictEqual(paidWithoutSettlement.cashIn, 1000, "A paid COD order without a separate receipt record must use its final order amount once.");
+assert.strictEqual(paidWithoutSettlement.cashIn, 0, "Paid by the customer is not a dated COD receipt into Dart cash.");
 
 const damagedReturnData = baseData({
   orders: [{ ...deliveredOrder, amountRefunded: 1000 }],

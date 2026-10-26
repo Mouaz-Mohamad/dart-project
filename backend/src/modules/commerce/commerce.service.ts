@@ -2,6 +2,7 @@
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import { PromotionService } from "../promotions/promotion.service.js";
 import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 import {
@@ -26,6 +27,7 @@ import {
   detectCartPriceChanges,
   campaignAppliesToItem,
   orderBenefit,
+  customerOrderView,
 } from "./commerce.pricing.js";
 import {
   cairoDateKey,
@@ -1309,58 +1311,7 @@ export class CommerceService {
     }
   }
 
-  public async checkout(
-    customerUserId: string,
-    input: CheckoutInput,
-    requestId: string,
-    guestOwnerHash?: string,
-    idempotencyKey?: string,
-  ): Promise<Record<string, unknown>> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-      await this.releaseExpired(client);
-
-      if (!idempotencyKey) {
-        throw new AppError(400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required");
-      }
-      const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
-      const requestHash = createHash("sha256")
-        .update(JSON.stringify({ customerUserId, input }))
-        .digest("hex");
-      const insertedKey = await client.query<{ id: string }>(
-        `INSERT INTO idempotency_keys (scope, key_hash, request_hash, expires_at)
-         VALUES ($1,$2,$3,now() + interval '24 hours')
-         ON CONFLICT (scope, key_hash) DO NOTHING
-         RETURNING id::text`,
-        [`order.create:${customerUserId}`, keyHash, requestHash],
-      );
-      if (!insertedKey.rows.length) {
-        const existingKey = await client.query<{
-          request_hash: string;
-          status: string;
-          response_body: Record<string, unknown> | null;
-        }>(
-          `SELECT request_hash, status, response_body
-             FROM idempotency_keys
-            WHERE scope=$1 AND key_hash=$2 AND expires_at > now()
-            FOR UPDATE`,
-          [`order.create:${customerUserId}`, keyHash],
-        );
-        const existing = existingKey.rows[0];
-        if (!existing) {
-          throw new AppError(409, "IDEMPOTENCY_KEY_EXPIRED", "Retry checkout with a new idempotency key");
-        }
-        if (existing.request_hash !== requestHash) {
-          throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used for different checkout data");
-        }
-        if (existing.status === "completed" && existing.response_body) {
-          await client.query("COMMIT");
-          return existing.response_body;
-        }
-        throw new AppError(409, "CHECKOUT_IN_PROGRESS", "This checkout is already being processed");
-      }
-
+  private async checkoutReservation(client: PoolClient, customerUserId: string, reservationId: string, guestOwnerHash?: string, claim = false) {
       const reservationResult = await client.query<{
         customer_user_id: string | null;
         guest_owner_hash: string | null;
@@ -1373,7 +1324,7 @@ export class CommerceService {
           WHERE id=$1
             AND source='cart'
           FOR UPDATE`,
-        [input.reservationId],
+        [reservationId],
       );
       const reservation = reservationResult.rows[0];
       if (!reservation || reservation.expires_at.getTime() <= Date.now()) {
@@ -1392,15 +1343,19 @@ export class CommerceService {
           "This guest cart belongs to another browser",
         );
       }
-      await client.query(
+      if (claim) await client.query(
         `UPDATE cart_reservations
             SET customer_user_id=$2,
                 guest_owner_hash=NULL,
                 updated_at=now()
           WHERE id=$1`,
-        [input.reservationId, customerUserId],
+        [reservationId, customerUserId],
       );
 
+      return reservation;
+  }
+
+  private async checkoutInventory(client: PoolClient, reservationId: string) {
       const itemResult = await client.query<LockedItem>(
         `SELECT i.id, i.item_code, i.model_id, i.color, i.size,
                 m.name AS model_name, m.category, i.cost_snapshot_minor::text,
@@ -1414,44 +1369,47 @@ export class CommerceService {
             AND m.active AND NOT m.is_archived AND NOT m.is_deleted
           ORDER BY i.created_at, i.id
           FOR UPDATE OF i`,
-        [input.reservationId],
+        [reservationId],
       );
       if (!itemResult.rows.length) {
         throw new AppError(409, "RESERVATION_EMPTY", "No reserved items remain in this cart");
       }
 
-      const settingsResult = await client.query<{ data: Record<string, unknown> }>(
-        "SELECT data FROM site_settings WHERE id='main'",
-      );
-      const settings = settingsResult.rows[0]?.data || {};
-      const configuredCourierFee = Number(
-        settings.courierFeePerOrder ?? settings.deliveryCostPerPiece,
-      );
-      const courierFeePerOrderMinor = Math.round(
-        Math.max(
-          0,
-          Number.isFinite(configuredCourierFee)
-            ? configuredCourierFee
-            : 100,
-        ) * 100,
-      );
-      const reservedPricing = Array.isArray(reservation.pricing_snapshot)
-        ? reservation.pricing_snapshot
-        : [];
-      const priceChanges = detectCartPriceChanges(
-        reservedPricing,
-        itemResult.rows,
-        0,
-      );
-      if (priceChanges.length && !input.acceptPriceChanges) {
-        throw new AppError(
-          409,
-          "PRICE_CHANGED",
-          "One or more cart prices changed. Review and confirm the current prices before checkout.",
-          { changes: priceChanges },
-        );
-      }
+      return itemResult;
+  }
 
+  private async checkoutPricing(
+    client: PoolClient, customerUserId: string, reservationId: string,
+    items: LockedItem[], settings: Record<string, unknown>, requestedCode?: string,
+  ) {
+      const setResult = await client.query<{
+        inventory_item_id: string; allocated_base_minor: string; allocated_final_minor: string;
+        discount_source: string; discount_percent: string; discount_reference: string | null;
+      }>(`SELECT c.inventory_item_id::text,c.allocated_base_minor::text,c.allocated_final_minor::text,
+                 g.discount_source,g.discount_percent::text,g.discount_reference
+            FROM cart_set_components c JOIN cart_set_groups g ON g.id=c.group_id
+           WHERE g.reservation_id=$1`, [reservationId]);
+      const setPrices = new Map(setResult.rows.map((row) => [row.inventory_item_id, row]));
+      const hasSetBirthday = setResult.rows.some((row) => row.discount_source === "Birthday");
+      const setCardCodes = new Set(setResult.rows.filter((row) => row.discount_source === "Dart Card").map((row) => String(row.discount_reference || "")));
+      const extraReservations = await client.query<{ card_code: string; pieces: string }>(`
+        SELECT card_code,sum(pieces)::text AS pieces FROM (
+          SELECT card_code,piece_count AS pieces FROM set_loyalty_cart_reservations
+           WHERE customer_user_id=$1 AND expires_at>now()
+          UNION ALL
+          SELECT slu.card_code,slu.piece_count-slu.returned_piece_count FROM set_loyalty_usage slu
+          JOIN orders o ON o.id=slu.order_id
+           WHERE o.customer_user_id=$1 AND slu.status='Reserved' AND NOT EXISTS (
+             SELECT 1 FROM jsonb_array_elements(dart_order_benefits(o.promotion)) benefit
+              WHERE benefit->>'type'='Dart Card' AND benefit->>'cardId'=slu.card_code
+           )
+        ) claims GROUP BY card_code`, [customerUserId]);
+      const extraCardReservations = new Map(extraReservations.rows.map((row) => [row.card_code, Number(row.pieces)]));
+      const resolvedCampaign = await new PromotionService(this.pool).resolveForCheckoutInTransaction(
+        client, customerUserId, reservationId, requestedCode,
+        items.map((row) => ({ itemCode: row.item_code, modelId: row.model_id, category: row.category || "",
+          sellingMinor: Number(row.selling_minor), modelDiscountPercent: Number(row.discount_percent || 0), isSet: setPrices.has(row.id) })),
+      );
       const customerPromotionResult = await client.query<{
         client_code: string;
         birthday: string | null;
@@ -1498,14 +1456,14 @@ export class CommerceService {
       let birthdayReward: Record<string, unknown> | null = null;
       let appliedCard: Record<string, unknown> | null = null;
       let cardRemainingItems = 0;
-      const hasUndiscountedItems = itemResult.rows.some(
-        (row) => Number(row.discount_percent || 0) <= 0,
+      const hasUndiscountedItems = items.some(
+        (row) => !setPrices.has(row.id) && Number(row.discount_percent || 0) <= 0,
       );
 
       // Priority for every undiscounted item: Campaign, Birthday, then Dart Card.
       // Model/item discount is evaluated first per line below and never stacks.
-      if (hasUndiscountedItems && input.promotionCode) {
-        const normalizedCode = String(input.promotionCode).trim().toUpperCase();
+      if (hasUndiscountedItems && resolvedCampaign.code) {
+        const normalizedCode = String(resolvedCampaign.code).trim().toUpperCase();
         const codePromotion = (promotionsState.data as Record<string, unknown>[]).find(
           (row) =>
             String(row.code || "").trim().toUpperCase() === normalizedCode &&
@@ -1543,7 +1501,7 @@ export class CommerceService {
       }
 
       const birthday = birthdayWindow(customerPromotion.birthday);
-      if (hasUndiscountedItems && birthday) {
+      if ((hasUndiscountedItems || hasSetBirthday) && birthday) {
         const rewardId = `BDAY-${customerPromotion.client_code}-${birthday.year}`;
         birthdayReward = (birthdayState.data as Record<string, unknown>[]).find(
           (row) => String(row.id || "") === rewardId,
@@ -1578,7 +1536,7 @@ export class CommerceService {
         }
       }
 
-      if (hasUndiscountedItems) {
+      if (hasUndiscountedItems || setCardCodes.size) {
         const nowMs = Date.now();
         appliedCard = (cardState.data as Record<string, unknown>[]).find((row) => {
           if (
@@ -1591,13 +1549,13 @@ export class CommerceService {
           const used = Number(row.purchasedItems || 0);
           const reserved = Number(row.reservedItems || 0);
           const expiry = flexibleDateExpiry(row.expDate);
-          return limit - used - reserved > 0 && (!expiry || expiry >= nowMs);
+          return (limit - used - reserved - (extraCardReservations.get(String(row.cardId || row.id || "")) || 0) > 0 || setCardCodes.has(String(row.cardId || row.id || ""))) && (!expiry || expiry >= nowMs);
         }) || null;
         if (appliedCard) {
           const limit = Number(appliedCard.itemLimit || appliedCard.purchasedLimit || 10);
           cardRemainingItems = Math.max(
             0,
-            limit - Number(appliedCard.purchasedItems || 0) - Number(appliedCard.reservedItems || 0),
+            limit - Number(appliedCard.purchasedItems || 0) - Number(appliedCard.reservedItems || 0) - (extraCardReservations.get(String(appliedCard.cardId || appliedCard.id || "")) || 0),
           );
           promotionPercent = Math.min(
             100,
@@ -1614,13 +1572,17 @@ export class CommerceService {
         }
       }
 
+      if ((hasSetBirthday && !birthdayBenefit) || [...setCardCodes].some((code) => code !== cardBenefit?.cardId)) {
+        throw new AppError(409, "SET_BENEFIT_CHANGED", "Set reward eligibility changed. Refresh the cart and add the Set again.");
+      }
       let subtotalMinor = 0;
       let finalMinor = 0;
       let cardAppliedItems = 0;
-      const itemSnapshots = itemResult.rows.map((row) => {
-        const sellingMinor = Number(row.selling_minor);
-        const modelDiscountPercent = Number(row.discount_percent || 0);
-        const resolvedDiscount = resolveItemDiscount(
+      const itemSnapshots = items.map((row) => {
+        const setPrice = setPrices.get(row.id);
+        const sellingMinor = setPrice ? Number(setPrice.allocated_base_minor) : Number(row.selling_minor);
+        const modelDiscountPercent = setPrice ? 0 : Number(row.discount_percent || 0);
+        const resolvedDiscount = setPrice ? { percent: Number(setPrice.discount_percent), source: setPrice.discount_source, reference: setPrice.discount_reference || "", consumesDartCardSlot: false } : resolveItemDiscount(
           modelDiscountPercent,
           promotion && campaign && campaignAppliesToItem(campaign, row) ? promotion : birthdayBenefit || cardBenefit,
           cardRemainingItems - cardAppliedItems,
@@ -1629,7 +1591,7 @@ export class CommerceService {
         const discountSource = resolvedDiscount.source;
         const discountReference = resolvedDiscount.reference || (discountSource === "Model" ? row.model_id : "");
         if (resolvedDiscount.consumesDartCardSlot) cardAppliedItems += 1;
-        const finalUnitMinor = finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
+        const finalUnitMinor = setPrice ? Number(setPrice.allocated_final_minor) : finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
         subtotalMinor += sellingMinor;
         finalMinor += finalUnitMinor;
         return {
@@ -1653,6 +1615,8 @@ export class CommerceService {
         const source = benefit.type === "Promotion" ? "Campaign" : String(benefit.type);
         const lines = itemSnapshots.filter((snapshot) => snapshot.discountSource === source);
         if (!lines.length) return false;
+        const rates = new Set(lines.map((line) => line.effectiveDiscountPercent));
+        benefit.percent = rates.size === 1 ? lines[0]!.effectiveDiscountPercent : 0;
         benefit.discountMinor = lines.reduce((sum, snapshot) => sum + snapshot.discountMinor, 0);
         return true;
       });
@@ -1660,6 +1624,150 @@ export class CommerceService {
         ? { type: "Mixed", percent: 0, discountMinor: benefitDiscountMinor, benefits: usedBenefits }
         : usedBenefits[0] || null;
       promotionPercent = Number(promotion?.percent || 0);
+      const fingerprint = createHash("sha256").update(JSON.stringify({ customerUserId, reservationId,
+        lines: itemSnapshots.map((line) => [line.row.item_code,line.sellingMinor,line.finalUnitMinor,line.discountSource,line.discountReference]),
+      })).digest("hex");
+      return { itemSnapshots, subtotalMinor, finalMinor, orderDiscountMinor, promotion, promotionPercent,
+        birthdayReward, appliedCard, birthdayState, cardState, fingerprint, setItemIds: new Set(setPrices.keys()) };
+  }
+
+  private cartQuoteView(pricing: Awaited<ReturnType<CommerceService["checkoutPricing"]>>) {
+    return { currency: "EGP", subtotalMinor: pricing.subtotalMinor, discountMinor: pricing.orderDiscountMinor,
+      totalMinor: pricing.finalMinor, fingerprint: pricing.fingerprint,
+      lines: pricing.itemSnapshots.map((line) => ({ itemCode: line.row.item_code, modelId: line.row.model_id,
+        color: line.row.color, size: line.row.size, baseMinor: line.sellingMinor, finalMinor: line.finalUnitMinor,
+        discountSource: line.discountSource, discountPercent: line.effectiveDiscountPercent, discountReference: line.discountReference })),
+    };
+  }
+
+  public async customerCartQuote(customerUserId: string, reservationId: string, promotionCode?: string, guestOwnerHash?: string) {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
+      const committed = await client.query<{ response_body: Record<string, unknown> }>(
+        "SELECT response_body FROM idempotency_keys WHERE scope=$1 AND key_hash=$2 AND status='completed' AND expires_at>now()",
+        [`order.create:${customerUserId}`, createHash("sha256").update(`checkout-${reservationId}`).digest("hex")],
+      );
+      if (committed.rows[0]?.response_body) {
+        await client.query("COMMIT");
+        return { completedOrder: customerOrderView(committed.rows[0].response_body) };
+      }
+      await this.checkoutReservation(client, customerUserId, reservationId, guestOwnerHash);
+      const items = await this.checkoutInventory(client, reservationId);
+      const settings = await client.query<{ data: Record<string, unknown> }>("SELECT data FROM site_settings WHERE id='main'");
+      const pricing = await this.checkoutPricing(client, customerUserId, reservationId, items.rows, settings.rows[0]?.data || {}, promotionCode);
+      await client.query("COMMIT");
+      return this.cartQuoteView(pricing);
+    } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
+    finally { client.release(); }
+  }
+
+  public async checkout(
+    customerUserId: string,
+    input: CheckoutInput,
+    requestId: string,
+    guestOwnerHash?: string,
+    idempotencyKey?: string,
+  ): Promise<Record<string, unknown>> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      if (!idempotencyKey) {
+        throw new AppError(400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required");
+      }
+      const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
+      const requestHash = createHash("sha256")
+        .update(JSON.stringify({ customerUserId, input }))
+        .digest("hex");
+      const insertedKey = await client.query<{ id: string }>(
+        `INSERT INTO idempotency_keys (scope, key_hash, request_hash, expires_at)
+         VALUES ($1,$2,$3,now() + interval '24 hours')
+         ON CONFLICT (scope, key_hash) DO NOTHING
+         RETURNING id::text`,
+        [`order.create:${customerUserId}`, keyHash, requestHash],
+      );
+      if (!insertedKey.rows.length) {
+        const existingKey = await client.query<{
+          request_hash: string;
+          status: string;
+          response_body: Record<string, unknown> | null;
+        }>(
+          `SELECT request_hash, status, response_body
+             FROM idempotency_keys
+            WHERE scope=$1 AND key_hash=$2 AND expires_at > now()
+            FOR UPDATE`,
+          [`order.create:${customerUserId}`, keyHash],
+        );
+        const existing = existingKey.rows[0];
+        if (!existing) {
+          throw new AppError(409, "IDEMPOTENCY_KEY_EXPIRED", "Retry checkout with a new idempotency key");
+        }
+        // Older HTTP middleware inserted the selected automatic code before hashing.
+        // Accept that exact legacy body too; all customer/contact/address fields must still match.
+        const cachedCode = String(existing.response_body?.promotionCode || "");
+        const { acceptPriceChanges, ...legacyFields } = input;
+        const legacyAutoHash = !input.promotionCode && !input.quoteFingerprint && input.expectedTotalMinor === undefined && cachedCode
+          ? createHash("sha256").update(JSON.stringify({ customerUserId, input: {
+              ...legacyFields, promotionCode: cachedCode,
+              ...(acceptPriceChanges !== undefined ? { acceptPriceChanges } : {}),
+            } })).digest("hex") : null;
+        if (existing.request_hash !== requestHash && existing.request_hash !== legacyAutoHash) {
+          throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used for different checkout data");
+        }
+        if (existing.status === "completed" && existing.response_body) {
+          await client.query("COMMIT");
+          return customerOrderView(existing.response_body);
+        }
+        throw new AppError(409, "CHECKOUT_IN_PROGRESS", "This checkout is already being processed");
+      }
+
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
+      await this.releaseExpired(client);
+      const reservation = await this.checkoutReservation(client, customerUserId, input.reservationId, guestOwnerHash, true);
+      const itemResult = await this.checkoutInventory(client, input.reservationId);
+
+      const settingsResult = await client.query<{ data: Record<string, unknown> }>(
+        "SELECT data FROM site_settings WHERE id='main'",
+      );
+      const settings = settingsResult.rows[0]?.data || {};
+      const configuredCourierFee = Number(
+        settings.courierFeePerOrder ?? settings.deliveryCostPerPiece,
+      );
+      const courierFeePerOrderMinor = Math.round(
+        Math.max(
+          0,
+          Number.isFinite(configuredCourierFee)
+            ? configuredCourierFee
+            : 100,
+        ) * 100,
+      );
+      const pricing = await this.checkoutPricing(client, customerUserId, input.reservationId, itemResult.rows, settings, input.promotionCode);
+      const { itemSnapshots, subtotalMinor, finalMinor, orderDiscountMinor, promotion, promotionPercent,
+        birthdayReward, appliedCard, birthdayState, cardState } = pricing;
+      if (input.quoteFingerprint && input.quoteFingerprint !== pricing.fingerprint) {
+        throw new AppError(409, "PRICE_CHANGED", "Cart pricing changed. Review the current total before confirming.", {
+          changes: [{ previousUnitPrice: Number(input.expectedTotalMinor || 0) / 100, currentUnitPrice: finalMinor / 100 }],
+        });
+      }
+      const reservedPricing = Array.isArray(reservation.pricing_snapshot)
+        ? reservation.pricing_snapshot
+        : [];
+      const priceChanges = detectCartPriceChanges(
+        reservedPricing,
+        itemResult.rows.filter((row) => !pricing.setItemIds.has(row.id)),
+        0,
+      );
+      if (priceChanges.length && !input.acceptPriceChanges) {
+        throw new AppError(
+          409,
+          "PRICE_CHANGED",
+          "One or more cart prices changed. Review and confirm the current prices before checkout.",
+          { changes: priceChanges },
+        );
+      }
+
       // The representative is paid once per order, not once per item.
       // Item cost already includes this allocation, so Finance must not add it again.
       const deliveryCostMinor = courierFeePerOrderMinor;
@@ -1885,6 +1993,8 @@ export class CommerceService {
           JSON.stringify({ orderCode: order.order_code, itemCount: itemSnapshots.length }),
         ],
       );
+      // Flush deferred Set allocations before queueing email or caching the customer reply.
+      await client.query("SET CONSTRAINTS order_items_set_order_reconcile IMMEDIATE");
       await queueOrderEmail(client, order.id, "order.created");
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
@@ -1926,7 +2036,6 @@ export class CommerceService {
           discountSource: snapshot.discountSource,
           discountReference: snapshot.discountReference,
           finalUnitPrice: snapshot.finalUnitMinor / 100,
-          costSnapshot: snapshot.costMinor / 100,
         })),
         ...input.contact,
         ...input.address,
@@ -4596,10 +4705,23 @@ export class CommerceService {
         delivery_cost_minor: string;
         customer_user_id: string | null;
         promotion: Record<string, unknown> | null;
+        has_set_groups: boolean;
+        payment_method: string;
+        payment_status: string;
+        amount_paid_minor: string;
+        amount_refunded_minor: string;
+        contact_snapshot: Record<string, unknown> | null;
+        delivery_address: Record<string, unknown> | null;
+        delivery_notes: string;
+        order_source: string;
+        legacy: Record<string, unknown> | null;
       }>(
         `SELECT id::text, order_code, status, subtotal_minor::text,
                 order_discount_minor::text, final_minor::text,
-                delivery_cost_minor::text, customer_user_id::text, promotion
+                delivery_cost_minor::text, customer_user_id::text, promotion,
+                payment_method,payment_status,amount_paid_minor::text,amount_refunded_minor::text,
+                contact_snapshot,delivery_address,delivery_notes,order_source,legacy,
+                EXISTS(SELECT 1 FROM order_set_groups g WHERE g.order_id=orders.id) AS has_set_groups
            FROM orders
           WHERE (id::text=$1 OR order_code=$1)
             AND NOT is_deleted
@@ -4627,17 +4749,15 @@ export class CommerceService {
         currentCodes.length !== itemCodes.length ||
         currentCodes.some((code) => !itemCodes.includes(code));
       const hasReservedBenefit = ["Promotion", "Birthday", "Dart Card"].some((type) => orderBenefit(existing.promotion, type));
-      const financiallyLocked = ["Delivered", "Returned"].includes(existing.status) || hasReservedBenefit;
-      const existingDiscountPercent =
-        existing.promotion ? Number(existing.promotion.percent || 0) : Number(existing.subtotal_minor) > 0
-          ? (Number(existing.order_discount_minor) / Number(existing.subtotal_minor)) * 100
-          : 0;
+      const financiallyLocked = ["Delivered", "Returned"].includes(existing.status) || hasReservedBenefit || existing.has_set_groups;
+      // Match the admin editor's order-level rate. A Set/model line discount
+      // is already in the immutable snapshot and is not a manual order discount.
+      const existingDiscountPercent = Number(existing.promotion?.percent || existing.legacy?.discount || 0);
       const requestedDiscount = Math.min(100, Math.max(0, Number(input.discountPercent ?? existingDiscountPercent) || 0));
 
-      if (
-        financiallyLocked &&
-        (itemSetChanged || Math.abs(requestedDiscount - existingDiscountPercent) > 0.01)
-      ) {
+      const financialEdit = itemSetChanged || Math.abs(requestedDiscount - existingDiscountPercent) > 0.01;
+      const preservePricing = financiallyLocked || !financialEdit;
+      if (financiallyLocked && financialEdit) {
         throw new AppError(
           409,
           "ORDER_FINANCIAL_SNAPSHOT_LOCKED",
@@ -4655,11 +4775,11 @@ export class CommerceService {
           : { rows: [] as { user_id: string }[] };
       const customerUserId = customerResult.rows[0]?.user_id || null;
 
-      if (hasReservedBenefit && clientCode && clientCode !== "-" && customerUserId !== existing.customer_user_id) {
+      if (financiallyLocked && clientCode && clientCode !== "-" && customerUserId !== existing.customer_user_id) {
         throw new AppError(409, "ORDER_BENEFIT_OWNER_IMMUTABLE", "An order with reserved discounts keeps its original customer");
       }
 
-      if (!financiallyLocked) {
+      if (!preservePricing) {
         await this.syncAdminOrderItems(
           client,
           existing.id,
@@ -4670,20 +4790,20 @@ export class CommerceService {
         );
       }
 
-      const priced = !financiallyLocked ? await this.priceAdminOrderLines(client, existing.id, requestedDiscount) : null;
-      const subtotalMinor = financiallyLocked
+      const priced = !preservePricing ? await this.priceAdminOrderLines(client, existing.id, requestedDiscount) : null;
+      const subtotalMinor = preservePricing
         ? Number(existing.subtotal_minor)
         : priced!.subtotalMinor;
-      const discountMinor = financiallyLocked
+      const discountMinor = preservePricing
         ? Number(existing.order_discount_minor)
         : Math.max(0, subtotalMinor - priced!.finalMinor);
-      const finalMinor = financiallyLocked
+      const finalMinor = preservePricing
         ? Number(existing.final_minor)
         : priced!.finalMinor;
 
       let updatedDeliveryCostMinor = Number(existing.delivery_cost_minor || 0);
       let updatedCourierFeePerOrderMinor = 0;
-      if (!financiallyLocked) {
+      if (!preservePricing) {
         const settingsResult = await client.query<{ data: Record<string, unknown> }>(
           "SELECT data FROM site_settings WHERE id='main'",
         );
@@ -4699,30 +4819,30 @@ export class CommerceService {
 
       const amountPaidMinor = Math.min(
         finalMinor,
-        Math.max(0, Math.round((Number(input.amountPaid) || 0) * 100)),
+        Math.max(0, Math.round(input.amountPaid === undefined ? Number(existing.amount_paid_minor) : input.amountPaid * 100)),
       );
       const amountRefundedMinor = Math.min(
         amountPaidMinor,
-        Math.max(0, Math.round((Number(input.amountRefunded) || 0) * 100)),
+        Math.max(0, Math.round(input.amountRefunded === undefined ? Number(existing.amount_refunded_minor) : input.amountRefunded * 100)),
       );
 
       const contact = {
         name: String(input.clientName || "").trim(),
         phone1: String(input.phone1 || "").trim(),
-        phone2: String(input.phone2 || "").trim(),
-        email: String(input.email || "").trim(),
+        phone2: String(input.phone2 ?? existing.contact_snapshot?.phone2 ?? "").trim(),
+        email: String(input.email ?? existing.contact_snapshot?.email ?? "").trim(),
       };
       const address = {
-        country: String(input.country || "Egypt"),
-        governorate: String(input.governorate || ""),
-        area: String(input.area || ""),
-        street: String(input.street || ""),
-        building: String(input.building || ""),
-        floor: String(input.floor || ""),
-        latitude: String(input.latitude || ""),
-        longitude: String(input.longitude || ""),
-        fullAddress: String(input.fullAddress || ""),
-        addressSource: "Manual Admin",
+        country: String(input.country ?? existing.delivery_address?.country ?? "Egypt"),
+        governorate: String(input.governorate ?? existing.delivery_address?.governorate ?? ""),
+        area: String(input.area ?? existing.delivery_address?.area ?? ""),
+        street: String(input.street ?? existing.delivery_address?.street ?? ""),
+        building: String(input.building ?? existing.delivery_address?.building ?? ""),
+        floor: String(input.floor ?? existing.delivery_address?.floor ?? ""),
+        latitude: String(input.latitude ?? existing.delivery_address?.latitude ?? ""),
+        longitude: String(input.longitude ?? existing.delivery_address?.longitude ?? ""),
+        fullAddress: String(input.fullAddress ?? existing.delivery_address?.fullAddress ?? ""),
+        addressSource: existing.delivery_address?.addressSource || "Manual Admin",
       };
 
       await client.query(
@@ -4748,14 +4868,14 @@ export class CommerceService {
         [
           existing.id,
           customerUserId,
-          String(input.paymentMethod || "Cash on Delivery"),
-          String(input.paymentStatus || "Unpaid"),
+          String(input.paymentMethod ?? existing.payment_method),
+          String(input.paymentStatus ?? existing.payment_status),
           subtotalMinor,
           discountMinor,
           finalMinor,
           amountPaidMinor,
           amountRefundedMinor,
-          requestedDiscount
+          preservePricing ? (existing.promotion ? JSON.stringify(existing.promotion) : null) : requestedDiscount
             ? JSON.stringify({
                 type: "Manual Order Discount",
                 percent: requestedDiscount,
@@ -4763,11 +4883,11 @@ export class CommerceService {
             : null,
           JSON.stringify(contact),
           JSON.stringify(address),
-          String(input.deliveryNotes || ""),
-          String(input.orderSource || "Manual"),
+          String(input.deliveryNotes ?? existing.delivery_notes),
+          String(input.orderSource ?? existing.order_source),
           updatedDeliveryCostMinor,
           JSON.stringify({
-            clientId: clientCode || "-",
+            clientId: clientCode || existing.legacy?.clientId || "-",
             discount: requestedDiscount,
             reasonDeduction: requestedDiscount ? "Order discount" : "-",
             deliveryCost: updatedDeliveryCostMinor / 100,
@@ -4781,7 +4901,12 @@ export class CommerceService {
         ],
       );
 
-      if (String(input.paymentMethod || "Cash on Delivery").toLowerCase().includes("cash")) {
+      const paymentMethod = String(input.paymentMethod ?? existing.payment_method);
+      if (paymentMethod.toLowerCase().includes("cash") && (
+        itemSetChanged || finalMinor !== Number(existing.final_minor) ||
+        (customerUserId !== null && customerUserId !== existing.customer_user_id) ||
+        paymentMethod !== existing.payment_method
+      )) {
         await this.refreshCodRiskForOrder(
           client,
           existing.id,
@@ -4811,8 +4936,11 @@ export class CommerceService {
           JSON.stringify({
             orderCode: existing.order_code,
             financiallyLocked,
+            preservePricing,
             itemSetChanged,
             discountPercent: requestedDiscount,
+            before: { promotion: existing.promotion, amountPaidMinor: Number(existing.amount_paid_minor), amountRefundedMinor: Number(existing.amount_refunded_minor), paymentStatus: existing.payment_status },
+            after: { promotion: preservePricing ? existing.promotion : requestedDiscount ? { type: "Manual Order Discount", percent: requestedDiscount } : null, amountPaidMinor, amountRefundedMinor, paymentStatus: input.paymentStatus ?? existing.payment_status },
           }),
         ],
       );
@@ -5769,7 +5897,7 @@ export class CommerceService {
       const parentOwnsAggregate =
         String(orderBenefit(parentPromotion, "Dart Card")?.cardId || "") === usage.card_code;
       const activePieces = Math.max(0, Number(usage.piece_count) - Number(usage.returned_piece_count));
-      const shouldDeliver = nextStatus === "Delivered" && previousStatus !== "Delivered" && usage.status !== "Used";
+      const shouldDeliver = nextStatus === "Delivered" && previousStatus !== "Delivered";
       const shouldRelease = ["Cancelled", "Refused"].includes(nextStatus) && usage.status !== "Released";
       const shouldReReserve = previousStatus === "Delivered" && nextStatus !== "Delivered" && !["Cancelled", "Refused"].includes(nextStatus);
 

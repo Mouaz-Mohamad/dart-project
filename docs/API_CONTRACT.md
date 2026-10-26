@@ -1,3 +1,13 @@
+# تحديث الإصلاح الثاني — 2026-10-26
+
+- `GET /api/v1/me/cart/quote?reservationId=...&promotionCode=...` يعيد `currency`, `fingerprint`, `subtotalMinor`, `discountMinor`, `totalMinor` و`lines` بالقروش. الحساب مشترك مع Checkout، بما فيه نطاق Campaign وتوزيع Set وحدود المكافآت. الرد `no-store`، وصلاحية السلة والعميل تُفحص خادميًا.
+- المتجر يرسل `quoteFingerprint` و`expectedTotalMinor` إلى `POST /orders`. الإجمالي الأخير للعرض فقط؛ اختلاف fingerprint يعيد `PRICE_CHANGED` حتى عند `acceptPriceChanges: true`، ولا ينشئ طلبًا. القبول مربوط بالأسعار ومصادر الخصم المعروضة.
+- عند وجود رد مكتمل للمفتاح القياسي `checkout-<reservationId>` يعيد Quote `completedOrder` بدلاً من فحص السلة المستهلكة. POST المطابق يعيد رده المكتمل قبل إعادة التحقق من السلة والحملة. لا تُكشف `costSnapshot` في قراءات العميل أو الردود القديمة المخزنة.
+- تعديلات الاسم/الملاحظات تحافظ على الحقول المالية والعنوان والقيم الاختيارية المحذوفة من الطلب. طلبات Set والمكافآت والتسليم تحتفظ بصور الأسعار والمستفيد؛ التحقق من COD يعاد فقط عند تغير مؤثر في المخاطر.
+- `COD Cash In` يأتي من إيصالات الاستلام المؤرخة وحدها. `Paid` على الطلب يصف دفع العميل ولا يثبت دخول المال إلى Dart. المستحق من المندوب = مبلغ البيع ناقص تخصيص التوصيل؛ مرتجع دفعته Dart هو Cash Out منفصل ولا ينقص المستحق مرة ثانية. `amountReceived` إجمالي الإيصال قبل COD fee. التدفق الحالي يفترض أن Dart ترد المبلغ؛ مقاصة مرتجع يدفعه المندوب تحتاج تسجيلاً مستقلاً مع بيان الممول، ولا تُفترض تلقائيًا من `amountRefunded`.
+- Migration `0064_set_reward_lifecycle_compatibility.sql` تعيد توافق Birthday مع Set-only legacy وتزامن سجل Set Card، مع الحفاظ على منطق Mixed في 0063. لا تعيد تسعير أو تعديل سجلات العمل التاريخية.
+- Forgot Password يحرك رسالة التحدي المحددة `password-reset-code:<challengeId>` بدلاً من دفعة FIFO عامة. سياسة القنوات وحدود التكلفة مستمرة.
+
 # Dart API Contract — Canonical Notes
 
 هذه الوثيقة تصف العقود التشغيلية الحالية التي لا يجوز للواجهة تجاوزها. المرجع التنفيذي النهائي هو Routes + Zod schemas + PostgreSQL migrations داخل `backend/`، و`backend/openapi.yaml` هو العقد المعلن القابل للقراءة آليًا.
@@ -83,7 +93,7 @@ Admin endpoints:
 - `PUT /api/v1/admin/promotions/:id` — `promotions.manage` + `expectedVersion`
 - `GET /api/v1/admin/promotions/:id/analytics` — `promotions.read`
 
-Checkout preflight يعمل server-side قبل Commerce write ويعيد تقييم الـEligibility وقت الطلب، بينما usage limits تُحجز transactionally في PostgreSQL مع الأوردر.
+Checkout يعيد تقييم Eligibility داخل معاملة Commerce بعد قراءة رد Idempotency المكتمل؛ تُحجز usage limits transactionally في PostgreSQL مع الأوردر.
 
 ### Customer rules
 

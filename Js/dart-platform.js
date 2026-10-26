@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:55d39e47257fc3ab2dcaa62720353743de18205e1dff89560e79389866c49a8a */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:bf1b947b5aa6e241b32ff1206f7774bdcfc3d6e49924c701c713fef43a030812 */
 (function () {
   "use strict";
 
@@ -790,6 +790,7 @@
     apiUserCache = adaptApiUser(profile);
     const nextId = apiUserCache?.id || null;
     if (previousId !== nextId) {
+      if (typeof invalidateCartQuote === "function") invalidateCartQuote();
       customerCommerceGeneration += 1;
       customerCommercePromise = null;
       serverReviewEligible = null;
@@ -835,7 +836,7 @@
         [KEYS.birthdayRewards, payload.birthdayRewards || []],
         [KEYS.birthdayMessages, payload.birthdayMessages || []],
       ];
-      snapshots.forEach(([key, value]) => write(key, value));
+      snapshots.forEach(([key, value]) => { if (JSON.stringify(read(key, [])) !== JSON.stringify(value)) write(key, value); });
       if (payload.savedAddress) write("user_last_address", payload.savedAddress);
       else window.DartState?.remove?.("user_last_address", { source: "platform" });
       window.dispatchEvent(
@@ -1468,6 +1469,42 @@
   }
 
 
+  let cartQuoteCache = null;
+  let cartQuotePending = null;
+  let reviewedQuote = null;
+  function cartQuoteSignature() {
+    const cart = typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
+    return JSON.stringify([currentUser()?.id, CART_RESERVATION_ID, window.dartAppliedPromotion?.type === "Promotion" ? window.dartAppliedPromotion.code : "",
+      cart.map((line) => [line.id, line.color, line.size, line.quantity, line.dartSetKey || ""])]);
+  }
+  function currentCartQuote() {
+    return cartQuoteCache?.signature === cartQuoteSignature() ? cartQuoteCache.quote : null;
+  }
+  function invalidateCartQuote() { cartQuoteCache = null; reviewedQuote = null; }
+  async function quoteCart(options = {}) {
+    if (!API_BASE || !currentUser()) return null;
+    const signature = cartQuoteSignature();
+    if (!options.force && cartQuoteCache?.signature === signature && Date.now() - cartQuoteCache.at < 2000) return cartQuoteCache.quote;
+    if (cartQuotePending?.signature === signature) return cartQuotePending.task;
+    const code = window.dartAppliedPromotion?.type === "Promotion" ? window.dartAppliedPromotion.code : "";
+    const task = (async () => {
+      const quote = await apiRequest(`/api/v1/me/cart/quote?reservationId=${encodeURIComponent(CART_RESERVATION_ID)}${code ? `&promotionCode=${encodeURIComponent(code)}` : ""}`);
+      if (signature !== cartQuoteSignature()) throw new Error("Cart changed while pricing. Review it and retry.");
+      cartQuoteCache = { signature, quote, at: Date.now() };
+      return quote;
+    })();
+    cartQuotePending = { signature, task };
+    try { return await task; } finally { if (cartQuotePending?.task === task) cartQuotePending = null; }
+  }
+  function cartPriceReview(previous, quote, previousTotal) {
+    reviewedQuote = { signature: cartQuoteSignature(), fingerprint: quote.fingerprint };
+    window.applyCartQuote?.(quote);
+    return Object.assign(new Error("Cart prices changed. Review the current total before confirming."), {
+      code: "PRICE_CHANGED", details: { changes: [{ modelId: "Cart total", color: "", size: "",
+        previousUnitPrice: Number(previous?.totalMinor ?? previousTotal ?? quote.totalMinor) / 100, currentUnitPrice: quote.totalMinor / 100 }] },
+    });
+  }
+
   function ensureCatalogInventory() {
     /* Inventory is created only through Add Item. */
   }
@@ -1559,11 +1596,30 @@
     details.governorate = acceptedGovernorate;
 
     if (API_BASE) {
-      const response = await apiRequest("/api/v1/orders", {
+      const previousQuote = currentCartQuote();
+      const previousTotal = window.dartDisplayedTotalMinor;
+      const quote = await quoteCart({ force: true });
+      if (!quote.completedOrder && (
+        (previousQuote?.fingerprint && previousQuote.fingerprint !== quote.fingerprint) ||
+        (Number.isFinite(previousTotal) && previousTotal !== quote.totalMinor)
+      ) && !(options.acceptPriceChanges && reviewedQuote?.signature === cartQuoteSignature() && reviewedQuote.fingerprint === quote.fingerprint)) {
+        throw cartPriceReview(previousQuote, quote, previousTotal);
+      }
+      // Acceptance is bound to the reviewed quote, including its discount sources.
+      if (!quote.completedOrder && options.acceptPriceChanges && reviewedQuote &&
+          (reviewedQuote.signature !== cartQuoteSignature() || reviewedQuote.fingerprint !== quote.fingerprint)) {
+        throw cartPriceReview(previousQuote, quote, previousTotal);
+      }
+      window.applyCartQuote?.(quote);
+      let response;
+      try {
+        response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest("/api/v1/orders", {
         method: "POST",
         headers: { "Idempotency-Key": `checkout-${CART_RESERVATION_ID}` },
         body: {
           reservationId: CART_RESERVATION_ID,
+          quoteFingerprint: quote.fingerprint,
+          expectedTotalMinor: quote.totalMinor,
           contact: {
             name: details.name,
             phone1: details.phone1,
@@ -1591,6 +1647,15 @@
             : {}),
         },
       });
+      } catch (error) {
+        if (error.code === "PRICE_CHANGED") {
+          const fresh = await quoteCart({ force: true });
+          reviewedQuote = { signature: cartQuoteSignature(), fingerprint: fresh.fingerprint };
+          window.applyCartQuote?.(fresh);
+        }
+        throw error;
+      }
+      invalidateCartQuote();
       if (typeof cartData !== "undefined") cartData = [];
       write("dart_cart", []);
       setCartReservationId(uid("CART"));
@@ -2056,6 +2121,7 @@
   }
 
   async function reserveCart(cart) {
+    invalidateCartQuote();
     if (API_BASE) {
       if (!cart.length) {
         await releaseCartReservation(false);
@@ -3345,6 +3411,8 @@
       location.replace("Sign Up modern.html?next=profile");
       return;
     }
+    const profileEdit = document.querySelector(".profile-details .edit");
+    const preserveDraft = profileEdit?.dataset.mode === "edit" && profileEdit.dataset.customerId === String(user.id);
     const customer = syncCustomer(user),
       orders = read(KEYS.orders, []).filter(
         (o) => o.clientId === user.customerId && !o.isDeleted,
@@ -3354,7 +3422,7 @@
       );
     const set = (selector, value) => {
       const el = document.querySelector(selector);
-      if (el) el.textContent = value ?? "-";
+      if (el && !(preserveDraft && el.querySelector?.(".profile-edit-input"))) el.textContent = value ?? "-";
     };
     set(".hello .user-name", user.name.split(/\s+/)[0]);
     set(".hello .e-mail", user.email);
@@ -3508,9 +3576,9 @@
         '<div class="empty-state">No returns or exchanges yet</div>';
     }
     const cancel = document.querySelector(".profile-details .cancel-edit");
-    if (cancel) cancel.remove();
+    if (cancel && !preserveDraft) cancel.remove();
     const edit = document.querySelector(".profile-details .edit");
-    if (edit) {
+    if (edit && !preserveDraft) {
       edit.dataset.mode = "";
       edit.textContent = "Edit";
       if (!edit.dataset.bound) {
@@ -3535,6 +3603,7 @@
     const editing = button.dataset.mode === "edit";
     if (!editing) {
       button.dataset.mode = "edit";
+      button.dataset.customerId = String(user.id);
       button.textContent = "Save";
       const mapping = {
         "#user-name": ["name", "text"],
@@ -3560,7 +3629,7 @@
         cancel.type = "button";
         cancel.className = "edit cancel-edit";
         cancel.textContent = "Cancel";
-        cancel.onclick = renderProfile;
+        cancel.onclick = () => { button.dataset.mode = ""; renderProfile(); };
         wrap.appendChild(cancel);
       }
       return;
@@ -3597,6 +3666,7 @@
             ...(values.birthday ? { birthday: values.birthday } : {}),
           },
         });
+        button.dataset.mode = "";
         cacheApiUser(result.user);
         if (result.verification) {
           sessionStorage.setItem(
@@ -3641,6 +3711,7 @@
         birthday: stored.birthday,
       },
     });
+    button.dataset.mode = "";
     renderProfile();
   }
 
@@ -4060,6 +4131,8 @@
     logout,
     currentUser,
     checkout,
+    quoteCart,
+    currentCartQuote,
     apiRequest,
     normalizeEmail,
     normalizePhone,

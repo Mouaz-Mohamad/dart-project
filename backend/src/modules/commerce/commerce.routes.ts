@@ -130,6 +130,8 @@ const checkoutSchema = z.object({
   deliveryNotes: z.string().trim().max(1000).optional(),
   promotionCode: z.string().trim().min(1).max(120).optional(),
   acceptPriceChanges: z.boolean().optional(),
+  quoteFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  expectedTotalMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 });
 
 function guestCartOwnerHash(
@@ -223,6 +225,18 @@ export function createCommerceRouter(
     async (request, response) => {
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json(await commerce.customerCart(request.auth!.userId));
+    },
+  );
+
+  router.get(
+    "/me/cart/quote", signedIn, requireAccountType("customer"),
+    async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.customerCartQuote(
+        request.auth!.userId, reservationId.parse(request.query.reservationId),
+        z.string().trim().min(1).max(120).optional().parse(request.query.promotionCode),
+        guestCartOwnerHash(request, response, config, false) ?? undefined,
+      ));
     },
   );
 

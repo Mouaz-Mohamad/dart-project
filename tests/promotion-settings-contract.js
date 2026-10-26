@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "Eye", "Dart Eye.html"), "utf8");
 const settings = fs.readFileSync(path.join(root, "Eye", "dart-settings.js"), "utf8");
 const ui = fs.readFileSync(path.join(root, "Js", "dart-ui.js"), "utf8");
-const catalog = fs.readFileSync(path.join(root, "Js", "dart-catalog.js"), "utf8");
+const catalog = fs.readFileSync(path.join(root, "src", "storefront", "catalog.js"), "utf8");
 const migration = fs.readFileSync(path.join(root, "backend", "migrations", "0053_item_level_discount_priority.sql"), "utf8");
 
 for (const id of [

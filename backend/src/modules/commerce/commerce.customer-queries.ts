@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 import { cairoDateKey, flexibleDateExpiry } from "./commerce.rewards.js";
+import { returnSaleKey } from "./commerce.returns.js";
 import { orderBenefit, orderBenefits } from "./commerce.pricing.js";
 
 export async function readPublicLeaderboard(pool: Pool): Promise<{
@@ -105,7 +106,7 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
               completed
             );
           })
-          .map((record) => String(record.itemCode || ""))
+          .map((record) => returnSaleKey(record.orderId, record.itemCode))
           .filter(Boolean),
       );
 
@@ -142,7 +143,7 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
             ? legacyItems
             : legacySnapshots;
         current.items += itemCodes.filter(
-          (itemCode) => !completedRefundItems.has(String(itemCode)),
+          (itemCode) => !completedRefundItems.has(returnSaleKey(order.order_code, itemCode)),
         ).length;
         current.spentMinor += Math.max(
           0,
@@ -422,8 +423,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
                     'discountAmount', (oi.original_unit_minor - oi.final_unit_minor) / 100.0,
                     'discountSource', oi.discount_source,
                     'discountReference', oi.discount_reference,
-                    'finalUnitPrice', oi.final_unit_minor / 100.0,
-                    'costSnapshot', oi.cost_snapshot_minor / 100.0
+                    'finalUnitPrice', oi.final_unit_minor / 100.0
                   ) ORDER BY oi.created_at, oi.id
                 ) FILTER (WHERE oi.id IS NOT NULL),
                 '[]'::jsonb

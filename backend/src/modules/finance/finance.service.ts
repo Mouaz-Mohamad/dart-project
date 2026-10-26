@@ -260,9 +260,6 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     (sum, row) => sum + toMinor(row.amountReceived),
     0,
   );
-  const settledOrderIds = new Set(
-    allSettlements.map((row) => String(row.orderId || "")).filter(Boolean),
-  );
 
   const damageRows = (states.get("damage") || [])
     .filter(active)
@@ -379,29 +376,7 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     fivePlusOrders: orderCounts.filter((count) => count >= 5).length,
   };
 
-  let fallbackCodCashInMinor = 0;
-  for (const order of deliveredRows) {
-    const method = String(order.payment_method || "").toLowerCase();
-    const isCod =
-      method === "cod" || method.includes("cash on") || method === "cash";
-    const paid = ["paid", "partially refunded", "refunded"].includes(
-      String(order.payment_status || "").toLowerCase(),
-    );
-    if (!isCod || !paid || settledOrderIds.has(order.order_code)) continue;
-    const paidMinor =
-      Number(order.amount_paid_minor || 0) > 0
-        ? Number(order.amount_paid_minor)
-        : Number(order.final_minor || 0);
-    const collectedMinor = Math.max(0, paidMinor);
-    fallbackCodCashInMinor += Math.max(
-      0,
-      collectedMinor -
-        Math.min(collectedMinor, Number(order.delivery_cost_minor || 0)),
-    );
-  }
-
-  const cashInMinor =
-    settlementCashInMinor + fallbackCodCashInMinor;
+  const cashInMinor = settlementCashInMinor;
   const cashOutMinor =
     paidExpenseMinor +
     inventoryPurchaseCashOutMinor +
@@ -584,7 +559,6 @@ export class FinanceService {
           outstandingMinor: Math.max(
             0,
             Number(order.final_minor) -
-              Number(order.amount_refunded_minor) -
               Number(order.delivery_cost_minor) -
               Number(order.cod_settled_minor),
           ),
@@ -615,9 +589,8 @@ export class FinanceService {
       const dueToDartMinor = Math.max(
         0,
         Number(order.final_minor) -
-          Number(order.amount_refunded_minor) -
           Math.min(
-            Math.max(0, Number(order.final_minor) - Number(order.amount_refunded_minor)),
+            Math.max(0, Number(order.final_minor)),
             Number(order.delivery_cost_minor),
           ),
       );

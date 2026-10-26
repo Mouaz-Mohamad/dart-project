@@ -83,6 +83,7 @@ describe("CommerceService public leaderboard", () => {
           rows: [
             {
               payload: {
+                orderId: "K-1",
                 itemCode: "A-2",
                 requestType: "Refund",
                 status: "Completed",

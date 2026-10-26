@@ -869,6 +869,7 @@
   }
 
   function renderSetAwareTotals() {
+    if (root.applyCartQuote?.(root.DartPlatform?.currentCartQuote?.())) return;
     const cart=tagCartLines(), groups=drafts();
     if (!groups.length) return;
     const groupKeys=new Set(groups.map(g=>`${g.setId}:${g.unitIndex}`));
@@ -889,11 +890,12 @@
       }
     }
     groups.forEach((group)=>{ const p=groupPricing(group); subtotal+=p.baseMinor/100; finalTotal+=p.finalMinor/100; });
+    root.dartDisplayedTotalMinor = Math.round(finalTotal * 100);
     const discount=Math.max(0,subtotal-finalTotal);
     const subtotalEl=root.document.getElementById("subtotalVal"),discountEl=root.document.getElementById("discountVal"),totalEl=root.document.getElementById("totalVal");
-    if (subtotalEl) subtotalEl.textContent=`${Math.trunc(subtotal)} EGP`;
-    if (discountEl) discountEl.textContent=`${Math.trunc(discount)} EGP`;
-    if (totalEl) totalEl.textContent=`${Math.trunc(finalTotal)} EGP`;
+    if (subtotalEl) subtotalEl.textContent=`${subtotal.toLocaleString("en-EG", { maximumFractionDigits: 2, useGrouping: false })} EGP`;
+    if (discountEl) discountEl.textContent=`${discount.toLocaleString("en-EG", { maximumFractionDigits: 2, useGrouping: false })} EGP`;
+    if (totalEl) totalEl.textContent=`${finalTotal.toLocaleString("en-EG", { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     if (groups.length===1&&cart.every((line)=>line.dartSetKey&&groupKeys.has(line.dartSetKey))) {
       const group=groups[0],percent=Number(group.discountPercent)||0,input=root.document.getElementById("discountInput"),button=root.document.getElementById("applyDiscountBtn");
       if (percent>0&&input) { input.value=`${String(group.discountSource||"Set").toUpperCase()} ${Math.round(percent)}% — AUTO`; input.disabled=true; }

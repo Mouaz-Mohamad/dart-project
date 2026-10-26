@@ -195,7 +195,7 @@ export function createIdentityRouter(
       body.identifier,
       metadata(request),
     );
-    await dispatchOutbox(outbox, 5);
+    await dispatchOutbox(outbox, 1, `password-reset-code:${result.challengeId}`);
     response.status(202).json({
       message: "If the account exists, a verification code has been sent to its registered email",
       challengeId: result.challengeId,

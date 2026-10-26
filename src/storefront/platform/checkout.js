@@ -1,3 +1,39 @@
+  let cartQuoteCache = null;
+  let cartQuotePending = null;
+  let reviewedQuote = null;
+  function cartQuoteSignature() {
+    const cart = typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
+    return JSON.stringify([currentUser()?.id, CART_RESERVATION_ID, window.dartAppliedPromotion?.type === "Promotion" ? window.dartAppliedPromotion.code : "",
+      cart.map((line) => [line.id, line.color, line.size, line.quantity, line.dartSetKey || ""])]);
+  }
+  function currentCartQuote() {
+    return cartQuoteCache?.signature === cartQuoteSignature() ? cartQuoteCache.quote : null;
+  }
+  function invalidateCartQuote() { cartQuoteCache = null; reviewedQuote = null; }
+  async function quoteCart(options = {}) {
+    if (!API_BASE || !currentUser()) return null;
+    const signature = cartQuoteSignature();
+    if (!options.force && cartQuoteCache?.signature === signature && Date.now() - cartQuoteCache.at < 2000) return cartQuoteCache.quote;
+    if (cartQuotePending?.signature === signature) return cartQuotePending.task;
+    const code = window.dartAppliedPromotion?.type === "Promotion" ? window.dartAppliedPromotion.code : "";
+    const task = (async () => {
+      const quote = await apiRequest(`/api/v1/me/cart/quote?reservationId=${encodeURIComponent(CART_RESERVATION_ID)}${code ? `&promotionCode=${encodeURIComponent(code)}` : ""}`);
+      if (signature !== cartQuoteSignature()) throw new Error("Cart changed while pricing. Review it and retry.");
+      cartQuoteCache = { signature, quote, at: Date.now() };
+      return quote;
+    })();
+    cartQuotePending = { signature, task };
+    try { return await task; } finally { if (cartQuotePending?.task === task) cartQuotePending = null; }
+  }
+  function cartPriceReview(previous, quote, previousTotal) {
+    reviewedQuote = { signature: cartQuoteSignature(), fingerprint: quote.fingerprint };
+    window.applyCartQuote?.(quote);
+    return Object.assign(new Error("Cart prices changed. Review the current total before confirming."), {
+      code: "PRICE_CHANGED", details: { changes: [{ modelId: "Cart total", color: "", size: "",
+        previousUnitPrice: Number(previous?.totalMinor ?? previousTotal ?? quote.totalMinor) / 100, currentUnitPrice: quote.totalMinor / 100 }] },
+    });
+  }
+
   function ensureCatalogInventory() {
     /* Inventory is created only through Add Item. */
   }
@@ -89,11 +125,30 @@
     details.governorate = acceptedGovernorate;
 
     if (API_BASE) {
-      const response = await apiRequest("/api/v1/orders", {
+      const previousQuote = currentCartQuote();
+      const previousTotal = window.dartDisplayedTotalMinor;
+      const quote = await quoteCart({ force: true });
+      if (!quote.completedOrder && (
+        (previousQuote?.fingerprint && previousQuote.fingerprint !== quote.fingerprint) ||
+        (Number.isFinite(previousTotal) && previousTotal !== quote.totalMinor)
+      ) && !(options.acceptPriceChanges && reviewedQuote?.signature === cartQuoteSignature() && reviewedQuote.fingerprint === quote.fingerprint)) {
+        throw cartPriceReview(previousQuote, quote, previousTotal);
+      }
+      // Acceptance is bound to the reviewed quote, including its discount sources.
+      if (!quote.completedOrder && options.acceptPriceChanges && reviewedQuote &&
+          (reviewedQuote.signature !== cartQuoteSignature() || reviewedQuote.fingerprint !== quote.fingerprint)) {
+        throw cartPriceReview(previousQuote, quote, previousTotal);
+      }
+      window.applyCartQuote?.(quote);
+      let response;
+      try {
+        response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest("/api/v1/orders", {
         method: "POST",
         headers: { "Idempotency-Key": `checkout-${CART_RESERVATION_ID}` },
         body: {
           reservationId: CART_RESERVATION_ID,
+          quoteFingerprint: quote.fingerprint,
+          expectedTotalMinor: quote.totalMinor,
           contact: {
             name: details.name,
             phone1: details.phone1,
@@ -121,6 +176,15 @@
             : {}),
         },
       });
+      } catch (error) {
+        if (error.code === "PRICE_CHANGED") {
+          const fresh = await quoteCart({ force: true });
+          reviewedQuote = { signature: cartQuoteSignature(), fingerprint: fresh.fingerprint };
+          window.applyCartQuote?.(fresh);
+        }
+        throw error;
+      }
+      invalidateCartQuote();
       if (typeof cartData !== "undefined") cartData = [];
       write("dart_cart", []);
       setCartReservationId(uid("CART"));

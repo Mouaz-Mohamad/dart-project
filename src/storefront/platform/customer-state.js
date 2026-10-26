@@ -22,6 +22,7 @@
     apiUserCache = adaptApiUser(profile);
     const nextId = apiUserCache?.id || null;
     if (previousId !== nextId) {
+      if (typeof invalidateCartQuote === "function") invalidateCartQuote();
       customerCommerceGeneration += 1;
       customerCommercePromise = null;
       serverReviewEligible = null;
@@ -67,7 +68,7 @@
         [KEYS.birthdayRewards, payload.birthdayRewards || []],
         [KEYS.birthdayMessages, payload.birthdayMessages || []],
       ];
-      snapshots.forEach(([key, value]) => write(key, value));
+      snapshots.forEach(([key, value]) => { if (JSON.stringify(read(key, [])) !== JSON.stringify(value)) write(key, value); });
       if (payload.savedAddress) write("user_last_address", payload.savedAddress);
       else window.DartState?.remove?.("user_last_address", { source: "platform" });
       window.dispatchEvent(

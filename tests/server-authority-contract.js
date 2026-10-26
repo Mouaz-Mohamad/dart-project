@@ -17,7 +17,7 @@ function walkJsFiles(root) {
   return output;
 }
 
-const catalog = read("Js/dart-catalog.js");
+const catalog = read("src/storefront/catalog.js");
 const sizeChart = read("Eye/dart-size-chart.js");
 const operations = read("Eye/dart-operations.js");
 const serviceWorker = read("sw.js");

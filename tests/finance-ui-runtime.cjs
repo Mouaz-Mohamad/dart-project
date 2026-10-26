@@ -105,7 +105,7 @@ async function main() {
   assert.equal(fieldsets.length, 6, "five record forms plus COD receipt");
   // Submit the real handler while the persistence service fails: retain the form.
   ui.openResourceModal("goals");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString("en-CA");
   form.payload = { name: "Goal", metric: "revenue", target: "100", startDate: today, endDate: today, status: "Active" };
   await ui.saveFinanceForm(form);
   assert.ok(error.classList.contains("is-visible"));

@@ -63,6 +63,8 @@ export interface CheckoutInput {
   deliveryNotes?: string | undefined;
   promotionCode?: string | undefined;
   acceptPriceChanges?: boolean | undefined;
+  quoteFingerprint?: string | undefined;
+  expectedTotalMinor?: number | undefined;
 }
 
 export interface LockedItem {

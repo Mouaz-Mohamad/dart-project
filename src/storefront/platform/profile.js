@@ -5,6 +5,8 @@
       location.replace("Sign Up modern.html?next=profile");
       return;
     }
+    const profileEdit = document.querySelector(".profile-details .edit");
+    const preserveDraft = profileEdit?.dataset.mode === "edit" && profileEdit.dataset.customerId === String(user.id);
     const customer = syncCustomer(user),
       orders = read(KEYS.orders, []).filter(
         (o) => o.clientId === user.customerId && !o.isDeleted,
@@ -14,7 +16,7 @@
       );
     const set = (selector, value) => {
       const el = document.querySelector(selector);
-      if (el) el.textContent = value ?? "-";
+      if (el && !(preserveDraft && el.querySelector?.(".profile-edit-input"))) el.textContent = value ?? "-";
     };
     set(".hello .user-name", user.name.split(/\s+/)[0]);
     set(".hello .e-mail", user.email);
@@ -168,9 +170,9 @@
         '<div class="empty-state">No returns or exchanges yet</div>';
     }
     const cancel = document.querySelector(".profile-details .cancel-edit");
-    if (cancel) cancel.remove();
+    if (cancel && !preserveDraft) cancel.remove();
     const edit = document.querySelector(".profile-details .edit");
-    if (edit) {
+    if (edit && !preserveDraft) {
       edit.dataset.mode = "";
       edit.textContent = "Edit";
       if (!edit.dataset.bound) {
@@ -195,6 +197,7 @@
     const editing = button.dataset.mode === "edit";
     if (!editing) {
       button.dataset.mode = "edit";
+      button.dataset.customerId = String(user.id);
       button.textContent = "Save";
       const mapping = {
         "#user-name": ["name", "text"],
@@ -220,7 +223,7 @@
         cancel.type = "button";
         cancel.className = "edit cancel-edit";
         cancel.textContent = "Cancel";
-        cancel.onclick = renderProfile;
+        cancel.onclick = () => { button.dataset.mode = ""; renderProfile(); };
         wrap.appendChild(cancel);
       }
       return;
@@ -257,6 +260,7 @@
             ...(values.birthday ? { birthday: values.birthday } : {}),
           },
         });
+        button.dataset.mode = "";
         cacheApiUser(result.user);
         if (result.verification) {
           sessionStorage.setItem(
@@ -301,6 +305,7 @@
         birthday: stored.birthday,
       },
     });
+    button.dataset.mode = "";
     renderProfile();
   }
 

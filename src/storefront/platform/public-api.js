@@ -19,6 +19,8 @@
     logout,
     currentUser,
     checkout,
+    quoteCart,
+    currentCartQuote,
     apiRequest,
     normalizeEmail,
     normalizePhone,

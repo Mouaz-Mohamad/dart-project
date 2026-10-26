@@ -607,7 +607,7 @@
 
   function codDueForOrder(order) {
     const orderTotal = roundMoney(
-      Math.max(0, orderAmount(order) - finiteNumber(order?.amountRefunded)),
+      Math.max(0, orderAmount(order)),
     );
     const courierDue = Math.min(orderTotal, deliveryCostForOrder(order));
     const dueToDart = roundMoney(Math.max(0, orderTotal - courierDue));
@@ -904,25 +904,8 @@
       fivePlusOrders: orderCounts.filter((count) => count >= 5).length,
     };
 
-    const settledOrderIds = new Set(data.settlements.filter(active).map((entry) => String(entry.orderId)));
-    let fallbackCODInflow = 0;
-    data.orders
-      .filter(active)
-      .filter(isCOD)
-      .filter((order) => String(order.status || "").toLowerCase() === "delivered")
-      .filter((order) => !settledOrderIds.has(String(order.orderId || order.id)))
-      .filter((order) => ["paid", "partially refunded", "refunded"].includes(String(order.paymentStatus || "").toLowerCase()))
-      .filter((order) => within(order.paymentReceivedAt || order.paidAt || order.deliveredAt, range))
-      .forEach((order) => {
-        const paidAmount = finiteNumber(order.amountPaid) > 0 ? finiteNumber(order.amountPaid) : orderAmount(order);
-        const grossCollected = Math.max(0, paidAmount);
-        fallbackCODInflow += Math.max(
-          0,
-          grossCollected - Math.min(grossCollected, deliveryCostForOrder(order)),
-        );
-      });
     const codCashIn = roundMoney(
-      settlementsInPeriod.reduce((sum, entry) => sum + Math.max(0, finiteNumber(entry.amountReceived)), 0) + fallbackCODInflow,
+      settlementsInPeriod.reduce((sum, entry) => sum + Math.max(0, finiteNumber(entry.amountReceived)), 0),
     );
     const paidExpenseCashOut = roundMoney(paidExpenses(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
     const inventoryPurchaseCashOut = roundMoney(paidInventoryAcquisitions(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));

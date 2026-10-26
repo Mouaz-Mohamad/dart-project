@@ -121,9 +121,9 @@ describe("finance summary integrity", () => {
 
     expect(fixture.queries[0]).toBe("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     expect(fixture.queries.at(-1)).toBe("COMMIT");
-    expect(summary.cashIn).toBe(50);
+    expect(summary.cashIn).toBe(0);
     expect(summary.refundCashOut).toBe(20);
-    expect(summary.netCashFlow).toBe(30);
+    expect(summary.netCashFlow).toBe(-20);
     expect(summary.uniqueCustomers).toBe(1);
     expect(summary.orderFrequencyBuckets).toEqual({
       oneOrder: 1,

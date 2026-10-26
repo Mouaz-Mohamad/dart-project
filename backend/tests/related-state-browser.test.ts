@@ -2,18 +2,18 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const catalogSource = readFileSync(new URL("../../Js/dart-catalog.js", import.meta.url), "utf8");
+const catalogSource = readFileSync(new URL("../../src/storefront/catalog.js", import.meta.url), "utf8");
 const adminCatalogSource = readFileSync(new URL("../../src/dashboard/catalog-admin.js", import.meta.url), "utf8");
 const domainSource = readFileSync(new URL("../../Eye/dart-domain-state.js", import.meta.url), "utf8");
 const response = (payload: unknown) => ({ ok: true, status: 200, json: async () => payload });
 type ReadResponse = ReturnType<typeof response>;
 type CatalogApi = { hydrate: (force?: boolean) => Promise<void>; refreshChanged: () => Promise<void>;
-  write: (key: string, data: unknown[]) => void; serverVersion: () => number };
+  write: (key: string, data: unknown[]) => void; serverVersion: () => number; checkForServerChanges: () => Promise<void> };
 type DomainApi = { hydrateDomain: (domain: string) => Promise<unknown[]>; refreshChanged: () => Promise<void>;
   write: (key: string, data: unknown[]) => void; writeAndSync: (key: string, data: unknown[]) => Promise<unknown[]>;
   version: (domain: string) => number; hydrateAudit: () => Promise<unknown[]>; syncNow: (domain: string) => Promise<unknown[]> };
 
-function runtime(source: string) {
+function runtime(source: string, failCatalogBootstrap = false) {
   const state = new Map<string, unknown[]>();
   const remote = { catalog: { version: 1, models: [] as unknown[], items: [] as unknown[] },
     domains: { cards: { version: 1, data: [{ id: "card-1" }] },
@@ -22,7 +22,10 @@ function runtime(source: string) {
   const fetch = vi.fn(async (url: string, _options?: { method?: string }): Promise<ReadResponse> => {
     const path = new URL(url).pathname;
     if (path.endsWith("catalog/version")) return response({ version: remote.catalog.version });
-    if (path.endsWith("catalog-state")) return response(structuredClone(remote.catalog));
+    if (path.endsWith("catalog-state")) {
+      if (failCatalogBootstrap) { failCatalogBootstrap = false; throw new Error("Synthetic bootstrap offline"); }
+      return response(structuredClone(remote.catalog));
+    }
     if (path.endsWith("domain-state-versions")) return response({ versions: Object.fromEntries(
       Object.entries(remote.domains).map(([domain, row]) => [domain, row.version])) });
     if (path.includes("domain-state/")) return response(structuredClone(remote.domains[path.split("/").at(-1)!]));
@@ -156,6 +159,16 @@ describe("read-only related state refresh", () => {
     expect(f.state.size).toBe(0);
     expect(f.fetch).toHaveBeenCalledTimes(1);
     expect(f.fetch.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
+  });
+
+  it("recovers catalog hydration after the initial request failed with version zero", async () => {
+    const f = runtime(catalogSource, true), api = f.window.DartCatalog;
+    for (let step = 0; step < 8; step++) await Promise.resolve();
+    expect(api.serverVersion()).toBe(0);
+    f.remote.catalog = { version: 2, models: [{ modelId: "recovered" }], items: [{ id: "recovered-item" }] };
+    await api.checkForServerChanges();
+    expect(api.serverVersion()).toBe(2);
+    expect(f.state.get("dart_items")).toEqual([{ id: "recovered-item" }]);
   });
 
   it("fetches catalog data only after its version changes", async () => {

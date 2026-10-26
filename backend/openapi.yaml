@@ -868,12 +868,53 @@ paths:
       responses:
         "204": { description: Staff sessions revoked }
 
+  /me/cart/quote:
+    get:
+      tags: [Orders, Promotions]
+      operationId: quoteCustomerCart
+      summary: Read authoritative per-line cart pricing or recover a previously committed checkout.
+      description: No-store. Validates customer or guest cart ownership. Set allocations and ordinary campaign/reward lines use the same pricing pass as checkout. A completed canonical checkout returns completedOrder even after its cart was consumed. No acquisition costs are exposed.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { in: query, name: reservationId, required: true, schema: { type: string, minLength: 16, maxLength: 160 } }
+        - { in: query, name: promotionCode, schema: { type: string, maxLength: 120 } }
+      responses:
+        "200":
+          description: Current quote or confirmed checkout recovery
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/CustomerCartQuote" }
+                  - { type: object, required: [completedOrder], properties: { completedOrder: { type: object } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /orders:
     post:
       tags: [Orders, Promotions]
-      summary: Create an order from an active reservation. Promotion eligibility is re-evaluated server-side before the Commerce transaction.
+      summary: Create an order from an active reservation. Promotion eligibility is re-evaluated inside the Commerce transaction after completed idempotency replay.
       operationId: createOrder
       security: [{ sessionCookie: [], csrfToken: [] }]
+      description: quoteFingerprint binds acceptance to prices and discount sources; a different fingerprint returns PRICE_CHANGED even with acceptPriceChanges. expectedTotalMinor is for displaying the review only and is never trusted for pricing. Replies, cached replays and customer commerce snapshots exclude acquisition cost. Idempotency replay is evaluated before reservation or eligibility reads.
+      parameters:
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string, minLength: 16, maxLength: 128 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reservationId, contact, address]
+              properties:
+                reservationId: { type: string, minLength: 16, maxLength: 160 }
+                contact: { type: object, required: [name, phone1, email] }
+                address: { type: object, required: [country, governorate, area, street, building, floor, latitude, longitude, addressSource] }
+                deliveryNotes: { type: string, maxLength: 1000 }
+                promotionCode: { type: string, maxLength: 120 }
+                acceptPriceChanges: { type: boolean }
+                quoteFingerprint: { type: string, pattern: '^[a-f0-9]{64}$' }
+                expectedTotalMinor: { type: integer, minimum: 0 }
       responses:
         "201": { description: Order created }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -1158,6 +1199,30 @@ components:
       required: true
       schema: { type: string, enum: [google, facebook] }
   schemas:
+    CustomerCartQuote:
+      type: object
+      required: [currency, fingerprint, subtotalMinor, discountMinor, totalMinor, lines]
+      properties:
+        currency: { type: string, enum: [EGP] }
+        fingerprint: { type: string, pattern: '^[a-f0-9]{64}$' }
+        subtotalMinor: { type: integer, minimum: 0 }
+        discountMinor: { type: integer, minimum: 0 }
+        totalMinor: { type: integer, minimum: 0 }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [itemCode, modelId, baseMinor, finalMinor, discountSource]
+            properties:
+              itemCode: { type: string }
+              modelId: { type: string }
+              color: { type: string }
+              size: { type: string }
+              baseMinor: { type: integer, minimum: 0 }
+              finalMinor: { type: integer, minimum: 0 }
+              discountSource: { type: string, enum: [None, Model, Set, Campaign, Birthday, Dart Card] }
+              discountPercent: { type: number, minimum: 0, maximum: 100 }
+              discountReference: { type: string }
     AdminOrderCommandState:
       type: object
       required: [version, orders]
