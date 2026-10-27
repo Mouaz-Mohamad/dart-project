@@ -1,3 +1,4 @@
+const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 // DART CODE GUIDE | tests/product-waiting-browser.js
 // Browser regression for the shared Buy/Waiting actions across Home and Products.
 const fs = require("fs");
@@ -76,7 +77,7 @@ const server = http.createServer((req, res) => {
   }
   try {
     res.setHeader("Content-Type", types[path.extname(filename).toLowerCase()] || "application/octet-stream");
-    res.end(fs.readFileSync(filename));
+    res.end(openStorefrontFixture(filename, fs.readFileSync(filename)));
   } catch {
     res.statusCode = 404;
     res.end();

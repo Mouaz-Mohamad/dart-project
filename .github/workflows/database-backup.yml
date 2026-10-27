@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/database-backup.yml"
+      - "backend/migrations/**"
       - "backend/scripts/verify-restored-store.ts"
       - "backend/scripts/recovery-schema.ts"
       - "backend/src/modules/monitoring/store-recovery-check.ts"

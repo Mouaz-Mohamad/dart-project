@@ -42,7 +42,7 @@ assert.doesNotMatch(ui, /serviceWorker\.register\s*\(/,
 assert.doesNotMatch(homeUi, /serviceWorker\.register\s*\(/,
   'Homepage runtime must not register a Service Worker after Cache Lifecycle V2 retirement');
 for (const entry of fs.readdirSync(path.join(root, 'Js'), { withFileTypes: true })) {
-  if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+  if (!entry.isFile() || !entry.name.endsWith('.js') || entry.name === 'dart-customer-notifications.js') continue;
   const source = fs.readFileSync(path.join(root, 'Js', entry.name), 'utf8');
   assert.doesNotMatch(source, /serviceWorker\.register\s*\(/,
     `Storefront JS must not re-register retired Service Workers: ${entry.name}`);

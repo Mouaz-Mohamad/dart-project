@@ -28,7 +28,14 @@
         registrations
           .filter((registration) => {
             try {
-              return new URL(registration.scope).origin === location.origin;
+              const scope = new URL(registration.scope);
+              const workers = [registration.active, registration.waiting, registration.installing].filter(Boolean);
+              const pushOnly = scope.origin === location.origin && scope.pathname === "/push/" &&
+                workers.length > 0 && workers.every((worker) => {
+                  const script = new URL(worker.scriptURL);
+                  return script.origin === location.origin && script.pathname === "/push-sw.js" && !script.search;
+                });
+              return scope.origin === location.origin && !pushOnly;
             } catch {
               return false;
             }

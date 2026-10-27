@@ -42,6 +42,7 @@
     <link rel="stylesheet" href="CSS/main.css">
     <link rel="stylesheet" href="CSS/base.css">
     <link rel="stylesheet" href="CSS/responsive.css">
+    <link rel="stylesheet" href="CSS/customer-notifications.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -189,6 +190,21 @@
                     </form>
 
                 </section>
+                <section id="customerNotifications" class="dart-customer-notifications" aria-labelledby="customerNotificationsTitle">
+                    <h2 id="customerNotificationsTitle">Notifications</h2>
+                    <p data-notification-unread>0 unread</p>
+                    <div class="dart-notification-actions">
+                        <button type="button" data-notification-refresh disabled>Refresh</button>
+                        <button type="button" data-notification-mark disabled>Mark shown as read</button>
+                    </div>
+                    <p data-notification-status role="status" aria-live="polite">Loading notifications…</p>
+                    <ul class="dart-notification-list" data-notification-list></ul>
+                    <button type="button" data-notification-more hidden>Load more</button>
+                    <div class="dart-notification-actions">
+                        <button type="button" data-push-toggle disabled>Enable browser notifications</button>
+                    </div>
+                    <p data-push-status role="status" aria-live="polite"></p>
+                </section>
                 <!-- ============ ناقذه الطلبات ========= -->
                 <section class="order-info">
                     <div class="exit-edit djasb">
@@ -312,5 +328,6 @@
     <script  src="Js/dart-platform.js" defer></script>
     <script  src="Js/dart-profile-records.js" defer></script>
     <script src="Js/dart-whatsapp-preferences.js" defer></script>
+    <script src="Js/dart-customer-notifications.js" defer></script>
 </body>
 </html>

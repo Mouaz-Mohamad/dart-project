@@ -1,0 +1,31 @@
+/* DART CODE GUIDE | CSS/customer-notifications.css — profile-only notification UI. */
+.dart-customer-notifications {
+  direction: ltr;
+  text-align: start;
+  background: #fff;
+  border: 1px solid #e3d9da;
+  border-radius: 12px;
+  padding: 20px;
+  margin-block: 20px;
+  color: #222;
+}
+.dart-customer-notifications h2 { margin-block: 0 12px; }
+.dart-notification-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 12px; }
+.dart-customer-notifications button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid #7a1533;
+  border-radius: 6px;
+  color: #7a1533;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.dart-customer-notifications button:disabled { opacity: .6; cursor: default; }
+.dart-customer-notifications button:focus-visible { outline: 3px solid #7a1533; outline-offset: 3px; }
+.dart-notification-list { list-style: none; margin: 0; padding: 0; }
+.dart-notification-list li { border-block-start: 1px solid #e3d9da; padding-block: 14px; overflow-wrap: anywhere; }
+.dart-notification-list li[data-unread="true"] { border-inline-start: 3px solid #7a1533; padding-inline-start: 12px; }
+.dart-notification-list p { margin-block: 6px; }
+.dart-notification-list time { display: block; font-size: .9em; margin-block: 6px; }
+.dart-customer-notifications [hidden] { display: none !important; }

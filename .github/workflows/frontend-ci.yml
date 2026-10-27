@@ -18,6 +18,7 @@ on:
       - "package-lock.json"
       - "sections/**"
       - "sw.js"
+      - "push-sw.js"
       - "manifest.json"
       - "vercel.json"
       - ".github/workflows/frontend-ci.yml"
@@ -38,6 +39,7 @@ on:
       - "package-lock.json"
       - "sections/**"
       - "sw.js"
+      - "push-sw.js"
       - "manifest.json"
       - "vercel.json"
       - ".github/workflows/frontend-ci.yml"
@@ -74,12 +76,14 @@ jobs:
           set -euo pipefail
           find Eye Js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           node --check sw.js
+          node --check push-sw.js
       - name: Frontend regression contracts
         run: |
           node scripts/check-source-layout.cjs
           node tests/source-layout-contract.cjs
           node tests/css-cascade-contract.cjs
           node tests/custom-domain-runtime.cjs
+          node tests/customer-notifications-runtime.cjs
           node tests/database-authoritative-storage.cjs
           node tests/cache-revalidation-contract.cjs
           node tests/auth-contract.js
@@ -154,5 +158,7 @@ jobs:
           node tests/sets-storefront-browser.js
           node tests/home-storefront-browser.js
           node tests/news-browser.cjs
+          node tests/customer-notifications-browser.cjs
+          node tests/coming-soon-browser.cjs
           node tests/storefront-settings-regression.js
           node tests/full-site-browser.js

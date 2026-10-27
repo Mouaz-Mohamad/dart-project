@@ -15,6 +15,7 @@ const PUBLIC_ROOT_FILES = new Set([
   'sitemap.xml',
   'sitemap-pages.xml',
   'sw.js',
+  'push-sw.js',
 ]);
 const VERSIONABLE_ASSET_RE =
   /\b(src|href)\s*=\s*(["'])([^"'?#]+\.(?:css|js))(?:\?[^"'#]*)?(#[^"']*)?\2/gi;

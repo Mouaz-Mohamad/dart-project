@@ -1,3 +1,4 @@
+const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 // Real homepage / Sets runtime: presentation, gestures, image-only preview and states.
 const fs = require("node:fs");
 const path = require("node:path");
@@ -59,7 +60,7 @@ const server = http.createServer((request, response) => {
   }
   const file = path.resolve(root, pathname === "/" ? "index.html" : pathname === "/products" || /^\/(?:sets|products)\/[^/]+$/.test(pathname) ? "products.html" : pathname.replace(/^\//, ""));
   if (!file.startsWith(root + path.sep)) { response.writeHead(403); response.end(); return; }
-  try { const content = fs.readFileSync(file); response.writeHead(200, { "Content-Type": types[path.extname(file)] || "application/octet-stream" }); response.end(content); }
+  try { const content = openStorefrontFixture(file, fs.readFileSync(file)); response.writeHead(200, { "Content-Type": types[path.extname(file)] || "application/octet-stream" }); response.end(content); }
   catch { response.writeHead(404); response.end(); }
 });
 

@@ -72,10 +72,11 @@ const pageScopedFeatureFiles = new Set([
   "Eye/dart-news-admin.js",
   "Eye/dart-catalog-admin.js",
   "Js/dart-whatsapp-preferences.js",
+  "Js/dart-customer-notifications.js",
 ]);
 for (const file of rootHtml.filter(file => file !== "profile.html")) {
-  if (fs.readFileSync(file,"utf8").includes('src="Js/dart-whatsapp-preferences.js"')) {
-    failures.push(`${file}: WhatsApp preference code must stay on the customer profile`);
+  if (/src="Js\/dart-(whatsapp-preferences|customer-notifications)\.js"/.test(fs.readFileSync(file,"utf8"))) {
+    failures.push(`${file}: Customer preference/notification code must stay on the customer profile`);
   }
 }
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");
@@ -140,7 +141,8 @@ if (fs.statSync('Eye/dart-dashboard-ui.js').size > 14 * 1024) failures.push('Das
 // Combined finance hydration and public navigation add 14 KiB of source. Home delivery still fits 225 KiB.
 // Versioned inventory-only writes add under 0.5 KiB of scoped delivery code.
 if (fs.statSync("Eye/dart-catalog-admin.js").size > 3 * 1024) failures.push("Catalog editor exceeds its 3 KiB delivery budget");
-// Customer WhatsApp consent is a profile-only feature, capped independently at 3 KiB.
+// Customer notifications and WhatsApp consent are profile-only, with independent file caps.
+if (fs.statSync("Js/dart-customer-notifications.js").size > 12 * 1024) failures.push("Customer notification runtime exceeds its 12 KiB profile budget");
 if (fs.statSync("Js/dart-whatsapp-preferences.js").size > 3 * 1024) failures.push("WhatsApp preference runtime exceeds its 3 KiB profile budget");
 if (lazyJsBytes > 449 * 1024) {
   failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 449KB`);

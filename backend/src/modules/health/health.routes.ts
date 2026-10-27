@@ -27,6 +27,8 @@ export function createHealthRouter(dependencies: HealthDependencies): Router {
         "catalog-assets-v1",
         "waiting-restock-reservation-v1",
         "whatsapp-cloud-api-direct-v1",
+        "customer-notifications-v1",
+        "web-push-opt-in-v1",
       ],
       startedAt: dependencies.startedAt.toISOString(),
       uptimeSeconds: Math.max(

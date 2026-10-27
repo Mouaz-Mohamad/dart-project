@@ -1,3 +1,4 @@
+const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 // DART CODE GUIDE | tests/navigation-browser.cjs
 // Real document/history regression against the staged production output; no request interception.
 const assert = require('node:assert/strict');
@@ -59,7 +60,7 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) { res.statusCode = 404; res.end(); return; }
   res.setHeader('Content-Type', (types[path.extname(file)] || 'application/octet-stream') + '; charset=utf-8');
   res.setHeader('Cache-Control', path.extname(file) === '.html' ? 'public, no-cache, max-age=0, must-revalidate' : 'public, max-age=31536000');
-  let content = fs.readFileSync(file);
+  let content = openStorefrontFixture(file, fs.readFileSync(file));
   if (file.endsWith('.html')) {
     res.setHeader('Content-Security-Policy', csp);
     // External fonts/maps do not participate in the document/history contract.

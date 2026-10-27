@@ -1,12 +1,13 @@
 import type { PoolClient } from "pg";
+import { sendNotification } from "../notifications/notification.queue.js";
 
 // Only a new operation is queued. Deployment never emails historical orders.
-export async function queueOrderEmail(client: PoolClient, orderId: string, eventType: "order.created" | "order.status_changed"): Promise<void> {
+export async function queueOrderNotifications(client: PoolClient, orderId: string, eventType: "order.created" | "order.status_changed"): Promise<void> {
   const result = await client.query<{
     order_code: string; status: string; final_minor: string; version: string;
-    recipient: string | null; customer_name: string;
+    recipient: string | null; customer_name: string; customer_user_id: string | null;
   }>(
-    `SELECT o.order_code,o.status,o.final_minor::text,o.version::text,
+    `SELECT o.order_code,o.status,o.final_minor::text,o.version::text,o.customer_user_id::text,
             CASE WHEN o.customer_user_id IS NULL THEN o.contact_snapshot->>'email'
                  WHEN u.status='active' AND u.deleted_at IS NULL THEN u.email ELSE NULL END AS recipient,
             COALESCE(NULLIF(o.contact_snapshot->>'name',''),c.full_name,'Dart customer') AS customer_name
@@ -14,8 +15,15 @@ export async function queueOrderEmail(client: PoolClient, orderId: string, event
        LEFT JOIN customers c ON c.user_id=o.customer_user_id WHERE o.id=$1`, [orderId],
   );
   const order = result.rows[0];
+  if (!order) return;
+  const notificationEvent = eventType === "order.created" ? "ORDER_PLACED" :
+    order.status === "Representative On The Way" ? "ORDER_OUT_FOR_DELIVERY" :
+    order.status === "Delivered" ? "ORDER_DELIVERED" : null;
+  if (notificationEvent && order.customer_user_id) await sendNotification(client,{
+    customerUserId:order.customer_user_id,orderId,orderCode:order.order_code,eventType:notificationEvent,
+  });
   const recipient = String(order?.recipient || "").trim();
-  if (!order || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return;
   const key = eventType === "order.created" ? `${eventType}:${orderId}` : `${eventType}:${orderId}:${order.version}`;
   await client.query(
     `INSERT INTO outbox_events(aggregate_type,aggregate_id,event_type,payload,deduplication_key)

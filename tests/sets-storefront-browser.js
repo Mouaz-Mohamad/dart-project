@@ -1,3 +1,4 @@
+const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 // DART CODE GUIDE | tests/sets-storefront-browser.js
 // Browser regression: real products/cart pages + real Sets runtime with API-backed cart/set-group rehydration.
 const fs = require('node:fs');
@@ -164,7 +165,7 @@ const server = http.createServer(async (request, response) => {
   }
   try {
     response.setHeader('Content-Type', contentTypes[path.extname(filename).toLowerCase()] || 'application/octet-stream');
-    response.end(fs.readFileSync(filename));
+    response.end(openStorefrontFixture(filename, fs.readFileSync(filename)));
   } catch {
     response.statusCode = 404; response.end();
   }

@@ -48,7 +48,7 @@ import {
 } from "./commerce.operations-queries.js";
 import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-queries.js";
 import { returnMatchesSale } from "./commerce.returns.js";
-import { queueOrderEmail } from "./commerce.notifications.js";
+import { queueOrderNotifications } from "./commerce.notifications.js";
 
 // Keep imports used by existing routers, Set workflows and tests compatible.
 export type {
@@ -2000,7 +2000,7 @@ export class CommerceService {
       );
       // Flush deferred Set allocations before queueing email or caching the customer reply.
       await client.query("SET CONSTRAINTS order_items_set_order_reconcile IMMEDIATE");
-      await queueOrderEmail(client, order.id, "order.created");
+      await queueOrderNotifications(client, order.id, "order.created");
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
       );
@@ -4671,7 +4671,7 @@ export class CommerceService {
           }),
         ],
       );
-      await queueOrderEmail(client, order.id, "order.created");
+      await queueOrderNotifications(client, order.id, "order.created");
 
       const versionUpdate = await client.query<{ version: string }>(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders' RETURNING version::text",
@@ -6390,7 +6390,7 @@ export class CommerceService {
         JSON.stringify({ orderCode }),
       ],
     );
-    await queueOrderEmail(client, orderId, "order.status_changed");
+    await queueOrderNotifications(client, orderId, "order.status_changed");
   }
 
   public async customerLiveTracking(customerUserId: string): Promise<{

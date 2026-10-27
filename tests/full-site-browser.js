@@ -1,3 +1,4 @@
+const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 // DART CODE GUIDE | tests/full-site-browser.js
 // الغرض: اختبار Frontend/Contract يثبت أن الواجهة والعقود الأساسية ما زالت تعمل كما هو متوقع.
 /* BEGIN Full-site smoke test — navigation, shared sections, controls and local requests. */
@@ -132,7 +133,7 @@ const server = http.createServer((request, response) => {
       "Content-Type",
       contentTypes[path.extname(filename).toLowerCase()] || "application/octet-stream",
     );
-    response.end(fs.readFileSync(filename));
+    response.end(openStorefrontFixture(filename, fs.readFileSync(filename)));
   } catch {
     response.statusCode = 404;
     response.end();

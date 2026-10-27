@@ -1,3 +1,4 @@
+const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 // DART CODE GUIDE | tests/home-storefront-browser.js
 // Browser regression for homepage catalogue rendering, modal deep-link navigation and history.
 const fs = require("node:fs");
@@ -191,7 +192,7 @@ const server = http.createServer((request, response) => {
   }
   try {
     response.setHeader("Content-Type", contentTypes[path.extname(filename).toLowerCase()] || "application/octet-stream");
-    response.end(fs.readFileSync(filename));
+    response.end(openStorefrontFixture(filename, fs.readFileSync(filename)));
   } catch {
     response.statusCode = 404;
     response.end();

@@ -59,6 +59,8 @@ import { createSetCartRouter } from "./modules/sets/set-cart.routes.js";
 import type { SetCartService } from "./modules/sets/set-cart.service.js";
 import { createNewsRouter } from "./modules/news/news.routes.js";
 import type { NewsService } from "./modules/news/news.service.js";
+import { createCustomerNotificationRouter } from "./modules/notifications/notification.routes.js";
+import type { CustomerNotificationService } from "./modules/notifications/notification.service.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
@@ -72,6 +74,7 @@ export interface AppDependencies extends HealthDependencies {
   setService?: SetService;
   setCartService?: SetCartService;
   newsService?: NewsService;
+  customerNotificationService?: CustomerNotificationService;
   siteSettingsService?: SiteSettingsService;
   dashboardStateService?: DashboardStateService;
   customerInteractionService?: CustomerInteractionService;
@@ -159,6 +162,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
 
   app.use("/api/v1/health", createHealthRouter(dependencies));
   if (dependencies.identityService) {
+    if (dependencies.customerNotificationService) app.use("/api/v1",createCustomerNotificationRouter(dependencies.customerNotificationService,dependencies.identityService,config));
     if (dependencies.birthdayMessagingService && dependencies.outboxService) app.use("/api/v1",
       createBirthdayMessagingRouter(dependencies.birthdayMessagingService,dependencies.identityService,config,dependencies.outboxService));
     app.use(

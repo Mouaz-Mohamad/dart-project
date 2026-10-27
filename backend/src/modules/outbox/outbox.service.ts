@@ -6,6 +6,8 @@ import type { AppConfig } from "../../config/env.js";
 import { decryptSecret } from "../../security/crypto.js";
 import type { EmailProvider } from "./email-provider.js";
 import { renderOutboxEmail } from "./email-templates.js";
+import { deliverWebPush } from "../notifications/push-dispatch.js";
+import { PushDeliveryError, type WebPushProvider } from "../notifications/web-push-provider.js";
 
 class DeliveryError extends Error {
   constructor(readonly disposition: "retryable" | "terminal" | "unknown", message: string) { super(message); }
@@ -64,9 +66,10 @@ export class OutboxService {
       | "mfaEncryptionKey"
     >,
     private readonly emailProvider: EmailProvider | null = null,
+    private readonly webPushProvider: WebPushProvider | null = null,
   ) {}
 
-  public configured(channel?: "email" | "whatsapp"): boolean {
+  public configured(channel?: "email" | "whatsapp" | "web_push"): boolean {
     const whatsapp = Boolean(
       this.config.whatsappAccessToken &&
         this.config.whatsappPhoneNumberId &&
@@ -75,7 +78,9 @@ export class OutboxService {
     const email = this.emailProvider?.configured() === true;
     if (channel === "email") return email;
     if (channel === "whatsapp") return whatsapp;
-    return email || whatsapp;
+    const push=this.webPushProvider?.configured()===true;
+    if (channel === "web_push") return push;
+    return email || whatsapp || push;
   }
 
   public async recentEvents(limit = 50): Promise<Array<Record<string, unknown>>> {
@@ -101,7 +106,7 @@ export class OutboxService {
            SELECT state,provider_message_id,last_error FROM outbox_delivery_attempts
             WHERE event_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1
          ) a ON true
-        WHERE e.payload->>'channel' IN ('email','whatsapp')
+        WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')
         ORDER BY e.created_at DESC,e.id DESC
         LIMIT $1`,
       [Math.min(100, Math.max(1, limit))],
@@ -139,7 +144,7 @@ export class OutboxService {
                 deduplication_key, payload, attempts
            FROM outbox_events
           WHERE attempts < 12 AND available_at <= now()
-            AND payload->>'channel' IN ('email','whatsapp')
+            AND payload->>'channel' IN ('email','whatsapp','web_push')
             AND ($2::text IS NULL OR deduplication_key=$2)
             AND NOT EXISTS (SELECT 1 FROM outbox_delivery_attempts a
               WHERE a.event_id=outbox_events.id AND a.state IN ('executing','accepted','unknown','terminal','suppressed'))
@@ -170,7 +175,7 @@ export class OutboxService {
       let result: { providerMessageId?: string; suppressed?: boolean };
       try { result=await this.publish(row); }
       catch (error) {
-        const disposition=error instanceof DeliveryError ? error.disposition : "unknown";
+        const disposition=error instanceof DeliveryError || error instanceof PushDeliveryError ? error.disposition : "unknown";
         if (disposition === "retryable") failed += 1;
         else if (disposition === "terminal") terminal += 1;
         else uncertain += 1;
@@ -218,7 +223,7 @@ export class OutboxService {
           (WHERE e.status<>'published' AND e.attempts<12 AND a.state IS NULL),0)::text AS oldest_seconds
       FROM outbox_events e LEFT JOIN LATERAL (
         SELECT state,updated_at FROM outbox_delivery_attempts WHERE event_id=e.id AND state<>'retryable' ORDER BY created_at DESC,id DESC LIMIT 1
-      ) a ON true WHERE e.payload->>'channel' IN ('email','whatsapp')`);
+      ) a ON true WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')`);
     const row=result.rows[0];
     return { pending:Number(row?.pending||0),exhausted:Number(row?.exhausted||0),uncertain:Number(row?.uncertain||0),
       terminal:Number(row?.terminal||0),oldestSeconds:Math.max(0,Math.floor(Number(row?.oldest_seconds||0))),
@@ -250,6 +255,13 @@ export class OutboxService {
     }
     if (channel === "whatsapp") {
       return this.publishWhatsApp(row);
+    }
+    if (channel === "web_push") {
+      try { return await deliverWebPush(this.pool,this.config.mfaEncryptionKey,this.webPushProvider,row.payload); }
+      catch(error) {
+        if (error instanceof PushDeliveryError) throw error;
+        throw new PushDeliveryError("unknown","Push delivery outcome requires reconciliation");
+      }
     }
     throw new DeliveryError("terminal", "Unsupported outbox delivery channel");
   }

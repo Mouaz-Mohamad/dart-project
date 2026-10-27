@@ -1989,11 +1989,28 @@ body.dart-set-image-open {
   font-weight: 300;
 }
 
+.footer-continear .hg {
+  color: var(--bg-dark);
+}
+
+.footer-continear .social-icons a,
+.footer-continear .social-icons a:hover,
+.footer-continear .social-icons a:focus-visible {
+  color: var(--bragnte, #ab012b);
+}
+
 .footer-continear .hg,
 .footer-continear .social-icons a {
-  color: var(--bg-dark);
   font-family: var(--font-cabin);
   font-weight: 300;
+}
+
+/* DART-CSS-POLICIES | Keep policy text legible without changing other pages. */
+#dart-policies-content,
+#dart-policies-content h1,
+#dart-policies-content h2,
+#dart-policies-content p {
+  color: #000;
 }
 
 .footer-continear a span {

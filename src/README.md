@@ -36,3 +36,8 @@ Run `npm run check` to verify source ownership, syntax, formatting, generated ou
 freshness and all maintained frontend static checks. The source-layout check fails
 when a new source file is not wired into a build. Check generated files into the
 same commit as their source changes.
+
+`Js/dart-customer-notifications.js` is a maintained profile-only entry point. It
+keeps customer notifications in memory and uses authenticated API ownership.
+`push-sw.js` is a push-only worker registered under `/push/`; it does not control
+storefront requests or restore the retired offline/static caches.

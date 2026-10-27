@@ -49,9 +49,10 @@ describe("production event delivery contracts", () => {
     expect(staffOnboardingRoutes).not.toContain("WHATSAPP_DELIVERY_FAILED");
   });
 
-  it("dispatches both email and WhatsApp channels from the transactional outbox", () => {
-    expect(outboxService).toContain("payload->>'channel' IN ('email','whatsapp')");
+  it("dispatches email, WhatsApp and Web Push channels from the transactional outbox", () => {
+    expect(outboxService).toContain("payload->>'channel' IN ('email','whatsapp','web_push')");
     expect(outboxService).toContain("publishEmail");
     expect(outboxService).toContain("publishWhatsApp");
+    expect(outboxService).toContain("deliverWebPush");
   });
 });

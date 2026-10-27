@@ -39,6 +39,8 @@ import { SetService } from "./modules/sets/set.service.js";
 import { NewsService } from "./modules/news/news.service.js";
 import { SetCartService } from "./modules/sets/set-cart.service.js";
 import { createEmailProvider } from "./modules/outbox/email-provider.js";
+import { CustomerNotificationService } from "./modules/notifications/notification.service.js";
+import { ConfiguredWebPushProvider } from "./modules/notifications/web-push-provider.js";
 
 export interface DartRuntime {
   app: Express;
@@ -106,6 +108,7 @@ export function createRuntimeApplication(
     database,
     config,
     emailProvider,
+    new ConfiguredWebPushProvider(config),
   );
   const waitingService = new WaitingService(database);
 
@@ -140,6 +143,7 @@ export function createRuntimeApplication(
     financeService,
     trafficAnalyticsService,
     outboxService,
+    customerNotificationService: new CustomerNotificationService(database,config),
     birthdayMessagingService: new BirthdayMessagingService(database,config.whatsappBirthdayTemplate || ""),
     maintenanceJob: async () => {
       await catalogService.cleanupReservations();

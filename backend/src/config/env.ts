@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/config/env.ts
 // الغرض: ملف مساعد ضمن مشروع Dart؛ راجع المسار والمستوردين قبل تعديله.
 import { z } from "zod";
+import { validVapidKeys } from "../modules/notifications/push-validation.js";
 
 export class EnvironmentConfigError extends Error {
   public readonly fields: string[];
@@ -93,6 +94,9 @@ const environmentSchema = z.object({
   OUTBOX_CRON_SECRET: z.string().trim().default(""),
   CRON_SECRET: z.string().trim().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
+  WEB_PUSH_VAPID_PUBLIC_KEY: z.string().trim().default(""),
+  WEB_PUSH_VAPID_PRIVATE_KEY: z.string().trim().default(""),
+  WEB_PUSH_VAPID_SUBJECT: z.string().trim().default(""),
 });
 
 export interface AppConfig {
@@ -134,6 +138,9 @@ export interface AppConfig {
   whatsappBirthdayTemplate?: string;
   outboxCronSecret: string | null;
   outboxBatchSize: number;
+  webPushVapidPublicKey?: string;
+  webPushVapidPrivateKey?: string;
+  webPushVapidSubject?: string;
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -206,6 +213,17 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const outboxCronSecret =
     parsed.data.OUTBOX_CRON_SECRET || parsed.data.CRON_SECRET;
+  const pushFields = [parsed.data.WEB_PUSH_VAPID_PUBLIC_KEY,parsed.data.WEB_PUSH_VAPID_PRIVATE_KEY,parsed.data.WEB_PUSH_VAPID_SUBJECT];
+  if (pushFields.some(Boolean)) {
+    let validSubject=false;
+    try {
+      const subject=new URL(parsed.data.WEB_PUSH_VAPID_SUBJECT);
+      validSubject=(subject.protocol==="https:" && !subject.username && !subject.password && !subject.hash) ||
+        (subject.protocol==="mailto:" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subject.pathname));
+    } catch { /* Invalid configuration is reported using field names only. */ }
+    if (!pushFields.every(Boolean) || !validSubject || !validVapidKeys(parsed.data.WEB_PUSH_VAPID_PUBLIC_KEY,parsed.data.WEB_PUSH_VAPID_PRIVATE_KEY))
+      invalidEnvironment("WEB_PUSH_VAPID_PUBLIC_KEY","WEB_PUSH_VAPID_PRIVATE_KEY","WEB_PUSH_VAPID_SUBJECT");
+  }
   const whatsappOwnerPhone = parsed.data.WHATSAPP_OWNER_PHONE.replace(/\D/g, "");
   if (whatsappOwnerPhone && !/^201(?:0|1|2|5)\d{8}$/.test(whatsappOwnerPhone)) {
     invalidEnvironment("WHATSAPP_OWNER_PHONE");
@@ -250,5 +268,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     whatsappBirthdayTemplate: parsed.data.WHATSAPP_BIRTHDAY_TEMPLATE,
     outboxCronSecret: outboxCronSecret || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
+    webPushVapidPublicKey: parsed.data.WEB_PUSH_VAPID_PUBLIC_KEY,
+    webPushVapidPrivateKey: parsed.data.WEB_PUSH_VAPID_PRIVATE_KEY,
+    webPushVapidSubject: parsed.data.WEB_PUSH_VAPID_SUBJECT,
   };
 }

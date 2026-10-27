@@ -1,3 +1,4 @@
+const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 // Chromium regression: real storefront pages and the static Dart Eye News markup/modules.
 const fs = require("node:fs"), path = require("node:path"), http = require("node:http");
 const assert = require("node:assert/strict"), { chromium } = require("playwright");
@@ -78,7 +79,7 @@ const server = http.createServer(async (req, res) => {
   }
   const file = path.resolve(root, pathname === "/" ? "index.html" : pathname.replace(/^\//, ""));
   if (!file.startsWith(root + path.sep)) return json(res, 403, {});
-  try { res.setHeader("Content-Type", ({ ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".jpg": "image/jpeg", ".png": "image/png" })[path.extname(file)] || "application/octet-stream"); res.end(fs.readFileSync(file)); }
+  try { res.setHeader("Content-Type", ({ ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".jpg": "image/jpeg", ".png": "image/png" })[path.extname(file)] || "application/octet-stream"); res.end(openStorefrontFixture(file, fs.readFileSync(file))); }
   catch { res.statusCode = 404; res.end(); }
 });
 (async () => {

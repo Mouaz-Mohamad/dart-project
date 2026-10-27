@@ -7,10 +7,11 @@
     "cache-revalidation-contract.cjs",
     "catalog-category-contract.js",
     "council-browser-runtime.cjs",
-    "council-third-runtime.cjs",
     "council-fourth-runtime.cjs",
+    "council-third-runtime.cjs",
     "css-cascade-contract.cjs",
     "custom-domain-runtime.cjs",
+    "customer-notifications-runtime.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",
     "database-authoritative-storage.cjs",
@@ -41,7 +42,9 @@
     "test-inventory-contract.cjs"
   ],
   "ciBrowser": [
+    "coming-soon-browser.cjs",
     "css-cascade-browser.cjs",
+    "customer-notifications-browser.cjs",
     "dashboard-groups-browser.cjs",
     "full-site-browser.js",
     "home-storefront-browser.js",
