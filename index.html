@@ -51,6 +51,94 @@
     <link id="dart-brand-fonts" href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet" media="print">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet"></noscript>
 
+    <!-- DART COMING SOON: temporary landing cover, scoped to index.html only. -->
+    <style id="dart-coming-soon-style">
+        html, body { overflow: hidden !important; }
+        body > .mother { visibility: hidden !important; pointer-events: none !important; }
+        #dart-coming-soon-cover,
+        #dart-coming-soon-cover * { box-sizing: border-box; }
+        #dart-coming-soon-cover {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 2147483647 !important;
+            width: 100% !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            overflow: auto !important;
+            padding: max(28px, env(safe-area-inset-top)) 24px max(28px, env(safe-area-inset-bottom)) !important;
+            background: #f9f7f4 !important;
+            color: #241c1d !important;
+            text-align: center !important;
+            font-family: Georgia, "Times New Roman", serif !important;
+            isolation: isolate;
+        }
+        #dart-coming-soon-cover::before {
+            content: "";
+            position: absolute;
+            inset: 16px;
+            border: 1px solid rgba(171, 1, 43, .22);
+            pointer-events: none;
+        }
+        #dart-coming-soon-cover .dart-coming-soon-content {
+            position: relative;
+            width: 100%;
+            max-width: 680px;
+            margin: auto;
+            padding: 32px 8px;
+        }
+        #dart-coming-soon-cover .dart-coming-soon-logo {
+            display: block;
+            width: clamp(132px, 32vw, 205px) !important;
+            height: auto !important;
+            max-width: 100% !important;
+            object-fit: contain;
+            margin: 0 auto 46px !important;
+        }
+        #dart-coming-soon-cover .dart-coming-soon-rule {
+            display: block;
+            width: 48px;
+            height: 2px;
+            margin: 0 auto 28px;
+            background: #ab012b;
+        }
+        #dart-coming-soon-cover .dart-coming-soon-heading {
+            margin: 0 !important;
+            color: #241c1d !important;
+            font-family: Georgia, "Times New Roman", serif !important;
+            font-size: clamp(42px, 10vw, 96px) !important;
+            font-weight: 400 !important;
+            line-height: 1.08 !important;
+            letter-spacing: .11em !important;
+            text-transform: uppercase;
+            overflow-wrap: normal;
+        }
+        #dart-coming-soon-cover .dart-coming-soon-heading span {
+            display: block;
+        }
+        #dart-coming-soon-cover .dart-coming-soon-heading span:last-child {
+            color: #ab012b;
+        }
+        #dart-coming-soon-cover .dart-coming-soon-subtitle {
+            margin: 27px 0 0 !important;
+            color: #6c6263 !important;
+            font-family: Arial, sans-serif !important;
+            font-size: clamp(11px, 2.5vw, 13px) !important;
+            font-weight: 400 !important;
+            letter-spacing: .35em !important;
+            text-transform: uppercase;
+        }
+        @media (max-width: 480px) {
+            #dart-coming-soon-cover::before { inset: 10px; }
+            #dart-coming-soon-cover .dart-coming-soon-logo { margin-bottom: 36px !important; }
+            #dart-coming-soon-cover .dart-coming-soon-heading { letter-spacing: .07em !important; }
+            #dart-coming-soon-cover .dart-coming-soon-subtitle { letter-spacing: .24em !important; }
+        }
+    </style>
+    <!-- END DART COMING SOON. -->
+
     <!-- Page-scoped critical performance/a11y rules. Keep the global 3-file CSS architecture unchanged. -->
     <style id="dart-home-critical-performance">
         .fa-solid,.fa-regular{display:inline-block;min-width:1em;min-height:1em}
@@ -89,6 +177,16 @@
     <meta name="theme-color" content="#000000">
 </head>
 <body class='dja-flexdir'>
+    <!-- DART COMING SOON: remove this cover and its matching style to reopen the homepage. -->
+    <div id="dart-coming-soon-cover" role="main" aria-label="Dart coming soon">
+        <div class="dart-coming-soon-content">
+            <img class="dart-coming-soon-logo" src="/Photos/1080px.png" width="205" height="205" alt="Dart logo" fetchpriority="high">
+            <span class="dart-coming-soon-rule" aria-hidden="true"></span>
+            <h1 class="dart-coming-soon-heading"><span>COMING</span><span>SOON</span></h1>
+            <p class="dart-coming-soon-subtitle">DART &nbsp;|&nbsp; FOR YOU</p>
+        </div>
+    </div>
+    <!-- END DART COMING SOON. -->
     <div class="mother">
         <header id="header-container" aria-label="Main Navigation"></header>
             
