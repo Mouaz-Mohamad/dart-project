@@ -3,12 +3,19 @@
 import { randomUUID } from "node:crypto";
 import { pinoHttp } from "pino-http";
 import type { Logger } from "pino";
+import { scrubSensitiveUrl } from "../security/sensitive-url.js";
 
 const SAFE_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export function requestContext(logger: Logger) {
   return pinoHttp({
     logger,
+    serializers: {
+      req(request) {
+        return { ...request, query: undefined,
+          url: typeof request.url === "string" ? scrubSensitiveUrl(request.url) : request.url };
+      },
+    },
     genReqId(request, response) {
       const incoming = request.headers["x-request-id"];
       const candidate = Array.isArray(incoming) ? incoming[0] : incoming;

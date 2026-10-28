@@ -2,21 +2,27 @@ import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 export const BIRTHDAY_CONSENT_VERSION = "birthday-whatsapp-v1";
+export const REVIEW_CONSENT_VERSION = "post-delivery-whatsapp-v1";
 export class BirthdayMessagingService {
     constructor(private readonly pool: Pool, private readonly template: string) { }
     async preference(userId: string): Promise<{
         birthdayMarketing: boolean;
         consentVersion: string;
+        postDeliveryReview: boolean;
+        reviewConsentVersion: string;
     }> {
         const result = await this.pool.query<{
             birthday_marketing: boolean;
+            post_delivery_review: boolean;
         }>(`SELECT
-      (p.birthday_marketing AND p.consented_at IS NOT NULL AND p.consent_version=$2) AS birthday_marketing
+      (p.birthday_marketing AND p.consented_at IS NOT NULL AND p.consent_version=$2) AS birthday_marketing,
+      (p.post_delivery_review AND p.review_consented_at IS NOT NULL AND p.review_consent_version=$3) AS post_delivery_review
       FROM customer_whatsapp_preferences p JOIN account_phones ph ON ph.user_id=p.customer_user_id
-      AND ph.is_primary AND ph.phone_normalized=p.phone_normalized WHERE p.customer_user_id=$1`, [userId, BIRTHDAY_CONSENT_VERSION]);
-        return { birthdayMarketing: result.rows[0]?.birthday_marketing === true, consentVersion: BIRTHDAY_CONSENT_VERSION };
+      AND ph.is_primary AND ph.phone_normalized=p.phone_normalized WHERE p.customer_user_id=$1`, [userId, BIRTHDAY_CONSENT_VERSION, REVIEW_CONSENT_VERSION]);
+        return { birthdayMarketing: result.rows[0]?.birthday_marketing === true, consentVersion: BIRTHDAY_CONSENT_VERSION,
+            postDeliveryReview: result.rows[0]?.post_delivery_review === true, reviewConsentVersion: REVIEW_CONSENT_VERSION };
     }
-    async setPreference(userId: string, enabled: boolean, requestId: string): Promise<void> {
+    async setPreference(userId: string, enabled: boolean, requestId: string, reviewEnabled?: boolean): Promise<void> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -26,12 +32,20 @@ export class BirthdayMessagingService {
         WHERE user_id=$1 AND is_primary AND account_type='customer' FOR SHARE`, [userId]);
             if (!phone.rows[0])
                 throw new AppError(422, "CUSTOMER_PHONE_REQUIRED", "Save your phone number before changing WhatsApp preferences");
-            await client.query(`INSERT INTO customer_whatsapp_preferences(customer_user_id,birthday_marketing,phone_normalized,consent_version,consented_at)
-        VALUES($1,$2,$3,$4,CASE WHEN $2 THEN now() ELSE NULL END)
+            await client.query(`INSERT INTO customer_whatsapp_preferences(customer_user_id,birthday_marketing,phone_normalized,consent_version,consented_at,
+          post_delivery_review,review_consented_at,review_consent_version)
+        VALUES($1,$2,$3,$4,CASE WHEN $2 THEN now() ELSE NULL END,COALESCE($5::boolean,false),CASE WHEN $5 THEN now() ELSE NULL END,$6)
         ON CONFLICT(customer_user_id) DO UPDATE SET birthday_marketing=$2,phone_normalized=$3,consent_version=$4,
-          consented_at=CASE WHEN $2 THEN now() ELSE NULL END,updated_at=now()`, [userId, enabled, phone.rows[0].phone_normalized, BIRTHDAY_CONSENT_VERSION]);
+          consented_at=CASE WHEN $2 THEN now() ELSE NULL END,
+          post_delivery_review=COALESCE($5::boolean,CASE WHEN customer_whatsapp_preferences.phone_normalized=$3 THEN customer_whatsapp_preferences.post_delivery_review ELSE false END),
+          review_consented_at=CASE WHEN $5::boolean IS NOT NULL THEN CASE WHEN $5 THEN now() ELSE NULL END
+            WHEN customer_whatsapp_preferences.phone_normalized=$3 THEN customer_whatsapp_preferences.review_consented_at ELSE NULL END,
+          review_consent_version=CASE WHEN $5::boolean IS NOT NULL THEN $6
+            WHEN customer_whatsapp_preferences.phone_normalized=$3 THEN customer_whatsapp_preferences.review_consent_version ELSE NULL END,
+          updated_at=now()`, [userId, enabled, phone.rows[0].phone_normalized, BIRTHDAY_CONSENT_VERSION, reviewEnabled ?? null, REVIEW_CONSENT_VERSION]);
             await client.query(`INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,new_values)
-        VALUES('customer',$1::uuid,'BIRTHDAY_WHATSAPP_PREFERENCE_UPDATED','customer_whatsapp_preferences',$1::text,$2,$3::jsonb)`, [userId, requestId, JSON.stringify({ birthdayMarketing: enabled, consentVersion: BIRTHDAY_CONSENT_VERSION })]);
+        VALUES('customer',$1::uuid,'BIRTHDAY_WHATSAPP_PREFERENCE_UPDATED','customer_whatsapp_preferences',$1::text,$2,$3::jsonb)`, [userId, requestId, JSON.stringify({ birthdayMarketing: enabled, consentVersion: BIRTHDAY_CONSENT_VERSION,
+            ...(reviewEnabled === undefined ? {} : { postDeliveryReview: reviewEnabled, reviewConsentVersion: REVIEW_CONSENT_VERSION }) })]);
             await client.query("COMMIT");
         }
         catch (error) {
@@ -42,7 +56,24 @@ export class BirthdayMessagingService {
             client.release();
         }
     }
-    async queue(customerRefs: string[], birthdayDate: string, actorId: string, requestId: string) {
+    async queueToday(): Promise<{ queued: number }> {
+        if (!this.template) return { queued: 0 };
+        const result = await this.pool.query<{ user_id: string; birthday_date: string }>(`
+          SELECT c.user_id::text,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS birthday_date
+          FROM customers c JOIN users u ON u.id=c.user_id
+          JOIN customer_whatsapp_preferences p ON p.customer_user_id=c.user_id
+          JOIN account_phones ph ON ph.user_id=c.user_id AND ph.is_primary AND ph.account_type='customer'
+          WHERE u.status='active' AND u.deleted_at IS NULL AND p.birthday_marketing
+            AND p.consented_at IS NOT NULL AND p.consent_version=$1 AND p.phone_normalized=ph.phone_normalized
+            AND to_char(c.birthday,'MM-DD')=to_char(now() AT TIME ZONE 'Africa/Cairo','MM-DD')
+            AND NOT EXISTS(SELECT 1 FROM outbox_events e WHERE e.deduplication_key=
+              'birthday:'||c.user_id::text||':'||(now() AT TIME ZONE 'Africa/Cairo')::date::text)
+          ORDER BY c.user_id LIMIT 100`, [BIRTHDAY_CONSENT_VERSION]);
+        const date = result.rows[0]?.birthday_date;
+        if (!date) return { queued: 0 };
+        return this.queue(result.rows.map(row => row.user_id), date, null, 'whatsapp-auto-birthday');
+    }
+    async queue(customerRefs: string[], birthdayDate: string, actorId: string | null, requestId: string) {
         if (!this.template)
             throw new AppError(503, "BIRTHDAY_TEMPLATE_NOT_CONFIGURED", "Configure the approved birthday WhatsApp template before sending");
         const client = await this.pool.connect();
@@ -87,7 +118,7 @@ export class BirthdayMessagingService {
                 const inserted = await client.query<{
                     id: string;
                 }>(`INSERT INTO outbox_events(id,aggregate_type,aggregate_id,event_type,payload,deduplication_key,available_at)
-          VALUES($1,'customer',$2,'CUSTOMER_BIRTHDAY_MESSAGE',$3::jsonb,$4,$5::date::timestamp AT TIME ZONE 'Africa/Cairo')
+          VALUES($1,'customer',$2,'CUSTOMER_BIRTHDAY_MESSAGE',$3::jsonb,$4,($5::date+time '13:00') AT TIME ZONE 'Africa/Cairo')
           ON CONFLICT(deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING RETURNING id::text`, [id, row.user_id, JSON.stringify({ channel: "whatsapp", to: row.phone_normalized, template: this.template,
                         birthdayDate, category: "marketing", consentVersion: BIRTHDAY_CONSENT_VERSION, parameters: [row.full_name, String(percent), "7"] }), key, birthdayDate]);
                 if (!inserted.rows.length) {
@@ -107,7 +138,7 @@ export class BirthdayMessagingService {
                 await client.query(`UPDATE dashboard_domain_state SET version=version+1,updated_by=$1,updated_at=now()
         WHERE domain IN ('birthday_messages','message_queue')`, [actorId]);
             await client.query(`INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,metadata)
-        VALUES('staff',$1,'BIRTHDAY_MESSAGES_QUEUED','messaging',$2,$3,$4::jsonb)`, [actorId, birthdayDate, requestId, JSON.stringify({ queued, alreadyQueued, skipped: skipped.length })]);
+        VALUES(CASE WHEN $1::uuid IS NULL THEN 'system' ELSE 'staff' END,$1,'BIRTHDAY_MESSAGES_QUEUED','messaging',$2,$3,$4::jsonb)`, [actorId, birthdayDate, requestId, JSON.stringify({ queued, alreadyQueued, skipped: skipped.length, category: 'marketing' })]);
             await client.query("COMMIT");
             return { queued, alreadyQueued, skipped };
         }

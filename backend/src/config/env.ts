@@ -84,6 +84,9 @@ const environmentSchema = z.object({
     .max(3_600_000)
     .default(300_000),
   WHATSAPP_CLOUD_API_TOKEN: z.string().default(""),
+  WHATSAPP_SEND_ENABLED: booleanFromString,
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(""),
+  WHATSAPP_APP_SECRET: z.string().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).or(z.literal("")).default(""),
   WHATSAPP_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
   WHATSAPP_TEMPLATE_LANGUAGE: z.string().trim().min(2).max(20).default("ar"),
@@ -91,6 +94,7 @@ const environmentSchema = z.object({
   WHATSAPP_STAFF_OTP_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_otp"),
   WHATSAPP_STAFF_INVITE_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_invite"),
   WHATSAPP_BIRTHDAY_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
+  WHATSAPP_POST_DELIVERY_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
   OUTBOX_CRON_SECRET: z.string().trim().default(""),
   CRON_SECRET: z.string().trim().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
@@ -129,6 +133,9 @@ export interface AppConfig {
   monitoringAlertEmail?: string | null;
   monitoringAlertCooldownMs?: number;
   whatsappAccessToken?: string | null;
+  whatsappSendEnabled?: boolean;
+  whatsappWebhookVerifyToken?: string | null;
+  whatsappAppSecret?: string | null;
   whatsappPhoneNumberId?: string | null;
   whatsappGraphApiVersion?: string;
   whatsappTemplateLanguage?: string;
@@ -136,6 +143,7 @@ export interface AppConfig {
   whatsappStaffOtpTemplate?: string;
   whatsappStaffInviteTemplate?: string;
   whatsappBirthdayTemplate?: string;
+  whatsappPostDeliveryTemplate?: string;
   outboxCronSecret: string | null;
   outboxBatchSize: number;
   webPushVapidPublicKey?: string;
@@ -224,6 +232,17 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     if (!pushFields.every(Boolean) || !validSubject || !validVapidKeys(parsed.data.WEB_PUSH_VAPID_PUBLIC_KEY,parsed.data.WEB_PUSH_VAPID_PRIVATE_KEY))
       invalidEnvironment("WEB_PUSH_VAPID_PUBLIC_KEY","WEB_PUSH_VAPID_PRIVATE_KEY","WEB_PUSH_VAPID_SUBJECT");
   }
+  const verifyToken = parsed.data.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+  const appSecret = parsed.data.WHATSAPP_APP_SECRET;
+  if (Boolean(verifyToken) !== Boolean(appSecret) || (verifyToken && verifyToken.length < 32)) {
+    invalidEnvironment("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "WHATSAPP_APP_SECRET");
+  }
+  if (parsed.data.WHATSAPP_SEND_ENABLED) {
+    const required = ["WHATSAPP_CLOUD_API_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET",
+      "WHATSAPP_WEBHOOK_VERIFY_TOKEN", "WHATSAPP_BIRTHDAY_TEMPLATE", "WHATSAPP_POST_DELIVERY_TEMPLATE"] as const;
+    const missing = required.filter(key => !parsed.data[key]);
+    if (missing.length) invalidEnvironment(...missing);
+  }
   const whatsappOwnerPhone = parsed.data.WHATSAPP_OWNER_PHONE.replace(/\D/g, "");
   if (whatsappOwnerPhone && !/^201(?:0|1|2|5)\d{8}$/.test(whatsappOwnerPhone)) {
     invalidEnvironment("WHATSAPP_OWNER_PHONE");
@@ -259,6 +278,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     monitoringAlertEmail: parsed.data.MONITORING_ALERT_EMAIL || null,
     monitoringAlertCooldownMs: parsed.data.MONITORING_ALERT_COOLDOWN_MS,
     whatsappAccessToken: parsed.data.WHATSAPP_CLOUD_API_TOKEN || null,
+    whatsappSendEnabled: parsed.data.WHATSAPP_SEND_ENABLED,
+    whatsappWebhookVerifyToken: verifyToken || null,
+    whatsappAppSecret: appSecret || null,
     whatsappPhoneNumberId: parsed.data.WHATSAPP_PHONE_NUMBER_ID || null,
     whatsappGraphApiVersion: parsed.data.WHATSAPP_GRAPH_API_VERSION,
     whatsappTemplateLanguage: parsed.data.WHATSAPP_TEMPLATE_LANGUAGE,
@@ -266,6 +288,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     whatsappStaffOtpTemplate: parsed.data.WHATSAPP_STAFF_OTP_TEMPLATE,
     whatsappStaffInviteTemplate: parsed.data.WHATSAPP_STAFF_INVITE_TEMPLATE,
     whatsappBirthdayTemplate: parsed.data.WHATSAPP_BIRTHDAY_TEMPLATE,
+    whatsappPostDeliveryTemplate: parsed.data.WHATSAPP_POST_DELIVERY_TEMPLATE,
     outboxCronSecret: outboxCronSecret || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
     webPushVapidPublicKey: parsed.data.WEB_PUSH_VAPID_PUBLIC_KEY,

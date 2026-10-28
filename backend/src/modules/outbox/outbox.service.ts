@@ -8,6 +8,9 @@ import type { EmailProvider } from "./email-provider.js";
 import { renderOutboxEmail } from "./email-templates.js";
 import { deliverWebPush } from "../notifications/push-dispatch.js";
 import { PushDeliveryError, type WebPushProvider } from "../notifications/web-push-provider.js";
+import { whatsappSendWindow } from "./whatsapp-schedule.js";
+
+class DeferredWhatsAppDelivery extends Error {}
 
 class DeliveryError extends Error {
   constructor(readonly disposition: "retryable" | "terminal" | "unknown", message: string) { super(message); }
@@ -59,6 +62,8 @@ export class OutboxService {
     private readonly config: Pick<
       AppConfig,
       | "whatsappAccessToken"
+      | "whatsappSendEnabled"
+      | "whatsappPostDeliveryTemplate"
       | "whatsappPhoneNumberId"
       | "whatsappGraphApiVersion"
       | "whatsappTemplateLanguage"
@@ -67,10 +72,12 @@ export class OutboxService {
     >,
     private readonly emailProvider: EmailProvider | null = null,
     private readonly webPushProvider: WebPushProvider | null = null,
+    private readonly now: () => Date = () => new Date(),
   ) {}
 
   public configured(channel?: "email" | "whatsapp" | "web_push"): boolean {
     const whatsapp = Boolean(
+      this.config.whatsappSendEnabled === true &&
       this.config.whatsappAccessToken &&
         this.config.whatsappPhoneNumberId &&
         /^v\d+\.\d+$/.test(this.config.whatsappGraphApiVersion || "v26.0"),
@@ -96,14 +103,18 @@ export class OutboxService {
       channel: string;
       recipient: string;
       delivery_state: string | null;
+      delivery_status: string | null;
+      delivery_error_code: string | null;
       provider_message_id: string | null;
+      category: string;
     }>(
       `SELECT e.id::text, e.event_type, e.status, e.attempts, COALESCE(a.last_error,e.last_error) AS last_error,
-              e.created_at, e.updated_at, e.published_at, a.state AS delivery_state, a.provider_message_id,
+              e.created_at, e.updated_at, e.published_at, a.state AS delivery_state, a.delivery_status, a.delivery_error_code, a.provider_message_id,
               COALESCE(e.payload->>'channel','') AS channel,
+              COALESCE(e.payload->>'category','') AS category,
               COALESCE(e.payload->>'to','') AS recipient
          FROM outbox_events e LEFT JOIN LATERAL (
-           SELECT state,provider_message_id,last_error FROM outbox_delivery_attempts
+           SELECT state,delivery_status,delivery_error_code,provider_message_id,last_error FROM outbox_delivery_attempts
             WHERE event_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1
          ) a ON true
         WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')
@@ -115,8 +126,11 @@ export class OutboxService {
       id: row.id,
       eventType: row.event_type,
       channel: row.channel,
+      category: row.category,
       recipient: maskRecipient(row.channel, row.recipient),
-      status: row.delivery_state || row.status,
+      status: row.delivery_status || row.delivery_state || row.status,
+      deliveryStatus: row.delivery_status || null,
+      deliveryErrorCode: row.delivery_error_code || null,
       eventStatus: row.status,
       providerMessageId: row.provider_message_id || null,
       attempts: row.attempts,
@@ -146,11 +160,14 @@ export class OutboxService {
           WHERE attempts < 12 AND available_at <= now()
             AND payload->>'channel' IN ('email','whatsapp','web_push')
             AND ($2::text IS NULL OR deduplication_key=$2)
+            AND (payload->>'channel'<>'whatsapp' OR ($3::boolean AND $4::boolean
+              AND (event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $5::boolean)))
             AND NOT EXISTS (SELECT 1 FROM outbox_delivery_attempts a
               WHERE a.event_id=outbox_events.id AND a.state IN ('executing','accepted','unknown','terminal','suppressed'))
             AND (status IN ('pending','failed') OR (status='processing' AND locked_at < now() - interval '5 minutes'))
           ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT $1`,
-        [Math.min(100, Math.max(1, limit)), deduplicationKey || null],
+        [Math.min(100, Math.max(1, limit)), deduplicationKey || null,
+          this.configured("whatsapp"), whatsappSendWindow(this.now()), Boolean(this.config.whatsappPostDeliveryTemplate)],
       );
       rows = result.rows;
       if (rows.length) await client.query(`UPDATE outbox_events
@@ -173,8 +190,18 @@ export class OutboxService {
         continue; // No external call was made. The expired lease is retryable.
       }
       let result: { providerMessageId?: string; suppressed?: boolean };
-      try { result=await this.publish(row); }
+      try { result=await this.publish(row, attemptId); }
       catch (error) {
+        if (error instanceof DeferredWhatsAppDelivery) {
+          // No external request was made; preserve this event and its retry budget.
+          await this.pool.query(`WITH deferred AS (
+            UPDATE outbox_delivery_attempts SET state='retryable',last_error='Waiting for WhatsApp send window',updated_at=now()
+            WHERE id=$2 RETURNING event_id
+          ) UPDATE outbox_events SET status='pending',attempts=GREATEST(attempts-1,0),locked_at=NULL,
+            available_at=dart_whatsapp_send_at(now()+interval '1 minute'),updated_at=now()
+            WHERE id=$1 AND EXISTS(SELECT 1 FROM deferred WHERE event_id=$1)`, [row.id,attemptId]);
+          continue;
+        }
         const disposition=error instanceof DeliveryError || error instanceof PushDeliveryError ? error.disposition : "unknown";
         if (disposition === "retryable") failed += 1;
         else if (disposition === "terminal") terminal += 1;
@@ -216,14 +243,19 @@ export class OutboxService {
         count(*) FILTER (WHERE e.status<>'published' AND e.attempts>=12)::text AS exhausted,
         count(*) FILTER (WHERE a.state='unknown' OR (a.state='executing' AND a.updated_at<now()-interval '5 minutes') OR (a.state='accepted' AND e.status<>'published'))::text AS uncertain,
         count(*) FILTER (WHERE a.state='terminal')::text AS terminal,
-        count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now())::text AS due_pending,
+        count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
+          AND (e.payload->>'channel'<>'whatsapp' OR ($1::boolean AND $2::boolean
+            AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean))))::text AS due_pending,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.available_at)) FILTER
-          (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()),0)::text AS oldest_due_seconds,
+          (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
+            AND (e.payload->>'channel'<>'whatsapp' OR ($1::boolean AND $2::boolean
+              AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean)))),0)::text AS oldest_due_seconds,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.created_at)) FILTER
           (WHERE e.status<>'published' AND e.attempts<12 AND a.state IS NULL),0)::text AS oldest_seconds
       FROM outbox_events e LEFT JOIN LATERAL (
         SELECT state,updated_at FROM outbox_delivery_attempts WHERE event_id=e.id AND state<>'retryable' ORDER BY created_at DESC,id DESC LIMIT 1
-      ) a ON true WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')`);
+      ) a ON true WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')`,
+      [this.configured("whatsapp"),whatsappSendWindow(this.now()),Boolean(this.config.whatsappPostDeliveryTemplate)]);
     const row=result.rows[0];
     return { pending:Number(row?.pending||0),exhausted:Number(row?.exhausted||0),uncertain:Number(row?.uncertain||0),
       terminal:Number(row?.terminal||0),oldestSeconds:Math.max(0,Math.floor(Number(row?.oldest_seconds||0))),
@@ -248,13 +280,13 @@ export class OutboxService {
     return copy;
   }
 
-  private async publish(row: OutboxRow): Promise<{ providerMessageId?: string; suppressed?: boolean }> {
+  private async publish(row: OutboxRow, attemptId: string): Promise<{ providerMessageId?: string; suppressed?: boolean }> {
     const channel = String(row.payload?.channel || "");
     if (channel === "email") {
       return this.publishEmail(row);
     }
     if (channel === "whatsapp") {
-      return this.publishWhatsApp(row);
+      return this.publishWhatsApp(row, attemptId);
     }
     if (channel === "web_push") {
       try { return await deliverWebPush(this.pool,this.config.mfaEncryptionKey,this.webPushProvider,row.payload); }
@@ -341,10 +373,11 @@ export class OutboxService {
     return result.rows[0]?.active === true;
   }
 
-  private async publishWhatsApp(row: OutboxRow): Promise<{ providerMessageId?: string; suppressed?: boolean }> {
+  private async publishWhatsApp(row: OutboxRow, attemptId: string): Promise<{ providerMessageId?: string; suppressed?: boolean }> {
     if (!this.configured("whatsapp")) {
-      throw new DeliveryError("retryable", "WhatsApp Business Platform delivery is not configured");
+      throw new DeferredWhatsAppDelivery("WhatsApp sending is disabled");
     }
+    if (!whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
     if (row.event_type === "CUSTOMER_BIRTHDAY_MESSAGE") {
       const eligible=await this.pool.query<{ allowed:boolean }>(`SELECT EXISTS (
         SELECT 1 FROM customer_whatsapp_preferences p JOIN users u ON u.id=p.customer_user_id
@@ -357,9 +390,25 @@ export class OutboxService {
         [row.aggregate_id,String(row.payload.to||""),String(row.payload.birthdayDate||""),String(row.payload.consentVersion||"")]);
       if (!eligible.rows[0]?.allowed) return {suppressed:true};
     }
+    if (row.event_type === "CUSTOMER_POST_DELIVERY_REVIEW") {
+      const eligible = await this.pool.query<{ allowed: boolean }>(`SELECT EXISTS(
+        SELECT 1 FROM orders o JOIN users u ON u.id=o.customer_user_id
+        JOIN customer_whatsapp_preferences p ON p.customer_user_id=o.customer_user_id
+        JOIN account_phones ph ON ph.user_id=o.customer_user_id AND ph.is_primary AND ph.account_type='customer'
+        WHERE o.id::text=$1 AND o.status='Delivered' AND NOT o.is_deleted
+          AND o.delivered_at=$2::timestamptz AND o.delivered_at+interval '7 hours'<=now()
+          AND now()<$3::timestamptz AND u.status='active' AND u.deleted_at IS NULL
+          AND p.post_delivery_review AND p.review_consented_at IS NOT NULL
+          AND p.review_consent_version='post-delivery-whatsapp-v1' AND $5='post-delivery-whatsapp-v1'
+          AND p.phone_normalized=$4 AND ph.phone_normalized=p.phone_normalized) AS allowed`,
+        [row.aggregate_id,String(row.payload.deliveredAt||""),String(row.payload.expiresAt||""),
+          String(row.payload.to||""),String(row.payload.consentVersion||"")]);
+      if (!eligible.rows[0]?.allowed) return {suppressed:true};
+    }
     const payload = this.externalPayload(row.payload || {});
     const to = String(payload.to || "").replace(/\D/g, "");
-    const template = String(payload.template || "").trim();
+    const template = String(row.event_type === "CUSTOMER_POST_DELIVERY_REVIEW"
+      ? this.config.whatsappPostDeliveryTemplate || "" : payload.template || "").trim();
     const languageCode = String(
       payload.languageCode || this.config.whatsappTemplateLanguage || "ar",
     ).trim();
@@ -391,6 +440,8 @@ export class OutboxService {
         ? [bodyComponent]
         : undefined;
 
+    // Recheck immediately before the external call as a batch can cross 22:00.
+    if (!whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
     const response = await fetch(
       `https://graph.facebook.com/${this.config.whatsappGraphApiVersion || "v26.0"}/${this.config.whatsappPhoneNumberId}/messages`,
       {
@@ -403,7 +454,7 @@ export class OutboxService {
           messaging_product: "whatsapp",
           recipient_type: "individual",
           to,
-          biz_opaque_callback_data: row.id,
+          biz_opaque_callback_data: attemptId,
           type: "template",
           template: {
             name: template,

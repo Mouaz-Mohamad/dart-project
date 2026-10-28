@@ -1,5 +1,6 @@
 // DART CODE GUIDE | backend/src/modules/monitoring/sentry-scrub.ts
 // الغرض: إزالة الأسرار والبيانات الحساسة من أحداث Sentry قبل خروجها من الخادم.
+import { scrubSensitiveUrl } from "../../security/sensitive-url.js";
 const SENSITIVE_KEY = /(?:authorization|cookie|password|passcode|token|secret|api[-_]?key|otp|mfa|session|credential)/i;
 const KEY_VALUE_SECRET = /\b(authorization|cookie|password|passcode|token|secret|api[-_]?key|otp|mfa|session|credential)\b\s*[:=]\s*([^\s,;&]+)/gi;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
@@ -38,7 +39,7 @@ export function redactSensitiveText(value: string): string {
 
 function scrubValue(value: unknown, key = ""): unknown {
   if (SENSITIVE_KEY.test(key)) return "[REDACTED]";
-  if (typeof value === "string") return redactSensitiveText(value);
+  if (typeof value === "string") return redactSensitiveText(scrubSensitiveUrl(value));
   if (Array.isArray(value)) return value.map((entry) => scrubValue(entry));
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
@@ -61,10 +62,7 @@ function scrubHeaders(headers: Record<string, string>): Record<string, string> {
 }
 
 function scrubUrl(value: string): string {
-  return redactSensitiveText(value).replace(
-    /([?&](?:password|passcode|token|secret|api[-_]?key|otp|mfa|session|credential)=)[^&#]*/gi,
-    "$1[REDACTED]",
-  );
+  return redactSensitiveText(scrubSensitiveUrl(value));
 }
 
 export function scrubSentryEvent<T extends SanitizableSentryEvent>(event: T): T {

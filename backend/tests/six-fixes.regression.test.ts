@@ -109,12 +109,16 @@ async function messageDatabase() {
     INSERT INTO dashboard_domain_state(domain) VALUES('birthday_messages'),('message_queue');
     CREATE TABLE message_records(domain text,record_id text,position bigint,payload jsonb,updated_at timestamptz DEFAULT now(),PRIMARY KEY(domain,record_id));
     CREATE TABLE site_settings(id text,data jsonb);INSERT INTO site_settings VALUES('main','{"birthdayDiscountPercent":30}');
-    CREATE TABLE audit_logs(actor_type text,actor_id uuid,action text,entity_type text,entity_id text,request_id text,new_values jsonb,metadata jsonb);`);
+    CREATE TABLE audit_logs(actor_type text,actor_id uuid,action text,entity_type text,entity_id text,request_id text,old_values jsonb,new_values jsonb,metadata jsonb);
+    CREATE TABLE orders(id uuid PRIMARY KEY,order_code text,customer_user_id uuid,status text,delivered_at timestamptz,is_deleted boolean DEFAULT false);`);
     await db.exec(await readFile(new URL("../migrations/0061_delivery_safety_and_birthday_consent.sql", import.meta.url), "utf8"));
+    await db.exec(await readFile(new URL("../migrations/0066_whatsapp_delivery_status.sql", import.meta.url), "utf8"));
+    await db.exec(await readFile(new URL("../migrations/0067_whatsapp_automations.sql", import.meta.url), "utf8"));
     return db;
 }
-const deliveryConfig = { whatsappAccessToken: "synthetic-nonsecret", whatsappPhoneNumberId: "123456789", whatsappGraphApiVersion: "v26.0",
+const deliveryConfig = { whatsappSendEnabled: true, whatsappAccessToken: "synthetic-nonsecret", whatsappPhoneNumberId: "123456789", whatsappGraphApiVersion: "v26.0",
     whatsappTemplateLanguage: "ar", outboxBatchSize: 5, mfaEncryptionKey: Buffer.alloc(32, 7) };
+function allowedWhatsAppClock() { const date = new Date(); date.setUTCHours(12, 0, 0, 0); return date; }
 async function event(db: PGlite) {
     const id = randomUUID();
     await db.query(`INSERT INTO outbox_events(id,aggregate_type,aggregate_id,event_type,payload,deduplication_key)
@@ -133,7 +137,7 @@ describe("durable external delivery outcomes on PostgreSQL SQL", () => {
         } return false; });
         const fetch = vi.fn(async () => accepted());
         vi.stubGlobal("fetch", fetch);
-        const service = new OutboxService(pool, deliveryConfig);
+        const service = new OutboxService(pool, deliveryConfig, null, null, allowedWhatsAppClock);
         expect(await service.processBatch(5)).toMatchObject({ claimed: 1, published: 0, failed: 0, uncertain: 1 });
         expect(await service.processBatch(5)).toMatchObject({ claimed: 0 });
         expect(fetch).toHaveBeenCalledOnce();
@@ -145,7 +149,7 @@ describe("durable external delivery outcomes on PostgreSQL SQL", () => {
         await event(db);
         const fetch = vi.fn(async () => { throw new Error("Synthetic timeout after request write"); });
         vi.stubGlobal("fetch", fetch);
-        const service = new OutboxService(poolFor(db), deliveryConfig);
+        const service = new OutboxService(poolFor(db), deliveryConfig, null, null, allowedWhatsAppClock);
         expect(await service.processBatch(1)).toMatchObject({ uncertain: 1, failed: 0 });
         await db.exec("UPDATE outbox_events SET available_at=now()-interval '1 hour'");
         expect((await service.processBatch(1)).claimed).toBe(0);
@@ -156,7 +160,7 @@ describe("durable external delivery outcomes on PostgreSQL SQL", () => {
         await event(db);
         const fetch = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 429 })).mockImplementationOnce(async () => accepted());
         vi.stubGlobal("fetch", fetch);
-        const service = new OutboxService(poolFor(db), deliveryConfig);
+        const service = new OutboxService(poolFor(db), deliveryConfig, null, null, allowedWhatsAppClock);
         expect(await service.processBatch(1)).toMatchObject({ failed: 1, published: 0 });
         await db.exec("UPDATE outbox_events SET available_at=now()-interval '1 hour'");
         expect(await service.processBatch(1)).toMatchObject({ published: 1, failed: 0 });
@@ -168,7 +172,7 @@ describe("durable external delivery outcomes on PostgreSQL SQL", () => {
         await db.query("INSERT INTO outbox_delivery_attempts(id,event_id,state,updated_at) VALUES($1,$2,'executing',now()-interval '10 minutes')", [randomUUID(), id]);
         const fetch = vi.fn();
         vi.stubGlobal("fetch", fetch);
-        const service = new OutboxService(poolFor(db), deliveryConfig);
+        const service = new OutboxService(poolFor(db), deliveryConfig, null, null, allowedWhatsAppClock);
         expect((await service.processBatch(1)).claimed).toBe(0);
         expect(fetch).not.toHaveBeenCalled();
         expect(await service.health()).toMatchObject({ uncertain: 1, pending: 0 });
@@ -179,7 +183,7 @@ describe("durable external delivery outcomes on PostgreSQL SQL", () => {
         await event(db);
         const fetch = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 400 })).mockImplementation(async () => accepted());
         vi.stubGlobal("fetch", fetch);
-        const service = new OutboxService(poolFor(db), deliveryConfig);
+        const service = new OutboxService(poolFor(db), deliveryConfig, null, null, allowedWhatsAppClock);
         expect(await service.processBatch(2)).toMatchObject({ claimed: 2, published: 1, terminal: 1, failed: 0 });
         expect((await service.processBatch(2)).claimed).toBe(0);
     });
@@ -212,9 +216,10 @@ describe("birthday command and explicit opt-in", () => {
         expect(await service.queue([customer.id], customer.today, customer.actor, "retry")).toMatchObject({ queued: 0, alreadyQueued: 1 });
         expect((await db.query("SELECT * FROM message_records")).rows).toHaveLength(2);
         await service.setPreference(customer.id, false, "opt-out");
+        await db.exec("UPDATE outbox_events SET available_at=now()-interval '1 minute'");
         const fetch = vi.fn();
         vi.stubGlobal("fetch", fetch);
-        expect(await new OutboxService(pool, deliveryConfig).processBatch(5)).toMatchObject({ published: 1 });
+        expect(await new OutboxService(pool, deliveryConfig, null, null, allowedWhatsAppClock).processBatch(5)).toMatchObject({ published: 1 });
         expect(fetch).not.toHaveBeenCalled();
         expect((await db.query("SELECT state FROM outbox_delivery_attempts")).rows).toMatchObject([{ state: "suppressed" }]);
         expect((await new DashboardStateService(pool).read("birthday_messages")).data[0]).toMatchObject({ status: "Suppressed" });

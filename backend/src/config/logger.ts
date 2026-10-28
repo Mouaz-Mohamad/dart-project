@@ -14,6 +14,7 @@ export function createLogger(config: Pick<AppConfig, "logLevel" | "nodeEnv">): L
       paths: [
         "req.headers.authorization",
         "req.headers.cookie",
+        'req.headers["x-hub-signature-256"]',
         "res.headers.set-cookie",
         "password",
         "token",

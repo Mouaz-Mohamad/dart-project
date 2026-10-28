@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:a1491069f817b1c953de5e0e3b6ecc35c9cf94ed34bd2feafb5bbd5a9191ae4e */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:8abc5236d597e6c932972afc035fad19e2853161781cf54a9e111a92b6c63cd9 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -4479,8 +4479,12 @@ async function dartBirthdayDeliveryHealth() {
   let status=document.getElementById("birthdayDeliveryStatus");
   if(!status){status=document.createElement("p");status.id="birthdayDeliveryStatus";status.setAttribute("role","status");feed.after(status);}
   try {
-    const {queue}=await window.DartAdminApi.request("/api/v1/admin/messaging/delivery-health");
-    status.textContent=`Message queue: ${queue.pending} pending · ${queue.uncertain} require review · ${queue.terminal+queue.exhausted} failed · oldest ${queue.oldestSeconds}s`;
+    const {queue,events}=await window.DartAdminApi.request("/api/v1/admin/messaging/delivery-health");
+    const whatsapp=(events || []).filter(event=>event.channel==="whatsapp");
+    const states=whatsapp.slice(0,5).map(event=>`${event.eventType}: ${event.status}${event.deliveryErrorCode ? ` (${event.deliveryErrorCode})` : ""}`);
+    const marketing=whatsapp.filter(event=>event.category==="marketing").length;
+    const utility=whatsapp.filter(event=>event.category==="utility").length;
+    status.textContent=`Message queue: ${queue.pending} pending · ${queue.uncertain} require review · ${queue.terminal+queue.exhausted} failed · oldest ${queue.oldestSeconds}s. Recent WhatsApp events: ${marketing} Marketing · ${utility} Utility. ${states.join(" · ")}`;
   } catch(error){status.textContent=error.message || "Delivery status unavailable";}
 }
 function setupBirthdayMessageActions() {

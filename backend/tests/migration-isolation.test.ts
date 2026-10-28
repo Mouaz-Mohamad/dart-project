@@ -10,6 +10,6 @@ it("validates and executes dependent SQL functions inside an isolated migration 
     expect((await store.pool.query("SELECT 1 AS value")).rowCount).toBe(1);
     expect(row.benefits).toEqual([{ type: "Birthday", rewardId: "synthetic" }]);
     expect((await store.pool.query("SELECT current_setting('check_function_bodies') AS enabled")).rows[0].enabled).toBe("on");
-    expect((await store.pool.query("SELECT count(*)::int AS n FROM dart_schema_migrations")).rows[0].n).toBe(65);
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM dart_schema_migrations")).rows[0].n).toBe(67);
   } finally { await store.db.close(); }
 }, 30000);

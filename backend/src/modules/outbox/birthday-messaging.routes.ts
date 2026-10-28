@@ -4,7 +4,7 @@ import type { AppConfig } from "../../config/env.js";
 import { AppError } from "../../http/app-error.js";
 import { authenticate, csrfProtection, requireAccountType, requireMfa, requirePermission } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
-import { BIRTHDAY_CONSENT_VERSION, type BirthdayMessagingService } from "./birthday-messaging.service.js";
+import { BIRTHDAY_CONSENT_VERSION, REVIEW_CONSENT_VERSION, type BirthdayMessagingService } from "./birthday-messaging.service.js";
 import type { OutboxService } from "./outbox.service.js";
 import { dispatchOutbox } from "./outbox.dispatch.js";
 export function createBirthdayMessagingRouter(service: BirthdayMessagingService, identity: IdentityService, config: Pick<AppConfig, "sessionCookieName" | "authPepper">, outbox: OutboxService): Router {
@@ -13,8 +13,11 @@ export function createBirthdayMessagingRouter(service: BirthdayMessagingService,
         res.json(await service.preference(req.auth!.userId));
     });
     router.put("/me/preferences/whatsapp", signedIn, csrf, requireAccountType("customer"), async (req, res) => {
-        const body = z.object({ birthdayMarketing: z.boolean(), consentVersion: z.literal(BIRTHDAY_CONSENT_VERSION) }).strict().parse(req.body);
-        await service.setPreference(req.auth!.userId, body.birthdayMarketing, String(req.id));
+        const body = z.object({ birthdayMarketing: z.boolean(), consentVersion: z.literal(BIRTHDAY_CONSENT_VERSION),
+            postDeliveryReview: z.boolean().optional(), reviewConsentVersion: z.literal(REVIEW_CONSENT_VERSION).optional(),
+        }).strict().refine(value => value.postDeliveryReview === undefined || value.reviewConsentVersion === REVIEW_CONSENT_VERSION,
+            { message: 'Review consent version is required', path: ['reviewConsentVersion'] }).parse(req.body);
+        await service.setPreference(req.auth!.userId, body.birthdayMarketing, String(req.id), body.postDeliveryReview);
         res.json(await service.preference(req.auth!.userId));
     });
     router.post("/admin/messaging/birthdays", signedIn, csrf, requireAccountType("staff"), requireMfa, requirePermission("messaging.manage"), async (req, res) => {

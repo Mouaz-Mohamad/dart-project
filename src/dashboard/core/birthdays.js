@@ -105,8 +105,12 @@ async function dartBirthdayDeliveryHealth() {
   let status=document.getElementById("birthdayDeliveryStatus");
   if(!status){status=document.createElement("p");status.id="birthdayDeliveryStatus";status.setAttribute("role","status");feed.after(status);}
   try {
-    const {queue}=await window.DartAdminApi.request("/api/v1/admin/messaging/delivery-health");
-    status.textContent=`Message queue: ${queue.pending} pending · ${queue.uncertain} require review · ${queue.terminal+queue.exhausted} failed · oldest ${queue.oldestSeconds}s`;
+    const {queue,events}=await window.DartAdminApi.request("/api/v1/admin/messaging/delivery-health");
+    const whatsapp=(events || []).filter(event=>event.channel==="whatsapp");
+    const states=whatsapp.slice(0,5).map(event=>`${event.eventType}: ${event.status}${event.deliveryErrorCode ? ` (${event.deliveryErrorCode})` : ""}`);
+    const marketing=whatsapp.filter(event=>event.category==="marketing").length;
+    const utility=whatsapp.filter(event=>event.category==="utility").length;
+    status.textContent=`Message queue: ${queue.pending} pending · ${queue.uncertain} require review · ${queue.terminal+queue.exhausted} failed · oldest ${queue.oldestSeconds}s. Recent WhatsApp events: ${marketing} Marketing · ${utility} Utility. ${states.join(" · ")}`;
   } catch(error){status.textContent=error.message || "Delivery status unavailable";}
 }
 function setupBirthdayMessageActions() {

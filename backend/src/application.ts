@@ -6,6 +6,8 @@ import express, { type Express, type RequestHandler } from "express";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import type { Logger } from "pino";
+import type { Pool } from "pg";
+import { createWhatsAppWebhookRouter } from "./modules/outbox/whatsapp-webhook.routes.js";
 import type { AppConfig } from "./config/env.js";
 import { AppError } from "./http/app-error.js";
 import { createErrorHandler } from "./middleware/error-handler.js";
@@ -82,6 +84,7 @@ export interface AppDependencies extends HealthDependencies {
   financeService?: FinanceService;
   trafficAnalyticsService?: TrafficAnalyticsService;
   outboxService?: OutboxService;
+  whatsappWebhookPool?: Pool;
   birthdayMessagingService?: BirthdayMessagingService;
   maintenanceJob?: () => Promise<void>;
   waitingService?: WaitingService;
@@ -111,6 +114,11 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       },
     }),
   );
+  // Mount before JSON parsing to preserve the exact signed bytes from Meta.
+  // The handler has a strict 256 KB body limit and rejects unsigned requests.
+  if (dependencies.whatsappWebhookPool) {
+    app.use("/api/v1/webhooks/whatsapp", createWhatsAppWebhookRouter(dependencies.whatsappWebhookPool, config));
+  }
   app.use(
     rateLimit({
       store: sharedRateLimitStore(config, "application"),

@@ -111,6 +111,7 @@ export function createRuntimeApplication(
     new ConfiguredWebPushProvider(config),
   );
   const waitingService = new WaitingService(database);
+  const birthdayMessagingService = new BirthdayMessagingService(database,config.whatsappBirthdayTemplate || "");
 
   database.on("error", (error) => {
     logger.error({ err: error }, "Unexpected PostgreSQL pool error");
@@ -143,11 +144,13 @@ export function createRuntimeApplication(
     financeService,
     trafficAnalyticsService,
     outboxService,
+    whatsappWebhookPool: database,
     customerNotificationService: new CustomerNotificationService(database,config),
-    birthdayMessagingService: new BirthdayMessagingService(database,config.whatsappBirthdayTemplate || ""),
+    birthdayMessagingService,
     maintenanceJob: async () => {
       await catalogService.cleanupReservations();
       if (config.rateLimitStore === "postgres") await pruneRateLimits(database);
+      if (outboxService.configured("whatsapp")) await birthdayMessagingService.queueToday();
     },
     waitingService,
     operationalAlerts,
