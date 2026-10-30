@@ -296,6 +296,23 @@ const server = http.createServer((request, response) => {
   assert.equal(ratings.direction, "ltr");
   assert(ratings.initialColors.stars.every(color => color === "rgb(224, 227, 232)"), "empty stars must appear gray");
   assert.equal(await longReview.locator(".stars").evaluate(el => getComputedStyle(el).justifyContent), "center");
+  // Use a real pointer on the rightmost (fifth) star, not a synthetic change event.
+  const rightmost = page.locator("#reviewForm .dart-rating-choice").nth(4);
+  await rightmost.click();
+  const fifth = await page.locator("#reviewForm").evaluate((form) => ({
+    rating: new FormData(form).get("rating"),
+    selected: [...form.querySelectorAll(".dart-star-shape")]
+      .filter(node => getComputedStyle(node).fill === "rgb(231, 185, 81)").length,
+  }));
+  assert.deepEqual(fifth, { rating: "5", selected: 5 },
+    "tapping the rightmost star must select exactly five");
+  await page.locator("#reviewForm").evaluate(form => form.reset());
+  await shortReview.locator("[data-review-read-more]").click();
+  await page.locator("#dartReviewDialog").waitFor({ state: "visible" });
+  assert.equal(await page.locator("#dart-review-full-title").textContent(), "Great fit");
+  assert.equal(await page.locator("#dart-review-full-text").textContent(), "Loved it.");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#dartReviewDialog").evaluate(dialog => dialog.open), false);
 
 
   const productImage = card.locator("img").first();
