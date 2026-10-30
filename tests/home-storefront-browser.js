@@ -269,13 +269,22 @@ const server = http.createServer((request, response) => {
     const form = document.querySelector("#reviewForm");
     const radios = [...form.querySelectorAll('input[name="rating"]')];
     const initiallySelected = radios.some(radio => radio.checked);
+    const color = (value) => getComputedStyle(form.querySelector(`label[for="review-rating-${value}"] .dart-rating-star`)).backgroundColor;
+    const emptyStar = color(1);
     document.querySelector('label[for="review-rating-4"]').click();
+    const chosenStar = color(4);
+    const unchosenStar = color(5);
     const submitted = new FormData(form).get("rating");
     form.reset();
     const resetSelected = radios.some(radio => radio.checked);
-    return { count: radios.length, initiallySelected, submitted, resetSelected };
+    return { count: radios.length, initiallySelected, submitted, resetSelected, emptyStar, chosenStar, unchosenStar };
   });
-  assert.deepEqual(rating, { count: 5, initiallySelected: false, submitted: "4", resetSelected: false });
+  assert.deepEqual(rating, {
+    count: 5, initiallySelected: false, submitted: "4", resetSelected: false,
+    emptyStar: "rgb(200, 205, 211)",
+    chosenStar: "rgb(213, 165, 59)",
+    unchosenStar: "rgb(200, 205, 211)",
+  });
 
   const productImage = card.locator("img").first();
   await productImage.evaluate(image => image.decode());
