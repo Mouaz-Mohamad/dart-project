@@ -1045,7 +1045,7 @@ body.dart-set-image-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 7px;
   margin: 2px 0 17px;
 }
 /* Review cards use the same hand-drawn gold/silver SVG tiles as the form. */
