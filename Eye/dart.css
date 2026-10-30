@@ -3686,3 +3686,19 @@ body.dart-admin-locked > main {
   width: 100%;
   height: auto;
 }
+
+/* Customer review groups: one expandable customer row, existing actions per review. */
+#review-container .dart-review-client-group { margin-bottom: 10px; }
+#review-container .dart-review-group-summary {
+  width: max-content;
+  min-width: 650px;
+  max-width: 100%;
+  cursor: pointer;
+  background: rgba(171, 1, 43, 0.05);
+  gap: 20px;
+}
+#review-container .dart-review-group-summary::before { content: "▸"; color: #ab012b; }
+#review-container .dart-review-client-group[open] > .dart-review-group-summary::before { content: "▾"; }
+#review-container .dart-review-group-name { font-weight: 700; min-width: 170px; }
+#review-container .dart-review-group-count { font-weight: 600; color: #ab012b; }
+#review-container .dart-review-client-entries { padding-inline-start: 14px; }

@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DashboardStateService } from "../src/modules/dashboard/dashboard-state.service.js";
+import { CustomerInteractionService } from "../src/modules/commerce/customer-interaction.service.js";
 
 let db: PGlite, service: DashboardStateService;
 const review = { id: "review-1", status: "Active", review: "Public review", rating: 5 };
@@ -58,5 +59,53 @@ describe("independent reviews and Contact Us projections on actual SQL", () => {
     await expect(service.write("contacts", 4, [], "staff", "request-1")).rejects.toMatchObject({ statusCode: 409 });
     expect((await service.read("contacts")).data).toHaveLength(3);
     expect((await db.query("SELECT * FROM audit_logs")).rows).toHaveLength(0);
+  });
+});
+
+describe("customer review submission persistence", () => {
+  it("appends unlimited independent reviews without overwriting earlier reviews or visibility", async () => {
+    await db.exec(`
+      CREATE TABLE users (id text PRIMARY KEY, email text);
+      CREATE TABLE customers (user_id text PRIMARY KEY, client_code text, full_name text);
+      CREATE TABLE account_phones (id text PRIMARY KEY, user_id text, account_type text,
+        phone_display text, is_primary boolean, created_at timestamptz);
+      CREATE TABLE orders (customer_user_id text, status text, is_deleted boolean);
+      CREATE TABLE notification_records (record_id text PRIMARY KEY, payload jsonb, position integer);
+      INSERT INTO users VALUES ('user-1','client@dart.test');
+      INSERT INTO customers VALUES ('user-1','DART-01','Dart Customer');
+      INSERT INTO account_phones VALUES ('phone-1','user-1','customer','01000000000',true,now());
+      INSERT INTO orders VALUES ('user-1','Delivered',false);
+      INSERT INTO dashboard_domain_state VALUES ('notifications',1,'[]'::jsonb,NULL,NULL);
+    `);
+    const query = (sql: string, values: unknown[] = []) => db.query(sql, values);
+    const interactions = new CustomerInteractionService({
+      connect: async () => ({ query, release() {} }),
+    } as unknown as Pool);
+    const first = await interactions.submitReview("user-1", {
+      rating: 5, title: "First", review: "Great fabric",
+    }, "first-request");
+    const second = await interactions.submitReview("user-1", {
+      rating: 4, title: "Second", review: "Fast delivery",
+    }, "second-request");
+    expect(first.id).not.toBe(second.id);
+    const state = await service.read("reviews");
+    expect(state.data.map((row) => (row as { id: string }).id))
+      .toEqual([second.id, first.id, review.id]);
+    const moderated = state.data.map((row) => ({
+      ...(row as Record<string, unknown>),
+      status: (row as { id: string }).id === first.id ? "Active" : (row as { status: string }).status,
+    }));
+    await service.write("reviews", state.version, moderated, "staff", "moderation-request");
+    const third = await interactions.submitReview("user-1", {
+      rating: 3, title: "Third", review: "Another independent review",
+    }, "third-request");
+    const latest = await service.read("reviews");
+    expect(latest.data.map((row) => (row as { id: string }).id))
+      .toEqual([third.id, second.id, first.id, review.id]);
+    expect(latest.data.find((row) => (row as { id: string }).id === first.id))
+      .toMatchObject({ status: "Active" });
+    expect((await service.publicReviews()).map((row) => (row as { id: string }).id))
+      .toEqual([first.id, review.id]);
+    expect((await service.read("contacts")).data).toHaveLength(2);
   });
 });
