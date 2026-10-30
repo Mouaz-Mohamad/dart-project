@@ -36,7 +36,7 @@ assert.match(home, /data-review-read-more/, "cards need a Read More control");
 assert.match(reviewsUi, /showModal\(\)/, "full reviews open a native dialog");
 assert.match(home, /data-review-read-more hidden/, "Read More must start hidden until real clipping is measured");
 assert.match(reviewsUi, /syncReviewReadMore/, "long reviews must be checked after rendering");
-assert.match(reviewsUi, /full\.getBoundingClientRect\(\)\.height > node\.getBoundingClientRect\(\)\.height/, "unclamped text measurements must determine button visibility");
+assert.match(reviewsUi, /range\.getClientRects\(\)/, "rendered text lines must determine Read More visibility");
 assert.match(styles, /\.dart-review-dialog \{[\s\S]*?width: 90vw;[\s\S]*?height: 90dvh;/, "full-review dialog must use 90% of both viewport dimensions");
 assert.match(styles, /overflow-x: hidden;\s*overflow-y: auto;/, "full-review dialog scrolls vertically only");
 assert.match(styles, /-webkit-line-clamp: 2/, "review title must be two lines");

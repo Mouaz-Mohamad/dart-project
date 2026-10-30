@@ -608,28 +608,17 @@ function renderReviewStars(container, rating) {
     }
 }
 function syncReviewReadMore(container) {
-  // Measure an unclamped, same-width copy: line-clamped nodes may report a
-  // scrollHeight equal to their visible height even when text is cut off.
-  const isClipped = (node) => {
-    const width = node.getBoundingClientRect().width;
-    if (!width) return false;
-    const full = node.cloneNode(true);
-    full.setAttribute("aria-hidden", "true");
-    Object.assign(full.style, {
-      position: "absolute", visibility: "hidden", pointerEvents: "none",
-      display: "block", width: `${width}px`, height: "auto",
-      maxHeight: "none", overflow: "visible", WebkitLineClamp: "unset",
-    });
-    node.parentElement.appendChild(full);
-    const exceeds = full.getBoundingClientRect().height > node.getBoundingClientRect().height + 1;
-    full.remove();
-    return exceeds;
-  };
   container.querySelectorAll(".review-card:not(#reviewTemplate)").forEach((card) => {
+    const clipped = (node) => {
+      const bounds = node.getBoundingClientRect();
+      if (!bounds.width) return false;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return [...range.getClientRects()].some((rect) => rect.bottom > bounds.bottom + 1);
+    };
     const button = card.querySelector("[data-review-read-more]");
-    const title = card.querySelector(".review-title");
-    const text = card.querySelector(".review-text");
-    if (button && title && text) button.hidden = !(isClipped(title) || isClipped(text));
+    button.hidden = ![".review-title", ".review-text"]
+      .some((selector) => clipped(card.querySelector(selector)));
   });
 }
 
