@@ -494,9 +494,11 @@ const server = http.createServer((request, response) => {
     assert.notEqual(style.display, "none", `${filename}: Read More must be displayed`);
     assert.equal(style.rating, "4 out of 5 stars");
     assert.equal(style.filled, 4);
+    const feedbackStarPath = fs.readFileSync(path.join(root, "sections/form-feedback.html"), "utf8")
+      .match(/class="dart-star-shape" d="([^"]+)"/)?.[1];
+    assert(feedbackStarPath, "feedback form must define the shared star SVG");
     assert.equal(await long.locator(".dart-star-shape").first().getAttribute("d"),
-      await page.locator("#reviewForm .dart-star-shape").first().getAttribute("d"),
-      `${filename}: displayed stars must reuse the feedback SVG design`);
+      feedbackStarPath, `${filename}: displayed stars must reuse the feedback SVG design`);
     await more.evaluate((element) => element.click());
     await publicPage.waitForFunction(() => document.getElementById("dartReviewDialog")?.open === true);
     assert.match(await publicPage.locator("#dart-review-full-title").textContent(), /overall Dart shopping experience/);
