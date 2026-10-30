@@ -1044,8 +1044,9 @@ body.dart-set-image-open {
 .dart-review-dialog .stars {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin: 0 0 12px;
+  justify-content: center;
+  gap: 7px;
+  margin: 2px 0 17px;
 }
 .dart-review-star {
   display: inline-block;
@@ -1054,17 +1055,36 @@ body.dart-set-image-open {
 .reviews-section .dart-review-star,
 .dart-review-dialog .dart-review-star {
   display: block;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  fill: #d0d3d8;
-  stroke: #b8bec6;
-  stroke-width: 0.8px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  padding: 5px;
+  border: 1px solid rgba(212, 165, 59, 0.17);
+  border-radius: 11px;
+  background: linear-gradient(145deg, #fffcf6, #f8f0e3);
+  box-sizing: border-box;
+  overflow: visible;
+  filter: drop-shadow(0 2px 2px rgba(107, 77, 25, 0.07));
 }
-.reviews-section .dart-review-star.is-filled,
-.dart-review-dialog .dart-review-star.is-filled {
-  fill: #d5a53b;
-  stroke: #b68a26;
+.reviews-section .dart-review-star .dart-star-shape,
+.dart-review-dialog .dart-review-star .dart-star-shape {
+  fill: #d5dae0;
+  stroke: #acb5be;
+  stroke-width: 1.15;
+  stroke-linejoin: round;
+}
+.reviews-section .dart-review-star.is-filled .dart-star-shape,
+.dart-review-dialog .dart-review-star.is-filled .dart-star-shape {
+  fill: #e7b951;
+  stroke: #bd8325;
+}
+.reviews-section .dart-review-star .dart-star-spark,
+.dart-review-dialog .dart-review-star .dart-star-spark {
+  fill: rgba(255, 255, 255, 0.8);
+}
+.reviews-section .dart-review-star.is-empty .dart-star-spark,
+.dart-review-dialog .dart-review-star.is-empty .dart-star-spark {
+  fill: #f9fafb;
 }
 
 .dart-review-avatar {
@@ -1137,18 +1157,24 @@ body.dart-set-image-open {
 }
 .dart-review-read-more {
   display: inline-flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  align-self: flex-start;
-  margin-top: 8px;
-  padding: 4px 0;
-  border: 0;
-  background: transparent;
+  align-self: center;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 8px 17px;
+  border: 1px solid rgba(171, 1, 43, 0.25);
+  border-radius: 999px;
+  background: #fff7f8;
   color: var(--bragnte);
   font: 600 13px var(--font-inter);
   cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
 }
-.dart-review-read-more[hidden] { display: none; }
+.dart-review-read-more:hover {
+  background: #fce8eb;
+  border-color: var(--bragnte);
+}
 .dart-review-read-more:focus-visible,
 .dart-review-dialog-close:focus-visible {
   outline: 2px solid var(--bragnte);
@@ -1903,50 +1929,79 @@ body.dart-set-image-open {
 }
 .dart-review-rating-picker {
   display: flex;
-  flex-direction: row-reverse;
-  justify-content: flex-end;
+  direction: ltr;
+  justify-content: center;
   align-items: center;
-  gap: 2px;
+  gap: 9px;
+  width: 100%;
+  padding: 12px 6px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fffdf9, #faf4ed);
+  border: 1px solid rgba(171, 1, 43, 0.08);
+}
+.dart-review-rating-picker .dart-rating-choice {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 47px;
+  height: 49px;
+  flex: 0 0 47px;
+  margin: 0;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e9e3dc;
+  box-shadow: 0 3px 10px rgba(33, 20, 14, 0.045);
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 .dart-review-rating-picker input[type="radio"] {
   position: absolute;
   width: 1px;
   height: 1px;
+  opacity: 0;
   margin: 0;
   padding: 0;
-  opacity: 0;
-}
-.dart-review-rating-picker label {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  margin: 0;
-  cursor: pointer;
 }
 .dart-review-rating-picker .dart-rating-star {
   display: block;
   width: 30px;
   height: 30px;
-  background: #c8cdd3;
-  clip-path: polygon(50% 1%, 61.5% 34%, 97% 35.5%, 70% 57%, 79% 92%, 50% 73%, 21% 92%, 30% 57%, 3% 35.5%, 38.5% 34%);
-  transition: background-color 0.16s, transform 0.16s;
+  flex-shrink: 0;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1px rgba(73, 51, 17, 0.06));
 }
-.dart-review-rating-picker input:checked ~ label .dart-rating-star,
-.dart-review-rating-picker label:hover .dart-rating-star,
-.dart-review-rating-picker label:hover ~ label .dart-rating-star {
-  background: #d5a53b;
+.dart-review-rating-picker .dart-star-shape {
+  fill: #e0e3e8;
+  stroke: #aeb7c0;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+  transition: fill 0.16s ease, stroke 0.16s ease;
 }
-.dart-review-rating-picker:hover input:checked ~ label .dart-rating-star { background: #c8cdd3; }
-.dart-review-rating-picker:hover label:hover .dart-rating-star,
-.dart-review-rating-picker:hover label:hover ~ label .dart-rating-star { background: #d5a53b; }
-.dart-review-rating-picker label:hover .dart-rating-star { transform: scale(1.1); }
-.dart-review-rating-picker input:focus-visible + label {
-  border-radius: 7px;
+.dart-review-rating-picker .dart-star-spark { fill: #f7f8fa; }
+.dart-review-rating-picker .dart-rating-choice:has(input:checked),
+.dart-review-rating-picker .dart-rating-choice:has(~ .dart-rating-choice input:checked) {
+  background: #fff3d8;
+  border-color: rgba(211, 159, 51, 0.48);
+}
+.dart-review-rating-picker .dart-rating-choice:has(input:checked) .dart-star-shape,
+.dart-review-rating-picker .dart-rating-choice:has(~ .dart-rating-choice input:checked) .dart-star-shape,
+.dart-review-rating-picker .dart-rating-choice:hover .dart-star-shape,
+.dart-review-rating-picker .dart-rating-choice:has(~ .dart-rating-choice:hover) .dart-star-shape {
+  fill: #e7b951;
+  stroke: #bd8325;
+}
+.dart-review-rating-picker .dart-rating-choice:has(input:checked) .dart-star-spark,
+.dart-review-rating-picker .dart-rating-choice:has(~ .dart-rating-choice input:checked) .dart-star-spark {
+  fill: rgba(255, 255, 255, 0.85);
+}
+.dart-review-rating-picker .dart-rating-choice:hover {
+  background: #fff3d8;
+  border-color: #d6a43e;
+  transform: translateY(-2px);
+}
+.dart-review-rating-picker .dart-rating-choice:has(input:focus-visible) {
   outline: 2px solid var(--bragnte);
-  outline-offset: 1px;
+  outline-offset: 3px;
 }
 /* DART-CSS-ABOUT | About story and shared brand story cards */
 .story,

@@ -251,7 +251,7 @@ const server = http.createServer((request, response) => {
   await longReview.waitFor({ state: "visible" });
   await shortReview.waitFor({ state: "attached" });
   await longReview.locator("[data-review-read-more]").waitFor({ state: "visible" });
-  assert.equal(await shortReview.locator("[data-review-read-more]").isVisible(), false, "short reviews should not show Read More");
+  assert.equal(await shortReview.locator("[data-review-read-more]").isVisible(), true, "all reviews should be openable, including short ones");
   assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-title")).webkitLineClamp), "2");
   assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-text")).webkitLineClamp), "4");
   const cardHeights = await page.locator('#reviewsContainer .review-card:not(#reviewTemplate)').evaluateAll(
@@ -265,26 +265,38 @@ const server = http.createServer((request, response) => {
   await page.locator("[data-review-dialog-close]").click();
   assert.equal(await page.locator("#dartReviewDialog").evaluate(dialog => dialog.open), false);
   await page.locator("#reviewForm input[name=rating]").first().waitFor({ state: "attached" });
-  const rating = await page.evaluate(() => {
+  const ratings = await page.evaluate(() => {
     const form = document.querySelector("#reviewForm");
+    const choices = [...form.querySelectorAll(".dart-rating-choice")];
     const radios = [...form.querySelectorAll('input[name="rating"]')];
-    const initiallySelected = radios.some(radio => radio.checked);
-    const color = (value) => getComputedStyle(form.querySelector(`label[for="review-rating-${value}"] .dart-rating-star`)).backgroundColor;
-    const emptyStar = color(1);
-    document.querySelector('label[for="review-rating-4"]').click();
-    const chosenStar = color(4);
-    const unchosenStar = color(5);
-    const submitted = new FormData(form).get("rating");
+    const initial = new FormData(form).get("rating");
+    const styles = () => ({
+      stars: choices.map(label => getComputedStyle(label.querySelector(".dart-star-shape")).fill),
+      boxes: choices.map(label => getComputedStyle(label).backgroundColor),
+    });
+    const initialColors = styles();
+    const results = [];
+    for (const rating of [1, 2, 3, 4, 5]) {
+      choices[rating - 1].click();
+      results.push({ requested: rating, saved: new FormData(form).get("rating"),
+        selected: styles().stars.filter(color => color === "rgb(231, 185, 81)").length });
+    }
+    const centered = getComputedStyle(form.querySelector(".dart-review-rating-picker")).justifyContent;
+    const direction = getComputedStyle(form.querySelector(".dart-review-rating-picker")).direction;
     form.reset();
-    const resetSelected = radios.some(radio => radio.checked);
-    return { count: radios.length, initiallySelected, submitted, resetSelected, emptyStar, chosenStar, unchosenStar };
+    return { count: choices.length, initial, initialColors, results, afterReset: new FormData(form).get("rating"), centered, direction };
   });
-  assert.deepEqual(rating, {
-    count: 5, initiallySelected: false, submitted: "4", resetSelected: false,
-    emptyStar: "rgb(200, 205, 211)",
-    chosenStar: "rgb(213, 165, 59)",
-    unchosenStar: "rgb(200, 205, 211)",
-  });
+  assert.equal(ratings.count, 5);
+  assert.equal(ratings.initial, null);
+  assert.deepEqual(ratings.results, [1, 2, 3, 4, 5].map(n => ({
+    requested: n, saved: String(n), selected: n,
+  })), "clicking star 5 must light exactly five stars and submit 5");
+  assert.equal(ratings.afterReset, null);
+  assert.equal(ratings.centered, "center");
+  assert.equal(ratings.direction, "ltr");
+  assert(ratings.initialColors.stars.every(color => color === "rgb(224, 227, 232)"), "empty stars must appear gray");
+  assert.equal(await longReview.locator(".stars").evaluate(el => getComputedStyle(el).justifyContent), "center");
+
 
   const productImage = card.locator("img").first();
   await productImage.evaluate(image => image.decode());

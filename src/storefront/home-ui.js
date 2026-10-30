@@ -231,22 +231,14 @@ function renderReviewStars(container, rating) {
     svg.setAttribute("aria-hidden", "true");
     svg.classList.add("dart-review-star", index <= count ? "is-filled" : "is-empty");
     const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    shape.setAttribute("d", "M12 2.4 15.03 8.54 21.8 9.53 16.9 14.3 18.06 21.06 12 17.88 5.94 21.06 7.1 14.3 2.2 9.53 8.97 8.54Z");
-    svg.appendChild(shape);
+    shape.classList.add("dart-star-shape");
+    shape.setAttribute("d", "M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z");
+    const sparkle = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    sparkle.classList.add("dart-star-spark");
+    sparkle.setAttribute("d", "M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z");
+    svg.append(shape, sparkle);
     container.appendChild(svg);
   }
-}
-
-function updateReviewReadMore(container) {
-  container.querySelectorAll(".review-card:not(#reviewTemplate)").forEach((card) => {
-    const button = card.querySelector("[data-review-read-more]");
-    const title = card.querySelector(".review-title");
-    const text = card.querySelector(".review-text");
-    if (!button || !title || !text) return;
-    // Read More is needed if either the two-line title or four-line body clips.
-    button.hidden = !(title.scrollHeight > title.clientHeight + 1 ||
-      text.scrollHeight > text.clientHeight + 1);
-  });
 }
 
 function renderReviewsLogic() {
@@ -272,13 +264,6 @@ function renderReviewsLogic() {
     dialog?.addEventListener("click", (event) => {
       if (event.target === dialog || event.target.closest("[data-review-dialog-close]")) dialog.close();
     });
-    window.addEventListener("resize", () => requestAnimationFrame(() => updateReviewReadMore(container)), { passive: true });
-    if ("IntersectionObserver" in window) {
-      new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) requestAnimationFrame(() => updateReviewReadMore(container));
-      }, { rootMargin: "300px 0px" }).observe(container);
-    }
-    document.fonts?.ready.then(() => requestAnimationFrame(() => updateReviewReadMore(container)));
   }
   [...container.children].forEach((child) => {
     if (child.id !== "reviewTemplate") child.remove();
@@ -312,7 +297,6 @@ function renderReviewsLogic() {
     fragment.appendChild(card);
   });
   container.appendChild(fragment);
-  requestAnimationFrame(() => updateReviewReadMore(container));
 }
 
 /* DART_SHARED_SECTIONS */
