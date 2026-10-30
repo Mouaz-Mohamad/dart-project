@@ -21,9 +21,11 @@ const contactSchema = z.object({
   message: z.string().trim().min(2).max(3000),
 });
 
-const reviewSchema = z.object({
+export const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
-  title: z.string().trim().min(1).max(160),
+  // The embedded form has an optional title. Empty titles are valid and
+  // receive a display fallback when the review is stored.
+  title: z.string().trim().max(160).optional(),
   review: z.string().trim().min(2).max(3000),
 });
 

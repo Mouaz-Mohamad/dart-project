@@ -27,7 +27,7 @@ export interface ContactInput {
 
 export interface ReviewInput {
   rating: number;
-  title: string;
+  title?: string | undefined;
   review: string;
 }
 
@@ -297,7 +297,7 @@ export class CustomerInteractionService {
         clientId: identity.clientCode,
         clientName: identity.name,
         rating: input.rating,
-        title: input.title,
+        title: input.title?.trim() || "Customer feedback",
         review: input.review,
         phone1: identity.phone1,
         phone2: identity.phone2 || "-",

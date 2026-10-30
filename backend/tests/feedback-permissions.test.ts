@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DashboardStateService } from "../src/modules/dashboard/dashboard-state.service.js";
 import { CustomerInteractionService } from "../src/modules/commerce/customer-interaction.service.js";
+import { reviewSchema } from "../src/modules/commerce/customer-interaction.routes.js";
 
 let db: PGlite, service: DashboardStateService;
 const review = { id: "review-1", status: "Active", review: "Public review", rating: 5 };
@@ -62,6 +63,17 @@ describe("independent reviews and Contact Us projections on actual SQL", () => {
   });
 });
 
+describe("verified customer review input validation", () => {
+  it("accepts an empty or omitted optional title, while keeping rating and review validation", () => {
+    const values = { rating: 5, review: "Great quality" };
+    expect(reviewSchema.safeParse({ ...values, title: "" }).success).toBe(true);
+    expect(reviewSchema.safeParse(values).success).toBe(true);
+    expect(reviewSchema.safeParse({ ...values, title: "Great fit" }).success).toBe(true);
+    expect(reviewSchema.safeParse({ ...values, rating: 6 }).success).toBe(false);
+    expect(reviewSchema.safeParse({ ...values, review: "x" }).success).toBe(false);
+  });
+});
+
 describe("customer review submission persistence", () => {
   it("appends unlimited independent reviews without overwriting earlier reviews or visibility", async () => {
     await db.exec(`
@@ -82,12 +94,17 @@ describe("customer review submission persistence", () => {
       connect: async () => ({ query, release() {} }),
     } as unknown as Pool);
     const first = await interactions.submitReview("user-1", {
-      rating: 5, title: "First", review: "Great fabric",
+      rating: 5, title: "", review: "Great fabric",
     }, "first-request");
     const second = await interactions.submitReview("user-1", {
       rating: 4, title: "Second", review: "Fast delivery",
     }, "second-request");
     expect(first.id).not.toBe(second.id);
+    const firstRecord = (await service.read("reviews")).data.find(
+      (row) => (row as { id: string }).id === first.id,
+    ) as Record<string, unknown>;
+    expect(firstRecord.title).toBe("Customer feedback");
+    expect(firstRecord.source).toBe("Review");
     const state = await service.read("reviews");
     expect(state.data.map((row) => (row as { id: string }).id))
       .toEqual([second.id, first.id, review.id]);
