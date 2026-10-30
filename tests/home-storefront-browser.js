@@ -528,8 +528,37 @@ const server = http.createServer((request, response) => {
     await publicPage.close();
   }
 
+  // WhatsApp guests reach the requested standalone URL directly. No login,
+  // previous purchase or embedded-section hydration is needed to submit.
+  let guestReviewPost = null;
+  await page.route(`${origin}/api/v1/reviews/public`, async (route) => {
+    guestReviewPost = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json",
+      body: JSON.stringify({ id: "guest-review-fixture" }) });
+  });
+  await page.goto(`${origin}/sections/form-feedback.html`, { waitUntil: "domcontentloaded" });
+  const guestForm = page.locator("#reviewForm");
+  await guestForm.waitFor({ state: "visible" });
+  assert.equal(await page.locator(".feedback-access-message").count(), 0,
+    "WhatsApp feedback must not ask for a delivered order");
+  assert.equal(await page.locator('input[name="email"]').getAttribute("required"), null);
+  await page.locator('input[name="full_name"]').fill("WhatsApp Guest");
+  await page.locator('input[name="phone1"]').fill("01012345678");
+  await page.locator('textarea[name="review"]').fill("Great new collection and helpful service");
+  await guestForm.locator('.dart-rating-choice').nth(4).click();
+  await guestForm.locator('button[type="submit"]').click();
+  await page.waitForFunction(() => document.getElementById("dart-public-review-status")
+    ?.textContent?.includes("awaiting approval"));
+  assert.deepEqual(guestReviewPost, {
+    fullName: "WhatsApp Guest", phone1: "01012345678", rating: 5,
+    review: "Great new collection and helpful service", website: "",
+  });
+  assert.equal(await guestForm.locator('input[name="full_name"]').inputValue(), "",
+    "successful guest feedback clears the form");
+  await page.unroute(`${origin}/api/v1/reviews/public`);
+
   assert.deepEqual(localFailures, []);
-  console.log("PASS home/products/profile review cards, shared feedback stars and full-review dialog");
+  console.log("PASS home/products/profile reviews and standalone WhatsApp guest submission");
   await context.close();
   await browser.close();
   server.close();
