@@ -198,7 +198,7 @@ describe("commerce concurrency and representative safety contracts", () => {
     expect(customerInteractions).toContain("resolveExchangeChain(existingReturns.filter(");
     expect(customerInteractions).toContain('String((raw as JsonRow).orderId || "") === line.order_code');
     expect(customerInteractions).toContain(
-      '"SELECT version::text FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE"',
+      '"SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE"',
     );
     expect(customerInteractions).toContain("readRelationalDashboardDomain(client, domain)");
   });
