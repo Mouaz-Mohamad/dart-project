@@ -61,7 +61,6 @@ const pageScopedFeatureFiles = new Set([
   "Eye/dart-traffic-analytics.js",
   "Eye/dart-finance.js",
   "Js/dart-rep.js",
-  "Js/dart-public-feedback.js",
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
   "Js/dart-sets.js",
@@ -117,18 +116,26 @@ if (!settingsRuntime.includes('[data-target="models"]')) {
   failures.push("Js/dart-site-settings.js: Dart Eye Sets must lazy-load from the Models section");
 }
 
+// This script is loaded only by the standalone WhatsApp feedback page, not
+// by any general storefront/dashboard page. Budget it independently.
+const standaloneScripts = new Set(["Js/dart-public-feedback.js"]);
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
 let coreJsBytes = 0;
 let lazyJsBytes = 0;
+let standaloneJsBytes = 0;
 for (const file of jsFiles) {
   const size = fs.statSync(file).size;
   totalJsBytes += size;
-  if (pageScopedFeatureFiles.has(file)) lazyJsBytes += size;
+  if (standaloneScripts.has(file)) standaloneJsBytes += size;
+  else if (pageScopedFeatureFiles.has(file)) lazyJsBytes += size;
   else coreJsBytes += size;
   if (size > maxJsBytes) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
+}
+if (standaloneJsBytes > 8 * 1024) {
+  failures.push("Standalone public feedback runtime exceeds its 8KB budget");
 }
 // This is the repository aggregate, not the bytes loaded on one page. The
 // Dashboard details, editor, feedback and display choices add scoped source; public delivery budgets stay unchanged.
