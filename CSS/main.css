@@ -1020,18 +1020,27 @@ body.dart-set-image-open {
 
 .review-card {
   flex: 0 0 300px;
+  flex-shrink: 0;
+  font-family: var(--font-inter);
+}
+.reviews-section .review-card {
   width: 300px;
   height: 348px;
   box-sizing: border-box;
   padding: 17px 16px 14px;
-  font-family: var(--font-inter);
 }
 .dart-review-card-main {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-.review-card .stars,
+.stars {
+  color: #d4af37;
+  font-size: 20px;
+  margin: 8px;
+  justify-self: center;
+}
+.reviews-section .review-card .stars,
 .dart-review-dialog .stars {
   display: flex;
   align-items: center;
@@ -1039,6 +1048,11 @@ body.dart-set-image-open {
   margin: 0 0 12px;
 }
 .dart-review-star {
+  display: inline-block;
+  line-height: 1;
+}
+.reviews-section .dart-review-star,
+.dart-review-dialog .dart-review-star {
   display: block;
   width: 22px;
   height: 22px;
@@ -1047,7 +1061,8 @@ body.dart-set-image-open {
   stroke: #b8bec6;
   stroke-width: 0.8px;
 }
-.dart-review-star.is-filled {
+.reviews-section .dart-review-star.is-filled,
+.dart-review-dialog .dart-review-star.is-filled {
   fill: #d5a53b;
   stroke: #b68a26;
 }
@@ -1092,7 +1107,7 @@ body.dart-set-image-open {
   margin-bottom: 6px;
   color: var(--bragnte);
 }
-.review-card .review-title {
+.reviews-section .review-card .review-title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1110,7 +1125,7 @@ body.dart-set-image-open {
   font-weight: 300;
   font-family: var(--font-inter);
 }
-.review-card .review-text {
+.reviews-section .review-card .review-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
@@ -1139,7 +1154,7 @@ body.dart-set-image-open {
   outline: 2px solid var(--bragnte);
   outline-offset: 4px;
 }
-.review-card .user-info { margin-top: 10px; }
+.reviews-section .review-card .user-info { margin-top: 10px; }
 .dart-review-dialog {
   width: min(560px, calc(100% - 32px));
   max-height: min(80vh, 730px);
@@ -1933,10 +1948,6 @@ body.dart-set-image-open {
   outline: 2px solid var(--bragnte);
   outline-offset: 1px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .dart-review-rating-picker .dart-rating-star { transition: none; }
-}
-
 /* DART-CSS-ABOUT | About story and shared brand story cards */
 .story,
 .birthday-details,
