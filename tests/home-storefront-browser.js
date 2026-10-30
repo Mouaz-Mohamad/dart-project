@@ -471,8 +471,42 @@ const server = http.createServer((request, response) => {
     afterClear: { setCards: 0, baseDisplays: ["flex", "flex"] },
   }, "Set cart decoration must use explicit server identity and never absorb an identical standalone variant");
 
+  // All active public review locations must share the same full-review UI,
+  // not only the homepage's smaller JavaScript runtime.
+  for (const filename of ["products.html", "profile.html"]) {
+    const publicPage = await context.newPage();
+    await publicPage.goto(`${origin}/${filename}`, { waitUntil: "domcontentloaded" });
+    const long = publicPage.locator('#reviewsContainer .review-card:not(#reviewTemplate)')
+      .filter({ hasText: "Long Review Customer" });
+    await long.waitFor({ state: "attached" });
+    const more = long.locator("[data-review-read-more]");
+    assert.equal(await more.count(), 1, `${filename}: every review needs a Read More button`);
+    assert.equal(await more.getAttribute("hidden"), null, `${filename}: button must never be hidden`);
+    const style = await long.evaluate((card) => {
+      const button = card.querySelector("[data-review-read-more]");
+      return {
+        display: getComputedStyle(button).display,
+        rating: card.querySelector(".stars").getAttribute("aria-label"),
+        filled: card.querySelectorAll(".dart-rating-choice.is-filled").length,
+        backdrop: getComputedStyle(card.querySelector(".dart-rating-choice")).backgroundImage,
+      };
+    });
+    assert.notEqual(style.display, "none", `${filename}: Read More must be displayed`);
+    assert.equal(style.rating, "4 out of 5 stars");
+    assert.equal(style.filled, 4);
+    assert.equal(await long.locator(".dart-star-shape").first().getAttribute("d"),
+      await page.locator("#reviewForm .dart-star-shape").first().getAttribute("d"),
+      `${filename}: displayed stars must reuse the feedback SVG design`);
+    await more.evaluate((element) => element.click());
+    await publicPage.waitForFunction(() => document.getElementById("dartReviewDialog")?.open === true);
+    assert.match(await publicPage.locator("#dart-review-full-title").textContent(), /overall Dart shopping experience/);
+    await publicPage.locator("[data-review-dialog-close]").evaluate(element => element.click());
+    assert.equal(await publicPage.locator("#dartReviewDialog").evaluate(dialog => dialog.open), false);
+    await publicPage.close();
+  }
+
   assert.deepEqual(localFailures, []);
-  console.log("PASS home storefront browser: API catalogue -> card -> modal -> deep link -> back/forward without reload");
+  console.log("PASS home/products/profile review cards, shared feedback stars and full-review dialog");
   await context.close();
   await browser.close();
   server.close();
