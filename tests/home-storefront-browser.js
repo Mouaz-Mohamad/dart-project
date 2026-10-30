@@ -168,7 +168,13 @@ const server = http.createServer((request, response) => {
       return;
     }
     if (pathname === "/api/v1/reviews") {
-      response.end(JSON.stringify({ reviews: [] }));
+      response.end(JSON.stringify({ reviews: [
+        { id: "review-long", name: "Long Review Customer", rating: 4, date: "2026-10-30",
+          title: "A very detailed and thoughtful title about the excellent quality, great look, fit, delivery and overall Dart shopping experience",
+          comment: "The material felt great and the delivery was excellent. ".repeat(18) },
+        { id: "review-short", name: "Short Review Customer", rating: 5, date: "2026-10-29",
+          title: "Great fit", comment: "Loved it." },
+      ] }));
       return;
     }
     if (pathname === "/api/v1/me") {
@@ -237,6 +243,40 @@ const server = http.createServer((request, response) => {
   assert.equal(await page.title(), "Dart | دارت للملابس الرجالي والشبابي في مصر",
     "the dynamic discovery helper must preserve the approved home title");
   assert.equal(await page.locator('link[rel="canonical"]').getAttribute("href"), "https://www.dartofficial.com/");
+  // The homepage must preserve entire reviews in the dialog while keeping
+  // cards balanced, and radio stars must submit the exact chosen rating.
+  await page.locator(".reviews-section").scrollIntoViewIfNeeded();
+  const longReview = page.locator('#reviewsContainer .review-card:not(#reviewTemplate)').filter({ hasText: "Long Review Customer" });
+  const shortReview = page.locator('#reviewsContainer .review-card:not(#reviewTemplate)').filter({ hasText: "Short Review Customer" });
+  await longReview.waitFor({ state: "visible" });
+  await shortReview.waitFor({ state: "attached" });
+  await longReview.locator("[data-review-read-more]").waitFor({ state: "visible" });
+  assert.equal(await shortReview.locator("[data-review-read-more]").isVisible(), false, "short reviews should not show Read More");
+  assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-title")).webkitLineClamp), "2");
+  assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-text")).webkitLineClamp), "4");
+  const cardHeights = await page.locator('#reviewsContainer .review-card:not(#reviewTemplate)').evaluateAll(
+    (rows) => rows.map(row => Math.round(row.getBoundingClientRect().height)),
+  );
+  assert.equal(new Set(cardHeights).size, 1, "review cards must have the same height");
+  await longReview.locator("[data-review-read-more]").click();
+  await page.locator("#dartReviewDialog").waitFor({ state: "visible" });
+  assert.match(await page.locator("#dart-review-full-title").textContent(), /overall Dart shopping experience/);
+  assert.match(await page.locator("#dart-review-full-text").textContent(), /material felt great/);
+  await page.locator("[data-review-dialog-close]").click();
+  assert.equal(await page.locator("#dartReviewDialog").evaluate(dialog => dialog.open), false);
+  await page.locator("#reviewForm input[name=rating]").first().waitFor({ state: "attached" });
+  const rating = await page.evaluate(() => {
+    const form = document.querySelector("#reviewForm");
+    const radios = [...form.querySelectorAll('input[name="rating"]')];
+    const initiallySelected = radios.some(radio => radio.checked);
+    document.querySelector('label[for="review-rating-4"]').click();
+    const submitted = new FormData(form).get("rating");
+    form.reset();
+    const resetSelected = radios.some(radio => radio.checked);
+    return { count: radios.length, initiallySelected, submitted, resetSelected };
+  });
+  assert.deepEqual(rating, { count: 5, initiallySelected: false, submitted: "4", resetSelected: false });
+
   const productImage = card.locator("img").first();
   await productImage.evaluate(image => image.decode());
   assert.equal(await productImage.getAttribute("src"), `${origin}/api/v1/catalog/assets/fixture-image?v=fixture-version`,
