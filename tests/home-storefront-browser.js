@@ -251,7 +251,7 @@ const server = http.createServer((request, response) => {
   await longReview.waitFor({ state: "visible" });
   await shortReview.waitFor({ state: "attached" });
   await longReview.locator("[data-review-read-more]").waitFor({ state: "visible" });
-  assert.equal(await shortReview.locator("[data-review-read-more]").isVisible(), true, "all reviews should be openable, including short ones");
+  assert.equal(await shortReview.locator("[data-review-read-more]").isVisible(), false, "short reviews must not show Read More");
   assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-title")).webkitLineClamp), "2");
   assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-text")).webkitLineClamp), "4");
   const cardHeights = await page.locator('#reviewsContainer .review-card:not(#reviewTemplate)').evaluateAll(
@@ -260,6 +260,24 @@ const server = http.createServer((request, response) => {
   assert.equal(new Set(cardHeights).size, 1, "review cards must have the same height");
   await longReview.locator("[data-review-read-more]").click();
   await page.locator("#dartReviewDialog").waitFor({ state: "visible" });
+  const reviewDialogGeometry = await page.locator("#dartReviewDialog").evaluate((dialog) => {
+    const rect = dialog.getBoundingClientRect();
+    const style = getComputedStyle(dialog);
+    return {
+      widthFraction: rect.width / innerWidth,
+      heightFraction: rect.height / innerHeight,
+      centeredX: Math.abs(rect.left - (innerWidth - rect.width) / 2) < 2,
+      centeredY: Math.abs(rect.top - (innerHeight - rect.height) / 2) < 2,
+      overflowX: style.overflowX,
+      overflowY: style.overflowY,
+    };
+  });
+  assert(Math.abs(reviewDialogGeometry.widthFraction - 0.9) < 0.02);
+  assert(Math.abs(reviewDialogGeometry.heightFraction - 0.9) < 0.02);
+  assert.equal(reviewDialogGeometry.centeredX, true);
+  assert.equal(reviewDialogGeometry.centeredY, true);
+  assert.equal(reviewDialogGeometry.overflowX, "hidden");
+  assert.equal(reviewDialogGeometry.overflowY, "auto");
   assert.match(await page.locator("#dart-review-full-title").textContent(), /overall Dart shopping experience/);
   assert.match(await page.locator("#dart-review-full-text").textContent(), /material felt great/);
   await page.locator("[data-review-dialog-close]").click();
@@ -309,12 +327,7 @@ const server = http.createServer((request, response) => {
   assert.deepEqual(fifth, { rating: "5", selected: 5 },
     "tapping the rightmost star must select exactly five");
   await page.locator("#reviewForm").evaluate(form => form.reset());
-  await shortReview.locator("[data-review-read-more]").click();
-  await page.locator("#dartReviewDialog").waitFor({ state: "visible" });
-  assert.equal(await page.locator("#dart-review-full-title").textContent(), "Great fit");
-  assert.equal(await page.locator("#dart-review-full-text").textContent(), "Loved it.");
-  await page.keyboard.press("Escape");
-  assert.equal(await page.locator("#dartReviewDialog").evaluate(dialog => dialog.open), false);
+  assert.equal(await shortReview.locator("[data-review-read-more]").isVisible(), false);
 
 
   const productImage = card.locator("img").first();
@@ -483,7 +496,13 @@ const server = http.createServer((request, response) => {
     await long.waitFor({ state: "attached" });
     const more = long.locator("[data-review-read-more]");
     assert.equal(await more.count(), 1, `${filename}: every review needs a Read More button`);
-    assert.equal(await more.getAttribute("hidden"), null, `${filename}: button must never be hidden`);
+    await long.scrollIntoViewIfNeeded();
+    await more.waitFor({ state: "visible" });
+    assert.equal(await more.getAttribute("hidden"), null, `${filename}: long review button must be revealed`);
+    const short = publicPage.locator('#reviewsContainer .review-card:not(#reviewTemplate)')
+      .filter({ hasText: "Short Review Customer" });
+    assert.equal(await short.locator("[data-review-read-more]").isVisible(), false,
+      `${filename}: short review must not show Read More`);
     const style = await long.evaluate((card) => {
       const button = card.querySelector("[data-review-read-more]");
       return {

@@ -607,6 +607,32 @@ function renderReviewStars(container, rating) {
         container.appendChild(tile);
     }
 }
+function syncReviewReadMore(container) {
+  // Measure an unclamped, same-width copy: line-clamped nodes may report a
+  // scrollHeight equal to their visible height even when text is cut off.
+  const isClipped = (node) => {
+    const width = node.getBoundingClientRect().width;
+    if (!width) return false;
+    const full = node.cloneNode(true);
+    full.setAttribute("aria-hidden", "true");
+    Object.assign(full.style, {
+      position: "absolute", visibility: "hidden", pointerEvents: "none",
+      display: "block", width: `${width}px`, height: "auto",
+      maxHeight: "none", overflow: "visible", WebkitLineClamp: "unset",
+    });
+    node.parentElement.appendChild(full);
+    const exceeds = full.getBoundingClientRect().height > node.getBoundingClientRect().height + 1;
+    full.remove();
+    return exceeds;
+  };
+  container.querySelectorAll(".review-card:not(#reviewTemplate)").forEach((card) => {
+    const button = card.querySelector("[data-review-read-more]");
+    const title = card.querySelector(".review-title");
+    const text = card.querySelector(".review-text");
+    if (button && title && text) button.hidden = !(isClipped(title) || isClipped(text));
+  });
+}
+
 function renderReviewsLogic() {
     const container = document.getElementById("reviewsContainer");
     const template = document.getElementById("reviewTemplate");
@@ -630,6 +656,17 @@ function renderReviewsLogic() {
         dialog?.addEventListener("click", (event) => {
             if (event.target === dialog || event.target.closest("[data-review-dialog-close]")) dialog.close();
         });
+    }
+    if (!container.dataset.dartReviewOverflowBound) {
+      container.dataset.dartReviewOverflowBound = "1";
+      const update = () => requestAnimationFrame(() => syncReviewReadMore(container));
+      window.addEventListener("resize", update, { passive: true });
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver((entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) update();
+        }, { rootMargin: "100px 0px" }).observe(container);
+      }
+      document.fonts?.ready.then(update);
     }
     [...container.children].forEach((child) => {
         if (child.id !== "reviewTemplate") child.remove();
@@ -656,6 +693,7 @@ function renderReviewsLogic() {
         fragment.appendChild(card);
     });
     container.appendChild(fragment);
+    requestAnimationFrame(() => syncReviewReadMore(container));
 }
 
 // ==========================================
