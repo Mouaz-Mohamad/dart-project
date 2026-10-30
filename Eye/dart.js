@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:8abc5236d597e6c932972afc035fad19e2853161781cf54a9e111a92b6c63cd9 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:4826f2f726e1216d6a36d3d7cc344f38647835cd9a5aa8a450f240cca0353c87 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -909,7 +909,7 @@ let damageData = [];
 let notificationData = [];
 let auditData = [];
 const DART_LOW_STOCK_THRESHOLD = 5;
-const DART_DEAD_STOCK_DAYS = 60;
+const DART_DEAD_STOCK_DAYS = 15;
 const DART_ORDER_FLOW = [
   "New",
   "Accepted",

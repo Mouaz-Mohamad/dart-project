@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/finance/finance.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
+import type { RequestHandler } from "express";
 import { AppError } from "../../http/app-error.js";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -14,6 +15,7 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { FinanceRange, FinanceService, FinanceSummary } from "./finance.service.js";
+import { BRAND_METRICS, type BrandMetric } from "./brand-inventory.service.js";
 
 const querySchema = z
   .object({
@@ -202,6 +204,41 @@ export function createFinanceRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
+
+  const brandQuerySchema = querySchema.and(z.object({
+    page: z.coerce.number().int().min(1).max(100000).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(100),
+  })).refine((query) => Date.parse(query.end) - Date.parse(query.start) <= 3660 * 86400000,
+    { message: "A Brand report cannot span more than ten years" });
+  const brandPermission = (metric: BrandMetric): string[] => {
+    if (metric === "sales" || ["models", "colors", "sizes"].includes(metric)) return ["finance.read", "finance.view_revenue"];
+    if (metric === "cost") return ["finance.read", "finance.view_cost"];
+    if (metric === "profit") return ["finance.read", "finance.view_profit"];
+    if (["damage", "stockCost"].includes(metric)) return ["finance.read", "finance.view_inventory_value"];
+    if (metric === "overview") return ["finance.read", "finance.view_revenue", "finance.view_inventory_value", "catalog.read", "catalog.manage", "inventory.manage"];
+    return ["finance.read", "finance.view_inventory_value", "catalog.read", "catalog.manage", "inventory.manage"];
+  };
+  router.get("/admin/finance/brand-details/:metric", signedIn, requireAccountType("staff"), requireMfa,
+    (request, response, next) => {
+      const metric = z.enum(BRAND_METRICS).parse(request.params.metric);
+      requireAnyPermission(...brandPermission(metric))(request, response, next);
+    },
+    // Profit discloses both contributors; a profit-only grant does not imply cost/revenue access.
+    ...["finance.view_revenue", "finance.view_cost"].map((permission) =>
+      ((request, response, next) => request.params.metric === "profit"
+        ? requireAnyPermission("finance.read", permission)(request, response, next) : next()) as RequestHandler),
+    async (request, response) => {
+      const metric = z.enum(BRAND_METRICS).parse(request.params.metric);
+      const query = brandQuerySchema.parse(request.query);
+      const permissions = request.auth!.permissions;
+      const result = await finance.brandDetails(metric, query.start, query.end, query.page, query.limit, {
+        costs: permissions.includes("finance.read") || permissions.includes("finance.view_inventory_value"),
+        waiting: permissions.includes("waiting.view"),
+        sales: permissions.includes("finance.read") || permissions.includes("finance.view_revenue"),
+      });
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(result);
+    });
 
   router.get(
     "/admin/finance/report",

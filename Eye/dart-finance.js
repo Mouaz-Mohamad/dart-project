@@ -1181,6 +1181,27 @@
 
   if (!root.document) return;
 
+  // Keep Brand drilldowns out of the initial dashboard and public storefront runtime.
+  let brandDetailsLoading = false;
+  function loadBrandDetails() {
+    if (!document.body || !document.getElementById("brand")) return;
+    if (root.DartBrandDetails || brandDetailsLoading) return;
+    brandDetailsLoading = true;
+    const script = document.createElement("script");
+    script.src = "dart-brand-details.js?v=20261030";
+    script.onload = () => { brandDetailsLoading = false; root.DartBrandDetails?.renderCards(); document.getElementById("dart-brand-details-retry")?.remove(); };
+    script.onerror = () => {
+      brandDetailsLoading = false; script.remove();
+      if (document.getElementById("dart-brand-details-retry")) return;
+      const retry = document.createElement("button");
+      retry.id = "dart-brand-details-retry"; retry.type = "button"; retry.textContent = "Retry card details";
+      retry.addEventListener("click", loadBrandDetails);
+      document.getElementById("dart-analytics-grid")?.after(retry);
+    };
+    document.body.appendChild(script);
+  }
+  loadBrandDetails();
+
   function loadPeriodState() {
     const saved = readJSON(STORAGE_KEYS.period, {});
     const preset = ["this_month", "last_month", "this_quarter", "this_year", "last_year", "last_7", "last_30", "custom"].includes(saved.preset)
@@ -1610,6 +1631,7 @@
       if (value) value.textContent = entry[0];
       if (note) note.textContent = `${entry[1]} sold item(s)`;
     });
+    void root.DartBrandDetails?.renderCards();
   }
 
   function renderBrandFinance() {

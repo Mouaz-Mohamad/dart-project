@@ -10,6 +10,7 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `dashboard/staff-admin.js` | Staff editor | `Eye/dart-staff.js` |
 | `dashboard/staff-permissions.js` | Dashboard permission adapter | `Eye/dart-permissions.js` |
 | `dashboard/dashboard-ui.js` | Dashboard record summaries, dialogs and status colors | `Eye/dart-dashboard-ui.js` |
+| `dashboard/brand-details.js` | Lazy Brand financial ledgers, inventory and demand drilldowns | `Eye/dart-brand-details.js` |
 | `dashboard/display-preferences.js` | Dashboard display preferences | `Eye/dart-display-preferences.js` |
 | `dashboard/news-admin.js` | News management and authorized prefetch | `Eye/dart-news-admin.js` |
 | `dashboard/sets-admin.js` | Set editor and authorized prefetch | `Eye/dart-sets-admin.js` |

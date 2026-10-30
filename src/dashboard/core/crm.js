@@ -1,7 +1,11 @@
 function renderReviews(dataArray) {
   const c = document.getElementById("review-container");
   if (!c) return;
+  const expanded = new Set(
+    [...c.querySelectorAll(".dart-review-client-group[open]")].map((element) => element.dataset.clientKey),
+  );
   c.innerHTML = "";
+  const clientGroups = new Map();
   getSortedData(dataArray)
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
     .forEach((r) => {
@@ -9,10 +13,43 @@ function renderReviews(dataArray) {
       const source =
         r.source || (r.recordType === "contact" ? "Contact Us" : "Review");
       const isContact = source === "Contact Us";
+      // Contact messages remain separate; each customer gets one expandable
+      // heading with all of their independently manageable reviews beneath it.
+      let target = c;
+      if (!isContact) {
+        const clientId = String(r.clientId || "").trim();
+        const email = String(r.email || "").trim().toLowerCase();
+        const phone = String(r.phone1 || "").replace(/\D/g, "");
+        const clientKey = clientId && clientId !== "-"
+          ? `client:${clientId}`
+          : email && email !== "-"
+            ? `email:${email}`
+            : phone ? `phone:${phone}` : `review:${r.id}`;
+        let group = clientGroups.get(clientKey);
+        if (!group) {
+          const details = document.createElement("details");
+          details.className = "dart-review-client-group";
+          details.dataset.clientKey = clientKey;
+          details.open = expanded.has(clientKey);
+          const summary = document.createElement("summary");
+          summary.className = "model-row row-normal dart-review-group-summary";
+          summary.innerHTML = `<span class="dart-review-group-name">${dartEsc(r.clientName || "Customer")}</span><span>${dartEsc(clientId || "-")}</span><span class="dart-review-group-count"></span><span>View reviews</span>`;
+          const entries = document.createElement("div");
+          entries.className = "dart-review-client-entries";
+          details.append(summary, entries);
+          c.appendChild(details);
+          group = { summary, entries, count: 0 };
+          clientGroups.set(clientKey, group);
+        }
+        group.count += 1;
+        group.summary.querySelector(".dart-review-group-count").textContent =
+          `${group.count} ${group.count === 1 ? "Review" : "Reviews"}`;
+        target = group.entries;
+      }
       const visibilityButton = isContact
         ? ""
         : `<button class="btn-toggle-review review-toggle-btn ${active ? "review-status-active" : "review-status-hidden"}">${active ? "Hide" : "Activate"}</button>`;
-      c.insertAdjacentHTML(
+      target.insertAdjacentHTML(
         "beforeend",
         `<div class="${getRowClass(r)}" data-id="${dartEsc(r.id)}" data-permission-domain="${isContact ? "contacts" : "reviews"}"><input type="checkbox" class="model-checkbox" ${r.isChecked ? "checked" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(r) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button>${visibilityButton}</div><span class="text-item w200">${dartEsc(new Date(r.createdAt).toLocaleString())}</span><span class="text-item w150">${dartEsc(source)}</span><span class="text-item w200">${dartEsc(r.clientName || "-")}</span><span class="text-item w150">${dartEsc(r.clientId || "-")}</span><span class="text-item w150 status-text" style="color:${isContact ? "#64748b" : active ? "green" : "red"}">${dartEsc(r.status || "-")}</span><span class="text-item w100">${isContact ? "-" : `${dartEsc(r.rating || "-")} / 5`}</span><span class="text-item w300">${dartEsc(r.title || "-")}</span><span class="text-item w500 overflow">${dartEsc(r.review || "-")}</span><span class="text-item w150">${dartEsc(r.phone1 || "-")}</span><span class="text-item w150">${dartEsc(r.phone2 || "-")}</span><span class="text-item w150">${dartEsc(r.email || "-")}</span></div>`,
       );

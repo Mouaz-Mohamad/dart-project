@@ -3,7 +3,7 @@ let damageData = [];
 let notificationData = [];
 let auditData = [];
 const DART_LOW_STOCK_THRESHOLD = 5;
-const DART_DEAD_STOCK_DAYS = 60;
+const DART_DEAD_STOCK_DAYS = 15;
 const DART_ORDER_FLOW = [
   "New",
   "Accepted",

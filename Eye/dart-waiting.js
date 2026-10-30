@@ -177,6 +177,7 @@
       state.entries = Array.isArray(payload.entries) ? payload.entries : [];
       state.demand = Array.isArray(payload.demand) ? payload.demand : [];
       render();
+      root.dispatchEvent(new CustomEvent("dart:waiting-updated"));
       return state.entries;
     } finally {
       state.loading = false;

@@ -152,6 +152,7 @@ jobs:
         run: |
           DART_CSS_BASE_REF=HEAD^ node tests/css-cascade-browser.cjs
           node tests/dashboard-groups-browser.cjs
+          node tests/brand-details-browser.cjs
           node tests/navigation-browser.cjs
           node tests/product-waiting-browser.js
           node tests/sets-admin-browser.js

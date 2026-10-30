@@ -772,3 +772,55 @@ dialog button:disabled {
   padding: 0;
 }
 /* END Shared state palette. */
+
+/* Brand financial and inventory drilldowns. Native dialog contains scrolling and focus. */
+#brand [data-brand-drilldown] { cursor: pointer; }
+#brand [data-brand-drilldown]:focus-visible { outline: 3px solid #ab012b; outline-offset: 4px; }
+#brand [data-brand-drilldown][aria-disabled="true"] { cursor: default; }
+.dart-brand-details-dialog {
+  box-sizing: border-box;
+  width: 90vw;
+  height: 90vh;
+  height: 90dvh;
+  max-width: 90vw;
+  max-height: 90dvh;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #e5dedf;
+  border-radius: 16px;
+  background: #faf8f5;
+  color: #262128;
+  overflow: hidden;
+}
+.dart-brand-details-dialog[open] { display: flex; flex-direction: column; }
+.dart-brand-details-dialog::backdrop { background: rgb(25 15 20 / 0.5); }
+.dart-brand-details-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid #e5dedf; }
+.dart-brand-details-head h2 { margin: 0; font-size: 20px; }
+.dart-brand-details-head button { border: 0; background: transparent; font-size: 28px; cursor: pointer; }
+.dart-brand-details-body { min-height: 0; flex: 1; overflow: auto; padding: 24px; overscroll-behavior: contain; }
+.dart-brand-details-body button { cursor: pointer; }
+.dart-brand-details-body button:disabled { cursor: default; opacity: 0.5; }
+.dart-brand-period { color: #6a5d63; margin-top: 0; }
+.dart-brand-total { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px; margin: 16px 0; border: 1px solid #e5dedf; border-radius: 10px; background: #fff; }
+.dart-brand-total strong { font-size: 24px; color: #ab012b; }
+.dart-brand-ledger-halves { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.dart-brand-ledger-halves section { min-width: 0; }
+.dart-brand-ledger-halves h3 { font-size: 17px; }
+.dart-brand-table-scroll { overflow-x: auto; border: 1px solid #e5dedf; border-radius: 10px; background: #fff; }
+.dart-brand-table-scroll table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.dart-brand-table-scroll th, .dart-brand-table-scroll td { padding: 13px 12px; text-align: start; border-bottom: 1px solid #eee8e9; white-space: nowrap; }
+.dart-brand-table-scroll th { background: #f2ecee; color: #6c1930; }
+.dart-brand-row-link { border: 0; background: transparent; color: #ab012b; text-decoration: underline; padding: 4px; font: inherit; }
+.dart-brand-empty { padding: 24px; background: #fff; border-radius: 10px; }
+.dart-brand-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; }
+.dart-brand-pagination button, [data-brand-parent], [data-brand-retry] { padding: 9px 14px; border: 1px solid #d6c9cd; border-radius: 7px; background: #fff; color: #6c1930; }
+.dart-brand-record { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.dart-brand-record > div { padding: 14px; border: 1px solid #e5dedf; border-radius: 8px; background: #fff; }
+.dart-brand-record dt { color: #74666d; }
+.dart-brand-record dd { margin: 7px 0 0; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .dart-brand-details-head, .dart-brand-details-body { padding: 14px; }
+  .dart-brand-details-head h2 { font-size: 17px; }
+  .dart-brand-ledger-halves, .dart-brand-record { grid-template-columns: minmax(0, 1fr); }
+  .dart-brand-total strong { font-size: 20px; }
+}

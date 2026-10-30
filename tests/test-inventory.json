@@ -43,6 +43,7 @@
     "test-inventory-contract.cjs"
   ],
   "ciBrowser": [
+    "brand-details-browser.cjs",
     "coming-soon-browser.cjs",
     "css-cascade-browser.cjs",
     "customer-notifications-browser.cjs",

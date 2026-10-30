@@ -35,12 +35,49 @@ function application(permissions: string[], options: { accountType?: "staff" | "
     netRevenue: 900, operatingExpenses: 40, brandTotalCost: 400, netProfit: 500,
     brandNetProfit: 500, cashIn: 900, physicalItemCost: 360, marketing: { spend: 20 },
   } as FinanceSummary)));
-  const finance = { summaries, summary: vi.fn() } as unknown as FinanceService;
-  return { summaries, app: createApp(config, { identityService: identity, financeService: finance,
+  const brandDetails = vi.fn().mockResolvedValue({ rows: [], totals: { amountMinor: 0 } });
+  const finance = { summaries, summary: vi.fn(), brandDetails } as unknown as FinanceService;
+  return { summaries, brandDetails, app: createApp(config, { identityService: identity, financeService: finance,
     logger: pino({ level: "silent" }), databasePing: async () => undefined, startedAt: new Date(), version: "fixture" }) };
 }
 
 describe("combined finance report", () => {
+  it("authorizes Brand metrics independently and requires both contributors before opening profit", async () => {
+    for (const fixture of [
+      { permissions: ["finance.view_revenue"], metric: "sales", status: 200 },
+      { permissions: ["finance.view_revenue"], metric: "cost", status: 403 },
+      { permissions: ["finance.view_profit"], metric: "profit", status: 403 },
+      { permissions: ["finance.view_profit", "finance.view_cost", "finance.view_revenue"], metric: "profit", status: 200 },
+      { permissions: ["catalog.read"], metric: "stockCost", status: 403 },
+      { permissions: ["catalog.read"], metric: "stockSelling", status: 200 },
+      { permissions: ["finance.view_inventory_value"], metric: "damage", status: 200 },
+      { permissions: [], metric: "models", status: 403 },
+    ]) {
+      const { app, brandDetails } = application(fixture.permissions);
+      const response = await request(app).get(`/api/v1/admin/finance/brand-details/${fixture.metric}`)
+        .query({ start: query.start, end: query.end }).set("Cookie", cookie);
+      expect(response.status).toBe(fixture.status);
+      expect(brandDetails.mock.calls).toHaveLength(fixture.status === 200 ? 1 : 0);
+      if (fixture.status === 200) expect(response.headers["cache-control"]).toBe("no-store");
+    }
+  });
+
+  it("validates Brand pagination, date bounds, sessions, MFA and Waiting visibility", async () => {
+    const fixture = application(["finance.read", "waiting.view"]);
+    const path = "/api/v1/admin/finance/brand-details/models";
+    await request(fixture.app).get(path).query({ start: query.start, end: query.end, page: 2, limit: 50 }).set("Cookie", cookie).expect(200);
+    expect(fixture.brandDetails).toHaveBeenCalledWith("models", query.start, query.end, 2, 50, { costs: true, waiting: true, sales: true });
+    for (const patch of [{ page: 0 }, { limit: 101 }, { start: "bad" }, { end: "2020-01-01" }]) {
+      await request(fixture.app).get(path).query({ start: query.start, end: query.end, ...patch }).set("Cookie", cookie).expect(422);
+    }
+    await request(fixture.app).get(path).query(query).expect(401);
+    for (const options of [{ mfaSatisfied: false }, { accountType: "customer" as const }]) {
+      const forbidden = application(["finance.read"], options);
+      await request(forbidden.app).get(path).query(query).set("Cookie", cookie).expect(403);
+      expect(forbidden.brandDetails).not.toHaveBeenCalled();
+    }
+  });
+
   it("returns all requested periods from one service call while exposing only allowed cost fields", async () => {
     const { app, summaries } = application(["finance.view_cost"]);
     const response = await request(app).get("/api/v1/admin/finance/report").query(query).set("Cookie", cookie);

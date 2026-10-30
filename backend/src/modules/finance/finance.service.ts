@@ -3,6 +3,7 @@
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
+import { readBrandInventory, type BrandMetric } from "./brand-inventory.service.js";
 
 type JsonRow = Record<string, unknown>;
 
@@ -207,12 +208,81 @@ interface AcquiredItemRow {
   created_at: Date;
 }
 
-interface FinanceSnapshot {
+export interface FinanceSnapshot {
   delivered: DeliveredOrderRow[];
   acquired: AcquiredItemRow[];
   itemCost: Map<string, number>;
   deliveredCodes: Set<string>;
   states: Map<string, JsonRow[]>;
+}
+
+export interface BrandLedgerRow {
+  id: string;
+  date: string;
+  source: string;
+  reference: string;
+  amountMinor: number;
+  lane: "income" | "outgoing";
+  details: Record<string, unknown>;
+}
+
+// These are the contributors to the existing owner-result cards, not bank receipts.
+// Preserve event dates, refund corrections and the acquisition/damage deduplication.
+export function buildBrandLedger(snapshot: FinanceSnapshot, start: string, end: string) {
+  const income: BrandLedgerRow[] = [], outgoing: BrandLedgerRow[] = [], damage: BrandLedgerRow[] = [];
+  const add = (target: BrandLedgerRow[], id: string, date: unknown, source: string,
+    reference: unknown, amountMinor: number, details: Record<string, unknown> = {}) => {
+    target.push({ id, date: dateKey(date) || "", source, reference: String(reference || id),
+      amountMinor, lane: target === income ? "income" : "outgoing", details });
+  };
+  for (const row of snapshot.delivered.filter((row) => inRange(row.event_at, start, end))) {
+    add(income, `order:${row.id}`, row.event_at, "Delivered order", row.order_code,
+      Number(row.final_minor), { order: row.order_code, pieces: Number(row.sold_units), payment: row.payment_method });
+  }
+  for (const row of uniqueCompletedReturns(snapshot.states.get("returns") || [], "0001-01-01", "9999-12-31").filter((row) => !isExchange(row))) {
+    const adjustments = refundAdjustments(row);
+    if (inRange(returnEventDate(row), start, end)) {
+      add(income, `refund:${String(row.id)}`, returnEventDate(row), "Completed refund", row.orderId,
+        -(toMinor(row.refundAmount) - adjustments.reduce((sum, entry) => sum + entry.amountMinor, 0)),
+        { return: row.id, item: row.itemCode, inspection: inspection(row) });
+    }
+    adjustments.forEach((entry, index) => {
+      if (inRange(entry.occurredAt, start, end)) add(income, `refund:${String(row.id)}:correction:${index}`,
+        entry.occurredAt, "Refund adjustment", row.orderId, -entry.amountMinor, { return: row.id, item: row.itemCode });
+    });
+  }
+  const acquired = snapshot.acquired.filter((row) => inRange(row.created_at, start, end));
+  const acquiredCodes = new Set(acquired.map((row) => row.item_code));
+  acquired.forEach((row) => add(outgoing, `item:${row.item_code}`, row.created_at, "Physical item cost",
+    row.item_code, Number(row.cost_snapshot_minor), { item: row.item_code }));
+  for (const row of (snapshot.states.get("finance_expenses") || []).filter(active)) {
+    if (String(row.status || "").toLowerCase() === "void" || isInventoryAcquisitionExpense(row) || !inRange(row.date, start, end)) continue;
+    add(outgoing, `expense:${String(row.id)}`, row.date, "Operating expense", row.id, toMinor(row.amount),
+      { category: row.category, description: row.description, vendor: row.vendor, status: row.status });
+  }
+  for (const row of (snapshot.states.get("finance_settlements") || []).filter(active)) {
+    if (!inRange(row.settlementDate, start, end) || !toMinor(row.fee)) continue;
+    add(outgoing, `cod:${String(row.id)}`, row.settlementDate, "COD fee", row.orderId, toMinor(row.fee),
+      { receipt: row.id, reference: row.reference, notes: row.notes });
+  }
+  for (const row of uniqueCompletedReturns(snapshot.states.get("returns") || [], start, end).filter(isExchange)) {
+    if (!toMinor(row.brandCourierFee)) continue;
+    add(outgoing, `exchange:${String(row.id)}`, returnEventDate(row), "Exchange courier fee", row.orderId,
+      toMinor(row.brandCourierFee), { return: row.id, item: row.itemCode });
+  }
+  const seen = new Set<string>();
+  for (const row of (snapshot.states.get("damage") || []).filter(active)) {
+    const date = row.destroyedAt || row.inspectedAt || row.updatedAt || row.date || row.createdAt;
+    const code = String(row.itemCode || row.id || "");
+    if (!code || seen.has(code) || !["damaged", "destroyed"].includes(String(row.status || "").toLowerCase()) || !inRange(date, start, end)) continue;
+    seen.add(code);
+    const cost = Number.isFinite(Number(row.costSnapshot)) ? toMinor(row.costSnapshot) : snapshot.itemCost.get(code) || 0;
+    add(damage, `damage:${code}`, date, String(row.status), code, cost,
+      { item: code, reason: row.reason || row.notes || "", includedInItemCost: acquiredCodes.has(code) });
+    if (!acquiredCodes.has(code)) outgoing.push({ ...damage[damage.length - 1]!, source: "Damage from older stock" });
+  }
+  const sort = (rows: BrandLedgerRow[]) => rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  return { income: sort(income), outgoing: sort(outgoing), damage: sort(damage) };
 }
 
 // Every period is calculated from the same immutable, server-read snapshot.
@@ -502,6 +572,23 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
 
 export class FinanceService {
   public constructor(private readonly pool: Pool) {}
+
+  public async brandDetails(metric: BrandMetric, start: string, end: string,
+    page: number, limit: number, visibility: { costs: boolean; waiting: boolean; sales: boolean }) {
+    if (!["sales", "profit", "cost", "damage"].includes(metric)) {
+      return readBrandInventory(this.pool, metric, start, end, page, limit, visibility);
+    }
+    const snapshot = await this.readSnapshot(start, end);
+    const summary = calculateSnapshot(snapshot, start, end);
+    const ledger = buildBrandLedger(snapshot, start, end);
+    const rows = metric === "sales" ? ledger.income : metric === "cost" ? ledger.outgoing
+      : metric === "damage" ? ledger.damage : [...ledger.income, ...ledger.outgoing];
+    const amountMinor = Math.round((metric === "sales" ? summary.netRevenue : metric === "cost" ? summary.brandTotalCost
+      : metric === "damage" ? summary.damageValue : summary.brandNetProfit) * 100);
+    return { metric, currency: "EGP", start, end, page, limit, total: rows.length,
+      totals: { amountMinor, ...(metric === "profit" ? { incomeMinor: Math.round(summary.netRevenue * 100), costMinor: Math.round(summary.brandTotalCost * 100) } : {}) },
+      rows: rows.slice((page - 1) * limit, page * limit) };
+  }
 
   public async createCodSettlement(
     actorId: string,

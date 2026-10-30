@@ -28,6 +28,7 @@ if (require.main === module) for (const [source, output] of [
   ['src/dashboard/staff-admin.js', 'Eye/dart-staff.js'],
   ['src/dashboard/staff-permissions.js', 'Eye/dart-permissions.js'],
   ['src/dashboard/dashboard-ui.js', 'Eye/dart-dashboard-ui.js'],
+  ['src/dashboard/brand-details.js', 'Eye/dart-brand-details.js'],
   ['src/dashboard/display-preferences.js', 'Eye/dart-display-preferences.js'],
   ['src/dashboard/news-admin.js', 'Eye/dart-news-admin.js'],
   ['src/dashboard/sets-admin.js', 'Eye/dart-sets-admin.js'],
