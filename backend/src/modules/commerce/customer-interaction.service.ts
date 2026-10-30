@@ -544,15 +544,21 @@ export class CustomerInteractionService {
   }
 
   private async lockDomain(client: PoolClient, domain: string): Promise<{ version: number; data: unknown[] }> {
-    const result = await client.query<{ version: string }>(
-      "SELECT version::text FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE",
+    const result = await client.query<{ version: string; data: unknown }>(
+      "SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE",
       [domain],
     );
     const row = result.rows[0];
     if (!row) throw new AppError(500, "DOMAIN_STATE_MISSING", `Missing dashboard domain: ${domain}`);
-    const data = isRelationalDashboardDomain(domain)
+    const relational = isRelationalDashboardDomain(domain);
+    if (!relational && !Array.isArray(row.data)) {
+      throw new AppError(500, "DOMAIN_STATE_INVALID", `Invalid dashboard domain data: ${domain}`);
+    }
+    // Preserve existing JSON-domain records (reviews and Contact Us) under
+    // the same row lock before appending a new independent submission.
+    const data = relational
       ? await readRelationalDashboardDomain(client, domain)
-      : [];
+      : row.data as unknown[];
     return { version: Number(row.version), data };
   }
 
