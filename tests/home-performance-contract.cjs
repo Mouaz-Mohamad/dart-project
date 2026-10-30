@@ -29,7 +29,7 @@ assert.ok(!home.includes('src="Js/dart-ui.js"'), "homepage must not regress to t
 assert.ok(!home.includes('src="Js/dart-platform.js"'), "homepage must not regress to the full unminified platform runtime");
 
 const reviewsUi = fs.readFileSync("src/storefront/home-ui.js", "utf8");
-const feedback = fs.readFileSync("sections/form-feedback.html", "utf8");
+const feedback = fs.readFileSync("sections/form-feedback-embed.html", "utf8");
 const styles = fs.readFileSync("CSS/main.css", "utf8");
 assert.match(home, /id="dartReviewDialog"/, "long reviews need a full-text dialog");
 assert.match(home, /data-review-read-more/, "cards need a Read More control");

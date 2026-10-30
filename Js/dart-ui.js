@@ -1717,7 +1717,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const optionalSections = [
         ['leaderboard-card', 'sections/leaderboard-card.html'],
         ['birthday', 'sections/birthday.html'],
-        ['feedback-form', 'sections/form-feedback.html'],
+        ['feedback-form', 'sections/form-feedback-embed.html'],
         ['contact-form', 'sections/form-contact.html'],
         ['story', 'sections/story.html'],
         ['dart-for-you', 'sections/dart-for-you.html'],

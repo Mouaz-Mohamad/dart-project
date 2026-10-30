@@ -93,6 +93,7 @@ jobs:
           node tests/news-loader.cjs
           node tests/news-seo.cjs
           node tests/home-performance-contract.cjs
+          node tests/public-feedback-contract.cjs
           node tests/modal-placement-contract.cjs
           node tests/order-action-latency-contract.cjs
           node tests/product_deep_links.cjs

@@ -27,6 +27,16 @@ const reviewSchema = z.object({
   review: z.string().trim().min(2).max(3000),
 });
 
+// Guest submissions are unverified; never reuse the authenticated review route.
+const publicReviewSchema = reviewSchema.omit({ title: true }).extend({
+  fullName: z.string().trim().min(3).max(160),
+  phone1: z.string().trim().regex(/^01[0125][0-9]{8}$/),
+  phone2: z.string().trim().regex(/^01[0125][0-9]{8}$/).optional(),
+  email: z.string().trim().email().max(320).optional(),
+  title: z.string().trim().min(1).max(160).optional(),
+  website: z.string().max(100).optional(), // Honeypot: must remain empty.
+}).strict();
+
 const returnSchema = z.object({
   itemCode: z.string().trim().min(1).max(160),
   requestType: z.enum(["Refund", "Exchange"]),
@@ -76,6 +86,24 @@ export function createCustomerInteractionRouter(
   router.post("/contact", contactLimiter, async (request, response) => {
     const body = contactSchema.parse(request.body);
     response.status(201).json(await interactions.submitContact(body, String(request.id)));
+  });
+
+  // Rate limit guests independently; customer-session requirements remain untouched.
+  router.post("/reviews/public", rateLimit({
+    store: sharedRateLimitStore(config, "public-feedback"),
+    windowMs: 60 * 60_000,
+    limit: 5,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+  }), async (request, response) => {
+    const body = publicReviewSchema.parse(request.body);
+    if (body.website) {
+      response.status(201).json({ accepted: true });
+      return;
+    }
+    response.status(201).json(
+      await interactions.submitPublicReview(body, String(request.id)),
+    );
   });
 
   router.post(

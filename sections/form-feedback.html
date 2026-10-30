@@ -1,16 +1,36 @@
-<!-- DART CODE GUIDE | sections/form-feedback.html
-     الغرض: جزء HTML قابل لإعادة الاستخدام ويتم حقنه داخل صفحات الموقع. -->
-    <link rel="stylesheet" href="../CSS/main.css">
-    <link rel="stylesheet" href="../CSS/base.css">
-    <link rel="stylesheet" href="../CSS/responsive.css">
-<div class="mother">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, follow">
+  <meta name="theme-color" content="#ab012b">
+  <meta name="description" content="Share your thoughts with Dart | for you.">
+  <title>Share Your Experience | Dart for you</title>
+  <link rel="icon" type="image/png" href="/Photos/192px.png">
+  <link rel="stylesheet" href="/CSS/main.css">
+  <link rel="stylesheet" href="/CSS/base.css">
+  <link rel="stylesheet" href="/CSS/responsive.css">
+  <link rel="stylesheet" href="/CSS/public-feedback.css">
+  <script src="/Js/dart-public-feedback.js" defer></script>
+</head>
+<body class="dart-public-feedback-page">
+  <main class="dart-public-feedback-shell">
+    <header class="dart-public-feedback-header">
+      <a href="/" aria-label="Dart homepage" class="dart-public-feedback-brand">
+        <img src="/Photos/Logos/01_Dart_original_transparent 2.png" alt="Dart logo" width="88" height="88">
+        <span>DART <small>FOR YOU</small></span>
+      </a>
+      <p>We'd love to hear from you.</p>
+    </header>
+    <div class="dart-public-feedback-panel">
   <section class="feedback-section dja-flexdir" aria-label="Share Your Experience | شارك تجربتك">
       <h1 class="section-title">&nbsp;Share Your <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Experience</h1>
 
       <form id="reviewForm" class="form">
           <div class="form-group">
               <label for="review-full-name">Full Name</label>
-              <input type="text" id="review-full-name" name="full_name" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
+              <input type="text" id="review-full-name" name="full_name" maxlength="160" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
           </div>
 
           <div class="form-row flex-center">
@@ -26,7 +46,7 @@
 
           <div class="form-group">
               <label for="review-email">Email</label>
-              <input type="email" id="review-email" name="email" placeholder="Value" autocomplete="email" required>
+              <input type="email" id="review-email" name="email" placeholder="Optional" autocomplete="email">
           </div>
           
           <fieldset class="container-select dart-review-rating-field">
@@ -72,15 +92,25 @@
 
           <div class="form-group">
               <label for="review-title">Title of the Text</label>
-              <input type="text" id="review-title" name="title" placeholder="Value" >
+              <input type="text" id="review-title" name="title" maxlength="160" placeholder="Optional" >
           </div>
 
           <div class="form-group">
               <label for="review-text">Review Text</label>
-              <textarea id="review-text" name="review" placeholder="Value" rows="4" required></textarea>
+              <textarea id="review-text" name="review" placeholder="Tell us about your experience" rows="5" minlength="2" maxlength="3000" required></textarea>
           </div>
 
+          <div class="dart-public-honeypot" aria-hidden="true">
+              <label for="review-website">Leave this field empty</label>
+              <input type="text" id="review-website" name="website" tabindex="-1" autocomplete="off">
+          </div>
+          <p class="dart-public-moderation-note">Your review will be sent to the Dart team for approval before appearing on our website.</p>
+          <p id="dart-public-review-status" class="dart-public-review-status" role="status" aria-live="polite"></p>
           <button type="submit" class="submit-btn-form">Submit</button>
       </form>
   </section>
-</div>
+    </div>
+    <footer class="dart-public-feedback-footer">Dart | for you &middot; Thanks for sharing your experience</footer>
+  </main>
+</body>
+</html>

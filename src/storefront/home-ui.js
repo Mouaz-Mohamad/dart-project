@@ -507,7 +507,7 @@ function scheduleOptionalSections() {
     preloadPageSections([
         ["leaderboard-card", "sections/leaderboard-card.html"],
         ["birthday", "sections/birthday.html"],
-        ["feedback-form", "sections/form-feedback.html"],
+        ["feedback-form", "sections/form-feedback-embed.html"],
         ["why", "sections/why-dart.html"],
     ]);
 }

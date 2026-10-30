@@ -109,3 +109,37 @@ describe("customer review submission persistence", () => {
     expect((await service.read("contacts")).data).toHaveLength(2);
   });
 });
+
+describe("public WhatsApp feedback submission", () => {
+  it("accepts a guest without an order/account, queues moderation, blocks duplicates and publishes only after approval", async () => {
+    await db.exec(`
+      CREATE TABLE notification_records (record_id text PRIMARY KEY, payload jsonb, position integer);
+      INSERT INTO dashboard_domain_state VALUES ('notifications',1,'[]'::jsonb,NULL,NULL);
+    `);
+    const query = (sql: string, values: unknown[] = []) => db.query(sql, values);
+    const interactions = new CustomerInteractionService({
+      connect: async () => ({ query, release() {} }),
+    } as unknown as Pool);
+    const input = { fullName: "Guest Reviewer", phone1: "01012345678", rating: 5,
+      review: "Nice quality", email: "guest@example.com" };
+    const saved = await interactions.submitPublicReview(input, "guest-request");
+    const rows = await service.read("reviews");
+    expect(rows.data[0]).toMatchObject({
+      id: saved.id, source: "Public Feedback Link", recordType: "review",
+      verifiedPurchase: false, clientId: "-", clientName: "Guest Reviewer",
+      status: "Pending", phone1: "01012345678", rating: 5,
+    });
+    expect((await service.publicReviews()).map((row) => (row as { id: string }).id))
+      .not.toContain(saved.id);
+    await expect(interactions.submitPublicReview(input, "guest-retry")).rejects
+      .toMatchObject({ statusCode: 409 });
+    const approved = rows.data.map((row) => ({
+      ...(row as Record<string, unknown>),
+      status: (row as { id: string }).id === saved.id ? "Active" : (row as { status: string }).status,
+    }));
+    await service.write("reviews", rows.version, approved, "staff", "approval");
+    expect((await service.publicReviews()).map((row) => (row as { id: string }).id))
+      .toContain(saved.id);
+    expect((await db.query("SELECT * FROM audit_logs WHERE action='PUBLIC_REVIEW_CREATED'")).rows).toHaveLength(1);
+  });
+});

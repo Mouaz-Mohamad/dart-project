@@ -1,0 +1,94 @@
+/* Standalone WhatsApp feedback page; embedded review form remains unchanged. */
+.dart-public-feedback-page {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: linear-gradient(145deg, #f8f4ef, #fffdfb 60%, #f3e6e8);
+  color: #30252a;
+  overflow-x: hidden;
+  font-family: "Readex Pro", "Segoe UI", Arial, sans-serif;
+}
+.dart-public-feedback-page *,
+.dart-public-feedback-page *::before,
+.dart-public-feedback-page *::after { box-sizing: border-box; }
+.dart-public-feedback-shell {
+  width: min(720px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 26px 0 38px;
+}
+.dart-public-feedback-header { text-align: center; margin-bottom: 20px; }
+.dart-public-feedback-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #ab012b;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-decoration: none;
+}
+.dart-public-feedback-brand img { width: 64px; height: 64px; object-fit: contain; }
+.dart-public-feedback-brand small { display: block; font-size: 11px; letter-spacing: .22em; }
+.dart-public-feedback-header p { margin: 10px 0 0; color: #655a5c; }
+.dart-public-feedback-panel {
+  border: 1px solid rgba(171, 1, 43, .13);
+  border-radius: 22px;
+  box-shadow: 0 20px 54px rgba(55, 21, 34, .09);
+  background: #fff;
+  padding: clamp(18px, 4vw, 38px);
+}
+.dart-public-feedback-page .feedback-section {
+  width: 100%;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+.dart-public-feedback-page .feedback-section h1 {
+  width: 100%;
+  margin: 0 0 24px;
+  line-height: 1.2;
+  color: #ab012b;
+  text-align: center;
+  font-size: clamp(30px, 6vw, 40px);
+}
+.dart-public-feedback-page .form { width: 100%; margin: 0; }
+.dart-public-feedback-page .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.dart-public-feedback-page .form-row > .form-group { flex: 1 1 190px; min-width: 0; }
+.dart-public-feedback-page .form-group { width: 100%; margin: 0 0 16px; }
+.dart-public-feedback-page .form-group label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+.dart-public-feedback-page input:not([type="radio"]),
+.dart-public-feedback-page textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 12px 13px;
+  border: 1px solid #dcd0d3;
+  border-radius: 10px;
+  color: #30252a;
+  background: #fff;
+  font-size: 16px;
+  font-family: inherit;
+}
+.dart-public-feedback-page input:focus-visible,
+.dart-public-feedback-page textarea:focus-visible,
+.dart-public-feedback-page button:focus-visible {
+  outline: 2px solid #ab012b;
+  outline-offset: 2px;
+}
+.dart-public-feedback-page .dart-review-rating-picker { max-width: 100%; gap: clamp(4px, 1vw, 9px); }
+.dart-public-feedback-page .dart-review-rating-picker .dart-rating-choice {
+  width: clamp(40px, 11vw, 47px);
+  flex-basis: clamp(40px, 11vw, 47px);
+}
+.dart-public-feedback-page .dart-public-honeypot { position: absolute; left: -99999px; width: 1px; height: 1px; overflow: hidden; }
+.dart-public-moderation-note, .dart-public-review-status { font-size: 13px; line-height: 1.6; }
+.dart-public-moderation-note { color: #686064; margin: 6px 0 10px; }
+.dart-public-review-status { min-height: 20px; color: #247b4a; margin: 8px 0 13px; }
+.dart-public-review-status.is-error { color: #b11c3d; }
+.dart-public-feedback-page .submit-btn-form { cursor: pointer; }
+.dart-public-feedback-page .submit-btn-form:disabled { opacity: .6; cursor: progress; }
+.dart-public-feedback-footer { margin-top: 20px; text-align: center; font-size: 12px; color: #736b6d; }

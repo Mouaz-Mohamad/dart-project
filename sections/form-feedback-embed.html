@@ -1,0 +1,86 @@
+<!-- DART CODE GUIDE | sections/form-feedback.html
+     الغرض: جزء HTML قابل لإعادة الاستخدام ويتم حقنه داخل صفحات الموقع. -->
+    <link rel="stylesheet" href="../CSS/main.css">
+    <link rel="stylesheet" href="../CSS/base.css">
+    <link rel="stylesheet" href="../CSS/responsive.css">
+<div class="mother">
+  <section class="feedback-section dja-flexdir" aria-label="Share Your Experience | شارك تجربتك">
+      <h1 class="section-title">&nbsp;Share Your <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Experience</h1>
+
+      <form id="reviewForm" class="form">
+          <div class="form-group">
+              <label for="review-full-name">Full Name</label>
+              <input type="text" id="review-full-name" name="full_name" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
+          </div>
+
+          <div class="form-row flex-center">
+              <div class="form-group">
+                  <label for="review-phone-1">Phone Number</label>
+                  <input type="tel" id="review-phone-1" name="phone1" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel" autocomplete="tel" required>
+              </div>
+              <div class="form-group">
+                  <label for="review-phone-2">Phone Number 2</label>
+                  <input type="tel" id="review-phone-2" name="phone2" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel" autocomplete="tel">
+              </div>
+          </div>
+
+          <div class="form-group">
+              <label for="review-email">Email</label>
+              <input type="email" id="review-email" name="email" placeholder="Value" autocomplete="email" required>
+          </div>
+          
+          <fieldset class="container-select dart-review-rating-field">
+              <legend>Star Rating</legend>
+              <div class="dart-review-rating-picker" role="group" aria-label="Choose a rating from 1 to 5 stars">
+                  <label class="dart-rating-choice">
+                      <input type="radio" name="rating" value="1" aria-label="1 star" required>
+                      <svg class="dart-rating-star" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                          <path class="dart-star-shape" d="M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z"></path>
+                          <path class="dart-star-spark" d="M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z"></path>
+                      </svg>
+                  </label>
+                  <label class="dart-rating-choice">
+                      <input type="radio" name="rating" value="2" aria-label="2 stars">
+                      <svg class="dart-rating-star" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                          <path class="dart-star-shape" d="M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z"></path>
+                          <path class="dart-star-spark" d="M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z"></path>
+                      </svg>
+                  </label>
+                  <label class="dart-rating-choice">
+                      <input type="radio" name="rating" value="3" aria-label="3 stars">
+                      <svg class="dart-rating-star" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                          <path class="dart-star-shape" d="M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z"></path>
+                          <path class="dart-star-spark" d="M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z"></path>
+                      </svg>
+                  </label>
+                  <label class="dart-rating-choice">
+                      <input type="radio" name="rating" value="4" aria-label="4 stars">
+                      <svg class="dart-rating-star" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                          <path class="dart-star-shape" d="M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z"></path>
+                          <path class="dart-star-spark" d="M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z"></path>
+                      </svg>
+                  </label>
+                  <label class="dart-rating-choice">
+                      <input type="radio" name="rating" value="5" aria-label="5 stars">
+                      <svg class="dart-rating-star" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                          <path class="dart-star-shape" d="M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z"></path>
+                          <path class="dart-star-spark" d="M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z"></path>
+                      </svg>
+                  </label>
+              </div>
+          </fieldset>
+
+          <div class="form-group">
+              <label for="review-title">Title of the Text</label>
+              <input type="text" id="review-title" name="title" placeholder="Value" >
+          </div>
+
+          <div class="form-group">
+              <label for="review-text">Review Text</label>
+              <textarea id="review-text" name="review" placeholder="Value" rows="4" required></textarea>
+          </div>
+
+          <button type="submit" class="submit-btn-form">Submit</button>
+      </form>
+  </section>
+</div>

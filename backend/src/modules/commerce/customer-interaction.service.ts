@@ -31,6 +31,16 @@ export interface ReviewInput {
   review: string;
 }
 
+export interface PublicReviewInput {
+  fullName: string;
+  phone1: string;
+  phone2?: string | undefined;
+  email?: string | undefined;
+  rating: number;
+  title?: string | undefined;
+  review: string;
+}
+
 export interface ReturnCourierPolicy {
   customerFee: number;
   brandFee: number;
@@ -183,6 +193,70 @@ export class CustomerInteractionService {
           actor_type, action, entity_type, entity_id, request_id, metadata
         ) VALUES ('system','CONTACT_CREATED','reviews',$1,$2,$3::jsonb)`,
         [id, requestId, JSON.stringify({ source: "Contact Us" })],
+      );
+      await client.query("COMMIT");
+      return { id };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Guest reviews share the moderation queue, but can never be tagged as a
+  // verified purchase. Preserve the existing delivered-order flow separately.
+  async submitPublicReview(input: PublicReviewInput, requestId: string): Promise<{ id: string }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const state = await this.lockDomain(client, "reviews");
+      const now = new Date().toISOString();
+      const submittedAt = Date.parse(now);
+      const repeated = state.data.some((raw) => {
+        const row = raw as JsonRow;
+        return row.source === "Public Feedback Link" &&
+          row.phone1 === input.phone1 &&
+          row.review === input.review &&
+          row.rating === input.rating &&
+          submittedAt - Date.parse(String(row.createdAt || 0)) < 15 * 60_000;
+      });
+      if (repeated) throw new AppError(409, "DUPLICATE_REVIEW", "This review was already received");
+
+      const id = randomUUID();
+      const record: JsonRow = {
+        id,
+        source: "Public Feedback Link",
+        recordType: "review",
+        verifiedPurchase: false,
+        clientId: "-",
+        clientName: input.fullName,
+        rating: input.rating,
+        title: input.title || "Customer feedback",
+        review: input.review,
+        phone1: input.phone1,
+        phone2: input.phone2 || "-",
+        email: input.email || "-",
+        status: "Pending",
+        date: now,
+        createdAt: now,
+        isArchived: false,
+        isDeleted: false,
+        isChecked: false,
+      };
+      await this.writeLockedDomain(client, "reviews", state.version, [record, ...state.data]);
+      await this.appendNotification(client, {
+        type: "review_created",
+        title: "New public feedback",
+        message: "A review from the public feedback link is awaiting approval.",
+        relatedEntityType: "reviews",
+        relatedEntityId: id,
+        severity: "info",
+      });
+      await client.query(
+        `INSERT INTO audit_logs (actor_type, action, entity_type, entity_id, request_id, metadata)
+         VALUES ('system', 'PUBLIC_REVIEW_CREATED', 'reviews', $1, $2, $3::jsonb)`,
+        [id, requestId, JSON.stringify({ source: "Public Feedback Link", verifiedPurchase: false })],
       );
       await client.query("COMMIT");
       return { id };
