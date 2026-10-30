@@ -151,9 +151,9 @@ for (const name of sectionNames) {
   const standalonePublicForm =
     name === "form-feedback.html" &&
     /<!doctype html>/i.test(html) &&
-    /<html[\\s>]/i.test(html) &&
-    /src="\\/Js\\/dart-public-feedback\\.js"/.test(html);
-  if (!standalonePublicForm && /<(?:link|script)\\b/i.test(html))
+    /<html[\s>]/i.test(html) &&
+    /src="\/Js\/dart-public-feedback\.js"/.test(html);
+  if (!standalonePublicForm && /<(?:link|script)\b/i.test(html))
     errors.push(`sections/${name}: fragment duplicates a stylesheet or script`);
 }
 
