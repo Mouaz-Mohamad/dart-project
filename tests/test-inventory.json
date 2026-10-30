@@ -32,6 +32,7 @@
     "product_ssr_seo.cjs",
     "profile-compact-records.cjs",
     "promotion-settings-contract.js",
+    "public-feedback-contract.cjs",
     "security-boundaries.cjs",
     "seo_checks.js",
     "server-authority-contract.js",
