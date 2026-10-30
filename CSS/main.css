@@ -1045,46 +1045,29 @@ body.dart-set-image-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 5px;
   margin: 2px 0 17px;
 }
-.dart-review-star {
-  display: inline-block;
-  line-height: 1;
+/* Review cards use the same hand-drawn gold/silver SVG tiles as the form. */
+.dart-review-display-stars .dart-rating-choice.is-filled {
+  background: #fff3d8;
+  border-color: rgba(211, 159, 51, 0.48);
 }
-.reviews-section .dart-review-star,
-.dart-review-dialog .dart-review-star {
-  display: block;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  padding: 5px;
-  border: 1px solid rgba(212, 165, 59, 0.17);
-  border-radius: 11px;
-  background: linear-gradient(145deg, #fffcf6, #f8f0e3);
-  box-sizing: border-box;
-  overflow: visible;
-  filter: drop-shadow(0 2px 2px rgba(107, 77, 25, 0.07));
-}
-.reviews-section .dart-review-star .dart-star-shape,
-.dart-review-dialog .dart-review-star .dart-star-shape {
-  fill: #d5dae0;
-  stroke: #acb5be;
-  stroke-width: 1.15;
-  stroke-linejoin: round;
-}
-.reviews-section .dart-review-star.is-filled .dart-star-shape,
-.dart-review-dialog .dart-review-star.is-filled .dart-star-shape {
+.dart-review-display-stars .dart-rating-choice.is-filled .dart-star-shape {
   fill: #e7b951;
   stroke: #bd8325;
 }
-.reviews-section .dart-review-star .dart-star-spark,
-.dart-review-dialog .dart-review-star .dart-star-spark {
-  fill: rgba(255, 255, 255, 0.8);
+.dart-review-display-stars .dart-rating-choice.is-filled .dart-star-spark {
+  fill: rgba(255, 255, 255, 0.85);
 }
-.reviews-section .dart-review-star.is-empty .dart-star-spark,
-.dart-review-dialog .dart-review-star.is-empty .dart-star-spark {
-  fill: #f9fafb;
+.reviews-section .dart-review-display-stars .dart-rating-choice {
+  width: 42px;
+  height: 44px;
+  flex: 0 0 42px;
+}
+.reviews-section .dart-review-display-stars .dart-rating-star {
+  width: 27px;
+  height: 27px;
 }
 
 .dart-review-avatar {
@@ -1939,7 +1922,8 @@ body.dart-set-image-open {
   background: linear-gradient(135deg, #fffdf9, #faf4ed);
   border: 1px solid rgba(171, 1, 43, 0.08);
 }
-.dart-review-rating-picker .dart-rating-choice {
+.dart-review-rating-picker .dart-rating-choice,
+.dart-review-display-stars .dart-rating-choice {
   position: relative;
   display: grid;
   place-items: center;
@@ -1962,7 +1946,8 @@ body.dart-set-image-open {
   margin: 0;
   padding: 0;
 }
-.dart-review-rating-picker .dart-rating-star {
+.dart-review-rating-picker .dart-rating-star,
+.dart-review-display-stars .dart-rating-star {
   display: block;
   width: 30px;
   height: 30px;
@@ -1970,14 +1955,16 @@ body.dart-set-image-open {
   overflow: visible;
   filter: drop-shadow(0 1px 1px rgba(73, 51, 17, 0.06));
 }
-.dart-review-rating-picker .dart-star-shape {
+.dart-review-rating-picker .dart-star-shape,
+.dart-review-display-stars .dart-star-shape {
   fill: #e0e3e8;
   stroke: #aeb7c0;
   stroke-width: 1.1;
   stroke-linejoin: round;
   transition: fill 0.16s ease, stroke 0.16s ease;
 }
-.dart-review-rating-picker .dart-star-spark { fill: #f7f8fa; }
+.dart-review-rating-picker .dart-star-spark,
+.dart-review-display-stars .dart-star-spark { fill: #f7f8fa; }
 .dart-review-rating-picker .dart-rating-choice:has(input:checked),
 .dart-review-rating-picker .dart-rating-choice:has(~ .dart-rating-choice input:checked) {
   background: #fff3d8;

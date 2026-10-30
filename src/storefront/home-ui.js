@@ -222,14 +222,15 @@ async function hydratePublicReviews() {
 function renderReviewStars(container, rating) {
   if (!container) return;
   container.replaceChildren();
+  container.classList.add("dart-review-display-stars");
   const count = Math.max(0, Math.min(5, Number(rating) || 0));
   container.setAttribute("role", "img");
   container.setAttribute("aria-label", `${count} out of 5 stars`);
   for (let index = 1; index <= 5; index += 1) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("viewBox", "0 0 32 32");
     svg.setAttribute("aria-hidden", "true");
-    svg.classList.add("dart-review-star", index <= count ? "is-filled" : "is-empty");
+    svg.classList.add("dart-rating-star");
     const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
     shape.classList.add("dart-star-shape");
     shape.setAttribute("d", "M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z");
@@ -237,7 +238,10 @@ function renderReviewStars(container, rating) {
     sparkle.classList.add("dart-star-spark");
     sparkle.setAttribute("d", "M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z");
     svg.append(shape, sparkle);
-    container.appendChild(svg);
+    const tile = document.createElement("span");
+    tile.className = "dart-rating-choice" + (index <= count ? " is-filled" : "");
+    tile.appendChild(svg);
+    container.appendChild(tile);
   }
 }
 

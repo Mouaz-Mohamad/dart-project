@@ -581,55 +581,81 @@ function createProductCard(item, template) {
     return card;
 }
 
+// Independent full-site runtime: Home uses the smaller curated home-ui module.
+function renderReviewStars(container, rating) {
+    if (!container) return;
+    container.replaceChildren();
+    const count = Math.max(0, Math.min(5, Number(rating) || 0));
+    container.classList.add("dart-review-display-stars");
+    container.setAttribute("role", "img");
+    container.setAttribute("aria-label", `${count} out of 5 stars`);
+    for (let index = 1; index <= 5; index++) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 32 32");
+        svg.setAttribute("aria-hidden", "true");
+        svg.classList.add("dart-rating-star");
+        const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        shape.classList.add("dart-star-shape");
+        shape.setAttribute("d", "M16 3.5c.5 0 .9.3 1.1.8l3.4 7 7.7 1.1c1 .1 1.3 1.3.6 1.9l-5.6 5.5 1.3 7.7c.2 1-.8 1.7-1.7 1.2L16 25l-6.8 3.6c-.9.5-1.9-.2-1.7-1.2l1.3-7.7-5.6-5.5c-.7-.7-.3-1.8.6-1.9l7.7-1.1 3.4-7c.2-.5.6-.8 1.1-.8Z");
+        const sparkle = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        sparkle.classList.add("dart-star-spark");
+        sparkle.setAttribute("d", "M16 11.7l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1Z");
+        svg.append(shape, sparkle);
+        const tile = document.createElement("span");
+        tile.className = "dart-rating-choice" + (index <= count ? " is-filled" : "");
+        tile.appendChild(svg);
+        container.appendChild(tile);
+    }
+}
 function renderReviewsLogic() {
-    const reviewsContainer = document.getElementById('reviewsContainer');
-    const reviewTemplate = document.getElementById('reviewTemplate');
-
-    if (reviewsContainer && reviewTemplate) {
-        [...reviewsContainer.children].forEach(child => { if (child.id !== 'reviewTemplate') child.remove(); });
-        if (!reviewsData.length) {
-            reviewsContainer.appendChild(
-                reviewsLoadFailed
-                    ? createUiState(
-                        'error',
-                        'Reviews temporarily unavailable',
-                        'Verified reviews could not be loaded from Dart right now.',
-                        'Retry',
-                        () => void hydratePublicReviews()
-                    )
-                    : createUiState(
-                        'empty',
-                        'No reviews yet',
-                        'Verified customer reviews will appear here after delivered orders.'
-                    )
-            );
-            return;
-        }
-        reviewsData.forEach(item => {
-            const card = reviewTemplate.cloneNode(true);
-            card.removeAttribute('id');
-            card.style.display = 'flex';
-
-            const starsContainer = card.querySelector('.stars');
-            starsContainer.innerHTML = '';
-            starsContainer.setAttribute('role', 'img');
-            starsContainer.setAttribute('aria-label', `${Number(item.rating) || 0} out of 5 stars`);
-            for (let i = 1; i <= 5; i++) {
-                const star = document.createElement('span');
-                star.className = 'dart-review-star';
-                star.textContent = i <= item.rating ? '★' : '☆';
-                star.setAttribute('aria-hidden', 'true');
-                starsContainer.appendChild(star);
-            }
-
-            card.querySelector('.review-title').textContent = item.title;
-            card.querySelector('.review-text').textContent = item.comment;
-            card.querySelector('.user-name-').textContent = item.name;
-            card.querySelector('.review-date').textContent = item.date;
-
-            reviewsContainer.appendChild(card);
+    const container = document.getElementById("reviewsContainer");
+    const template = document.getElementById("reviewTemplate");
+    if (!container || !template) return;
+    if (!container.dataset.dartReviewDialogBound) {
+        container.dataset.dartReviewDialogBound = "1";
+        container.addEventListener("click", (event) => {
+            const trigger = event.target.closest("[data-review-read-more]");
+            if (!trigger) return;
+            const review = reviewsData[Number(trigger.dataset.reviewIndex)];
+            const dialog = document.getElementById("dartReviewDialog");
+            if (!review || !dialog) return;
+            renderReviewStars(dialog.querySelector(".stars"), review.rating);
+            dialog.querySelector("#dart-review-full-title").textContent = review.title || "";
+            dialog.querySelector("#dart-review-full-text").textContent = review.comment || "";
+            dialog.querySelector(".dart-review-dialog-name").textContent = review.name || "";
+            dialog.querySelector(".dart-review-dialog-date").textContent = review.date || "";
+            if (!dialog.open) dialog.showModal();
+        });
+        const dialog = document.getElementById("dartReviewDialog");
+        dialog?.addEventListener("click", (event) => {
+            if (event.target === dialog || event.target.closest("[data-review-dialog-close]")) dialog.close();
         });
     }
+    [...container.children].forEach((child) => {
+        if (child.id !== "reviewTemplate") child.remove();
+    });
+    if (!reviewsData.length) {
+        container.appendChild(reviewsLoadFailed
+            ? createUiState("error", "Reviews temporarily unavailable",
+                "Verified reviews could not be loaded from Dart right now.", "Retry", () => void hydratePublicReviews())
+            : createUiState("empty", "No reviews yet",
+                "Verified customer reviews will appear here after delivered orders."));
+        return;
+    }
+    const fragment = document.createDocumentFragment();
+    reviewsData.forEach((review, index) => {
+        const card = template.cloneNode(true);
+        card.removeAttribute("id");
+        card.style.display = "flex";
+        renderReviewStars(card.querySelector(".stars"), review.rating);
+        card.querySelector(".review-title").textContent = review.title || "";
+        card.querySelector(".review-text").textContent = review.comment || "";
+        card.querySelector(".user-name-").textContent = review.name || "";
+        card.querySelector(".review-date").textContent = review.date || "";
+        card.querySelector("[data-review-read-more]").dataset.reviewIndex = String(index);
+        fragment.appendChild(card);
+    });
+    container.appendChild(fragment);
 }
 
 // ==========================================

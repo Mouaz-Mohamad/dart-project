@@ -193,24 +193,35 @@
             </section>
             
             <section class="reviews-section">
-                <h2 class="section-title-">&nbsp; Our Reviews </h2>
-                <div class="reviews-container" id="reviewsContainer">
-                    <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
-                        <div>
-                            <div class="stars"></div>
-                            <div class="review-title"></div>
-                            <div class="review-text"></div>
-                        </div>
-                        <div class="user-info" dir="rtl">
-                            <i class="fa-regular fa-circle-user fa-xl user-avatar"></i>
-                            <div>
-                                <div class="user-name-"></div>
-                                <div class="review-date"></div>
+                    <h2 class="section-title-">&nbsp; Our Reviews </h2>
+                    <div class="reviews-container" id="reviewsContainer">
+                        <div class="review-card" id="reviewTemplate" style="display: none;" dir="rtl">
+                            <div class="dart-review-card-main">
+                                <div class="stars" aria-label="Review rating"></div>
+                                <div class="review-title" dir="auto"></div>
+                                <div class="review-text" dir="auto"></div>
+                                <button type="button" class="dart-review-read-more" data-review-read-more>Read More <span aria-hidden="true">↗</span></button>
+                            </div>
+                            <div class="user-info" dir="rtl">
+                                <span class="user-avatar dart-review-avatar" aria-hidden="true"></span>
+                                <div>
+                                    <div class="user-name-"></div>
+                                    <div class="review-date"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
+                <dialog id="dartReviewDialog" class="dart-review-dialog" aria-labelledby="dart-review-full-title" aria-describedby="dart-review-full-text">
+                    <button type="button" class="dart-review-dialog-close" data-review-dialog-close aria-label="Close full review">&times;</button>
+                    <div class="dart-review-dialog-stars stars" aria-label="Review rating"></div>
+                    <h2 id="dart-review-full-title" dir="auto"></h2>
+                    <p id="dart-review-full-text" dir="auto"></p>
+                    <div class="dart-review-dialog-footer">
+                        <span class="dart-review-dialog-name"></span>
+                        <time class="dart-review-dialog-date"></time>
+                    </div>
+                </dialog>
 
             <section id="birthday"></section>
 
