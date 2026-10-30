@@ -218,10 +218,68 @@ async function hydratePublicReviews() {
   return reviewsData;
 }
 
+// The same vector stars are used on cards and in the full-review dialog.
+function renderReviewStars(container, rating) {
+  if (!container) return;
+  container.replaceChildren();
+  const count = Math.max(0, Math.min(5, Number(rating) || 0));
+  container.setAttribute("role", "img");
+  container.setAttribute("aria-label", `${count} out of 5 stars`);
+  for (let index = 1; index <= 5; index += 1) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.classList.add("dart-review-star", index <= count ? "is-filled" : "is-empty");
+    const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    shape.setAttribute("d", "M12 2.4 15.03 8.54 21.8 9.53 16.9 14.3 18.06 21.06 12 17.88 5.94 21.06 7.1 14.3 2.2 9.53 8.97 8.54Z");
+    svg.appendChild(shape);
+    container.appendChild(svg);
+  }
+}
+
+function updateReviewReadMore(container) {
+  container.querySelectorAll(".review-card:not(#reviewTemplate)").forEach((card) => {
+    const button = card.querySelector("[data-review-read-more]");
+    const title = card.querySelector(".review-title");
+    const text = card.querySelector(".review-text");
+    if (!button || !title || !text) return;
+    // Read More is needed if either the two-line title or four-line body clips.
+    button.hidden = !(title.scrollHeight > title.clientHeight + 1 ||
+      text.scrollHeight > text.clientHeight + 1);
+  });
+}
+
 function renderReviewsLogic() {
   const container = document.getElementById("reviewsContainer");
   const template = document.getElementById("reviewTemplate");
   if (!container || !template) return;
+  if (!container.dataset.dartReviewDialogBound) {
+    container.dataset.dartReviewDialogBound = "1";
+    container.addEventListener("click", (event) => {
+      const trigger = event.target.closest("[data-review-read-more]");
+      if (!trigger) return;
+      const item = reviewsData[Number(trigger.dataset.reviewIndex)];
+      const dialog = document.getElementById("dartReviewDialog");
+      if (!item || !dialog) return;
+      renderReviewStars(dialog.querySelector(".stars"), item.rating);
+      dialog.querySelector("#dart-review-full-title").textContent = item.title || "";
+      dialog.querySelector("#dart-review-full-text").textContent = item.comment || "";
+      dialog.querySelector(".dart-review-dialog-name").textContent = item.name || "";
+      dialog.querySelector(".dart-review-dialog-date").textContent = item.date || "";
+      if (!dialog.open) dialog.showModal();
+    });
+    const dialog = document.getElementById("dartReviewDialog");
+    dialog?.addEventListener("click", (event) => {
+      if (event.target === dialog || event.target.closest("[data-review-dialog-close]")) dialog.close();
+    });
+    window.addEventListener("resize", () => requestAnimationFrame(() => updateReviewReadMore(container)), { passive: true });
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) requestAnimationFrame(() => updateReviewReadMore(container));
+      }, { rootMargin: "300px 0px" }).observe(container);
+    }
+    document.fonts?.ready.then(() => requestAnimationFrame(() => updateReviewReadMore(container)));
+  }
   [...container.children].forEach((child) => {
     if (child.id !== "reviewTemplate") child.remove();
   });
@@ -236,34 +294,25 @@ function renderReviewsLogic() {
   }
 
   const fragment = document.createDocumentFragment();
-  reviewsData.forEach((item) => {
+  reviewsData.forEach((item, index) => {
     const card = template.cloneNode(true);
     card.removeAttribute("id");
     card.style.display = "flex";
-    const stars = card.querySelector(".stars");
-    if (stars) {
-      stars.replaceChildren();
-      stars.setAttribute("role", "img");
-      stars.setAttribute("aria-label", `${Number(item.rating) || 0} out of 5 stars`);
-      for (let index = 1; index <= 5; index += 1) {
-        const star = document.createElement("span");
-        star.className = "dart-review-star";
-        star.textContent = index <= Number(item.rating || 0) ? "★" : "☆";
-        star.setAttribute("aria-hidden", "true");
-        stars.appendChild(star);
-      }
-    }
+    renderReviewStars(card.querySelector(".stars"), item.rating);
     const title = card.querySelector(".review-title");
     const text = card.querySelector(".review-text");
     const name = card.querySelector(".user-name-");
     const date = card.querySelector(".review-date");
+    const more = card.querySelector("[data-review-read-more]");
     if (title) title.textContent = item.title || "";
     if (text) text.textContent = item.comment || "";
     if (name) name.textContent = item.name || "";
     if (date) date.textContent = item.date || "";
+    if (more) more.dataset.reviewIndex = String(index);
     fragment.appendChild(card);
   });
   container.appendChild(fragment);
+  requestAnimationFrame(() => updateReviewReadMore(container));
 }
 
 /* DART_SHARED_SECTIONS */

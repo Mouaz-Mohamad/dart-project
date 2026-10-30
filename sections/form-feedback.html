@@ -27,16 +27,16 @@
               <input type="email" id="review-email" name="email" placeholder="Value" autocomplete="email" required>
           </div>
           
-          <div class="container-select">
-              <label for="review-rating">Star Rating</label>
-              <select id="review-rating" name="rating" required>
-                  <option value="1">1 Star</option>
-                  <option value="2">2 Stars</option>
-                  <option value="3">3 Stars</option>
-                  <option value="4">4 Stars</option>
-                  <option value="5" selected>5 Stars</option>
-              </select>
-          </div>
+          <fieldset class="container-select dart-review-rating-field">
+              <legend>Star Rating</legend>
+              <div class="dart-review-rating-picker" aria-label="Choose a rating from 1 to 5 stars">
+                  <input type="radio" id="review-rating-5" name="rating" value="5" aria-label="5 stars" required><label for="review-rating-5"><span class="dart-rating-star" aria-hidden="true"></span></label>
+                  <input type="radio" id="review-rating-4" name="rating" value="4" aria-label="4 stars"><label for="review-rating-4"><span class="dart-rating-star" aria-hidden="true"></span></label>
+                  <input type="radio" id="review-rating-3" name="rating" value="3" aria-label="3 stars"><label for="review-rating-3"><span class="dart-rating-star" aria-hidden="true"></span></label>
+                  <input type="radio" id="review-rating-2" name="rating" value="2" aria-label="2 stars"><label for="review-rating-2"><span class="dart-rating-star" aria-hidden="true"></span></label>
+                  <input type="radio" id="review-rating-1" name="rating" value="1" aria-label="1 star"><label for="review-rating-1"><span class="dart-rating-star" aria-hidden="true"></span></label>
+              </div>
+          </fieldset>
 
           <div class="form-group">
               <label for="review-title">Title of the Text</label>

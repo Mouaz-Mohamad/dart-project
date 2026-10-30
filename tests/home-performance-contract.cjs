@@ -28,4 +28,18 @@ assert.ok(perfIndex < uiIndex, "performance/session guard must install before th
 assert.ok(!home.includes('src="Js/dart-ui.js"'), "homepage must not regress to the full shared UI runtime");
 assert.ok(!home.includes('src="Js/dart-platform.js"'), "homepage must not regress to the full unminified platform runtime");
 
+const reviewsUi = fs.readFileSync("src/storefront/home-ui.js", "utf8");
+const feedback = fs.readFileSync("sections/form-feedback.html", "utf8");
+const styles = fs.readFileSync("CSS/main.css", "utf8");
+assert.match(home, /id="dartReviewDialog"/, "long reviews need a full-text dialog");
+assert.match(home, /data-review-read-more/, "cards need a Read More control");
+assert.match(reviewsUi, /showModal\(\)/, "full reviews open a native dialog");
+assert.match(reviewsUi, /title\.scrollHeight > title\.clientHeight/, "truncated titles expose Read More");
+assert.match(reviewsUi, /text\.scrollHeight > text\.clientHeight/, "truncated review bodies expose Read More");
+assert.match(styles, /-webkit-line-clamp: 2/, "review title must be two lines");
+assert.match(styles, /-webkit-line-clamp: 4/, "review body must be four lines");
+assert.doesNotMatch(feedback, /<select[^>]+name="rating"/, "rating must not use a dropdown");
+assert.equal((feedback.match(/type="radio"[^>]+name="rating"/g) || []).length, 5, "choose from five native star radios");
+assert.doesNotMatch(feedback, /name="rating"[^>]+checked/, "star rating must start empty");
+assert.match(feedback, /name="rating" value="5"[^>]+required/, "star selection must be required");
 console.log("PASS home performance contract: guest probe, lazy reviews, automatic icons, render guard and runtime ordering");

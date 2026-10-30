@@ -1020,20 +1020,36 @@ body.dart-set-image-open {
 
 .review-card {
   flex: 0 0 300px;
-  flex-shrink: 0;
+  width: 300px;
+  height: 348px;
+  box-sizing: border-box;
+  padding: 17px 16px 14px;
   font-family: var(--font-inter);
 }
-
-.stars {
-  color: #d4af37;
-  font-size: 20px;
-  margin: 8px;
-  justify-self: center;
+.dart-review-card-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
-
+.review-card .stars,
+.dart-review-dialog .stars {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 12px;
+}
 .dart-review-star {
-  display: inline-block;
-  line-height: 1;
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  fill: #d0d3d8;
+  stroke: #b8bec6;
+  stroke-width: 0.8px;
+}
+.dart-review-star.is-filled {
+  fill: #d5a53b;
+  stroke: #b68a26;
 }
 
 .dart-review-avatar {
@@ -1076,7 +1092,16 @@ body.dart-set-image-open {
   margin-bottom: 6px;
   color: var(--bragnte);
 }
-
+.review-card .review-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  height: 2.7em;
+  line-height: 1.35;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .review-text {
   font-size: 16px;
   color: var(--bg-dark);
@@ -1085,6 +1110,90 @@ body.dart-set-image-open {
   font-weight: 300;
   font-family: var(--font-inter);
 }
+.review-card .review-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  height: 6em;
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.dart-review-read-more {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--bragnte);
+  font: 600 13px var(--font-inter);
+  cursor: pointer;
+}
+.dart-review-read-more[hidden] { display: none; }
+.dart-review-read-more:focus-visible,
+.dart-review-dialog-close:focus-visible {
+  outline: 2px solid var(--bragnte);
+  outline-offset: 4px;
+}
+.review-card .user-info { margin-top: 10px; }
+.dart-review-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: min(80vh, 730px);
+  max-height: min(80dvh, 730px);
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 32px 26px 24px;
+  border: 1px solid rgba(171, 1, 43, 0.25);
+  border-radius: 18px;
+  background: #fff;
+  color: var(--bg-dark);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+.dart-review-dialog:not([open]) { display: none; }
+.dart-review-dialog::backdrop { background: rgba(22, 15, 19, 0.64); }
+.dart-review-dialog .dart-review-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: #f5ecee;
+  color: var(--bragnte);
+  font-size: 24px;
+  cursor: pointer;
+}
+.dart-review-dialog .stars { margin-bottom: 16px; }
+.dart-review-dialog h2 {
+  margin: 0 0 14px;
+  font-size: clamp(21px, 4vw, 27px);
+  line-height: 1.4;
+  color: var(--bragnte);
+  overflow-wrap: anywhere;
+}
+.dart-review-dialog p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dart-review-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid #ece7e8;
+  font-size: 13px;
+  color: #68646a;
+}
+.dart-review-dialog-name { font-weight: 700; color: var(--bg-dark); }
 
 .user-info {
   display: flex;
@@ -1762,6 +1871,70 @@ body.dart-set-image-open {
   font-size: 15px;
   font-family: var(--font-cairo);
   color: var(--bg-dark);
+}
+
+/* Native radio inputs keep the selected rating authoritative on every device. */
+.dart-review-rating-field {
+  min-width: 0;
+  margin: 10px 0 15px !important;
+  padding: 0;
+  border: 0;
+}
+.dart-review-rating-field legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.7);
+}
+.dart-review-rating-picker {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+}
+.dart-review-rating-picker input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+}
+.dart-review-rating-picker label {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  margin: 0;
+  cursor: pointer;
+}
+.dart-review-rating-picker .dart-rating-star {
+  display: block;
+  width: 30px;
+  height: 30px;
+  background: #c8cdd3;
+  clip-path: polygon(50% 1%, 61.5% 34%, 97% 35.5%, 70% 57%, 79% 92%, 50% 73%, 21% 92%, 30% 57%, 3% 35.5%, 38.5% 34%);
+  transition: background-color 0.16s, transform 0.16s;
+}
+.dart-review-rating-picker input:checked ~ label .dart-rating-star,
+.dart-review-rating-picker label:hover .dart-rating-star,
+.dart-review-rating-picker label:hover ~ label .dart-rating-star {
+  background: #d5a53b;
+}
+.dart-review-rating-picker:hover input:checked ~ label .dart-rating-star { background: #c8cdd3; }
+.dart-review-rating-picker:hover label:hover .dart-rating-star,
+.dart-review-rating-picker:hover label:hover ~ label .dart-rating-star { background: #d5a53b; }
+.dart-review-rating-picker label:hover .dart-rating-star { transform: scale(1.1); }
+.dart-review-rating-picker input:focus-visible + label {
+  border-radius: 7px;
+  outline: 2px solid var(--bragnte);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dart-review-rating-picker .dart-rating-star { transition: none; }
 }
 
 /* DART-CSS-ABOUT | About story and shared brand story cards */
