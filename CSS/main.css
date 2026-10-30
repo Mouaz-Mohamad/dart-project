@@ -1019,7 +1019,7 @@ body.dart-set-image-open {
 }
 
 .review-card {
-  flex: 0 0 200px;
+  flex: 0 0 300px;
   flex-shrink: 0;
   font-family: var(--font-inter);
 }
