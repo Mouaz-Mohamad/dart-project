@@ -61,6 +61,7 @@ const pageScopedFeatureFiles = new Set([
   "Eye/dart-traffic-analytics.js",
   "Eye/dart-finance.js",
   "Js/dart-rep.js",
+  "Js/dart-public-feedback.js",
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
   "Js/dart-sets.js",
