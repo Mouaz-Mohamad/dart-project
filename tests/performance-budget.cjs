@@ -125,10 +125,12 @@ let coreJsBytes = 0;
 let lazyJsBytes = 0;
 let standaloneJsBytes = 0;
 let brandDetailsBytes = 0;
+let customerDetailsBytes = 0;
 for (const file of jsFiles) {
   const size = fs.statSync(file).size;
   totalJsBytes += size;
-  if (file === "Eye/dart-brand-details.js") brandDetailsBytes += size;
+  if (file === "Eye/dart-customer-details.js") customerDetailsBytes += size;
+  else if (file === "Eye/dart-brand-details.js") brandDetailsBytes += size;
   else if (standaloneScripts.has(file)) standaloneJsBytes += size;
   else if (pageScopedFeatureFiles.has(file)) lazyJsBytes += size;
   else coreJsBytes += size;
@@ -140,6 +142,7 @@ if (standaloneJsBytes > 8 * 1024) {
   failures.push("Standalone public feedback runtime exceeds its 8KB budget");
 }
 // Independently loaded only after Finance; do not raise existing public/core/lazy budgets.
+if (customerDetailsBytes > 16 * 1024) failures.push("Lazy customer history exceeds its 16 KiB module budget");
 if (brandDetailsBytes > 11 * 1024) failures.push("Brand drilldowns exceed their 11 KiB module budget");
 // This is the repository aggregate, not the bytes loaded on one page. The
 // Dashboard details, editor, feedback and display choices add scoped source; public delivery budgets stay unchanged.

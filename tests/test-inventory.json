@@ -46,6 +46,7 @@
     "brand-details-browser.cjs",
     "coming-soon-browser.cjs",
     "css-cascade-browser.cjs",
+    "customer-details-browser.cjs",
     "customer-notifications-browser.cjs",
     "dashboard-groups-browser.cjs",
     "full-site-browser.js",

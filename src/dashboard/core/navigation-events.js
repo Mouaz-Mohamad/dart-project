@@ -216,6 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // تفعيل القسم المخزن أو الافتراضي عند التحميل
+  window.dartNavigateSection = activateSection;
   activateSection(savedSectionId);
 
   // إضافة الأحداث لكل الروابط

@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { AppError } from "../../http/app-error.js";
+import { customerDetails, type CustomerDetailSection } from "./customer-details.service.js";
+import { saveManualDiscount, type ManualDiscountInput } from "./customer-manual-discount.js";
 
 const conditionField = z.enum([
   "ordersCount",
@@ -192,6 +194,30 @@ function campaignPayload(input: PromotionCampaignInput): Record<string, unknown>
 
 export class PromotionService {
   public constructor(private readonly pool: Pool) {}
+
+  public saveCustomerDiscount(ref: string, actor: string, requestId: string, id: string,
+    input: ManualDiscountInput | null, expectedVersion?: number) {
+    return saveManualDiscount(this.pool, ref, actor, requestId, id, input, expectedVersion);
+  }
+
+  public async customerDetails(ref: string, section: CustomerDetailSection, offset: number, actor: string, permissions: string[]) {
+    const details = await customerDetails(this.pool, ref, section, offset, actor, permissions);
+    if (section !== "discounts") return details;
+    const db = await this.pool.connect();
+    try {
+      const customer = (await db.query<{ user_id: string }>("SELECT user_id::text FROM customers WHERE client_code=$1 OR user_id::text=$1", [ref])).rows[0]!;
+      const facts = await this.customerFacts(db, customer.user_id);
+      const campaigns = await this.loadCampaigns(db);
+      const active = [];
+      for (const campaign of campaigns) {
+        if (this.campaignActive(campaign) && this.audienceEligible(campaign, facts) && evaluateRule(campaign.customerRules, facts)
+          && await this.campaignUsageAllowed(db, campaign, customer.user_id)) active.push({ type: "Campaign", name: campaign.name,
+          code: campaign.code, discountPercent: campaign.discountPercent, expiresAt: campaign.endsAt,
+          minQuantity: campaign.minQuantity, minOrderMinor: campaign.minOrderMinor, productScope: campaign.productScope });
+      }
+      return { ...details, campaigns: active };
+    } finally { db.release(); }
+  }
 
   private async customerFacts(client: PoolClient, customerUserId: string): Promise<CustomerFacts> {
     const customer = await client.query<{

@@ -386,6 +386,8 @@ function dartShowOrderHistory(o) {
 }
 
 function dartShowClientProfile(c) {
+  const trigger = [...document.querySelectorAll("#customers .model-row")].find(row => String(row.dataset.id) === String(c?.id))?.querySelector(".dart-record-open");
+  if (trigger) { trigger.click(); return; }
   const st = dartCustomerStats(c.clientId),
     os = ordersData
       .filter((o) => o.clientId === c.clientId)
@@ -397,6 +399,7 @@ function dartShowClientProfile(c) {
     `<div><b>${dartEsc(c.clientId)}</b> · ${dartEsc(c.phone1)} · ${dartEsc(c.email || "-")}</div><p>Orders: <b>${st.orders}</b> · Delivered: <b>${st.delivered}</b> · Items: <b>${st.purchased}</b> · Spent: <b>${dartMoney(st.spent)}</b></p><p class="dart-purchase-trend ${trend.direction}"><b>Purchase trend:</b> Orders ${dartEsc(trend.orders)} · Spending ${dartEsc(trend.spending)} <small>(last complete month vs previous month)</small></p><div class="dart-timeline">${os.map((o) => `<div class="dart-timeline-item"><b>${dartEsc(o.orderId)}</b> — ${dartEsc(o.status)}<div>${(o.items || []).map(dartEsc).join(", ")}</div><small>${dartEsc(o.date || "")} · ${dartMoney(dartOrderNet(o))}</small></div>`).join("") || '<div class="dart-empty-state">No orders</div>'}</div>`;
   openModal(document.getElementById("history-modal"));
 }
+
 
 function updateOrderCards() {
   const sec = document.getElementById("orders");

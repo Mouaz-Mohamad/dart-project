@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { PromotionService } from "../promotions/promotion.service.js";
+import { activeManualDiscount, allocateManualDiscount, consumeManualDiscount } from "../promotions/customer-manual-discount.js";
 import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 import {
@@ -1460,7 +1461,7 @@ export class CommerceService {
         (row) => !setPrices.has(row.id) && Number(row.discount_percent || 0) <= 0,
       );
 
-      // Priority for every undiscounted item: Campaign, Birthday, then Dart Card.
+      // Priority for every undiscounted item: Campaign, Manual, Birthday, then Dart Card.
       // Model/item discount is evaluated first per line below and never stacks.
       if (hasUndiscountedItems && resolvedCampaign.code) {
         const normalizedCode = String(resolvedCampaign.code).trim().toUpperCase();
@@ -1580,6 +1581,13 @@ export class CommerceService {
       if ((hasSetBirthday && !birthdayBenefit) || [...setCardCodes].some((code) => code !== cardBenefit?.cardId)) {
         throw new AppError(409, "SET_BENEFIT_CHANGED", "Set reward eligibility changed. Refresh the cart and add the Set again.");
       }
+      const manualGrant = await activeManualDiscount(client, customerUserId);
+      const manualAllocations = allocateManualDiscount(manualGrant, items.filter((row) => !setPrices.has(row.id)
+        && Number(row.discount_percent || 0) <= 0 && !(promotion && campaign && campaignAppliesToItem(campaign, row)))
+        .map((row) => ({ id: row.id, baseMinor: Number(row.selling_minor) })));
+      const manualBenefit: Record<string, unknown> | null = manualGrant && manualAllocations.size
+        ? { type: "Manual", id: manualGrant.id, name: manualGrant.name, kind: manualGrant.kind,
+          value: manualGrant.value, percent: manualGrant.kind === "percent" ? manualGrant.value / 100 : 0 } : null;
       let subtotalMinor = 0;
       let finalMinor = 0;
       let cardAppliedItems = 0;
@@ -1587,7 +1595,10 @@ export class CommerceService {
         const setPrice = setPrices.get(row.id);
         const sellingMinor = setPrice ? Number(setPrice.allocated_base_minor) : Number(row.selling_minor);
         const modelDiscountPercent = setPrice ? 0 : Number(row.discount_percent || 0);
-        const resolvedDiscount = setPrice ? { percent: Number(setPrice.discount_percent), source: setPrice.discount_source, reference: setPrice.discount_reference || "", consumesDartCardSlot: false } : resolveItemDiscount(
+        const manualMinor = manualAllocations.get(row.id);
+        const resolvedDiscount = manualMinor !== undefined ? { percent: sellingMinor ? manualMinor * 100 / sellingMinor : 0,
+          source: "Manual", reference: manualGrant!.id, consumesDartCardSlot: false }
+          : setPrice ? { percent: Number(setPrice.discount_percent), source: setPrice.discount_source, reference: setPrice.discount_reference || "", consumesDartCardSlot: false } : resolveItemDiscount(
           modelDiscountPercent,
           promotion && campaign && campaignAppliesToItem(campaign, row) ? promotion : birthdayBenefit || cardBenefit,
           cardRemainingItems - cardAppliedItems,
@@ -1596,7 +1607,7 @@ export class CommerceService {
         const discountSource = resolvedDiscount.source;
         const discountReference = resolvedDiscount.reference || (discountSource === "Model" ? row.model_id : "");
         if (resolvedDiscount.consumesDartCardSlot) cardAppliedItems += 1;
-        const finalUnitMinor = setPrice ? Number(setPrice.allocated_final_minor) : finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
+        const finalUnitMinor = manualMinor !== undefined ? sellingMinor - manualMinor : setPrice ? Number(setPrice.allocated_final_minor) : finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
         subtotalMinor += sellingMinor;
         finalMinor += finalUnitMinor;
         return {
@@ -1615,7 +1626,7 @@ export class CommerceService {
       const benefitDiscountMinor = itemSnapshots
         .filter((snapshot) => snapshot.discountSource !== "Model" && snapshot.discountSource !== "None")
         .reduce((sum, snapshot) => sum + snapshot.discountMinor, 0);
-      const usedBenefits = [promotion, birthdayBenefit, cardBenefit].filter((benefit): benefit is Record<string, unknown> => {
+      const usedBenefits = [promotion, manualBenefit, birthdayBenefit, cardBenefit].filter((benefit): benefit is Record<string, unknown> => {
         if (!benefit) return false;
         const source = benefit.type === "Promotion" ? "Campaign" : String(benefit.type);
         const lines = itemSnapshots.filter((snapshot) => snapshot.discountSource === source);
@@ -1803,6 +1814,8 @@ export class CommerceService {
         ],
       );
       const order = orderResult.rows[0]!;
+
+      await consumeManualDiscount(client, orderBenefit(promotion, "Manual"), customerUserId, order.id, "customer", customerUserId, requestId);
 
       await this.refreshCodRiskForOrder(
         client,
@@ -4583,7 +4596,7 @@ export class CommerceService {
         100,
         Math.max(0, Number(input.discountPercent) || 0),
       );
-      const { subtotalMinor, finalMinor } = await this.priceAdminOrderLines(client, order.id, discountPercent);
+      const { subtotalMinor, finalMinor, manualBenefit } = await this.priceAdminOrderLines(client, order.id, discountPercent, customerUserId);
       const discountMinor = Math.max(0, subtotalMinor - finalMinor);
       const amountPaidMinor = Math.min(
         finalMinor,
@@ -4613,7 +4626,7 @@ export class CommerceService {
           finalMinor,
           amountPaidMinor,
           amountRefundedMinor,
-          discountPercent
+          manualBenefit ? JSON.stringify(manualBenefit) : discountPercent
             ? JSON.stringify({
                 type: "Manual Order Discount",
                 percent: discountPercent,
@@ -4625,6 +4638,8 @@ export class CommerceService {
           }),
         ],
       );
+
+      if (customerUserId) await consumeManualDiscount(client, manualBenefit || null, customerUserId, order.id, "staff", actorId, requestId);
 
       if (String(input.paymentMethod || "Cash on Delivery").toLowerCase().includes("cash")) {
         await this.refreshCodRiskForOrder(
@@ -4781,7 +4796,7 @@ export class CommerceService {
       const itemSetChanged =
         currentCodes.length !== itemCodes.length ||
         currentCodes.some((code) => !itemCodes.includes(code));
-      const hasReservedBenefit = ["Promotion", "Birthday", "Dart Card"].some((type) => orderBenefit(existing.promotion, type));
+      const hasReservedBenefit = ["Promotion", "Manual", "Birthday", "Dart Card"].some((type) => orderBenefit(existing.promotion, type));
       const financiallyLocked = ["Delivered", "Returned", "Cancelled", "Refused"].includes(existing.status) || hasReservedBenefit || existing.has_set_groups;
       // Match the admin editor's order-level rate. A Set/model line discount
       // is already in the immutable snapshot and is not a manual order discount.
@@ -5668,7 +5683,7 @@ export class CommerceService {
     }
   }
 
-  private async priceAdminOrderLines(client: PoolClient, orderId: string, manualPercent: number): Promise<{ subtotalMinor: number; finalMinor: number }> {
+  private async priceAdminOrderLines(client: PoolClient, orderId: string, manualPercent: number, customerId?: string | null): Promise<{ subtotalMinor: number; finalMinor: number; manualBenefit?: Record<string, unknown> }> {
     await client.query(
       `WITH priced AS (
          SELECT id,original_unit_minor,
@@ -5682,11 +5697,27 @@ export class CommerceService {
            discount_reference=CASE WHEN oi.model_discount_percent>0 THEN oi.model_id WHEN a.percent>0 THEN 'MANUAL' ELSE NULL END
          FROM amounts a WHERE oi.id=a.id`, [orderId, manualPercent],
     );
+    let manualBenefit: Record<string, unknown> | undefined;
+    if (customerId && manualPercent <= 0) {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerId}`]);
+      const grant = await activeManualDiscount(client, customerId);
+      const lines = (await client.query<{ id: string; base: string }>(`SELECT id::text,original_unit_minor::text AS base FROM order_items
+        WHERE order_id=$1 AND discount_source='None' ORDER BY created_at,id`, [orderId])).rows;
+      const allocations = allocateManualDiscount(grant, lines.map(line => ({ id: line.id, baseMinor: Number(line.base) })));
+      if (grant && allocations.size) {
+        for (const [id, minor] of allocations) await client.query(`UPDATE order_items SET final_unit_minor=original_unit_minor-$2,
+          discount_minor=$2,discount_percent=CASE WHEN original_unit_minor>0 THEN $2::numeric*100/original_unit_minor ELSE 0 END,
+          discount_source='Manual',discount_reference=$3 WHERE id=$1`, [id, minor, grant.id]);
+        manualBenefit = { type: "Manual", id: grant.id, name: grant.name, kind: grant.kind, value: grant.value,
+          percent: grant.kind === "percent" ? grant.value / 100 : 0,
+          discountMinor: [...allocations.values()].reduce((sum, minor) => sum + minor, 0) };
+      }
+    }
     const totals = await client.query<{ subtotal_minor: string; final_minor: string }>(
       `SELECT COALESCE(sum(original_unit_minor),0)::text AS subtotal_minor,
               COALESCE(sum(final_unit_minor),0)::text AS final_minor FROM order_items WHERE order_id=$1`, [orderId],
     );
-    return { subtotalMinor: Number(totals.rows[0]?.subtotal_minor || 0), finalMinor: Number(totals.rows[0]?.final_minor || 0) };
+    return { subtotalMinor: Number(totals.rows[0]?.subtotal_minor || 0), finalMinor: Number(totals.rows[0]?.final_minor || 0), ...(manualBenefit ? { manualBenefit } : {}) };
   }
 
   private async syncAdminOrderItems(

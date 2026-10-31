@@ -145,10 +145,13 @@
   }
   function showDetails(state) {
     doc.querySelectorAll(".dart-record-dialog[open]").forEach(dialog => { if (dialog !== state.dialog) dialog.close(); });
-    openRecord = { section: state.section.id, key: state.key, scroll: openRecord?.scroll || 0 };
+    const previous = openRecord?.key === state.key ? openRecord : null;
+    openRecord = { section: state.section.id, key: state.key, scroll: previous?.scroll || 0, panels: previous?.panels || new Set(["general"]), draft: previous?.draft || null };
     state.trigger.setAttribute("aria-expanded", "true");
     state.dialog.showModal();
+    if (state.section.id === "customers") installCustomerDetails(state);
     state.dialog.scrollTop = openRecord.scroll;
+    state.dialog.querySelectorAll("[data-client-panel]").forEach(panel => { panel.open = openRecord.panels.has(panel.dataset.clientPanel); });
   }
   function decorate(row, section) {
     if (states.has(row) || row.closest(".dart-record-dialog")) return;
@@ -202,9 +205,14 @@
     if (checkbox) main.append(checkbox);
     main.append(fields,controls,dialog); row.replaceChildren(main);
     row.classList.add("dart-compact-record");
-    const state = { row, section, cells, labels, key:keyFor(row), trigger, dialog, primary, proxy };
+    const state = { row, section, cells, labels, key:keyFor(row), trigger, dialog, grid, primary, proxy };
     states.set(row,state);
     trigger.addEventListener("click", event => { event.stopPropagation(); showDetails(state); });
+    if (section.id === "customers") {
+      fields.tabIndex = 0; fields.setAttribute("role", "button"); fields.setAttribute("aria-label", "Open customer details");
+      fields.onclick = () => showDetails(state);
+      fields.onkeydown = event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); showDetails(state); } };
+    }
     close.addEventListener("click", event => { event.stopPropagation(); closeDetails(state); });
     dialog.addEventListener("cancel", () => { openRecord = null; });
     dialog.addEventListener("close", () => {
@@ -217,9 +225,22 @@
     });
     // Close the detail layer before an original action opens its existing editor/confirmation.
     dialog.addEventListener("click", event => {
-      if (event.target.closest("button,a") && !event.target.closest(".dart-record-dialog-head")) closeDetails(state);
+      if (event.target.closest("button,a") && !event.target.closest(".dart-record-dialog-head,.dart-client-panel-body")) closeDetails(state);
     },true);
     syncBusy(state);
+  }
+  function installCustomerDetails(state) {
+    if (state.customerStarted || state.customerLoading) return;
+    if (root.DartCustomerDetails) {
+      state.customerStarted = true;
+      root.DartCustomerDetails.install(state.dialog, state.grid, state.key, { selection: () => openRecord?.key === state.key ? openRecord : null });
+    } else {
+      state.customerLoading = true;
+      const script = doc.createElement("script"); script.src = "dart-customer-details.js?v=20261031";
+      script.onload = () => { state.customerLoading = false; if (state.dialog.isConnected) installCustomerDetails(state); };
+      script.onerror = () => { state.customerLoading = false; script.remove(); notify("Reopen Details to retry.", "warning"); };
+      doc.head.append(script);
+    }
   }
   function syncBusy(state) {
     if (!state.proxy || !state.primary) return;

@@ -824,3 +824,27 @@ dialog button:disabled {
   .dart-brand-ledger-halves, .dart-brand-record { grid-template-columns: minmax(0, 1fr); }
   .dart-brand-total strong { font-size: 20px; }
 }
+/* Customer details reuse the record dialog and retain original general controls. */
+.dart-client-panels { display:grid; gap:12px; min-width:0; }
+.dart-client-panels > details { border:1px solid #e7dce0; border-radius:12px; background:#fff; min-width:0; }
+.dart-client-panels > details > summary { cursor:pointer; padding:16px; color:#72122d; font-weight:700; }
+.dart-client-panels > details > summary:focus-visible,.dart-client-tool:focus-visible,.dart-client-order:focus-visible { outline:3px solid #ab012b; outline-offset:3px; }
+.dart-client-panel-body { padding:0 16px 16px; min-width:0; }
+.dart-client-table-wrap { overflow:auto; max-width:100%; }
+.dart-client-table { border-collapse:collapse; width:100%; font-size:14px; }
+.dart-client-table th,.dart-client-table td { text-align:start; padding:12px 10px; border-bottom:1px solid #eee; vertical-align:top; overflow-wrap:anywhere; }
+.dart-client-table small,.dart-client-benefits small { display:block; margin-top:5px; color:#666; }
+.dart-client-table tr:has(.dart-client-order) { cursor:pointer; }
+.dart-client-section-tools,.dart-client-manual-actions { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.dart-client-tool,.dart-client-order,.dart-client-discount-form button { padding:8px 12px; cursor:pointer; border:1px solid #d8bfc6; border-radius:8px; background:#faf6f7; color:#72122d; }
+.dart-client-tool:disabled,.dart-client-order:disabled,.dart-client-discount-form button:disabled { cursor:wait; opacity:.6; }
+.dart-client-benefits { margin-bottom:20px; }
+.dart-client-benefits article { padding:10px 0; border-bottom:1px solid #eee; }
+.dart-client-discount-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr)); gap:12px; padding:16px; border:1px solid #d8bfc6; border-radius:12px; margin-bottom:20px; }
+.dart-client-discount-form h3,.dart-client-discount-form p,.dart-client-discount-form > div { grid-column:1/-1; }
+.dart-client-discount-form label { display:grid; gap:6px; min-width:0; }
+.dart-client-discount-form input,.dart-client-discount-form select { box-sizing:border-box; width:100%; min-width:0; padding:10px; border:1px solid #ddd; border-radius:6px; }
+.dart-client-form-status { color:#72122d; }
+.dart-client-confirm { box-sizing:border-box; width:min(430px,90vw); padding:24px; margin:auto; border:1px solid #d8bfc6; border-radius:14px; color:#381724; }
+.dart-client-confirm h2 { font-size:18px; margin:0 0 16px; }
+.dart-client-confirm::backdrop { background:#25131e88; }
