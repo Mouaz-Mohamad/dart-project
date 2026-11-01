@@ -24,6 +24,10 @@ const server = http.createServer((req, res) => {
       data = { offers: [offer] };
     }
     if (pathname === '/api/v1/site-settings') data = { version: 1, settings: { modelCards: {}, announcements: [], typing: { scenes: [] } } };
+    if (pathname.startsWith('/api/v1/cart/reservation/')) data = { cart: {
+      reservationId: pathname.split('/').at(-1), expiresAt: new Date(Date.now()+15*60*1000).toISOString(),
+      lines: [{ modelId:'A',color:'Black',size:'M',quantity:2 },{ modelId:'B',color:'Black',size:'M',quantity:1 }],
+    } };
     if (pathname === '/api/v1/me') data = { user: null, permissions: [], session: null };
     if (pathname === '/api/v1/reviews') data = { reviews: [] };
     if (pathname === '/api/v1/auth/social/providers') data = { providers: { google: false, facebook: false } };
@@ -82,6 +86,14 @@ const server = http.createServer((req, res) => {
       assert.deepEqual(failures, []);
       await page.close();
     }
-    console.log('PASS related-model modal navigation, stock/identity filters, safe text, distinct-model cart progress, exact quoted savings and stale/error states at 370/768/1366px');
+    const cartPage=await browser.newPage({viewport:{width:390,height:844}});
+    const errors=[];cartPage.on('pageerror',error=>errors.push(error.message));
+    await cartPage.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
+    await cartPage.goto(`${origin}/cart-checkout.html`,{waitUntil:'domcontentloaded'});
+    await cartPage.locator('#cartQuantityOffer:not([hidden])').waitFor({state:'visible'});
+    assert.match(await cartPage.locator('#cartQuantityOffer').textContent(),/فاضلك 1 موديل مختلف/,'standalone cart rehydrates its reservation and loads the offer module');
+    assert.deepEqual(errors,[]);
+    await cartPage.close();
+    console.log('PASS related-model modal navigation, stock/identity filters, safe text, distinct-model cart progress, exact quoted savings, standalone server-backed cart and stale/error states at 370/768/1366px');
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exit(1); });

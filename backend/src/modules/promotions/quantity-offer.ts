@@ -49,9 +49,14 @@ export async function quantityReturnRefund(
   const benefits = Array.isArray(promotion?.benefits) ? promotion.benefits : promotion ? [promotion] : [];
   const benefit = benefits.find((row: Record<string, unknown>) => row.type === "Promotion" && row.quantityOffer);
   if (!benefit) return null;
-  const policy = benefit.quantityOffer as QuantityOfferSnapshot;
-  const lines = await client.query<{ item_code: string; model_id: string; original_unit_minor: string; final_unit_minor: string }>(
-    "SELECT item_code,model_id,original_unit_minor::text,final_unit_minor::text FROM order_items WHERE order_id=$1", [orderId]);
+  const savedPolicy = benefit.quantityOffer as QuantityOfferSnapshot;
+  const lines = await client.query<{ item_code: string; model_id: string; original_unit_minor: string; final_unit_minor: string; discount_source: string; discount_reference: string | null }>(
+    "SELECT item_code,model_id,original_unit_minor::text,final_unit_minor::text,discount_source,discount_reference FROM order_items WHERE order_id=$1", [orderId]);
+  // Exchanges replace physical codes while retaining the same priced order line.
+  // Its immutable campaign source/reference preserve membership in this offer.
+  const policy: QuantityOfferSnapshot = { ...savedPolicy, eligibleItemCodes: lines.rows
+    .filter((line) => line.discount_source === "Campaign" && line.discount_reference === String(benefit.code || ""))
+    .map((line) => line.item_code) };
   const completed = await client.query<{ item_code: string }>(
     `SELECT item_code FROM return_requests WHERE order_id=$1 AND record_id<>$2
       AND lower(request_type) IN ('refund','return')

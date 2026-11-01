@@ -117,6 +117,27 @@ describe("quantity offers on the production schema", () => {
     await expect(commerce.representativeReturnAction(rep, ref, "complete")).rejects.toMatchObject({ code: "RETURN_STATE_INVALID" });
     expect((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [order.id])).rows[0].amount_refunded_minor).toBe(before);
   });
+  it("preserves the offer's model slot when a physical piece is exchanged before a refund", async () => {
+    const f = await fixture("percent", 2); await f.reserve([0, 1, 2]);
+    const order = await commerce.checkout(f.user, f.input, "exchange-quantity", undefined, `KEY-${f.reservation}`); await deliver(order);
+    const rep = randomUUID(), ref = `EXCHANGE-${randomUUID()}`;
+    await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
+      VALUES($1,'representative',$2,$2,'test-only-hash','active',now())`, [rep, `${rep}@example.test`]);
+    await store.pool.query("INSERT INTO representatives(user_id,full_name,national_id_hash,national_id_last4,approval_status,approved_by,approved_at) VALUES($1,'Quantity courier',$2,'1234','approved',$3,now())", [rep, rep.replaceAll('-', '').padEnd(64, 'a'), actor]);
+    const repCode = (await store.pool.query("SELECT representative_code FROM representatives WHERE user_id=$1", [rep])).rows[0].representative_code;
+    const replacement = f.pieces[0]![1]!;
+    await store.pool.query("UPDATE inventory_items SET status='Processing/Held' WHERE item_code=$1", [replacement]);
+    const record = { id: ref, returnId: ref, orderId: order.orderId, itemCode: f.pieces[0]![0], replacementItemCode: replacement,
+      requestType: "Exchange", status: "Pickup On The Way", pickupStartedAt: new Date().toISOString(), representativeId: repCode,
+      requestedColor: "Black", requestedSize: "M", latitude: 30.05, longitude: 31.35, inspectionStatus: "Pending" };
+    await store.pool.query("INSERT INTO return_requests(record_id,payload) VALUES($1,$2::jsonb)", [ref, JSON.stringify(record)]);
+    await store.pool.query("INSERT INTO representative_locations(representative_user_id,latitude,longitude) VALUES($1,30.05,31.35)", [rep]);
+    await commerce.representativeReturnAction(rep, ref, "complete");
+    const first = await commerce.adminManualReturn(actor, { itemCode: f.pieces[1]![0]!, condition: "Good", reason: "Test", refundAmount: 0 }, "post-exchange-return");
+    expect(first.refundAmount).toBe(900); // Exchanged A + retained C still qualify.
+    const second = await commerce.adminManualReturn(actor, { itemCode: replacement, condition: "Good", reason: "Test", refundAmount: 0 }, "replacement-return");
+    expect(second.refundAmount).toBe(800); // Only C remains, so its 100 EGP saving is recovered.
+  });
   it.skipIf(!process.env.TEST_DATABASE_URL)("serializes competing refunds and never grants two cumulative refunds", async () => {
     const f = await fixture(); await f.reserve([0, 1, 2]);
     const order = await commerce.checkout(f.user, f.input, "parallel-quantity", undefined, `KEY-${f.reservation}`); await deliver(order);
