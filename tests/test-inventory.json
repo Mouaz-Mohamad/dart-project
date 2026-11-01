@@ -53,6 +53,7 @@
     "home-storefront-browser.js",
     "navigation-browser.cjs",
     "news-browser.cjs",
+    "product-merchandising-browser.cjs",
     "product-waiting-browser.js",
     "sets-admin-browser.js",
     "sets-home-browser.js",

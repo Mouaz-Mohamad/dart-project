@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:8e56fd463f2c788b18a6dda4879dd7a6010511ecfa9d901511589ac9c7515c52 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:1a475cf2fa20f9feb45796b4fe2073121d8d0dc76aa09b4146156395c4306a20 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -6204,7 +6204,8 @@ function setupReturnModal() {
       Number(document.getElementById("modal-return-refund")?.value) || 0;
     const originalLine = (order.priceSnapshot || []).find((line) => String(line.itemCode) === code);
     const lineNet = Number(originalLine?.finalUnitPrice ?? existing?.originalNetAmount ?? dartOrderNet(order));
-    const remainingRefund = Math.min(lineNet, Math.max(
+    const hasQuantityOffer = (order.discountBenefits || []).some((benefit) => benefit.type === "Promotion" && benefit.quantityOffer);
+    const remainingRefund = Math.min(hasQuantityOffer ? dartOrderNet(order) : lineNet, Math.max(
       0,
       dartOrderNet(order) - Math.max(0, (Number(order.amountRefunded) || 0) - (Number(existing?.refundAmount) || 0)),
     ));

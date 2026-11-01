@@ -9,7 +9,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const home = read("index.html");
 const products = read("products.html");
 const fragment = read("sections/product-modal.html");
-const storefront = read("Js/dart-storefront.js");
+const storefront = read("src/storefront/storefront.js");
 const actions = read("Js/dart-product-button-state.js");
 const homeUi = read("Js/dart-ui.home.min.js");
 const productsUi = read("Js/dart-ui.js");

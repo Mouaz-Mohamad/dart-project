@@ -2,6 +2,7 @@
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import { allocateFixedSaving, quantityReturnRefund } from "../promotions/quantity-offer.js";
 import { PromotionService } from "../promotions/promotion.service.js";
 import { activeManualDiscount, allocateManualDiscount, consumeManualDiscount } from "../promotions/customer-manual-discount.js";
 import { AppError } from "../../http/app-error.js";
@@ -1406,11 +1407,6 @@ export class CommerceService {
            )
         ) claims GROUP BY card_code`, [customerUserId]);
       const extraCardReservations = new Map(extraReservations.rows.map((row) => [row.card_code, Number(row.pieces)]));
-      const resolvedCampaign = await new PromotionService(this.pool).resolveForCheckoutInTransaction(
-        client, customerUserId, reservationId, requestedCode,
-        items.map((row) => ({ itemCode: row.item_code, modelId: row.model_id, category: row.category || "",
-          sellingMinor: Number(row.selling_minor), modelDiscountPercent: Number(row.discount_percent || 0), isSet: setPrices.has(row.id) })),
-      );
       const customerPromotionResult = await client.query<{
         client_code: string;
         birthday: string | null;
@@ -1449,6 +1445,12 @@ export class CommerceService {
         throw new AppError(500, "PROMOTION_STATE_MISSING", "Promotion state is not initialized");
       }
 
+      const resolvedCampaign = await new PromotionService(this.pool).resolveForCheckoutInTransaction(
+        client, customerUserId, reservationId, requestedCode,
+        items.map((row) => ({ itemCode: row.item_code, modelId: row.model_id, category: row.category || "",
+          sellingMinor: Number(row.selling_minor), modelDiscountPercent: Number(row.discount_percent || 0), isSet: setPrices.has(row.id) })),
+      );
+
       let promotion: Record<string, unknown> | null = null;
       let promotionPercent = 0;
       let campaign: Record<string, unknown> | null = null;
@@ -1475,7 +1477,7 @@ export class CommerceService {
         if (
           !codePromotion ||
           !promotionDateActive(codePromotion) ||
-          !promotionPercentage(codePromotion)
+          (!promotionPercentage(codePromotion) && codePromotion.discountKind !== "fixed")
         ) {
           throw new AppError(
             409,
@@ -1498,6 +1500,11 @@ export class CommerceService {
           type: "Promotion",
           code: normalizedCode,
           percent: promotionPercent,
+          ...(codePromotion.distinctModels ? { quantityOffer: {
+            minQuantity: Number(codePromotion.minQuantity), minOrderMinor: Number(codePromotion.minOrderMinor || 0),
+            discountKind: codePromotion.discountKind || "percent", discountAmountMinor: Number(codePromotion.discountAmountMinor || 0),
+            eligibleItemCodes: items.filter((row) => !setPrices.has(row.id) && Number(row.discount_percent || 0) <= 0 && campaignAppliesToItem(codePromotion, row)).map((row) => row.item_code),
+          } } : {}),
         };
       }
 
@@ -1581,6 +1588,9 @@ export class CommerceService {
       if ((hasSetBirthday && !birthdayBenefit) || [...setCardCodes].some((code) => code !== cardBenefit?.cardId)) {
         throw new AppError(409, "SET_BENEFIT_CHANGED", "Set reward eligibility changed. Refresh the cart and add the Set again.");
       }
+      const campaignFixed = campaign?.discountKind === "fixed" ? allocateFixedSaving(items.filter((row) => !setPrices.has(row.id)
+        && Number(row.discount_percent || 0) <= 0 && campaignAppliesToItem(campaign!, row))
+        .map((row) => ({ id: row.id, baseMinor: Number(row.selling_minor) })), Number(campaign.discountAmountMinor)) : new Map<string, number>();
       const manualGrant = await activeManualDiscount(client, customerUserId);
       const manualAllocations = allocateManualDiscount(manualGrant, items.filter((row) => !setPrices.has(row.id)
         && Number(row.discount_percent || 0) <= 0 && !(promotion && campaign && campaignAppliesToItem(campaign, row)))
@@ -1596,7 +1606,9 @@ export class CommerceService {
         const sellingMinor = setPrice ? Number(setPrice.allocated_base_minor) : Number(row.selling_minor);
         const modelDiscountPercent = setPrice ? 0 : Number(row.discount_percent || 0);
         const manualMinor = manualAllocations.get(row.id);
-        const resolvedDiscount = manualMinor !== undefined ? { percent: sellingMinor ? manualMinor * 100 / sellingMinor : 0,
+        const campaignMinor = campaignFixed.get(row.id);
+        const resolvedDiscount = campaignMinor !== undefined ? { percent: sellingMinor ? campaignMinor * 100 / sellingMinor : 0,
+          source: "Campaign", reference: String(promotion!.code), consumesDartCardSlot: false } : manualMinor !== undefined ? { percent: sellingMinor ? manualMinor * 100 / sellingMinor : 0,
           source: "Manual", reference: manualGrant!.id, consumesDartCardSlot: false }
           : setPrice ? { percent: Number(setPrice.discount_percent), source: setPrice.discount_source, reference: setPrice.discount_reference || "", consumesDartCardSlot: false } : resolveItemDiscount(
           modelDiscountPercent,
@@ -1607,7 +1619,7 @@ export class CommerceService {
         const discountSource = resolvedDiscount.source;
         const discountReference = resolvedDiscount.reference || (discountSource === "Model" ? row.model_id : "");
         if (resolvedDiscount.consumesDartCardSlot) cardAppliedItems += 1;
-        const finalUnitMinor = manualMinor !== undefined ? sellingMinor - manualMinor : setPrice ? Number(setPrice.allocated_final_minor) : finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
+        const finalUnitMinor = campaignMinor !== undefined ? sellingMinor - campaignMinor : manualMinor !== undefined ? sellingMinor - manualMinor : setPrice ? Number(setPrice.allocated_final_minor) : finalModelPriceMinor(sellingMinor, effectiveDiscountPercent);
         subtotalMinor += sellingMinor;
         finalMinor += finalUnitMinor;
         return {
@@ -1651,7 +1663,7 @@ export class CommerceService {
     return { currency: "EGP", subtotalMinor: pricing.subtotalMinor, discountMinor: pricing.orderDiscountMinor,
       totalMinor: pricing.finalMinor, fingerprint: pricing.fingerprint,
       lines: pricing.itemSnapshots.map((line) => ({ itemCode: line.row.item_code, modelId: line.row.model_id,
-        color: line.row.color, size: line.row.size, baseMinor: line.sellingMinor, finalMinor: line.finalUnitMinor,
+        color: line.row.color, size: line.row.size, isSet: pricing.setItemIds.has(line.row.id), baseMinor: line.sellingMinor, finalMinor: line.finalUnitMinor,
         discountSource: line.discountSource, discountPercent: line.effectiveDiscountPercent, discountReference: line.discountReference })),
     };
   }
@@ -2718,12 +2730,15 @@ export class CommerceService {
         [line.order_item_id],
       );
       if (setLine.rowCount) requestedRefundMinor = Number(line.final_unit_minor || 0);
+      const quantityAdjustment = await quantityReturnRefund(client, line.order_id, line.promotion, requestedItemCode,
+        Number(line.final_minor), Number(line.amount_refunded_minor) - previousRefundMinor, String(existing?.id || ""));
+      if (quantityAdjustment) requestedRefundMinor = existing ? previousRefundMinor : quantityAdjustment.refundMinor;
       const currentOrderRefundedMinor = Number(line.amount_refunded_minor || 0);
       const availableRefundMinor = Math.max(
         0,
         Number(line.final_minor || 0) - currentOrderRefundedMinor + previousRefundMinor,
       );
-      const lineRefundLimitMinor = Number(line.final_unit_minor || 0);
+      const lineRefundLimitMinor = quantityAdjustment ? availableRefundMinor : Number(line.final_unit_minor || 0);
 
       if (
         requestedRefundMinor > availableRefundMinor ||
@@ -2789,7 +2804,8 @@ export class CommerceService {
         inspectedAt: now,
         updatedAt: now,
         refundAmount: requestedRefundMinor / 100,
-        financialCompletionApplied: requestedRefundMinor > 0,
+        financialCompletionApplied: quantityAdjustment ? true : requestedRefundMinor > 0,
+        ...(quantityAdjustment ? { quantityOfferAdjustment: existing?.quantityOfferAdjustment || quantityAdjustment } : {}),
       });
 
       if (input.condition === "Good") {
@@ -3160,13 +3176,16 @@ export class CommerceService {
         [item.order_item_id],
       );
       if (setLine.rowCount) requestedRefundMinor = Number(item.line_final_minor || 0);
+      const quantityAdjustment = await quantityReturnRefund(client, item.order_db_id, item.promotion, item.item_code,
+        Number(item.final_minor), Number(item.amount_refunded_minor) - previousRefundMinor, String(existing?.id || ""));
+      if (quantityAdjustment) requestedRefundMinor = existing ? previousRefundMinor : quantityAdjustment.refundMinor;
       if (existing && requestedRefundMinor !== previousRefundMinor && !input.expectedUpdatedAt) {
         throw new AppError(409, "RETURN_VERSION_REQUIRED", "Reload the return before changing its refund amount.");
       }
       const currentRefundedMinor = Number(item.amount_refunded_minor || 0);
       const baseWithoutThisReturn = Math.max(0, currentRefundedMinor - previousRefundMinor);
       const maxRemainingMinor = Math.max(0, Math.min(
-        Number(item.line_final_minor || 0), Number(item.final_minor || 0) - baseWithoutThisReturn,
+        quantityAdjustment ? Number(item.final_minor) : Number(item.line_final_minor || 0), Number(item.final_minor || 0) - baseWithoutThisReturn,
       ));
       if (requestedRefundMinor > maxRemainingMinor) {
         throw new AppError(
@@ -3239,7 +3258,8 @@ export class CommerceService {
         refundAmount: requestedRefundMinor / 100,
         refundAdjustments,
         originalNetAmount: Number(item.line_final_minor || 0) / 100,
-        financialCompletionApplied: requestedRefundMinor > 0,
+        financialCompletionApplied: quantityAdjustment ? true : requestedRefundMinor > 0,
+        ...(quantityAdjustment ? { quantityOfferAdjustment: existing?.quantityOfferAdjustment || quantityAdjustment } : {}),
         inspectedAt: String(existing?.inspectedAt || existing?.completedAt || now),
         completedAt: String(existing?.completedAt || existing?.createdAt || now),
         updatedAt: now,
@@ -4068,8 +4088,11 @@ export class CommerceService {
         if (requestType === "Refund") {
           // Refund is always derived from the immutable order-item snapshot. For a Set
           // this is the exact allocated share captured at checkout, never a client/admin amount.
-          const refundMinor = Math.max(0,Number(returnedLine.final_unit_minor || 0));
-          record.originalNetAmount = refundMinor / 100;
+          const quantityAdjustment = await quantityReturnRefund(client, order.id, order.promotion, itemCode,
+            Number(order.final_minor), Number(order.amount_refunded_minor), String(record.id || ""));
+          const refundMinor = quantityAdjustment?.refundMinor ?? Math.max(0,Number(returnedLine.final_unit_minor || 0));
+          if (quantityAdjustment) record.quantityOfferAdjustment = quantityAdjustment;
+          record.originalNetAmount = Number(returnedLine.final_unit_minor || 0) / 100;
           const finalMinor = Number(order.final_minor || 0);
           const refundedMinor = Math.min(
             finalMinor,

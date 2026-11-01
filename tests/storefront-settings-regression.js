@@ -60,6 +60,8 @@ const seededSettings = {
 };
 
 const seededModel = {
+  id: "model-regression",
+  cost: 400,
   modelId: "DT-TEST-1",
   name: "Regression Tee",
   category: "T-Shirts",
@@ -97,6 +99,7 @@ let settingsPutCount = 0;
 let lastSettingsPut = null;
 const uploadedAssets = new Map();
 let assetPutCount = 0;
+let promotionWrites = [];
 
 function json(response, status, payload) {
   response.statusCode = status;
@@ -163,6 +166,14 @@ const server = http.createServer(async (request, response) => {
       return json(response, 200, { version: 1 });
     }
 
+    if (pathname === "/api/v1/admin/promotions") {
+      if (request.method === "POST") {
+        let raw = ""; for await (const chunk of request) raw += chunk;
+        promotionWrites.push(JSON.parse(raw));
+        return json(response, 201, { promotion: { ...promotionWrites.at(-1), id: "PROMO-REGRESSION", version: 1 } });
+      }
+      return json(response, 200, { promotions: promotionWrites.map(promotion => ({ ...promotion, id: "PROMO-REGRESSION", version: 1 })) });
+    }
     if (pathname === "/api/v1/admin/catalog-state") {
       return json(response, 200, { version: 1, models: [seededModel], items: [] });
     }
@@ -181,6 +192,8 @@ const server = http.createServer(async (request, response) => {
         session: { mfaRequired: false, mfaSatisfied: true },
         permissions: [
           "settings.manage",
+          "promotions.read",
+          "promotions.manage",
           "catalog.manage",
           "orders.read",
           "dashboard_state.read",
@@ -411,12 +424,40 @@ const server = http.createServer(async (request, response) => {
   await dashboard.waitForFunction(()=>document.querySelectorAll('[data-typing-scene]').length===3);
   assert.equal(await dashboard.locator('[data-typing-scene]').nth(1).locator('.dart-typing-preview').textContent(),'For Everyone Dart | Today','saved sentence grouping survives reload');
 
+  await dashboard.evaluate(() => document.querySelector('a[data-target="settings"]').click());
+  await dashboard.locator('[data-settings-tab="general"]').click();
+  await dashboard.locator('#settings-promotion-name').fill('Quantity Regression');
+  await dashboard.locator('#settings-promotion-code').fill('Q-REGRESSION');
+  await dashboard.locator('#settings-promotion-kind').selectOption('fixed');
+  await dashboard.locator('#settings-promotion-amount').fill('150.25');
+  await dashboard.locator('#settings-promotion-distinct').check();
+  await dashboard.locator('#settings-promotion-min-quantity').fill('3');
+  await dashboard.locator('#settings-promotion-message').fill('كمّل اللوك واستفيد');
+  await dashboard.locator('#settings-promotion-status').selectOption('Active');
+  await dashboard.locator('#save-promotion').click();
+  await dashboard.waitForFunction(() => document.getElementById('settings-promotion-status-message').textContent.includes('Campaign created'));
+  assert.equal(promotionWrites.length,1);
+  assert.deepEqual(Object.fromEntries(['discountKind','discountAmountMinor','discountPercent','distinctModels','automatic','minQuantity','marketingText'].map(key => [key,promotionWrites[0][key]])), {
+    discountKind:'fixed',discountAmountMinor:15025,discountPercent:0,distinctModels:true,automatic:true,minQuantity:3,marketingText:'كمّل اللوك واستفيد',
+  });
+  await dashboard.locator('[data-promotion-action="edit"]').click();
+  assert.equal(await dashboard.locator('#settings-promotion-amount').inputValue(),'150.25');
+  assert.equal(await dashboard.locator('#settings-promotion-distinct').isChecked(),true);
+  await dashboard.evaluate(() => {
+    modelsData.push({...modelsData[0],id:'related-2',modelId:'RELATED-2',name:'Related 2'}, {...modelsData[0],id:'related-3',modelId:'RELATED-3',name:'Related 3'});
+    window.DartInventory.openEditor('model-regression','models');
+  });
+  assert.equal(await dashboard.locator('#modal-related-models option[value="DT-TEST-1"]').count(),0);
+  await dashboard.locator('#modal-related-models').selectOption(['RELATED-2','RELATED-3']);
+  await dashboard.locator('#modal-related-order [data-related-index="1"][data-related-move="-1"]').click();
+  assert.deepEqual(await dashboard.locator('#modal-related-order span').allTextContents(),['RELATED-3','RELATED-2']);
+
   await about.close();
   await dashboard.close();
   await context.close();
   await browser.close();
   server.close();
-  console.log("PASS navbar/icons, product modal, settings PUT, founder PNG lifecycle, grouped hero preview/reorder/move/save/reload");
+  console.log("PASS navbar/icons, product modal, settings PUT, founder PNG lifecycle, grouped hero preview/reorder/move/save/reload, quantity campaign save/edit and related model selection/reorder");
 })().catch((error) => {
   console.error(error.stack || error);
   server.close();

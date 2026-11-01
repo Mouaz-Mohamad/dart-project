@@ -246,11 +246,29 @@
   // END Dynamic model categories.
 
   // BEGIN Model editor. Editable color galleries own media; items contain references.
+  function renderRelatedOrder() {
+    const list = $("modal-related-order");
+    if (!list) return;
+    list.innerHTML = (draft.related || []).map((id, index, all) => `<div><span>${esc(id)}</span><button type="button" data-related-index="${index}" data-related-move="-1" aria-label="Move ${esc(id)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-related-index="${index}" data-related-move="1" aria-label="Move ${esc(id)} down" ${index === all.length - 1 ? "disabled" : ""}>↓</button></div>`).join("");
+  }
   function setupModelModal() {
     initViews();
     const form = $("model-form");
     if (!form || form.dataset.catalogReady) return;
     form.dataset.catalogReady = "1";
+    $("modal-related-models").addEventListener("change", () => {
+      const selected = [...$("modal-related-models").selectedOptions].map((option) => option.value);
+      draft.related = [...(draft.related || []).filter((id) => selected.includes(id)), ...selected.filter((id) => !(draft.related || []).includes(id))];
+      renderRelatedOrder();
+    });
+    $("modal-related-order").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-related-move]");
+      if (!button) return;
+      const from = Number(button.dataset.relatedIndex), to = from + Number(button.dataset.relatedMove);
+      if (to < 0 || to >= draft.related.length) return;
+      [draft.related[from], draft.related[to]] = [draft.related[to], draft.related[from]];
+      renderRelatedOrder();
+    });
     const discountGroup = $("modal-discount").closest(".form-group");
     const editor = document.createElement("div");
     editor.className = "model-options-editor";
@@ -371,6 +389,7 @@
         return window.DartDialog.alert("Model Code already exists.");
       if (!draft.sizes.some(C.active) || !draft.colors.some(C.active))
         return window.DartDialog.alert("Add at least one active size and color.");
+      if ($("modal-related-models").selectedOptions.length > 12) return window.DartDialog.alert("Choose at most 12 related models.");
       const category = canonicalCategory($("modal-category").value);
       if (!category) return window.DartDialog.alert("Category is required.");
       const payload = {
@@ -378,6 +397,7 @@
         name: $("modal-name").value.trim(),
         category,
         description: $("modal-description").value,
+        relatedModelIds: [...(draft.related || [])],
         cost: Number($("modal-cost").value),
         selling: Number($("modal-selling").value),
         discount: Number($("modal-discount").value) || 0,
@@ -562,8 +582,18 @@
       const m = modelsData.find((m) => m.id === id);
       $("model-form").reset();
       refreshCategoryOptions(m?.category || "");
+      const related = $("modal-related-models");
+      related.replaceChildren();
+      modelsData.filter((candidate) => candidate.modelId !== m?.modelId && !candidate.isDeleted && !candidate.isArchived).forEach((candidate) => {
+        const option = document.createElement("option");
+        option.value = candidate.modelId;
+        option.textContent = `${candidate.modelId} · ${candidate.name}`;
+        option.selected = (m?.relatedModelIds || []).includes(candidate.modelId);
+        related.appendChild(option);
+      });
       $("modal-edit-id").value = id || "";
       draft = {
+        related: [...(m?.relatedModelIds || [])].filter((id) => modelsData.some((candidate) => candidate.modelId === id && !candidate.isDeleted && !candidate.isArchived)),
         sizes: structuredClone(C.sizes(m)),
         colors: structuredClone(C.colors(m)),
       };
@@ -595,6 +625,7 @@
         });
       $("modal-final-price").textContent = `${Math.trunc(C.price(m))} EGP`;
       $("catalog-form-status").textContent = "";
+      renderRelatedOrder();
       renderOptions();
       openModal($("model-modal"));
     } else {

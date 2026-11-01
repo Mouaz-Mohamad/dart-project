@@ -490,6 +490,14 @@ const server = http.createServer((request, response) => {
   // not only the homepage's smaller JavaScript runtime.
   for (const filename of ["products.html", "profile.html"]) {
     const publicPage = await context.newPage();
+    // Profile intentionally redirects guests; this review presentation scenario
+    // needs a customer session rather than asserting against the signup page.
+    if (filename === "profile.html") await context.addCookies([{ name: "dart_csrf", value: "review-fixture", url: origin }]);
+    if (filename === "profile.html") await publicPage.route("**/api/v1/me", route => route.fulfill({
+      contentType: "application/json", body: JSON.stringify({ user: { id: "review-fixture-customer", code: "DR-REVIEW",
+        accountType: "customer", name: "Review Fixture", email: "review@example.test", phones: ["+201000000001"],
+        status: "active", emailVerified: true, birthday: "2000-01-01" }, session: {}, permissions: [] }),
+    }));
     await publicPage.goto(`${origin}/${filename}`, { waitUntil: "domcontentloaded" });
     const long = publicPage.locator('#reviewsContainer .review-card:not(#reviewTemplate)')
       .filter({ hasText: "Long Review Customer" });

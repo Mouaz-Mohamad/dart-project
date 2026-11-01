@@ -618,7 +618,7 @@ const server = http.createServer((request, response) => {
   for (const domain of ['contacts','reviews']) {
     const page=await context.newPage(), writes=[];
     const row={id:`${domain}-fixture`,clientName:'Synthetic feedback',review:'Original message',email:'fixture@example.test',
-      phone1:'01012345678',status:'Active',createdAt:'2026-10-21T12:00:00Z',
+      phone1:'01012345678',status:'Active',createdAt:new Date().toISOString(),
       ...(domain==='contacts'?{recordType:'contact',source:'Contact Us'}:{recordType:'review',rating:5})};
     await page.route('**/api/v1/me',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
       user:{id:'synthetic-feedback-staff',accountType:'staff'},session:{mfaRequired:false,mfaSatisfied:true},permissions:[`${domain}.read`,`${domain}.manage`]})}));
@@ -633,6 +633,15 @@ const server = http.createServer((request, response) => {
     await page.waitForFunction(()=>window.DartAdminHydration?.ready===true);
     await page.evaluate(()=>document.querySelector('a[data-target="review"]').click());
     const record=page.locator(`#review-container [data-id="${row.id}"]`);
+    await record.waitFor({state:'attached'});
+    // This scenario verifies domain permissions and saving. Keep its fixture
+    // groups expanded across hydration/decoration so visibility is deterministic.
+    await page.evaluate(() => {
+      const container=document.getElementById('review-container');
+      const expand=()=>container.querySelectorAll('.dart-review-client-group').forEach(node=>{if(!node.open)node.open=true;});
+      new MutationObserver(expand).observe(container,{childList:true,subtree:true,attributes:true,attributeFilter:['open']});
+      expand();
+    });
     await record.locator('.dart-record-open').click();
     await record.locator('.btn-edit').click();
     assert.equal(await page.locator('#customer-review-form').getAttribute('data-permission-domain'),domain);

@@ -23,6 +23,7 @@ interface PublicCatalogModelRow {
   name: string;
   category: string;
   description: string;
+  related_model_ids?: unknown;
   selling_minor: string | number;
   discount_percent: string | number;
   low_stock_limit: string | number;
@@ -230,7 +231,8 @@ export class CatalogService {
       const reusable = cached?.version === version && cached.until > Date.now();
       const modelResult = reusable ? { rows: cached.rows } : await client.query<PublicCatalogModelRow>(
         `SELECT model_id, name, category, description, selling_minor, discount_percent,
-                low_stock_limit, size_options, color_options, size_chart, created_at, updated_at
+                low_stock_limit, size_options, color_options, size_chart, created_at, updated_at,
+                legacy->'relatedModelIds' AS related_model_ids
            FROM catalog_models
           WHERE ${where}
           ORDER BY ${ordering}, model_id ASC ${page ? "LIMIT $3 OFFSET $4" : ""}`,
@@ -259,6 +261,7 @@ export class CatalogService {
           name: row.name,
           category: row.category,
           description: row.description,
+          relatedModelIds: Array.isArray(row.related_model_ids) ? row.related_model_ids.filter((id): id is string => typeof id === "string" && id !== row.model_id).slice(0, 12) : [],
           selling: money(row.selling_minor),
           discount: Number(row.discount_percent || 0),
           lowStockLimit: Number(row.low_stock_limit || 5),
@@ -586,6 +589,19 @@ export class CatalogService {
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtext('dart:admin-state-bulk-write'))",
       );
+      const relatedIds = models.flatMap((row) => {
+        const values = row.relatedModelIds ?? [];
+        if (!Array.isArray(values) || values.length > 12 || values.some((value) => typeof value !== "string" || !value.trim() || value.length > 160)
+          || new Set(values).size !== values.length || values.includes(text(row.modelId))) {
+          throw new AppError(422, "RELATED_MODELS_INVALID", "Choose up to 12 different models, excluding the current model");
+        }
+        return values as string[];
+      });
+      if (relatedIds.length) {
+        const known = await client.query<{ model_id: string }>("SELECT model_id FROM catalog_models WHERE model_id=ANY($1::text[]) AND NOT is_deleted", [relatedIds]);
+        const valid = new Set([...known.rows.map((row) => row.model_id), ...models.filter((row) => !row.isDeleted).map((row) => text(row.modelId))]);
+        if (relatedIds.some((id) => !valid.has(id))) throw new AppError(422, "RELATED_MODEL_NOT_FOUND", "A related model no longer exists");
+      }
       const referenced = [...new Set([...models.map((row) => text(row.modelId)), ...items.map((row) => text(row.modelId))])];
       if (!costWritable) {
         const costs = await client.query<{ model_id: string; cost_minor: string }>(

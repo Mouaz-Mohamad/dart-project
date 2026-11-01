@@ -6053,6 +6053,30 @@ button,
 }
 /* END News details. */
 
+/* Product suggestions and campaign progress inside the product modal/cart. */
+.dart-quantity-offer {
+  padding: 14px;
+  margin-block: 14px;
+  border: 1px solid #ab012b26;
+  border-radius: 12px;
+  background: #ab012b08;
+  color: #3a242a;
+  text-align: start;
+}
+.dart-quantity-offer[hidden], .dart-related-models[hidden] { display: none; }
+.dart-quantity-offer strong { color: #ab012b; font-size: 15px; }
+.dart-quantity-offer p { margin-block: 8px; font-size: 14px; line-height: 1.7; }
+.dart-quantity-offer small { display: block; font-size: 12px; line-height: 1.7; color: #62565a; }
+.dart-related-models { min-width: 0; margin-block-start: 16px; text-align: start; color: #3a242a; }
+.dart-related-models h3 { font-size: 18px; margin-block-end: 6px; }
+.dart-related-models > p { font-size: 13px; margin-block-end: 12px; color: #62565a; }
+.dart-related-list { display: flex; gap: 12px; overflow-x: auto; padding: 4px; scroll-snap-type: x proximity; }
+.dart-related-card { flex: 0 0 132px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid #e4d9d6; border-radius: 10px; background: #fffcf8; color: #2c2528; cursor: pointer; scroll-snap-align: start; text-align: start; }
+.dart-related-card img { width: 100%; height: 140px; object-fit: cover; border-radius: 6px; }
+.dart-related-card span { font-size: 13px; line-height: 1.5; }
+.dart-related-card strong { font-size: 13px; color: #ab012b; }
+.dart-related-card:focus-visible { outline: 2px solid #ab012b; outline-offset: 2px; }
+
 /* === CSS/base.css === */
 /* DART CODE GUIDE | CSS/base.css
    الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */
@@ -6780,3 +6804,9 @@ picture.dart-picture {
   }
 }
 /* END News details — mobile. */
+
+@media (max-width: 480px) {
+  .dart-related-card { flex-basis: 116px; }
+  .dart-related-card img { height: 122px; }
+  .dart-quantity-offer { padding: 10px; }
+}

@@ -159,6 +159,7 @@ jobs:
           node tests/sets-home-browser.js
           node tests/sets-storefront-browser.js
           node tests/home-storefront-browser.js
+          node tests/product-merchandising-browser.cjs
           node tests/news-browser.cjs
           node tests/customer-notifications-browser.cjs
           node tests/customer-details-browser.cjs

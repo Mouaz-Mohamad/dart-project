@@ -512,6 +512,7 @@
           title: m.name,
           category: m.category,
           description: m.description || "",
+          relatedModelIds: Array.isArray(m.relatedModelIds) ? m.relatedModelIds : [],
           price: currentPricing.finalPrice,
           originalPrice: currentPricing.originalPrice,
           effectiveDiscountPercent: currentPricing.effectiveDiscountPercent,
