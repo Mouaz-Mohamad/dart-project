@@ -15,6 +15,9 @@
   }
 
   function destinationUrl(next) {
+    const saved = sessionStorage.getItem("dart_customer_auth_return");
+    sessionStorage.removeItem("dart_customer_auth_return");
+    if (saved && /^(?:profile\.html(?:\?view=(?:profile|orders|waiting|returns))?|form-return\.html|track\.html(?:\?(?:order|return)=[^#]*)?)$/.test(saved)) return saved;
     return requestedDestination(next) === "checkout"
       ? "cart-checkout.html"
       : "profile.html";
@@ -70,6 +73,8 @@
           setAuthStatus(`${providerLabel(provider)} sign-in is not configured yet.`, true);
           return;
         }
+        const destination = window.DartPlatform?.requestedAuthDestination?.();
+        if (destination) sessionStorage.setItem("dart_customer_auth_return", destination);
         const next = requestedDestination();
         location.assign(
           `${API_BASE}/api/v1/auth/social/${encodeURIComponent(provider)}/start?next=${encodeURIComponent(next)}`,

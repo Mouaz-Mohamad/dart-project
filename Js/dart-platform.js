@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:e12bd595c087c6c7bbc7e38a5c4a67bbeebcd38d72eed6926cc4cbaa0a53ff86 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:01dfc9f6cfa5029279e14ace67dc65b9e48a72cc449b53f59d867a944c0da9bf */
 (function () {
   "use strict";
 
@@ -37,6 +37,10 @@
   let customerCommerceGeneration = 0;
   let customerCommerceStatus = "idle";
   let apiSessionUnavailable = false;
+  let apiSessionChecked = false;
+  let apiSessionPromise = null;
+  let apiSessionGeneration = 0;
+  let apiSessionLastChecked = 0;
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   let apiUserCache = null;
@@ -509,15 +513,15 @@
       });
     const method = String(options.method || "GET").toUpperCase();
     const csrfToken =
-      csrfMemory ||
       document.cookie
         .split("; ")
         .find((row) => row.startsWith("dart_csrf="))
         ?.split("=")
         .slice(1)
-        .join("=");
+        .join("=") || csrfMemory;
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
+      cache: "no-store",
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -789,6 +793,8 @@
 
   function cacheApiUser(profile) {
     apiSessionUnavailable = false;
+    apiSessionChecked = true;
+    apiSessionGeneration += 1;
     const previousId = apiUserCache?.id || null;
     apiUserCache = adaptApiUser(profile);
     const nextId = apiUserCache?.id || null;
@@ -938,20 +944,30 @@
 
   async function hydrateApiSession() {
     if (!API_BASE) return null;
-    const hasSessionHint = document.cookie
-      .split(";")
-      .some((part) => part.trim().startsWith("dart_csrf="));
-    if (!hasSessionHint) return cacheApiUser(null);
-    try {
-      const payload = await apiRequest("/api/v1/me");
-      const user = cacheApiUser(payload.user);
-      if (user) refreshCustomerCommerceInBackground();
-      return user;
-    } catch (error) {
-      if (error.status === 401) return cacheApiUser(null);
-      apiSessionUnavailable = true;
-      throw error;
-    }
+    if (apiSessionPromise) return apiSessionPromise;
+    const generation = apiSessionGeneration;
+    const task = (async () => {
+      try {
+        // The HttpOnly session is authoritative; a missing CSRF helper is not logout.
+        const payload = await apiRequest("/api/v1/me");
+        if (generation !== apiSessionGeneration) return currentUser();
+        apiSessionLastChecked = Date.now();
+        const user = cacheApiUser(payload.user);
+        if (user) refreshCustomerCommerceInBackground();
+        return user;
+      } catch (error) {
+        if (generation !== apiSessionGeneration) return currentUser();
+        if (error.status === 401) {
+          clearCustomerPrivateCache();
+          return cacheApiUser(null);
+        }
+        apiSessionUnavailable = true;
+        throw error;
+      }
+    })();
+    apiSessionPromise = task;
+    try { return await task; }
+    finally { if (apiSessionPromise === task) apiSessionPromise = null; }
   }
 
   function nextCode(prefix, collection, field) {
@@ -1461,11 +1477,12 @@
     if (API_BASE) {
       try {
         await apiRequest("/api/v1/auth/logout", { method: "POST" });
-      } finally {
-        csrfMemory = "";
-        cacheApiUser(null);
-        clearCustomerPrivateCache();
+      } catch (error) {
+        if (error.status !== 401) throw error;
       }
+      csrfMemory = "";
+      cacheApiUser(null);
+      clearCustomerPrivateCache();
       return;
     }
     const user = currentUser();
@@ -2611,19 +2628,24 @@
   }
 
   function requestedAuthDestination() {
-    let requested = "";
-    try {
-      requested = new URLSearchParams(location.search || "").get("next") || "";
-    } catch {}
-    return requested === "checkout" ? "cart-checkout.html" : "profile.html";
+    const params = new URLSearchParams(location.search || "");
+    const requested = params.get("next") || "";
+    if (requested === "checkout") return "cart-checkout.html";
+    if (requested === "track") {
+      const query = new URLSearchParams();
+      for (const key of ["order", "return"]) if (params.get(key)) query.set(key, params.get(key));
+      return `track.html${query.size ? `?${query}` : ""}`;
+    }
+    if (requested === "return") return "form-return.html";
+    const view = params.get("view");
+    return ["profile", "orders", "waiting", "returns"].includes(view)
+      ? `profile.html?view=${view}` : "profile.html";
   }
 
   function wireAccountLink() {
-    const destination = currentUser()
-      ? "/profile.html"
-      : "/Sign%20Up%20modern.html?next=profile";
+    // Let the account gate wait for the server before deciding whether login is needed.
     document.querySelectorAll(".account-btn a").forEach((link) => {
-      link.href = destination;
+      link.href = "/profile.html";
     });
   }
 
@@ -3511,7 +3533,7 @@
         if (host) host.innerHTML = '<div class="empty-state" role="status">Your session could not be verified. <button type="button" data-profile-commerce-retry>Retry</button></div>';
         return;
       }
-      location.replace("Sign Up modern.html?next=profile");
+      if (typeof enforceCustomerAccountAccess === "function") enforceCustomerAccountAccess();
       return;
     }
     const commerceState = typeof customerCommerceStatus === "string" ? customerCommerceStatus : "ready";
@@ -3700,8 +3722,13 @@
       logoutBtn.type = "button";
       logoutBtn.textContent = "Log Out";
       logoutBtn.onclick = async () => {
-        await logout();
-        location.replace("index.html");
+        logoutBtn.disabled = true;
+        try {
+          await logout();
+          location.replace("index.html");
+        } catch {
+          window.DartDialog.alert("تعذر تسجيل الخروج. حاول مرة أخرى.");
+        } finally { logoutBtn.disabled = false; }
       };
     }
   }
@@ -4062,6 +4089,111 @@
     };
   }
 
+  // Account windows keep their current appearance and have reloadable URLs.
+  const accountViews = Object.freeze({
+    profile: ".profile-details", orders: ".order-info",
+    waiting: ".waiting-info", returns: ".return-info",
+  });
+
+  function customerLoginUrl() {
+    const current = new URL(location.href);
+    const params = new URLSearchParams({ next: "profile" });
+    if (current.pathname.endsWith("/track.html")) {
+      params.set("next", "track");
+      for (const key of ["order", "return"]) if (current.searchParams.get(key)) params.set(key, current.searchParams.get(key));
+    } else if (current.pathname.endsWith("/form-return.html")) params.set("next", "return");
+    else if (accountViews[current.searchParams.get("view")]) params.set("view", current.searchParams.get("view"));
+    return `Sign%20Up%20modern.html?${params}`;
+  }
+
+  function enforceCustomerAccountAccess() {
+    if (!document.body?.hasAttribute("data-customer-private")) return true;
+    const status = document.querySelector("[data-customer-access-status]");
+    if (apiSessionUnavailable) {
+      document.body.dataset.customerAuth = "error";
+      if (status) {
+        status.textContent = "Account unavailable. ";
+        const retry = document.createElement("button");
+        retry.type = "button"; retry.textContent = "Retry";
+        retry.addEventListener("click", async () => {
+          document.body.dataset.customerAuth = "pending";
+          status.textContent = "Checking account…";
+          try { await hydrateApiSession(); } catch { /* Keep the recoverable access error. */ }
+          enforceCustomerAccountAccess();
+        });
+        status.appendChild(retry);
+      }
+      return false;
+    }
+    if (!apiSessionChecked) return false;
+    if (!currentUser()) {
+      document.body.dataset.customerAuth = "pending";
+      location.replace(customerLoginUrl());
+      return false;
+    }
+    document.body.dataset.customerAuth = "ready";
+    return true;
+  }
+
+  function initializeAccountNavigation() {
+    if (!document.querySelector(".account")) return;
+    const sections = Object.values(accountViews).map(selector => document.querySelector(selector)).filter(Boolean);
+    let lastTrigger = null;
+    function renderAccountView() {
+      const requested = new URLSearchParams(location.search).get("view");
+      const selector = Object.hasOwn(accountViews, requested) ? accountViews[requested] : null;
+      const allowed = document.body.dataset.customerAuth === "ready";
+      sections.forEach(section => section.classList.toggle("active", allowed && section.matches(selector || ":not(*)")));
+      document.body.classList.toggle("no-scroll", Boolean(allowed && selector));
+    }
+    function closeAccountView() {
+      const url = new URL(location.href);
+      if (!url.searchParams.has("view")) return;
+      if (history.state?.dartAccountParent) history.back();
+      else {
+        url.searchParams.delete("view");
+        history.replaceState(null, "", url);
+        renderAccountView();
+      }
+      lastTrigger?.focus();
+    }
+    document.querySelectorAll("[data-account-view]").forEach(link => {
+      link.addEventListener("click", event => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        if (!enforceCustomerAccountAccess()) return;
+        lastTrigger = link;
+        const url = new URL(link.href, location.href);
+        if (url.href !== location.href) history.pushState({ dartAccountParent: location.href }, "", url);
+        renderAccountView();
+        if (link.dataset.accountView === "waiting") void hydrateWaiting(true).catch(() => {});
+      });
+    });
+    sections.forEach(section => {
+      const close = section.querySelector(".dart-account-back");
+      if (close) {
+        close.addEventListener("click", closeAccountView);
+      }
+      let startX = 0, startY = 0;
+      section.addEventListener("touchstart", event => {
+        const touch = event.touches[0]; if (touch) { startX = touch.clientX; startY = touch.clientY; }
+      }, { passive: true });
+      section.addEventListener("touchend", event => {
+        if (event.target.closest("input, textarea, select, button")) return;
+        const touch = event.changedTouches[0];
+        if (touch && touch.clientX - startX > 100 && Math.abs(touch.clientY - startY) < 80) closeAccountView();
+      }, { passive: true });
+    });
+    document.addEventListener("keydown", event => { if (event.key === "Escape") closeAccountView(); });
+    window.addEventListener("popstate", renderAccountView);
+    window.addEventListener("dart:customer-session-changed", renderAccountView);
+    renderAccountView();
+  }
+
+  window.addEventListener("dart:customer-session-changed", () => {
+    enforceCustomerAccountAccess();
+    wireAccountLink();
+  });
   bindAuth();
   document.addEventListener("DOMContentLoaded", async () => {
     if (document.prerendering) {
@@ -4084,6 +4216,8 @@
         );
       }
     }
+    initializeAccountNavigation();
+    if (!enforceCustomerAccountAccess()) return;
     if (redirectRememberedCustomer()) return;
     if (document.getElementById("customerEmailVerificationForm")) {
       try {
@@ -4170,7 +4304,18 @@
       }
     }
   }, 15000);
+  async function recheckCustomerSession() {
+    if (document.hidden || document.prerendering) return;
+    try { await hydrateApiSession(); } catch { /* Connectivity failure is not logout. */ }
+    enforceCustomerAccountAccess();
+    redirectRememberedCustomer();
+  }
+  setInterval(() => {
+    if (Date.now() - apiSessionLastChecked >= 5 * 60 * 1000) void recheckCustomerSession();
+  }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) void recheckCustomerSession(); });
   window.addEventListener("focus", () => {
+    void recheckCustomerSession();
     void hydratePublicLeaderboard();
     if (currentUser()) {
       void hydrateCustomerCommerce();
@@ -4183,7 +4328,11 @@
     if (!event.persisted || pageRestorePending || document.prerendering) return;
     pageRestorePending = true;
     window.DartSets?.clearDrafts?.();
-    cacheApiUser(null);
+    apiSessionChecked = false;
+    apiSessionGeneration += 1;
+    apiSessionPromise = null;
+    apiUserCache = null;
+    if (document.body?.hasAttribute("data-customer-private")) document.body.dataset.customerAuth = "pending";
     [KEYS.customers, KEYS.orders, KEYS.returns, KEYS.cards, KEYS.birthdayRewards,
       KEYS.birthdayMessages, "user_last_address", "dart_cart"].forEach((key) =>
       window.DartState?.remove?.(key, { source: "page-restore" }));
@@ -4192,6 +4341,7 @@
     setCartReservationId(sessionStorage.getItem("dart_cart_reservation_id") || uid("CART"));
     try {
       await hydrateApiSession();
+      if (!enforceCustomerAccountAccess()) return;
       await Promise.all([window.DartCatalog?.hydrate?.(), hydrateCustomerCart({ claimLocal: false })]);
       updateCartReservationTimer();
       renderBirthdayExperience();
@@ -4224,6 +4374,7 @@
     login,
     verifyEmail,
     hydrateApiSession,
+    requestedAuthDestination,
     hydrateCustomerCommerce,
     hydrateWaiting,
     waitingEntries,

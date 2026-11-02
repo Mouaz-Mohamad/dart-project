@@ -76,7 +76,7 @@ describe("guest identity lifecycle", () => {
     const start = platform.indexOf("  function cacheApiUser(profile)");
     const source = platform.slice(start, platform.indexOf("  async function hydrateCustomerCommerce", start));
     const track = vi.fn();
-    const cache = runInNewContext(`let apiUserCache=null, customerCommerceGeneration=0, customerCommercePromise=null, serverReviewEligible=null, serverPurchaseStats=null; ${source}\ncacheApiUser`, {
+    const cache = runInNewContext(`let apiSessionChecked=false, apiSessionGeneration=0, apiUserCache=null, customerCommerceGeneration=0, customerCommercePromise=null, serverReviewEligible=null, serverPurchaseStats=null; ${source}\ncacheApiUser`, {
       adaptApiUser: (profile: unknown) => profile,
       trackAnalyticsEvent: track,
       window: {},

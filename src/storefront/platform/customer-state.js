@@ -19,6 +19,8 @@
 
   function cacheApiUser(profile) {
     apiSessionUnavailable = false;
+    apiSessionChecked = true;
+    apiSessionGeneration += 1;
     const previousId = apiUserCache?.id || null;
     apiUserCache = adaptApiUser(profile);
     const nextId = apiUserCache?.id || null;
@@ -168,20 +170,30 @@
 
   async function hydrateApiSession() {
     if (!API_BASE) return null;
-    const hasSessionHint = document.cookie
-      .split(";")
-      .some((part) => part.trim().startsWith("dart_csrf="));
-    if (!hasSessionHint) return cacheApiUser(null);
-    try {
-      const payload = await apiRequest("/api/v1/me");
-      const user = cacheApiUser(payload.user);
-      if (user) refreshCustomerCommerceInBackground();
-      return user;
-    } catch (error) {
-      if (error.status === 401) return cacheApiUser(null);
-      apiSessionUnavailable = true;
-      throw error;
-    }
+    if (apiSessionPromise) return apiSessionPromise;
+    const generation = apiSessionGeneration;
+    const task = (async () => {
+      try {
+        // The HttpOnly session is authoritative; a missing CSRF helper is not logout.
+        const payload = await apiRequest("/api/v1/me");
+        if (generation !== apiSessionGeneration) return currentUser();
+        apiSessionLastChecked = Date.now();
+        const user = cacheApiUser(payload.user);
+        if (user) refreshCustomerCommerceInBackground();
+        return user;
+      } catch (error) {
+        if (generation !== apiSessionGeneration) return currentUser();
+        if (error.status === 401) {
+          clearCustomerPrivateCache();
+          return cacheApiUser(null);
+        }
+        apiSessionUnavailable = true;
+        throw error;
+      }
+    })();
+    apiSessionPromise = task;
+    try { return await task; }
+    finally { if (apiSessionPromise === task) apiSessionPromise = null; }
   }
 
   function nextCode(prefix, collection, field) {

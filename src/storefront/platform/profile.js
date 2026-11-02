@@ -16,7 +16,7 @@
         if (host) host.innerHTML = '<div class="empty-state" role="status">Your session could not be verified. <button type="button" data-profile-commerce-retry>Retry</button></div>';
         return;
       }
-      location.replace("Sign Up modern.html?next=profile");
+      if (typeof enforceCustomerAccountAccess === "function") enforceCustomerAccountAccess();
       return;
     }
     const commerceState = typeof customerCommerceStatus === "string" ? customerCommerceStatus : "ready";
@@ -205,8 +205,13 @@
       logoutBtn.type = "button";
       logoutBtn.textContent = "Log Out";
       logoutBtn.onclick = async () => {
-        await logout();
-        location.replace("index.html");
+        logoutBtn.disabled = true;
+        try {
+          await logout();
+          location.replace("index.html");
+        } catch {
+          window.DartDialog.alert("تعذر تسجيل الخروج. حاول مرة أخرى.");
+        } finally { logoutBtn.disabled = false; }
       };
     }
   }

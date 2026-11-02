@@ -5,6 +5,7 @@
     login,
     verifyEmail,
     hydrateApiSession,
+    requestedAuthDestination,
     hydrateCustomerCommerce,
     hydrateWaiting,
     waitingEntries,

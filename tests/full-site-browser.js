@@ -268,12 +268,7 @@ const server = http.createServer((request, response) => {
   await rep.close();
 
   const tracking = await open("track.html");
-  assert.equal(
-    await tracking.locator("#order-tracking-card-template").evaluate(
-      (template) => template.content.querySelectorAll("[data-order-map-shell]").length,
-    ),
-    1,
-  );
+  await tracking.waitForURL(/Sign%20Up%20modern\.html\?next=track$/);
   await tracking.close();
 
   const dashboard = await open("Eye/Dart%20Eye.html");

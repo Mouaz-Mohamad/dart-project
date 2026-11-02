@@ -86,6 +86,7 @@ jobs:
           node tests/customer-notifications-runtime.cjs
           node tests/database-authoritative-storage.cjs
           node tests/cache-revalidation-contract.cjs
+          node tests/customer-account-runtime.cjs
           node tests/auth-contract.js
           node tests/address-unit.js
           node tests/security-boundaries.cjs

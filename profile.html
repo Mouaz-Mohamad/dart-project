@@ -48,7 +48,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class='dja-flexdir'>
+<body class='dja-flexdir' data-customer-private data-customer-auth="pending">
+    <p class="dart-account-access-status" data-customer-access-status role="status">Checking account…</p>
     <div class="mother">
         <header id="header-container" aria-label="Main Navigation"></header>
             
@@ -63,26 +64,26 @@
                         <h3 class="e-mail">...</h3>
                     </div>
 
-                    <div class="flex-start profile glass-effect width100">
+                    <a class="flex-start profile glass-effect width100" href="profile.html?view=profile" data-account-view="profile">
                         <i class="fa-regular fa-user"></i>
                         <h2>Profile</h2>
                         <i class="fa-solid fa-sort-up"></i>
-                    </div>
-                    <div class="flex-start orde2r glass-effect width100">
+                    </a>
+                    <a class="flex-start orde2r glass-effect width100" href="profile.html?view=orders" data-account-view="orders">
                         <i class="fa-solid fa-cart-plus"></i>
                         <h2>All Orders</h2>
                         <i class="fa-solid fa-sort-up"></i>
-                    </div>
-                    <div class="flex-start retur2n glass-effect width100">
+                    </a>
+                    <a class="flex-start retur2n glass-effect width100" href="profile.html?view=returns" data-account-view="returns">
                         <i class="fa-solid fa-arrows-rotate"></i>
                         <h2>Returns and Exchanges</h2>
                         <i class="fa-solid fa-sort-up"></i>
-                    </div>
-                    <div class="flex-start waitin2g glass-effect width100">
+                    </a>
+                    <a class="flex-start waitin2g glass-effect width100" href="profile.html?view=waiting" data-account-view="waiting">
                         <i class="fa-regular fa-clock"></i>
                         <h2>My Waiting</h2>
                         <i class="fa-solid fa-sort-up"></i>
-                    </div>
+                    </a>
 
                     <div class="djasb width100">
                         <div class="total-order glass-effect">
@@ -137,7 +138,7 @@
                 <!-- =================== نافذه البروفيل ================== -->
                 <section class="profile-details">
                     <div class="exit-edit djasb">
-                        <i class="fa-solid fa-arrow-right-from-bracket fa-xl"></i>
+                        <button type="button" class="dart-account-back" aria-label="Back to account"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5M14 7l5 5-5 5M8 12h11"/></svg></button>
                         <button type="button" class="edit">Edit</button>
                     </div>
 
@@ -171,13 +172,6 @@
                         <span class="value" id="user-birthday"></span>
                     </div>
 
-                    <form id="birthdayWhatsappPreference" class="dart-profile-password-form dart-whatsapp-consent">
-                        <label><input type="checkbox" name="birthdayMarketing" disabled> I want birthday greetings and discount offers from Dart on WhatsApp. Optional; you can opt out here at any time.</label>
-                        <label><input type="checkbox" name="postDeliveryReview" disabled> I want one WhatsApp follow-up for each delivered order, between 1 PM and 10 PM Cairo time. Optional; you can opt out here at any time.</label>
-                        <button type="submit" class="dart-profile-security-btn" disabled>Save WhatsApp preference</button>
-                        <p class="form-status" role="status" aria-live="polite"></p>
-                    </form>
-
                     <div class="info-profile dart-account-security">
                         <span class="label">Password</span>
                         <button type="button" class="dart-profile-security-btn" data-change-password-toggle>Change Password</button>
@@ -192,24 +186,13 @@
 
                 </section>
                 <section id="customerNotifications" class="dart-customer-notifications" aria-labelledby="customerNotificationsTitle">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9 21h6"/></svg>
                     <h2 id="customerNotificationsTitle">Notifications</h2>
-                    <p data-notification-unread>0 unread</p>
-                    <div class="dart-notification-actions">
-                        <button type="button" data-notification-refresh disabled>Refresh</button>
-                        <button type="button" data-notification-mark disabled>Mark shown as read</button>
-                    </div>
-                    <p data-notification-status role="status" aria-live="polite">Loading notifications…</p>
-                    <ul class="dart-notification-list" data-notification-list></ul>
-                    <button type="button" data-notification-more hidden>Load more</button>
-                    <div class="dart-notification-actions">
-                        <button type="button" data-push-toggle disabled>Enable browser notifications</button>
-                    </div>
-                    <p data-push-status role="status" aria-live="polite"></p>
                 </section>
                 <!-- ============ ناقذه الطلبات ========= -->
                 <section class="order-info">
                     <div class="exit-edit djasb">
-                        <i class="fa-solid fa-arrow-right-from-bracket fa-xl"></i>
+                        <button type="button" class="dart-account-back" aria-label="Back to account"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5M14 7l5 5-5 5M8 12h11"/></svg></button>
                         <h2>My Orders</h2>
                     </div>
                     <div class="profile-records" id="profileOrdersList"></div>
@@ -217,7 +200,7 @@
                 <!-- =========== نافذه الاسترجاع ========= -->
                 <section class="return-info">
                     <div class="exit-edit djasb">
-                        <i class="fa-solid fa-arrow-right-from-bracket fa-xl"></i>
+                        <button type="button" class="dart-account-back" aria-label="Back to account"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5M14 7l5 5-5 5M8 12h11"/></svg></button>
                         <h2>Returns &amp; Exchanges</h2>
                     </div>
                     <div class="profile-records" id="profileReturnsList"></div>
@@ -227,7 +210,7 @@
                 <!-- =========== نافذة Waiting ========= -->
                 <section class="waiting-info">
                     <div class="exit-edit djasb">
-                        <i class="fa-solid fa-arrow-right-from-bracket fa-xl"></i>
+                        <button type="button" class="dart-account-back" aria-label="Back to account"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5M14 7l5 5-5 5M8 12h11"/></svg></button>
                         <h2>My Waiting</h2>
                     </div>
                     <p class="dart-waiting-profile-note">Your Waiting requests are free. A real piece is reserved only when matching stock becomes available.</p>
@@ -337,7 +320,5 @@
     <script src="Js/dart-dialog.js"></script>
     <script  src="Js/dart-platform.js" defer></script>
     <script  src="Js/dart-profile-records.js" defer></script>
-    <script src="Js/dart-whatsapp-preferences.js" defer></script>
-    <script src="Js/dart-customer-notifications.js" defer></script>
 </body>
 </html>

@@ -257,7 +257,13 @@ export function createIdentityRouter(
   );
 
   router.get("/me", signedIn, async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    const renewal = request.auth!.accountType === "customer"
+      ? await service.renewCustomerSession(request.auth!, request.cookies[config.sessionCookieName] as string)
+      : null;
+    if (renewal) setSessionCookies(response, config, renewal);
     response.status(200).json({
+      ...(renewal ? { csrfToken: renewal.csrfToken, expiresAt: renewal.expiresAt.toISOString() } : {}),
       user: await service.profile(request.auth!),
       permissions: request.auth!.permissions,
       session: {

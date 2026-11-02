@@ -6072,3 +6072,13 @@ button,
 .dart-related-card span { font-size: 13px; line-height: 1.5; }
 .dart-related-card strong { font-size: 13px; color: #ab012b; }
 .dart-related-card:focus-visible { outline: 2px solid #ab012b; outline-offset: 2px; }
+
+/* Account access is revealed only after the server verifies the customer session. */
+body[data-customer-private]:not([data-customer-auth="ready"]) main { display: none; }
+.dart-account-access-status { text-align: center; padding: 32px 16px; }
+body[data-customer-auth="ready"] .dart-account-access-status { display: none; }
+.account a[data-account-view] { text-decoration: none; cursor: pointer; }
+.account a[data-account-view]:focus-visible { outline: 2px solid var(--bg-dark); outline-offset: 3px; }
+
+.dart-account-back { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dart-account-back:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

@@ -361,11 +361,12 @@
     if (API_BASE) {
       try {
         await apiRequest("/api/v1/auth/logout", { method: "POST" });
-      } finally {
-        csrfMemory = "";
-        cacheApiUser(null);
-        clearCustomerPrivateCache();
+      } catch (error) {
+        if (error.status !== 401) throw error;
       }
+      csrfMemory = "";
+      cacheApiUser(null);
+      clearCustomerPrivateCache();
       return;
     }
     const user = currentUser();

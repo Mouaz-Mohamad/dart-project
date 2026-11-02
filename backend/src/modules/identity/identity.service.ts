@@ -16,6 +16,7 @@ import {
   createSessionSecret,
   hashCsrfToken,
   hashSessionSecret,
+  parseSessionToken,
   serializeSessionToken,
 } from "../../security/session-token.js";
 import type {
@@ -1737,6 +1738,35 @@ export class IdentityService {
     return this.toAuthenticatedAccount(row, await this.permissionsForUser(row.id));
   }
 
+  // Renew the same customer session so simultaneous pages do not revoke each other.
+  // CSRF is stable per session and can be recovered when its helper cookie is absent.
+  public async renewCustomerSession(
+    account: AuthenticatedAccount,
+    sessionToken: string,
+  ): Promise<IssuedSession> {
+    const parsed = parseSessionToken(sessionToken);
+    if (account.accountType !== "customer" || parsed?.id !== account.sessionId) {
+      throw new AppError(401, "SESSION_INVALID", "The session is no longer valid");
+    }
+    const csrfToken = digest(`customer-csrf:${parsed.secret}`, this.config.authPepper);
+    const csrfTokenHash = hashCsrfToken(csrfToken, this.config.authPepper);
+    const expiresAt = new Date(Date.now() + Math.max(365, this.config.sessionTtlDays) * 86_400_000);
+    const result = await this.pool.query<{ expires_at: Date }>(
+      `UPDATE sessions
+          SET expires_at = GREATEST(sessions.expires_at, $4), csrf_token_hash = $5
+         FROM users
+        WHERE sessions.id = $1 AND sessions.user_id = $2 AND sessions.token_hash = $3
+          AND users.id = sessions.user_id AND users.account_type = 'customer'
+          AND users.status = 'active' AND users.deleted_at IS NULL
+          AND sessions.user_session_version = users.session_version
+          AND sessions.revoked_at IS NULL AND sessions.expires_at > now()
+        RETURNING sessions.expires_at`,
+      [account.sessionId, account.userId, hashSessionSecret(parsed.secret, this.config.authPepper), expiresAt, csrfTokenHash],
+    );
+    if (!result.rows[0]) throw new AppError(401, "SESSION_INVALID", "The session is no longer valid");
+    return { account: { ...account, csrfTokenHash }, sessionToken, csrfToken, expiresAt: result.rows[0].expires_at };
+  }
+
   public async rotateSession(
     account: AuthenticatedAccount,
     metadata: RequestMetadata,
@@ -3358,8 +3388,11 @@ export class IdentityService {
     if (!row) throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
     const sessionId = randomUUID();
     const secret = createSessionSecret();
-    const csrfToken = randomToken(24);
-    const expiresAt = new Date(Date.now() + this.config.sessionTtlDays * 86_400_000);
+    const csrfToken = row.account_type === "customer"
+      ? digest(`customer-csrf:${secret}`, this.config.authPepper)
+      : randomToken(24);
+    const lifetimeDays = row.account_type === "customer" ? Math.max(365, this.config.sessionTtlDays) : this.config.sessionTtlDays;
+    const expiresAt = new Date(Date.now() + lifetimeDays * 86_400_000);
     await client.query(
       `INSERT INTO sessions (
         id, user_id, family_id, token_hash, csrf_token_hash,
