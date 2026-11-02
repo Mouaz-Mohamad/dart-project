@@ -102,6 +102,7 @@ async function profileRecovery() {
   let fail = true, redirects = 0;
   const c = { API_BASE: "https://synthetic.test", API_REQUIRED: true, apiUserCache: { id: "customer", customerId: "DR-1", name: "Synthetic", email: "synthetic@example.test" },
     customerCommerceGeneration: 1, customerCommercePromise: null, customerCommerceStatus: "idle", apiSessionUnavailable: false,
+    apiSessionPromise: null, apiSessionGeneration: 0, apiSessionLastChecked: 0, apiSessionChecked: false,
     serverReviewEligible: null, serverPurchaseStats: null, KEYS: { orders: "orders", returns: "returns", cards: "cards", birthdayRewards: "birthday", birthdayMessages: "messages", customers: "customers" },
     uid: () => "synthetic-id", now: () => new Date().toISOString(), async trackAnalyticsEvent() {},
     read: (key, fallback) => data[key] ?? fallback, write: (key, value) => data[key] = value, syncCustomer: () => ({}),

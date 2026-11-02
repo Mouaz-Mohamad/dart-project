@@ -15,15 +15,15 @@
       });
     const method = String(options.method || "GET").toUpperCase();
     const csrfToken =
-      csrfMemory ||
       document.cookie
         .split("; ")
         .find((row) => row.startsWith("dart_csrf="))
         ?.split("=")
         .slice(1)
-        .join("=");
+        .join("=") || csrfMemory;
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
+      cache: "no-store",
       ...options,
       headers: {
         "Content-Type": "application/json",

@@ -110,6 +110,7 @@ function fakeService(auth = account()) {
     verifyStaffEmailAccess: vi.fn().mockResolvedValue(issued(auth)),
     profile: vi.fn().mockResolvedValue(profile(auth)),
     authenticate: vi.fn().mockResolvedValue(auth),
+    renewCustomerSession: vi.fn().mockResolvedValue(issued(auth)),
     logout: vi.fn().mockResolvedValue(undefined),
     decideRepresentative: vi.fn().mockResolvedValue(undefined),
   } as unknown as IdentityService;
@@ -296,6 +297,19 @@ describe("identity HTTP boundaries", () => {
     const cookies = response.headers["set-cookie"] as unknown as string[];
     expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
     expect(cookies.some((value) => value.startsWith("dart_csrf=") && !value.includes("HttpOnly"))).toBe(true);
+  });
+
+  it("restores a customer without a CSRF helper and renews persistent cookies", async () => {
+    const service = fakeService();
+    const response = await request(app(service)).get("/api/v1/me")
+      .set("Cookie", `dart_session=${sessionId}.${secret}`);
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.csrfToken).toBe(csrf);
+    expect(service.renewCustomerSession).toHaveBeenCalledWith(expect.objectContaining({ sessionId }), `${sessionId}.${secret}`);
+    const cookies = response.headers["set-cookie"] as unknown as string[];
+    expect(cookies.every(value => value.includes("Expires="))).toBe(true);
+    expect(cookies.some(value => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
   });
 
   it("supports secure cross-site cookies for separate Vercel frontend and API projects", async () => {

@@ -11,6 +11,7 @@
     "council-third-runtime.cjs",
     "css-cascade-contract.cjs",
     "custom-domain-runtime.cjs",
+    "customer-account-runtime.cjs",
     "customer-notifications-runtime.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",

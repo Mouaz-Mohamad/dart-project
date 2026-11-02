@@ -60,19 +60,24 @@
   }
 
   function requestedAuthDestination() {
-    let requested = "";
-    try {
-      requested = new URLSearchParams(location.search || "").get("next") || "";
-    } catch {}
-    return requested === "checkout" ? "cart-checkout.html" : "profile.html";
+    const params = new URLSearchParams(location.search || "");
+    const requested = params.get("next") || "";
+    if (requested === "checkout") return "cart-checkout.html";
+    if (requested === "track") {
+      const query = new URLSearchParams();
+      for (const key of ["order", "return"]) if (params.get(key)) query.set(key, params.get(key));
+      return `track.html${query.size ? `?${query}` : ""}`;
+    }
+    if (requested === "return") return "form-return.html";
+    const view = params.get("view");
+    return ["profile", "orders", "waiting", "returns"].includes(view)
+      ? `profile.html?view=${view}` : "profile.html";
   }
 
   function wireAccountLink() {
-    const destination = currentUser()
-      ? "/profile.html"
-      : "/Sign%20Up%20modern.html?next=profile";
+    // Let the account gate wait for the server before deciding whether login is needed.
     document.querySelectorAll(".account-btn a").forEach((link) => {
-      link.href = destination;
+      link.href = "/profile.html";
     });
   }
 

@@ -101,7 +101,8 @@ assert(
 );
 
 function documentSafeSocialAuth(source) {
-  return !/\b(?:localStorage|sessionStorage)\.(?:setItem|getItem)\s*\(/.test(source);
+  const storageCalls = source.match(/\b(?:localStorage|sessionStorage)\.(?:setItem|getItem)\s*\([^)]*\)/g) || [];
+  return storageCalls.every(call => /^sessionStorage\.(?:setItem|getItem)\("dart_customer_auth_return"(?:, destination)?\)$/.test(call));
 }
 
 console.log("PASS server-backed customer/social, representative and simplified Staff email auth contracts");

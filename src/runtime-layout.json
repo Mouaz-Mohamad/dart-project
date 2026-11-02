@@ -54,6 +54,7 @@
         "src/storefront/platform/auth-forms.js",
         "src/storefront/platform/profile.js",
         "src/storefront/platform/tracking.js",
+        "src/storefront/platform/account-navigation.js",
         "src/storefront/platform/lifecycle.js",
         "src/storefront/platform/public-api.js"
       ]

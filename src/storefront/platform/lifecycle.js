@@ -20,6 +20,8 @@
         );
       }
     }
+    initializeAccountNavigation();
+    if (!enforceCustomerAccountAccess()) return;
     if (redirectRememberedCustomer()) return;
     if (document.getElementById("customerEmailVerificationForm")) {
       try {
@@ -106,7 +108,18 @@
       }
     }
   }, 15000);
+  async function recheckCustomerSession() {
+    if (document.hidden || document.prerendering) return;
+    try { await hydrateApiSession(); } catch { /* Connectivity failure is not logout. */ }
+    enforceCustomerAccountAccess();
+    redirectRememberedCustomer();
+  }
+  setInterval(() => {
+    if (Date.now() - apiSessionLastChecked >= 5 * 60 * 1000) void recheckCustomerSession();
+  }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) void recheckCustomerSession(); });
   window.addEventListener("focus", () => {
+    void recheckCustomerSession();
     void hydratePublicLeaderboard();
     if (currentUser()) {
       void hydrateCustomerCommerce();
@@ -119,7 +132,11 @@
     if (!event.persisted || pageRestorePending || document.prerendering) return;
     pageRestorePending = true;
     window.DartSets?.clearDrafts?.();
-    cacheApiUser(null);
+    apiSessionChecked = false;
+    apiSessionGeneration += 1;
+    apiSessionPromise = null;
+    apiUserCache = null;
+    if (document.body?.hasAttribute("data-customer-private")) document.body.dataset.customerAuth = "pending";
     [KEYS.customers, KEYS.orders, KEYS.returns, KEYS.cards, KEYS.birthdayRewards,
       KEYS.birthdayMessages, "user_last_address", "dart_cart"].forEach((key) =>
       window.DartState?.remove?.(key, { source: "page-restore" }));
@@ -128,6 +145,7 @@
     setCartReservationId(sessionStorage.getItem("dart_cart_reservation_id") || uid("CART"));
     try {
       await hydrateApiSession();
+      if (!enforceCustomerAccountAccess()) return;
       await Promise.all([window.DartCatalog?.hydrate?.(), hydrateCustomerCart({ claimLocal: false })]);
       updateCartReservationTimer();
       renderBirthdayExperience();
