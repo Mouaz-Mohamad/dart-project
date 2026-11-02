@@ -431,3 +431,9 @@
   }
 }
 /* END News details — mobile. */
+
+@media (max-width: 480px) {
+  .dart-related-card { flex-basis: 116px; }
+  .dart-related-card img { height: 122px; }
+  .dart-quantity-offer { padding: 10px; }
+}

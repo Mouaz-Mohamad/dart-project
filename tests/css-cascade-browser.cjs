@@ -179,6 +179,12 @@ async function initialize(page, origin, file, phase) {
       ],
     );
   await page.evaluate(async () => {
+    // The reviewed merchandising addition has its own modal/editor browser
+    // acceptance test. Compare existing surfaces with those new-only controls
+    // removed from both phases; old CSS never defined their intended appearance.
+    document.getElementById('productQuantityOffer')?.remove();
+    document.getElementById('productRelatedModels')?.remove();
+    document.getElementById('modal-related-models')?.closest('.form-group')?.remove();
     // Populate the static product and leaderboard templates without API writes.
     const card = document.getElementById('productTemplate');
     if (card) {

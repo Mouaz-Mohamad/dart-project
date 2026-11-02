@@ -3702,3 +3702,10 @@ body.dart-admin-locked > main {
 #review-container .dart-review-group-name { font-weight: 700; min-width: 170px; }
 #review-container .dart-review-group-count { font-weight: 600; color: #ab012b; }
 #review-container .dart-review-client-entries { padding-inline-start: 14px; }
+
+#modal-related-models { width: 100%; min-height: 132px; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+#modal-related-help { display: block; margin-top: 6px; line-height: 1.7; }
+
+.dart-related-order > div { display: flex; align-items: center; gap: 8px; margin-block: 6px; }
+.dart-related-order span { flex: 1; }
+.dart-related-order button { padding: 4px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; }

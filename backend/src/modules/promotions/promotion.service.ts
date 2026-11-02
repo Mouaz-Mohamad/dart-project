@@ -37,7 +37,11 @@ export const promotionCampaignInputSchema = z.object({
   name: z.string().trim().min(2).max(160),
   code: z.string().trim().min(2).max(60).regex(/^[A-Za-z0-9_-]+$/).transform((value) => value.toUpperCase()),
   status: z.enum(["Draft","Scheduled","Active","Paused","Expired"]).default("Draft"),
-  discountPercent: z.number().finite().gt(0).max(100),
+  discountPercent: z.number().finite().min(0).max(100),
+  discountKind: z.enum(["percent", "fixed"]).default("percent"),
+  discountAmountMinor: z.number().int().min(0).max(1_000_000_000).default(0),
+  distinctModels: z.boolean().default(false),
+  marketingText: z.string().trim().max(240).default(""),
   maxDiscountPercent: z.number().finite().gt(0).max(100).optional(),
   startsAt: z.iso.date().optional(),
   endsAt: z.iso.date().optional(),
@@ -56,6 +60,15 @@ export const promotionCampaignInputSchema = z.object({
   }).strict().default({ mode: "all", values: [] }),
   stacking: z.literal("none").default("none"),
 }).strict().superRefine((value, context) => {
+  if (value.discountKind === "percent" && value.discountPercent <= 0) {
+    context.addIssue({ code: "custom", path: ["discountPercent"], message: "A percentage discount must be positive" });
+  }
+  if (value.discountKind === "fixed" && (!value.distinctModels || value.discountAmountMinor <= 0)) {
+    context.addIssue({ code: "custom", path: ["discountAmountMinor"], message: "Fixed savings require a positive amount and a quantity offer" });
+  }
+  if (value.distinctModels && (value.minQuantity < 2 || !value.automatic)) {
+    context.addIssue({ code: "custom", path: ["minQuantity"], message: "Quantity offers require at least two different models and automatic application" });
+  }
   if (value.startsAt && value.endsAt && value.endsAt < value.startsAt) {
     context.addIssue({ code: "custom", path: ["endsAt"], message: "endsAt must be on or after startsAt" });
   }
@@ -156,6 +169,7 @@ function evaluateRule(rule: unknown, facts: CustomerFacts, reference = new Date(
 }
 
 function normalizedCampaign(row: { record_id: string; version: string | number; payload: Record<string, unknown> }) {
+  if (row.payload.isArchived || row.payload.isDeleted) return null;
   const parsed = promotionCampaignInputSchema.safeParse(row.payload);
   if (parsed.success) return { id: row.record_id, version: Number(row.version), ...parsed.data };
   const legacy = row.payload;
@@ -170,6 +184,10 @@ function normalizedCampaign(row: { record_id: string; version: string | number; 
     priority: Number(legacy.priority || 100),
     minOrderMinor: Number(legacy.minOrderMinor || 0),
     minQuantity: Number(legacy.minQuantity || 1),
+    discountKind: legacy.discountKind || "percent",
+    discountAmountMinor: Number(legacy.discountAmountMinor || 0),
+    distinctModels: Boolean(legacy.distinctModels),
+    marketingText: String(legacy.marketingText || ""),
     totalUsageLimit: Number(legacy.totalUsageLimit || 0),
     perCustomerUsageLimit: Number(legacy.perCustomerUsageLimit || 0),
     limitBasis: legacy.limitBasis || "orders",
@@ -292,7 +310,7 @@ export class PromotionService {
     }));
   }
 
-  private async campaignUsageAllowed(client: PoolClient, campaign: PromotionCampaignInput & { id: string }, customerUserId: string): Promise<boolean> {
+  private async campaignUsageAllowed(client: PoolClient, campaign: PromotionCampaignInput & { id: string }, customerUserId: string | null): Promise<boolean> {
     const result = await client.query<{ total: string; customer: string }>(
       `SELECT
          CASE WHEN $3='customers'
@@ -331,7 +349,8 @@ export class PromotionService {
       scope.mode === "all" || allowed.has((scope.mode === "categories" ? item.category
         : scope.mode === "models" ? item.modelId : item.itemCode).toLowerCase())
     ));
-    if (!eligible.length || eligible.length < campaign.minQuantity) return false;
+    const quantity = campaign.distinctModels ? new Set(eligible.map((item) => item.modelId)).size : eligible.length;
+    if (!eligible.length || quantity < campaign.minQuantity) return false;
     const subtotal = eligible.reduce((sum, item) => sum + item.sellingMinor, 0);
     if (subtotal < campaign.minOrderMinor) return false;
     return true;
@@ -406,6 +425,27 @@ export class PromotionService {
     }
   }
 
+  public async quantityOffers(customerUserId?: string): Promise<Record<string, unknown>[]> {
+    const client = await this.pool.connect();
+    try {
+      const facts = customerUserId ? await this.customerFacts(client, customerUserId) : null;
+      const campaigns = (await this.loadCampaigns(client)).filter((campaign) => campaign.distinctModels && campaign.automatic && this.campaignActive(campaign))
+        .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+      const offers: Record<string, unknown>[] = [];
+      for (const campaign of campaigns) {
+        if (facts ? !this.audienceEligible(campaign, facts) || !evaluateRule(campaign.customerRules, facts)
+          : campaign.audience !== "all" || Boolean(campaign.customerRules)) continue;
+        if (!await this.campaignUsageAllowed(client, campaign, customerUserId || null)) continue;
+        offers.push({ id: campaign.id, code: campaign.code, name: campaign.name, discountPercent: campaign.discountPercent,
+          discountKind: campaign.discountKind, discountAmountMinor: campaign.discountAmountMinor, minQuantity: campaign.minQuantity,
+          minOrderMinor: campaign.minOrderMinor, productScope: campaign.productScope, marketingText: campaign.marketingText,
+          endsAt: campaign.endsAt || null });
+        if (offers.length >= 20) break;
+      }
+      return offers;
+    } finally { client.release(); }
+  }
+
   public async list(): Promise<Record<string, unknown>[]> {
     const result = await this.pool.query<{ record_id: string; version: string; payload: Record<string, unknown> }>(
       "SELECT record_id,version::text,payload FROM promotion_records ORDER BY position DESC,updated_at DESC",
@@ -448,6 +488,7 @@ export class PromotionService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SELECT version FROM dashboard_domain_state WHERE domain='promotions' FOR UPDATE");
       const current = await client.query<{ version: string; code: string }>(
         "SELECT version::text,code FROM promotion_records WHERE record_id=$1 FOR UPDATE",
         [recordId],

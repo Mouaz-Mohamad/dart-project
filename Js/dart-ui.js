@@ -847,6 +847,7 @@ function applyCartQuote(quote) {
         if (el) { el.textContent = `${(value / 100).toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`; el.removeAttribute('aria-busy'); }
     }
     window.dartDisplayedTotalMinor = quote.totalMinor;
+    window.DartStorefront?.renderOffers?.();
     return true;
 }
 function updateCartTotals() {
@@ -877,6 +878,7 @@ function updateCartTotals() {
     if (discountEl) discountEl.textContent = `${discountAmount.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     if (totalEl) totalEl.textContent = `${finalTotal.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     window.dartDisplayedTotalMinor = Math.round(finalTotal * 100);
+    window.DartStorefront?.refreshOffers?.();
     applyCartQuote(window.DartPlatform?.currentCartQuote?.());
     if (cartData.length && window.DartPlatform?.currentUser?.() && window.DartPlatform?.quoteCart) {
         totalEl?.setAttribute('aria-busy', 'true');

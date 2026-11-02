@@ -49,6 +49,15 @@ export function createPromotionRouter(
         request.auth!.userId, String(request.id), z.uuid().parse(request.params.id), body.discount, body.expectedVersion));
     });
 
+  router.get("/promotions/quantity-offers", async (_request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.json({ offers: await promotions.quantityOffers() });
+  });
+  router.get("/me/promotions/quantity-offers", signedIn, requireAccountType("customer"), async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.json({ offers: await promotions.quantityOffers(request.auth!.userId) });
+  });
+
   router.get(
     "/me/promotions/validate-v2",
     signedIn,

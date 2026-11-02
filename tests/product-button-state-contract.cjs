@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "Js/dart-product-button-state.js"), "utf8");
 const stateSource = fs.readFileSync(path.join(root, "Js/dart-state.js"), "utf8");
-const storefrontSource = fs.readFileSync(path.join(root, "Js/dart-storefront.js"), "utf8");
+const storefrontSource = fs.readFileSync(path.join(root, "src/storefront/storefront.js"), "utf8");
 
 function makeStyle() {
   const values = new Map();

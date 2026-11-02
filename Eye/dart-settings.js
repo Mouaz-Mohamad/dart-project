@@ -434,10 +434,14 @@
       name: $("settings-promotion-name").value.trim(),
       code: $("settings-promotion-code").value.trim().toUpperCase(),
       status: $("settings-promotion-status").value,
-      discountPercent: number("settings-promotion-percent", 0),
+      discountPercent: $("settings-promotion-kind").value === "fixed" ? 0 : number("settings-promotion-percent", 0),
+      discountKind: $("settings-promotion-kind").value,
+      discountAmountMinor: Math.round(Math.max(0, number("settings-promotion-amount", 0)) * 100),
+      distinctModels: $("settings-promotion-distinct").checked,
+      marketingText: $("settings-promotion-message").value.trim(),
       ...($("settings-promotion-start").value ? { startsAt: $("settings-promotion-start").value } : {}),
       ...($("settings-promotion-end").value ? { endsAt: $("settings-promotion-end").value } : {}),
-      automatic: $("settings-promotion-automatic").checked,
+      automatic: $("settings-promotion-distinct").checked || $("settings-promotion-automatic").checked,
       priority: Math.round(number("settings-promotion-priority", 100)),
       minOrderMinor: Math.round(Math.max(0, number("settings-promotion-min-order", 0)) * 100),
       minQuantity: Math.max(1, Math.round(number("settings-promotion-min-quantity", 1))),
@@ -472,7 +476,7 @@
       row.dataset.promotionId = campaign.id;
       const copy = document.createElement("div");
       const title = document.createElement("strong");
-      title.textContent = `${campaign.name} · ${campaign.discountPercent}%`;
+      title.textContent = `${campaign.name} · ${campaign.discountKind === "fixed" ? `${Number(campaign.discountAmountMinor) / 100} EGP` : `${campaign.discountPercent}%`}${campaign.distinctModels ? ` · ${campaign.minQuantity} different models` : ""}`;
       const details = document.createElement("small");
       const basis = campaign.limitBasis === "customers" ? "customers" : "orders";
       const limit = Number(campaign.totalUsageLimit || 0);
@@ -598,6 +602,13 @@
     } finally { button.disabled = false; }
   });
 
+  $("settings-promotion-distinct")?.addEventListener("change", () => {
+    if ($("settings-promotion-distinct").checked) {
+      $("settings-promotion-min-quantity").value = Math.max(2, Number($("settings-promotion-min-quantity").value) || 2);
+      $("settings-promotion-automatic").checked = true;
+    }
+  });
+
   $("cancel-promotion-edit")?.addEventListener("click", resetPromotionForm);
   $("settings-promotions-list")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-promotion-action='edit']");
@@ -609,6 +620,10 @@
     $("settings-promotion-name").value = campaign.name;
     $("settings-promotion-code").value = campaign.code;
     $("settings-promotion-percent").value = campaign.discountPercent;
+    $("settings-promotion-kind").value = campaign.discountKind || "percent";
+    $("settings-promotion-amount").value = Number(campaign.discountAmountMinor || 0) / 100;
+    $("settings-promotion-distinct").checked = Boolean(campaign.distinctModels);
+    $("settings-promotion-message").value = campaign.marketingText || "";
     $("settings-promotion-status").value = campaign.status;
     $("settings-promotion-start").value = campaign.startsAt || "";
     $("settings-promotion-end").value = campaign.endsAt || "";

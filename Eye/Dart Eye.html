@@ -529,6 +529,12 @@
                                 <textarea id="modal-description" placeholder="+ Value" rows="4"></textarea>
                             </div>
                             <div class="form-group">
+                                <label for="modal-related-models">Related Models</label>
+                                <select id="modal-related-models" multiple size="6" aria-describedby="modal-related-help"></select>
+                                <div id="modal-related-order" class="dart-related-order"></div>
+                                <small id="modal-related-help">اختر حتى 12 موديلًا مختلفًا ليظهروا تحت زر الشراء. اللون والمقاس لا يُعتبران موديلًا مختلفًا.</small>
+                            </div>
+                            <div class="form-group">
                                 <label for="modal-discount">Discount %</label>
                                 <input type="number" id="modal-discount" placeholder="Value" value="0">
                             </div>
@@ -2143,7 +2149,12 @@
                         <input id="settings-promotion-id" type="hidden"><input id="settings-promotion-version" type="hidden">
                         <label>Campaign name<input id="settings-promotion-name" type="text" maxlength="160" required></label>
                         <label>Code<input id="settings-promotion-code" type="text" maxlength="60" pattern="[A-Za-z0-9_-]+" required></label>
-                        <label>Discount %<input id="settings-promotion-percent" type="number" min="0.01" max="100" step="0.01" required></label>
+                        <label>Discount type<select id="settings-promotion-kind"><option value="percent">Percentage</option><option value="fixed">Fixed amount (quantity offer)</option></select></label>
+                        <label>Discount %<input id="settings-promotion-percent" type="number" min="0" max="100" step="0.01" value="0" required></label>
+                        <label>Fixed saving (EGP)<input id="settings-promotion-amount" type="number" min="0" max="10000000" step="0.01" value="0"></label>
+                        <label class="dart-settings-check"><input id="settings-promotion-distinct" type="checkbox"> Quantity offer — different models only</label>
+                        <label class="dart-settings-field-wide">Promotional message<input id="settings-promotion-message" type="text" maxlength="240" placeholder="كمّل اللوك واستفيد بعرض العدد"></label>
+                        <p class="dart-settings-field-wide">عرض العدد يُطبق تلقائيًا داخل أوردر واحد. القطع ذات الخصم المستقل والطقمات لا تُحسب. عند كسر شرط العرض بالمرتجع يُعاد حساب الخصم ويُسوّى الفرق من الاسترداد.</p>
                         <label>Status<select id="settings-promotion-status"><option>Draft</option><option>Scheduled</option><option>Active</option><option>Paused</option><option>Expired</option></select></label>
                         <label>Start date<input id="settings-promotion-start" type="date"></label>
                         <label>End date<input id="settings-promotion-end" type="date"></label>

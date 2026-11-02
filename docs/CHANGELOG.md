@@ -291,3 +291,7 @@ Implementation notes and backend boundaries are in `README.md` and `API_CONTRACT
 - Restored Birthday eligibility only after every Birthday-discounted item in the order is returned while the reward window remains open; campaign returns never restore campaign usage.
 - Counted and restored only the physical pieces that actually consumed Dart Card quota.
 - Added campaign analytics, cart preflight, API/OpenAPI documentation and regression tests for priority, limits and dashboard controls.
+
+## 2026-11-01 — Related models and distinct-model quantity offers
+
+Added ordered related models in the model editor and stock-filtered suggestions inside the shared product modal. Extended the existing promotion engine with automatic distinct-model thresholds, percent/fixed savings and promotional copy in product/cart views. Checkout freezes the quantity rule and all three refund entry points settle retained-piece repricing cumulatively. Merchandising loads lazily; the existing storefront runtime now has a maintained source and a generated minified delivery file. No database migration or live campaign activation is required. See `PRODUCT_MERCHANDISING.md` for contracts, checks and rollback constraints.
