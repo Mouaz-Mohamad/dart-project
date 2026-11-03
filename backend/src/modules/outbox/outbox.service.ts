@@ -63,6 +63,8 @@ export class OutboxService {
       AppConfig,
       | "whatsappAccessToken"
       | "whatsappSendEnabled"
+      | "whatsappOrderConfirmationEnabled"
+      | "whatsappOrderConfirmationTemplate"
       | "whatsappPostDeliveryTemplate"
       | "whatsappPhoneNumberId"
       | "whatsappGraphApiVersion"
@@ -87,7 +89,13 @@ export class OutboxService {
     if (channel === "whatsapp") return whatsapp;
     const push=this.webPushProvider?.configured()===true;
     if (channel === "web_push") return push;
-    return email || whatsapp || push;
+    return email || whatsapp || push || this.orderMessagingConfigured();
+  }
+
+  private orderMessagingConfigured(): boolean {
+    return Boolean((this.config.whatsappOrderConfirmationEnabled ?? this.config.whatsappSendEnabled)
+      && this.config.whatsappAccessToken && this.config.whatsappPhoneNumberId
+      && /^v\d+\.\d+$/.test(this.config.whatsappGraphApiVersion || "v26.0"));
   }
 
   public async recentEvents(limit = 50): Promise<Array<Record<string, unknown>>> {
@@ -160,14 +168,15 @@ export class OutboxService {
           WHERE attempts < 12 AND available_at <= now()
             AND payload->>'channel' IN ('email','whatsapp','web_push')
             AND ($2::text IS NULL OR deduplication_key=$2)
-            AND (payload->>'channel'<>'whatsapp' OR ($3::boolean AND $4::boolean
-              AND (event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $5::boolean)))
+            AND (payload->>'channel'<>'whatsapp' OR CASE WHEN event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
+              THEN $6::boolean ELSE ($3::boolean AND $4::boolean
+              AND (event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $5::boolean)) END)
             AND NOT EXISTS (SELECT 1 FROM outbox_delivery_attempts a
               WHERE a.event_id=outbox_events.id AND a.state IN ('executing','accepted','unknown','terminal','suppressed'))
             AND (status IN ('pending','failed') OR (status='processing' AND locked_at < now() - interval '5 minutes'))
           ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT $1`,
         [Math.min(100, Math.max(1, limit)), deduplicationKey || null,
-          this.configured("whatsapp"), whatsappSendWindow(this.now()), Boolean(this.config.whatsappPostDeliveryTemplate)],
+          this.configured("whatsapp"), whatsappSendWindow(this.now()), Boolean(this.config.whatsappPostDeliveryTemplate), this.orderMessagingConfigured()],
       );
       rows = result.rows;
       if (rows.length) await client.query(`UPDATE outbox_events
@@ -244,18 +253,20 @@ export class OutboxService {
         count(*) FILTER (WHERE a.state='unknown' OR (a.state='executing' AND a.updated_at<now()-interval '5 minutes') OR (a.state='accepted' AND e.status<>'published'))::text AS uncertain,
         count(*) FILTER (WHERE a.state='terminal')::text AS terminal,
         count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
-          AND (e.payload->>'channel'<>'whatsapp' OR ($1::boolean AND $2::boolean
-            AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean))))::text AS due_pending,
+          AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
+            THEN $4::boolean ELSE ($1::boolean AND $2::boolean
+            AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean)) END))::text AS due_pending,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.available_at)) FILTER
           (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
-            AND (e.payload->>'channel'<>'whatsapp' OR ($1::boolean AND $2::boolean
-              AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean)))),0)::text AS oldest_due_seconds,
+            AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
+              THEN $4::boolean ELSE ($1::boolean AND $2::boolean
+              AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean)) END)),0)::text AS oldest_due_seconds,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.created_at)) FILTER
           (WHERE e.status<>'published' AND e.attempts<12 AND a.state IS NULL),0)::text AS oldest_seconds
       FROM outbox_events e LEFT JOIN LATERAL (
         SELECT state,updated_at FROM outbox_delivery_attempts WHERE event_id=e.id AND state<>'retryable' ORDER BY created_at DESC,id DESC LIMIT 1
       ) a ON true WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')`,
-      [this.configured("whatsapp"),whatsappSendWindow(this.now()),Boolean(this.config.whatsappPostDeliveryTemplate)]);
+      [this.configured("whatsapp"),whatsappSendWindow(this.now()),Boolean(this.config.whatsappPostDeliveryTemplate),this.orderMessagingConfigured()]);
     const row=result.rows[0];
     return { pending:Number(row?.pending||0),exhausted:Number(row?.exhausted||0),uncertain:Number(row?.uncertain||0),
       terminal:Number(row?.terminal||0),oldestSeconds:Math.max(0,Math.floor(Number(row?.oldest_seconds||0))),
@@ -374,10 +385,29 @@ export class OutboxService {
   }
 
   private async publishWhatsApp(row: OutboxRow, attemptId: string): Promise<{ providerMessageId?: string; suppressed?: boolean }> {
-    if (!this.configured("whatsapp")) {
+    const immediate = ["ORDER_WHATSAPP_CONFIRMATION","ORDER_WHATSAPP_ACK"].includes(row.event_type);
+    if (!(immediate ? this.orderMessagingConfigured() : this.configured("whatsapp"))) {
       throw new DeferredWhatsAppDelivery("WhatsApp sending is disabled");
     }
-    if (!whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
+    if (!immediate && !whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
+    if (row.event_type === "ORDER_WHATSAPP_CONFIRMATION") {
+      const eligible = await this.pool.query<{allowed:boolean}>(`SELECT EXISTS(
+        SELECT 1 FROM order_whatsapp_confirmations c JOIN orders o ON o.id=c.order_id
+        JOIN users u ON u.id=o.customer_user_id
+        WHERE c.id::text=$1 AND c.order_id::text=$2 AND c.phone_normalized=$3
+          AND c.state='pending' AND c.expires_at>now() AND c.expected_version=o.version
+          AND c.final_minor=o.final_minor AND o.status='New' AND NOT o.is_deleted AND NOT o.is_archived
+          AND u.status='active' AND u.deleted_at IS NULL
+          AND regexp_replace(o.contact_snapshot->>'phone1','[^0-9]','','g') IN ($3,'0'||substring($3 from 3))) AS allowed`,
+        [String(row.payload.confirmationId || ""),row.aggregate_id,String(row.payload.to || "")]);
+      if (!eligible.rows[0]?.allowed) return {suppressed:true};
+    }
+    if (row.event_type === "ORDER_WHATSAPP_ACK") {
+      if (!(new Date(String(row.payload.expiresAt || "")).getTime() > this.now().getTime())) return {suppressed:true};
+      const state = await this.pool.query<{status:string}>("SELECT status FROM orders WHERE id::text=$1 AND NOT is_deleted", [row.aggregate_id]);
+      if (!state.rows[0] || (row.payload.outcome === "confirmed" && !["Accepted","Preparing"].includes(state.rows[0].status))
+        || (row.payload.outcome === "cancelled" && state.rows[0].status !== "Cancelled")) return {suppressed:true};
+    }
     if (row.event_type === "CUSTOMER_BIRTHDAY_MESSAGE") {
       const eligible=await this.pool.query<{ allowed:boolean }>(`SELECT EXISTS (
         SELECT 1 FROM customer_whatsapp_preferences p JOIN users u ON u.id=p.customer_user_id
@@ -408,13 +438,14 @@ export class OutboxService {
     const payload = this.externalPayload(row.payload || {});
     const to = String(payload.to || "").replace(/\D/g, "");
     const template = String(row.event_type === "CUSTOMER_POST_DELIVERY_REVIEW"
-      ? this.config.whatsappPostDeliveryTemplate || "" : payload.template || "").trim();
+      ? this.config.whatsappPostDeliveryTemplate || "" : row.event_type === "ORDER_WHATSAPP_CONFIRMATION"
+        ? this.config.whatsappOrderConfirmationTemplate || "dart_order_confirmation" : payload.template || "").trim();
     const languageCode = String(
       payload.languageCode || this.config.whatsappTemplateLanguage || "ar",
     ).trim();
 
     if (!/^\d{8,15}$/.test(to)) throw new DeliveryError("terminal", "WhatsApp recipient is missing or invalid");
-    if (!/^[a-z0-9_]+$/.test(template)) throw new DeliveryError("terminal", "WhatsApp template is missing or invalid");
+    if (row.event_type !== "ORDER_WHATSAPP_ACK" && !/^[a-z0-9_]+$/.test(template)) throw new DeliveryError("terminal", "WhatsApp template is missing or invalid");
     if (!languageCode) throw new DeliveryError("terminal", "WhatsApp template language is missing");
 
     const parameters = textParameters(payload);
@@ -426,7 +457,10 @@ export class OutboxService {
       : undefined;
     const authenticationOtp = payload.authenticationOtp === true;
     const otp = parameters[0] || "";
-    const components = authenticationOtp && otp
+    const components = row.event_type === "ORDER_WHATSAPP_CONFIRMATION"
+      ? [bodyComponent!, ...["confirm","cancel"].map((action,index) => ({type:"button",sub_type:"quick_reply",index:String(index),
+          parameters:[{type:"payload",payload:`${action}:${payload.confirmationId}`}]}))]
+      : authenticationOtp && otp
       ? [
           bodyComponent!,
           {
@@ -441,7 +475,7 @@ export class OutboxService {
         : undefined;
 
     // Recheck immediately before the external call as a batch can cross 22:00.
-    if (!whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
+    if (!immediate && !whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
     const response = await fetch(
       `https://graph.facebook.com/${this.config.whatsappGraphApiVersion || "v26.0"}/${this.config.whatsappPhoneNumberId}/messages`,
       {
@@ -455,12 +489,11 @@ export class OutboxService {
           recipient_type: "individual",
           to,
           biz_opaque_callback_data: attemptId,
-          type: "template",
-          template: {
-            name: template,
-            language: { code: languageCode },
-            ...(components ? { components } : {}),
-          },
+          ...(row.event_type === "ORDER_WHATSAPP_ACK" ? {
+            type:"text",text:{body:String(payload.body || ""),preview_url:false},
+          } : {
+            type:"template",template:{name:template,language:{code:languageCode},...(components ? {components} : {})},
+          }),
         }),
         signal: AbortSignal.timeout(12_000),
       },

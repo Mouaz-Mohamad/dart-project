@@ -85,6 +85,7 @@ const environmentSchema = z.object({
     .default(300_000),
   WHATSAPP_CLOUD_API_TOKEN: z.string().default(""),
   WHATSAPP_SEND_ENABLED: booleanFromString,
+  WHATSAPP_ORDER_CONFIRMATION_ENABLED: booleanFromString,
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(""),
   WHATSAPP_APP_SECRET: z.string().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).or(z.literal("")).default(""),
@@ -94,6 +95,7 @@ const environmentSchema = z.object({
   WHATSAPP_STAFF_OTP_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_otp"),
   WHATSAPP_STAFF_INVITE_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).default("dart_staff_invite"),
   WHATSAPP_BIRTHDAY_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
+  WHATSAPP_ORDER_CONFIRMATION_TEMPLATE: z.string().trim().regex(/^[a-z0-9_]+$/).default("dart_order_confirmation"),
   WHATSAPP_POST_DELIVERY_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
   OUTBOX_CRON_SECRET: z.string().trim().default(""),
   CRON_SECRET: z.string().trim().default(""),
@@ -134,6 +136,7 @@ export interface AppConfig {
   monitoringAlertCooldownMs?: number;
   whatsappAccessToken?: string | null;
   whatsappSendEnabled?: boolean;
+  whatsappOrderConfirmationEnabled?: boolean;
   whatsappWebhookVerifyToken?: string | null;
   whatsappAppSecret?: string | null;
   whatsappPhoneNumberId?: string | null;
@@ -143,6 +146,7 @@ export interface AppConfig {
   whatsappStaffOtpTemplate?: string;
   whatsappStaffInviteTemplate?: string;
   whatsappBirthdayTemplate?: string;
+  whatsappOrderConfirmationTemplate?: string;
   whatsappPostDeliveryTemplate?: string;
   outboxCronSecret: string | null;
   outboxBatchSize: number;
@@ -237,6 +241,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   if (Boolean(verifyToken) !== Boolean(appSecret) || (verifyToken && verifyToken.length < 32)) {
     invalidEnvironment("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "WHATSAPP_APP_SECRET");
   }
+  if (parsed.data.WHATSAPP_ORDER_CONFIRMATION_ENABLED) {
+    const required = ["WHATSAPP_CLOUD_API_TOKEN","WHATSAPP_PHONE_NUMBER_ID","WHATSAPP_APP_SECRET","WHATSAPP_WEBHOOK_VERIFY_TOKEN"] as const;
+    const missing = required.filter(key => !parsed.data[key]);
+    if (missing.length) invalidEnvironment(...missing);
+  }
   if (parsed.data.WHATSAPP_SEND_ENABLED) {
     const required = ["WHATSAPP_CLOUD_API_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET",
       "WHATSAPP_WEBHOOK_VERIFY_TOKEN", "WHATSAPP_BIRTHDAY_TEMPLATE", "WHATSAPP_POST_DELIVERY_TEMPLATE"] as const;
@@ -279,6 +288,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     monitoringAlertCooldownMs: parsed.data.MONITORING_ALERT_COOLDOWN_MS,
     whatsappAccessToken: parsed.data.WHATSAPP_CLOUD_API_TOKEN || null,
     whatsappSendEnabled: parsed.data.WHATSAPP_SEND_ENABLED,
+    whatsappOrderConfirmationEnabled: parsed.data.WHATSAPP_ORDER_CONFIRMATION_ENABLED,
     whatsappWebhookVerifyToken: verifyToken || null,
     whatsappAppSecret: appSecret || null,
     whatsappPhoneNumberId: parsed.data.WHATSAPP_PHONE_NUMBER_ID || null,
@@ -288,6 +298,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     whatsappStaffOtpTemplate: parsed.data.WHATSAPP_STAFF_OTP_TEMPLATE,
     whatsappStaffInviteTemplate: parsed.data.WHATSAPP_STAFF_INVITE_TEMPLATE,
     whatsappBirthdayTemplate: parsed.data.WHATSAPP_BIRTHDAY_TEMPLATE,
+    whatsappOrderConfirmationTemplate: parsed.data.WHATSAPP_ORDER_CONFIRMATION_TEMPLATE,
     whatsappPostDeliveryTemplate: parsed.data.WHATSAPP_POST_DELIVERY_TEMPLATE,
     outboxCronSecret: outboxCronSecret || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,

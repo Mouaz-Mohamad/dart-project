@@ -4,6 +4,8 @@ import express, { Router, type Request, type Response } from "express";
 import type { Pool } from "pg";
 import type { AppConfig } from "../../config/env.js";
 
+import type { OrderWhatsAppReply } from "../commerce/commerce.whatsapp.js";
+
 type Config = Pick<AppConfig, "whatsappWebhookVerifyToken" | "whatsappAppSecret" | "whatsappPhoneNumberId">;
 type DeliveryState = "sent" | "delivered" | "read" | "failed";
 const ranks: Record<DeliveryState, number> = { sent: 1, failed: 2, delivered: 3, read: 4 };
@@ -51,7 +53,31 @@ function extractStatuses(data: unknown, phoneNumberId: string | null | undefined
   return statuses;
 }
 
-export function createWhatsAppWebhookRouter(pool: Pick<Pool, "query">, config: Config): Router {
+// Template buttons arrive as `button`; standalone interactive buttons use `interactive`.
+function extractReplies(data: unknown, phoneNumberId: string | null | undefined): OrderWhatsAppReply[] {
+  const replies: OrderWhatsAppReply[] = [];
+  const entries = (data as {entry?: Array<{changes?: Array<{value?: {
+    metadata?: {phone_number_id?: string}; messages?: Array<{id?: string; from?: string; timestamp?: string;
+      type?: string; button?: {payload?: string}; interactive?: {type?: string; button_reply?: {id?: string}}}>;
+  }}>}>} | null)?.entry;
+  for (const entry of Array.isArray(entries) ? entries : []) for (const change of entry.changes || []) {
+    const value = change.value;
+    if (!phoneNumberId || value?.metadata?.phone_number_id !== phoneNumberId || !Array.isArray(value.messages)) continue;
+    for (const message of value.messages) {
+      const payload = message.type === "button" ? message.button?.payload :
+        message.type === "interactive" && message.interactive?.type === "button_reply" ? message.interactive.button_reply?.id : undefined;
+      if (typeof payload !== "string" || payload.length > 128 || typeof message.id !== "string"
+        || !message.id || message.id.length > 255 || typeof message.from !== "string"
+        || !/^\d{8,15}$/.test(message.from) || !/^\d{9,11}$/.test(message.timestamp || "")) continue;
+      replies.push({messageId:message.id,from:message.from,payload,timestamp:Number(message.timestamp)});
+      if (replies.length > 100) throw new Error("Too many button replies");
+    }
+  }
+  return replies;
+}
+
+export function createWhatsAppWebhookRouter(pool: Pick<Pool, "query">, config: Config,
+  onReply?: (reply: OrderWhatsAppReply) => Promise<void>, afterReplies?: () => Promise<void>): Router {
   const router = Router();
   router.get("/", (request: Request, response: Response) => {
     const challenge = request.query["hub.challenge"];
@@ -86,6 +112,8 @@ export function createWhatsAppWebhookRouter(pool: Pick<Pool, "query">, config: C
 
     try {
       const statuses = extractStatuses(data, config.whatsappPhoneNumberId);
+      const replies = extractReplies(data, config.whatsappPhoneNumberId);
+      if (replies.length && !onReply) { response.sendStatus(503); return; }
       for (const item of statuses) {
         const correlation = typeof item.biz_opaque_callback_data === "string" &&
           uuid.test(item.biz_opaque_callback_data) ? item.biz_opaque_callback_data : null;
@@ -117,7 +145,10 @@ export function createWhatsAppWebhookRouter(pool: Pick<Pool, "query">, config: C
           [item.id, correlation, item.status, receivedAt, errorCode, ranks[item.status]],
         );
       }
+      for (const reply of replies) await onReply!(reply);
+      // Decisions are committed before 200. External sends use the durable outbox.
       response.sendStatus(200);
+      if (replies.length) await afterReplies?.().catch(() => undefined);
     } catch {
       // Meta retries 5xx responses. Never acknowledge a receipt that failed
       // to persist, and never echo payloads, phone numbers or secrets.

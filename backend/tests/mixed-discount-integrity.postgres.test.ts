@@ -157,7 +157,7 @@ describe("mixed line discounts and reward ledgers on the production schema", () 
     await commerce.checkout(f.user, f.input, "duplicate-checkout", undefined, `key-${f.reservation}`);
     await commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "New", target: "Accepted" }, "accepted", false);
     await commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "Accepted", target: "Accepted" }, "noop", false);
-    const events = (await store.pool.query("SELECT event_type,payload FROM outbox_events WHERE aggregate_id=$1 ORDER BY created_at", [order.id])).rows;
+    const events = (await store.pool.query("SELECT event_type,payload FROM outbox_events WHERE aggregate_id=$1 AND payload->>'channel'='email' ORDER BY created_at", [order.id])).rows;
     expect(events).toHaveLength(2);
     expect(events.map((event) => event.payload.to)).toEqual([accountEmail, accountEmail]);
     const messages: EmailMessage[] = [];

@@ -1,3 +1,4 @@
+import { dispatchOutbox } from "./modules/outbox/outbox.dispatch.js";
 // DART CODE GUIDE | backend/src/application.ts
 // الغرض: تجميع تطبيق Express: الأمان وCORS والـrate limits والـrouters ومعالجة الأخطاء.
 import cors from "cors";
@@ -117,7 +118,9 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   // Mount before JSON parsing to preserve the exact signed bytes from Meta.
   // The handler has a strict 256 KB body limit and rejects unsigned requests.
   if (dependencies.whatsappWebhookPool) {
-    app.use("/api/v1/webhooks/whatsapp", createWhatsAppWebhookRouter(dependencies.whatsappWebhookPool, config));
+    app.use("/api/v1/webhooks/whatsapp", createWhatsAppWebhookRouter(dependencies.whatsappWebhookPool, config,
+      dependencies.commerceService ? reply => dependencies.commerceService!.orderWhatsAppReply(reply) : undefined,
+      () => dispatchOutbox(dependencies.outboxService, 5)));
   }
   app.use(
     rateLimit({

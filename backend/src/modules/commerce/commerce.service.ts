@@ -50,6 +50,8 @@ import {
 } from "./commerce.operations-queries.js";
 import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-queries.js";
 import { returnMatchesSale } from "./commerce.returns.js";
+import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
+import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
 
 // Keep imports used by existing routers, Set workflows and tests compatible.
@@ -2026,6 +2028,7 @@ export class CommerceService {
       // Flush deferred Set allocations before queueing email or caching the customer reply.
       await client.query("SET CONSTRAINTS order_items_set_order_reconcile IMMEDIATE");
       await queueOrderNotifications(client, order.id, "order.created");
+      await queueOrderConfirmation(client, order.id);
       await client.query(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
       );
@@ -4710,6 +4713,7 @@ export class CommerceService {
         ],
       );
       await queueOrderNotifications(client, order.id, "order.created");
+      await queueOrderConfirmation(client, order.id);
 
       const versionUpdate = await client.query<{ version: string }>(
         "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='orders' RETURNING version::text",
@@ -5531,6 +5535,95 @@ export class CommerceService {
   }
 
 
+  // Only called by the signed Meta webhook, never by an unauthenticated customer route.
+  public async orderWhatsAppReply(input: OrderWhatsAppReply): Promise<void> {
+    const match = /^(confirm|cancel):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.exec(input.payload);
+    if (!match || !Number.isSafeInteger(input.timestamp) || input.timestamp > Date.now()/1000+300
+      || input.timestamp < Date.now()/1000-86400) return;
+    let phone: string;
+    try { phone = normalizeEgyptianPhone(input.from); } catch { return; }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      // Lock the order first, matching the admin workflow's lock order.
+      const result = await client.query<{
+        id: string; order_code: string; status: string; version: string; final_minor: string;
+        customer_user_id: string; promotion: Record<string, unknown> | null;
+        legacy: Record<string, unknown> | null; cod_verification_status: string;
+        confirmation_id: string; confirmation_state: string; expected_version: string;
+        fresh: boolean; snapshot_minor: string; phone: string;
+      }>(`SELECT o.id::text,o.order_code,o.status,o.version::text,o.final_minor::text,
+          o.customer_user_id::text,o.promotion,o.legacy,o.cod_verification_status,
+          c.id::text AS confirmation_id,c.state AS confirmation_state,c.expected_version::text,
+          c.expires_at>now() AS fresh,c.final_minor::text AS snapshot_minor,
+          o.contact_snapshot->>'phone1' AS phone
+        FROM orders o JOIN order_whatsapp_confirmations c ON c.order_id=o.id
+        WHERE c.id=$1 AND c.phone_normalized=$2 AND NOT o.is_deleted AND NOT o.is_archived
+          AND EXISTS(SELECT 1 FROM users u WHERE u.id=o.customer_user_id AND u.status='active' AND u.deleted_at IS NULL)
+        FOR UPDATE OF o,c`, [match[2], phone]);
+      const order = result.rows[0];
+      if (!order || !order.customer_user_id) { await client.query("COMMIT"); return; }
+      // Editing the checkout phone also invalidates previously issued buttons.
+      try { if (normalizeEgyptianPhone(order.phone || "") !== phone) { await client.query("COMMIT"); return; } }
+      catch { await client.query("COMMIT"); return; }
+      const action = match[1]!;
+      const inserted = await client.query(`INSERT INTO order_whatsapp_replies(message_id,confirmation_id,action,outcome)
+        VALUES($1,$2,$3,'received') ON CONFLICT(message_id) DO NOTHING RETURNING message_id`,
+        [input.messageId, order.confirmation_id, action]);
+      if (!inserted.rowCount) { await client.query("COMMIT"); return; }
+      const current = Number(order.version) === Number(order.expected_version)
+        && order.final_minor === order.snapshot_minor && order.fresh;
+      const canConfirm = current && action === "confirm" && order.status === "New" && order.confirmation_state === "pending";
+      const canCancel = current && action === "cancel" && ["New","Accepted"].includes(order.status)
+        && ["pending","confirmed"].includes(order.confirmation_state);
+      let outcome = "stale";
+      if (canConfirm || canCancel) {
+        const target = canConfirm ? "Accepted" : "Cancelled";
+        const now = new Date().toISOString();
+        const legacy = {...order.legacy, ...(canConfirm ? {acceptedAt:now,whatsappConfirmedAt:now} :
+          {cancelledAt:now,cancellationReason:"Customer cancelled via WhatsApp"})};
+        await client.query(`UPDATE orders SET status=$2,legacy=$3::jsonb,version=version+1,updated_at=now(),
+          cod_verification_status=CASE WHEN $2='Accepted' THEN 'Verified' ELSE cod_verification_status END,
+          cod_verification_reason=CASE WHEN $2='Accepted' THEN 'Customer confirmed via WhatsApp' ELSE cod_verification_reason END,
+          cod_verified_at=CASE WHEN $2='Accepted' THEN now() ELSE cod_verified_at END,
+          cod_verified_by=CASE WHEN $2='Accepted' THEN NULL ELSE cod_verified_by END
+          WHERE id=$1`, [order.id,target,JSON.stringify(legacy)]);
+        if (canConfirm) await client.query(`INSERT INTO cod_verification_events(order_id,customer_user_id,event_type,
+          risk_level,risk_score,verification_status,policy_version,reason,actor_type,actor_id,metadata)
+          SELECT id,customer_user_id,'VERIFICATION_APPROVED',cod_risk_level,cod_risk_score,'Verified',
+            cod_risk_policy_version,'Customer confirmed via WhatsApp','customer',customer_user_id,
+            jsonb_build_object('source','whatsapp') FROM orders WHERE id=$1`, [order.id]);
+        await this.applyOrderStatusTransition(client,order.id,order.order_code,order.status,target,
+          order.promotion,order.customer_user_id,"customer");
+        await client.query(`UPDATE order_whatsapp_confirmations SET state=$2,decided_at=now(),
+          expected_version=(SELECT version FROM orders WHERE id=$3) WHERE id=$1`,
+          [order.confirmation_id,canConfirm ? "confirmed" : "cancelled",order.id]);
+        await client.query("UPDATE domain_state_versions SET version=version+1,updated_at=now() WHERE domain='orders'");
+        await client.query(`INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,old_values,new_values)
+          VALUES('customer',$1,'ORDER_WHATSAPP_DECISION','orders',$2,$3,$4::jsonb,$5::jsonb)`,
+          [order.customer_user_id,order.id,input.messageId,JSON.stringify({status:order.status,verification:order.cod_verification_status}),
+            JSON.stringify({status:target,source:"whatsapp"})]);
+        outcome = canConfirm ? "confirmed" : "cancelled";
+      } else if ((action === "confirm" && order.confirmation_state === "confirmed" && order.status === "Accepted")
+        || (action === "cancel" && order.confirmation_state === "cancelled" && order.status === "Cancelled")) {
+        outcome = action === "confirm" ? "confirmed" : "cancelled";
+      }
+      await client.query("UPDATE order_whatsapp_replies SET outcome=$2 WHERE message_id=$1", [input.messageId,outcome]);
+      // One acknowledgment per decision/outcome, even when Meta gives repeated taps different message IDs.
+      const body = outcome === "confirmed" ? `تم تأكيد طلبك ${order.order_code} بنجاح ✅ هنبدأ تجهيزه.` :
+        outcome === "cancelled" ? `تم إلغاء طلبك ${order.order_code}.` :
+        `تعذّر تنفيذ الاختيار للطلب ${order.order_code} لأن حالته أو تفاصيله اتغيّرت أو انتهت صلاحية التأكيد. راجع حسابك أو تواصل مع Dart.`;
+      await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,event_type,payload,deduplication_key)
+        VALUES('order',$1,'ORDER_WHATSAPP_ACK',$2::jsonb,$3)
+        ON CONFLICT(deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING`,
+        [order.id,JSON.stringify({channel:"whatsapp",category:"service",to:phone,body,outcome,
+          expiresAt:new Date((input.timestamp+86400)*1000).toISOString()}),
+          `order-whatsapp-ack:${order.confirmation_id}:${action}:${outcome}`]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  }
+
   public async adminCodVerificationAction(
     actorId: string,
     orderRef: string,
@@ -6133,7 +6226,7 @@ export class CommerceService {
     nextStatus: string,
     promotion: Record<string, unknown> | null,
     actorId: string,
-    actorType: "staff" | "representative" = "staff",
+    actorType: "staff" | "representative" | "customer" = "staff",
   ): Promise<void> {
     if (previousStatus === nextStatus) return;
 
