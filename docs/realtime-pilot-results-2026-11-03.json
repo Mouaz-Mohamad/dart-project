@@ -1,0 +1,42 @@
+{
+  "kind": "isolated-synthetic-pilot",
+  "database": "PGlite with production migrations and real CommerceService.checkout",
+  "transport": "in-process broker fixture; not a hosted Ably connection",
+  "limitations": [
+    "Virtual time, synthetic accounts and one order; not production traffic or a capacity test",
+    "Bytes are application JSON only: exclude HTTP headers, TLS, SDK/auth, heartbeat and provider billing",
+    "SQL counts include read/publisher statements; mutation statements common to both are excluded",
+    "SQL counts are driver calls, not internal engine work; the trigger's extra journal INSERT is not included",
+    "Synthetic broker rechecks grants; real Ably authorization/revocation, quota and delivery latency still need a sandbox test",
+    "Trigger/event journal exists only in the isolated fixture; no production migration, endpoint or polling change"
+  ],
+  "polling": {
+    "mode": "polling",
+    "scenarioSeconds": 90,
+    "checkIntervalSeconds": 3,
+    "dataEndpointCalls": 32,
+    "idleDataCallsBeforeChange": 14,
+    "applicationJsonBytes": 2217,
+    "providerSignalJsonBytes": 0,
+    "dataSqlStatements": 38,
+    "publisherSqlStatements": 0,
+    "committedOrders": 1,
+    "visibleCommittedOrders": 1,
+    "providerSignals": 0
+  },
+  "push": {
+    "mode": "push",
+    "scenarioSeconds": 90,
+    "checkIntervalSeconds": null,
+    "dataEndpointCalls": 2,
+    "idleDataCallsBeforeChange": 0,
+    "applicationJsonBytes": 1827,
+    "providerSignalJsonBytes": 57,
+    "dataSqlStatements": 8,
+    "publisherSqlStatements": 2,
+    "committedOrders": 1,
+    "visibleCommittedOrders": 1,
+    "providerSignals": 1
+  },
+  "dataCallReductionPercent": 93.75
+}

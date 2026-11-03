@@ -13,6 +13,7 @@ if [[ -z "$base" || "$base" == "$head_sha" ]] || ! git cat-file -e "${base}^{com
 fi
 
 if git diff --quiet "$base" HEAD -- . \
+  ':(exclude)experiments/**' \
   ':(exclude)tests/**' \
   ':(exclude)scripts/verify-restored-store.ts' \
   ':(exclude)scripts/recovery-schema.ts' \
