@@ -94,49 +94,12 @@
     return user;
   }
 
-  function requestPasswordReset(identifier) {
-    const input = String(identifier || "").trim(),
-      email = normalizeEmail(input),
-      phone = normalizePhone(input);
-    const user = read(KEYS.users, []).find(
-      (row) =>
-        !row.isArchived &&
-        (normalizeEmail(row.email) === email ||
-          normalizePhone(row.phone1) === phone ||
-          normalizePhone(row.phone2) === phone ||
-          String(row.customerId).toLowerCase() === input.toLowerCase()),
-    );
-    if (user) {
-      const requests = read(KEYS.passwordResets, []);
-      if (
-        !requests.some(
-          (row) =>
-            row.status === "Pending" &&
-            row.accountType === "Customer" &&
-            row.accountId === user.id,
-        )
-      ) {
-        requests.unshift({
-          id: uid("PWR"),
-          accountType: "Customer",
-          accountId: user.id,
-          identifier: input,
-          displayName: user.name,
-          status: "Pending",
-          createdAt: now(),
-          source: "Customer Login",
-        });
-        write(KEYS.passwordResets, requests);
-        notify(
-          "password_reset",
-          "Customer password reset request",
-          `${user.customerId} requested a temporary password.`,
-          "customers",
-          user.customerId,
-        );
-      }
-    }
-    return true;
+  async function requestPasswordReset(identifier, accountType = "customer") {
+    if (!API_BASE) throw new Error("Password recovery requires the secure account API.");
+    return apiRequest("/api/v1/auth/forgot-password", {
+      method: "POST",
+      body: { identifier: String(identifier || "").trim(), accountType },
+    });
   }
 
   function ensurePasswordResetDialog() {
@@ -146,7 +109,7 @@
     const style = document.createElement("style");
     style.textContent = `
       .dart-reset-dialog{position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.58);display:grid;place-items:center;padding:20px}
-      .dart-reset-dialog[hidden]{display:none}
+      .dart-reset-dialog[hidden],.dart-reset-card [hidden]{display:none}
       .dart-reset-card{position:relative;width:min(460px,100%);max-height:90vh;overflow:auto;background:#fffaf3;color:#191919;border-radius:22px;padding:26px;box-shadow:0 24px 70px rgba(0,0,0,.28)}
       .dart-reset-card h2{margin:0 0 8px}.dart-reset-card p{line-height:1.55}
       .dart-reset-card form{display:grid;gap:12px;margin-top:18px}
@@ -157,6 +120,8 @@
       .dart-reset-submit{background:#ab012b;color:#fff;font-weight:700}
       .dart-reset-secondary{background:#eee;color:#222}
       .dart-reset-close{position:absolute;top:12px;right:14px;border:0;background:transparent;font-size:24px;cursor:pointer}
+      .dart-reset-card :focus-visible{outline:3px solid #ab012b;outline-offset:3px}
+      .dart-reset-card button:disabled{opacity:.6;cursor:wait}
       .dart-reset-dialog .form-status.is-error{color:#a00024}.dart-reset-dialog .form-status.is-success{color:#176b3a}
     `;
     document.head.appendChild(style);
@@ -175,7 +140,7 @@
         <p data-reset-intro>Enter the email, phone, or account ID registered with Dart. The OTP will be sent only to the registered email.</p>
         <form id="dartPasswordResetRequestForm" novalidate>
           <label>Account identifier
-            <input name="identifier" type="text" autocomplete="username" required placeholder="Email, phone or account ID">
+            <input name="identifier" type="text" autocomplete="username" minlength="3" maxlength="254" required placeholder="Email, phone or account ID">
           </label>
           <button type="submit" class="dart-reset-submit">Send OTP to registered email</button>
           <p class="form-status" role="status" aria-live="polite"></p>
@@ -185,10 +150,10 @@
             <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="\\d{6}" maxlength="6" required placeholder="000000">
           </label>
           <label>New password
-            <input name="password" type="password" autocomplete="new-password" minlength="8" required>
+            <input name="password" type="password" autocomplete="new-password" minlength="6" maxlength="200" required>
           </label>
           <label>Confirm new password
-            <input name="confirmation" type="password" autocomplete="new-password" minlength="8" required>
+            <input name="confirmation" type="password" autocomplete="new-password" minlength="6" maxlength="200" required>
           </label>
           <button type="submit" class="dart-reset-submit">Change password</button>
           <div class="dart-reset-actions">
@@ -196,63 +161,100 @@
           </div>
           <p class="form-status" role="status" aria-live="polite"></p>
         </form>
+        <div data-reset-success hidden>
+          <p role="status">Password changed successfully. Sign in with your new password.</p>
+          <button type="button" class="dart-reset-submit" data-reset-login>Back to Login</button>
+        </div>
       </div>
     `;
     document.body.appendChild(dialog);
 
     const requestForm = dialog.querySelector("#dartPasswordResetRequestForm");
     const completeForm = dialog.querySelector("#dartPasswordResetCompleteForm");
+    const success = dialog.querySelector("[data-reset-success]");
+    const busy = (form, value) => {
+      form.setAttribute("aria-busy", String(value));
+      form.querySelectorAll("input,button").forEach((control) => { control.disabled = value; });
+    };
+    const pending = () => [requestForm, completeForm].some((form) => form.getAttribute("aria-busy") === "true");
+    const active = (generation) => !dialog.hidden && dialog.dataset.generation === generation;
+    const errorMessage = (error) => ({
+      OTP_INVALID: "The code is incorrect or has already been used. Check it or request a new code.",
+      OTP_EXPIRED: "This code has expired. Request a new code.",
+      PASSWORD_REUSED: "Choose a password you have not used recently.",
+      WEAK_PASSWORD: "The password does not meet the account's password requirements.",
+    }[error.code] || (error.status === 429
+      ? "Too many attempts. Please wait before trying again."
+      : "Unable to complete the request. Please check your connection and try again."));
 
     requestForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (pending() || requestForm.hidden) return;
       if (!requestForm.checkValidity()) return requestForm.reportValidity();
       if (!API_BASE) return setStatus(requestForm, "Password recovery requires the secure account API.", true);
+      const generation = dialog.dataset.generation;
+      const identifier = requestForm.elements.identifier.value.trim();
+      const accountType = dialog.dataset.accountType;
+      busy(requestForm, true);
+      setStatus(requestForm, "Sending a code to your registered email…");
       try {
-        const payload = await apiRequest("/api/v1/auth/forgot-password", {
-          method: "POST",
-          body: {
-            identifier: requestForm.elements.identifier.value,
-            accountType: dialog.dataset.accountType || "customer",
-          },
-        });
+        const payload = await requestPasswordReset(identifier, accountType);
+        if (!active(generation)) return;
+        if (!payload.challengeId) throw new Error("Missing reset challenge");
         dialog.dataset.challengeId = payload.challengeId || "";
-        dialog.dataset.identifier = requestForm.elements.identifier.value;
+        dialog.dataset.identifier = identifier;
         requestForm.hidden = true;
         completeForm.hidden = false;
         completeForm.elements.code.focus();
         setStatus(
           completeForm,
-          "If the account exists, a 6-digit OTP was sent to its registered email. Enter it and choose a new password.",
+          "If the account exists, a 6-digit code was sent to its registered email. Check your inbox and Spam folder, then enter it below.",
         );
       } catch (error) {
-        setStatus(requestForm, error.message, true);
+        if (active(generation)) setStatus(requestForm, errorMessage(error), true);
+      } finally {
+        if (active(generation)) busy(requestForm, false);
       }
     });
 
     completeForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (pending() || completeForm.hidden) return;
       if (!completeForm.checkValidity()) return completeForm.reportValidity();
       const password = completeForm.elements.password.value;
       const confirmation = completeForm.elements.confirmation.value;
       if (password !== confirmation) return setStatus(completeForm, "Passwords do not match.", true);
+      const generation = dialog.dataset.generation;
+      const code = completeForm.elements.code.value;
+      busy(completeForm, true);
+      setStatus(completeForm, "Changing your password…");
       try {
         await apiRequest("/api/v1/auth/reset-password", {
           method: "POST",
           body: {
             challengeId: dialog.dataset.challengeId,
-            code: completeForm.elements.code.value,
+            code,
             password,
             confirmation,
           },
         });
+        if (!active(generation)) return;
         completeForm.reset();
-        setStatus(completeForm, "Password changed successfully. You can now sign in with the new password.");
+        dialog.dataset.challengeId = "";
+        completeForm.hidden = true;
+        success.hidden = false;
+        success.querySelector("button").focus();
       } catch (error) {
-        setStatus(completeForm, error.message, true);
+        if (active(generation)) setStatus(completeForm, errorMessage(error), true);
+      } finally {
+        if (active(generation)) busy(completeForm, false);
       }
     });
 
     dialog.querySelector("[data-reset-resend]").addEventListener("click", () => {
+      if (pending()) return;
+      dialog.dataset.challengeId = "";
+      completeForm.reset();
       completeForm.hidden = true;
       requestForm.hidden = false;
       requestForm.elements.identifier.value = dialog.dataset.identifier || "";
@@ -260,28 +262,71 @@
       setStatus(requestForm, "Request a fresh OTP. Any previous OTP will stop working.");
     });
     dialog.querySelector("[data-reset-close]").addEventListener("click", () => {
-      dialog.hidden = true;
+      closePasswordResetDialog(dialog);
+    });
+    dialog.querySelector("[data-reset-login]").addEventListener("click", () => {
+      const identifier = dialog.dataset.identifier;
+      closePasswordResetDialog(dialog);
+      const loginForm = document.getElementById("loginForm");
+      if (loginForm) {
+        loginForm.elements.identifier.value = identifier;
+        loginForm.elements.password.value = "";
+        loginForm.elements.password.focus();
+      }
     });
     dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) dialog.hidden = true;
+      if (event.target === dialog) closePasswordResetDialog(dialog);
+    });
+    dialog.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePasswordResetDialog(dialog);
+      }
+      if (event.key !== "Tab") return;
+      const controls = [...dialog.querySelectorAll("button,input")].filter((control) =>
+        !control.disabled && !control.closest("[hidden]"));
+      const first = controls[0], last = controls.at(-1);
+      if ((event.shiftKey && document.activeElement === first) ||
+          (!event.shiftKey && document.activeElement === last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+      }
     });
     return dialog;
+  }
+
+  function closePasswordResetDialog(dialog) {
+    dialog.hidden = true;
+    dialog.dataset.generation = String(Number(dialog.dataset.generation || 0) + 1);
+    dialog.dataset.challengeId = "";
+    dialog.dataset.identifier = "";
+    dialog.querySelectorAll("form").forEach((form) => form.reset());
+    dialog.returnFocus?.focus();
   }
 
   function openPasswordReset(accountType = "customer", identifierHint = "") {
     const dialog = ensurePasswordResetDialog();
     const requestForm = dialog.querySelector("#dartPasswordResetRequestForm");
     const completeForm = dialog.querySelector("#dartPasswordResetCompleteForm");
+    if (!dialog.hidden) return;
+    dialog.returnFocus = document.activeElement;
+    dialog.dataset.generation = String(Number(dialog.dataset.generation || 0) + 1);
     dialog.dataset.accountType = accountType === "representative" ? "representative" : "customer";
     dialog.dataset.challengeId = "";
     dialog.dataset.identifier = identifierHint || "";
-    const minimumPasswordLength = dialog.dataset.accountType === "representative" ? 12 : 8;
+    const minimumPasswordLength = dialog.dataset.accountType === "representative" ? 12 : 6;
     completeForm.elements.password.minLength = minimumPasswordLength;
     completeForm.elements.confirmation.minLength = minimumPasswordLength;
     completeForm.elements.password.placeholder = `At least ${minimumPasswordLength} characters`;
     completeForm.elements.confirmation.placeholder = `Repeat the new password`;
     requestForm.reset();
     completeForm.reset();
+    [requestForm, completeForm].forEach((form) => {
+      form.setAttribute("aria-busy", "false");
+      form.querySelectorAll("input,button").forEach((control) => { control.disabled = false; });
+      setStatus(form, "");
+    });
+    dialog.querySelector("[data-reset-success]").hidden = true;
     requestForm.hidden = false;
     completeForm.hidden = true;
     requestForm.elements.identifier.value = identifierHint || "";
