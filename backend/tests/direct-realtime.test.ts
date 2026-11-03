@@ -158,6 +158,10 @@ describe("direct feed failure and browser adapter contracts", () => {
     vi.stubEnv("NODE_ENV", "production"); expect(assertLocalPilotEnvironment).toThrow("isolated");
     vi.stubEnv("NODE_ENV", "test"); vi.stubEnv("TEST_DATABASE_URL", "postgres://x:x@external.example/dart_test");
     expect(assertLocalPilotEnvironment).toThrow("loopback");
+    vi.stubEnv("TEST_DATABASE_URL", "postgres://x:x@127.0.0.1/dart_test?host=external.example");
+    expect(assertLocalPilotEnvironment).toThrow("loopback");
+    vi.stubEnv("TEST_DATABASE_URL", "postgres://x:x@127.0.0.1/dart_test?options=-c%20search_path%3Dpublic");
+    expect(assertLocalPilotEnvironment).toThrow("loopback");
   });
   it("waits for LISTEN-ready, validates events, resumes on reconnect and closes on startup timeout", async () => {
     vi.useFakeTimers();

@@ -20,7 +20,10 @@ export function assertLocalPilotEnvironment() {
   if (process.env.VERCEL || process.env.NODE_ENV === "production" || process.env.DATABASE_URL) throw new Error("Direct pilot requires an isolated local test process");
   if (process.env.TEST_DATABASE_URL) {
     const url = new URL(process.env.TEST_DATABASE_URL);
-    if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) || !/^\/dart_(test|pilot[a-z0-9_]*)$/.test(url.pathname)) {
+    // pg accepts query-string host overrides: validate the entire effective target.
+    const unknownOptions = [...url.searchParams.keys()].some(key => key !== "sslmode");
+    if (!["postgres:", "postgresql:"].includes(url.protocol) || unknownOptions ||
+      !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) || !/^\/dart_(test|pilot[a-z0-9_]*)$/.test(url.pathname)) {
       throw new Error("Direct pilot accepts only a named loopback test database");
     }
   }
