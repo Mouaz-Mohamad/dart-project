@@ -1275,10 +1275,6 @@ body.dart-set-image-open {
 .cart-checkout p i {
   color: var(--bragnte);
 }
-.payment-header {
-  font-size: 30px;
-  margin-top: 30px;
-}
 .cart-product-card {
   display: flex;
   align-items: center;
@@ -1471,48 +1467,45 @@ body.dart-set-image-open {
   height: 80px;
 }
 
-.payment-method-box {
-  display: inline-block;
-  padding: 10px;
-  border: 1px solid var(--bragnte);
-  width: 100%;
-}
-
-.simple-checkbox {
+.dart-cash-payment {
   display: flex;
   align-items: center;
-  gap: 20px;
-  cursor: pointer;
-  font-family: var(--font-cabin, sans-serif);
-  font-size: 10px;
-  color: var(--bragnte); /* أو حسب لون الخط عندك */
-  -webkit-user-select: none;
-  user-select: none;
-}
-.simple-checkbox span {
-  font-size: large;
+  gap: 14px;
+  width: 100%;
+  margin: 24px 0 16px;
+  padding: 18px;
+  border: 1px solid rgba(171, 1, 43, 0.16);
+  border-radius: 12px;
+  background: #faf7f5;
+  text-align: start;
 }
 
-/* تنسيق هادئ للشيك بوكس نفسه */
-.simple-checkbox input[type="checkbox"] {
-  -moz-appearance: none;
-  appearance: none;
-  -webkit-appearance: none;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--bragnte);
-  border-radius: 4px;
-  outline: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background-color: #fff;
-  position: relative;
+.dart-cash-payment-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f1e5e7;
+  color: var(--bragnte);
 }
 
-/* لما يتحدد، ياخد لون البراند وبدون زحمة بصرية */
-.simple-checkbox input[type="checkbox"]:checked {
-  background-color: var(--bragnte);
-  border-color: var(--bragnte);
+.dart-cash-payment-copy {
+  min-width: 0;
+}
+
+.dart-cash-payment-copy h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--bg-dark);
+}
+
+.dart-cash-payment-copy > span {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #61585b;
 }
 
 .arrwo-for-other-adrees {
@@ -4814,17 +4807,6 @@ button,
   color: #6b7280;
   font-size: 13px;
   line-height: 1.45;
-}
-.birthday-auto-discount-note {
-  width: min(100%, 620px);
-  margin: -4px auto 14px;
-  padding: 10px 12px;
-  border-inline-start: 4px solid #ab012b;
-  border-radius: 8px;
-  background: #fff3f6;
-  color: #7d0b28;
-  font-size: 13px;
-  font-weight: 700;
 }
 .discount-box input:disabled,
 .discount-box button:disabled {

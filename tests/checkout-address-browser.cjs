@@ -52,6 +52,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
       document.getElementById("checkoutForm").addEventListener("submit", (event) => { event.preventDefault(); window.submits++; });
     });
     const submit = page.locator('#checkoutForm [type="submit"]');
+    const payment = page.getByRole('region', { name: 'Cash on delivery' });
+    assert.equal(await payment.count(), 1);
+    assert.equal(await payment.locator('input, select, button').count(), 0, 'cash-only payment is information, not a choice');
+    assert.equal(await payment.getByText('Pay when your order arrives.', { exact: true }).count(), 1);
     assert.equal(await submit.isDisabled(), false);
     await page.evaluate(() => { void dartCheckoutAddress.selectLocation(30.05, 31.35); });
     assert.equal(await submit.isDisabled(), true);
@@ -86,6 +90,8 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
     for (const width of [370, 480, 767, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       const bounds = await submit.boundingBox(); assert.ok(bounds && bounds.width <= width, `button fits ${width}`);
+      const paymentBounds = await payment.boundingBox();
+      assert.ok(paymentBounds && paymentBounds.x >= 0 && paymentBounds.x + paymentBounds.width <= width, `cash payment fits ${width}`);
     }
     assert.deepEqual(errors, []);
     console.log("PASS checkout Chromium: actual form, disabled button/Enter, 8s delay, new address fields, unit edits, busy guard, timeout/retry and mobile/desktop button");

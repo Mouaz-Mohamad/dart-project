@@ -764,8 +764,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         : window.DartPlatform?.activeDartCard?.(customer, 0);
     const discountInput = document.getElementById('discountInput');
     const discountBtn = document.getElementById('applyDiscountBtn');
-    const discountBox = discountInput?.closest('.discount-box');
-    let note = document.querySelector('.birthday-auto-discount-note');
     if (activeCampaign) {
         appliedDiscountRate = Math.max(0, Math.min(1, Number(activeCampaign.discountPercent ?? activeCampaign.percent ?? 0) / 100));
         if (discountInput) {
@@ -776,12 +774,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
             discountBtn.disabled = Boolean(activeCampaign.automatic);
             discountBtn.textContent = activeCampaign.automatic ? 'Applied' : 'Apply';
         }
-        if (discountBox && !note) {
-            note = document.createElement('p');
-            note.className = 'birthday-auto-discount-note';
-            discountBox.insertAdjacentElement('afterend', note);
-        }
-        if (note) note.textContent = 'Campaign discount applies only to items without their own item discount.';
         return true;
     }
     if (birthdayReward) {
@@ -795,12 +787,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
             discountBtn.disabled = true;
             discountBtn.textContent = 'Applied';
         }
-        if (discountBox && !note) {
-            note = document.createElement('p');
-            note.className = 'birthday-auto-discount-note';
-            discountBox.insertAdjacentElement('afterend', note);
-        }
-        if (note) note.textContent = 'Birthday discount applies to items without an item or campaign discount.';
         if (showNotice) showToast(`تم تطبيق خصم عيد الميلاد ${Math.round(appliedDiscountRate * 100)}% تلقائيًا.`);
         return true;
     }
@@ -816,12 +802,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
             discountBtn.disabled = true;
             discountBtn.textContent = 'Applied';
         }
-        if (discountBox && !note) {
-            note = document.createElement('p');
-            note.className = 'birthday-auto-discount-note';
-            discountBox.insertAdjacentElement('afterend', note);
-        }
-        if (note) note.textContent = 'Your active Dart Card discount is applied automatically to eligible items.';
         if (showNotice) showToast(`تم تطبيق خصم Dart Card بنسبة ${Math.round(cardPercent)}% تلقائيًا.`);
         return true;
     }
@@ -837,7 +817,6 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         discountBtn.disabled = false;
         discountBtn.textContent = 'Apply';
     }
-    note?.remove();
     return false;
 }
 function applyCartQuote(quote) {
