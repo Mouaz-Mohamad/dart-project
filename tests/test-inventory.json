@@ -6,6 +6,7 @@
     "auth-contract.js",
     "cache-revalidation-contract.cjs",
     "catalog-category-contract.js",
+    "checkout-address-runtime.cjs",
     "council-browser-runtime.cjs",
     "council-fourth-runtime.cjs",
     "council-third-runtime.cjs",
@@ -45,6 +46,7 @@
     "test-inventory-contract.cjs"
   ],
   "ciBrowser": [
+    "checkout-address-browser.cjs",
     "brand-details-browser.cjs",
     "coming-soon-browser.cjs",
     "css-cascade-browser.cjs",

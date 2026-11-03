@@ -18,6 +18,7 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `storefront/storefront.js` | Shared product modal, variants and lazy merchandising loader | `Js/dart-storefront.js` |
 | `storefront/merchandising.js` | Lazy related-model suggestions and quantity-offer messaging | `Js/dart-merchandising.js` |
 | `storefront/catalog.js` | Catalog hydration, version recovery and projections | `Js/dart-catalog.js` |
+| `storefront/address.js` | Delivery pin verification, address state and lookup concurrency | `Js/dart-address.js` |
 | `storefront/profile-records.js` | Profile order, return and waiting summaries | `Js/dart-profile-records.js` |
 | `storefront/home-ui.js` | Curated Home UI | `Js/dart-ui.home.min.js` |
 

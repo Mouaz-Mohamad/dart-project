@@ -1,0 +1,528 @@
+// DART CODE GUIDE | src/storefront/address.js -> Js/dart-address.js
+// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
+// DART | MODULE: dart-address.js
+// Storefront address validation, geocoding, and delivery-zone helpers.
+// BEGIN MODULE
+
+(function () {
+  'use strict';
+
+  const NOMINATIM = 'https://nominatim.openstreetmap.org';
+  // The rectangle is only a broad map/search safety envelope. Acceptance is
+  // decided by the reverse-geocoded administrative governorate below, so a
+  // valid address anywhere in Cairo or Giza is not rejected by a city-centre
+  // radius while every other governorate is still refused.
+  const DELIVERY_BOUNDS = [[27.00, 27.00], [30.65, 32.25]];
+  const DELIVERY_VIEWBOX = '27.00,30.65,32.25,27.00';
+  const DEFAULT_CENTER = [30.0444, 31.2357];
+  const controllers = new Map();
+  let lastRequestAt = 0;
+
+  const value = element => String(element?.value || '').trim();
+  const setValue = (element, next) => {
+    if (!element || next == null || String(next).trim() === '') return;
+    if (element.tagName === 'SELECT' && ![...element.options].some(option => option.value === String(next).trim())) {
+      element.add(new Option(String(next).trim(), String(next).trim()));
+    }
+    element.value = String(next).trim();
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function nominatim(path, params) {
+    const waitFor = Math.max(0, 1050 - (Date.now() - lastRequestAt));
+    if (waitFor) await wait(waitFor);
+    lastRequestAt = Date.now();
+    const query = new URLSearchParams({ format: 'jsonv2', addressdetails: '1', ...params });
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 12000);
+    try {
+      const response = await fetch(`${NOMINATIM}/${path}?${query}`, {
+        headers: { 'Accept-Language': 'en' }, signal: abort.signal
+      });
+      if (!response.ok) throw new Error('Address service is temporarily unavailable.');
+      return await response.json();
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  function providerBuilding(result) {
+    const a = result?.address || {};
+    const direct = a.house_number || a.building || a.house_name || '';
+    if (String(direct).trim()) return String(direct).trim();
+    const category = String(result?.category || result?.class || '').trim().toLowerCase();
+    const type = String(result?.type || '').trim().toLowerCase();
+    const name = String(result?.name || '').trim();
+    const buildingLike = category === 'building' || ['house', 'apartments', 'commercial', 'office'].includes(type);
+    return buildingLike ? name : '';
+  }
+
+  function addressParts(result) {
+    const a = result?.address || {};
+    const rawGovernorate = a.state || a.governorate || a.region || '';
+    return {
+      country: a.country || 'Egypt',
+      governorate: canonicalDeliveryGovernorate(rawGovernorate) || rawGovernorate,
+      area: a.suburb || a.neighbourhood || a.quarter || a.borough || a.city_district || a.state_district || a.town || a.village || a.city || a.county || '',
+      street: a.road || a.pedestrian || a.residential || a.footway || a.path || a.service || '',
+      building: providerBuilding(result),
+      fullAddress: result?.display_name || ''
+    };
+  }
+
+  function normalizePlace(value) {
+    return String(value || '').trim().toLowerCase().replace(/[\u064B-\u065F\u0670]/g, '').replace(/\s+/g, ' ');
+  }
+
+  function canonicalDeliveryGovernorate(value) {
+    const name = normalizePlace(value);
+    if (name === 'cairo' || name === 'cairo governorate' || name === 'al qahirah' ||
+        name === 'القاهرة' || name === 'محافظة القاهرة') return 'Cairo';
+    if (name === 'giza' || name === 'giza governorate' || name === 'al jizah' ||
+        name === 'الجيزة' || name === 'محافظة الجيزة') return 'Giza';
+    return '';
+  }
+
+  function isSupportedGovernorateName(value) {
+    return Boolean(canonicalDeliveryGovernorate(value));
+  }
+
+  function isInsideDeliveryBounds(lat, lng) {
+    const latitude = Number(lat), longitude = Number(lng);
+    return Number.isFinite(latitude) && Number.isFinite(longitude) &&
+      latitude >= DELIVERY_BOUNDS[0][0] && latitude <= DELIVERY_BOUNDS[1][0] &&
+      longitude >= DELIVERY_BOUNDS[0][1] && longitude <= DELIVERY_BOUNDS[1][1];
+  }
+
+  function isSupportedDeliveryResult(result) {
+    const a = result?.address || {};
+    const iso = String(a['ISO3166-2-lvl4'] || a['ISO3166-2-lvl3'] || '').toUpperCase();
+    const governorate = a.state || a.governorate || a.region || '';
+    const administrativeMatch = ['EG-C', 'EG-GZ'].includes(iso) || isSupportedGovernorateName(governorate);
+    return administrativeMatch && isInsideDeliveryBounds(result?.lat, result?.lon);
+  }
+
+  function create(options) {
+    const form = document.querySelector(options.form);
+    const mapElement = document.querySelector(options.map);
+    if (!form || !mapElement || typeof window.L === 'undefined') return null;
+    if (controllers.has(mapElement)) return controllers.get(mapElement);
+
+    const fields = {
+      search: document.querySelector(options.search),
+      results: document.querySelector(options.results),
+      latitude: document.querySelector(options.latitude),
+      longitude: document.querySelector(options.longitude),
+      fullAddress: document.querySelector(options.fullAddress),
+      country: document.querySelector(options.country),
+      governorate: document.querySelector(options.governorate),
+      area: document.querySelector(options.area),
+      street: document.querySelector(options.street),
+      building: document.querySelector(options.building),
+      floor: document.querySelector(options.floor),
+      status: document.querySelector(options.status)
+    };
+
+    const map = L.map(mapElement, {
+      attributionControl: true,
+      zoomControl: false,
+      maxBounds: DELIVERY_BOUNDS,
+      maxBoundsViscosity: 1
+    }).setView(DEFAULT_CENTER, 11);
+
+    map.attributionControl?.setPrefix(false);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4571_1_f3f5f58e8a8808e98e8b6df9', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }).addTo(map);
+
+    const pin = L.divIcon({
+      className: 'dart-address-pin',
+      html: '<span aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>',
+      iconSize: [34, 42],
+      iconAnchor: [17, 40]
+    });
+
+    let marker = null;
+    let searchTimer = null;
+    let manualTimer = null;
+    let requestVersion = 0;
+    let userInteractedWithAddress = false;
+
+    function status(message, state = '') {
+      form.dataset.dartAddressState = state;
+      if (fields.status) {
+        fields.status.textContent = message;
+        fields.status.dataset.state = state;
+      }
+      form.dispatchEvent(new CustomEvent('dart:address-state', { bubbles: true, detail: { state } }));
+    }
+
+    function setCoordinates(lat, lng, source = 'map') {
+      if (fields.latitude) fields.latitude.value = Number(lat).toFixed(7);
+      if (fields.longitude) fields.longitude.value = Number(lng).toFixed(7);
+      form.dataset.dartAddressSource = source;
+      form.dataset.dartAddressReady = 'true';
+      form.dataset.dartDeliveryZone = 'cairo-giza';
+    }
+
+    function clearCoordinates() {
+      if (fields.latitude) fields.latitude.value = '';
+      if (fields.longitude) fields.longitude.value = '';
+      form.dataset.dartAddressReady = 'false';
+      form.dataset.dartDeliveryZone = '';
+    }
+
+    function beginVerification(message) {
+      userInteractedWithAddress = true;
+      clearTimeout(manualTimer);
+      clearTimeout(searchTimer);
+      const version = ++requestVersion;
+      clearCoordinates();
+      if (fields.fullAddress) fields.fullAddress.value = '';
+      status(message, 'loading');
+      return version;
+    }
+
+    function rejectVerification(message) {
+      clearCoordinates();
+      if (marker) { map.removeLayer(marker); marker = null; }
+      status(message, 'error');
+      form.dispatchEvent(new CustomEvent('dart:address-rejected', { bubbles: true }));
+    }
+
+    function applyParts(parts, overwrite = false) {
+      form.dataset.dartAddressApplying = 'true';
+      try {
+        for (const name of ['country', 'governorate', 'area', 'street', 'building']) {
+          // Never retain the previous destination's route when the new pin has
+          // no provider value. Unit details can still be entered by the customer.
+          if (overwrite && name !== 'building' && fields[name] && !parts[name]) fields[name].value = '';
+          if (overwrite || !value(fields[name])) setValue(fields[name], parts[name]);
+        }
+        if (parts.fullAddress) {
+          if (fields.fullAddress) fields.fullAddress.value = parts.fullAddress;
+          if (fields.search) fields.search.value = parts.fullAddress;
+        }
+      } finally {
+        form.dataset.dartAddressApplying = 'false';
+      }
+    }
+
+    function setMarker(lat, lng, openPopup = true) {
+      if (marker) marker.setLatLng([lat, lng]);
+      else {
+        marker = L.marker([lat, lng], { icon: pin, draggable: true }).addTo(map);
+        marker.on('dragstart', () => beginVerification('Checking the new delivery location…'));
+        marker.on('dragend', event => selectLocation(event.target.getLatLng().lat, event.target.getLatLng().lng));
+      }
+      map.setView([lat, lng], 16);
+      if (openPopup) marker.bindPopup('Delivery location').openPopup();
+    }
+
+    async function selectLocation(lat, lng, knownResult = null, selectionVersion = null) {
+      if (selectionVersion !== null && selectionVersion !== requestVersion) return false;
+      const version = selectionVersion ?? beginVerification('Checking that this delivery location is inside Cairo or Giza…');
+      setMarker(lat, lng, false);
+      try {
+        const result = knownResult || await nominatim('reverse', { lat, lon: lng, zoom: '18', namedetails: '1', extratags: '1' });
+        if (version !== requestVersion) return;
+        if (!isSupportedDeliveryResult(result)) {
+          rejectVerification('Delivery is currently available in Cairo and Giza only. Choose a location inside the delivery zone.');
+          return false;
+        }
+        const parts = addressParts(result);
+        parts.country = 'Egypt';
+        parts.governorate = canonicalDeliveryGovernorate(parts.governorate);
+        setCoordinates(lat, lng, 'map');
+        setMarker(lat, lng);
+        applyParts(parts, Boolean(options.overwriteFromMap));
+        marker.bindPopup(parts.fullAddress || 'Delivery location').openPopup();
+        status(`${parts.governorate} location selected. Complete the building and floor details.`, 'success');
+        form.dispatchEvent(new CustomEvent('dart:address-selected', { bubbles: true, detail: { lat, lng, parts } }));
+        return true;
+      } catch (error) {
+        if (version !== requestVersion) return false;
+        rejectVerification(navigator.onLine ? 'The location could not be verified. Try again or enter the Cairo/Giza address manually.' : 'You are offline. Reconnect to verify the delivery location.');
+        return false;
+      }
+    }
+
+    function manualQuery() {
+      return [value(fields.building), value(fields.street), value(fields.area), value(fields.governorate), value(fields.country) || 'Egypt']
+        .filter(Boolean).join(', ');
+    }
+
+    async function locateManualAddress(showErrors = true) {
+      const query = manualQuery();
+      const version = beginVerification('Locating the manually entered address…');
+      if (!value(fields.country) || !value(fields.governorate) || !value(fields.area) || !value(fields.street) || !value(fields.building) || !value(fields.floor)) {
+        status('Complete country, governorate, area, street, building and floor first.', showErrors ? 'error' : '');
+        return false;
+      }
+      if (!isSupportedGovernorateName(value(fields.governorate))) {
+        rejectVerification('Delivery is currently available in Cairo and Giza only.');
+        return false;
+      }
+      try {
+        const results = await nominatim('search', { q: query, countrycodes: 'eg', viewbox:DELIVERY_VIEWBOX, bounded:'1', limit: '5' });
+        if (version !== requestVersion) return false;
+        const result = results.find(isSupportedDeliveryResult);
+        if (!result) {
+          rejectVerification('This address could not be verified inside Cairo or Giza. Refine it or choose a pin inside the delivery zone.');
+          return false;
+        }
+        const lat = Number(result.lat), lng = Number(result.lon);
+        setCoordinates(lat, lng, 'manual');
+        form.dataset.dartAddressApplying = 'true';
+        try {
+          setValue(fields.country, 'Egypt');
+          setValue(fields.governorate, canonicalDeliveryGovernorate(addressParts(result).governorate));
+        } finally {
+          form.dataset.dartAddressApplying = 'false';
+        }
+        if (fields.fullAddress) fields.fullAddress.value = result.display_name || query;
+        if (fields.search) fields.search.value = result.display_name || query;
+        setMarker(lat, lng, false);
+        status('Manual address matched to the Cairo/Giza delivery map.', 'success');
+        form.dispatchEvent(new CustomEvent('dart:address-selected', { bubbles: true, detail: { lat, lng, parts: addressParts(result) } }));
+        return true;
+      } catch (error) {
+        if (version !== requestVersion) return false;
+        rejectVerification('Address lookup failed. Check the connection or select the pin manually.');
+        return false;
+      }
+    }
+
+    function validate() {
+      if (form.dataset.dartAddressState === 'loading') return { ok: false, message: 'Wait until the delivery location has been verified.' };
+      if (form.dataset.dartAddressReady !== 'true') return { ok: false, message: 'Verify the delivery location before confirming the order.' };
+      const missing = [];
+      if (!value(fields.country)) missing.push('country');
+      if (!value(fields.governorate)) missing.push('governorate');
+      if (!value(fields.area)) missing.push('area');
+      if (!value(fields.street)) missing.push('street');
+      if (!value(fields.building)) missing.push('building number/name');
+      if (!value(fields.floor)) missing.push('floor');
+      const hasCoordinates = Boolean(value(fields.latitude) && value(fields.longitude));
+      if (missing.length) return { ok: false, message: `Complete: ${missing.join(', ')}.` };
+      if (!isSupportedGovernorateName(value(fields.governorate)) || form.dataset.dartDeliveryZone !== 'cairo-giza') {
+        return { ok:false, message:'Delivery is currently available in Cairo and Giza only. Verify the address on the map.' };
+      }
+      if (!hasCoordinates) return { ok: false, message: 'Select a location on the map or locate the manually entered address.' };
+      return { ok: true, source: form.dataset.dartAddressSource || 'map', zone:'cairo-giza' };
+    }
+
+    function snapshot() {
+      return JSON.stringify([requestVersion, form.dataset.dartAddressSource,
+        ...['latitude', 'longitude', 'fullAddress', 'country', 'governorate', 'area', 'street', 'building', 'floor'].map(name => value(fields[name]))]);
+    }
+
+    function isCurrentSnapshot(saved) {
+      return validate().ok && saved === snapshot();
+    }
+
+    map.on('click', event => selectLocation(event.latlng.lat, event.latlng.lng));
+
+    const locateControl = L.control({ position: 'bottomright' });
+    locateControl.onAdd = () => {
+      const wrap = L.DomUtil.create('div', 'dart-map-actions');
+      const button = L.DomUtil.create('button', 'dart-map-locate', wrap);
+      button.type = 'button';
+      button.title = 'Use my current location';
+      button.setAttribute('aria-label', 'Use my current location');
+      button.innerHTML = '<i class="fa-solid fa-crosshairs"></i>';
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.on(button, 'click', () => {
+        if (!navigator.geolocation) return status('Location access is not supported by this browser.', 'error');
+        const version = beginVerification('Finding your current location…');
+        navigator.geolocation.getCurrentPosition(
+          position => selectLocation(position.coords.latitude, position.coords.longitude, null, version),
+          () => { if (version === requestVersion) rejectVerification('Location permission was denied. Select the pin manually.'); },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      });
+      return wrap;
+    };
+    locateControl.addTo(map);
+
+    if (fields.search && fields.results) {
+      fields.search.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        const query = value(fields.search);
+        if (query.length < 3) {
+          fields.results.hidden = true;
+          fields.results.style.display = 'none';
+          return;
+        }
+        searchTimer = setTimeout(async () => {
+          fields.results.hidden = false;
+          fields.results.style.display = 'block';
+          fields.results.innerHTML = '<li class="dart-address-loading">Searching…</li>';
+          try {
+            const results = (await nominatim('search', { q: query, countrycodes: 'eg', viewbox:DELIVERY_VIEWBOX, bounded:'1', limit: '8' })).filter(isSupportedDeliveryResult).slice(0, 5);
+            fields.results.innerHTML = results.length ? '' : '<li class="dart-address-empty">No verified address found inside Cairo or Giza.</li>';
+            results.forEach(result => {
+              const item = document.createElement('li');
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.textContent = result.display_name;
+              button.addEventListener('click', () => {
+                fields.results.hidden = true;
+                fields.results.style.display = 'none';
+                selectLocation(Number(result.lat), Number(result.lon), result);
+              });
+              item.appendChild(button);
+              fields.results.appendChild(item);
+            });
+          } catch (error) {
+            fields.results.innerHTML = '<li class="dart-address-empty">Address search is temporarily unavailable.</li>';
+          }
+        }, 650);
+      });
+    }
+
+    const manualFields = [fields.country, fields.governorate, fields.area, fields.street, fields.building, fields.floor].filter(Boolean);
+    const hasVerifiedCoordinates = () => {
+      const lat = Number(value(fields.latitude));
+      const lng = Number(value(fields.longitude));
+      return Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0 &&
+        form.dataset.dartDeliveryZone === 'cairo-giza';
+    };
+    const onManualAddressInput = () => {
+      if (form.dataset.dartAddressApplying === 'true') return;
+      userInteractedWithAddress = true;
+      clearTimeout(manualTimer);
+      // Once the customer deliberately selects a map/GPS pin, text fields only
+      // describe that exact destination. They must never silently geocode a new pin.
+      if (hasVerifiedCoordinates()) {
+        form.dataset.dartAddressReady = 'true';
+        status('Exact map pin preserved. Address details updated without moving the destination.', 'success');
+        return;
+      }
+      form.dataset.dartAddressSource = 'manual';
+      beginVerification('Locating the manually entered address…');
+      if (!manualFields.every(input => value(input))) {
+        status('Complete country, governorate, area, street, building and floor first.');
+        return;
+      }
+      manualTimer = setTimeout(() => {
+        if (manualFields.every(input => value(input))) locateManualAddress(false);
+      }, 1500);
+    };
+    manualFields.forEach(field => {
+      field.addEventListener('input', onManualAddressInput);
+      if (field.tagName === 'SELECT') field.addEventListener('change', onManualAddressInput);
+    });
+
+    const manualButton = document.querySelector(options.manualButton);
+    manualButton?.addEventListener('click', () => {
+      userInteractedWithAddress = true;
+      locateManualAddress(true);
+    });
+
+    function applySavedAddress(saved) {
+      if (!saved || userInteractedWithAddress) return false;
+      const lat = Number(saved.lat ?? saved.latitude);
+      const lng = Number(saved.lng ?? saved.longitude);
+      const governorate = canonicalDeliveryGovernorate(saved.governorate);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat || !lng ||
+          !governorate || !isInsideDeliveryBounds(lat, lng)) return false;
+      form.dataset.dartAddressApplying = 'true';
+      try {
+        setValue(fields.country, saved.country || 'Egypt');
+        setValue(fields.governorate, governorate);
+        setValue(fields.area, saved.area || '');
+        setValue(fields.street, saved.street || '');
+        setValue(fields.building, saved.building || '');
+        setValue(fields.floor, saved.floor || '');
+        const savedText = String(saved.address || saved.fullAddress || '').trim();
+        if (fields.fullAddress && savedText) fields.fullAddress.value = savedText;
+        if (fields.search && savedText) fields.search.value = savedText;
+        setCoordinates(lat, lng, 'map');
+        setMarker(lat, lng, false);
+        status('Saved exact delivery pin restored. Review the address details before ordering.', 'success');
+      } finally {
+        form.dataset.dartAddressApplying = 'false';
+      }
+      return true;
+    }
+
+    const savedAddress = window.DartState?.read?.('user_last_address', null);
+    const restoredSavedAddress = applySavedAddress(savedAddress);
+    window.addEventListener('dart:saved-address-hydrated', event => {
+      applySavedAddress(event.detail?.address || null);
+    });
+
+    const initialLat = Number(value(fields.latitude));
+    const initialLng = Number(value(fields.longitude));
+    if (!restoredSavedAddress && Number.isFinite(initialLat) && Number.isFinite(initialLng) && initialLat && initialLng) selectLocation(initialLat, initialLng);
+
+    const controller = { map, selectLocation, locateManualAddress, validate, snapshot, isCurrentSnapshot, fields, invalidate: () => setTimeout(() => map.invalidateSize(), 50) };
+    controllers.set(mapElement, controller);
+    setTimeout(() => map.invalidateSize(), 200);
+    return controller;
+  }
+
+  function initCheckout() {
+    const form = document.getElementById('checkoutForm');
+    if (!form) return null;
+    const manual = form.querySelector('.other-addres');
+    const toggle = form.querySelector('.arrwo-for-other-adrees');
+    if (manual && toggle && !toggle.dataset.dartBound) {
+      manual.hidden = true;
+      toggle.dataset.dartBound = '1';
+      toggle.addEventListener('click', () => {
+        manual.hidden = !manual.hidden;
+        toggle.setAttribute('aria-expanded', String(!manual.hidden));
+      });
+      toggle.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle.click(); }
+      });
+      form.addEventListener('invalid', event => {
+        if (manual.contains(event.target)) { manual.hidden = false; toggle.setAttribute('aria-expanded','true'); }
+      }, true);
+    }
+    const controller = create({
+      form: '#checkoutForm', map: '#map', search: '#address-input', results: '#results-list',
+      latitude: '#lat-input', longitude: '#lng-input', fullAddress: '#formatted-address-input',
+      country: '#checkout-country', governorate: '#governorate-select', area: '#area-input',
+      street: '#street-input', building: '#checkout-building', floor: '#checkout-floor',
+      status: '#checkout-address-status', manualButton: '#locate-manual-address', overwriteFromMap: true
+    });
+    if (controller) window.dartCheckoutAddress = controller;
+    return controller;
+  }
+
+  function initReturnRequest() {
+    const form = document.getElementById('returnRequestForm');
+    if (!form) return null;
+    const controller = create({
+      form: '#returnRequestForm', map: '#return-address-map', search: '#return-address-search', results: '#return-address-results',
+      latitude: '#return-latitude', longitude: '#return-longitude', fullAddress: '#return-full-address',
+      country: '#return-country', governorate: '#return-governorate', area: '#return-area',
+      street: '#return-street', building: '#return-building', floor: '#return-floor',
+      status: '#return-address-status', manualButton: '#return-locate-manual-address', overwriteFromMap: true
+    });
+    if (controller) window.dartReturnAddress = controller;
+    return controller;
+  }
+
+  window.DartAddress = {
+    create,
+    initCheckout,
+    initReturnRequest,
+    addressParts,
+    canonicalDeliveryGovernorate,
+    isSupportedGovernorateName,
+    isSupportedDeliveryResult,
+    isInsideDeliveryBounds
+  };
+})();
+
+
+// END MODULE

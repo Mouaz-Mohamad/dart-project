@@ -2187,8 +2187,7 @@ body.dart-set-image-open {
 }
 
 .footer-continear .logo-text img {
-  width: 25%;
-  height: 25%;
+  width: 100%;
 }
 
 .footer-continear .logo-text h1 {

@@ -19,6 +19,7 @@ function sourceText(source) {
 module.exports = { sourceText };
 if (require.main === module) buildSourceRuntimes();
 if (require.main === module) for (const [source, output] of [
+  ['src/storefront/address.js', 'Js/dart-address.js'],
   ['src/storefront/catalog.js', 'Js/dart-catalog.js'],
   ['src/storefront/storefront.js', 'Js/dart-storefront.js'],
   ['src/storefront/merchandising.js', 'Js/dart-merchandising.js'],

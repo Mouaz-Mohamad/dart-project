@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:bd6a0dd416f31850c06e754e55be27fb93ea8dd8ed49ad8c3824db5d4676bde6 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:ae78421a2bac95a4d55b66b9df375ae8987c9c0328f600bc33d3b5c5cce8609d */
 (function () {
   "use strict";
 
@@ -1670,9 +1670,17 @@
     };
     if (!details.name || !details.phone1)
       throw new Error("Complete your name and phone number.");
-    const addressValidation = window.dartCheckoutAddress?.validate?.();
-    if (addressValidation && !addressValidation.ok)
-      throw new Error(addressValidation.message);
+    const addressController = window.dartCheckoutAddress;
+    const addressValidation = addressController?.validate?.();
+    if (!addressValidation?.ok)
+      throw new Error(addressValidation?.message || "Verify the delivery location before confirming the order.");
+    const addressSnapshot = addressController.snapshot?.();
+    const assertAddressUnchanged = () => {
+      if (!addressController.validate().ok ||
+          (addressSnapshot !== undefined && !addressController.isCurrentSnapshot(addressSnapshot))) {
+        throw new Error("Delivery location changed while preparing the order. Verify it and confirm again.");
+      }
+    };
     if (
       !details.country ||
       !details.governorate ||
@@ -1727,6 +1735,9 @@
         throw cartPriceReview(previousQuote, quote, previousTotal);
       }
       window.applyCartQuote?.(quote);
+      // Quoting may take time. Never POST the old destination after a map,
+      // GPS or manual-address change made while that request was in flight.
+      if (!quote.completedOrder) assertAddressUnchanged();
       let response;
       try {
         response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest("/api/v1/orders", {

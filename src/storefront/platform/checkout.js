@@ -122,9 +122,17 @@
     };
     if (!details.name || !details.phone1)
       throw new Error("Complete your name and phone number.");
-    const addressValidation = window.dartCheckoutAddress?.validate?.();
-    if (addressValidation && !addressValidation.ok)
-      throw new Error(addressValidation.message);
+    const addressController = window.dartCheckoutAddress;
+    const addressValidation = addressController?.validate?.();
+    if (!addressValidation?.ok)
+      throw new Error(addressValidation?.message || "Verify the delivery location before confirming the order.");
+    const addressSnapshot = addressController.snapshot?.();
+    const assertAddressUnchanged = () => {
+      if (!addressController.validate().ok ||
+          (addressSnapshot !== undefined && !addressController.isCurrentSnapshot(addressSnapshot))) {
+        throw new Error("Delivery location changed while preparing the order. Verify it and confirm again.");
+      }
+    };
     if (
       !details.country ||
       !details.governorate ||
@@ -179,6 +187,9 @@
         throw cartPriceReview(previousQuote, quote, previousTotal);
       }
       window.applyCartQuote?.(quote);
+      // Quoting may take time. Never POST the old destination after a map,
+      // GPS or manual-address change made while that request was in flight.
+      if (!quote.completedOrder) assertAddressUnchanged();
       let response;
       try {
         response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest("/api/v1/orders", {

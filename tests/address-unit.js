@@ -53,7 +53,7 @@ assert(address.addressParts({category:'highway',type:'residential',name:'Example
 const mobileParts = address.addressParts({address:{state:'Cairo Governorate',quarter:'El Manteqa',path:'Service Path'}});
 assert(mobileParts.area === 'El Manteqa', 'mobile reverse geocoding should accept quarter as a precise area fallback');
 assert(mobileParts.street === 'Service Path', 'mobile reverse geocoding should accept path when road is unavailable');
-const addressSource = fs.readFileSync('Js/dart-address.js', 'utf8');
+const addressSource = fs.readFileSync('src/storefront/address.js', 'utf8');
 assert(addressSource.includes("namedetails: '1'"), 'reverse lookup should request provider naming details for building fallback');
 assert(addressSource.includes('zoomControl: false'), 'address maps must not expose Leaflet zoom buttons');
 assert(addressSource.includes('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4571_1_f3f5f58e8a8808e98e8b6df9'), 'address maps must use the calm CARTO Positron layer with the configured API key');
