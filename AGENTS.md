@@ -24,6 +24,7 @@ Codex reads this file automatically before every task, so the rules below apply 
 - Run backend dev server: `cd backend && npm run dev`
 - Run backend checks: `cd backend && npm run check`
 - Run the isolated real-time order experiment: `cd backend && node --import tsx experiments/realtime-pilot/run.ts` (local synthetic database only; refuses configured database URLs and never changes production polling).
+- Run the provider-free direct update experiment: `cd backend && node --import tsx experiments/direct-realtime/run.ts`; browser check: `node experiments/direct-realtime/browser-check.mjs` (optional existing Playwright/Chromium setup). Experiments must never be imported by production. `TEST_DATABASE_URL`, if supplied, must point to a named loopback test database; production polling remains unchanged.
 - Run bounded read-only load checks: `cd backend && npm run test:load -- --base http://127.0.0.1:4000 --users 10 --duration 10`
 - Benchmark isolated order responses: `cd backend && TEST_DATABASE_URL=<local-test-database-url> npm run bench:orders` (local test database only; creates and removes synthetic data).
 - Benchmark isolated catalog scaling: `cd backend && TEST_DATABASE_URL=<local-test-database-url> npm run bench:scale` (local test database only; synthetic data and identity, never a production capacity certification).

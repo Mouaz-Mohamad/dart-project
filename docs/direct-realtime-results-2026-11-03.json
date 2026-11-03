@@ -1,0 +1,27 @@
+{
+  "kind": "isolated-direct-postgres-sse-pilot",
+  "database": "PGlite PostgreSQL engine; no native TCP or multiple processes",
+  "newServices": 0,
+  "externalProviderRequests": 0,
+  "committedOrderVisible": true,
+  "idleMeasuredMs": 150,
+  "idleExtraDataReads": 0,
+  "idleExtraListenStatements": 0,
+  "metrics": {
+    "dataReads": 2,
+    "dataJsonBytes": 1827,
+    "authReads": 4,
+    "connectionsOpened": 1,
+    "listenStatements": 1,
+    "notifications": 1
+  },
+  "streamedBodyBytes": 128,
+  "checkoutStartToSignalMs": 85.05,
+  "limitations": [
+    "Local synthetic identity and one checkout; not production latency/load/billing",
+    "Body bytes exclude HTTP/TLS headers and 24-hour keepalive/reconnect overhead",
+    "Native cross-instance PostgreSQL/TCP is tested by CI when TEST_DATABASE_URL is present",
+    "Vercel and database usage may rise while streams keep functions/compute active; no zero-cost guarantee",
+    "No production trigger, endpoint or polling change"
+  ]
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dart isolated direct-update experiment</title>
+<style>body{font:16px system-ui;max-width:720px;margin:40px auto;padding:16px;background:#faf7f1;color:#36262a}h1{color:#850225}output{display:block;padding:16px;background:white;border:1px solid #ddd}li{margin:8px}</style>
+<h1>Direct update experiment</h1><p>Local synthetic orders only.</p><output id="status">Connecting</output><ul id="orders"></ul>
+<script type="module">
+import { PilotClient } from '/demo/client.js';
+import { subscribeToEvents } from '/demo/events.js';
+import { directSnapshotSource } from '/demo/source.js';
+let reads = 0;
+const client = new PilotClient(directSnapshotSource({
+  subscribe: (receive, state) => subscribeToEvents(() => new EventSource('/direct/events'), receive, state),
+  loadVersion: async signal => { reads++; const response = await fetch('/direct/version', {signal, cache:'no-store'}); if(!response.ok) throw new Error('Version unavailable'); return (await response.json()).version; },
+  loadSnapshot: async signal => { reads++; const response = await fetch('/direct/snapshot', {signal, cache:'no-store'}); if(!response.ok) throw new Error('Snapshot unavailable'); return response.json(); },
+  apply: snapshot => {
+    document.getElementById('status').textContent = `Version ${snapshot.version} · ${reads} data reads`;
+    document.getElementById('orders').replaceChildren(...snapshot.orders.map(order => {const row=document.createElement('li');row.textContent=order.orderId;return row;}));
+  },
+}));
+window.pilot = {client, get reads(){return reads;}};
+document.addEventListener('visibilitychange',()=>{if(document.hidden) client.stop();else client.start().catch(()=>{document.getElementById('status').textContent='Connection unavailable';});});
+window.addEventListener('pagehide',()=>client.stop());
+client.start().catch(()=>{document.getElementById('status').textContent='Connection unavailable';});
+</script></html>
