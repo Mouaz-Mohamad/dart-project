@@ -63,11 +63,6 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-rep.js",
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
-  // Checkout suggestions are page-scoped, and the two dashboard shipping modules
-  // are dynamically loaded by dart-shipping-loader.js only on shipping/dispatch.
-  "Js/dart-checkout-regions.js",
-  "Eye/dart-shipping.js",
-  "Eye/dart-coverage-picker.js",
   "Js/dart-sets.js",
   "Js/dart-set-modal-ui.js",
   "Js/dart-navigation.js",
@@ -124,11 +119,20 @@ if (!settingsRuntime.includes('[data-target="models"]')) {
 // This script is loaded only by the standalone WhatsApp feedback page, not
 // by any general storefront/dashboard page. Budget it independently.
 const standaloneScripts = new Set(["Js/dart-public-feedback.js"]);
+// New coverage editors are isolated from core and older lazy sections:
+// shipping is loaded only when a shipment/Shipping section is opened;
+// checkout suggestions appear only on cart-checkout.html.
+const coverageFeatureFiles = new Set([
+  "Js/dart-checkout-regions.js",
+  "Eye/dart-shipping.js",
+  "Eye/dart-coverage-picker.js",
+]);
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
 let coreJsBytes = 0;
 let lazyJsBytes = 0;
 let standaloneJsBytes = 0;
+let coverageFeatureBytes = 0;
 let brandDetailsBytes = 0;
 let customerDetailsBytes = 0;
 let merchandisingBytes = 0;
@@ -139,11 +143,25 @@ for (const file of jsFiles) {
   else if (file === "Eye/dart-customer-details.js") customerDetailsBytes += size;
   else if (file === "Eye/dart-brand-details.js") brandDetailsBytes += size;
   else if (standaloneScripts.has(file)) standaloneJsBytes += size;
+  else if (coverageFeatureFiles.has(file)) coverageFeatureBytes += size;
   else if (pageScopedFeatureFiles.has(file)) lazyJsBytes += size;
   else coreJsBytes += size;
   if (size > maxJsBytes) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
+}
+// Independent 23 KiB cap; do not change core/lazy budgets.
+if (coverageFeatureBytes > 23 * 1024) {
+  failures.push("Shipping/checkout coverage feature scripts exceed their 23 KiB cap");
+}
+if (/src=["']dart-(?:shipping|coverage-picker)\.js["']/.test(dashboardHtml)) {
+  failures.push("Shipping management must stay lazy-loaded on the dashboard");
+}
+if (!dashboardHtml.includes('src="dart-shipping-loader.js"')) {
+  failures.push("Dashboard missing the lazy shipping loader");
+}
+if (!fs.readFileSync("cart-checkout.html","utf8").includes('src="Js/dart-checkout-regions.js"')) {
+  failures.push("Checkout city suggestions are not page-scoped");
 }
 if (standaloneJsBytes > 8 * 1024) {
   failures.push("Standalone public feedback runtime exceeds its 8KB budget");
