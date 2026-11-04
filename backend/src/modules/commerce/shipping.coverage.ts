@@ -889,7 +889,9 @@ export function isCompanyAddressCovered(company: CoveredCompany, governorate:unk
   // Existing orders may store a city or area in the free-text 'area' field.
   const matched=gov.cities.filter(x=>matchesPart(city,x.id,x.en,x.ar) || matchesPart(area,x.id,x.en,x.ar));
   if(matched.length!==1)return false;
-  const chosenCity=matched[0], selected=scope.cities[chosenCity.id];
+  const chosenCity=matched[0];
+  if (!chosenCity) return false;
+  const selected=scope.cities[chosenCity.id];
   if(!selected)return false;
   if(selected.all)return true;
   return chosenCity.areas.some(a=>selected.areas.includes(a.id) &&

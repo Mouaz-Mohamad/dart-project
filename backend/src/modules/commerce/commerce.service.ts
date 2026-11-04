@@ -52,7 +52,7 @@ import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-querie
 import { returnMatchesSale } from "./commerce.returns.js";
 import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
-import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage, isCompanyAddressCovered } from "./shipping.coverage.js";
+import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage } from "./shipping.coverage.js";
 import { DART_CARRIER, dispatchShipment, validTrackingPortal,
   type ShippingCompany, type DispatchedShipment } from "./shipping.core.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
