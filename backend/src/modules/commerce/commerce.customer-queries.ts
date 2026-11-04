@@ -355,6 +355,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
       status: string;
       payment_method: string;
       payment_status: string;
+      legacy: Record<string, unknown> | null;
       subtotal_minor: string;
       order_discount_minor: string;
       final_minor: string;
@@ -380,7 +381,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
       set_groups: Array<Record<string, unknown>>;
       items: Array<Record<string, unknown>>;
     }>(
-      `SELECT o.id, o.order_code, o.status, o.payment_method, o.payment_status,
+      `SELECT o.id, o.order_code, o.status, o.payment_method, o.payment_status, o.legacy,
               o.subtotal_minor::text, o.order_discount_minor::text, o.final_minor::text,
               o.delivery_cost_minor::text, o.amount_paid_minor::text,
               o.amount_refunded_minor::text, o.promotion,
@@ -530,6 +531,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
         longitude: address.longitude || "",
         fullAddress: address.fullAddress || "",
         deliveryNotes: row.delivery_notes,
+        deliveryShipment: row.legacy?.deliveryShipment || null,
         representativeId: row.representative_user_id || "",
         representativeBusinessId: row.representative_code || "",
         representativeName: row.representative_name || "",

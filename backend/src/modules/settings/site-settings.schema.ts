@@ -82,6 +82,13 @@ export const siteSettingsSchema = z.object({
   modelCards: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   typing: typing.optional(),
   codRisk: codRisk.optional(),
+  shippingCompanies: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9_-]{2,64}$/),
+    name: z.string().trim().min(2).max(100),
+    trackingUrl: z.string().trim().min(1).max(2000),
+    active: z.boolean(),
+    governorates: z.array(z.string().trim().min(2).max(100)).max(27),
+  }).strict()).max(50).optional(),
 }).strict();
 
 export type SiteSettings = z.infer<typeof siteSettingsSchema>;

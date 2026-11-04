@@ -52,6 +52,8 @@ import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-querie
 import { returnMatchesSale } from "./commerce.returns.js";
 import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
+import { DART_CARRIER, dispatchShipment, validTrackingPortal,
+  type ShippingCompany, type DispatchedShipment } from "./shipping.core.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
 
 // Keep imports used by existing routers, Set workflows and tests compatible.
@@ -94,6 +96,95 @@ async function customerPurchaseStats(
 
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
+
+  public async shippingCompanies(): Promise<{version:number;companies:ShippingCompany[]}> {
+    const rows=await this.pool.query<{version:string;data:Record<string,unknown>}>(
+      "SELECT version::text,data FROM site_settings WHERE id='main'");
+    const raw=rows.rows[0]?.data?.shippingCompanies;
+    const companies=Array.isArray(raw)?raw as ShippingCompany[]:[];
+    return {version:Number(rows.rows[0]?.version||1),companies:[DART_CARRIER,...companies]};
+  }
+
+  public async saveShippingCompanies(actorId:string,expectedVersion:number,
+      companies:ShippingCompany[],requestId:string):Promise<{version:number;companies:ShippingCompany[]}>{
+    const ids=companies.map(company=>company.id);
+    if(ids.includes("dart") || new Set(ids).size!==ids.length)
+      throw new AppError(422,"SHIPPING_COMPANY_DUPLICATE","Shipping company IDs must be unique, and Dart cannot be modified");
+    for(const company of companies){
+      try {validTrackingPortal(company.trackingUrl);}
+      catch {throw new AppError(422,"SHIPPING_COMPANY_URL","Use an official HTTPS tracking portal");}
+    }
+    const client=await this.pool.connect();
+    try{
+      await client.query("BEGIN");
+      const existing=await client.query<{version:string}>(
+        "SELECT version::text FROM site_settings WHERE id='main' FOR UPDATE");
+      const current=Number(existing.rows[0]?.version||1);
+      if(expectedVersion!==current)
+        throw new AppError(409,"SETTINGS_VERSION_CONFLICT","Shipping settings changed; refresh and retry");
+      const changed=await client.query<{version:string}>(
+        `UPDATE site_settings SET data=jsonb_set(COALESCE(data,'{}'::jsonb),'{shippingCompanies}',$1::jsonb,true),
+           version=version+1,updated_by=$2,updated_at=now()
+         WHERE id='main' RETURNING version::text`,[JSON.stringify(companies),actorId]);
+      await client.query(
+        `INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,metadata)
+         VALUES('staff',$1,'SHIPPING_COMPANIES_UPDATED','site_settings','main',$2,$3::jsonb)`,
+        [actorId,requestId,JSON.stringify({companyIds:ids,previousVersion:current})]);
+      await client.query("COMMIT");
+      return {version:Number(changed.rows[0]?.version||current+1),companies:[DART_CARRIER,...companies]};
+    }catch(error){await client.query("ROLLBACK").catch(()=>undefined);throw error;}
+    finally{client.release();}
+  }
+
+  // Corrections are restricted by the database's Owner flag, not browser-side roles.
+  public async correctOrderShipment(actorId:string,orderRef:string,expectedVersion:number,
+       companyId:string,trackingNumber:string,requestId:string):Promise<AdminOrdersState>{
+    const client=await this.pool.connect();
+    let orderId="",customerId:string|null=null,version=0;
+    try{
+      await client.query("BEGIN");
+      const owner=await client.query<{is_owner:boolean}>(
+        "SELECT is_owner FROM staff_users WHERE user_id=$1",[actorId]);
+      if(!owner.rows[0]?.is_owner)
+        throw new AppError(403,"OWNER_REQUIRED","Only the Owner can correct shipping after dispatch");
+      const rows=await client.query<{id:string;customer_user_id:string|null;version:string;status:string;
+         legacy:Record<string,unknown>|null;delivery_address:Record<string,unknown>|null}>(
+        `SELECT id::text,customer_user_id::text,version::text,status,legacy,delivery_address
+         FROM orders WHERE id::text=$1 OR order_code=$1 LIMIT 1 FOR UPDATE`,[orderRef]);
+      const order=rows.rows[0];
+      if(!order)throw new AppError(404,"ORDER_NOT_FOUND","Order not found");
+      if(Number(order.version)!==expectedVersion)
+        throw new AppError(409,"ORDER_STATE_STALE","Order changed; refresh first");
+      const old=(order.legacy?.deliveryShipment||null) as DispatchedShipment|null;
+      if(order.status!=="Out With Representative" || old?.type!=="external")
+        throw new AppError(409,"SHIPPING_CORRECTION_LOCKED","Only active externally dispatched orders can be corrected");
+      const settings=await client.query<{data:Record<string,unknown>}>(
+        "SELECT data FROM site_settings WHERE id='main'");
+      const companies=Array.isArray(settings.rows[0]?.data?.shippingCompanies)
+        ?settings.rows[0].data.shippingCompanies as ShippingCompany[]:[];
+      let next:DispatchedShipment;
+      try{next=dispatchShipment([DART_CARRIER,...companies],{
+          companyId,trackingNumber,governorate:String(order.delivery_address?.governorate||""),
+          now:old.dispatchedAt,
+        });}
+      catch(error){throw new AppError(422,"INVALID_SHIPPING_CORRECTION",error instanceof Error?error.message:"Invalid carrier");}
+      if(next.type!=="external")throw new AppError(422,"EXTERNAL_COMPANY_REQUIRED","Use a separate workflow to return an order to Dart");
+      const snapshot={...next,correctedAt:new Date().toISOString()};
+      await client.query(
+        `UPDATE orders SET legacy=jsonb_set(COALESCE(legacy,'{}'::jsonb),'{deliveryShipment}',$2::jsonb,true),
+           version=version+1,updated_at=now() WHERE id=$1`,[order.id,JSON.stringify(snapshot)]);
+      const v=await client.query<{version:string}>(
+        "UPDATE domain_state_versions SET version=version+1,updated_at=now() WHERE domain='orders' RETURNING version::text");
+      await client.query(
+        `INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,old_values,new_values)
+         VALUES('staff',$1,'SHIPPING_CORRECTED','orders',$2,$3,$4::jsonb,$5::jsonb)`,
+        [actorId,order.id,requestId,JSON.stringify(old),JSON.stringify(snapshot)]);
+      orderId=order.id;customerId=order.customer_user_id;version=Number(v.rows[0]?.version||1);
+      await client.query("COMMIT");
+    }catch(error){await client.query("ROLLBACK").catch(()=>undefined);throw error;}
+    finally{client.release();}
+    return this.ordersAfterCommit(version,undefined,[orderId],customerId?[customerId]:[]);
+  }
 
   private async cartLinesForReservation(
     client: PoolClient,
@@ -5070,6 +5161,8 @@ export class CommerceService {
         | "Refused"
         | "Cancelled";
       representativeId?: string | undefined;
+      shippingCompanyId?: string | undefined;
+      trackingNumber?: string | undefined;
       deliveryGroupId?: string | undefined;
       reason?: string | undefined;
       notes?: string | undefined;
@@ -5149,7 +5242,11 @@ export class CommerceService {
 
       const previousIndex = flow.indexOf(previousStatus);
       const targetIndex = flow.indexOf(target);
-      const isForward = previousIndex >= 0 && targetIndex === previousIndex + 1;
+      const previousShipment=order.legacy?.deliveryShipment as DispatchedShipment|undefined;
+      const external=previousShipment?.type==="external";
+      const externalDelivered=external && previousStatus==="Out With Representative" && target==="Delivered";
+      const isForward = previousIndex >= 0 && targetIndex === previousIndex + 1 &&
+        !(external && target==="Representative On The Way");
       const isBack = previousIndex > 0 && targetIndex === previousIndex - 1;
       const isCancelled =
         target === "Cancelled" &&
@@ -5157,7 +5254,7 @@ export class CommerceService {
       const isRefused =
         target === "Refused" &&
         ["Out With Representative", "Representative On The Way"].includes(previousStatus);
-      if (!isForward && !isBack && !isCancelled && !isRefused) {
+      if (!isForward && !isBack && !isCancelled && !isRefused && !externalDelivered) {
         throw new AppError(
           409,
           "ORDER_STATE_INVALID",
@@ -5238,32 +5335,32 @@ export class CommerceService {
       }
 
       let representativeUserId = order.representative_user_id;
+      let dispatchedShipment:DispatchedShipment|null=null;
       if (target === "Out With Representative" && previousStatus === "Preparing") {
-        const representativeRef = String(input.representativeId || "").trim();
-        if (!representativeRef) {
-          throw new AppError(
-            422,
-            "REPRESENTATIVE_REQUIRED",
-            "Choose a representative before sending the order out",
-          );
-        }
-        const representativeResult = await client.query<{ user_id: string }>(
-          `SELECT r.user_id::text
-             FROM representatives r
-             JOIN users u ON u.id=r.user_id
-            WHERE (r.user_id::text=$1::text OR r.representative_code=$1::text)
-              AND r.approval_status='approved'
-              AND u.status='active'
-            LIMIT 1`,
-          [representativeRef],
-        );
-        representativeUserId = representativeResult.rows[0]?.user_id || null;
-        if (!representativeUserId) {
-          throw new AppError(
-            409,
-            "REPRESENTATIVE_UNAVAILABLE",
-            "Choose an active representative",
-          );
+        const companyId=String(input.shippingCompanyId||"dart").trim();
+        if(companyId!=="dart"){
+          const settings=await client.query<{data:Record<string,unknown>}>(
+            "SELECT data FROM site_settings WHERE id='main'");
+          const companies=Array.isArray(settings.rows[0]?.data?.shippingCompanies)
+             ?settings.rows[0].data.shippingCompanies as ShippingCompany[]:[];
+          const destination=await client.query<{governorate:string}>(
+            "SELECT COALESCE(delivery_address->>'governorate','') AS governorate FROM orders WHERE id=$1",[order.id]);
+          try{dispatchedShipment=dispatchShipment([DART_CARRIER,...companies],{
+             companyId,trackingNumber:input.trackingNumber,governorate:destination.rows[0]?.governorate||"",
+             now:new Date().toISOString(),
+          });}
+          catch(error){throw new AppError(422,"EXTERNAL_DISPATCH_INVALID",
+            error instanceof Error?error.message:"Invalid shipping details");}
+          representativeUserId=null;
+        }else{
+          const representativeRef=String(input.representativeId||"").trim();
+          if(!representativeRef)throw new AppError(422,"REPRESENTATIVE_REQUIRED","Choose a representative before sending the order out");
+          const representativeResult=await client.query<{user_id:string}>(
+            `SELECT r.user_id::text FROM representatives r JOIN users u ON u.id=r.user_id
+             WHERE (r.user_id::text=$1::text OR r.representative_code=$1::text)
+             AND r.approval_status='approved' AND u.status='active' LIMIT 1`,[representativeRef]);
+          representativeUserId=representativeResult.rows[0]?.user_id||null;
+          if(!representativeUserId)throw new AppError(409,"REPRESENTATIVE_UNAVAILABLE","Choose an active representative");
         }
       }
       if (
@@ -5281,7 +5378,8 @@ export class CommerceService {
         ...(target === "Out With Representative"
           ? {
               outWithRepresentativeAt: now,
-              deliveryGroupId: String(input.deliveryGroupId || ""),
+              deliveryGroupId: dispatchedShipment ? "" : String(input.deliveryGroupId || ""),
+              deliveryShipment: dispatchedShipment,
             }
           : {}),
         ...(target === "Representative On The Way"
@@ -5309,6 +5407,7 @@ export class CommerceService {
         if (previousStatus === "Out With Representative") {
           legacy.outWithRepresentativeAt = null;
           legacy.deliveryGroupId = "";
+          legacy.deliveryShipment = null;
         }
         if (previousStatus === "Representative On The Way") {
           legacy.representativeOnWayAt = null;

@@ -73,6 +73,8 @@ const orderWorkflowInputSchema = z.object({
   expectedStatus: z.string().trim().min(1).max(80),
   target: orderWorkflowTargetSchema,
   representativeId: z.string().trim().max(160).optional(),
+  shippingCompanyId: z.string().trim().max(64).optional(),
+  trackingNumber: z.string().trim().max(80).optional(),
   deliveryGroupId: z.string().trim().max(160).optional(),
   reason: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(1500).optional(),
@@ -327,6 +329,36 @@ export function createCommerceRouter(
     response.status(204).end();
   });
 
+  const shippingCompanySchema=z.object({
+    id:z.string().regex(/^[a-z0-9_-]{2,64}$/),
+    name:z.string().trim().min(2).max(100),
+    trackingUrl:z.string().trim().url().max(2000),
+    active:z.boolean(),
+    governorates:z.array(z.string().trim().min(2).max(100)).max(27),
+  }).strict();
+
+  router.get("/admin/shipping/companies",signedIn,requireAccountType("staff"),requireMfa,
+    requireAnyPermission("orders.read","orders.manage","settings.manage"),
+    async(_request,response)=>{response.setHeader("Cache-Control","no-store");
+      response.status(200).json(await commerce.shippingCompanies());});
+  router.put("/admin/shipping/companies",signedIn,csrf,requireAccountType("staff"),requireMfa,
+    requirePermission("settings.manage"),
+    async(request,response)=>{
+      const input=z.object({expectedVersion:z.number().int().positive(),
+        companies:z.array(shippingCompanySchema).max(50)}).strict().parse(request.body);
+      response.status(200).json(await commerce.saveShippingCompanies(
+        request.auth!.userId,input.expectedVersion,input.companies,String(request.id)));
+    });
+  router.patch("/admin/orders/:orderRef/shipment",signedIn,csrf,requireAccountType("staff"),requireMfa,
+    requirePermission("orders.manage"),
+    async(request,response)=>{
+      const input=z.object({expectedVersion:z.number().int().positive(),
+        companyId:z.string().regex(/^[a-z0-9_-]{2,64}$/),
+        trackingNumber:z.string().trim().min(2).max(80)}).strict().parse(request.body);
+      const orderRef=z.string().trim().min(1).max(160).parse(request.params.orderRef);
+      response.status(200).json(await commerce.correctOrderShipment(request.auth!.userId,orderRef,
+        input.expectedVersion,input.companyId,input.trackingNumber,String(request.id)));
+    });
   router.post(
     "/admin/orders/:orderRef/workflow",
     signedIn,
