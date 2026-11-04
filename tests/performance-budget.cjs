@@ -63,6 +63,11 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-rep.js",
   "Js/dart-tracking.js",
   "Js/dart-checkout-stability.js",
+  // Checkout suggestions are page-scoped, and the two dashboard shipping modules
+  // are dynamically loaded by dart-shipping-loader.js only on shipping/dispatch.
+  "Js/dart-checkout-regions.js",
+  "Eye/dart-shipping.js",
+  "Eye/dart-coverage-picker.js",
   "Js/dart-sets.js",
   "Js/dart-set-modal-ui.js",
   "Js/dart-navigation.js",
