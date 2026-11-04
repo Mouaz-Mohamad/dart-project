@@ -52,6 +52,7 @@ import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-querie
 import { returnMatchesSale } from "./commerce.returns.js";
 import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
+import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage, isCompanyAddressCovered } from "./shipping.coverage.js";
 import { DART_CARRIER, dispatchShipment, validTrackingPortal,
   type ShippingCompany, type DispatchedShipment } from "./shipping.core.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
@@ -97,6 +98,8 @@ async function customerPurchaseStats(
 export class CommerceService {
   public constructor(private readonly pool: Pool) {}
 
+  public shippingCoverageCatalog() { return { governorates: EGYPT_COVERAGE_CATALOG }; }
+
   public async shippingCompanies(): Promise<{version:number;companies:ShippingCompany[]}> {
     const rows=await this.pool.query<{version:string;data:Record<string,unknown>}>(
       "SELECT version::text,data FROM site_settings WHERE id='main'");
@@ -111,8 +114,13 @@ export class CommerceService {
     if(ids.includes("dart") || new Set(ids).size!==ids.length)
       throw new AppError(422,"SHIPPING_COMPANY_DUPLICATE","Shipping company IDs must be unique, and Dart cannot be modified");
     for(const company of companies){
-      try {validTrackingPortal(company.trackingUrl);}
-      catch {throw new AppError(422,"SHIPPING_COMPANY_URL","Use an official HTTPS tracking portal");}
+      try {
+        validTrackingPortal(company.trackingUrl);
+        validateCompanyCoverage(company);
+      } catch (error) {
+        throw new AppError(422,"SHIPPING_COMPANY_COVERAGE",
+          error instanceof Error ? error.message : "Invalid shipping coverage");
+      }
     }
     const client=await this.pool.connect();
     try{
@@ -196,6 +204,7 @@ export class CommerceService {
       let next:DispatchedShipment;
       try{next=dispatchShipment([DART_CARRIER,...companies],{
           companyId,trackingNumber,governorate:String(order.delivery_address?.governorate||""),
+          city:String(order.delivery_address?.city||""),area:String(order.delivery_address?.area||""),
           now:old.dispatchedAt,
         });}
       catch(error){throw new AppError(422,"INVALID_SHIPPING_CORRECTION",error instanceof Error?error.message:"Invalid carrier");}
@@ -5382,10 +5391,13 @@ export class CommerceService {
             "SELECT data FROM site_settings WHERE id='main'");
           const companies=Array.isArray(settings.rows[0]?.data?.shippingCompanies)
              ?settings.rows[0].data.shippingCompanies as ShippingCompany[]:[];
-          const destination=await client.query<{governorate:string}>(
-            "SELECT COALESCE(delivery_address->>'governorate','') AS governorate FROM orders WHERE id=$1",[order.id]);
+          const destination=await client.query<{governorate:string;city:string;area:string}>(
+            `SELECT COALESCE(delivery_address->>'governorate','') AS governorate,
+               COALESCE(delivery_address->>'city','') AS city,
+               COALESCE(delivery_address->>'area','') AS area FROM orders WHERE id=$1`,[order.id]);
           try{dispatchedShipment=dispatchShipment([DART_CARRIER,...companies],{
              companyId,trackingNumber:input.trackingNumber,governorate:destination.rows[0]?.governorate||"",
+             city:destination.rows[0]?.city||"",area:destination.rows[0]?.area||"",
              now:new Date().toISOString(),
           });}
           catch(error){throw new AppError(422,"EXTERNAL_DISPATCH_INVALID",

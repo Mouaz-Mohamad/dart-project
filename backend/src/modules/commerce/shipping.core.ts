@@ -1,5 +1,6 @@
 // DART | Shipping & Fulfillment: pure domain rules.
 // A shipment is not a second order. External carriers do not receive representative credentials.
+import { isCompanyAddressCovered, type CompanyCoverage } from "./shipping.coverage.js";
 export const EGYPT_GOVERNORATES = Object.freeze([
   "Cairo", "Giza", "Alexandria", "Qalyubia", "Sharqia", "Dakahlia",
   "Gharbia", "Monufia", "Beheira", "Kafr El Sheikh", "Damietta",
@@ -16,6 +17,8 @@ export interface ShippingCompany {
   trackingUrl: string;
   active: boolean;
   governorates: string[];
+  // Absent coverage means old company records: governorates [] = entire Egypt.
+  coverage?: CompanyCoverage | undefined;
 }
 
 export interface DispatchedShipment {
@@ -55,13 +58,12 @@ export function validTrackingPortal(raw: unknown): string {
 }
 
 export function selectShippingCompany(
-  companies: readonly ShippingCompany[], companyId: string, governorate = "",
+  companies: readonly ShippingCompany[], companyId: string, governorate = "", city = "", area = "",
 ): ShippingCompany {
   const selected = companies.find((company) => company.id === companyId && company.active);
   if (!selected) throw new Error("Shipping company is inactive or missing.");
-  if (selected.governorates.length && (!governorate ||
-      !selected.governorates.some((name) => name.toLocaleLowerCase() === governorate.toLocaleLowerCase()))) {
-    throw new Error("Shipping company does not cover this governorate.");
+  if (!isCompanyAddressCovered(selected, governorate, city, area)) {
+    throw new Error("Shipping company does not cover this governorate/city/area.");
   }
   return selected;
 }
@@ -72,10 +74,12 @@ export function dispatchShipment(
     trackingNumber?: string | undefined;
     representativeId?: string | undefined;
     governorate: string;
+    city?: string | undefined;
+    area?: string | undefined;
     now: string;
   },
 ): DispatchedShipment {
-  const company = selectShippingCompany(companies, input.companyId, input.governorate);
+  const company = selectShippingCompany(companies, input.companyId, input.governorate, input.city, input.area);
   if (company.id === "dart") {
     if (!input.representativeId?.trim()) throw new Error("Dart representative is required.");
     if (input.trackingNumber) throw new Error("Dart tracking uses representative live tracking.");

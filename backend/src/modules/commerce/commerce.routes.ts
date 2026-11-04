@@ -335,8 +335,17 @@ export function createCommerceRouter(
     trackingUrl:z.string().trim().url().max(2000),
     active:z.boolean(),
     governorates:z.array(z.string().trim().min(2).max(100)).max(27),
+    coverage: z.record(z.string(),z.object({
+      all:z.boolean(),
+      cities:z.record(z.string(),z.object({all:z.boolean(),
+        areas:z.array(z.string().trim().min(1).max(100)).max(200)}).strict()),
+    }).strict()).optional(),
   }).strict();
 
+  router.get("/shipping/coverage-catalog",async(_request,response)=>{
+    response.setHeader("Cache-Control","public, max-age=3600");
+    response.status(200).json(commerce.shippingCoverageCatalog());
+  });
   router.get("/admin/shipping/companies",signedIn,requireAccountType("staff"),requireMfa,
     requireAnyPermission("orders.read","orders.manage","settings.manage"),
     async(_request,response)=>{response.setHeader("Cache-Control","no-store");

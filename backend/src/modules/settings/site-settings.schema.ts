@@ -88,6 +88,11 @@ export const siteSettingsSchema = z.object({
     trackingUrl: z.string().trim().min(1).max(2000),
     active: z.boolean(),
     governorates: z.array(z.string().trim().min(2).max(100)).max(27),
+    coverage: z.record(z.string(),z.object({
+      all:z.boolean(),
+      cities:z.record(z.string(),z.object({all:z.boolean(),
+        areas:z.array(z.string().trim().min(1).max(100)).max(200)}).strict()),
+    }).strict()).optional(),
   }).strict()).max(50).optional(),
 }).strict();
 
