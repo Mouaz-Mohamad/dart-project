@@ -8,6 +8,7 @@
  let coveragePicker=null;
  async function loadCompanies(){
    const payload=await api("/api/v1/admin/shipping/companies");
+   if(coveragePicker)await coveragePicker.ready;
    version=Number(payload.version);companies=payload.companies||companies;renderCompanies();
    return companies;
  }
