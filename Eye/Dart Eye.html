@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="dart-news.css?v=20261008-news-v1">
     <link rel="stylesheet" href="dart-live-operations.css">
     <link rel="stylesheet" href="dart-dashboard-ui.css">
+    <link rel="stylesheet" href="dart-shipping.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,6 +68,7 @@
             <li><a href="#" data-target="items">Items</a></li>
             <li><a href="#" data-target="customers">Clients</a></li>
             <li><a href="#" data-target="orders">Orders</a></li>
+            <li><a href="#" data-target="shipping">Shipping Companies</a></li>
             <li><a href="#" data-target="waiting">Waiting</a></li>
             <li><a href="#" data-target="returns">Returns</a></li>
             <li><a href="#" data-target="damage">Damage</a></li>
@@ -89,6 +91,7 @@
         <li><a href="#" data-target="items"><i class='bx bx-box'></i><span>Items</span></a></li>
         <li><a href="#" data-target="customers"><i class='bx bx-user-pin'></i><span>Clients</span></a></li>
         <li><a href="#" data-target="orders"><i class='bx bx-cart'></i><span>Orders</span></a></li>
+        <li><a href="#" data-target="shipping"><i class="fa-solid fa-truck"></i><span>Shipping</span></a></li>
         <li><a href="#" data-target="waiting"><i class='bx bx-time-five'></i><span>Waiting</span></a></li>
         <li><a href="#" data-target="returns"><i class='bx bx-undo'></i><span>Returns</span></a></li>
         <li><a href="#" data-target="damage"><i class='bx bx-error-circle'></i><span>Damage</span></a></li>
@@ -1128,12 +1131,39 @@
             </div>
         </div>
 
-        <div class="modal" id="rep-assignment-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Assign Representative</h3><select id="rep-assignment-select"></select><button type="button" class="btn-done" id="confirm-rep-assignment">Assign</button></div></div>
+        <div class="modal" id="rep-assignment-modal">
+          <div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Confirm Dispatch</h3>
+            <label>Shipping Company <select id="shipping-company-select"><option value="dart">Dart Delivery</option></select></label>
+            <label>Representative (Dart only) <select id="rep-assignment-select"></select></label>
+            <label>Tracking Number (external only) <input type="text" id="shipping-tracking-number" class="modal-input" maxlength="80" disabled></label>
+            <button type="button" class="btn-done" id="confirm-rep-assignment">Confirm Dispatch</button>
+          </div>
+        </div>
 
         <div class="modal" id="order-reason-modal"><div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3 id="order-reason-title">Reason</h3><select id="order-reason-select"></select><textarea id="order-reason-notes" rows="3" placeholder="Notes / Other reason"></textarea><button type="button" class="btn-done" id="confirm-order-reason">Confirm</button></div></div>
         <!-- END Orders modals. -->
 
 
+        <section id="shipping" class="dashboard-section dart-shipping-section">
+          <h2>Shipping Companies</h2><p>External shipments remain visible in Orders.</p>
+          <div class="dart-shipping-grid"><div>
+            <h3>Companies</h3>
+            <form id="shipping-company-form">
+              <input type="hidden" id="shipping-company-id">
+              <label>Company Name <input id="shipping-company-name" required maxlength="100"></label>
+              <label>Official tracking page (HTTPS) <input type="url" id="shipping-company-url" required></label>
+              <label>Governorates (comma-separated, blank = all) <input id="shipping-company-regions" maxlength="800"></label>
+              <label><input type="checkbox" id="shipping-company-active" checked> Active</label>
+              <button type="submit" class="btn-done">Save Company</button>
+              <button type="button" id="shipping-company-cancel">Clear</button>
+            </form>
+            <div id="shipping-companies-list" aria-live="polite"></div>
+          </div><div>
+            <h3>External Shipments</h3>
+            <button type="button" id="shipping-refresh">Refresh</button>
+            <div id="shipping-orders-list" aria-live="polite"></div>
+          </div></div>
+        </section>
         <!-- Waiting / Restock Reservation -->
         <section id="waiting" class="dashboard-section dart-waiting-section" aria-labelledby="waiting-page-title">
             <div class="dart-waiting-head">
@@ -2384,6 +2414,7 @@
     <script  src="../Js/dart-returns.js" defer></script>
     <script src="dart-permissions.js"></script>
     <script src="dart-orders-api.js"></script>
+    <script src="dart-shipping.js"></script>
     <script src="dart-domain-state.js?v=20261006-cod-command-v2"></script>
     <script src="../Js/dart-dialog.js"></script>
     <script src="dart-admin-auth.js"></script>

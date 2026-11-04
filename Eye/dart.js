@@ -1533,6 +1533,8 @@ function dartCanTransition(order, target) {
   if (target === "Preparing" && order.status === "Out With Representative")
     return true; // representative cancelled pickup
   if (order.status === "Needs Attention") return false;
+  if (order.deliveryShipment?.type === "external" && order.status === "Out With Representative")
+    return target === "Delivered";
   return dartNextStatus(order.status) === target;
 }
 function dartPriceSnapshotForCodes(codes) {
@@ -1641,16 +1643,15 @@ async function dartApplyTransition(order, target, meta = {}) {
   const prev = order.status,
     now = dartNowISO(),
     serverAuthoritative = Boolean(window.DartOrdersApi);
-  if (target === "Out With Representative" && !meta.representativeId)
+  if (target === "Out With Representative" && !meta.representativeId && !meta.shippingCompanyId)
     return { ok: false, needsRep: true };
   if (window.DartOrdersApi?.workflow) {
     try {
       await window.DartOrdersApi.workflow(order.orderId || order.id, {
         expectedStatus: order.status,
         target,
-        ...(meta.representativeId
-          ? { representativeId: String(meta.representativeId) }
-          : {}),
+        ...(meta.representativeId ? { representativeId: String(meta.representativeId) } : {}),
+        ...(meta.shippingCompanyId ? { shippingCompanyId: String(meta.shippingCompanyId), trackingNumber: String(meta.trackingNumber || "") } : {}),
         ...(meta.deliveryGroupId
           ? { deliveryGroupId: String(meta.deliveryGroupId) }
           : {}),
@@ -1788,10 +1789,10 @@ async function dartBatchTransition(orders, target, meta = {}) {
       ok: false,
       message: "حدد أوردرات من نفس الحالة الحالية لتنفيذ عملية جماعية.",
     };
-  if (target === "Out With Representative" && !meta.representativeId)
+  if (target === "Out With Representative" && !meta.representativeId && !meta.shippingCompanyId)
     return { ok: false, needsRep: true };
   if (
-    target === "Out With Representative" &&
+    target === "Out With Representative" && !meta.shippingCompanyId &&
     !dartFindRepById(meta.representativeId)
   ) return { ok: false, message: "Representative unavailable." };
 
@@ -3002,6 +3003,8 @@ async function dartRequestOrderTransition(orders, target) {
   }
   if (target === "Out With Representative") {
     dartPendingOrderAction = { orders, target };
+    try { await window.DartShipping.loadCompanies(); }
+    catch (error) { window.DartDialog.alert(error.message || "Shipping partners could not be loaded");return; }
     const sel = document.getElementById("rep-assignment-select");
     sel.innerHTML = dartActiveReps()
       .map(
@@ -3009,10 +3012,15 @@ async function dartRequestOrderTransition(orders, target) {
           `<option value="${dartEsc(r.id)}">${dartEsc(r.name)} — ${dartEsc(r.repId)}</option>`,
       )
       .join("");
-    if (!sel.options.length) {
-      window.DartDialog.alert("لا يوجد مندوب Active وغير مشطوب.");
-      return;
+    const companySelect=document.getElementById("shipping-company-select");
+    const tracking=document.getElementById("shipping-tracking-number");
+    companySelect.replaceChildren();
+    for (const company of window.DartShipping.companies().filter(row=>row.active)) {
+      const opt=document.createElement("option");opt.value=company.id;opt.textContent=company.name;companySelect.append(opt);
     }
+    companySelect.value="dart";tracking.value="";
+    const toggle=()=>{const dart=companySelect.value==="dart";sel.disabled=!dart;tracking.disabled=dart;tracking.required=!dart;};
+    companySelect.onchange=toggle;toggle();
     openModal(document.getElementById("rep-assignment-modal"));
     return;
   }
@@ -3134,12 +3142,19 @@ function dartSetupOperationalModals() {
       if (!dartPendingOrderAction) return;
       const button = event.currentTarget;
       button.disabled = true;
-      const rep = document.getElementById("rep-assignment-select").value;
-      const { orders, target } = dartPendingOrderAction;
+      const rep=document.getElementById("rep-assignment-select").value;
+      const companyId=document.getElementById("shipping-company-select").value;
+      const trackingNumber=document.getElementById("shipping-tracking-number").value.trim();
+      const {orders,target}=dartPendingOrderAction;
+      if(companyId==="dart"&&!rep){button.disabled=false;window.DartDialog.alert("Choose a Dart representative.");return;}
+      if(companyId!=="dart"&&!/^[A-Za-z0-9][A-Za-z0-9/_-]{1,79}$/.test(trackingNumber)){
+        button.disabled=false;window.DartDialog.alert("Enter the shipment tracking code.");return;}
+      if(companyId!=="dart"&&orders.length!==1){
+        button.disabled=false;window.DartDialog.alert("Select one external order at a time, so each has its own tracking code.");return;}
       try {
         const res =
           orders.length === 1
-            ? await dartApplyTransition(orders[0], target, { representativeId: rep })
+            ? await dartApplyTransition(orders[0], target, companyId==="dart" ? {representativeId:rep} : {shippingCompanyId:companyId,trackingNumber})
             : await dartBatchTransition(orders, target, { representativeId: rep });
         if (!res.ok) {
           window.DartDialog.alert(res.message || "Operation failed");
@@ -3791,7 +3806,8 @@ function renderOrders(dataArray) {
     return;
   }
   sorted.forEach((o) => {
-    const next = dartNextStatus(o.status),
+    const next = o.deliveryShipment?.type==="external" && o.status==="Out With Representative"
+      ? "Delivered" : dartNextStatus(o.status),
       net = dartOrderNet(o),
       verificationStatus = String(
         o.verificationStatus || o.codVerificationStatus || "Not Required",

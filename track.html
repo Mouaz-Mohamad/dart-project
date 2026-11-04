@@ -19,6 +19,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600&family=Readex+Pro:wght@200;300;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="CSS/dart-shipping-track.css">
 </head>
 <body class='dja-flexdir' data-customer-private data-customer-auth="pending">
     <p class="dart-account-access-status" data-customer-access-status role="status">Checking account…</p>
@@ -30,6 +31,13 @@
 
 <template id="order-tracking-card-template">
   <article class="tracking-card" data-order-tracking-card>
+    <div data-external-shipping class="dart-shipping-external" hidden>
+      <h3>Your Order Has Been Shipped!</h3>
+      <p>Shipping Company: <strong data-shipping-company></strong></p>
+      <p>Tracking Number: <code data-shipping-code></code> <button type="button" data-shipping-copy>Copy</button></p>
+      <a data-shipping-link target="_blank" rel="noopener noreferrer">Track Your Shipment ↗</a>
+      <span role="status" aria-live="polite" data-shipping-copy-status></span>
+    </div>
     <div class="tracking-map-shell is-disabled" data-order-map-shell>
       <div class="tracking-order-map" data-order-map aria-label="Live delivery map"></div>
       <div class="tracking-map-disabled" data-order-map-disabled>Representative not assigned yet</div>

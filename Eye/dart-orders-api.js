@@ -246,6 +246,9 @@
   function bulkWorkflow(input) {
     return runAuthoritativeMutation("/api/v1/admin/orders/bulk-workflow", input, input.orderRefs, true);
   }
+  function correctShipment(orderRef, input) {
+    return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}/shipment`,input,[orderRef],false,"PATCH");
+  }
   function codVerification(orderRef, input) {
     return runAuthoritativeMutation(`/api/v1/admin/orders/${encodeURIComponent(orderRef)}/cod-verification`, input, [orderRef]);
   }
@@ -297,7 +300,7 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden) void check(); });
   window.setInterval(check, 3000);
   window.DartOrdersApi = {
-    hydrate, createManual, updateManual, workflow, bulkWorkflow, codVerification, stateAction,
+    hydrate, createManual, updateManual, workflow, bulkWorkflow, correctShipment, codVerification, stateAction,
     sync: hydrate, flush: async () => readLocal(), write, read: readLocal, check,
     isBusy: (ref) => ref === undefined ? activeMutations > 0 : pendingOrders.has(orderKey(ref)),
     serverVersion: () => serverVersion,

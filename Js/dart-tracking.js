@@ -615,7 +615,30 @@
       card.querySelector("[data-order-eta]").textContent = (liveRecord("order", trackingRecord)?.deliveryStartedAt || trackingRecord.deliveryStartedAt) ? "Live trip" : "ETA: Not determined";
       list.appendChild(fragment);
       const inserted = list.lastElementChild;
-      createMap(inserted.querySelector("[data-order-map]"), trackingRecord, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"), "order");
+      const shipment=trackingRecord.deliveryShipment;
+      if(shipment?.type==="external"){
+        inserted.querySelector("[data-order-map-shell]")?.remove();
+        inserted.querySelector("[data-order-map-summary]")?.remove();
+        const box=inserted.querySelector("[data-external-shipping]");box.hidden=false;
+        box.querySelector("[data-shipping-company]").textContent=shipment.companyName||"Shipping Company";
+        box.querySelector("[data-shipping-code]").textContent=shipment.trackingNumber||"";
+        const link=box.querySelector("[data-shipping-link]");
+        try{const u=new URL(String(shipment.trackingUrl||""));
+          if(u.protocol!=="https:"||u.username||u.password||!u.hostname.includes("."))throw Error("Invalid link");
+          link.href=u.href;}catch{link.hidden=true;}
+        box.querySelector("[data-shipping-copy]").addEventListener("click",async()=>{
+          const status=box.querySelector("[data-shipping-copy-status]");
+          try{await navigator.clipboard.writeText(String(shipment.trackingNumber||""));status.textContent="Copied Successfully";}
+          catch{status.textContent="Select the code above and copy it.";}
+        });
+        inserted.querySelector('[data-order-field="representative"]').textContent=shipment.companyName||"Shipping Company";
+        inserted.querySelector('[data-order-field="representativeMeta"]').textContent="External shipping";
+        inserted.querySelector("[data-order-call]").hidden=true;
+        inserted.querySelector("[data-order-eta]").textContent="Shipped";
+      }else{
+        inserted.querySelector("[data-external-shipping]")?.remove();
+        createMap(inserted.querySelector("[data-order-map]"), trackingRecord, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"), "order");
+      }
     });
   }
 
