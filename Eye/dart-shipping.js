@@ -5,6 +5,7 @@
  const message=text=>window.DartDialog?.alert?.(text);
  const api=(path,options)=>window.DartAdminApi.request(path,options);
  let version=0,companies=[{id:"dart",name:"Dart Delivery",active:true,trackingUrl:"",governorates:[]}];
+ let coveragePicker=null;
  async function loadCompanies(){
    const payload=await api("/api/v1/admin/shipping/companies");
    version=Number(payload.version);companies=payload.companies||companies;renderCompanies();
@@ -16,9 +17,14 @@
      const el=document.createElement("div"),name=document.createElement("span"),edit=document.createElement("button");
      name.textContent=company.name+" · "+(company.active?"Active":"Inactive")+" · ";
      edit.type="button";edit.textContent="Edit";
-     edit.onclick=()=>{$("shipping-company-id").value=company.id;$("shipping-company-name").value=company.name;
+     edit.onclick=()=>{
+       $("shipping-company-id").value=company.id;$("shipping-company-name").value=company.name;
        $("shipping-company-url").value=company.trackingUrl;$("shipping-company-active").checked=company.active;
-       $("shipping-company-regions").value=(company.governorates||[]).join(", ");};
+       const unknown=coveragePicker?.setCoverage(company.coverage,company.governorates||[])||[];
+       $("shipping-coverage-warning").textContent=unknown.length?
+          "Unrecognized old governorates: "+unknown.join(", ")+". Review coverage before saving.":"";
+       $("shipping-company-form").scrollIntoView({behavior:"smooth",block:"nearest"});
+     };
      el.append(name,edit);box.append(el);
    }
  }
@@ -69,13 +75,21 @@
      box.append(row);
    }
  }
- function reset(){ $("shipping-company-form")?.reset();$("shipping-company-id").value=""; }
+ function reset(){
+   $("shipping-company-form")?.reset();$("shipping-company-id").value="";
+   $("shipping-coverage-warning").textContent="";
+   coveragePicker?.setCoverage({},[]);
+ }
  async function save(event){
    event.preventDefault();
    const id=$("shipping-company-id").value||"carrier-"+Date.now().toString(36);
+   if(!coveragePicker){message("Coverage selector unavailable. Please reload.");return;}
+   let coverage;
+   try{await coveragePicker.ready;coverage=coveragePicker.getCoverage();}
+   catch(error){message(error.message||"Select a valid coverage");return;}
+   if($("shipping-coverage-warning").textContent){message("Review unknown legacy regions before saving.");return;}
    const company={id,name:$("shipping-company-name").value.trim(),trackingUrl:$("shipping-company-url").value.trim(),
-    active:$("shipping-company-active").checked,
-    governorates:$("shipping-company-regions").value.split(",").map(x=>x.trim()).filter(Boolean)};
+    active:$("shipping-company-active").checked,governorates:Object.keys(coverage),coverage};
    const next=[...companies.filter(c=>c.id!=="dart"&&c.id!==id),company];
    const button=event.target.querySelector('[type="submit"]');button.disabled=true;
    try{const r=await api("/api/v1/admin/shipping/companies",{method:"PUT",body:{expectedVersion:version,companies:next}});
@@ -83,6 +97,11 @@
    }catch(error){message(error.message||"Unable to save company");}finally{button.disabled=false;}
  }
  function init(){
+   coveragePicker=window.DartCoveragePicker?.create?.($("shipping-coverage-picker"))||null;
+   if(coveragePicker){
+     coveragePicker.ready.then(()=>coveragePicker.setCoverage({},[]))
+       .catch(error=>{$("shipping-coverage-warning").textContent=error.message;});
+   }
    $("shipping-company-form")?.addEventListener("submit",save);
    $("shipping-company-cancel")?.addEventListener("click",reset);
    $("shipping-refresh")?.addEventListener("click",()=>{

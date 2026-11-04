@@ -1152,7 +1152,12 @@
               <input type="hidden" id="shipping-company-id">
               <label>Company Name <input id="shipping-company-name" required maxlength="100"></label>
               <label>Official tracking page (HTTPS) <input type="url" id="shipping-company-url" required></label>
-              <label>Governorates (comma-separated, blank = all) <input id="shipping-company-regions" maxlength="800"></label>
+              <section class="dart-coverage-fieldset" aria-labelledby="shipping-coverage-heading">
+                <h4 id="shipping-coverage-heading">Delivery Coverage · مناطق التوصيل</h4>
+                <p>اختر المحافظات ثم خصّص المدن والمناطق. لا توجد كتابة يدوية للأسماء.</p>
+                <div id="shipping-coverage-picker"></div>
+                <p id="shipping-coverage-warning" role="status" aria-live="polite"></p>
+              </section>
               <label><input type="checkbox" id="shipping-company-active" checked> Active</label>
               <button type="submit" class="btn-done">Save Company</button>
               <button type="button" id="shipping-company-cancel">Clear</button>
@@ -2414,6 +2419,7 @@
     <script  src="../Js/dart-returns.js" defer></script>
     <script src="dart-permissions.js"></script>
     <script src="dart-orders-api.js"></script>
+    <script src="dart-coverage-picker.js"></script>
     <script src="dart-shipping.js"></script>
     <script src="dart-domain-state.js?v=20261006-cod-command-v2"></script>
     <script src="../Js/dart-dialog.js"></script>
