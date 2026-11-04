@@ -613,11 +613,12 @@ export class FinanceService {
         delivery_cost_minor: string;
         cod_settled_minor: string;
         representative_user_id: string | null;
+        legacy: Record<string, unknown> | null;
       }>(
         `SELECT id::text, order_code, status, payment_method,
                 final_minor::text, amount_refunded_minor::text,
                 delivery_cost_minor::text, cod_settled_minor::text,
-                representative_user_id::text
+                representative_user_id::text, legacy
            FROM orders
           WHERE id::text=$1::text OR order_code=$1::text
           LIMIT 1
@@ -675,11 +676,14 @@ export class FinanceService {
           "Only a delivered Cash on Delivery order can be settled",
         );
       }
-      if (!order.representative_user_id) {
+      const shipment = order.legacy?.deliveryShipment as
+        {type?: string; companyId?: string; companyName?: string} | undefined;
+      const externalCompanyId=shipment?.type==="external" ? String(shipment.companyId||"") : "";
+      if (!order.representative_user_id && !externalCompanyId) {
         throw new AppError(
           409,
           "REPRESENTATIVE_REQUIRED",
-          "The delivered order is not assigned to a representative",
+          "The delivered order must be assigned to a representative or external shipping company",
         );
       }
       if (amountReceivedMinor <= 0 || feeMinor < 0 || feeMinor > amountReceivedMinor) {
@@ -731,6 +735,8 @@ export class FinanceService {
         id: input.id,
         orderId: order.order_code,
         representativeId: order.representative_user_id,
+        shippingCompanyId: externalCompanyId || null,
+        shippingCompanyName: externalCompanyId ? String(shipment?.companyName || "") : null,
         settlementDate: input.settlementDate,
         amountReceived: amountReceivedMinor / 100,
         amountReceivedMinor,
@@ -783,6 +789,7 @@ export class FinanceService {
             settlementId: input.id,
             orderCode: order.order_code,
             representativeId: order.representative_user_id,
+            shippingCompanyId: externalCompanyId || null,
             amountReceivedMinor,
             feeMinor,
             currency: "EGP",
