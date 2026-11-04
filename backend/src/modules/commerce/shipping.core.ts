@@ -25,7 +25,7 @@ export interface DispatchedShipment {
   trackingNumber: string | null;
   trackingUrl: string | null;
   dispatchedAt: string;
-  status: "Handed Over";
+  status: "Handed Over" | "Returned to Sender";
 }
 
 export const DART_CARRIER: ShippingCompany = Object.freeze({
