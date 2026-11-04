@@ -5,21 +5,31 @@
   const normalize = text => String(text || "").trim().toLowerCase()
     .replace(/[\u064b-\u065f\u0670\u0640]/g, "")
     .replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/[\s_\-]+/g, "");
-  const fuzzy = (label, query) => {
-    const a = normalize(label), b = normalize(query);
-    if (!b) return true;
-    if (a.includes(b)) return true;
-    if (b.length < 4) return false;
-    // Allow one omitted/incorrect character at the beginning of a name.
-    const word = a.slice(0, b.length + 1);
-    for (const s of [word.slice(0,b.length),word.slice(0,b.length-1)]) {
-      if (!s) continue;
-      let edits = Math.abs(s.length-b.length);
-      const size = Math.min(s.length,b.length);
-      for(let i=0;i<size;i++)if(s[i]!==b[i])edits++;
-      if(edits<=1)return true;
+  // Damerau-Levenshtein with a small threshold: common typos and swapped letters
+  // still reveal a known place, but typing never creates a new unvalidated place.
+  function closeSpelling(a,b,max) {
+    if(Math.abs(a.length-b.length)>max)return false;
+    const dist=Array.from({length:a.length+1},()=>new Uint16Array(b.length+1));
+    for(let i=0;i<=a.length;i++)dist[i][0]=i;
+    for(let j=0;j<=b.length;j++)dist[0][j]=j;
+    for(let i=1;i<=a.length;i++){
+      for(let j=1;j<=b.length;j++){
+        const cost=a[i-1]===b[j-1]?0:1;
+        dist[i][j]=Math.min(dist[i-1][j]+1,dist[i][j-1]+1,dist[i-1][j-1]+cost);
+        if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])
+          dist[i][j]=Math.min(dist[i][j],dist[i-2][j-2]+1);
+      }
     }
-    return false;
+    return dist[a.length][b.length]<=max;
+  }
+  const fuzzy = (label, query) => {
+    const a=normalize(label),b=normalize(query);
+    if(!b||a.includes(b))return true;
+    if(b.length<4)return false;
+    const max=b.length>=7?2:1;
+    return closeSpelling(a,b,max) ||
+      closeSpelling(a.slice(0,b.length),b,max) ||
+      closeSpelling(a.slice(0,b.length+1),b,max);
   };
   const node = (tag,css,text) => {
     const el=document.createElement(tag);
