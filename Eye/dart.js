@@ -1515,6 +1515,8 @@ function dartNextStatus(status) {
 function dartCanTransition(order, target) {
   if (!order || dartIsArchived(order)) return false;
   if (order.status === target) return false;
+  if (order.deliveryShipment?.type === "external" && order.status === "Out With Representative" &&
+    ["Preparing","Refused","Cancelled"].includes(target)) return false;
   if (target === "Cancelled")
     return !["Delivered", "Refused", "Cancelled"].includes(order.status);
   if (target === "Refused")

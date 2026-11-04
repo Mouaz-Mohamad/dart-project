@@ -35,8 +35,8 @@
      copy.onclick=()=>navigator.clipboard?.writeText(String(s.trackingNumber||"")).then(()=>window.DartDashboardUI?.notify?.("Copied")).catch(()=>message("Copy unavailable"));
      edit.type="button";edit.textContent="Correct (Owner only)";
      edit.onclick=async()=>{
-       const companyId=prompt("External company ID:",s.companyId);if(companyId===null)return;
-       const trackingNumber=prompt("Tracking number:",s.trackingNumber);if(trackingNumber===null)return;
+       const companyId=await window.DartDialog.prompt("External company ID:",s.companyId);if(companyId===null)return;
+       const trackingNumber=await window.DartDialog.prompt("Tracking number:",s.trackingNumber);if(trackingNumber===null)return;
        if(!companies.some(c=>c.id===companyId&&c.id!=="dart"&&c.active)){message("Choose an active external company");return;}
        edit.disabled=true;
        try{await window.DartOrdersApi.correctShipment(o.orderId||o.id,{expectedVersion:Number(o.version),companyId,trackingNumber:trackingNumber.trim()});

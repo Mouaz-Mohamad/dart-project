@@ -55,6 +55,12 @@ export class SiteSettingsService {
           ? parsedSettings.codRisk as Record<string, unknown>
           : null;
       const nextSettings: Record<string, unknown> = { ...parsedSettings };
+      // Older Settings clients do not know about shipping companies.
+      // Never drop carrier configuration when saving unrelated settings.
+      if (!Object.prototype.hasOwnProperty.call(nextSettings, "shippingCompanies") &&
+          Array.isArray(currentSettings.shippingCompanies)) {
+        nextSettings.shippingCompanies = currentSettings.shippingCompanies;
+      }
       let codRiskPolicyVersion = Number(currentCodRisk?.version || 1);
 
       if (currentCodRisk && !incomingCodRisk) {

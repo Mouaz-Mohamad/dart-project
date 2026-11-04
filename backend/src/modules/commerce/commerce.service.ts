@@ -5245,6 +5245,12 @@ export class CommerceService {
       const previousShipment=order.legacy?.deliveryShipment as DispatchedShipment|undefined;
       const external=previousShipment?.type==="external";
       const externalDelivered=external && previousStatus==="Out With Representative" && target==="Delivered";
+      // Shipment has physically left the warehouse: never release inventory
+      // merely by rolling the order back or marking it refused/cancelled.
+      if(external && previousStatus==="Out With Representative" &&
+        ["Preparing","Refused","Cancelled"].includes(target)) {
+        throw new AppError(409,"EXTERNAL_SHIPMENT_STILL_OUT","Confirm the external parcel was returned and inspected before reversing the order");
+      }
       const isForward = previousIndex >= 0 && targetIndex === previousIndex + 1 &&
         !(external && target==="Representative On The Way");
       const isBack = previousIndex > 0 && targetIndex === previousIndex - 1;
