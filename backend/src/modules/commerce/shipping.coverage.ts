@@ -873,8 +873,12 @@ export function validateCompanyCoverage(company: CoveredCompany): void {
   }
 }
 function matchesPart(input: unknown, id:string, en:string, ar:string):boolean{
-  const n=normalizeCoverageSearch(input);
-  return Boolean(n) && [id,en,ar].some(x=>normalizeCoverageSearch(x)===n);
+  // The checkout may store "Sheikh Zayed, First District" as one human-readable area.
+  // Match complete comma-separated components, never arbitrary substrings.
+  return String(input??"").split(",").some(part=>{
+    const n=normalizeCoverageSearch(part);
+    return Boolean(n) && [id,en,ar].some(x=>normalizeCoverageSearch(x)===n);
+  });
 }
 // No free-text guessing: narrow coverage without an unambiguous city/area is not eligible.
 export function isCompanyAddressCovered(company: CoveredCompany, governorate:unknown, city?:unknown, area?:unknown):boolean {
