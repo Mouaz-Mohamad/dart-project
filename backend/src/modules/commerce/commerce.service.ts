@@ -137,6 +137,37 @@ export class CommerceService {
   }
 
   // Corrections are restricted by the database's Owner flag, not browser-side roles.
+  public async externalShipmentReturned(actorId:string,orderRef:string,expectedVersion:number,
+    reason:string,requestId:string):Promise<AdminOrdersState>{
+    const client=await this.pool.connect();
+    let resultId="",customerId:string|null=null,version=0;
+    try{
+      await client.query("BEGIN");
+      const result=await client.query<{id:string;version:string;status:string;customer_user_id:string|null;legacy:Record<string,unknown>|null}>(
+        `SELECT id::text,version::text,status,customer_user_id::text,legacy
+           FROM orders WHERE id::text=$1 OR order_code=$1 LIMIT 1 FOR UPDATE`,[orderRef]);
+      const order=result.rows[0];
+      if(!order)throw new AppError(404,"ORDER_NOT_FOUND","Order not found");
+      if(Number(order.version)!==expectedVersion)throw new AppError(409,"ORDER_STATE_STALE","Refresh the order and retry");
+      const shipment=order.legacy?.deliveryShipment as DispatchedShipment|undefined;
+      if(order.status!=="Out With Representative"||shipment?.type!=="external"||shipment.status!=="Handed Over")
+        throw new AppError(409,"SHIPPING_RETURN_STATE_INVALID","Only active external shipments can be marked returned");
+      const next={...shipment,status:"Returned to Sender",returnedAt:new Date().toISOString(),returnReason:reason};
+      await client.query(
+        "UPDATE orders SET legacy=jsonb_set(COALESCE(legacy,'{}'::jsonb),'{deliveryShipment}',$2::jsonb,true),version=version+1,updated_at=now() WHERE id=$1",
+        [order.id,JSON.stringify(next)]);
+      const v=await client.query<{version:string}>(
+        "UPDATE domain_state_versions SET version=version+1,updated_at=now() WHERE domain='orders' RETURNING version::text");
+      await client.query(
+        `INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,old_values,new_values,metadata)
+         VALUES('staff',$1,'EXTERNAL_SHIPMENT_RETURNED','orders',$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)`,
+        [actorId,order.id,requestId,JSON.stringify(shipment),JSON.stringify(next),JSON.stringify({reason})]);
+      resultId=order.id;customerId=order.customer_user_id;version=Number(v.rows[0]?.version||1);
+      await client.query("COMMIT");
+    }catch(error){await client.query("ROLLBACK").catch(()=>undefined);throw error;}finally{client.release();}
+    return this.ordersAfterCommit(version,undefined,[resultId],customerId?[customerId]:[]);
+  }
+
   public async correctOrderShipment(actorId:string,orderRef:string,expectedVersion:number,
        companyId:string,trackingNumber:string,requestId:string):Promise<AdminOrdersState>{
     const client=await this.pool.connect();
@@ -156,7 +187,7 @@ export class CommerceService {
       if(Number(order.version)!==expectedVersion)
         throw new AppError(409,"ORDER_STATE_STALE","Order changed; refresh first");
       const old=(order.legacy?.deliveryShipment||null) as DispatchedShipment|null;
-      if(order.status!=="Out With Representative" || old?.type!=="external")
+      if(order.status!=="Out With Representative" || old?.type!=="external" || old.status!=="Handed Over")
         throw new AppError(409,"SHIPPING_CORRECTION_LOCKED","Only active externally dispatched orders can be corrected");
       const settings=await client.query<{data:Record<string,unknown>}>(
         "SELECT data FROM site_settings WHERE id='main'");
@@ -5248,8 +5279,10 @@ export class CommerceService {
       // Shipment has physically left the warehouse: never release inventory
       // merely by rolling the order back or marking it refused/cancelled.
       if(external && previousStatus==="Out With Representative" &&
-        ["Preparing","Refused","Cancelled"].includes(target)) {
-        throw new AppError(409,"EXTERNAL_SHIPMENT_STILL_OUT","Confirm the external parcel was returned and inspected before reversing the order");
+        (["Preparing","Cancelled"].includes(target) ||
+         (target==="Refused" && previousShipment?.status!=="Returned to Sender"))) {
+        throw new AppError(409,"EXTERNAL_SHIPMENT_STILL_OUT",
+          "Confirm physical parcel return before moving it to refused/inspection");
       }
       const isForward = previousIndex >= 0 && targetIndex === previousIndex + 1 &&
         !(external && target==="Representative On The Way");

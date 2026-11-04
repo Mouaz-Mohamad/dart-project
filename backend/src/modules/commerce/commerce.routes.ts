@@ -349,6 +349,13 @@ export function createCommerceRouter(
       response.status(200).json(await commerce.saveShippingCompanies(
         request.auth!.userId,input.expectedVersion,input.companies,String(request.id)));
     });
+  router.patch("/admin/orders/:orderRef/shipment-return",signedIn,csrf,requireAccountType("staff"),requireMfa,
+    requirePermission("orders.manage"),async(request,response)=>{
+      const body=z.object({expectedVersion:z.number().int().positive(),reason:z.string().trim().min(3).max(500)}).strict().parse(request.body);
+      const orderRef=z.string().trim().min(1).max(160).parse(request.params.orderRef);
+      response.status(200).json(await commerce.externalShipmentReturned(request.auth!.userId,
+        orderRef,body.expectedVersion,body.reason,String(request.id)));
+    });
   router.patch("/admin/orders/:orderRef/shipment",signedIn,csrf,requireAccountType("staff"),requireMfa,
     requirePermission("orders.manage"),
     async(request,response)=>{

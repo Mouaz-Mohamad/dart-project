@@ -42,7 +42,31 @@
        try{await window.DartOrdersApi.correctShipment(o.orderId||o.id,{expectedVersion:Number(o.version),companyId,trackingNumber:trackingNumber.trim()});
          renderShipments();}catch(error){message(error.message||"Correction failed");}finally{edit.disabled=false;}
      };
-     row.append(label,copy,edit);box.append(row);
+     row.append(label,copy,edit);
+     if(o.status==="Out With Representative" && s.status==="Handed Over"){
+       const returned=document.createElement("button");returned.type="button";returned.textContent="Parcel Returned to Dart";
+       returned.onclick=async()=>{
+         const ok=await window.DartDialog.confirm("Confirm the parcel is physically back at Dart. It will still require inspection.");
+         if(!ok)return;
+         const reason=await window.DartDialog.prompt("Reason for return:","Customer refused delivery");
+         if(reason===null||String(reason).trim().length<3)return;
+         returned.disabled=true;
+         try{await window.DartOrdersApi.shipmentReturned(o.orderId||o.id,
+           {expectedVersion:Number(o.version),reason:String(reason).trim()});renderShipments();}
+         catch(e){message(e.message||"Return could not be recorded");}finally{returned.disabled=false;}
+       };row.append(returned);
+     }
+     if(o.status==="Out With Representative" && s.status==="Returned to Sender"){
+       const inspect=document.createElement("button");inspect.type="button";inspect.textContent="Send to Return Inspection";
+       inspect.onclick=async()=>{
+         if(!await window.DartDialog.confirm("Mark Refused and move items to Return Inspection?"))return;
+         inspect.disabled=true;
+         try{await window.DartOrdersApi.workflow(o.orderId||o.id,{expectedStatus:o.status,target:"Refused",
+           reason:String(s.returnReason||"Returned from carrier")});renderShipments();}
+         catch(e){message(e.message||"Could not begin inspection");}finally{inspect.disabled=false;}
+       };row.append(inspect);
+     }
+     box.append(row);
    }
  }
  function reset(){ $("shipping-company-form")?.reset();$("shipping-company-id").value=""; }
