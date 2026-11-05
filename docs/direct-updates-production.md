@@ -6,6 +6,7 @@
 - Streams last at most 240 seconds inside the existing 300-second function limit. Payloads, pending topics and stream counts are bounded. Browser tabs close their stream when hidden, offline or logged out.
 - A successful stream pauses the three-second Orders/domain/catalog checks. A change refreshes only its authorized affected domain. Reconnect and a small once-per-minute integrity check reconcile persistent versions, including clock-driven reservation expiry. Unchanged versions do not download full snapshots.
 - Signals arriving during an in-flight read or order mutation are reconciled afterward. Failed local writes retain their existing recovery path.
+- A tab that reaches the per-IP/session stream limit receives an `unavailable` event and uses the existing polling path for a minute before retrying. The limit remains enforced even when a hosting proxy delays disconnect cleanup; normal saturation does not create repeated HTTP errors in the browser.
 - The browser checks the API's `direct-updates-v1` capability before opening EventSource. An older/disabled API retains the existing polling behavior. `DIRECT_UPDATES_ENABLED=false` disables the runtime feature without changing business data.
 - Existing GPS, finance-report and other specialized timers remain separate. This release does not claim that every timer or every API request has disappeared.
 - No new provider, subscription or dependency is added to production. Existing Vercel/Neon resource usage still applies; this is not a guarantee of a zero hosting bill.

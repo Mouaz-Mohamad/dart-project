@@ -1,13 +1,17 @@
 "use strict";
 const assert = require("node:assert/strict"), http = require("node:http"), fs = require("node:fs");
 const { chromium } = require("playwright");
-const streams = new Set(); let supported = true, opened = 0, probes = 0;
+const streams = new Set(); let supported = true, opened = 0, probes = 0, limited = false;
 const server = http.createServer((req, res) => {
   if (req.url === "/api/v1/health/live") {
     probes++; res.setHeader("Content-Type", "application/json");
     return res.end(JSON.stringify({ capabilities: supported ? ["direct-updates-v1"] : [] }));
   }
   if (req.url === "/api/v1/catalog/changes") {
+    if (limited) {
+      opened++; res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store" });
+      return res.end('event: unavailable\ndata: {"retryMs":60000}\n\n');
+    }
     opened++; streams.add(res); res.on("close", () => streams.delete(res));
     res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store" });
     return res.write("event: ready\ndata: {}\n\n");
@@ -49,6 +53,15 @@ const server = http.createServer((req, res) => {
     await fallback.waitForLoadState("networkidle");
     assert.equal(await fallback.evaluate(() => window.DartChanges.active), false);
     assert.equal(opened, 3, "an older/disabled API never opens an incompatible event source");
+    await fallback.close(); supported = true; limited = true;
+    const saturated = await browser.newPage(), capacityErrors = [];
+    saturated.on('console', message => { if (message.type() === 'error') capacityErrors.push(message.text()); });
+    const capacityResponse = saturated.waitForResponse(response => response.url().endsWith('/api/v1/catalog/changes'));
+    await saturated.goto(origin); await (await capacityResponse).finished();
+    await saturated.waitForTimeout(1100);
+    assert.equal(await saturated.evaluate(() => window.DartChanges.active), false);
+    assert.equal(opened, 4, "a saturated stream uses the minute cooldown rather than immediate EventSource retries");
+    assert.deepEqual(capacityErrors, [], "normal saturation must not create HTTP/console errors");
     assert.deepEqual(errors, []);
     console.log("PASS native Chromium SSE: push delivery, bounded reconnect, version reconciliation, hidden-tab cleanup and capability fallback");
   } finally {

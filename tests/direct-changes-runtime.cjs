@@ -46,6 +46,14 @@ admin.sources[0].emit("ready", {}); assert.equal(admin.window.DartChanges.active
 admin.listeners.get("dart:data-changed")({ detail: { source: "logout" } });
 assert.equal(admin.window.DartChanges.active, false); assert.equal(admin.sources[0].closed, true);
 admin.listeners.get("online")(); assert.equal(admin.sources.length, 1, "logout cannot reconnect a private stream");
+const limited = fixture(); await tick();
+limited.sources[0].emit("unavailable", { retryMs: 60000 });
+assert.equal(limited.window.DartChanges.active, false, "normal capacity fallback never pauses the existing polling path");
+assert.equal(limited.sources[0].closed, true);
+assert.equal(limited.timers.size, 1);
+assert.equal([...limited.timers.values()][0].ms, 60000, "capacity fallback avoids rapid retries");
+limited.sources[0].emit("ready", {}); assert.equal(limited.window.DartChanges.active, false);
+limited.fire(60000); await tick(); assert.equal(limited.sources.length, 2);
 console.log("PASS direct changes: authoritative invalidations, reconnect reconciliation, stale events, startup timeout, hidden tabs and Staff logout isolation");
 
 })().catch(error => { console.error(error); process.exitCode = 1; });

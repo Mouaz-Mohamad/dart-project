@@ -24,7 +24,13 @@ export function createChangeRouter(feed: ChangeFeed, identity: IdentityService, 
     const origin = request.get("origin");
     if (origin && origin !== `${request.protocol}://${request.get("host")}` && !config.corsOrigins.includes(origin)) throw new AppError(403, "ORIGIN_NOT_ALLOWED", "Stream origin is not allowed");
     const key = admin ? `staff:${request.auth!.sessionId}` : `public:${request.ip}`;
-    if ((streams.get(key) || 0) >= 2) throw new AppError(429, "STREAM_LIMIT", "Too many change streams");
+    if ((streams.get(key) || 0) >= 2) {
+      // Saturation is a normal fallback state, including proxy-delayed disconnects.
+      // Keep the resource limit without producing repeated browser HTTP errors.
+      response.set({ "Content-Type": "text/event-stream", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
+      response.end('event: unavailable\ndata: {"retryMs":60000}\n\n');
+      return;
+    }
     streams.set(key, (streams.get(key) || 0) + 1);
     let closed = false, opened = false, flushing = false;
     let subscription: { close(): void } | undefined;

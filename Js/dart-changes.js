@@ -40,6 +40,11 @@
       backoff = Math.min(backoff * 2, 60000);
     };
     startupTimer = window.setTimeout(failed, 10000);
+    current.addEventListener("unavailable", () => {
+      if (generation !== epoch) return;
+      stop(); backoff = 60000;
+      retryTimer = window.setTimeout(connect, backoff);
+    });
     current.addEventListener("ready", () => {
       if (generation !== epoch) return;
       clearTimeout(startupTimer); startupTimer = 0;

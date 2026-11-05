@@ -62,6 +62,23 @@ function routerFixture() {
   return { app, auth, feed, close, emit: (signal: ChangeSignal) => receive?.(signal), cookie: `dart_session_staff=${auth.sessionId}.${"a".repeat(43)}` };
 }
 describe("change-stream authorization and HTTP lifecycle", () => {
+  it("keeps two public streams per IP and returns a bounded graceful fallback for another tab", async () => {
+    const f = routerFixture(), server = f.app.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => server.once("listening", resolve));
+    const controllers = [new AbortController(), new AbortController()];
+    try {
+      const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/v1/catalog/changes`;
+      for (const controller of controllers) {
+        const response = await fetch(url, { signal: controller.signal });
+        expect(response.status).toBe(200);
+        expect(new TextDecoder().decode((await response.body!.getReader().read()).value)).toContain("event: ready");
+      }
+      const fallback = await fetch(url);
+      expect(fallback.status).toBe(200); expect(fallback.headers.get("content-type")).toContain("text/event-stream");
+      const frame = await fallback.text(); expect(frame).toContain("event: unavailable"); expect(frame).not.toContain("event: ready");
+      expect(f.feed.subscribe).toHaveBeenCalledTimes(2);
+    } finally { controllers.forEach(controller => controller.abort()); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
   it("rejects guests, customers, missing grants/MFA and foreign origins before opening a listener", async () => {
     const f = routerFixture();
     await request(f.app).get("/api/v1/admin/changes").expect(401);
