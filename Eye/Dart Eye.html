@@ -468,10 +468,25 @@
         </section>
 
         <!-- سكشن Model Code -->
-        <section id="models" class="dashboard-section active-section">
+        <section id="models" class="dashboard-section active-section" aria-labelledby="dart-models-page-title">
+            <header class="dart-models-page-header">
+                <div>
+                    <p class="dart-models-eyebrow"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> PRODUCT MANAGEMENT</p>
+                    <h2 id="dart-models-page-title">Models</h2>
+                    <p>Manage product models, prices, variations and inventory. Select Details to view every field and action.</p>
+                </div>
+                <span class="dart-models-page-badge"><i class="fa-solid fa-shirt" aria-hidden="true"></i> Dart Catalog</span>
+            </header>
+            <article class="dart-models-workspace" aria-label="Model catalogue and filters">
+                <div class="dart-models-workspace-head">
+                    <div>
+                        <h3>Model Catalog</h3>
+                        <p>Filter by category, stock status and price. Select a row to open its details.</p>
+                    </div>
+                </div>
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search returns">
+                    <input type="search" placeholder="Search model name, code or category" aria-label="Search models">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
@@ -533,6 +548,7 @@
                 </div>
                 <div id="models-container"></div>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Models modals: kept beside the owning dashboard section. -->
