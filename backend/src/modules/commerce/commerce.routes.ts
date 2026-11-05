@@ -104,7 +104,7 @@ const savedAddressSchema = z.object({
   address: z.string().trim().min(1).max(600),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  governorate: z.enum(["Cairo", "Giza"]),
+  governorate: z.string().trim().min(2).max(100),
   country: z.string().trim().max(120).optional(),
   area: z.string().trim().max(160).optional(),
   street: z.string().trim().max(200).optional(),

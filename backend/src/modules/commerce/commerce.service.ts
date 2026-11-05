@@ -105,7 +105,11 @@ export class CommerceService {
     const settings=await this.pool.query<{data:Record<string,unknown>}>("SELECT data FROM site_settings WHERE id='main'");
     const raw=settings.rows[0]?.data?.shippingCompanies;
     const companies=(Array.isArray(raw)?raw:[]) as CheckoutShippingCompany[];
-    return { governorates: checkoutShippingRegions(companies) };
+    return {
+      governorates: checkoutShippingRegions(companies),
+      companies: companies.filter(c=>c.active===true&&c.checkoutEnabled===true&&c.coverage)
+        .map(({id,name,governorates,coverage})=>({id,name,governorates,coverage})),
+    };
   }
 
   public async shippingCompanies(): Promise<{version:number;companies:ShippingCompany[]}> {
