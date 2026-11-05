@@ -64,7 +64,7 @@ const server = http.createServer((request, response) => {
           }
         : pathname === "/api/v1/auth/social/providers"
           ? { providers: { google: false, facebook: false } }
-        : pathname === "/api/v1/me"
+        : pathname === "/api/v1/me" || pathname === "/api/v1/admin/auth/me"
           ? {
               user: { id: "owner", accountType: "staff", name: "CI Owner" },
               session: { mfaRequired: false, mfaSatisfied: true },
@@ -301,6 +301,7 @@ const server = http.createServer((request, response) => {
   await tracking.close();
 
   const dashboard = await open("Eye/Dart%20Eye.html");
+  await dashboard.waitForFunction(() => window.DartAdminHydration?.ready === true);
   assert.equal(await dashboard.locator("#dart-admin-auth").count(), 1);
   assert.equal(
     await dashboard.locator(".menu").evaluate((node) => getComputedStyle(node).overflowY),
@@ -427,6 +428,7 @@ const server = http.createServer((request, response) => {
     );
     await dashboard.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
     if(target==="shipping"){
+      await dashboard.locator("#shipping-add-company").click();
       await dashboard.waitForFunction(() =>
         document.querySelectorAll("#shipping-coverage-picker .dart-coverage-gov").length===27);
       const regionSearch=dashboard.locator("#shipping-coverage-picker .dart-coverage-search");
@@ -436,6 +438,7 @@ const server = http.createServer((request, response) => {
       await regionSearch.fill("");
       assert.equal(await dashboard.locator("#shipping-coverage-picker .dart-coverage-gov").count(),27,
         "Clearing region search restores all Egyptian governorates");
+      await dashboard.locator("#shipping-company-cancel").click();
     }
     const unreadable=await dashboard.evaluate(()=>{
       const rgb=value=>(value.match(/[\d.]+/g)||[]).map(Number),white=value=>value.length>=3&&value.slice(0,3).every(channel=>channel>=245);
@@ -617,7 +620,7 @@ const server = http.createServer((request, response) => {
     const page = await context.newPage(), stockWrites = [];
     const model = {modelId:'M-PERM',name:'Permission fixture',category:'Hoodies',cost:100,selling:150,discount:0,
       active:true,isArchived:false,isDeleted:false,version:1,sizeOptions:[{name:'M',active:true}],colorOptions:[{name:'Black',active:true,images:[]}]};
-    await page.route('**/api/v1/me',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
+    await page.route(/\/api\/v1\/(?:me|admin\/auth\/me)(?:\?|$)/,route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
       user:{id:'synthetic-staff',accountType:'staff'},session:{mfaRequired:false,mfaSatisfied:true},permissions})}));
     await page.route('**/api/v1/admin/catalog-state',async route=>{
       const write=route.request().method()!=='GET';
@@ -660,7 +663,7 @@ const server = http.createServer((request, response) => {
     const row={id:`${domain}-fixture`,clientName:'Synthetic feedback',review:'Original message',email:'fixture@example.test',
       phone1:'01012345678',status:'Active',createdAt:new Date().toISOString(),
       ...(domain==='contacts'?{recordType:'contact',source:'Contact Us'}:{recordType:'review',rating:5})};
-    await page.route('**/api/v1/me',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
+    await page.route(/\/api\/v1\/(?:me|admin\/auth\/me)(?:\?|$)/,route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
       user:{id:'synthetic-feedback-staff',accountType:'staff'},session:{mfaRequired:false,mfaSatisfied:true},permissions:[`${domain}.read`,`${domain}.manage`]})}));
     await page.route('**/api/v1/admin/domain-state',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({domains:[{domain,version:1,data:[row]}]})}));
     await page.route('**/api/v1/admin/domain-state/*',async route=>{
