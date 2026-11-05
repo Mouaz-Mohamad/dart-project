@@ -388,6 +388,33 @@ describe("identity HTTP boundaries", () => {
     expect(response.status).toBe(401);
   });
 
+  it("Staff logout only clears Staff cookies and not the customer session", async () => {
+    const service = fakeService(account({ accountType: "staff" }));
+    const response = await request(app(service))
+      .post("/api/v1/admin/auth/logout")
+      .set("Cookie", `dart_session_staff=${sessionId}.${secret}; dart_session=customer-value`)
+      .set("X-CSRF-Token", csrf);
+    expect(response.status).toBe(204);
+    const cookies = response.headers["set-cookie"] as unknown as string[];
+    expect(cookies.some((row) => row.startsWith("dart_session_staff="))).toBe(true);
+    expect(cookies.some((row) => row.startsWith("dart_staff_csrf="))).toBe(true);
+    expect(cookies.some((row) => row.startsWith("dart_session="))).toBe(false);
+    expect(cookies.some((row) => row.startsWith("dart_csrf="))).toBe(false);
+  });
+
+  it("Customer logout does not clear Staff cookies", async () => {
+    const response = await request(app(fakeService()))
+      .post("/api/v1/auth/logout")
+      .set("Cookie", `dart_session=${sessionId}.${secret}`)
+      .set("X-CSRF-Token", csrf);
+    expect(response.status).toBe(204);
+    const cookies = response.headers["set-cookie"] as unknown as string[];
+    expect(cookies.some((row) => row.startsWith("dart_session="))).toBe(true);
+    expect(cookies.some((row) => row.startsWith("dart_csrf="))).toBe(true);
+    expect(cookies.some((row) => row.startsWith("dart_session_staff="))).toBe(false);
+    expect(cookies.some((row) => row.startsWith("dart_staff_csrf="))).toBe(false);
+  });
+
   it("accepts representative applications with private verification documents", async () => {
     const service = fakeService();
     const response = await request(app(service)).post("/api/v1/representatives/register").send({
