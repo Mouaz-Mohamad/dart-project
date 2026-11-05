@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 import { returnMatchesSale } from "./commerce.returns.js";
+import { matchesDeliveryGovernorate } from "./shipping.geography.js";
 
 type JsonRow = Record<string, unknown>;
 
@@ -124,7 +125,7 @@ export interface ReturnInput {
   requestedSize?: string | undefined;
   address: {
     country: string;
-    governorate: "Cairo" | "Giza";
+    governorate: string;
     area: string;
     street: string;
     building: string;
@@ -339,6 +340,9 @@ export class CustomerInteractionService {
     input: ReturnInput,
     requestId: string,
   ): Promise<{ id: string; returnId: string }> {
+    if (!matchesDeliveryGovernorate(input.address.governorate, input.address.latitude, input.address.longitude)) {
+      throw new AppError(422, "RETURN_PICKUP_LOCATION_INVALID", "The pickup pin must be inside the selected Egypt governorate");
+    }
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");

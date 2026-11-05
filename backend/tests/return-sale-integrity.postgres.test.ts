@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CommerceService } from "../src/modules/commerce/commerce.service.js";
 import { CustomerInteractionService } from "../src/modules/commerce/customer-interaction.service.js";
 import { embeddedStore } from "./embedded-store.js";
+import { returnSchema } from "../src/modules/commerce/customer-interaction.routes.js";
+import { EGYPT_GOVERNORATES } from "../src/modules/commerce/shipping.core.js";
 
 describe("returns preserve each sale's inventory and money on the production schema", () => {
   let store: Awaited<ReturnType<typeof embeddedStore>>;
@@ -63,6 +65,22 @@ describe("returns preserve each sale's inventory and money on the production sch
   const ownership = async (piece: string) => (await store.pool.query(
     "SELECT status,order_id,cart_reservation_id,return_request_id FROM inventory_items WHERE id=$1", [piece])).rows[0];
   const address = { country: "Egypt", governorate: "Cairo" as const, area: "Nasr City", street: "Test", building: "1", floor: "1", latitude: 30.05, longitude: 31.35 };
+
+  it("accepts nationwide pickup independently of checkout carriers and rejects a mismatched or foreign pin", async () => {
+    const f = await fixture();
+    const base = { itemCode: f.piece, requestType: "Refund" as const, reason: "Synthetic pickup", address };
+    for (const governorate of EGYPT_GOVERNORATES) {
+      expect(returnSchema.safeParse({ ...base, address: { ...address, governorate } }).success).toBe(true);
+    }
+    const pickup = returnSchema.parse({ ...base, address: { ...address, governorate: "Alexandria", latitude: 31.20, longitude: 29.92 } });
+    await expect(customerReturns.submitReturn(f.user, { ...pickup, address: { ...pickup.address, latitude: 51.5, longitude: -0.12 } }, "foreign-pickup"))
+      .rejects.toMatchObject({ code: "RETURN_PICKUP_LOCATION_INVALID" });
+    await expect(customerReturns.submitReturn(f.user, { ...pickup, address: { ...pickup.address, governorate: "Cairo" } }, "wrong-governorate"))
+      .rejects.toMatchObject({ code: "RETURN_PICKUP_LOCATION_INVALID" });
+    const returned = await customerReturns.submitReturn(f.user, pickup, "national-pickup");
+    const record = (await store.pool.query("SELECT payload FROM return_requests WHERE record_id=$1", [returned.id])).rows[0].payload;
+    expect(record).toMatchObject({ governorate: "Alexandria", latitude: 31.20, longitude: 29.92, orderId: f.code });
+  });
 
   it("caps a manual refund at its immutable line price and rolls back the whole failed command", async () => {
     const f = await fixture();

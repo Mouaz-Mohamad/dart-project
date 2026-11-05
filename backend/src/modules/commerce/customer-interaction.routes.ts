@@ -12,6 +12,7 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CustomerInteractionService } from "./customer-interaction.service.js";
+import { EGYPT_GOVERNORATES } from "./shipping.core.js";
 
 const contactSchema = z.object({
   fullName: z.string().trim().min(2).max(160),
@@ -39,7 +40,7 @@ const publicReviewSchema = reviewSchema.omit({ title: true }).extend({
   website: z.string().max(100).optional(), // Honeypot: must remain empty.
 }).strict();
 
-const returnSchema = z.object({
+export const returnSchema = z.object({
   itemCode: z.string().trim().min(1).max(160),
   requestType: z.enum(["Refund", "Exchange"]),
   reason: z.string().trim().min(1).max(500),
@@ -48,13 +49,13 @@ const returnSchema = z.object({
   requestedSize: z.string().trim().max(120).optional(),
   address: z.object({
     country: z.string().trim().min(2).max(120),
-    governorate: z.enum(["Cairo", "Giza"]),
+    governorate: z.enum(EGYPT_GOVERNORATES),
     area: z.string().trim().min(1).max(160),
     street: z.string().trim().min(1).max(200),
     building: z.string().trim().min(1).max(120),
     floor: z.string().trim().min(1).max(80),
-    latitude: z.number().finite(),
-    longitude: z.number().finite(),
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180),
     fullAddress: z.string().trim().max(600).optional(),
     addressSource: z.string().trim().max(80).optional(),
   }),
