@@ -1,12 +1,8 @@
-// DART | Read-only official-selection UI. Region names/IDs come from Dart's own server.
-// Never accept arbitrary typed city/area names as persisted coverage.
 (() => {
 "use strict";
 const normalize = text => String(text || "").trim().toLowerCase()
 .replace(/[\u064b-\u065f\u0670\u0640]/g, "")
 .replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/[\s_\-]+/g, "");
-// Damerau-Levenshtein with a small threshold: common typos and swapped letters
-// still reveal a known place, but typing never creates a new unvalidated place.
 function closeSpelling(a,b,max) {
 if(Math.abs(a.length-b.length)>max)return false;
 const dist=Array.from({length:a.length+1},()=>new Uint16Array(b.length+1));
@@ -149,7 +145,6 @@ coverage=JSON.parse(JSON.stringify(saved));render();return [];
 const available=new Map(catalog.map(g=>[normalize(g.id),g.id]));
 const matched=legacy.map(x=>available.get(normalize(x))).filter(Boolean);
 const unknown=legacy.filter(x=>!available.has(normalize(x)));
-// Old blank list meant unrestricted. Represent it explicitly so saving never changes behavior silently.
 coverage=Object.fromEntries((legacy.length?matched:catalog.map(g=>g.id))
 .map(id=>[id,{all:true,cities:{}}]));
 render();return unknown;
