@@ -1397,6 +1397,10 @@
                 <article><span>Conversion</span><strong id="waiting-kpi-conversion">0%</strong></article>
             </div>
 
+            <article class="dart-waiting-workspace" aria-label="Waiting queue and demand management">
+                <div class="dart-ops-workspace-head">
+                    <div><h2>Waiting Management</h2><p>Filter requests, compare demand, then open each record for its permitted actions.</p></div>
+                </div>
             <div class="first filter-bar dart-waiting-filters">
                 <div class="search-box">
                     <input id="waiting-search" type="search" placeholder="Search customer, code, model, color or size">
@@ -1433,13 +1437,26 @@
             <div id="waiting-demand-view" hidden>
                 <div id="waiting-demand-table" class="dart-waiting-table-wrap" aria-live="polite"></div>
             </div>
+            </article>
         </section>
 
         <!-- return -->
-        <section id="returns" class="dashboard-section">
+        <section id="returns" class="dashboard-section" aria-labelledby="dart-returns-title">
+            <header class="dart-returns-header">
+                <div>
+                    <p class="dart-returns-eyebrow"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> AFTER-SALES OPERATIONS</p>
+                    <h2 id="dart-returns-title">Returns &amp; Exchanges</h2>
+                    <p>Manage return requests, exchange pickups and item inspections in one organized workspace.</p>
+                </div>
+                <span class="dart-returns-badge"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Dart Operations</span>
+            </header>
+            <article class="dart-returns-workspace" aria-label="Returns and exchanges management">
+                <div class="dart-ops-workspace-head">
+                    <div><h3>Return Requests</h3><p>Use search and filters to find a request. Open Details for full history and actions.</p></div>
+                </div>
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search product name">
+                    <input type="search" placeholder="Search return, customer, order or item code" aria-label="Search return requests" autocomplete="off">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
@@ -1545,6 +1562,7 @@
                     </div>
                 </template>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Returns modals: kept beside the owning dashboard section. -->
