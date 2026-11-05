@@ -219,7 +219,7 @@ export class CommerceService {
       let next:DispatchedShipment;
       try{next=dispatchShipment([DART_CARRIER,...companies],{
           companyId,trackingNumber,governorate:String(order.delivery_address?.governorate||""),
-          city:String(order.delivery_address?.city||""),area:String(order.delivery_address?.area||""),
+          city:String(order.delivery_address?.city||""),area:String(order.delivery_address?.coverageArea||order.delivery_address?.area||""),
           now:old.dispatchedAt,
         });}
       catch(error){throw new AppError(422,"INVALID_SHIPPING_CORRECTION",error instanceof Error?error.message:"Invalid carrier");}
@@ -5419,7 +5419,7 @@ export class CommerceService {
           const destination=await client.query<{governorate:string;city:string;area:string}>(
             `SELECT COALESCE(delivery_address->>'governorate','') AS governorate,
                COALESCE(delivery_address->>'city','') AS city,
-               COALESCE(delivery_address->>'area','') AS area FROM orders WHERE id=$1`,[order.id]);
+               COALESCE(delivery_address->>'coverageArea',delivery_address->>'area','') AS area FROM orders WHERE id=$1`,[order.id]);
           try{dispatchedShipment=dispatchShipment([DART_CARRIER,...companies],{
              companyId,trackingNumber:input.trackingNumber,governorate:destination.rows[0]?.governorate||"",
              city:destination.rows[0]?.city||"",area:destination.rows[0]?.area||"",
