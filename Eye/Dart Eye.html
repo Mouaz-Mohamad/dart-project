@@ -2434,7 +2434,10 @@
                     <form id="settings-display-form" class="dart-settings-fields">
                         <label>Row spacing<select id="settings-display-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
                         <label>Section<select id="settings-display-section"><option value="orders">Orders</option><option value="customers">Clients</option><option value="models">Models</option><option value="items">Items</option><option value="returns">Returns</option><option value="damage">Damage</option><option value="representative">Representatives</option><option value="review">Reviews</option><option value="card">Dart Card</option><option value="news">News</option></select></label>
-                        <fieldset id="settings-display-columns" class="dart-settings-field-wide"><legend>Summary columns — choose up to seven</legend></fieldset>
+                        <details class="dart-settings-field-wide dart-settings-columns-collapsible" id="settings-display-columns-toggle">
+                            <summary><span>Summary columns — choose up to seven</span><span class="dart-settings-columns-expand">Show columns <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span></summary>
+                            <fieldset id="settings-display-columns" class="dart-settings-field-wide"><legend>Visible summary columns and order</legend></fieldset>
+                        </details>
                         <button type="submit" class="dart-settings-save">Save display</button><button type="button" id="settings-display-reset" class="dart-settings-secondary">Reset display</button>
                         <p id="settings-display-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
                     </form>
