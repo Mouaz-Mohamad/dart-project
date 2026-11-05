@@ -7,6 +7,7 @@ import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
 import { AppError } from "../../http/app-error.js";
+import { STAFF_CSRF_COOKIE_NAME, staffSessionCookieName } from "../../security/account-cookies.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
@@ -52,14 +53,14 @@ function setCookies(
 ): void {
   const secure =
     config.nodeEnv === "production" || config.sessionCookieSameSite === "none";
-  response.cookie(config.sessionCookieName, session.sessionToken, {
+  response.cookie(staffSessionCookieName(config.sessionCookieName), session.sessionToken, {
     httpOnly: true,
     secure,
     sameSite: config.sessionCookieSameSite,
     path: "/api/v1",
     expires: session.expiresAt,
   });
-  response.cookie("dart_csrf", session.csrfToken, {
+  response.cookie(STAFF_CSRF_COOKIE_NAME, session.csrfToken, {
     httpOnly: false,
     secure,
     sameSite: config.sessionCookieSameSite,
