@@ -73,6 +73,10 @@ const server = http.createServer((req, res) => {
     for (const view of ["profile", "orders", "waiting", "returns"]) {
       await page.goto(`${origin}/profile.html?view=${view}`);
       await page.locator("body[data-customer-auth=ready]").waitFor();
+      // Authentication is ready before the selected accordion becomes active on some devices.
+      // Wait for the visible, route-specific section instead of asserting during the transition.
+      await page.locator(".profile-details.active, .order-info.active, .waiting-info.active, .return-info.active")
+        .waitFor({state:"visible"});
       assert.equal(await page.locator(".profile-details.active, .order-info.active, .waiting-info.active, .return-info.active").count(), 1);
     }
     await page.goto(`${origin}/profile.html`);
