@@ -853,7 +853,15 @@
         <!-- END Customers modals. -->
 
         <!-- order -->
-        <section id="orders" class="dashboard-section">
+        <section id="orders" class="dashboard-section" aria-labelledby="dart-orders-title">
+            <header class="dart-orders-header">
+                <div>
+                    <p class="dart-orders-eyebrow"><i class="fa-solid fa-boxes-packing" aria-hidden="true"></i> ORDER MANAGEMENT</p>
+                    <h2 id="dart-orders-title">Orders</h2>
+                    <p>Manage every stage from new orders to confirmed delivery, with full details one click away.</p>
+                </div>
+                <span class="dart-orders-header-label"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Dart Operations</span>
+            </header>
             <div class="cont-card-info">
                 <div class="card-inf">
                     <div class="span-img">
@@ -884,6 +892,20 @@
                 </div>
             </div>
 
+            <nav class="dart-orders-quick-filters" aria-label="Quick order status filters">
+                <span class="dart-orders-quick-label">Quick Views</span>
+                <button type="button" class="dart-orders-quick is-active" data-dart-order-quick="" aria-pressed="true">All Orders</button>
+                <button type="button" class="dart-orders-quick" data-dart-order-quick="New" aria-pressed="false">New</button>
+                <button type="button" class="dart-orders-quick" data-dart-order-quick="Preparing" aria-pressed="false">Preparing</button>
+                <button type="button" class="dart-orders-quick" data-dart-order-quick="Ready for Dispatch" aria-pressed="false">Ready for Dispatch</button>
+                <button type="button" class="dart-orders-quick" data-dart-order-quick="Delivered" aria-pressed="false">Delivered</button>
+                <button type="button" class="dart-orders-quick" data-dart-order-quick="Needs Attention" aria-pressed="false">Needs Attention</button>
+            </nav>
+
+            <article class="dart-orders-workspace" aria-label="Orders list and actions">
+                <div class="dart-orders-workspace-heading">
+                    <div><h3>Order List</h3><p>Use search and filters to narrow the list. Open Details to review any order.</p></div>
+                </div>
             <div class="first filter-bar">
                 <div class="search-box">
                     <input type="text" placeholder="search product name">
@@ -939,8 +961,9 @@
                     <span>Groups</span>
                 </button>
             </div>
-            <div class="order-bulk-actions" id="order-bulk-actions">
-                <span class="bulk-selected-count" id="bulk-selected-count">0 selected</span>
+            <details class="dart-orders-bulk-panel">
+                <summary><i class="fa-solid fa-list-check" aria-hidden="true"></i><strong>Bulk Actions</strong><span class="bulk-selected-count" id="bulk-selected-count">0 selected</span><i class="fa-solid fa-chevron-down dart-orders-bulk-chevron" aria-hidden="true"></i></summary>
+                <div class="order-bulk-actions" id="order-bulk-actions">
                 <button type="button" data-bulk-order-status="Accepted">Accept</button>
                 <button type="button" data-bulk-order-status="Preparing">Preparing</button>
                 <button type="button" data-bulk-order-status="Ready for Dispatch">Ready for Dispatch</button>
@@ -949,7 +972,8 @@
                 <button type="button" data-bulk-order-status="Delivered">Delivered</button>
                 <button type="button" data-bulk-order-status="Refused">Refused</button>
                 <button type="button" data-bulk-order-status="Cancelled">Cancel</button>
-            </div>
+                </div>
+            </details>
 
             <div class="cont-titel">
                 <div class="title-name">
@@ -984,6 +1008,7 @@
                 </div>
                 <div id="orders-container"></div>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Orders modals: kept beside the owning dashboard section. -->
