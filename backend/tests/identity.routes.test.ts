@@ -388,6 +388,27 @@ describe("identity HTTP boundaries", () => {
     expect(response.status).toBe(401);
   });
 
+  it("keeps simultaneous website and dashboard accounts independent", async () => {
+    const customerId = "123e4567-e89b-12d3-a456-426614174098";
+    const staffId = "123e4567-e89b-12d3-a456-426614174099";
+    const customer = account({ accountType: "customer" });
+    const staff = account({ accountType: "staff", permissions: ["staff.read"] });
+    const service = fakeService(customer);
+    vi.mocked(service.authenticate).mockImplementation(async (id) =>
+      id === customerId ? customer : id === staffId ? staff : null,
+    );
+    vi.mocked(service.profile).mockImplementation(async (auth) => profile(auth));
+    vi.mocked(service.renewCustomerSession).mockResolvedValue(null);
+    const cookies = `dart_session=${customerId}.${secret}; dart_session_staff=${staffId}.${secret}`;
+
+    const site = await request(app(service)).get("/api/v1/me").set("Cookie", cookies);
+    const eye = await request(app(service)).get("/api/v1/admin/auth/me").set("Cookie", cookies);
+    expect(site.status).toBe(200);
+    expect(site.body.user.accountType).toBe("customer");
+    expect(eye.status).toBe(200);
+    expect(eye.body.user.accountType).toBe("staff");
+  });
+
   it("Staff logout only clears Staff cookies and not the customer session", async () => {
     const service = fakeService(account({ accountType: "staff" }));
     const response = await request(app(service))
