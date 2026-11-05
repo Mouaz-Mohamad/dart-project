@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:ae78421a2bac95a4d55b66b9df375ae8987c9c0328f600bc33d3b5c5cce8609d */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:b1ccd8df65b3bc1c03f74663339ef6b8c9b929f115e97049839b0752957c67fc */
 (function () {
   "use strict";
 
@@ -1634,7 +1634,8 @@
       ].includes(normalized)
     )
       return "Giza";
-    return "";
+    const possible=window.DartShippingAvailability?.canonical?.(value)||"";
+    return window.DartShippingAvailability?.isGovernorateOpen?.(possible) ? possible : "";
   }
 
   async function checkout(form, options = {}) {
@@ -1657,6 +1658,8 @@
       email: getCheckoutField(form, "email") || logged?.email || "",
       country: getCheckoutField(form, "country") || "Egypt",
       governorate: getCheckoutField(form, "governorate"),
+      city: getCheckoutField(form, "city"),
+      coverageArea: getCheckoutField(form, "coverageArea"),
       area: getCheckoutField(form, "area"),
       street: getCheckoutField(form, "street"),
       building: getCheckoutField(form, "building"),
@@ -1704,6 +1707,9 @@
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
+    if (!window.DartShippingAvailability?.isAddressCovered?.(details)) {
+      throw new Error("No active shipping service covers this selected governorate/city/area.");
+    }
 
     if (API_BASE) {
       const previousQuote = currentCartQuote();
@@ -1756,6 +1762,8 @@
           address: {
             country: details.country,
             governorate: details.governorate,
+            ...(details.city ? {city: details.city} : {}),
+            ...(details.coverageArea ? {coverageArea: details.coverageArea} : {}),
             area: details.area,
             street: details.street,
             building: details.building,
