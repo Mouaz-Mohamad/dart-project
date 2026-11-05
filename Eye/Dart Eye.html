@@ -1146,40 +1146,129 @@
         <!-- END Orders modals. -->
 
 
-        <section id="shipping" class="dashboard-section dart-shipping-section">
-          <h2>Shipping Companies</h2><p>External shipments remain visible in Orders.</p>
-          <div class="dart-shipping-grid"><div>
-            <form id="shipping-policy-form">
-              <h3>Blocked Governorates</h3>
-              <p>حدد المحافظات التي لا نستقبل طلبات توصيل لها. المنع يشمل توصيل Dart وجميع شركات الشحن.</p>
-              <div id="shipping-blocked-governorates" class="dart-blocked-governorates"></div>
-              <button type="submit" class="btn-done" disabled>Save Delivery Policy</button>
-              <p id="shipping-policy-status" role="status" aria-live="polite">افتح القسم لتحميل سياسة التوصيل.</p>
-            </form>
-            <h3>Companies</h3>
-            <form id="shipping-company-form">
-              <input type="hidden" id="shipping-company-id">
-              <label>Company Name <input id="shipping-company-name" required maxlength="100"></label>
-              <label>Official tracking page (HTTPS) <input type="url" id="shipping-company-url" required></label>
-              <section class="dart-coverage-fieldset" aria-labelledby="shipping-coverage-heading">
-                <h4 id="shipping-coverage-heading">Delivery Coverage · مناطق التوصيل</h4>
-                <p>اختر المحافظات ثم خصّص المدن والمناطق. لا توجد كتابة يدوية للأسماء.</p>
-                <p>لتلقي طلبات من المحافظة، فعّل الشركة وAccept orders in Checkout، وتأكد أن المحافظة غير موقوفة بالأعلى.</p>
-                <div id="shipping-coverage-picker"></div>
-                <p id="shipping-coverage-warning" role="status" aria-live="polite"></p>
-              </section>
-              <label><input type="checkbox" id="shipping-company-active" checked> Active</label>
-              <label><input type="checkbox" id="shipping-company-checkout-enabled"> Accept orders in Checkout from covered regions</label>
-              <small>Off by default. Enable only after confirming the carrier covers all selected cities/areas and delivery fees.</small>
-              <button type="submit" class="btn-done">Save Company</button>
-              <button type="button" id="shipping-company-cancel">Clear</button>
-            </form>
-            <div id="shipping-companies-list" aria-live="polite"></div>
-          </div><div>
-            <h3>External Shipments</h3>
-            <button type="button" id="shipping-refresh">Refresh</button>
-            <div id="shipping-orders-list" aria-live="polite"></div>
-          </div></div>
+        <!-- Shipping Companies remains one primary dashboard section. All four panels are internal tabs. -->
+        <section id="shipping" class="dashboard-section dart-shipping-section" aria-labelledby="shipping-page-title">
+          <header class="dart-shipping-header">
+            <h2 id="shipping-page-title">Shipping Companies</h2>
+            <p>Manage couriers, external shipments, delivery coverage and shipping policy in one place.</p>
+          </header>
+
+          <div class="dart-shipping-tabs" role="tablist" aria-label="Shipping Companies sections">
+            <button type="button" class="dart-shipping-tab is-active" id="shipping-tab-companies" role="tab" aria-controls="shipping-panel-companies" aria-selected="true" tabindex="0" data-shipping-tab="companies"><i class="fa-solid fa-building" aria-hidden="true"></i> Companies</button>
+            <button type="button" class="dart-shipping-tab" id="shipping-tab-shipments" role="tab" aria-controls="shipping-panel-shipments" aria-selected="false" tabindex="-1" data-shipping-tab="shipments"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Shipments</button>
+            <button type="button" class="dart-shipping-tab" id="shipping-tab-coverage" role="tab" aria-controls="shipping-panel-coverage" aria-selected="false" tabindex="-1" data-shipping-tab="coverage"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Delivery Coverage</button>
+            <button type="button" class="dart-shipping-tab" id="shipping-tab-policy" role="tab" aria-controls="shipping-panel-policy" aria-selected="false" tabindex="-1" data-shipping-tab="policy"><i class="fa-solid fa-gear" aria-hidden="true"></i> Delivery Policy</button>
+          </div>
+
+          <section id="shipping-panel-companies" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-companies">
+            <div class="dart-shipping-stat-grid" aria-label="Company totals">
+              <div class="dart-shipping-stat"><small>Total Companies</small><strong id="shipping-stat-total">0</strong></div>
+              <div class="dart-shipping-stat is-positive"><small>Active Companies</small><strong id="shipping-stat-active">0</strong></div>
+              <div class="dart-shipping-stat is-muted"><small>Inactive Companies</small><strong id="shipping-stat-inactive">0</strong></div>
+            </div>
+            <div class="dart-shipping-card">
+              <div class="dart-shipping-card-head">
+                <div><h3>Companies</h3><p>One compact row per company. Open a company to see or edit its full settings.</p></div>
+                <button type="button" id="shipping-add-company" class="dart-shipping-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add Company</button>
+              </div>
+              <div class="dart-shipping-toolbar" aria-label="Filter shipping companies">
+                <label>Search Company<input type="search" id="shipping-filter-search" placeholder="Search by company name" autocomplete="off"></label>
+                <label>Status<select id="shipping-filter-status"><option value="">All Statuses</option><option value="true">Active</option><option value="false">Inactive</option></select></label>
+                <label>Checkout<select id="shipping-filter-checkout"><option value="">All</option><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                <label>Governorate<select id="shipping-filter-governorate"><option value="">All Governorates</option></select></label>
+                <button type="button" id="shipping-clear-filters" class="dart-shipping-secondary">Clear Filters</button>
+              </div>
+              <p id="shipping-company-results-count" class="dart-shipping-count" role="status" aria-live="polite">Loading companies…</p>
+              <div class="dart-shipping-table-scroll">
+                <div class="dart-shipping-table" role="table" aria-label="Shipping companies">
+                  <div role="rowgroup">
+                    <div class="dart-shipping-company-head" role="row">
+                      <span role="columnheader">Company</span><span role="columnheader">Status</span><span role="columnheader">Checkout</span><span role="columnheader">Coverage</span><span role="columnheader">Actions</span>
+                    </div>
+                  </div>
+                  <div id="shipping-companies-list" role="rowgroup" aria-live="polite"></div>
+                </div>
+              </div>
+              <p id="shipping-company-empty" class="dart-shipping-empty" hidden>No shipping companies yet.</p>
+            </div>
+          </section>
+
+          <section id="shipping-panel-shipments" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-shipments" hidden>
+            <div class="dart-shipping-card">
+              <div class="dart-shipping-card-head">
+                <div><h3>External Shipments</h3><p>Shipping corrections and return-to-Dart actions remain subject to existing permissions.</p></div>
+                <button type="button" id="shipping-refresh" class="dart-shipping-secondary"><i class="fa-solid fa-rotate" aria-hidden="true"></i> Refresh</button>
+              </div>
+              <div class="dart-shipping-toolbar" aria-label="Filter external shipments">
+                <label>Search Shipment<input type="search" id="shipping-shipment-search" placeholder="Order or tracking number" autocomplete="off"></label>
+                <label>Company<select id="shipping-shipment-company"><option value="">All Companies</option></select></label>
+                <label>Order Status<select id="shipping-shipment-status"><option value="">All Statuses</option></select></label>
+                <button type="button" id="shipping-shipment-clear" class="dart-shipping-secondary">Clear Filters</button>
+              </div>
+              <p class="dart-shipping-count" id="shipping-shipment-count" role="status" aria-live="polite">0 shipments</p>
+              <div id="shipping-orders-list" aria-live="polite"></div>
+              <p id="shipping-shipment-empty" class="dart-shipping-empty" hidden>No external shipments yet.</p>
+            </div>
+          </section>
+
+          <section id="shipping-panel-coverage" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-coverage" hidden>
+            <div class="dart-shipping-card">
+              <div class="dart-shipping-card-head">
+                <div><h3>Delivery Coverage</h3><p>Review each company's governorates. Open a company to manage its cities and areas.</p></div>
+              </div>
+              <p class="dart-shipping-note">A company can accept checkout orders only when it is active, Checkout is enabled, and the destination is not blocked by Delivery Policy.</p>
+              <div id="shipping-coverage-list" class="dart-shipping-coverage-list" aria-live="polite"></div>
+            </div>
+          </section>
+
+          <section id="shipping-panel-policy" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-policy" hidden>
+            <div class="dart-shipping-card">
+              <form id="shipping-policy-form">
+                <h3>Blocked Governorates</h3>
+                <p>حدد المحافظات التي لا نستقبل طلبات توصيل لها. المنع يشمل توصيل Dart وجميع شركات الشحن.</p>
+                <div id="shipping-blocked-governorates" class="dart-blocked-governorates"></div>
+                <button type="submit" class="btn-done" disabled>Save Delivery Policy</button>
+                <p id="shipping-policy-status" role="status" aria-live="polite">افتح القسم لتحميل سياسة التوصيل.</p>
+              </form>
+            </div>
+          </section>
+
+          <div id="shipping-company-overlay" class="dart-shipping-overlay" hidden>
+            <div class="dart-shipping-editor" role="dialog" aria-modal="true" aria-labelledby="shipping-editor-title" aria-describedby="shipping-editor-description">
+              <div class="dart-shipping-editor-head">
+                <div>
+                  <h3 id="shipping-editor-title">Add Company</h3>
+                  <p id="shipping-editor-description">Fill in the details and save your company.</p>
+                </div>
+                <button type="button" id="shipping-editor-close" aria-label="Close company editor"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+              </div>
+              <form id="shipping-company-form">
+                <input type="hidden" id="shipping-company-id">
+                <div class="dart-shipping-form-group">
+                  <h4>Company Information</h4>
+                  <label>Company Name <input id="shipping-company-name" required maxlength="100"></label>
+                  <label>Official tracking page (HTTPS) <input type="url" id="shipping-company-url" required></label>
+                </div>
+                <section class="dart-coverage-fieldset" aria-labelledby="shipping-coverage-heading">
+                  <h4 id="shipping-coverage-heading">Delivery Coverage · مناطق التوصيل</h4>
+                  <p>اختر المحافظات ثم خصّص المدن والمناطق. لا توجد كتابة يدوية للأسماء.</p>
+                  <p>لتلقي طلبات من المحافظة، فعّل الشركة وAccept orders in Checkout، وتأكد أن المحافظة غير موقوفة في Delivery Policy.</p>
+                  <div id="shipping-coverage-picker"></div>
+                  <p id="shipping-coverage-warning" role="status" aria-live="polite"></p>
+                </section>
+                <div class="dart-shipping-form-group">
+                  <h4>Company Settings</h4>
+                  <label><input type="checkbox" id="shipping-company-active" checked> Active</label>
+                  <label><input type="checkbox" id="shipping-company-checkout-enabled"> Accept orders in Checkout from covered regions</label>
+                  <small>Off by default. Enable only after confirming the carrier covers all selected cities/areas and delivery fees.</small>
+                </div>
+                <div class="dart-shipping-form-actions">
+                  <button type="submit" class="dart-shipping-primary">Save Company</button>
+                  <button type="button" id="shipping-company-cancel" class="dart-shipping-secondary">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </section>
         <!-- Waiting / Restock Reservation -->
         <section id="waiting" class="dashboard-section dart-waiting-section" aria-labelledby="waiting-page-title">
@@ -2432,6 +2521,7 @@
     <script src="dart-permissions.js"></script>
     <script src="dart-orders-api.js"></script>
     <script src="dart-shipping-loader.js"></script>
+    <script src="dart-shipping-ui.js"></script>
     <script src="dart-domain-state.js?v=20261006-cod-command-v2"></script>
     <script src="../Js/dart-dialog.js"></script>
     <script src="dart-admin-auth.js"></script>
