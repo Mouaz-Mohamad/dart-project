@@ -246,28 +246,168 @@
   // END Dynamic model categories.
 
   // BEGIN Model editor. Editable color galleries own media; items contain references.
+  const MAX_RELATED_MODELS = 12;
+
+  function availableRelatedModels() {
+    const editingId = $("modal-edit-id").value;
+    const editing = modelsData.find((m) => String(m.id) === String(editingId));
+    return modelsData.filter((model) =>
+      model.modelId !== editing?.modelId &&
+      !model.isDeleted &&
+      !model.isArchived
+    );
+  }
+
   function renderRelatedOrder() {
     const list = $("modal-related-order");
     if (!list) return;
-    list.innerHTML = (draft.related || []).map((id, index, all) => `<div><span>${esc(id)}</span><button type="button" data-related-index="${index}" data-related-move="-1" aria-label="Move ${esc(id)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-related-index="${index}" data-related-move="1" aria-label="Move ${esc(id)} down" ${index === all.length - 1 ? "disabled" : ""}>↓</button></div>`).join("");
+    list.replaceChildren();
+    const selected = draft.related || [];
+    for (const [index, id] of selected.entries()) {
+      const model = modelsData.find((candidate) => candidate.modelId === id);
+      const row = document.createElement("div");
+      row.className = "dart-related-selected-item";
+      const text = document.createElement("span");
+      text.className = "dart-related-selected-name";
+      text.textContent = (model?.name || id) + " · " + id;
+      row.append(text);
+      const controls = document.createElement("div");
+      controls.className = "dart-related-selected-controls";
+      for (const [label, move, disabled] of [
+        ["↑", -1, index === 0],
+        ["↓", 1, index === selected.length - 1]
+      ]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.dataset.relatedIndex = String(index);
+        button.dataset.relatedMove = String(move);
+        button.setAttribute("aria-label", "Move " + id + (move < 0 ? " up" : " down"));
+        button.disabled = disabled;
+        controls.append(button);
+      }
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.className = "dart-related-remove";
+      remove.dataset.relatedIndex = String(index);
+      remove.dataset.relatedRemove = "1";
+      remove.setAttribute("aria-label", "Remove related model " + id);
+      controls.append(remove);
+      row.append(controls);
+      list.append(row);
+    }
+    if (!selected.length) {
+      const empty = document.createElement("p");
+      empty.className = "dart-related-selected-empty";
+      empty.textContent = "No models selected yet.";
+      list.append(empty);
+    }
+    const count = $("modal-related-count");
+    if (count) count.textContent = selected.length + " / " + MAX_RELATED_MODELS + " selected";
   }
+
+  function updateRelatedSelectionUi() {
+    const selected = new Set(draft.related || []);
+    $("modal-related-models")?.querySelectorAll("[data-related-model]").forEach((card) => {
+      const active = selected.has(card.dataset.relatedModel);
+      card.classList.toggle("is-selected", active);
+      card.setAttribute("aria-pressed", String(active));
+    });
+    renderRelatedOrder();
+  }
+
+  function filterRelatedCards() {
+    const search = String($("modal-related-search")?.value || "").toLocaleLowerCase().trim();
+    let visible = 0;
+    $("modal-related-models")?.querySelectorAll("[data-related-model]").forEach((card) => {
+      const matches = !search || (card.dataset.search || "").includes(search);
+      card.hidden = !matches;
+      if (matches) visible++;
+    });
+    const empty = $("modal-related-empty");
+    if (empty) empty.hidden = visible > 0;
+  }
+
+  function renderRelatedCards() {
+    const grid = $("modal-related-models");
+    if (!grid) return;
+    grid.replaceChildren();
+    for (const model of availableRelatedModels()) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "dart-related-card";
+      card.dataset.relatedModel = String(model.modelId);
+      card.dataset.search = [model.modelId, model.name, model.category]
+        .map((value) => String(value || "").toLocaleLowerCase()).join(" ");
+      card.setAttribute("aria-label", "Related model " + (model.name || model.modelId) + ", code " + model.modelId);
+      card.setAttribute("aria-pressed", "false");
+      const photo = document.createElement("img");
+      photo.className = "dart-related-card-image";
+      photo.src = String(C.cover(model) || "");
+      photo.alt = "Photo of " + (model.name || model.modelId);
+      photo.loading = "lazy";
+      photo.decoding = "async";
+      photo.width = 64;
+      photo.height = 82;
+      const body = document.createElement("span");
+      body.className = "dart-related-card-details";
+      const title = document.createElement("strong");
+      title.textContent = String(model.name || model.modelId);
+      const code = document.createElement("small");
+      code.textContent = String(model.modelId);
+      const category = document.createElement("span");
+      category.className = "dart-related-card-category";
+      category.textContent = String(model.category || "Model");
+      body.append(title, code, category);
+      const check = document.createElement("span");
+      check.className = "dart-related-card-check";
+      check.textContent = "✓";
+      check.setAttribute("aria-hidden", "true");
+      card.append(photo, body, check);
+      grid.append(card);
+    }
+    updateRelatedSelectionUi();
+    filterRelatedCards();
+  }
+
   function setupModelModal() {
     initViews();
     const form = $("model-form");
     if (!form || form.dataset.catalogReady) return;
     form.dataset.catalogReady = "1";
-    $("modal-related-models").addEventListener("change", () => {
-      const selected = [...$("modal-related-models").selectedOptions].map((option) => option.value);
-      draft.related = [...(draft.related || []).filter((id) => selected.includes(id)), ...selected.filter((id) => !(draft.related || []).includes(id))];
-      renderRelatedOrder();
+    $("modal-related-models").addEventListener("click", (event) => {
+      const card = event.target.closest("[data-related-model]");
+      if (!card || !card.closest("#modal-related-models")) return;
+      const id = card.dataset.relatedModel;
+      const index = (draft.related || []).indexOf(id);
+      if (index >= 0) {
+        draft.related.splice(index, 1);
+      } else {
+        if ((draft.related || []).length >= MAX_RELATED_MODELS) {
+          window.DartDialog.alert("Choose at most " + MAX_RELATED_MODELS + " related models.");
+          return;
+        }
+        if (!availableRelatedModels().some((model) => model.modelId === id)) return;
+        draft.related.push(id);
+      }
+      updateRelatedSelectionUi();
     });
+    $("modal-related-search").addEventListener("input", filterRelatedCards);
     $("modal-related-order").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-related-move]");
+      const button = event.target.closest("[data-related-index]");
       if (!button) return;
-      const from = Number(button.dataset.relatedIndex), to = from + Number(button.dataset.relatedMove);
-      if (to < 0 || to >= draft.related.length) return;
+      const from = Number(button.dataset.relatedIndex);
+      if (!Number.isInteger(from) || from < 0 || from >= draft.related.length) return;
+      if (button.dataset.relatedRemove === "1") {
+        draft.related.splice(from, 1);
+        updateRelatedSelectionUi();
+        return;
+      }
+      const to = from + Number(button.dataset.relatedMove);
+      if (!Number.isInteger(to) || to < 0 || to >= draft.related.length) return;
       [draft.related[from], draft.related[to]] = [draft.related[to], draft.related[from]];
-      renderRelatedOrder();
+      updateRelatedSelectionUi();
     });
     const discountGroup = $("modal-discount").closest(".form-group");
     const editor = document.createElement("div");
@@ -389,7 +529,7 @@
         return window.DartDialog.alert("Model Code already exists.");
       if (!draft.sizes.some(C.active) || !draft.colors.some(C.active))
         return window.DartDialog.alert("Add at least one active size and color.");
-      if ($("modal-related-models").selectedOptions.length > 12) return window.DartDialog.alert("Choose at most 12 related models.");
+      if ((draft.related || []).length > MAX_RELATED_MODELS) return window.DartDialog.alert("Choose at most " + MAX_RELATED_MODELS + " related models.");
       const category = canonicalCategory($("modal-category").value);
       if (!category) return window.DartDialog.alert("Category is required.");
       const payload = {
@@ -582,15 +722,7 @@
       const m = modelsData.find((m) => m.id === id);
       $("model-form").reset();
       refreshCategoryOptions(m?.category || "");
-      const related = $("modal-related-models");
-      related.replaceChildren();
-      modelsData.filter((candidate) => candidate.modelId !== m?.modelId && !candidate.isDeleted && !candidate.isArchived).forEach((candidate) => {
-        const option = document.createElement("option");
-        option.value = candidate.modelId;
-        option.textContent = `${candidate.modelId} · ${candidate.name}`;
-        option.selected = (m?.relatedModelIds || []).includes(candidate.modelId);
-        related.appendChild(option);
-      });
+      $("modal-related-search").value = "";
       $("modal-edit-id").value = id || "";
       draft = {
         related: [...(m?.relatedModelIds || [])].filter((id) => modelsData.some((candidate) => candidate.modelId === id && !candidate.isDeleted && !candidate.isArchived)),
@@ -621,11 +753,11 @@
       );
       if (m)
         C.loadModelImages(m.modelId).then(() => {
-          if ($("modal-edit-id").value === id) renderOptions();
+          if ($("modal-edit-id").value === id) { renderOptions(); renderRelatedCards(); }
         });
       $("modal-final-price").textContent = `${Math.trunc(C.price(m))} EGP`;
       $("catalog-form-status").textContent = "";
-      renderRelatedOrder();
+      renderRelatedCards();
       renderOptions();
       openModal($("model-modal"));
     } else {
