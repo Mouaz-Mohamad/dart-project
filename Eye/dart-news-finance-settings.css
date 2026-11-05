@@ -712,3 +712,13 @@
   #finance .dart-finance-tab-group-buttons button,
   #settings .dart-settings-quick-links button{transition:none}
 }
+
+/* Highlight a section reached from the quick navigation without changing form state. */
+#settings .dart-settings-card.is-jump-highlighted{
+  border-color:#ae5872;
+  outline:2px solid #ab012b29;
+  outline-offset:2px;
+}
+@media(max-width:768px){
+  #settings .dart-settings-card{scroll-margin-top:85px}
+}
