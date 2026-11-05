@@ -1,0 +1,46 @@
+// DART | Public checkout shipping eligibility.
+// Checkout sees only enabled, active external companies; legacy company records are NOT checkout-enabled.
+// Dart's internal courier retains its current Cairo/Giza coverage until separately configured.
+import { governorateFromText, isCompanyAddressCovered,
+  EGYPT_COVERAGE_CATALOG } from "./shipping.coverage.js";
+import type { ShippingCompany } from "./shipping.core.js";
+
+export interface CheckoutShippingAddress {
+  governorate: string;
+  city?: string | undefined;
+  coverageArea?: string | undefined;
+  area?: string | undefined;
+}
+export interface CheckoutShippingCompany extends ShippingCompany {
+  checkoutEnabled?: boolean | undefined;
+}
+const LOCAL_GOVERNORATES = new Set(["Cairo", "Giza"]);
+export function checkoutEligibleCompanies(companies: readonly CheckoutShippingCompany[],
+  address:CheckoutShippingAddress): CheckoutShippingCompany[] {
+  const governorate=governorateFromText(address.governorate);
+  if(!governorate)return [];
+  const result:CheckoutShippingCompany[]=[];
+  // Dart delivery is a distinct internal path, not a public configurable provider.
+  if(LOCAL_GOVERNORATES.has(governorate)) {
+    result.push({id:"dart",name:"Dart Delivery",trackingUrl:"",
+      governorates:["Cairo","Giza"],active:true,checkoutEnabled:true});
+  }
+  for(const company of companies){
+    if(company.id==="dart"||company.active!==true||company.checkoutEnabled!==true)continue;
+    // Legacy companies (without owner-chosen structured coverage) cannot silently open nationwide checkout.
+    if(!company.coverage)continue;
+    if(isCompanyAddressCovered(company,governorate,address.city,
+      address.coverageArea||address.area)) result.push(company);
+  }
+  return result;
+}
+export function checkoutShippingRegions(companies: readonly CheckoutShippingCompany[]) {
+  return EGYPT_COVERAGE_CATALOG.map(g=>({
+    id:g.id,ar:g.ar,en:g.en,
+    cities:g.cities.map(c=>({id:c.id,ar:c.ar,en:c.en,
+      areas:c.areas.map(a=>({id:a.id,ar:a.ar,en:a.en}))})),
+    carriers:checkoutEligibleCompanies(companies,{governorate:g.id}).map(c=>c.id),
+    // Area-specific scopes need the city/area chosen; province is still selectable if some region is enabled.
+    available:g.id==="Cairo"||g.id==="Giza"||companies.some(company=>company.active&&company.checkoutEnabled&&company.coverage?.[g.id]),
+  })).filter(g=>g.available);
+}
