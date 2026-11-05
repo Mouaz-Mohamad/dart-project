@@ -224,6 +224,10 @@
   color:#fff;
 }
 #models .second .delete-btn{border-color:#f0c9cb;color:#ad3440;background:#fff8f8}
+#models .second button[hidden],
+#models .first.filter-bar button[hidden],
+#models .dart-sets-admin-panel[hidden],
+#models .dart-models-workspace[hidden]{display:none!important}
 #models .cont-titel{
   display:block;
   position:relative;
