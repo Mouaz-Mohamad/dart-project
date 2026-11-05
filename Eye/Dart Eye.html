@@ -1146,21 +1146,21 @@
         <!-- END Orders modals. -->
 
 
-        <!-- Shipping Companies remains one primary dashboard section. All four panels are internal tabs. -->
-        <section id="shipping" class="dashboard-section dart-shipping-section" aria-labelledby="shipping-page-title">
+        <!-- Shipping Companies remains one primary dashboard section. All four panels are internal article tabs. -->
+        <article id="shipping" class="dashboard-section dart-shipping-section" aria-labelledby="shipping-page-title">
           <header class="dart-shipping-header">
             <h2 id="shipping-page-title">Shipping Companies</h2>
             <p>Manage couriers, external shipments, delivery coverage and shipping policy in one place.</p>
           </header>
 
-          <div class="dart-shipping-tabs" role="tablist" aria-label="Shipping Companies sections">
+          <div class="dart-shipping-tabs" role="tablist" aria-label="Shipping Companies tabs">
             <button type="button" class="dart-shipping-tab is-active" id="shipping-tab-companies" role="tab" aria-controls="shipping-panel-companies" aria-selected="true" tabindex="0" data-shipping-tab="companies"><i class="fa-solid fa-building" aria-hidden="true"></i> Companies</button>
             <button type="button" class="dart-shipping-tab" id="shipping-tab-shipments" role="tab" aria-controls="shipping-panel-shipments" aria-selected="false" tabindex="-1" data-shipping-tab="shipments"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Shipments</button>
             <button type="button" class="dart-shipping-tab" id="shipping-tab-coverage" role="tab" aria-controls="shipping-panel-coverage" aria-selected="false" tabindex="-1" data-shipping-tab="coverage"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Delivery Coverage</button>
             <button type="button" class="dart-shipping-tab" id="shipping-tab-policy" role="tab" aria-controls="shipping-panel-policy" aria-selected="false" tabindex="-1" data-shipping-tab="policy"><i class="fa-solid fa-gear" aria-hidden="true"></i> Delivery Policy</button>
           </div>
 
-          <section id="shipping-panel-companies" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-companies">
+          <article id="shipping-panel-companies" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-companies">
             <div class="dart-shipping-stat-grid" aria-label="Company totals">
               <div class="dart-shipping-stat"><small>Total Companies</small><strong id="shipping-stat-total">0</strong></div>
               <div class="dart-shipping-stat is-positive"><small>Active Companies</small><strong id="shipping-stat-active">0</strong></div>
@@ -1191,9 +1191,9 @@
               </div>
               <p id="shipping-company-empty" class="dart-shipping-empty" hidden>No shipping companies yet.</p>
             </div>
-          </section>
+          </article>
 
-          <section id="shipping-panel-shipments" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-shipments" hidden>
+          <article id="shipping-panel-shipments" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-shipments" hidden>
             <div class="dart-shipping-card">
               <div class="dart-shipping-card-head">
                 <div><h3>External Shipments</h3><p>Shipping corrections and return-to-Dart actions remain subject to existing permissions.</p></div>
@@ -1209,9 +1209,9 @@
               <div id="shipping-orders-list" aria-live="polite"></div>
               <p id="shipping-shipment-empty" class="dart-shipping-empty" hidden>No external shipments yet.</p>
             </div>
-          </section>
+          </article>
 
-          <section id="shipping-panel-coverage" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-coverage" hidden>
+          <article id="shipping-panel-coverage" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-coverage" hidden>
             <div class="dart-shipping-card">
               <div class="dart-shipping-card-head">
                 <div><h3>Delivery Coverage</h3><p>Review each company's governorates. Open a company to manage its cities and areas.</p></div>
@@ -1219,9 +1219,9 @@
               <p class="dart-shipping-note">A company can accept checkout orders only when it is active, Checkout is enabled, and the destination is not blocked by Delivery Policy.</p>
               <div id="shipping-coverage-list" class="dart-shipping-coverage-list" aria-live="polite"></div>
             </div>
-          </section>
+          </article>
 
-          <section id="shipping-panel-policy" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-policy" hidden>
+          <article id="shipping-panel-policy" class="dart-shipping-panel" role="tabpanel" aria-labelledby="shipping-tab-policy" hidden>
             <div class="dart-shipping-card">
               <form id="shipping-policy-form">
                 <h3>Blocked Governorates</h3>
@@ -1231,7 +1231,7 @@
                 <p id="shipping-policy-status" role="status" aria-live="polite">افتح القسم لتحميل سياسة التوصيل.</p>
               </form>
             </div>
-          </section>
+          </article>
 
           <div id="shipping-company-overlay" class="dart-shipping-overlay" hidden>
             <div class="dart-shipping-editor" role="dialog" aria-modal="true" aria-labelledby="shipping-editor-title" aria-describedby="shipping-editor-description">
@@ -1249,13 +1249,13 @@
                   <label>Company Name <input id="shipping-company-name" required maxlength="100"></label>
                   <label>Official tracking page (HTTPS) <input type="url" id="shipping-company-url" required></label>
                 </div>
-                <section class="dart-coverage-fieldset" aria-labelledby="shipping-coverage-heading">
+                <article class="dart-coverage-fieldset" aria-labelledby="shipping-coverage-heading">
                   <h4 id="shipping-coverage-heading">Delivery Coverage · مناطق التوصيل</h4>
                   <p>اختر المحافظات ثم خصّص المدن والمناطق. لا توجد كتابة يدوية للأسماء.</p>
                   <p>لتلقي طلبات من المحافظة، فعّل الشركة وAccept orders in Checkout، وتأكد أن المحافظة غير موقوفة في Delivery Policy.</p>
                   <div id="shipping-coverage-picker"></div>
                   <p id="shipping-coverage-warning" role="status" aria-live="polite"></p>
-                </section>
+                </article>
                 <div class="dart-shipping-form-group dart-shipping-settings-group">
                   <h4>Company Settings</h4>
                   <label><input type="checkbox" id="shipping-company-active" checked> Active</label>
@@ -1269,7 +1269,7 @@
               </form>
             </div>
           </div>
-        </section>
+        </article>
         <!-- Waiting / Restock Reservation -->
         <section id="waiting" class="dashboard-section dart-waiting-section" aria-labelledby="waiting-page-title">
             <div class="dart-waiting-head">
