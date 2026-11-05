@@ -43,11 +43,14 @@ jobs:
             }
           }
           const health = result.health;
+          // Compatibility while the API deployment for this field is rolling out.
+          if (health) health.deliveryFailed ??= 0;
           if (!health || ['uncertain', 'exhausted', 'terminal', 'duePending', 'oldestDueSeconds'].some(field => !Number.isInteger(health[field]) || health[field] < 0)) {
             throw new Error('Missing outbox backlog health');
           }
           const overdue = health.duePending > 0 && health.oldestDueSeconds >= 900 ? 1 : 0;
-          process.stdout.write(`${result.claimed} ${result.failed + result.uncertain + result.terminal + health.uncertain + health.exhausted + health.terminal} ${overdue}`);
+          if (!Number.isInteger(health.deliveryFailed) || health.deliveryFailed < 0) throw new Error('Invalid delivery failure health');
+          process.stdout.write(`${result.claimed} ${result.failed + result.uncertain + result.terminal + health.uncertain + health.exhausted + health.terminal + health.deliveryFailed} ${overdue}`);
           NODE
             )"
             read -r claimed issues pending_overdue <<< "$result"

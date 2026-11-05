@@ -254,12 +254,13 @@ export class OutboxService {
   }
 
   public async health(): Promise<Record<string, number>> {
-    const result=await this.pool.query<{ pending: string; exhausted: string; uncertain: string; terminal: string; oldest_seconds: string; due_pending: string; oldest_due_seconds: string }>(`
+    const result=await this.pool.query<{ pending: string; exhausted: string; uncertain: string; terminal: string; delivery_failed: string; oldest_seconds: string; due_pending: string; oldest_due_seconds: string }>(`
       SELECT
         count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL)::text AS pending,
         count(*) FILTER (WHERE e.status<>'published' AND e.attempts>=12)::text AS exhausted,
         count(*) FILTER (WHERE a.state='unknown' OR (a.state='executing' AND a.updated_at<now()-interval '5 minutes') OR (a.state='accepted' AND e.status<>'published'))::text AS uncertain,
         count(*) FILTER (WHERE a.state='terminal')::text AS terminal,
+        count(*) FILTER (WHERE a.delivery_status='failed')::text AS delivery_failed,
         count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
           AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
             THEN $4::boolean ELSE ($1::boolean AND $2::boolean
@@ -272,12 +273,12 @@ export class OutboxService {
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.created_at)) FILTER
           (WHERE e.status<>'published' AND e.attempts<12 AND a.state IS NULL),0)::text AS oldest_seconds
       FROM outbox_events e LEFT JOIN LATERAL (
-        SELECT state,updated_at FROM outbox_delivery_attempts WHERE event_id=e.id AND state<>'retryable' ORDER BY created_at DESC,id DESC LIMIT 1
+        SELECT state,updated_at,delivery_status FROM outbox_delivery_attempts WHERE event_id=e.id AND state<>'retryable' ORDER BY created_at DESC,id DESC LIMIT 1
       ) a ON true WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')`,
       [this.configured("whatsapp"),whatsappSendWindow(this.now()),Boolean(this.config.whatsappPostDeliveryTemplate),this.orderMessagingConfigured(),this.dispatchMessagingConfigured()]);
     const row=result.rows[0];
     return { pending:Number(row?.pending||0),exhausted:Number(row?.exhausted||0),uncertain:Number(row?.uncertain||0),
-      terminal:Number(row?.terminal||0),oldestSeconds:Math.max(0,Math.floor(Number(row?.oldest_seconds||0))),
+      terminal:Number(row?.terminal||0),deliveryFailed:Number(row?.delivery_failed||0),oldestSeconds:Math.max(0,Math.floor(Number(row?.oldest_seconds||0))),
       duePending:Number(row?.due_pending||0),oldestDueSeconds:Math.max(0,Math.floor(Number(row?.oldest_due_seconds||0))) };
   }
 

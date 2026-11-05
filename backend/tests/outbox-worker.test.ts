@@ -4,7 +4,7 @@ import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-function runWorker(mode: "empty" | "full" | "provider" | "network" | "uncertain" | "exhausted" | "missing-health" | "overdue" | "future" | "recovered-backlog") {
+function runWorker(mode: "empty" | "full" | "provider" | "network" | "uncertain" | "exhausted" | "delivery-failed" | "missing-health" | "overdue" | "future" | "recovered-backlog") {
   const directory = mkdtempSync(join(tmpdir(), "dart-worker-test-"));
   try {
     const workflow = readFileSync(resolve(process.cwd(), "../.github/workflows/outbox-worker.yml"), "utf8");
@@ -25,6 +25,7 @@ fs.writeFileSync(target, JSON.stringify({ configured: true, claimed: full || pro
   health: process.env.DART_TEST_MODE === 'missing-health' ? undefined : {
     uncertain: process.env.DART_TEST_MODE === 'uncertain' ? 2 : 0,
     exhausted: process.env.DART_TEST_MODE === 'exhausted' ? 1 : 0, terminal: 0,
+    deliveryFailed: process.env.DART_TEST_MODE === 'delivery-failed' ? 1 : 0,
     pending: process.env.DART_TEST_MODE === 'future' ? 5000 : 0, oldestSeconds: 86400,
     duePending: process.env.DART_TEST_MODE === 'overdue' || recovering ? 1 : 0,
     oldestDueSeconds: process.env.DART_TEST_MODE === 'overdue' || recovering ? 901 : 0 } }));
@@ -50,7 +51,7 @@ describe("bounded durable outbox worker", () => {
   it("stops after an HTTP or network failure", () => {
     expect(runWorker("network")).toMatchObject({ status: 22, calls: 1 });
   });
-  it.each(["uncertain", "exhausted", "missing-health", "overdue"] as const)("fails visibly for %s even when no new event is claimed", (mode) => {
+  it.each(["uncertain", "exhausted", "delivery-failed", "missing-health", "overdue"] as const)("fails visibly for %s even when no new event is claimed", (mode) => {
     expect(runWorker(mode)).toMatchObject({ status: 1, calls: 1 });
   });
   it("does not confuse future scheduled messages with overdue delivery", () => {

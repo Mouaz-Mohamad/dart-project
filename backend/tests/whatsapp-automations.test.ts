@@ -172,6 +172,20 @@ describe("durable WhatsApp automations and receipts", () => {
     const audits=await store.pool.query("SELECT old_values,new_values FROM audit_logs WHERE action='WHATSAPP_DELIVERY_STATUS_CHANGED' AND entity_id=$1",[event.attempt]);
     expect(audits.rows).toHaveLength(1);expect(audits.rows[0]).toMatchObject({old_values:{status:null},new_values:{status:"read"}});
   });
+  it("alerts on failed delivery after provider acceptance without paying for a duplicate send",async()=>{
+    const buyer=await delivered();await makeDue(buyer.key);const provider=fakeProvider();
+    await sender().processBatch(1,buyer.key);
+    const event=(await store.pool.query("SELECT a.id::text,a.provider_message_id FROM outbox_delivery_attempts a JOIN outbox_events e ON e.id=a.event_id WHERE e.deduplication_key=$1",[buyer.key])).rows[0]!;
+    const app=express();app.use("/webhook",createWhatsAppWebhookRouter(store.pool,{whatsappAppSecret:secret,whatsappWebhookVerifyToken:verify,whatsappPhoneNumberId:"123"}));
+    const baseline=Number((await sender().health()).deliveryFailed);
+    for(const status of ["failed","failed","delivered"]){
+      const body=JSON.stringify({entry:[{changes:[{value:{metadata:{phone_number_id:"123"},statuses:[{id:event.provider_message_id,status,timestamp:"1793210000"}]}}]}]});
+      expect((await request(app).post("/webhook").set("content-type","application/json").set("x-hub-signature-256","sha256="+createHmac("sha256",secret).update(body).digest("hex")).send(body)).status).toBe(200);
+      expect((await sender().health()).deliveryFailed).toBe(baseline+(status==="failed"?1:0));
+    }
+    expect((await sender().processBatch(1,buyer.key)).claimed).toBe(0);
+    expect(provider).toHaveBeenCalledOnce();
+  });
   it("does not attach a mismatched provider identity to an acknowledged attempt",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);fakeProvider();await sender().processBatch(1,buyer.key);
     const event=(await store.pool.query("SELECT a.id::text FROM outbox_delivery_attempts a JOIN outbox_events e ON e.id=a.event_id WHERE e.deduplication_key=$1",[buyer.key])).rows[0]!;
