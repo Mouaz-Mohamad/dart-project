@@ -21,6 +21,7 @@
      edit.onclick=()=>{
        $("shipping-company-id").value=company.id;$("shipping-company-name").value=company.name;
        $("shipping-company-url").value=company.trackingUrl;$("shipping-company-active").checked=company.active;
+       $("shipping-company-checkout-enabled").checked=company.checkoutEnabled===true;
        const unknown=coveragePicker?.setCoverage(company.coverage,company.governorates||[])||[];
        $("shipping-coverage-warning").textContent=unknown.length?
           "Unrecognized old governorates: "+unknown.join(", ")+". Review coverage before saving.":"";
@@ -78,6 +79,7 @@
  }
  function reset(){
    $("shipping-company-form")?.reset();$("shipping-company-id").value="";
+   $("shipping-company-checkout-enabled").checked=false;
    $("shipping-coverage-warning").textContent="";
    coveragePicker?.setCoverage({},[]);
  }
@@ -90,7 +92,9 @@
    catch(error){message(error.message||"Select a valid coverage");return;}
    if($("shipping-coverage-warning").textContent){message("Review unknown legacy regions before saving.");return;}
    const company={id,name:$("shipping-company-name").value.trim(),trackingUrl:$("shipping-company-url").value.trim(),
-    active:$("shipping-company-active").checked,governorates:Object.keys(coverage),coverage};
+    active:$("shipping-company-active").checked,
+    checkoutEnabled:$("shipping-company-checkout-enabled").checked,
+    governorates:Object.keys(coverage),coverage};
    const next=[...companies.filter(c=>c.id!=="dart"&&c.id!==id),company];
    const button=event.target.querySelector('[type="submit"]');button.disabled=true;
    try{const r=await api("/api/v1/admin/shipping/companies",{method:"PUT",body:{expectedVersion:version,companies:next}});
