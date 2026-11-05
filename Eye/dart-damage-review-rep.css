@@ -1,0 +1,429 @@
+/* DART EYE | Damage, Reviews & Representatives
+   Scope: dashboard presentation only. Original list rendering, permissions,
+   archive/recovery, feedback visibility, verification and assignment remain untouched. */
+#damage.dashboard-section,#review.dashboard-section,#representative.dashboard-section{
+  min-width:0;min-height:100dvh;height:auto;overflow:visible;
+  padding:24px clamp(16px,2.4vw,32px) 54px!important;
+  background:#f8f6f7;color:#392b35;
+}
+#damage .dart-operations-page-head,#review .dart-operations-page-head,
+#representative .dart-operations-page-head{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;margin:0 0 18px;padding:2px;
+}
+#damage .dart-operations-page-copy,#review .dart-operations-page-copy,
+#representative .dart-operations-page-copy{flex:1 1 235px;min-width:0}
+#damage .dart-operations-eyebrow,#review .dart-operations-eyebrow,
+#representative .dart-operations-eyebrow{
+  display:flex;align-items:center;gap:7px;margin:0 0 5px;
+  color:#922f4f;font-size:10px;letter-spacing:.11em;font-weight:800;
+}
+#damage .dart-operations-page-head h2,#review .dart-operations-page-head h2,
+#representative .dart-operations-page-head h2{
+  margin:0 0 5px;color:#3e1b2c;font-size:clamp(24px,2.3vw,32px);
+  line-height:1.3;font-weight:800;
+}
+#damage .dart-operations-page-head p:not(.dart-operations-eyebrow),
+#review .dart-operations-page-head p:not(.dart-operations-eyebrow),
+#representative .dart-operations-page-head p:not(.dart-operations-eyebrow){
+  margin:0;color:#7e7079;font-size:12px;line-height:1.65;max-width:720px;
+}
+#damage .dart-operations-page-badge,#review .dart-operations-page-badge,
+#representative .dart-operations-page-badge{
+  display:inline-flex;align-items:center;gap:8px;min-height:41px;
+  padding:9px 13px;border:1px solid #e6d5dd;border-radius:10px;
+  background:#fff;color:#773350;font-size:12px;font-weight:750;
+}
+#damage .dart-operations-workspace,#review .dart-operations-workspace,
+#representative .dart-operations-workspace{
+  display:block;position:relative;width:100%;min-width:0;
+  padding:18px;margin:0;border:1px solid #e7dce2;
+  border-radius:15px;background:#fff;box-shadow:none;
+}
+#damage .dart-operations-workspace-head,#review .dart-operations-workspace-head,
+#representative .dart-operations-workspace-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin:0 0 13px;
+}
+#damage .dart-operations-workspace-head h3,#review .dart-operations-workspace-head h3,
+#representative .dart-operations-workspace-head h3{
+  margin:0 0 4px;color:#472133;font-size:17px;font-weight:800;line-height:1.4;
+}
+#damage .dart-operations-workspace-head p,#review .dart-operations-workspace-head p,
+#representative .dart-operations-workspace-head p{
+  margin:0;color:#847681;font-size:12px;line-height:1.55;
+}
+/* Search / filters / add actions */
+#damage .first.filter-bar,#review .first.filter-bar,
+#representative .first.filter-bar{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0;
+  width:100%;margin:0;padding:12px;border:1px solid #ede3e8;
+  border-radius:11px;background:#fcfafb;box-shadow:none;
+}
+#damage .first.filter-bar .search-box,#review .first.filter-bar .search-box,
+#representative .first.filter-bar .search-box{
+  flex:2 1 230px;min-width:0;max-width:none;
+}
+#damage .first.filter-bar .search-box input,#review .first.filter-bar .search-box input,
+#representative .first.filter-bar .search-box input{
+  width:100%;min-height:42px;height:auto;min-width:0;
+  padding:10px 37px 10px 12px;border:1px solid #d9cad2;
+  border-radius:9px;background:#fff;color:#3b2b36;font-size:12px;
+}
+#damage .first.filter-bar .search-box i,#review .first.filter-bar .search-box i,
+#representative .first.filter-bar .search-box i{
+  left:auto;right:12px;color:#81516a;opacity:.75;
+}
+#damage .first.filter-bar .select-box,#review .first.filter-bar .select-box,
+#representative .first.filter-bar .select-box{
+  flex:1 1 140px;min-width:130px;max-width:100%;
+}
+#damage .first.filter-bar .select-box select,#review .first.filter-bar .select-box select,
+#representative .first.filter-bar .select-box select{
+  display:block;width:100%;min-height:42px;height:auto;
+  padding:9px 29px 9px 11px;border:1px solid #d9cad2;
+  border-radius:9px;background:#fff;color:#4d3946;font-size:12px;cursor:pointer;
+}
+#damage .first.filter-bar .select-box .arrow-icon,#review .first.filter-bar .select-box .arrow-icon,
+#representative .first.filter-bar .select-box .arrow-icon{
+  left:auto;right:9px;color:#815169;pointer-events:none;
+}
+#damage .first.filter-bar .add-btn,#review .first.filter-bar .add-btn,
+#representative .first.filter-bar .add-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:42px;height:auto;width:auto;margin:0;
+  padding:9px 15px;border:1px solid #ab012b;border-radius:9px;
+  background:#ab012b;color:#fff;font-size:12px;font-weight:800;white-space:nowrap;
+}
+#damage .first.filter-bar .add-btn:hover,#review .first.filter-bar .add-btn:hover,
+#representative .first.filter-bar .add-btn:hover{background:#8b0023;border-color:#8b0023}
+#damage .first.filter-bar button[hidden],#review .first.filter-bar button[hidden],
+#representative .first.filter-bar button[hidden]{display:none!important}
+#damage .dart-filter-summary,#review .dart-filter-summary,
+#representative .dart-filter-summary{
+  display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+  padding:7px 2px;margin:7px 0 10px;min-height:0;color:#7f707b;font-size:12px;
+}
+#damage .dart-filter-summary button,#review .dart-filter-summary button,
+#representative .dart-filter-summary button{
+  padding:6px 10px;min-height:31px;border:1px solid #e6cfda;
+  border-radius:99px;background:#fcf0f5;color:#80314e;font-size:11px;
+}
+#damage .second,#review .second,#representative .second{
+  display:flex;align-items:center;justify-content:flex-start;
+  gap:8px;flex-wrap:wrap;min-height:43px;margin:6px 0 12px;width:100%;text-align:left;
+}
+#damage .second button,#review .second button,#representative .second button{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:39px;height:auto;width:auto;padding:9px 13px;margin:0;
+  border:1px solid #e8c8d0;border-radius:9px;background:#fff9fa;
+  color:#a13646;font-size:12px;font-weight:750;
+}
+#damage .second button[hidden],#review .second button[hidden],
+#representative .second button[hidden]{display:none!important}
+#damage .second button:disabled,#review .second button:disabled,
+#representative .second button:disabled{opacity:.5;cursor:not-allowed}
+/* Native compact record summary and drawer. */
+#damage .cont-titel,#review .cont-titel,#representative .cont-titel{
+  display:block;position:relative;width:100%;min-width:0;
+  height:auto!important;min-height:150px;max-height:none!important;
+  margin:0;padding:0;border:0;border-radius:0;background:transparent;
+  overflow:visible!important;
+}
+#damage .cont-titel>.title-name,#review .cont-titel>.title-name,
+#representative .cont-titel>.title-name{
+  position:relative;top:auto;z-index:1;display:flex!important;align-items:center;
+  gap:11px!important;width:100%!important;min-width:0!important;
+  padding:11px 13px!important;margin:0 0 10px;
+  border:0;border-radius:9px;background:#f7f1f4!important;color:#684c5a;
+}
+#damage .cont-titel>.title-name h2,#review .cont-titel>.title-name h2,
+#representative .cont-titel>.title-name h2{display:none!important}
+#damage .cont-titel>.title-name .dart-compact-heading,
+#review .cont-titel>.title-name .dart-compact-heading,
+#representative .cont-titel>.title-name .dart-compact-heading{
+  color:#6d5261;font-size:12px;font-weight:750;
+}
+#damage .cont-titel>.title-name input[type="checkbox"],
+#review .cont-titel>.title-name input[type="checkbox"],
+#representative .cont-titel>.title-name input[type="checkbox"]{
+  width:18px;height:18px;flex:none;accent-color:#ab012b;
+}
+#damage #damage-container,#review #review-container,#representative #representative-container{
+  min-width:0;width:100%;margin:0;
+}
+#damage #damage-container>.dart-compact-record,
+#review #review-container>.dart-compact-record,
+#representative #representative-container>.dart-compact-record,
+#review .dart-review-client-entries>.dart-compact-record{
+  width:100%;min-width:0;margin:0 0 9px;padding:0!important;
+  border:1px solid #e9dfe5;border-radius:11px;
+  background:#fff;box-shadow:none;transition:border-color .15s ease,box-shadow .15s ease;
+}
+#damage #damage-container>.dart-compact-record:hover,
+#review #review-container>.dart-compact-record:hover,
+#representative #representative-container>.dart-compact-record:hover,
+#review .dart-review-client-entries>.dart-compact-record:hover{
+  border-color:#c9afbb;box-shadow:0 5px 17px #401a280b;
+}
+#damage #damage-container .dart-record-main,
+#review #review-container .dart-record-main,
+#representative #representative-container .dart-record-main{
+  display:flex;align-items:center;flex-wrap:nowrap;gap:12px;padding:12px 14px;min-width:0;
+}
+#damage #damage-container .dart-record-fields,
+#review #review-container .dart-record-fields,
+#representative #representative-container .dart-record-fields{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px 13px;flex:1 1 auto;min-width:0;
+}
+#damage .dart-record-field small,#review .dart-record-field small,
+#representative .dart-record-field small{
+  color:#897b83;font-size:10px;font-weight:650;line-height:1.4;
+}
+#damage .dart-record-field strong,#review .dart-record-field strong,
+#representative .dart-record-field strong{
+  color:#372a33;font-size:12px;font-weight:750;line-height:1.5;
+  overflow-wrap:anywhere;
+}
+#damage .dart-record-field img{
+  width:49px;height:60px;object-fit:cover;border-radius:8px;background:#faf5f7;
+}
+#damage .dart-record-controls,#review .dart-record-controls,
+#representative .dart-record-controls{
+  flex:0 0 auto;min-width:102px;width:auto;justify-content:flex-end;gap:7px;
+}
+#damage .dart-record-controls button,#review .dart-record-controls button,
+#representative .dart-record-controls button{
+  min-height:36px;height:auto;padding:8px 12px;
+  border:1px solid #d6bfca;border-radius:8px;
+  background:#fff;color:#762d49;font-size:11px;font-weight:750;
+}
+#damage .dart-record-controls button[hidden],#review .dart-record-controls button[hidden],
+#representative .dart-record-controls button[hidden]{display:none!important}
+#damage .dart-record-controls button:hover,#review .dart-record-controls button:hover,
+#representative .dart-record-controls button:hover{background:#fbf0f4}
+#damage .status-pill,#review .status-pill,#representative .status-pill{
+  max-width:100%;font-size:11px;line-height:1.45;white-space:normal;
+}
+#damage .dart-record-dialog,#review .dart-record-dialog,
+#representative .dart-record-dialog{
+  width:min(900px,97vw);max-width:none;max-height:100dvh;
+  padding:0 22px 28px;background:#fdfbfc;border-left:1px solid #e9dce1;
+}
+#damage .dart-record-dialog-head,#review .dart-record-dialog-head,
+#representative .dart-record-dialog-head{
+  position:sticky;top:0;z-index:3;
+  display:flex;align-items:center;justify-content:space-between;gap:13px;
+  margin:0 -22px 17px;padding:20px 22px 15px;
+  background:#fff;border-bottom:1px solid #e8dbe1;
+}
+#damage .dart-record-dialog-head h2,#review .dart-record-dialog-head h2,
+#representative .dart-record-dialog-head h2{
+  color:#451f34;font-size:clamp(18px,2vw,23px);line-height:1.4;font-weight:800;
+}
+#damage .dart-record-detail-grid,#review .dart-record-detail-grid,
+#representative .dart-record-detail-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+}
+#damage .dart-record-detail-field,#review .dart-record-detail-field,
+#representative .dart-record-detail-field{
+  min-width:0;display:grid;align-content:start;gap:6px;
+  padding:12px;border:1px solid #e9dfe4;border-radius:10px;background:#fff;
+  color:#392b35;overflow-wrap:anywhere;
+}
+#damage .dart-record-detail-field>h3,#review .dart-record-detail-field>h3,
+#representative .dart-record-detail-field>h3{
+  color:#776371;font-size:11px;font-weight:750;margin:0;
+}
+#damage .dart-record-detail-actions,#review .dart-record-detail-actions,
+#representative .dart-record-detail-actions{
+  grid-column:1/-1;background:#faf4f7;border-color:#e4d0d9;
+}
+#damage .dart-record-detail-actions .row-action-btns,
+#review .dart-record-detail-actions .row-action-btns,
+#representative .dart-record-detail-actions .row-action-btns{
+  display:flex;flex-wrap:wrap;gap:8px;min-width:0;width:auto;max-width:100%;overflow:visible;
+}
+#damage .dart-record-detail-actions button,#review .dart-record-detail-actions button,
+#representative .dart-record-detail-actions button{
+  min-height:36px;height:auto;
+  padding:8px 11px;border:1px solid #d6c0c9;border-radius:8px;
+  background:#fff;color:#722f48;font-size:11px;
+}
+#damage .dart-record-detail-actions button[hidden],
+#review .dart-record-detail-actions button[hidden],
+#representative .dart-record-detail-actions button[hidden]{display:none!important}
+/* Reviews have independently expandable client groups. Contact Us entries stay outside. */
+#review #review-container>.dart-review-client-group{
+  display:block;min-width:0;width:100%;margin:0 0 10px;
+  border:1px solid #e6d9e0;border-radius:12px;
+  background:#fff;overflow:hidden;
+}
+#review #review-container>.dart-review-client-group[open]{border-color:#cdb4c1;box-shadow:0 4px 15px #43172d09}
+#review #review-container .dart-review-group-summary{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:8px 13px;min-width:0!important;max-width:none;width:100%;
+  margin:0!important;min-height:57px;padding:13px 16px!important;
+  border:0;border-radius:0;
+  background:#fff!important;color:#4d2d3f;cursor:pointer;list-style:none;
+}
+#review .dart-review-group-summary::-webkit-details-marker{display:none}
+#review .dart-review-group-summary:hover{background:#fcf6f9!important}
+#review .dart-review-group-summary:focus-visible{outline:3px solid #ab012b;outline-offset:-3px}
+#review .dart-review-group-summary::before{
+  content:"+";flex:none;display:grid;place-items:center;
+  width:27px;height:27px;margin:0;border-radius:8px;
+  border:1px solid #e4ced9;background:#faf0f4;color:#8b3253;
+  font-size:16px;font-weight:750;
+}
+#review .dart-review-client-group[open]>.dart-review-group-summary{
+  border-bottom:1px solid #eadfe4;background:#fcf8fa!important;
+}
+#review .dart-review-client-group[open]>.dart-review-group-summary::before{
+  content:"−";background:#ab012b;border-color:#ab012b;color:#fff;
+}
+#review .dart-review-group-name{flex:1 1 150px;min-width:0;font-weight:800;color:#432739;font-size:13px;overflow-wrap:anywhere}
+#review .dart-review-group-count{
+  display:inline-flex;align-items:center;min-height:27px;
+  padding:5px 10px;border-radius:50px;
+  background:#f8edf2;color:#852d4d;font-size:11px;font-weight:750;
+}
+#review .dart-review-client-entries{
+  display:grid;gap:8px;min-width:0;padding:12px 14px;
+  background:#fcfafb;
+}
+#review .dart-review-client-entries>.dart-compact-record{margin:0;background:#fff}
+/* Review moderation buttons keep their existing handlers and labels. */
+#review .review-toggle-btn{
+  min-height:35px;padding:7px 11px;border-radius:8px;
+  font-size:11px;font-weight:750;background:#fff;
+}
+#review .review-status-active{color:#aa334a;border:1px solid #ecc6d0;background:#fff7f9}
+#review .review-status-hidden{color:#217052;border:1px solid #c9e7d8;background:#f4fbf7}
+#review .dart-record-field .status-text{white-space:normal}
+#review .dart-record-detail-field .w500.overflow{
+  white-space:pre-wrap;overflow:visible;max-height:none;overflow-wrap:anywhere;
+}
+/* Representative: preserve secure controls and the masked identity field. */
+#representative .dart-record-detail-field .dart-rep-photos{
+  display:flex;flex-wrap:wrap;gap:7px;min-width:0;width:auto;
+}
+#representative .dart-rep-document,
+#representative .dart-rep-docs,
+#representative .dart-rep-reset,
+#representative .dart-approve-rep,
+#representative .dart-reject-rep{
+  min-height:36px;height:auto;padding:8px 11px;
+  border:1px solid #d4c0cb;border-radius:8px;
+  background:#fff;color:#772e4d;font-size:11px;font-weight:700;cursor:pointer;
+}
+#representative .dart-approve-rep{background:#eff8f2;border-color:#cce6d3;color:#1e724d}
+#representative .dart-reject-rep{background:#fff4f5;border-color:#eccbd2;color:#a72f43}
+#representative .dart-rep-document:hover,#representative .dart-rep-reset:hover{background:#f9f0f3}
+#representative .dart-rep-document[hidden],#representative .dart-approve-rep[hidden],
+#representative .dart-reject-rep[hidden]{display:none!important}
+/* Existing forms, without replacing fields or exposing protected assets. */
+#damage-modal .modal-content,#customer-review-modal .modal-content,
+#representative-modal .modal-content{
+  width:min(910px,96vw);max-width:910px;max-height:90dvh;
+  padding:24px;border:1px solid #eadce2;border-radius:15px;
+  background:#fffdfd;color:#372835;
+}
+#damage-modal .modal-content{width:min(650px,95vw);max-width:650px}
+#damage-modal .modal-content>h3{
+  margin:0 35px 16px 0;color:#4b2337;font-size:19px;font-weight:800;
+}
+#damage-modal .modal-grid,#customer-review-modal .modal-grid,
+#representative-modal .modal-grid{gap:13px 18px}
+#damage-modal .form-group,#customer-review-modal .form-group,
+#representative-modal .form-group,
+#customer-review-modal .input-group{min-width:0;margin-bottom:11px}
+#damage-modal .form-group label,#customer-review-modal .form-group label,
+#representative-modal .form-group label,#customer-review-modal .input-group label{
+  display:block;margin:0 0 6px;
+  color:#604656;font-size:12px;font-weight:750;line-height:1.5;
+}
+#damage-modal .form-group input,#damage-modal .form-group select,
+#damage-modal .form-group textarea,
+#customer-review-modal .form-group input,#customer-review-modal .form-group select,
+#customer-review-modal .form-group textarea,#customer-review-modal .input-group select,
+#customer-review-modal .input-group textarea,
+#representative-modal .form-group input,#representative-modal .form-group select,
+#representative-modal .form-group textarea{
+  box-sizing:border-box;display:block;width:100%;max-width:100%;min-width:0;
+  min-height:42px;height:auto;margin:0;padding:10px 12px;
+  border:1px solid #dac6d1;border-radius:9px;
+  background:#fff;color:#372935;font-size:12px;
+}
+#customer-review-modal .input-group textarea{min-height:100px;resize:vertical}
+#representative-modal .form-group textarea{min-height:75px;resize:vertical}
+#damage-modal .form-group textarea{min-height:85px;resize:vertical}
+#representative-modal .dart-file-field{
+  padding:12px;border:1px dashed #d6becb;border-radius:10px;background:#fcf7f9;
+}
+#representative-modal .dart-file-field input[type="file"]{
+  padding:9px;border:1px solid #e3d3db;background:#fff;font-size:11px;
+}
+#representative-modal .dart-rep-upload-preview:not([hidden]){
+  display:block;width:min(100%,240px);height:auto;max-height:170px;
+  margin:10px 0 0;object-fit:contain;border:1px solid #e7dae0;border-radius:9px;background:#fff;
+}
+#representative-modal .dart-rep-upload-preview[hidden]{display:none!important}
+#damage-modal .btn-done,#customer-review-modal .btn-done,
+#representative-modal .btn-done{
+  min-height:44px;height:auto;padding:10px 18px;border-radius:9px;
+  background:#ab012b;color:#fff;font-weight:750;
+}
+#damage-modal .close-modal,#customer-review-modal .close-modal,
+#representative-modal .close-modal{border-radius:8px;color:#783550}
+@media(max-width:1150px){
+  #damage .dart-record-fields,#review .dart-record-fields,
+  #representative .dart-record-fields{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+}
+@media(max-width:768px){
+  #damage.dashboard-section,#review.dashboard-section,#representative.dashboard-section{
+    width:100%!important;margin-left:0!important;min-height:100dvh;
+    padding:16px 12px 100px!important;
+  }
+  #damage .dart-operations-page-badge,#review .dart-operations-page-badge,
+  #representative .dart-operations-page-badge{display:none}
+  #damage .dart-operations-workspace,#review .dart-operations-workspace,
+  #representative .dart-operations-workspace{padding:12px;border-radius:12px}
+  #damage .first.filter-bar,#review .first.filter-bar,
+  #representative .first.filter-bar{padding:10px;gap:8px}
+  #damage .first.filter-bar .search-box,#review .first.filter-bar .search-box,
+  #representative .first.filter-bar .search-box{flex:1 1 100%}
+  #damage .first.filter-bar .select-box,#review .first.filter-bar .select-box,
+  #representative .first.filter-bar .select-box{flex:1 1 calc(50% - 8px);min-width:0}
+  #damage .first.filter-bar .add-btn,#review .first.filter-bar .add-btn,
+  #representative .first.filter-bar .add-btn{flex:1 1 100%}
+  #damage .dart-record-main,#review .dart-record-main,#representative .dart-record-main{
+    flex-wrap:wrap!important;gap:9px;padding:11px!important;
+  }
+  #damage .dart-record-fields,#review .dart-record-fields,
+  #representative .dart-record-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #damage .dart-record-controls,#review .dart-record-controls,
+  #representative .dart-record-controls{
+    flex:1 1 100%;justify-content:flex-end;padding-top:8px;border-top:1px solid #f0e7eb;
+  }
+  #review .dart-review-group-summary{padding:12px!important}
+  #review .dart-review-client-entries{padding:9px}
+  #damage .dart-record-dialog,#review .dart-record-dialog,
+  #representative .dart-record-dialog{width:100vw;max-width:100vw;padding:0 12px 24px}
+  #damage .dart-record-dialog-head,#review .dart-record-dialog-head,
+  #representative .dart-record-dialog-head{margin:0 -12px 13px;padding:16px 12px 12px}
+  #damage .dart-record-detail-grid,#review .dart-record-detail-grid,
+  #representative .dart-record-detail-grid{grid-template-columns:1fr}
+  #damage-modal .modal-content,#customer-review-modal .modal-content,
+  #representative-modal .modal-content{width:calc(100vw - 20px);padding:15px;max-height:92dvh}
+  #damage-modal .modal-grid,#customer-review-modal .modal-grid,
+  #representative-modal .modal-grid{grid-template-columns:1fr;gap:9px}
+  #customer-review-modal .search-box{max-width:100%!important;width:100%!important}
+}
+@media(prefers-reduced-motion:reduce){
+  #damage .dart-compact-record,#review .dart-compact-record,
+  #representative .dart-compact-record{transition:none}
+}
