@@ -182,7 +182,9 @@ function uniqueCompletedReturns(
   const unique = new Map<string, JsonRow>();
   for (const row of filtered) {
     unique.set(
-      `${String(row.orderId || "")}:${String(row.itemCode || row.id || "")}`,
+      isExchange(row)
+        ? `exchange:${String(row.id || row.returnId || `${row.orderId}:${row.itemCode}:${row.replacementItemCode}:${returnEventDate(row)}`)}`
+        : `refund:${String(row.orderId || "")}:${String(row.itemCode || row.id || "")}`,
       row,
     );
   }
@@ -198,6 +200,14 @@ function refundAdjustments(row: JsonRow): { amountMinor: number; occurredAt: unk
     unique.set(value.id, { amountMinor: Number(value.amountMinor), occurredAt: value.occurredAt });
   }
   return [...unique.values()];
+}
+
+function physicalReturnCost(row: JsonRow, costs: Map<string, number>, replacement = false): number {
+  const snapshot = row[replacement ? "replacementLineSnapshot" : "originalLineSnapshot"] as JsonRow | undefined;
+  const captured = snapshot?.costSnapshot;
+  // Zero is a real captured cost; null/absent legacy values use the physical record.
+  if (captured !== null && captured !== undefined && captured !== "" && Number.isFinite(Number(captured))) return toMinor(captured);
+  return costs.get(String(row[replacement ? "replacementItemCode" : "itemCode"] || "")) || 0;
 }
 
 export interface FinanceRange { start: string; end: string; }
@@ -292,6 +302,15 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
   const acquiredRows = snapshot.acquired.filter((row) => inRange(row.created_at, start, end));
   const returns = states.get("returns") || [];
   const periodReturns = uniqueCompletedReturns(returns, start, end);
+  const exchanges = periodReturns.filter(isExchange);
+  // The immutable sale COGS stays on its delivery date. Each physical exchange
+  // posts only its replacement cost less good stock recovered, on completion.
+  const exchangeCogsMinor = exchanges.reduce((sum, row) => sum + physicalReturnCost(row, itemCost, true)
+    - (inspection(row) === "Good" ? physicalReturnCost(row, itemCost) : 0), 0);
+  const soldCostCodes = new Set(deliveredCodes);
+  for (const row of uniqueCompletedReturns(returns, "0001-01-01", "9999-12-31").filter(isExchange)) {
+    soldCostCodes.add(String(row.itemCode || ""));
+  }
   const refundsRows = periodReturns.filter((row) => !isExchange(row));
   const refundsMinor = refundsRows.reduce(
     (sum, row) => sum + toMinor(row.refundAmount) - refundAdjustments(row).reduce((total, adjustment) => total + adjustment.amountMinor, 0),
@@ -303,12 +322,7 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
   const cogsReversalMinor = refundsRows
     .filter((row) => inspection(row) === "Good")
     .reduce((sum, row) => {
-      const snapshot = row.originalLineSnapshot as JsonRow | undefined;
-      const snapshotCost = snapshot?.costSnapshot;
-      const costMinor = Number.isFinite(Number(snapshotCost))
-        ? toMinor(snapshotCost)
-        : itemCost.get(String(row.itemCode || "")) || 0;
-      return sum + costMinor;
+      return sum + physicalReturnCost(row, itemCost);
     }, 0);
 
   const returnCourierMinor = periodReturns
@@ -374,7 +388,7 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
       ? toMinor(row.costSnapshot)
       : itemCost.get(itemCode) || 0;
     damageValueMinor += rowCost;
-    if (!deliveredCodes.has(itemCode)) damageLossMinor += rowCost;
+    if (!soldCostCodes.has(itemCode)) damageLossMinor += rowCost;
   }
 
   const acquiredCodes = new Set(
@@ -404,7 +418,7 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
   const grossCogsMinor = deliveredRows.reduce(
     (sum, row) => sum + Number(row.cogs_minor || 0),
     0,
-  );
+  ) + exchangeCogsMinor;
   const deliveryCostMinor = deliveredRows.reduce(
     (sum, row) => sum + Number(row.delivery_cost_minor || 0),
     0,

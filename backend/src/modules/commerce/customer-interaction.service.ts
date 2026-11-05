@@ -362,10 +362,12 @@ export class CustomerInteractionService {
         size: string;
         model_name: string;
         final_unit_minor: string;
+        physical_cost_minor: string;
       }>(
         `SELECT oi.id::text AS order_item_id, o.id::text AS order_id, o.order_code, o.delivered_at,
                 oi.inventory_item_id AS item_id, oi.item_code, oi.model_id,
-                oi.color, oi.size, oi.model_name, oi.final_unit_minor::text
+                oi.color, oi.size, oi.model_name, oi.final_unit_minor::text,
+                i.cost_snapshot_minor::text AS physical_cost_minor
            FROM orders o
            JOIN order_items oi ON oi.order_id=o.id
            JOIN inventory_items i ON i.id=oi.inventory_item_id
@@ -491,6 +493,7 @@ export class CustomerInteractionService {
           size: line.size,
           qty: 1,
           finalUnitPrice: amount,
+          costSnapshot: Number(line.physical_cost_minor) / 100,
         },
         originalNetAmount: amount,
         refundAmount: input.requestType === "Refund" ? amount : 0,

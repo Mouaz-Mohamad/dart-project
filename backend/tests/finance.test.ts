@@ -16,6 +16,7 @@ function financePool(options: {
   itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string }>;
   acquiredItems?: Array<{ item_code: string; cost_snapshot_minor: string; created_at?: Date }>;
   expensePayloads?: Array<Record<string, unknown>>;
+  damagePayloads?: Array<Record<string, unknown>>;
 } = {}) {
   const queries: string[] = [];
   const client = {
@@ -57,7 +58,7 @@ function financePool(options: {
         }];
         return { rows: payloads.map((payload) => ({ payload })) };
       }
-      if (sql.includes("FROM damage_records")) return { rows: [] };
+      if (sql.includes("FROM damage_records")) return { rows: (options.damagePayloads || []).map(payload => ({ payload })) };
       if (sql.includes("FROM finance_records")) {
         const domain = String(values[0] || "");
         if (domain === "finance_settlements") {
@@ -87,6 +88,43 @@ function financePool(options: {
 }
 
 describe("finance summary integrity", () => {
+  it.each([false, true])("posts exchange cost differences then cancels all COGS on a full good refund (captured=%s)", async captured => {
+    const exchange = { id: "EX-1", orderId: "K-EX", itemCode: "A", replacementItemCode: "B",
+      requestType: "Exchange", status: "Completed", inspectionStatus: "Good", isPostDeliveryReturn: true,
+      completedAt: "2026-10-02T10:00:00Z", ...(captured ? { originalLineSnapshot: { costSnapshot: 300 }, replacementLineSnapshot: { costSnapshot: 400 } } : {}) };
+    const refund = { id: "RF-1", orderId: "K-EX", itemCode: "B", requestType: "Refund", status: "Completed", inspectionStatus: "Good",
+      isPostDeliveryReturn: true, completedAt: "2026-10-03T10:00:00Z", refundAmount: 500,
+      ...(captured ? { originalLineSnapshot: { costSnapshot: 400 } } : {}) };
+    const fixture = financePool({ deliveredRows: [{ id: "EX", order_code: "K-EX", event_at: new Date("2026-09-10T10:00:00Z"), final_minor: "50000", cogs_minor: "30000", sold_units: "1" }],
+      returnPayloads: [exchange, refund, exchange], itemCosts: [{ item_code: "A", cost_snapshot_minor: captured ? "99900" : "30000" }, { item_code: "B", cost_snapshot_minor: captured ? "99900" : "40000" }] });
+    const [sale, later, all] = await new FinanceService(fixture.pool as never).summaries([
+      { start: "2026-09-01", end: "2026-09-30" }, { start: "2026-10-01", end: "2026-10-31" }, { start: "2026-09-01", end: "2026-10-31" }]);
+    expect(sale).toMatchObject({ grossCogs: 300, grossProfit: 200 });
+    expect(later).toMatchObject({ grossCogs: 100, cogsReversal: 400, netCogs: -300, grossProfit: -200 });
+    expect(all).toMatchObject({ netRevenue: 0, grossCogs: 400, cogsReversal: 400, netCogs: 0, grossProfit: 0 });
+  });
+
+  it("keeps each posted exchange when a physical piece returns to the same sale later", async () => {
+    const common = { orderId: "K-LOOP", status: "Completed", inspectionStatus: "Good", isPostDeliveryReturn: true };
+    const fixture = financePool({ deliveredRows: [{ id: "LOOP", order_code: "K-LOOP", event_at: new Date("2026-09-01T10:00:00Z"), final_minor: "50000", cogs_minor: "30000", sold_units: "1" }],
+      itemCosts: [{ item_code: "A", cost_snapshot_minor: "30000" }, { item_code: "B", cost_snapshot_minor: "40000" }],
+      returnPayloads: [{ ...common, id: "EX-A", requestType: "Exchange", itemCode: "A", replacementItemCode: "B", completedAt: "2026-09-02" },
+        { ...common, id: "EX-B", requestType: "Exchange", itemCode: "B", replacementItemCode: "A", completedAt: "2026-09-03" },
+        { ...common, id: "RF-A", requestType: "Refund", itemCode: "A", refundAmount: 500, completedAt: "2026-09-04" }] });
+    expect(await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30"))
+      .toMatchObject({ netRevenue: 0, grossCogs: 300, cogsReversal: 300, netCogs: 0, grossProfit: 0 });
+  });
+
+  it("keeps damaged original COGS once when exchanging and refunding the good replacement", async () => {
+    const common = { orderId: "K-DMG", status: "Completed", isPostDeliveryReturn: true, completedAt: "2026-09-04" };
+    const fixture = financePool({ deliveredRows: [{ id: "DMG", order_code: "K-DMG", event_at: new Date("2026-09-01T10:00:00Z"), final_minor: "50000", cogs_minor: "30000", sold_units: "1" }],
+      itemCosts: [{ item_code: "A", cost_snapshot_minor: "30000" }, { item_code: "B", cost_snapshot_minor: "40000" }],
+      returnPayloads: [{ ...common, id: "EX-DMG", requestType: "Exchange", itemCode: "A", replacementItemCode: "B", inspectionStatus: "Damaged" },
+        { ...common, id: "RF-DMG", requestType: "Refund", itemCode: "B", refundAmount: 500, inspectionStatus: "Good" }],
+      damagePayloads: [{ id: "DMG-A", itemCode: "A", status: "Damaged", date: "2026-09-04", costSnapshot: 300 }] });
+    expect(await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30"))
+      .toMatchObject({ netRevenue: 0, netCogs: 300, grossProfit: -300, damageLoss: 0 });
+  });
   it("excludes timestamp-archived expenses from costs, profit and paid cash out without deleting their history", async () => {
     const fixture = financePool({
       deliveredRows: [],

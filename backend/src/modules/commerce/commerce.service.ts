@@ -3270,6 +3270,7 @@ export class CommerceService {
         client_code: string | null;
         line_final_minor: string;
         discount_source: string;
+        physical_cost_minor: string;
       }>(
         `SELECT i.id AS item_id, oi.id::text AS order_item_id, i.item_code, i.model_id, i.color, i.size,
                 i.status AS item_status, i.order_id AS current_order_code, i.cart_reservation_id,
@@ -3277,7 +3278,7 @@ export class CommerceService {
                 o.final_minor::text, o.amount_refunded_minor::text,
                 o.payment_status, o.promotion, o.contact_snapshot,
                 c.client_code, oi.final_unit_minor::text AS line_final_minor,
-                oi.discount_source
+                oi.discount_source, i.cost_snapshot_minor::text AS physical_cost_minor
            FROM inventory_items i
            JOIN order_items oi ON oi.inventory_item_id=i.id
            JOIN orders o ON o.id=oi.order_id
@@ -3448,6 +3449,10 @@ export class CommerceService {
         refundAmount: requestedRefundMinor / 100,
         refundAdjustments,
         originalNetAmount: Number(item.line_final_minor || 0) / 100,
+        originalLineSnapshot: existing?.originalLineSnapshot || {
+          itemCode: item.item_code,
+          costSnapshot: Number(item.physical_cost_minor) / 100,
+        },
         financialCompletionApplied: quantityAdjustment ? true : requestedRefundMinor > 0,
         ...(quantityAdjustment ? { quantityOfferAdjustment: existing?.quantityOfferAdjustment || quantityAdjustment } : {}),
         inspectedAt: String(existing?.inspectedAt || existing?.completedAt || now),
@@ -4213,8 +4218,9 @@ export class CommerceService {
           model_id: string;
           color: string;
           size: string;
+          cost_snapshot_minor: string;
         }>(
-          `SELECT id, status, model_id, color, size, order_id, cart_reservation_id
+          `SELECT id, status, model_id, color, size, order_id, cart_reservation_id, cost_snapshot_minor::text
              FROM inventory_items
             WHERE item_code=$1
             FOR UPDATE`,
@@ -4262,6 +4268,10 @@ export class CommerceService {
           throw new AppError(409, "RETURN_IDENTITY_IMMUTABLE", "The original order line of this return has changed");
         }
         record.orderItemId = returnedLine.id;
+        record.originalLineSnapshot = {
+          ...(record.originalLineSnapshot as Record<string, unknown> || {}),
+          costSnapshot: Number(originalItem.cost_snapshot_minor) / 100,
+        };
         const returnedDiscountSource = returnedLine.discount_source || "None";
 
         const requestType = String(record.requestType || "");
@@ -4361,8 +4371,9 @@ export class CommerceService {
             color: string;
             size: string;
             status: string;
+            cost_snapshot_minor: string;
           }>(
-            `SELECT id, item_code, model_id, color, size, status
+            `SELECT id, item_code, model_id, color, size, status, cost_snapshot_minor::text
                FROM inventory_items
               WHERE item_code=$1
               FOR UPDATE`,
@@ -4383,6 +4394,12 @@ export class CommerceService {
               "Replacement must use the original model and the color/size selected for this exchange",
             );
           }
+
+          record.replacementLineSnapshot = {
+            ...(record.replacementLineSnapshot as Record<string, unknown> || {}),
+            itemCode: replacement.item_code,
+            costSnapshot: Number(replacement.cost_snapshot_minor) / 100,
+          };
 
           await client.query(
             `UPDATE inventory_items

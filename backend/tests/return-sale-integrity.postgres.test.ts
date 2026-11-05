@@ -6,6 +6,7 @@ import { embeddedStore } from "./embedded-store.js";
 import { returnSchema } from "../src/modules/commerce/customer-interaction.routes.js";
 import { EGYPT_GOVERNORATES } from "../src/modules/commerce/shipping.core.js";
 import type { Pool } from "pg";
+import { FinanceService } from "../src/modules/finance/finance.service.js";
 import { setTimeout as delay } from "node:timers/promises";
 
 describe("returns preserve each sale's inventory and money on the production schema", () => {
@@ -67,6 +68,36 @@ describe("returns preserve each sale's inventory and money on the production sch
   const ownership = async (piece: string) => (await store.pool.query(
     "SELECT status,order_id,cart_reservation_id,return_request_id FROM inventory_items WHERE id=$1", [piece])).rows[0];
   const address = { country: "Egypt", governorate: "Cairo" as const, area: "Nasr City", street: "Test", building: "1", floor: "1", latitude: 30.05, longitude: 31.35 };
+
+  it("completes a different-cost exchange, inspection and full refund without rewriting sale COGS or creating gross profit", async () => {
+    const finance = new FinanceService(store.pool);
+    const before = await finance.summary("2000-01-01", "2099-12-31");
+    const f = await fixture(), replacement = `REPLACE-${randomUUID()}`, rep = randomUUID();
+    await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
+      VALUES($1,'representative',$2,$2,'synthetic','active',now())`, [rep, `${rep}@example.test`]);
+    await store.pool.query(`INSERT INTO representatives(user_id,full_name,national_id_hash,national_id_last4,approval_status,approved_by,approved_at)
+      VALUES($1,'Synthetic Courier',repeat('2',64),'2222','approved',$2,now())`, [rep, actor]);
+    await store.pool.query(`INSERT INTO inventory_items(id,item_code,model_id,color,size,status,cost_snapshot_minor)
+      VALUES($1,$1,$2,'Navy','L','In stock',40000)`, [replacement, f.model]);
+    const exchange = await customerReturns.submitReturn(f.user, { itemCode: f.piece, requestType: "Exchange", requestedColor: "Navy", requestedSize: "L", reason: "Synthetic exchange", address }, "cost-chain");
+    await commerce.adminReturnAction(actor, String(exchange.id), { action: "approve", replacementItemCode: replacement }, "cost-chain");
+    await commerce.adminReturnAction(actor, String(exchange.id), { action: "assign", representativeId: rep }, "cost-chain");
+    await commerce.representativeReturnAction(rep, String(exchange.id), "start");
+    await commerce.updateRepresentativeLocation(rep, address.latitude, address.longitude, 5);
+    const posted = await commerce.representativeReturnAction(rep, String(exchange.id), "complete");
+    expect(posted.originalLineSnapshot).toMatchObject({ costSnapshot: 300 });
+    expect(posted.replacementLineSnapshot).toMatchObject({ costSnapshot: 400 });
+    await commerce.adminReturnAction(actor, String(exchange.id), { action: "inspect", condition: "Good" }, "cost-chain");
+    expect(Number((await store.pool.query("SELECT cost_snapshot_minor FROM order_items WHERE id=$1", [f.lineId])).rows[0].cost_snapshot_minor)).toBe(30000);
+    const refund = await commerce.adminManualReturn(actor, manual(replacement), "cost-chain-refund");
+    expect(refund.originalLineSnapshot).toMatchObject({ costSnapshot: 400 });
+    await commerce.adminManualReturn(actor, manual(f.second), "cost-chain-refund-rest");
+    const after = await finance.summary("2000-01-01", "2099-12-31");
+    expect(after.netRevenue - before.netRevenue).toBe(0);
+    expect(after.netCogs - before.netCogs).toBe(0);
+    expect(after.grossProfit - before.grossProfit).toBe(0);
+    expect(Number((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [f.id])).rows[0].amount_refunded_minor)).toBe(100000);
+  });
 
   it("accepts nationwide pickup independently of checkout carriers and rejects a mismatched or foreign pin", async () => {
     const f = await fixture();
