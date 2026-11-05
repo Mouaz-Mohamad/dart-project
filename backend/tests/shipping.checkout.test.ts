@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkoutEligibleCompanies, checkoutShippingRegions, type CheckoutShippingCompany }
+import { checkoutEligibleCompanies, checkoutShippingRegions, isInsideEgyptEnvelope, type CheckoutShippingCompany }
   from "../src/modules/commerce/shipping.checkout.js";
 import { validateCompanyCoverage, isCompanyAddressCovered,
   EGYPT_COVERAGE_CATALOG, governorateFromText } from "../src/modules/commerce/shipping.coverage.js";
@@ -36,6 +36,12 @@ describe("Shipping checkout coverage (fail closed)",()=>{
     expect(checkoutShippingRegions([carrier]).map(x=>x.id)).toContain("Alexandria");
     expect(()=>validateCompanyCoverage(carrier)).not.toThrow();
     expect(()=>validateCompanyCoverage({...carrier,governorates:["Alexandrria"]})).toThrow();
+  });
+  it("rejects delivery coordinates outside Egypt's safety envelope",()=>{
+    expect(isInsideEgyptEnvelope(30.04,31.24)).toBe(true);
+    expect(isInsideEgyptEnvelope("31.20","29.92")).toBe(true);
+    expect(isInsideEgyptEnvelope(51.5,0.12)).toBe(false);
+    expect(isInsideEgyptEnvelope("not-coordinates",31)).toBe(false);
   });
   it("preserves old saved shipping companies but rejects their unexpected checkout activation",()=>{
     const legacy:CheckoutShippingCompany={...carrier,coverage:undefined,governorates:[]};
