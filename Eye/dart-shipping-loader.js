@@ -13,7 +13,7 @@
   }
   function loaded(){
     if(task)return task;
-    task=inject("dart-coverage-picker.js").then(()=>inject("dart-shipping.js"))
+    task=inject("dart-coverage-picker.js").then(()=>inject("dart-shipping.js?v=20261105-shipping-tabs-1"))
       .then(()=>window.DartShipping)
       .catch(error=>{task=null;throw error;});
     return task;
