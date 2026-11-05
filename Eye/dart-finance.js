@@ -1743,11 +1743,11 @@
   }
 
   const RETURNING_ORDER_BUCKETS = Object.freeze([
-    { key: "oneOrder", label: "1 Order", color: "#F2E3E7" },
-    { key: "twoOrders", label: "2 Orders", color: "#E3B7C2" },
-    { key: "threeOrders", label: "3 Orders", color: "#D18498" },
-    { key: "fourOrders", label: "4 Orders", color: "#BF506D" },
-    { key: "fivePlusOrders", label: "5+ Orders", color: "#AB012B" },
+    { key: "oneOrder", label: "1 Order", color: "#A91241" },
+    { key: "twoOrders", label: "2 Orders", color: "#1D65B8" },
+    { key: "threeOrders", label: "3 Orders", color: "#CE7918" },
+    { key: "fourOrders", label: "4 Orders", color: "#137E63" },
+    { key: "fivePlusOrders", label: "5+ Orders", color: "#7946A7" },
   ]);
 
   function orderBucketComparison(current, previous) {
@@ -1795,8 +1795,10 @@
             position: "bottom",
             labels: {
               usePointStyle: true,
-              boxWidth: 9,
-              padding: 14,
+              boxWidth: 11,
+              padding: 17,
+              color: "#3D2C35",
+              font: { size: 12, weight: "600" },
               generateLabels: (chart) =>
                 RETURNING_ORDER_BUCKETS.map((bucket, index) => ({
                   text: `${bucket.label}: ${values[index]} · ${percentages[index].toFixed(1)}% · ${changes[index]}`,
@@ -1895,12 +1897,12 @@
       data: {
         labels: buckets.map((bucket) => bucket.label),
         datasets: [
-          { label: "Revenue", data: buckets.map((bucket) => bucket.revenue), backgroundColor: "rgba(23,130,91,.78)", borderRadius: 5 },
-          { label: "Owner Total Cost", data: buckets.map((bucket) => bucket.cost), backgroundColor: "rgba(171,1,43,.22)", borderRadius: 5 },
-          { type: "line", label: "Owner Net Result", data: buckets.map((bucket) => bucket.profit), borderColor: "#AB012B", backgroundColor: "#AB012B", tension: .32, pointRadius: 2, borderWidth: 2 },
+          { label: "Revenue", data: buckets.map((bucket) => bucket.revenue), backgroundColor: "#13826B", borderRadius: 5 },
+          { label: "Owner Total Cost", data: buckets.map((bucket) => bucket.cost), backgroundColor: "#E19A2B", borderRadius: 5 },
+          { type: "line", label: "Owner Net Result", data: buckets.map((bucket) => bucket.profit), borderColor: "#6B46BD", backgroundColor: "#6B46BD", tension: .32, pointRadius: 3, borderWidth: 3 },
         ],
       },
-      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: "rgba(15,23,42,.06)" }, ticks: { callback: (value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value } } }, plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8 } } } },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: "rgba(15,23,42,.06)" }, ticks: { callback: (value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value } } }, plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 10, color: "#3D2C35", padding: 16, font: { size: 12, weight: "600" } } } } },
     });
   }
 
