@@ -3,6 +3,7 @@ import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router, type Request, type Response } from "express";
 import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
+import { STAFF_CSRF_COOKIE_NAME, staffSessionCookieName } from "../../security/account-cookies.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { AppConfig } from "../../config/env.js";
@@ -118,6 +119,22 @@ function clearSessionCookies(
   };
   response.clearCookie(config.sessionCookieName, { ...options, httpOnly: true, path: "/api/v1" });
   response.clearCookie("dart_csrf", { ...options, httpOnly: false, path: "/" });
+}
+
+function clearStaffSessionCookies(
+  response: Response,
+  config: Pick<AppConfig, "nodeEnv" | "sessionCookieName" | "sessionCookieSameSite">,
+): void {
+  const options = {
+    secure: config.nodeEnv === "production" || config.sessionCookieSameSite === "none",
+    sameSite: config.sessionCookieSameSite,
+  };
+  response.clearCookie(staffSessionCookieName(config.sessionCookieName), {
+    ...options, httpOnly: true, path: "/api/v1",
+  });
+  response.clearCookie(STAFF_CSRF_COOKIE_NAME, {
+    ...options, httpOnly: false, path: "/",
+  });
 }
 
 export function createIdentityRouter(
@@ -256,6 +273,19 @@ export function createIdentityRouter(
     },
   );
 
+  // Staff sessions are validated independently from the website's customer session.
+  router.get("/admin/auth/me", signedIn, requireAccountType("staff"), async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.status(200).json({
+      user: await service.profile(request.auth!),
+      permissions: request.auth!.permissions,
+      session: {
+        mfaRequired: request.auth!.mfaRequired,
+        mfaSatisfied: request.auth!.mfaSatisfied,
+      },
+    });
+  });
+
   router.get("/me", signedIn, async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
     const renewal = request.auth!.accountType === "customer"
@@ -304,6 +334,18 @@ export function createIdentityRouter(
     setSessionCookies(response, config, session);
     response.status(200).json({ csrfToken: session.csrfToken, expiresAt: session.expiresAt.toISOString() });
   });
+
+  router.post(
+    "/admin/auth/logout",
+    signedIn,
+    csrf,
+    requireAccountType("staff"),
+    async (request, response) => {
+      await service.logout(request.auth!, false, metadata(request));
+      clearStaffSessionCookies(response, config);
+      response.status(204).end();
+    },
+  );
 
   router.post("/auth/logout", signedIn, csrf, async (request, response) => {
     await service.logout(request.auth!, false, metadata(request));
