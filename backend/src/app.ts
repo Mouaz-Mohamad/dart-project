@@ -2,6 +2,7 @@
 // الغرض: إنشاء Runtime وربط الخدمات وقاعدة البيانات بالتطبيق، مع fallback آمن عند سوء الإعداد.
 import express, { type Express } from "express";
 import pino from "pino";
+import { ChangeFeed, directListenerConnection } from "./modules/changes/change-feed.js";
 import { readFile } from "node:fs/promises";
 import { registerSharedRateLimits, pruneRateLimits } from "./security/shared-rate-limit.js";
 import { applyScaleFoundationMigration, SCALE_FOUNDATION_MIGRATION } from "./database/scale-foundation-migration.js";
@@ -123,6 +124,7 @@ export function createRuntimeApplication(
   });
 
   const app = createApp(config, {
+    ...(process.env.DIRECT_UPDATES_ENABLED === "false" ? {} : { changeFeed: new ChangeFeed(() => directListenerConnection(config)) }),
     logger,
     databasePing: () => pingDatabase(database),
     startedAt: new Date(),

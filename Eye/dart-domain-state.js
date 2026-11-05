@@ -444,7 +444,18 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) checkAll();
   });
-  window.setInterval(checkAll, 3000);
+  window.addEventListener("dart:server-change", event => {
+    const signal = event.detail;
+    if (signal?.reconcile) { if (polling) refreshAgain = true; else void checkAll(); }
+    else if (signal?.scope === "domain" && STORAGE_BY_DOMAIN[signal.name] && signal.version > (versions.get(signal.name) || 0)) {
+      void checkDomain(signal.name, signal.version);
+    }
+  });
+  window.setInterval(() => {
+    if (!window.DartChanges?.active) return checkAll();
+    // Keep failed local writes recoverable without polling unrelated server data.
+    if (adminPollingEnabled && !document.hidden && dirty.size) return Promise.all([...dirty].map(domain => checkDomain(domain)));
+  }, 3000);
 
   window.DartDomainState = {
     hydrateAll,

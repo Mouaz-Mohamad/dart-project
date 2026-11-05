@@ -585,9 +585,11 @@
   };
   let versionPollTimer = 0;
   let versionCheckBusy = false;
+  let versionCheckAgain = false;
 
   async function checkForServerChanges() {
-    if (!API_BASE || versionCheckBusy || document.hidden) return;
+    if (!API_BASE || document.hidden) return;
+    if (versionCheckBusy) { versionCheckAgain = true; return; }
     if (IS_ADMIN && (!canReadAdmin() || adminReadDenied)) return;
     versionCheckBusy = true;
     const session = sessionEpoch;
@@ -614,15 +616,24 @@
       if (session === sessionEpoch && IS_ADMIN && [401, 403].includes(error.status)) adminReadDenied = true;
       else if (session === sessionEpoch) console.warn("Dart catalogue live refresh failed", error);
     } finally {
-      if (session === sessionEpoch) versionCheckBusy = false;
+      if (session === sessionEpoch) {
+        versionCheckBusy = false;
+        if (versionCheckAgain) { versionCheckAgain = false; void checkForServerChanges(); }
+      }
     }
   }
 
   function startLiveRefresh() {
     clearInterval(versionPollTimer);
+    if (typeof window.EventSource === "function" && !window.DartChanges && !document.querySelector('script[data-dart-changes]')) {
+      const script = document.createElement("script");
+      script.src = new URL("/Js/dart-changes.js", location.origin).href;
+      script.dataset.dartChanges = "true";
+      document.head.append(script);
+    }
     const intervalMs = IS_ADMIN ? 3000 : 20000;
     versionPollTimer = window.setInterval(() => {
-      if (!document.hidden) void checkForServerChanges();
+      if (!document.hidden && (!window.DartChanges?.active || catalogDirty)) void checkForServerChanges();
     }, intervalMs);
   }
 
@@ -639,11 +650,15 @@
     serverVersion = 0;
     remoteStock = null;
     catalogDirty = refreshAgain = false;
-    versionCheckBusy = false;
+    versionCheckBusy = versionCheckAgain = false;
     refreshPromise = null;
     clearTimeout(syncTimer);
   });
   window.addEventListener("focus", checkForServerChanges);
+  window.addEventListener("dart:server-change", event => {
+    const signal = event.detail;
+    if (signal?.reconcile || (signal?.scope === "version" && signal.name === "catalog_inventory" && signal.version > serverVersion)) void checkForServerChanges();
+  });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) checkForServerChanges();
   });

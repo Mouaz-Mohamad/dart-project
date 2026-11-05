@@ -3,6 +3,7 @@
 import { Router } from "express";
 
 export interface HealthDependencies {
+  directChanges?: boolean;
   databasePing: () => Promise<void>;
   startedAt: Date;
   version: string;
@@ -18,6 +19,7 @@ export function createHealthRouter(dependencies: HealthDependencies): Router {
       version: dependencies.version,
       apiCompatibility: "dart-database-v1",
       capabilities: [
+        ...(dependencies.directChanges ? ["direct-updates-v1"] : []),
         "database-authoritative-v1",
         "staff-onboarding-v1",
         "staff-email-access-v1",

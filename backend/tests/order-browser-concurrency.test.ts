@@ -272,4 +272,19 @@ describe("orders browser concurrency", () => {
     expect(api.read()).toEqual([]);
     expect(api.serverVersion()).toBe(0);
   });
+
+  it("reconciles a direct invalidation arriving during a local mutation even when polling is paused", async () => {
+    const f = runtime(); await f.api.hydrate();
+    Object.assign(f.window, { DartChanges: { active: true } });
+    f.window.dispatchEvent({ type: "dart:admin-authenticated" });
+    const action = f.api.workflow("K-A", { expectedStatus: "New", target: "Accepted" });
+    f.snapshot({ version: 3, orders: initial().map(row => ({ ...row, status: "Accepted" })) });
+    f.window.dispatchEvent({ type: "dart:server-change", detail: { scope: "version", name: "orders", version: 3 } });
+    f.pending[0]!.resolve({ responseMode: "delta", baseVersion: 1, version: 2, orders: [{ ...initial()[0], status: "Accepted" }] });
+    await action; await vi.advanceTimersByTimeAsync(0);
+    expect(f.api.serverVersion()).toBe(3); expect(f.api.read()[1]?.status).toBe("Accepted");
+    const reads = f.fetch.mock.calls.length;
+    await (f.window.setInterval.mock.calls[0]![0] as () => Promise<void>)();
+    expect(f.fetch.mock.calls).toHaveLength(reads);
+  });
 });

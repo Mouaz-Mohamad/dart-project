@@ -53,7 +53,7 @@ const SENSITIVE_DOMAIN_PERMISSIONS: Partial<
   draw_audit: { read: "loyalty.read", write: "loyalty.manage" },
 };
 
-const FINANCE_DOMAIN_READ_GATE_PERMISSIONS = [
+export const FINANCE_DOMAIN_READ_GATE_PERMISSIONS = [
   "dashboard_state.read",
   "finance.read",
   "finance.manage",
@@ -91,7 +91,7 @@ function permissionList(
   return typeof configured === "string" ? [configured] : configured;
 }
 
-function hasDomainPermission(
+export function hasDomainPermission(
   domain: DashboardDomain,
   mode: "read" | "write",
   permissions: string[],

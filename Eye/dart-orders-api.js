@@ -44,6 +44,7 @@
   let hydrateSerial = 0;
   let lastAppliedHydrateSerial = 0;
   let polling = false;
+  let changeCheckAgain = false;
   let reconciliationRequired = false;
   let refreshTimer = 0;
   let relatedRefreshRunning = false;
@@ -237,6 +238,7 @@
         reconciliationRequired ||= reconcile;
         if (reconciliationRequired && activeMutations === 0)
           setTimeout(() => { void hydrate(true).catch(() => {}); }, 0);
+        if (changeCheckAgain && activeMutations === 0) { changeCheckAgain = false; void check(); }
       }
     }
   }
@@ -269,7 +271,7 @@
   async function check() {
     if (!adminPollingEnabled || document.hidden) return;
     if (window.DartAdminAccess?.can?.("orders.read") !== true) return;
-    if (activeMutations > 0 || polling) return;
+    if (activeMutations > 0 || polling) { changeCheckAgain = true; return; }
     polling = true;
     try {
       if (relatedRefreshRequired) scheduleRelatedRefresh();
@@ -283,6 +285,7 @@
       else console.warn("Dart order live refresh failed", error);
     } finally {
       polling = false;
+      if (changeCheckAgain) { changeCheckAgain = false; void check(); }
     }
   }
   window.addEventListener("dart:admin-authenticated", () => { adminPollingEnabled = true; });
@@ -293,6 +296,7 @@
     activeMutations = serverVersion = 0;
     confirmedOrders = [];
     adminPollingEnabled = reconciliationRequired = refreshAgain = relatedRefreshRequired = relatedRefreshRunning = false;
+    changeCheckAgain = false;
     relatedRefreshNotified = false;
     clearTimeout(refreshTimer);
     pendingOrders.clear();
@@ -301,7 +305,11 @@
   window.addEventListener("online", check);
   window.addEventListener("focus", check);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) void check(); });
-  window.setInterval(check, 3000);
+  window.addEventListener("dart:server-change", event => {
+    const signal = event.detail;
+    if (signal?.reconcile || (signal?.scope === "version" && signal.name === "orders" && signal.version > serverVersion)) void check();
+  });
+  window.setInterval(() => !window.DartChanges?.active || reconciliationRequired ? check() : undefined, 3000);
   window.DartOrdersApi = {
     hydrate, createManual, updateManual, workflow, bulkWorkflow, correctShipment, shipmentReturned, codVerification, stateAction,
     sync: hydrate, flush: async () => readLocal(), write, read: readLocal, check,

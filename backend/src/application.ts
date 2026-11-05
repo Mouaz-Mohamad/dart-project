@@ -64,9 +64,12 @@ import { createNewsRouter } from "./modules/news/news.routes.js";
 import type { NewsService } from "./modules/news/news.service.js";
 import { createCustomerNotificationRouter } from "./modules/notifications/notification.routes.js";
 import type { CustomerNotificationService } from "./modules/notifications/notification.service.js";
+import { createChangeRouter } from "./modules/changes/change.routes.js";
+import type { ChangeFeed } from "./modules/changes/change-feed.js";
 
 export interface AppDependencies extends HealthDependencies {
   logger: Logger;
+  changeFeed?: ChangeFeed;
   identityService?: IdentityService;
   socialAuthService?: SocialAuthService;
   catalogService?: CatalogService;
@@ -171,7 +174,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
     next();
   });
 
-  app.use("/api/v1/health", createHealthRouter(dependencies));
+  app.use("/api/v1/health", createHealthRouter({ ...dependencies, directChanges: Boolean(dependencies.changeFeed) }));
+  if (dependencies.changeFeed && dependencies.identityService) app.use("/api/v1", createChangeRouter(dependencies.changeFeed, dependencies.identityService, config));
   if (dependencies.identityService) {
     if (dependencies.customerNotificationService) app.use("/api/v1",createCustomerNotificationRouter(dependencies.customerNotificationService,dependencies.identityService,config));
     if (dependencies.birthdayMessagingService && dependencies.outboxService) app.use("/api/v1",
