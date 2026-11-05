@@ -27,7 +27,7 @@ describe("fourth Council: order, return, finance and least-privilege acceptance"
   const csrf = "synthetic-council-fourth-csrf", config = { sessionCookieName: "dart_session", authPepper: "synthetic-pepper-32-characters-long", nodeEnv: "test" as const };
   const address = { country: "Egypt", governorate: "Cairo" as const, area: "Nasr City", street: "Synthetic", building: "1", floor: "1", latitude: 30.05, longitude: 31.35 };
   let auth: AuthenticatedAccount;
-  const cookie = `dart_session=${randomUUID()}.${"x".repeat(43)}`;
+  const cookie = `dart_session_staff=${randomUUID()}.${"x".repeat(43)}`;
   let app: express.Express;
   beforeAll(async () => {
     store = await embeddedStore(true); commerce = new CommerceService(store.pool); finance = new FinanceService(store.pool);

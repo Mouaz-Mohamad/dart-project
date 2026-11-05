@@ -215,7 +215,7 @@ const server = http.createServer(async (req, res) => {
     const admin = await adminContext.newPage(); admin.on("pageerror", error => errors.push(error.message));
     await admin.goto(origin + "/admin-fixture");
     await admin.locator('[data-target="news"]').click(); await admin.locator(".dart-news-row").first().waitFor();
-    assert.equal(await admin.locator("#news > .first").count(), 1); assert.equal(await admin.locator("#news > .second").count(), 1);
+    assert.equal(await admin.locator("#news .first").count(), 1); assert.equal(await admin.locator("#news .second").count(), 1);
     await admin.locator("#news-add").click();
     await admin.locator('#news-form [name="title"]').fill("New draft"); await admin.locator('#news-form [name="body"]').fill("Complete plain text.");
     await admin.locator('#news-form [name="cover"]').setInputFiles(path.join(root, "Photos/products/1.jpg"));

@@ -13,7 +13,7 @@ import { hashCsrfToken } from "../src/security/session-token.js";
 
 const config = { sessionCookieName: "dart_session", authPepper: "test-news-auth-pepper" };
 const csrf = "test-news-csrf", actor = "123e4567-e89b-12d3-a456-426614174002";
-const cookie = `dart_session=123e4567-e89b-12d3-a456-426614174000.${"a".repeat(43)}`;
+const cookie = `dart_session_staff=123e4567-e89b-12d3-a456-426614174000.${"a".repeat(43)}`;
 const input = { title: "Dart News", excerpt: "Short copy", body: "First paragraph.\n\nSecond paragraph.",
   coverAssetId: "NEWSIMG-cover1234", status: "draft" as const, sortOrder: null };
 

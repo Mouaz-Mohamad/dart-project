@@ -398,7 +398,7 @@ describe("identity HTTP boundaries", () => {
       id === customerId ? customer : id === staffId ? staff : null,
     );
     vi.mocked(service.profile).mockImplementation(async (auth) => profile(auth));
-    vi.mocked(service.renewCustomerSession).mockResolvedValue(null);
+    vi.mocked(service.renewCustomerSession).mockResolvedValue(issued(customer));
     const cookies = `dart_session=${customerId}.${secret}; dart_session_staff=${staffId}.${secret}`;
 
     const site = await request(app(service)).get("/api/v1/me").set("Cookie", cookies);

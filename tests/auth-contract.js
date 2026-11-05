@@ -90,7 +90,7 @@ assert(!dashboard.includes("Continue with Google"), "Dashboard must not present 
 assert(!dashboard.includes('id="dart-admin-login-form"'), "Staff dashboard must not expose the retired password login form");
 assert(!dashboard.includes('id="dart-admin-onboarding-password-form"'), "Staff dashboard must not expose password setup");
 assert(!dashboard.includes('id="dart-admin-mfa-form"'), "Staff dashboard must not expose TOTP setup");
-assert(dashboard.includes('src="dart-admin-auth.js"'), "Dashboard auth gate script is not loaded");
+assert(/src="dart-admin-auth\.js(?:\?[^\"]*)?"/.test(dashboard), "Dashboard auth gate script is not loaded");
 assert(
   !/<script(?![^>]*\bsrc=)(?![^>]*type=["']application\/ld\+json["'])[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/i.test(signup),
   "Signup must not execute inline JavaScript",

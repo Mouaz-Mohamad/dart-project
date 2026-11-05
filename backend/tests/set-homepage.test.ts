@@ -21,7 +21,7 @@ const input = {
 const config = { sessionCookieName: "dart_session", authPepper: "test-set-homepage-auth-pepper" };
 const csrf = "test-csrf";
 const sessionId = "123e4567-e89b-12d3-a456-426614174000";
-const sessionCookie = `dart_session=${sessionId}.${"a".repeat(43)}`;
+const sessionCookie = `dart_session_staff=${sessionId}.${"a".repeat(43)}`;
 
 function fixture(permissions = ["sets.read", "sets.manage"]) {
   let stored: Record<string, unknown> | null = null;

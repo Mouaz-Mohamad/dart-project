@@ -35,9 +35,11 @@ describe("Dart custom browser dialogs", () => {
     );
 
     const dashboard = readFileSync(join(repoRoot, "Eye/Dart Eye.html"), "utf8");
+    const authScriptIndex = dashboard.search(/src="dart-admin-auth\.js(?:\?[^\"]*)?"/);
+    expect(authScriptIndex).toBeGreaterThan(-1);
     expect(dashboard.indexOf('src="../Js/dart-dialog.js"')).toBeGreaterThan(-1);
     expect(dashboard.indexOf('src="../Js/dart-dialog.js"')).toBeLessThan(
-      dashboard.indexOf('src="dart-admin-auth.js"'),
+      authScriptIndex,
     );
   });
 

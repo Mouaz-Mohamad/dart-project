@@ -80,8 +80,8 @@ assert(html.includes("Customer Order Frequency"), "Brand must label the five-buc
 for (const label of ["1 Order", "2 Orders", "3 Orders", "4 Orders", "5+ Orders"]) {
   assert(finance.includes(`label: "${label}"`), `Returning-customer chart is missing ${label}.`);
 }
-for (const color of ["#F2E3E7", "#E3B7C2", "#D18498", "#BF506D", "#AB012B"]) {
-  assert(finance.includes(color), `Returning-customer chart is missing brand-compatible bucket color ${color}.`);
+for (const color of ["#A91241", "#1D65B8", "#CE7918", "#137E63", "#7946A7"]) {
+  assert(finance.includes(color), `Returning-customer chart is missing current contrast-palette bucket color ${color}.`);
 }
 assert(finance.includes("renderReturningChart(current, previous)"), "Returning-customer chart must compare authoritative current and previous server buckets.");
 assert(finance.includes("orderFrequencyBuckets"), "Finance summary must expose five customer order-frequency buckets.");

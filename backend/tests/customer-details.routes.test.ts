@@ -9,7 +9,7 @@ import { createPromotionRouter } from "../src/modules/promotions/promotion.route
 import { hashCsrfToken } from "../src/security/session-token.js";
 
 const config = { sessionCookieName: "dart_session", authPepper: "customer-test-pepper-at-least-32-characters" };
-const cookie = `dart_session=123e4567-e89b-12d3-a456-426614174100.${"a".repeat(43)}`;
+const cookie = `dart_session_staff=123e4567-e89b-12d3-a456-426614174100.${"a".repeat(43)}`;
 function fixture(permissions: string[], mfaSatisfied = true) {
   const service = { customerDetails: vi.fn().mockResolvedValue({ rows: [], nextOffset: null }), saveCustomerDiscount: vi.fn().mockResolvedValue({ version: 1 }) };
   const account = { userId: "123e4567-e89b-12d3-a456-426614174101", accountType: "staff", permissions,
