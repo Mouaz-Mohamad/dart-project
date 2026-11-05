@@ -1,0 +1,714 @@
+/* DART EYE — News, Finance & Settings usability refresh.
+   Scoped presentation: does not change saved values, access checks, finance
+   calculations, News publishing or destructive-action confirmations. */
+#news.dashboard-section,#finance.dashboard-section,#settings.dashboard-section{
+  height:auto;min-height:100dvh;min-width:0;overflow:visible;
+  padding:24px clamp(16px,2.4vw,32px) 58px!important;
+  background:#f8f6f7;color:#3c2c37;
+}
+/* News: editorial library and compact rows */
+#news .dart-workspace-page-header{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:14px;flex-wrap:wrap;margin:0 0 18px;
+}
+#news .dart-workspace-page-header>div:first-child{flex:1 1 250px;min-width:0}
+#news .dart-workspace-eyebrow,#finance .dart-workspace-eyebrow{
+  display:flex;gap:7px;align-items:center;margin:0 0 5px;
+  color:#8f2f50;font-size:10px;font-weight:800;letter-spacing:.11em;
+}
+#news .dart-workspace-page-header h2{
+  margin:0 0 6px;color:#421d30;
+  font-size:clamp(24px,2.4vw,32px);font-weight:800;line-height:1.3;
+}
+#news .dart-workspace-page-header p:not(.dart-workspace-eyebrow){
+  max-width:730px;margin:0;color:#7d6d77;font-size:12px;line-height:1.65;
+}
+#news .dart-workspace-badge{
+  display:inline-flex;align-items:center;gap:8px;min-height:40px;
+  padding:9px 13px;border:1px solid #e3d2db;border-radius:10px;
+  background:#fff;color:#7b3250;font-size:11px;font-weight:750;
+}
+#news .dart-news-workspace{
+  display:block;width:100%;min-width:0;
+  padding:18px;border:1px solid #e8dce2;border-radius:15px;background:#fff;
+}
+#news .dart-workspace-inner-head{margin:0 0 13px}
+#news .dart-workspace-inner-head h3{
+  color:#472337;font-size:17px;font-weight:800;margin:0 0 4px;
+}
+#news .dart-workspace-inner-head p{
+  margin:0;color:#81717d;font-size:12px;line-height:1.6;
+}
+#news .first.filter-bar{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  width:100%;margin:0;padding:12px;border:1px solid #ece2e7;
+  border-radius:11px;background:#fcfafb;box-shadow:none;min-width:0;
+}
+#news .first.filter-bar .search-box{
+  flex:2 1 240px;max-width:none;min-width:0;
+}
+#news .first.filter-bar .search-box input{
+  display:block;width:100%;min-height:42px;height:auto;
+  padding:9px 36px 9px 12px;border:1px solid #d8c7d0;
+  border-radius:9px;background:#fff;color:#402c38;font-size:12px;
+}
+#news .first.filter-bar .search-box i{left:auto;right:12px;color:#7d4b65}
+#news .first.filter-bar .select-box{
+  flex:1 1 140px;min-width:125px;max-width:210px;
+}
+#news .first.filter-bar .select-box select{
+  display:block;width:100%;min-height:42px;height:auto;
+  padding:8px 29px 8px 10px;border:1px solid #d8c7d0;
+  border-radius:9px;background:#fff;color:#473641;font-size:12px;
+}
+#news .first.filter-bar .select-box .arrow-icon{
+  left:auto;right:9px;color:#86546c;pointer-events:none;
+}
+#news .first.filter-bar .add-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:7px;min-height:42px;height:auto;width:auto;
+  padding:9px 14px;margin:0;border:1px solid #ab012b;
+  border-radius:9px;background:#ab012b;color:#fff;
+  font-size:12px;font-weight:750;white-space:nowrap;
+}
+#news .first.filter-bar button[hidden],#news .second button[hidden],
+#news #news-retry[hidden]{display:none!important}
+#news .second{
+  display:flex;align-items:center;justify-content:flex-start;
+  gap:8px;flex-wrap:wrap;min-height:42px;margin:5px 0 10px;
+  width:100%;text-align:left;
+}
+#news .second button{
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:8px;min-height:38px;height:auto;width:auto;padding:8px 13px;
+  border:1px solid #e8c4cf;border-radius:9px;
+  background:#fff8fa;color:#a63b4b;font-size:12px;font-weight:750;
+}
+#news #news-message{
+  min-height:0;padding:0 4px;margin:7px 0;
+  color:#735d6a;font-size:12px;line-height:1.6;
+}
+#news #news-retry{
+  min-height:36px;padding:7px 12px;border-radius:8px;
+  background:#fff;color:#8d2b4c;border:1px solid #dec5d0;
+}
+#news .dart-news-table{
+  display:block;width:100%;min-width:0;height:auto;
+  max-height:none!important;margin:0;padding:0;
+  border:0;background:transparent;overflow:visible!important;
+}
+#news .dart-news-table>.title-name{
+  position:relative;top:auto;display:flex!important;align-items:center;
+  gap:10px!important;width:100%!important;min-width:0!important;
+  padding:10px 13px!important;margin:0 0 10px;
+  border:0;border-radius:9px;background:#f8f1f5!important;
+}
+#news .dart-news-table>.title-name h2{display:none!important}
+#news .dart-news-table>.title-name .dart-compact-heading{
+  color:#6e5362;font-weight:750;font-size:12px;
+}
+#news .dart-news-table>.title-name input[type="checkbox"],
+#news .dart-news-row .news-checkbox{
+  flex:none;width:18px;height:18px;margin:0;accent-color:#ab012b;
+}
+#news #news-rows{width:100%;min-width:0}
+#news #news-rows>.dart-compact-record{
+  min-width:0;width:100%;margin:0 0 9px;padding:0!important;
+  border:1px solid #e8dce2;border-radius:11px;background:#fff;box-shadow:none;
+}
+#news #news-rows>.dart-compact-record:hover{
+  border-color:#cdb3bf;box-shadow:0 4px 15px #3212210b;
+}
+#news .dart-news-row .dart-record-main{
+  display:flex;align-items:center;gap:12px;min-width:0;padding:12px 14px;
+}
+#news .dart-news-row .dart-record-fields{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px 13px;min-width:0;flex:1 1 auto;
+}
+#news .dart-news-row .dart-record-field strong{
+  color:#402e3a;font-size:12px;font-weight:750;line-height:1.5;
+  overflow-wrap:anywhere;
+}
+#news .dart-news-row .dart-record-field small{
+  color:#887882;font-size:10px;font-weight:650;
+}
+#news .dart-news-row .dart-record-field img{
+  width:48px;height:63px;object-fit:cover;
+  border-radius:7px;background:#f7f1f4;
+}
+#news .dart-news-row .dart-record-controls{
+  flex:0 0 auto;min-width:98px;gap:7px;justify-content:flex-end;
+}
+#news .dart-news-row .dart-record-controls button{
+  min-height:36px;height:auto;padding:7px 12px;
+  border:1px solid #d9c5cf;border-radius:8px;background:#fff;
+  color:#76334d;font-size:11px;font-weight:750;
+}
+#news .dart-news-pagination{
+  display:flex;align-items:center;justify-content:center;gap:13px;
+  flex-wrap:wrap;margin:15px 0 1px;padding:5px;
+}
+#news .dart-news-pagination button{
+  min-height:37px;height:auto;padding:8px 12px;
+  background:#fff;border:1px solid #d9c3cd;border-radius:9px;
+  color:#75314c;font-size:12px;font-weight:750;
+}
+#news .dart-news-pagination span{
+  color:#765966;font-size:12px;font-weight:700;
+}
+#news .dart-record-dialog{
+  width:min(910px,97vw);max-width:none;padding:0 22px 25px;
+  background:#fdfbfc;border-left:1px solid #e6d8e0;
+}
+#news .dart-record-dialog-head{
+  position:sticky;top:0;z-index:3;display:flex;
+  align-items:center;justify-content:space-between;gap:12px;
+  margin:0 -22px 15px;padding:19px 22px 15px;
+  background:#fff;border-bottom:1px solid #e8dce1;
+}
+#news .dart-record-detail-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+}
+#news .dart-record-detail-field{
+  display:grid;align-content:start;gap:6px;
+  min-width:0;padding:12px;border:1px solid #e8dee4;
+  border-radius:9px;background:#fff;overflow-wrap:anywhere;
+}
+#news .dart-record-detail-field h3{
+  color:#786370;font-size:11px;margin:0;font-weight:750;
+}
+#news .dart-record-detail-actions{grid-column:1/-1;background:#faf4f7}
+#news .dart-record-detail-actions .row-action-btns{
+  display:flex;flex-wrap:wrap;gap:8px;width:auto;
+}
+#news .dart-record-detail-actions button{
+  min-height:36px;padding:7px 11px;border:1px solid #d8c5cd;
+  border-radius:8px;background:#fff;color:#79304d;
+}
+/* Editorial compose and preview should read like articles, not cramped popups. */
+.dart-news-editor{
+  width:min(810px,96vw);max-width:810px;max-height:90dvh;
+  padding:28px 25px;border:1px solid #e2d2da;
+  border-radius:15px;background:#fffdfd;color:#3c2836;
+  box-shadow:0 24px 60px #27142134;
+}
+.dart-news-editor #news-editor-title{
+  color:#452135;margin:0 34px 18px 0;
+  font-size:22px;font-weight:800;
+}
+.dart-news-editor form{display:grid;gap:13px}
+.dart-news-editor label{
+  min-width:0;display:grid;gap:6px;
+  color:#593d50;font-size:12px;font-weight:750;
+}
+.dart-news-editor label span{
+  color:#86727d;font-size:11px;font-weight:500;line-height:1.6;
+}
+.dart-news-editor input,.dart-news-editor textarea,.dart-news-editor select{
+  box-sizing:border-box;width:100%;min-width:0;
+  border:1px solid #d9c7d0;border-radius:9px;
+  padding:10px 12px;color:#3b2935;background:#fff;
+  font-size:12px;line-height:1.6;
+}
+.dart-news-editor textarea[name="body"]{min-height:260px;resize:vertical;line-height:1.8}
+.dart-news-editor textarea[name="excerpt"]{min-height:85px;resize:vertical}
+.dart-news-editor input:focus-visible,.dart-news-editor textarea:focus-visible,
+.dart-news-editor select:focus-visible{
+  outline:2px solid #a93254;outline-offset:1px;
+}
+.dart-news-editor .dart-news-editor-options{
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+  padding:14px;border:1px solid #e9dce2;
+  border-radius:10px;background:#fcf8fa;
+}
+.dart-news-editor .dart-news-editor-actions{
+  display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;
+  position:sticky;bottom:-28px;z-index:2;
+  margin:0 -25px -28px;padding:13px 25px;
+  background:#fff;border-top:1px solid #eee2e7;
+}
+.dart-news-editor .dart-news-editor-actions button{
+  min-height:40px;border-radius:9px;font-size:12px;font-weight:750;
+}
+.dart-news-editor #news-save{background:#ab012b;border-color:#ab012b;color:#fff}
+.dart-news-dialog{
+  width:min(1040px,96vw);max-width:1040px;max-height:92dvh;
+  padding:45px clamp(14px,3vw,32px) 24px;
+  border:1px solid #e9dce2;border-radius:15px;
+  background:#fffdfd;color:#362635;
+}
+.dart-news-dialog .dart-news-article{gap:22px}
+.dart-news-dialog .dart-news-article-copy h2{
+  color:#422134;font-weight:800;line-height:1.35;
+  font-size:clamp(23px,2.7vw,36px);
+}
+.dart-news-dialog .dart-news-body{
+  color:#392a35;font-size:clamp(14px,1.3vw,17px);line-height:1.9;
+}
+.dart-news-dialog .dart-news-dialog-footer button{border-radius:9px}
+
+/* Finance: groups of original permission-filtered reports */
+#finance .dart-finance-page-head{
+  min-width:0;flex-wrap:wrap;gap:14px;
+  padding:21px 23px;border:1px solid #e9dce2;
+  border-radius:15px;background:linear-gradient(115deg,#fff 0%,#fdf6f9 100%);
+  box-shadow:none;
+}
+#finance .dart-finance-page-head h1{
+  color:#432136;font-size:clamp(24px,2.5vw,32px);
+  font-weight:800;line-height:1.3;
+}
+#finance .dart-finance-page-head p:not(.dart-eyebrow){
+  color:#786874;line-height:1.6;
+}
+#finance .dart-finance-page-head .dart-finance-primary{
+  min-height:41px;padding:10px 15px;border-radius:9px;font-size:12px;
+}
+#finance .dart-finance-page-head .dart-finance-primary[hidden]{display:none!important}
+#finance .dart-finance-period-heading,#finance .dart-finance-content-heading{
+  display:flex;justify-content:space-between;align-items:end;
+  gap:10px;flex-wrap:wrap;margin:19px 1px 11px;
+}
+#finance .dart-finance-period-heading h2{
+  margin:0;color:#492239;font-size:17px;font-weight:800;line-height:1.4;
+}
+#finance .dart-finance-period-heading>span,
+#finance .dart-finance-content-heading>span:last-child{
+  color:#857581;font-size:11px;line-height:1.55;
+}
+#finance #finance-period-control{
+  min-width:0;grid-template-columns:minmax(200px,1fr) minmax(165px,220px) auto;
+  gap:12px;margin:0 0 17px;padding:17px;
+  background:#fff;border:1px solid #e6dbe0;
+  border-radius:13px;box-shadow:none;
+}
+#finance #finance-period-control select,
+#finance #finance-period-control input{
+  min-height:42px;height:auto;
+  border:1px solid #d8c8d0;border-radius:9px;
+  background:#fff;color:#3c2c36;font-size:12px;
+}
+#finance .dart-finance-tabs{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;width:100%;min-width:0;overflow:visible;
+  margin:0;padding:0;background:transparent;border:0;box-shadow:none;
+}
+#finance .dart-finance-tab-group{
+  display:flex;flex-direction:column;gap:9px;
+  min-width:0;padding:13px 14px;
+  border:1px solid #e7dbe1;border-radius:12px;background:#fff;
+}
+#finance .dart-finance-tab-group:not(:has(button:not([hidden]))){display:none}
+#finance .dart-finance-tab-group-head{
+  display:flex;align-items:center;gap:8px;justify-content:space-between;
+  flex-wrap:wrap;padding:0 1px;
+}
+#finance .dart-finance-tab-group-head strong{
+  color:#54293e;font-size:12px;font-weight:800;
+}
+#finance .dart-finance-tab-group-head small{
+  color:#8d7b85;font-size:10px;line-height:1.4;
+}
+#finance .dart-finance-tab-group-buttons{
+  display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0;
+}
+#finance .dart-finance-tab-group-buttons button{
+  display:inline-flex;justify-content:center;align-items:center;
+  flex:1 1 auto;min-height:36px;min-width:80px;
+  padding:8px 12px;border:1px solid #e7dce1;
+  border-radius:8px;background:#fcf9fa;color:#6b5361;
+  font-size:11px;font-weight:750;white-space:nowrap;
+}
+#finance .dart-finance-tab-group-buttons button[hidden]{display:none!important}
+#finance .dart-finance-tab-group-buttons button:not([hidden]):hover{
+  border-color:#ccabba;background:#f8eff3;color:#792746;
+}
+#finance .dart-finance-tab-group-buttons button.active{
+  background:#ab012b;border-color:#ab012b;color:#fff;
+  box-shadow:0 2px 9px #ab012b19;
+}
+#finance .dart-finance-content-heading{margin:19px 1px 2px}
+#finance #dart-finance-content{
+  min-width:0;gap:13px;margin:0;padding:10px 0;
+}
+#finance .dart-finance-section-head{
+  min-width:0;flex-wrap:wrap;gap:12px;
+  margin:0 0 12px;padding:10px 2px;
+}
+#finance .dart-finance-section-head h2{
+  color:#442238;font-weight:800;font-size:18px;line-height:1.4;
+}
+#finance .dart-finance-panel,
+#finance .dart-finance-kpi,
+#finance .dart-goal-card,
+#finance .dart-finance-empty{
+  min-width:0;border:1px solid #e8dde2;border-radius:12px;
+  background:#fff;box-shadow:none;
+}
+#finance .dart-finance-panel{padding:17px}
+#finance .dart-finance-kpi{padding:16px;min-height:123px}
+#finance .dart-finance-kpi strong{
+  color:#402335;font-weight:800;overflow-wrap:anywhere;
+}
+#finance .dart-finance-kpi p{color:#796d76;font-size:12px;line-height:1.5}
+#finance .dart-panel-head h3{color:#4d2a40;font-size:15px;font-weight:800}
+#finance .dart-panel-head p{color:#83717e;font-size:11px}
+#finance .dart-finance-table-wrap{
+  max-width:100%;overflow:auto;border:1px solid #e9dde2;
+  border-radius:10px;background:#fff;
+}
+#finance .dart-finance-table{
+  min-width:620px;border-spacing:0;color:#422f3c;font-size:12px;
+}
+#finance .dart-finance-table th{
+  background:#f9f3f6;color:#6f4c60;
+  font-size:11px;font-weight:800;
+}
+#finance .dart-finance-table td{border-bottom-color:#f0e7eb}
+#finance .dart-finance-table tr:hover td{background:#fcf8fa}
+#finance .dart-finance-actions{flex-wrap:wrap;gap:8px}
+#finance .dart-finance-actions button{
+  min-height:37px;height:auto;border-radius:8px;font-size:11px;
+}
+#finance .dart-finance-empty{
+  padding:20px;color:#84717d;font-size:12px;line-height:1.7;
+}
+#finance .dart-finance-primary[hidden],
+#finance .dart-finance-secondary[hidden]{display:none!important}
+/* Modal retains its security and validation; better reading and input groups. */
+#dart-finance-modal .dart-finance-modal-content{
+  width:min(910px,96vw);max-width:910px;max-height:90dvh;
+  padding:22px;border:1px solid #e7d7df;
+  border-radius:15px;background:#fffdfd;color:#382b35;
+}
+#dart-finance-modal .dart-finance-modal-head{
+  padding:0 30px 12px 0;margin:0 0 15px;border-bottom:1px solid #ede1e6;
+}
+#dart-finance-modal .dart-finance-modal-head h2{
+  color:#492239;font-weight:800;font-size:21px;
+}
+#dart-finance-modal .dart-finance-form-section{
+  min-width:0;border:1px solid #e9dce3;border-radius:10px;
+  padding:14px;background:#fcfafb;
+}
+#dart-finance-modal .dart-finance-field input,
+#dart-finance-modal .dart-finance-field select,
+#dart-finance-modal .dart-finance-field textarea{
+  min-width:0;max-width:100%;border:1px solid #d7c5ce;
+  border-radius:9px;background:#fff;color:#402c38;font-size:12px;
+}
+#dart-finance-modal .dart-finance-field input:focus-visible,
+#dart-finance-modal .dart-finance-field textarea:focus-visible{
+  outline:2px solid #af3153;outline-offset:1px;
+}
+#dart-finance-modal .dart-finance-form-actions{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;
+}
+#dart-finance-modal .dart-finance-form-actions button{min-height:40px;border-radius:9px}
+/* Settings: tab clarity, fast jump links and easy-to-read forms. */
+#settings .dart-settings-page-head{
+  min-width:0;gap:15px;padding:21px 23px;
+  border:1px solid #e9dce3;border-radius:15px;
+  background:linear-gradient(115deg,#fff 0%,#fdf6f9 100%);box-shadow:none;
+}
+#settings .dart-settings-page-head h1{
+  color:#432037;font-size:clamp(24px,2.4vw,32px);font-weight:800;line-height:1.3;
+}
+#settings .dart-settings-page-head p:not(.dart-settings-eyebrow){
+  color:#7c6c78;line-height:1.65;
+}
+#settings .dart-settings-page-head>i{
+  width:43px;height:43px;border-radius:10px;
+  background:#f8edf2;color:#942d4e;
+}
+#settings .dart-settings-utility{
+  display:flex;gap:10px;align-items:end;flex-wrap:wrap;min-width:0;
+  margin:0 0 12px;padding:14px;
+  border:1px solid #e8dce2;border-radius:12px;background:#fff;
+}
+#settings .dart-settings-utility label{
+  flex:1 1 210px;min-width:0;color:#695461;font-weight:750;font-size:11px;
+}
+#settings .dart-settings-utility input,
+#settings .dart-settings-utility select{
+  width:100%;min-height:42px;margin-top:2px;
+  border:1px solid #d7c5ce;border-radius:9px;
+  background:#fff;color:#48323f;font-size:12px;
+}
+#settings #settings-search-status{
+  flex:1 1 100%;min-width:0;min-height:0;
+  margin:0;color:#826e7a;font-size:11px;
+}
+#settings .dart-settings-tabs{
+  display:flex;gap:6px;flex-wrap:wrap;overflow:visible;
+  min-width:0;padding:7px;margin:0 0 12px;
+  border:1px solid #e7dce2;border-radius:12px;background:#fff;box-shadow:none;
+}
+#settings .dart-settings-tab{
+  display:inline-flex;gap:7px;min-width:125px;min-height:40px;
+  border:1px solid transparent;border-radius:9px;
+  font-size:12px;color:#695361;
+}
+#settings .dart-settings-tab.is-active{
+  background:#ab012b;border-color:#ab012b;color:#fff;
+}
+#settings .dart-settings-tab:hover:not(.is-active){
+  background:#faf0f4;color:#7d2947;
+}
+#settings .dart-settings-tab[hidden]{display:none!important}
+#settings .dart-settings-quick-nav{
+  display:block;padding:15px 16px;margin:0 0 15px;
+  border:1px solid #e7dce1;border-radius:12px;background:#fff;
+}
+#settings:has(#settings-content:not([data-active-settings-tab="general"])) .dart-settings-quick-nav{
+  display:none;
+}
+#settings .dart-settings-quick-heading{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  gap:7px;margin:0 0 11px;
+}
+#settings .dart-settings-quick-heading strong{
+  color:#472239;font-size:13px;font-weight:800;
+}
+#settings .dart-settings-quick-heading span{
+  color:#84717d;font-size:11px;line-height:1.6;
+}
+#settings .dart-settings-quick-links{
+  display:flex;align-items:center;flex-wrap:wrap;gap:7px;
+}
+#settings .dart-settings-quick-links button{
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:7px;min-height:37px;padding:8px 12px;
+  border:1px solid #e4d4dc;border-radius:9px;
+  color:#75314b;background:#fcf8fa;font-size:11px;
+  font-weight:750;cursor:pointer;
+}
+#settings .dart-settings-quick-links button:hover{
+  background:#f9eaf0;border-color:#c999ab;color:#65273f;
+}
+#settings .dart-settings-quick-links button:focus-visible{
+  outline:2px solid #ab012b;outline-offset:2px;
+}
+#settings .dart-settings-grid{gap:12px;min-width:0}
+#settings .dart-settings-card{
+  min-width:0;gap:13px;align-items:start;
+  border:1px solid #e7dce2;border-radius:13px;
+  background:#fff;box-shadow:none;padding:18px;
+  scroll-margin-top:20px;
+}
+#settings .dart-settings-card-icon{
+  width:40px;height:40px;border-radius:10px;
+  background:#f9ebf1;color:#a12f51;font-size:17px;
+}
+#settings .dart-settings-card-copy{min-width:0}
+#settings .dart-settings-card-copy h2{
+  color:#442238;font-size:17px;line-height:1.45;font-weight:800;
+}
+#settings .dart-settings-card-copy p{
+  color:#776876;font-size:12px;line-height:1.7;
+}
+#settings .dart-settings-form-card>.dart-settings-fields,
+#settings .dart-settings-form-card>form{
+  min-width:0;width:100%;margin:0;
+}
+#settings .dart-settings-fields{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:13px 15px;padding-top:10px;
+}
+#settings .dart-settings-fields label{
+  min-width:0;color:#604957;font-size:12px;line-height:1.5;font-weight:750;
+}
+#settings .dart-settings-fields input:not([type="checkbox"]),
+#settings .dart-settings-fields select,
+#settings .dart-settings-fields textarea,
+#settings .dart-settings-utility input,
+#settings .dart-settings-utility select{
+  width:100%;min-width:0;max-width:100%;
+  border:1px solid #d8c7d0;border-radius:9px;
+  background:#fff;color:#44313e;
+  font-size:12px;
+}
+#settings .dart-settings-fields input:not([type="checkbox"]),
+#settings .dart-settings-fields select,
+#settings .dart-settings-fields textarea{min-height:42px}
+#settings .dart-settings-check{
+  display:flex!important;align-items:center;gap:8px;min-width:0;
+  font-size:11px;color:#66515f;
+}
+#settings .dart-settings-check input{
+  flex:none;width:18px;height:18px;min-height:18px;
+  accent-color:#ab012b;
+}
+#settings .dart-settings-save,#settings .dart-settings-secondary{
+  min-height:40px;height:auto;border-radius:9px;
+  padding:9px 13px;font-size:12px;font-weight:750;
+}
+#settings .dart-settings-save{
+  border-color:#ab012b;background:#ab012b;color:#fff;
+}
+#settings .dart-settings-secondary{
+  color:#74354e;border-color:#d8c4ce;background:#fff;
+}
+#settings .dart-settings-save[hidden],
+#settings .dart-settings-secondary[hidden],
+#settings .dart-settings-card[hidden]{display:none!important}
+#settings .dart-settings-list{display:grid;gap:8px;min-width:0}
+#settings .dart-settings-list-row,
+#settings .dart-settings-model-row{
+  min-width:0;padding:12px;border:1px solid #e9dce3;
+  border-radius:10px;background:#fcfafb;
+}
+#settings .dart-settings-list-row strong,
+#settings .dart-settings-model-row strong{color:#4d2b40;font-size:12px}
+#settings .dart-settings-list-row small,
+#settings .dart-settings-model-row small{color:#81717c;font-size:11px}
+#settings .dart-settings-media-grid{
+  gap:13px;min-width:0;
+}
+#settings .dart-settings-media-grid label{
+  padding:13px;border:1px solid #e9dfe4;border-radius:10px;
+  background:#fcf9fb;color:#5d4353;
+}
+#settings .dart-settings-media-grid img{
+  border-radius:9px;border:1px solid #e9dce2;background:#fff;
+}
+#settings #settings-display-columns{
+  padding:12px;border:1px solid #e5d8de;border-radius:10px;background:#fcfafb;
+}
+#settings .dart-settings-typing-row,
+#settings .dart-settings-model-row{
+  border:1px solid #e9dce3;border-radius:10px;background:#fcf9fb;
+}
+#settings .dart-settings-typing-row details{
+  min-width:0;border:1px solid #e8dce2;
+  border-radius:8px;background:#fff;
+}
+#settings .dart-settings-typing-row summary{
+  padding:9px 12px;color:#752f4c;font-size:11px;
+  font-weight:750;cursor:pointer;
+}
+#settings #settings-staff-add{
+  border:1px solid #e0cbd5;border-radius:10px;background:#fcf8fa;
+}
+#settings #settings-staff-add>summary{
+  padding:13px 14px;color:#7f2d4d;font-size:12px;font-weight:750;
+}
+#settings .dart-staff-directory-toolbar{
+  display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+}
+#settings .dart-staff-directory-toolbar input{
+  min-height:41px;border:1px solid #d9c8d1;
+  border-radius:9px;padding:9px 12px;
+  min-width:0;flex:1 1 220px;
+}
+#settings .dart-staff-directory-toolbar button{
+  min-height:38px;border:1px solid #dac3cf;
+  border-radius:8px;background:#fff;color:#762e4a;
+  font-size:11px;padding:8px 12px;
+}
+#settings .dart-staff-directory-toolbar button[aria-pressed="true"]{
+  background:#ab012b;color:#fff;border-color:#ab012b;
+}
+#settings .dart-staff-directory-toolbar button[hidden]{display:none!important}
+/* Danger Zone is intentionally unlike Save: this is destructive and permanent. */
+#settings #settings-reset-card{
+  border:2px solid #e7a9a7;border-radius:13px;
+  background:#fff7f7;padding:20px;
+}
+#settings #settings-reset-card .dart-settings-card-icon{
+  background:#ffe3e2;color:#b42318;
+}
+#settings #settings-reset-card h2{color:#92261e}
+#settings #settings-reset-card strong{color:#971f1a}
+#settings #settings-reset-card .dart-settings-danger-button{
+  min-height:42px;height:auto;padding:9px 14px;
+  border-radius:9px;border-color:#b42318;
+  background:#b42318;color:#fff;font-size:12px;
+}
+#settings .dart-settings-draft-note{
+  padding:10px 12px;border:1px solid #f0d9a3;
+  border-radius:8px;background:#fff6df;color:#7f5817;
+  font-size:11px;line-height:1.55;
+}
+#settings .dart-settings-card:target{outline:2px solid #ad3557;outline-offset:3px}
+@media(max-width:1160px){
+  #finance .dart-finance-tabs{grid-template-columns:1fr}
+  #news .dart-news-row .dart-record-fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:1000px){
+  #finance #finance-period-control{grid-template-columns:minmax(0,1fr) minmax(160px,1fr)}
+  #finance #finance-period-control .dart-custom-period{grid-column:1/-1}
+}
+@media(max-width:768px){
+  #news.dashboard-section,#finance.dashboard-section,#settings.dashboard-section{
+    width:100%!important;margin-left:0!important;min-height:100dvh;
+    padding:16px 12px 100px!important;
+  }
+  #news .dart-workspace-badge{display:none}
+  #news .dart-news-workspace{padding:12px;border-radius:12px}
+  #news .first.filter-bar{padding:10px;gap:8px}
+  #news .first.filter-bar .search-box{flex:1 1 100%}
+  #news .first.filter-bar .select-box{flex:1 1 calc(50% - 8px);min-width:0;max-width:none}
+  #news .first.filter-bar .add-btn{flex:1 1 100%}
+  #news .dart-news-row .dart-record-main{flex-wrap:wrap;padding:11px}
+  #news .dart-news-row .dart-record-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #news .dart-news-row .dart-record-controls{
+    flex:1 1 100%;justify-content:flex-end;
+    padding-top:9px;border-top:1px solid #f0e7eb;
+  }
+  #news .dart-record-dialog{
+    width:100vw;max-width:100vw;padding:0 12px 23px;
+  }
+  #news .dart-record-dialog-head{margin:0 -12px 12px;padding:15px 12px}
+  #news .dart-record-detail-grid{grid-template-columns:1fr}
+  .dart-news-editor{width:calc(100vw - 16px);padding:16px}
+  .dart-news-editor .dart-news-editor-options{grid-template-columns:1fr}
+  .dart-news-editor .dart-news-editor-actions{
+    bottom:-16px;margin:0 -16px -16px;padding:11px 16px;
+  }
+  .dart-news-dialog{width:96vw;max-width:96vw}
+  .dart-news-dialog .dart-news-article{grid-template-columns:1fr}
+  #finance .dart-finance-page-head{padding:16px}
+  #finance .dart-finance-page-head .dart-finance-primary{width:100%;justify-content:center}
+  #finance #finance-period-control{
+    grid-template-columns:1fr;padding:13px;gap:11px;
+  }
+  #finance #finance-period-control .dart-custom-period{
+    grid-column:1;grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  #finance .dart-finance-tabs{grid-template-columns:1fr}
+  #finance .dart-finance-tab-group{padding:11px}
+  #finance .dart-finance-tab-group-buttons button{min-width:90px}
+  #finance .dart-finance-panel{padding:13px}
+  #finance #dart-finance-content{padding:8px 0}
+  #finance .dart-finance-table{min-width:550px}
+  #dart-finance-modal .dart-finance-modal-content{width:calc(100vw - 16px);padding:16px}
+  #dart-finance-modal .dart-finance-form-grid{grid-template-columns:1fr}
+  #settings .dart-settings-page-head{padding:16px}
+  #settings .dart-settings-utility{padding:11px}
+  #settings .dart-settings-tabs{
+    position:sticky;top:0;z-index:10;
+    flex-wrap:nowrap;overflow-x:auto;
+  }
+  #settings .dart-settings-tab{flex:0 0 auto;min-width:108px}
+  #settings .dart-settings-quick-nav{padding:12px}
+  #settings .dart-settings-quick-links{gap:7px}
+  #settings .dart-settings-quick-links button{flex:1 1 calc(50% - 7px);min-width:0}
+  #settings .dart-settings-card{padding:13px;gap:10px}
+  #settings .dart-settings-fields{grid-template-columns:1fr;gap:11px}
+  #settings .dart-settings-card .dart-settings-fields .dart-settings-field-wide{
+    grid-column:1/-1;
+  }
+  #settings #settings-reset-card{padding:15px}
+}
+@media(max-width:390px){
+  #finance #finance-period-control .dart-custom-period{grid-template-columns:1fr}
+  #settings .dart-settings-quick-links button{flex:1 1 100%}
+  #news .first.filter-bar .select-box{flex:1 1 100%}
+}
+@media(prefers-reduced-motion:reduce){
+  #news #news-rows>.dart-compact-record,
+  #finance .dart-finance-tab-group-buttons button,
+  #settings .dart-settings-quick-links button{transition:none}
+}
