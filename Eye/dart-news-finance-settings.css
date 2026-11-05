@@ -722,3 +722,68 @@
 @media(max-width:768px){
   #settings .dart-settings-card{scroll-margin-top:85px}
 }
+
+/* Settings > Dashboard display: opt-in column editor instead of a permanently expanded list. */
+#settings .dart-settings-columns-collapsible{
+  display:block;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  border:1px solid #e5d6de;
+  border-radius:10px;
+  background:#fcf9fb;
+  overflow:hidden;
+}
+#settings .dart-settings-columns-collapsible>summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+  min-height:46px;
+  margin:0;
+  padding:12px 14px;
+  list-style:none;
+  cursor:pointer;
+  color:#4b293a;
+  font-size:12px;
+  font-weight:800;
+}
+#settings .dart-settings-columns-collapsible>summary::-webkit-details-marker{display:none}
+#settings .dart-settings-columns-collapsible>summary:hover{
+  background:#f7edf2;
+}
+#settings .dart-settings-columns-collapsible>summary:focus-visible{
+  outline:2px solid #ab012b;
+  outline-offset:-2px;
+}
+#settings .dart-settings-columns-expand{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  color:#8a3352;
+  font-size:11px;
+  font-weight:750;
+}
+#settings .dart-settings-columns-expand i{transition:transform .18s ease}
+#settings .dart-settings-columns-collapsible[open] .dart-settings-columns-expand i{
+  transform:rotate(180deg);
+}
+#settings .dart-settings-columns-collapsible:not([open])>#settings-display-columns{
+  display:none!important;
+}
+#settings .dart-settings-columns-collapsible[open]>summary{
+  border-bottom:1px solid #ebdee4;
+  background:#fcf4f8;
+}
+#settings .dart-settings-columns-collapsible>#settings-display-columns{
+  margin:0;
+  padding:12px;
+  border:0;
+  border-radius:0 0 10px 10px;
+  background:#fff;
+}
+@media(prefers-reduced-motion:reduce){
+  #settings .dart-settings-columns-expand i{transition:none}
+}
