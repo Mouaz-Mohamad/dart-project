@@ -297,6 +297,11 @@
   font-size:10px;
   text-align:left;
 }
+/* Preserve the financial comparison meaning: negative must remain red,
+   positive green, and unchanged neutral. */
+#brand .chart-one .financial-summary .variance.is-up{color:#126b48;background:#e9f5ee}
+#brand .chart-one .financial-summary .variance.is-down{color:#aa372e;background:#fdefed}
+#brand .chart-one .financial-summary .variance.is-flat{color:#6b6670;background:#f2f0f3}
 #brand .chart-one .financial-summary>.profit-cont .sales{color:#8b2344}
 #brand .chart-one .financial-summary>.cost-cont .sales{color:#4d434a}
 #brand .chart-one>.dart-chart-card{
