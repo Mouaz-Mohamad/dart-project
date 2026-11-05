@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:b1ccd8df65b3bc1c03f74663339ef6b8c9b929f115e97049839b0752957c67fc */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:00eb10d31e30d70ca223f02fd4be2b16959eff4515a4a8e8979d285a68beeffd */
 (function () {
   "use strict";
 
@@ -1707,7 +1707,8 @@
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
-    if (!window.DartShippingAvailability?.isAddressCovered?.(details)) {
+    if (!["Cairo","Giza"].includes(acceptedGovernorate) &&
+        window.DartShippingAvailability?.isAddressCovered?.(details) !== true) {
       throw new Error("No active shipping service covers this selected governorate/city/area.");
     }
 

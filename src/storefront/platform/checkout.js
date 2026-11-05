@@ -159,7 +159,8 @@
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
-    if (!window.DartShippingAvailability?.isAddressCovered?.(details)) {
+    if (!["Cairo","Giza"].includes(acceptedGovernorate) &&
+        window.DartShippingAvailability?.isAddressCovered?.(details) !== true) {
       throw new Error("No active shipping service covers this selected governorate/city/area.");
     }
 
