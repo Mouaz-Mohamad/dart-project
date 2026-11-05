@@ -29,7 +29,11 @@ const shippingGovernorateNames = [
   "Minya","Assiut","Sohag","Qena","Luxor","Aswan","New Valley","Matrouh"
 ];
 const shippingCatalogFixture = { governorates: shippingGovernorateNames.map(id => ({
-  id, en:id, ar:id, cities:[]
+  id, en:id, ar:id==="Giza"?"الجيزة":id==="Cairo"?"القاهرة":id,
+  cities:id==="Giza"?[{
+    id:"sheikh-zayed",en:"Sheikh Zayed",ar:"الشيخ زايد",
+    areas:[{id:"district-1",en:"First District",ar:"الحي الأول"}],
+  }]:[]
 })) };
 const shippingCompaniesFixture = { version:1, companies:[
   {id:"dart",name:"Dart Delivery",trackingUrl:"",active:true,governorates:[]}
@@ -416,6 +420,17 @@ const server = http.createServer((request, response) => {
       `dashboard navigation must activate ${target}`,
     );
     await dashboard.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
+    if(target==="shipping"){
+      await dashboard.waitForFunction(() =>
+        document.querySelectorAll("#shipping-coverage-picker .dart-coverage-gov").length===27);
+      const regionSearch=dashboard.locator("#shipping-coverage-picker .dart-coverage-search");
+      await regionSearch.fill("الجيزة");
+      assert.equal(await dashboard.locator("#shipping-coverage-picker .dart-coverage-gov").count(),1,
+        "Arabic shipping search filters to the matching governorate");
+      await regionSearch.fill("");
+      assert.equal(await dashboard.locator("#shipping-coverage-picker .dart-coverage-gov").count(),27,
+        "Clearing region search restores all Egyptian governorates");
+    }
     const unreadable=await dashboard.evaluate(()=>{
       const rgb=value=>(value.match(/[\d.]+/g)||[]).map(Number),white=value=>value.length>=3&&value.slice(0,3).every(channel=>channel>=245);
       return [...document.querySelectorAll('.active-section *')].filter(node=>{
