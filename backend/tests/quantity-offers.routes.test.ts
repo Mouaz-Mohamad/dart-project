@@ -10,6 +10,7 @@ import { hashCsrfToken } from "../src/security/session-token.js";
 
 const config = { sessionCookieName: "dart_session", authPepper: "quantity-test-pepper-at-least-32-characters" };
 const cookie = `dart_session=123e4567-e89b-12d3-a456-426614174100.${"a".repeat(43)}`;
+const staffCookie = cookie.replace("dart_session=", "dart_session_staff=");
 function fixture(type: "staff" | "customer" = "customer", permissions: string[] = [], mfaSatisfied = true) {
   const service = { quantityOffers: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ version: 1 }) };
   const account = { userId: "123e4567-e89b-12d3-a456-426614174101", accountType: type, permissions,
@@ -39,13 +40,13 @@ describe("quantity offer HTTP authority", () => {
     const body = { name: "Quantity", code: "Q-HTTP", discountPercent: 10, automatic: true, distinctModels: true, minQuantity: 3 };
     for (const [permissions, mfa] of [[[], true], [["promotions.manage"], false]] as [string[], boolean][]) {
       const f = fixture("staff", permissions, mfa);
-      expect((await request(f.app).post("/admin/promotions").set("Cookie", cookie).set("X-CSRF-Token", "csrf").send(body)).status).toBe(403);
+      expect((await request(f.app).post("/admin/promotions").set("Cookie", staffCookie).set("X-CSRF-Token", "csrf").send(body)).status).toBe(403);
       expect(f.service.create).not.toHaveBeenCalled();
     }
     const f = fixture("staff", ["promotions.manage"]);
-    expect((await request(f.app).post("/admin/promotions").set("Cookie", cookie).send(body)).status).toBe(403);
-    expect((await request(f.app).post("/admin/promotions").set("Cookie", cookie).set("X-CSRF-Token", "csrf").send({ ...body, minQuantity: 1 })).status).toBe(422);
-    expect((await request(f.app).post("/admin/promotions").set("Cookie", cookie).set("X-CSRF-Token", "csrf").send(body)).status).toBe(201);
+    expect((await request(f.app).post("/admin/promotions").set("Cookie", staffCookie).send(body)).status).toBe(403);
+    expect((await request(f.app).post("/admin/promotions").set("Cookie", staffCookie).set("X-CSRF-Token", "csrf").send({ ...body, minQuantity: 1 })).status).toBe(422);
+    expect((await request(f.app).post("/admin/promotions").set("Cookie", staffCookie).set("X-CSRF-Token", "csrf").send(body)).status).toBe(201);
     expect(f.service.create).toHaveBeenCalledTimes(1);
   });
 });
