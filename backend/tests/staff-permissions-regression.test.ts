@@ -12,7 +12,8 @@ import type { CommerceService } from "../src/modules/commerce/commerce.service.j
 import type { DashboardStateService } from "../src/modules/dashboard/dashboard-state.service.js";
 
 const csrf = "synthetic-staff-csrf-token", sessionId = randomUUID();
-const cookie = `dart_session=${sessionId}.${"a".repeat(43)}`;
+const cookie = `dart_session_staff=${sessionId}.${"a".repeat(43)}`;
+const customerCookie = `dart_session=${sessionId}.${"a".repeat(43)}`;
 const point = { lat: 30.0444, lng: 31.2357 };
 function snapshot() {
   return { version: 1, responseMode: "delta", baseVersion: 0,
@@ -105,7 +106,7 @@ describe("independent representative location access", () => {
   });
   it("preserves the existing customer's own delivery tracking", async () => {
     const { app } = fixture([], "customer");
-    const response = await request(app).get("/api/v1/me/tracking/live").set("Cookie", cookie);
+    const response = await request(app).get("/api/v1/me/tracking/live").set("Cookie", customerCookie);
     expect(response.status).toBe(200); expect(response.body.orders[0].courierLocation).toEqual(point);
   });
 });
