@@ -6,7 +6,9 @@ function dartNextStatus(status) {
 }
 function dartCanTransition(order, target) {
   if (!order || dartIsArchived(order)) return false;
-  if (order.status === target) return false;
+  if (order.status === target) return target === "Ready for Dispatch";
+  if (["Out With Representative", "Representative On The Way"].includes(order.status) &&
+      ["Preparing", "Ready for Dispatch", "Cancelled"].includes(target)) return false;
   if (order.deliveryShipment?.type === "external" && order.status === "Out With Representative") {
     if (["Preparing","Cancelled"].includes(target)) return false;
     if (target==="Refused") return order.deliveryShipment.status==="Returned to Sender";
@@ -26,8 +28,6 @@ function dartCanTransition(order, target) {
     );
     if (!["Not Required", "Verified"].includes(verificationStatus)) return false;
   }
-  if (target === "Preparing" && order.status === "Out With Representative")
-    return true; // representative cancelled pickup
   if (order.status === "Needs Attention") return false;
   if (order.deliveryShipment?.type === "external" && order.status === "Out With Representative")
     return target === "Delivered";
@@ -139,12 +139,13 @@ async function dartApplyTransition(order, target, meta = {}) {
   const prev = order.status,
     now = dartNowISO(),
     serverAuthoritative = Boolean(window.DartOrdersApi);
-  if (target === "Out With Representative" && !meta.representativeId && !meta.shippingCompanyId)
+  if (target === "Ready for Dispatch" && !meta.representativeId && !meta.shippingCompanyId)
     return { ok: false, needsRep: true };
   if (window.DartOrdersApi?.workflow) {
     try {
       await window.DartOrdersApi.workflow(order.orderId || order.id, {
         expectedStatus: order.status,
+        expectedVersion: Number(order.version),
         target,
         ...(meta.representativeId ? { representativeId: String(meta.representativeId) } : {}),
         ...(meta.shippingCompanyId ? { shippingCompanyId: String(meta.shippingCompanyId), trackingNumber: String(meta.trackingNumber || "") } : {}),
@@ -169,13 +170,13 @@ async function dartApplyTransition(order, target, meta = {}) {
     }
   }
   if (
-    target === "Out With Representative" &&
+    target === "Ready for Dispatch" &&
     !dartAssignRepresentative(order, meta.representativeId)
   )
     return { ok: false, message: "Representative is not available." };
   if (target === "Out With Representative" && !order.deliveryGroupId)
     order.deliveryGroupId = window.DartGroups?.newId?.("DLG") || `DLG-${Date.now()}`;
-  if (target === "Preparing" && prev === "Out With Representative") {
+  if (target === "Preparing" && prev === "Ready for Dispatch") {
     order.representativeId = null;
     order.representativeBusinessId = "";
     order.representativeName = "";
@@ -186,6 +187,7 @@ async function dartApplyTransition(order, target, meta = {}) {
   const stamps = {
     Accepted: "acceptedAt",
     Preparing: "preparingAt",
+    "Ready for Dispatch": "readyForDispatchAt",
     "Out With Representative": "outWithRepresentativeAt",
     "Representative On The Way": "representativeOnWayAt",
     Delivered: "deliveredAt",
@@ -286,10 +288,10 @@ async function dartBatchTransition(orders, target, meta = {}) {
       ok: false,
       message: "حدد أوردرات من نفس الحالة الحالية لتنفيذ عملية جماعية.",
     };
-  if (target === "Out With Representative" && !meta.representativeId && !meta.shippingCompanyId)
+  if (target === "Ready for Dispatch" && !meta.representativeId && !meta.shippingCompanyId)
     return { ok: false, needsRep: true };
   if (
-    target === "Out With Representative" && !meta.shippingCompanyId &&
+    target === "Ready for Dispatch" && !meta.shippingCompanyId &&
     !dartFindRepById(meta.representativeId)
   ) return { ok: false, message: "Representative unavailable." };
 
@@ -298,6 +300,7 @@ async function dartBatchTransition(orders, target, meta = {}) {
       const payload = await window.DartOrdersApi.bulkWorkflow({
         orderRefs: orders.map((order) => String(order.orderId || order.id)),
         expectedStatus: String(orders[0]?.status || ""),
+        expectedVersions: Object.fromEntries(orders.map(order => [String(order.orderId || order.id), Number(order.version)])),
         target,
         ...(meta.representativeId
           ? { representativeId: String(meta.representativeId) }

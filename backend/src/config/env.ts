@@ -86,6 +86,8 @@ const environmentSchema = z.object({
   WHATSAPP_CLOUD_API_TOKEN: z.string().default(""),
   WHATSAPP_SEND_ENABLED: booleanFromString,
   WHATSAPP_ORDER_CONFIRMATION_ENABLED: booleanFromString,
+  WHATSAPP_DISPATCH_ENABLED: booleanFromString,
+  WHATSAPP_DISPATCH_TEMPLATE: z.string().trim().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(""),
   WHATSAPP_APP_SECRET: z.string().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).or(z.literal("")).default(""),
@@ -137,6 +139,8 @@ export interface AppConfig {
   whatsappAccessToken?: string | null;
   whatsappSendEnabled?: boolean;
   whatsappOrderConfirmationEnabled?: boolean;
+  whatsappDispatchEnabled?: boolean;
+  whatsappDispatchTemplate?: string;
   whatsappWebhookVerifyToken?: string | null;
   whatsappAppSecret?: string | null;
   whatsappPhoneNumberId?: string | null;
@@ -241,6 +245,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   if (Boolean(verifyToken) !== Boolean(appSecret) || (verifyToken && verifyToken.length < 32)) {
     invalidEnvironment("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "WHATSAPP_APP_SECRET");
   }
+  if (parsed.data.WHATSAPP_DISPATCH_ENABLED) {
+    const required = ["WHATSAPP_CLOUD_API_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_DISPATCH_TEMPLATE"] as const;
+    const missing = required.filter(key => !parsed.data[key]);
+    if (missing.length) invalidEnvironment(...missing);
+  }
   if (parsed.data.WHATSAPP_ORDER_CONFIRMATION_ENABLED) {
     const required = ["WHATSAPP_CLOUD_API_TOKEN","WHATSAPP_PHONE_NUMBER_ID","WHATSAPP_APP_SECRET","WHATSAPP_WEBHOOK_VERIFY_TOKEN"] as const;
     const missing = required.filter(key => !parsed.data[key]);
@@ -289,6 +298,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     whatsappAccessToken: parsed.data.WHATSAPP_CLOUD_API_TOKEN || null,
     whatsappSendEnabled: parsed.data.WHATSAPP_SEND_ENABLED,
     whatsappOrderConfirmationEnabled: parsed.data.WHATSAPP_ORDER_CONFIRMATION_ENABLED,
+    whatsappDispatchEnabled: parsed.data.WHATSAPP_DISPATCH_ENABLED,
+    whatsappDispatchTemplate: parsed.data.WHATSAPP_DISPATCH_TEMPLATE,
     whatsappWebhookVerifyToken: verifyToken || null,
     whatsappAppSecret: appSecret || null,
     whatsappPhoneNumberId: parsed.data.WHATSAPP_PHONE_NUMBER_ID || null,

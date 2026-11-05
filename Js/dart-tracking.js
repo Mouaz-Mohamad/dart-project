@@ -540,7 +540,7 @@
   }
 
   function statusIndex(order) {
-    return ({ New: 0, Accepted: 0, Preparing: 1, "Out With Representative": 2, "Representative On The Way": 3, Delivered: 4 })[order.status] ?? 0;
+    return ({ New: 0, Accepted: 0, Preparing: 1, "Ready for Dispatch": 1, "Out With Representative": 2, "Representative On The Way": 3, Delivered: 4 })[order.status] ?? 0;
   }
 
   function templateFragment(id) {

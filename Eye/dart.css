@@ -1777,6 +1777,7 @@ section {
   background: #dbeafe;
   color: #1d4ed8;
 }
+.status-ready-for-dispatch,
 .status-preparing {
   background: #ede9fe;
   color: #6d28d9;

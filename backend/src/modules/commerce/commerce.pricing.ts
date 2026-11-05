@@ -96,7 +96,9 @@ export function detectCartPriceChanges(
 // Explicit allowlist also sanitizes replies cached before customer cost removal.
 export function customerOrderView(order: Record<string, unknown>): Record<string, unknown> {
   const fields = ["itemId","itemCode","modelCode","name","color","size","qty","originalUnitPrice","discountPercent","discountAmount","discountSource","discountReference","finalUnitPrice"];
-  return { ...order, ...(Array.isArray(order.priceSnapshot) ? {
+  const publicOrder = { ...order };
+  delete publicOrder.pendingDispatch;
+  return { ...publicOrder, ...(Array.isArray(order.priceSnapshot) ? {
     priceSnapshot: order.priceSnapshot.map((line: Record<string, unknown>) => Object.fromEntries(fields.filter((key) => key in line).map((key) => [key, line[key]]))),
   } : {}) };
 }

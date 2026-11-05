@@ -23,7 +23,7 @@
   // BEGIN Shared status colors. Display-only: status text remains the source for row colors.
   const statusGroups = {
     success: "active|sold|delivered|completed|good|repaired|available|in stock|published|paid|settled|received|converted|eligible|verified|used|achieved|online|connected|approved|return received|return completed|refund completed|exchange completed|returned|refunded",
-    processing: "accepted|preparing|processing|processing/held|in progress|repairing",
+    processing: "accepted|preparing|ready for dispatch|processing|processing/held|in progress|repairing",
     info: "new|new order|new request|scheduled|expected|upcoming",
     warning: "waiting|pending|pending request|under review|pending inspection|pending approval|reserved|hold|held|out with representative|representative on the way|on the way|delivering|representative assigned|approved - awaiting representative|awaiting settlement|open|unpaid|partial|partially paid|low stock|email pending|return pending|exchange pending|partially refunded",
     danger: "refused|rejected|cancelled|canceled|order cancelled|order canceled|cancelled order|canceled order|damaged|bad|destroyed|suspended|disabled|blocked|failed|delivery failed|failed delivery|delivery failure|unsuccessful delivery|delivery unsuccessful|failed to deliver|undelivered|not delivered|delivery refused|return rejected|verification failed|failed to complete|expired|error|overdue|needs attention|problem|out of stock|sold out|over budget",
@@ -42,7 +42,7 @@
     if (node.dataset.dartLabel !== label) node.dataset.dartLabel = label;
     if (node.dataset.dartKind !== kind) node.dataset.dartKind = kind;
     // Older status cells use inline red/green text; the shared palette now owns those colors.
-    if (kind === "badge" && node.style.color) node.style.removeProperty("color");
+    if (kind === "badge") node.style.removeProperty("color");
   }
   function rowStatus(row, labels, cells) {
     if (row.matches(".row-deleted,.is-archived")) return "Archived";

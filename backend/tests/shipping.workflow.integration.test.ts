@@ -54,8 +54,10 @@ describe.skipIf(!databaseUrl)("external shipping warehouse -> carrier -> return 
   it("dispatches an external carrier without creating any Dart representative or duplicate order",async()=>{
     const f=await fixture("DISPATCH"),commerce=new CommerceService(db!);
     await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
-      {expectedStatus:"Preparing",target:"Out With Representative",
+      {expectedStatus:"Preparing",target:"Ready for Dispatch",
         shippingCompanyId:"carrier-test",trackingNumber:"SHIP-123"},randomUUID(),false);
+    await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
+      {expectedStatus:"Ready for Dispatch",target:"Out With Representative",expectedVersion:Number((await snapshot(f.orderId)).version)},randomUUID(),false);
     const order=await snapshot(f.orderId);
     expect(order.status).toBe("Out With Representative");
     expect(order.representative_user_id).toBeNull();
@@ -64,11 +66,24 @@ describe.skipIf(!databaseUrl)("external shipping warehouse -> carrier -> return 
     const count=await db!.query<{n:string}>("SELECT count(*)::text AS n FROM orders WHERE id=$1",[f.orderId]);
     expect(count.rows[0]?.n).toBe("1");
   });
+  it("serializes simultaneous physical handover confirmations across real connections",async()=>{
+    const f=await fixture("RACE"),commerce=new CommerceService(db!);
+    await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
+      {expectedStatus:"Preparing",target:"Ready for Dispatch",shippingCompanyId:"carrier-test",trackingNumber:"SHIP-RACE"},randomUUID(),false);
+    const version=Number((await snapshot(f.orderId)).version);
+    const outcomes=await Promise.allSettled([1,2].map(()=>commerce.adminOrderWorkflowAction(randomUUID(),f.code,
+      {expectedStatus:"Ready for Dispatch",target:"Out With Representative",expectedVersion:version},randomUUID(),false)));
+    expect(outcomes.filter(o=>o.status==="fulfilled")).toHaveLength(1);
+    expect(outcomes.filter(o=>o.status==="rejected")).toHaveLength(1);
+    expect((await db!.query("SELECT id FROM outbox_events WHERE aggregate_id=$1 AND event_type='ORDER_WHATSAPP_DISPATCHED'",[f.orderId])).rows).toHaveLength(1);
+  });
   it("does not restock refused goods before the carrier returns the parcel",async()=>{
     const f=await fixture("RETURN"),commerce=new CommerceService(db!);
     await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
-      {expectedStatus:"Preparing",target:"Out With Representative",
+      {expectedStatus:"Preparing",target:"Ready for Dispatch",
         shippingCompanyId:"carrier-test",trackingNumber:"SHIP-456"},randomUUID(),false);
+    await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
+      {expectedStatus:"Ready for Dispatch",target:"Out With Representative",expectedVersion:Number((await snapshot(f.orderId)).version)},randomUUID(),false);
     await expect(commerce.adminOrderWorkflowAction(randomUUID(),f.code,
       {expectedStatus:"Out With Representative",target:"Refused",reason:"Refused delivery"},
       randomUUID(),false)).rejects.toMatchObject({code:"EXTERNAL_SHIPMENT_STILL_OUT"});
@@ -89,8 +104,10 @@ describe.skipIf(!databaseUrl)("external shipping warehouse -> carrier -> return 
   it("marks delivered goods sold but keeps the courier COD remittance unsettled",async()=>{
     const f=await fixture("DELIVERY"),commerce=new CommerceService(db!);
     await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
-      {expectedStatus:"Preparing",target:"Out With Representative",
+      {expectedStatus:"Preparing",target:"Ready for Dispatch",
         shippingCompanyId:"carrier-test",trackingNumber:"SHIP-789"},randomUUID(),false);
+    await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
+      {expectedStatus:"Ready for Dispatch",target:"Out With Representative",expectedVersion:Number((await snapshot(f.orderId)).version)},randomUUID(),false);
     await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
       {expectedStatus:"Out With Representative",target:"Delivered"},randomUUID(),false);
     const row=await db!.query<{status:string;payment_status:string;cod_settled_minor:string}>(

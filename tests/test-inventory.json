@@ -28,6 +28,7 @@
     "news-loader.cjs",
     "news-seo.cjs",
     "order-action-latency-contract.cjs",
+    "order-dispatch-runtime.cjs",
     "password-reset-runtime.cjs",
     "performance-budget.cjs",
     "product-button-state-contract.cjs",

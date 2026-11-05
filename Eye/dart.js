@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:05f86e861757b1a992d32b06ebd0b43e3b01a85e888cbe236f6f7b39750a2d9c */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:41dc11df44abd470c4569e8ffade7661ea20512a024b542a1e463fc120ae98af */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -915,6 +915,7 @@ const DART_ORDER_FLOW = [
   "New",
   "Accepted",
   "Preparing",
+  "Ready for Dispatch",
   "Out With Representative",
   "Representative On The Way",
   "Delivered",
@@ -1514,7 +1515,9 @@ function dartNextStatus(status) {
 }
 function dartCanTransition(order, target) {
   if (!order || dartIsArchived(order)) return false;
-  if (order.status === target) return false;
+  if (order.status === target) return target === "Ready for Dispatch";
+  if (["Out With Representative", "Representative On The Way"].includes(order.status) &&
+      ["Preparing", "Ready for Dispatch", "Cancelled"].includes(target)) return false;
   if (order.deliveryShipment?.type === "external" && order.status === "Out With Representative") {
     if (["Preparing","Cancelled"].includes(target)) return false;
     if (target==="Refused") return order.deliveryShipment.status==="Returned to Sender";
@@ -1534,8 +1537,6 @@ function dartCanTransition(order, target) {
     );
     if (!["Not Required", "Verified"].includes(verificationStatus)) return false;
   }
-  if (target === "Preparing" && order.status === "Out With Representative")
-    return true; // representative cancelled pickup
   if (order.status === "Needs Attention") return false;
   if (order.deliveryShipment?.type === "external" && order.status === "Out With Representative")
     return target === "Delivered";
@@ -1647,12 +1648,13 @@ async function dartApplyTransition(order, target, meta = {}) {
   const prev = order.status,
     now = dartNowISO(),
     serverAuthoritative = Boolean(window.DartOrdersApi);
-  if (target === "Out With Representative" && !meta.representativeId && !meta.shippingCompanyId)
+  if (target === "Ready for Dispatch" && !meta.representativeId && !meta.shippingCompanyId)
     return { ok: false, needsRep: true };
   if (window.DartOrdersApi?.workflow) {
     try {
       await window.DartOrdersApi.workflow(order.orderId || order.id, {
         expectedStatus: order.status,
+        expectedVersion: Number(order.version),
         target,
         ...(meta.representativeId ? { representativeId: String(meta.representativeId) } : {}),
         ...(meta.shippingCompanyId ? { shippingCompanyId: String(meta.shippingCompanyId), trackingNumber: String(meta.trackingNumber || "") } : {}),
@@ -1677,13 +1679,13 @@ async function dartApplyTransition(order, target, meta = {}) {
     }
   }
   if (
-    target === "Out With Representative" &&
+    target === "Ready for Dispatch" &&
     !dartAssignRepresentative(order, meta.representativeId)
   )
     return { ok: false, message: "Representative is not available." };
   if (target === "Out With Representative" && !order.deliveryGroupId)
     order.deliveryGroupId = window.DartGroups?.newId?.("DLG") || `DLG-${Date.now()}`;
-  if (target === "Preparing" && prev === "Out With Representative") {
+  if (target === "Preparing" && prev === "Ready for Dispatch") {
     order.representativeId = null;
     order.representativeBusinessId = "";
     order.representativeName = "";
@@ -1694,6 +1696,7 @@ async function dartApplyTransition(order, target, meta = {}) {
   const stamps = {
     Accepted: "acceptedAt",
     Preparing: "preparingAt",
+    "Ready for Dispatch": "readyForDispatchAt",
     "Out With Representative": "outWithRepresentativeAt",
     "Representative On The Way": "representativeOnWayAt",
     Delivered: "deliveredAt",
@@ -1794,10 +1797,10 @@ async function dartBatchTransition(orders, target, meta = {}) {
       ok: false,
       message: "حدد أوردرات من نفس الحالة الحالية لتنفيذ عملية جماعية.",
     };
-  if (target === "Out With Representative" && !meta.representativeId && !meta.shippingCompanyId)
+  if (target === "Ready for Dispatch" && !meta.representativeId && !meta.shippingCompanyId)
     return { ok: false, needsRep: true };
   if (
-    target === "Out With Representative" && !meta.shippingCompanyId &&
+    target === "Ready for Dispatch" && !meta.shippingCompanyId &&
     !dartFindRepById(meta.representativeId)
   ) return { ok: false, message: "Representative unavailable." };
 
@@ -1806,6 +1809,7 @@ async function dartBatchTransition(orders, target, meta = {}) {
       const payload = await window.DartOrdersApi.bulkWorkflow({
         orderRefs: orders.map((order) => String(order.orderId || order.id)),
         expectedStatus: String(orders[0]?.status || ""),
+        expectedVersions: Object.fromEntries(orders.map(order => [String(order.orderId || order.id), Number(order.version)])),
         target,
         ...(meta.representativeId
           ? { representativeId: String(meta.representativeId) }
@@ -3006,7 +3010,10 @@ async function dartRequestOrderTransition(orders, target) {
     window.DartDialog.alert("حدد أوردرات من نفس الحالة الحالية.");
     return;
   }
-  if (target === "Out With Representative") {
+  if (target === "Out With Representative" && !await window.DartDialog.confirm(
+    `تأكيد تسليم ${orders.length} أوردر فعليًا للمندوب أو شركة الشحن؟ بعد التأكيد يظهر للعميل أن الأوردر خرج للتوصيل.`
+  )) return;
+  if (target === "Ready for Dispatch") {
     dartPendingOrderAction = { orders, target };
     try { await window.DartShipping.loadCompanies(); }
     catch (error) { window.DartDialog.alert(error.message || "Shipping partners could not be loaded");return; }
@@ -3023,7 +3030,10 @@ async function dartRequestOrderTransition(orders, target) {
     for (const company of window.DartShipping.companies().filter(row=>row.active)) {
       const opt=document.createElement("option");opt.value=company.id;opt.textContent=company.name;companySelect.append(opt);
     }
-    companySelect.value="dart";tracking.value="";
+    const planned = orders.length === 1 ? orders[0].pendingDispatch : null;
+    companySelect.value=planned?.companyId || "dart";
+    tracking.value=planned?.trackingNumber || "";
+    if (planned?.representativeId) sel.value=planned.representativeId;
     const toggle=()=>{const dart=companySelect.value==="dart";sel.disabled=!dart;tracking.disabled=dart;tracking.required=!dart;};
     companySelect.onchange=toggle;toggle();
     openModal(document.getElementById("rep-assignment-modal"));
@@ -3685,7 +3695,7 @@ async function dartRollbackOrderOneStep(order) {
   if (
     !order ||
     dartIsArchived(order) ||
-    ["New", "Refused", "Cancelled", "Needs Attention"].includes(order.status)
+    ["New", "Out With Representative", "Refused", "Cancelled", "Needs Attention"].includes(order.status)
   )
     return { ok: false, message: "لا يمكن الرجوع خطوة من هذه الحالة." };
   const prevStatus = order.status,
@@ -3702,6 +3712,7 @@ async function dartRollbackOrderOneStep(order) {
     try {
       await window.DartOrdersApi.workflow(order.orderId || order.id, {
         expectedStatus: prevStatus,
+        expectedVersion: Number(order.version),
         target,
         reason: "Manual one-step rollback",
       });
@@ -3761,8 +3772,9 @@ async function dartRollbackOrderOneStep(order) {
   }
   if (prevStatus === "Representative On The Way")
     order.representativeOnWayAt = null;
-  if (prevStatus === "Out With Representative") {
-    order.outWithRepresentativeAt = null;
+  if (prevStatus === "Ready for Dispatch") {
+    order.readyForDispatchAt = null;
+    order.pendingDispatch = null;
     order.representativeId = null;
     order.representativeName = "";
     order.deliveryGroupId = "";
@@ -3834,6 +3846,7 @@ function renderOrders(dataArray) {
       riskMeta =
         `<small class="dart-kpi-inline" title="${dartEsc(refusalSummary || "No refusal history")}">Order risk ${dartEsc(riskLevel)} (${Number(o.riskScore) || 0}) · Customer ${dartEsc(customerRiskLevel)} · Verification ${dartEsc(verificationStatus)} · Refusals ${Number(o.refusalsInWindow) || 0}</small>`,
       rep =
+        o.pendingDispatch?.representativeName || o.pendingDispatch?.companyName || o.deliveryShipment?.companyName ||
         o.representativeName ||
         dartFindRepById(o.representativeId)?.name ||
         "-",
@@ -3843,7 +3856,7 @@ function renderOrders(dataArray) {
           .join("") || "-";
     const nextBtn =
         next && dartCanTransition(o, next)
-          ? `<button class="dart-status-btn" data-order-target="${dartEsc(next)}">${dartEsc(next)}</button>`
+          ? `<button class="dart-status-btn" data-order-target="${dartEsc(next)}">${dartEsc(next === "Out With Representative" ? "Confirm Dispatch" : next)}</button>`
           : next === "Preparing" && codBlocked
             ? '<button class="dart-status-btn" disabled title="COD verification required">Verify first</button>'
             : "",
@@ -3855,7 +3868,7 @@ function renderOrders(dataArray) {
           : "",
       back =
         dartPreviousStatus(o.status) &&
-        !["Refused", "Cancelled", "Needs Attention"].includes(o.status)
+        !["Out With Representative", "Refused", "Cancelled", "Needs Attention"].includes(o.status)
           ? '<button class="dart-back-btn" title="Back one step"><i class="bx bx-undo"></i></button>'
           : "",
       refuse = [
@@ -3864,12 +3877,12 @@ function renderOrders(dataArray) {
       ].includes(o.status)
         ? '<button class="dart-refuse-btn" data-order-target="Refused">Refuse</button>'
         : "",
-      cancel = !DART_FINAL_ORDER_STATES.includes(o.status)
+      cancel = dartCanTransition(o, "Cancelled")
         ? '<button class="dart-cancel-btn" data-order-target="Cancelled">Cancel</button>'
         : "",
       pickup =
-        o.status === "Out With Representative"
-          ? '<button class="dart-pickup-cancel-btn">Cancel Pickup</button>'
+        o.status === "Ready for Dispatch"
+          ? '<button class="dart-status-btn" data-order-target="Ready for Dispatch">Change Assignment</button>'
           : "";
     c.insertAdjacentHTML(
       "beforeend",

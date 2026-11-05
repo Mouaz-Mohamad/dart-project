@@ -247,7 +247,7 @@ describe("second Council regressions on the production schema", () => {
     for (const key of ["refunds", "cashOut", "cogsReversal", "netProfit"] as const) expect(after[key]).toEqual(before[key]);
   });
 
-  it("keeps a consumed Birthday benefit consistent after Back and cancellation, then quotes the actual eligible price", async () => {
+  it("keeps a consumed Birthday benefit consistent after Back and refusal, then quotes the actual eligible price", async () => {
     const f = await fixture({ birthday: true, ordinary: true });
     await commerce.reserveCart(f.reservation, [{ modelId: f.models[2]!, color: "Black", size: "M", quantity: 1 }], f.user);
     const order = await checkout(f); await deliver(order);
@@ -255,7 +255,12 @@ describe("second Council regressions on the production schema", () => {
     const read = async () => (await store.pool.query(`SELECT u.status AS usage,r.status AS reward FROM birthday_discount_usage u
       JOIN birthday_rewards r ON r.record_id=u.reward_record_id WHERE u.customer_user_id=$1`, [f.user])).rows[0];
     expect(await read()).toMatchObject({ usage: "Used", reward: "Used" });
-    await commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "Representative On The Way", target: "Cancelled" }, "synthetic", false);
+    await expect(commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "Representative On The Way", target: "Cancelled" }, "synthetic", false)).rejects.toMatchObject({ code: "DISPATCH_ALREADY_CONFIRMED" });
+    await commerce.adminOrderWorkflowAction(actor, String(order.orderId), { expectedStatus: "Representative On The Way", target: "Refused" }, "synthetic", false);
+    // Refused stock is under return inspection. Quote a different sellable piece.
+    const replacement = `I-NEXT-${randomUUID()}`;
+    await store.pool.query(`INSERT INTO inventory_items(id,item_code,model_id,color,size,status,cost_snapshot_minor)
+      VALUES($1,$1,$2,'Black','M','In stock',50000)`, [replacement,f.models[2]]);
     expect(await read()).toMatchObject({ usage: "Used", reward: "Used" });
     const next = `CART-NEXT-${randomUUID()}`;
     // A legacy stale projection must not overrule the usage ledger either.

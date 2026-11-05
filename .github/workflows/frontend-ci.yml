@@ -88,6 +88,7 @@ jobs:
           node tests/cache-revalidation-contract.cjs
           node tests/customer-account-runtime.cjs
           node tests/cart-shipping-recovery-runtime.cjs
+          node tests/order-dispatch-runtime.cjs
           node tests/auth-contract.js
           node tests/password-reset-runtime.cjs
           node tests/address-unit.js

@@ -43,7 +43,7 @@ Codex reads this file automatically before every task, so the rules below apply 
 - **n8n / GPT / MCP / any automation layer is a limited API client, never a bypass** of authentication, authorization, or the database.
 - **No secrets, tokens, or credentials in frontend code, client bundles, git history, or logs.** Ever.
 - **WhatsApp messages cost money** (Utility ≈ $0.0036/msg in Egypt, Marketing ≈ $0.0644/msg) — never over-send, never misclassify a transactional message as Marketing, and log volume so cost is visible.
-- **Approved channel policy:** WhatsApp is used only for interactive order confirmation, birthday messages, and post-delivery review requests. Routine order status events use Email, Web Push, and in-site notifications.
+- **Approved channel policy:** WhatsApp is used only for interactive order confirmation, confirmed physical dispatch, birthday messages, and post-delivery review requests. Dispatch assignment alone never sends WhatsApp. Other routine order status events use Email, Web Push, and in-site notifications.
 - Operational/technical names (buttons, statuses, field/module names) stay in English. Explanatory/admin-facing prose can be Arabic. Keep this convention consistent with the existing codebase.
 
 ## Workflow expectations

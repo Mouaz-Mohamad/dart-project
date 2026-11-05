@@ -52,7 +52,7 @@
         "Representative On The Way",
         "Delivered",
       ],
-      index = Math.max(0, states.indexOf(order.status));
+      index = Math.max(0, states.indexOf(order.status === "Ready for Dispatch" ? "Preparing" : order.status));
     const steps = card.querySelectorAll(".step");
     steps.forEach((step, i) => {
       step.classList.toggle("active", i <= index);

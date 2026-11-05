@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:39cf822b2a70005e6b3aa9b10f16abde36a2167ced2330745c538b6cebd96de5 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:e85b015c8cfce4f81068347f684543c19a5e06deab9efc2058c56cdd10df0787 */
 (function () {
   "use strict";
 
@@ -4125,7 +4125,7 @@
         "Representative On The Way",
         "Delivered",
       ],
-      index = Math.max(0, states.indexOf(order.status));
+      index = Math.max(0, states.indexOf(order.status === "Ready for Dispatch" ? "Preparing" : order.status));
     const steps = card.querySelectorAll(".step");
     steps.forEach((step, i) => {
       step.classList.toggle("active", i <= index);

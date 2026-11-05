@@ -906,6 +906,7 @@
                         <option value="New">New</option>
                         <option value="Accepted">Accepted</option>
                         <option value="Preparing">Preparing</option>
+                        <option value="Ready for Dispatch">Ready for Dispatch</option>
                         <option value="Out With Representative">Out With Representative</option>
                         <option value="Representative On The Way">Representative On The Way</option>
                         <option value="Delivered">Delivered</option>
@@ -942,7 +943,8 @@
                 <span class="bulk-selected-count" id="bulk-selected-count">0 selected</span>
                 <button type="button" data-bulk-order-status="Accepted">Accept</button>
                 <button type="button" data-bulk-order-status="Preparing">Preparing</button>
-                <button type="button" data-bulk-order-status="Out With Representative">Out With Rep</button>
+                <button type="button" data-bulk-order-status="Ready for Dispatch">Ready for Dispatch</button>
+                <button type="button" data-bulk-order-status="Out With Representative">Confirm Dispatch</button>
                 <button type="button" data-bulk-order-status="Representative On The Way">On The Way</button>
                 <button type="button" data-bulk-order-status="Delivered">Delivered</button>
                 <button type="button" data-bulk-order-status="Refused">Refused</button>
@@ -1132,11 +1134,11 @@
         </div>
 
         <div class="modal" id="rep-assignment-modal">
-          <div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Confirm Dispatch</h3>
+          <div class="modal-content dart-small-modal"><span class="close-modal">&times;</span><h3>Dispatch Assignment</h3>
             <label>Shipping Company <select id="shipping-company-select"><option value="dart">Dart Delivery</option></select></label>
             <label>Representative (Dart only) <select id="rep-assignment-select"></select></label>
             <label>Tracking Number (external only) <input type="text" id="shipping-tracking-number" class="modal-input" maxlength="80" disabled></label>
-            <button type="button" class="btn-done" id="confirm-rep-assignment">Confirm Dispatch</button>
+            <button type="button" class="btn-done" id="confirm-rep-assignment">Save Assignment</button>
           </div>
         </div>
 

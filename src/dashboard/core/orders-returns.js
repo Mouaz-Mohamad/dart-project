@@ -6,7 +6,7 @@ async function dartRollbackOrderOneStep(order) {
   if (
     !order ||
     dartIsArchived(order) ||
-    ["New", "Refused", "Cancelled", "Needs Attention"].includes(order.status)
+    ["New", "Out With Representative", "Refused", "Cancelled", "Needs Attention"].includes(order.status)
   )
     return { ok: false, message: "لا يمكن الرجوع خطوة من هذه الحالة." };
   const prevStatus = order.status,
@@ -23,6 +23,7 @@ async function dartRollbackOrderOneStep(order) {
     try {
       await window.DartOrdersApi.workflow(order.orderId || order.id, {
         expectedStatus: prevStatus,
+        expectedVersion: Number(order.version),
         target,
         reason: "Manual one-step rollback",
       });
@@ -82,8 +83,9 @@ async function dartRollbackOrderOneStep(order) {
   }
   if (prevStatus === "Representative On The Way")
     order.representativeOnWayAt = null;
-  if (prevStatus === "Out With Representative") {
-    order.outWithRepresentativeAt = null;
+  if (prevStatus === "Ready for Dispatch") {
+    order.readyForDispatchAt = null;
+    order.pendingDispatch = null;
     order.representativeId = null;
     order.representativeName = "";
     order.deliveryGroupId = "";
@@ -155,6 +157,7 @@ function renderOrders(dataArray) {
       riskMeta =
         `<small class="dart-kpi-inline" title="${dartEsc(refusalSummary || "No refusal history")}">Order risk ${dartEsc(riskLevel)} (${Number(o.riskScore) || 0}) · Customer ${dartEsc(customerRiskLevel)} · Verification ${dartEsc(verificationStatus)} · Refusals ${Number(o.refusalsInWindow) || 0}</small>`,
       rep =
+        o.pendingDispatch?.representativeName || o.pendingDispatch?.companyName || o.deliveryShipment?.companyName ||
         o.representativeName ||
         dartFindRepById(o.representativeId)?.name ||
         "-",
@@ -164,7 +167,7 @@ function renderOrders(dataArray) {
           .join("") || "-";
     const nextBtn =
         next && dartCanTransition(o, next)
-          ? `<button class="dart-status-btn" data-order-target="${dartEsc(next)}">${dartEsc(next)}</button>`
+          ? `<button class="dart-status-btn" data-order-target="${dartEsc(next)}">${dartEsc(next === "Out With Representative" ? "Confirm Dispatch" : next)}</button>`
           : next === "Preparing" && codBlocked
             ? '<button class="dart-status-btn" disabled title="COD verification required">Verify first</button>'
             : "",
@@ -176,7 +179,7 @@ function renderOrders(dataArray) {
           : "",
       back =
         dartPreviousStatus(o.status) &&
-        !["Refused", "Cancelled", "Needs Attention"].includes(o.status)
+        !["Out With Representative", "Refused", "Cancelled", "Needs Attention"].includes(o.status)
           ? '<button class="dart-back-btn" title="Back one step"><i class="bx bx-undo"></i></button>'
           : "",
       refuse = [
@@ -185,12 +188,12 @@ function renderOrders(dataArray) {
       ].includes(o.status)
         ? '<button class="dart-refuse-btn" data-order-target="Refused">Refuse</button>'
         : "",
-      cancel = !DART_FINAL_ORDER_STATES.includes(o.status)
+      cancel = dartCanTransition(o, "Cancelled")
         ? '<button class="dart-cancel-btn" data-order-target="Cancelled">Cancel</button>'
         : "",
       pickup =
-        o.status === "Out With Representative"
-          ? '<button class="dart-pickup-cancel-btn">Cancel Pickup</button>'
+        o.status === "Ready for Dispatch"
+          ? '<button class="dart-status-btn" data-order-target="Ready for Dispatch">Change Assignment</button>'
           : "";
     c.insertAdjacentHTML(
       "beforeend",

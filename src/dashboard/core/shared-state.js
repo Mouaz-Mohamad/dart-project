@@ -8,6 +8,7 @@ const DART_ORDER_FLOW = [
   "New",
   "Accepted",
   "Preparing",
+  "Ready for Dispatch",
   "Out With Representative",
   "Representative On The Way",
   "Delivered",

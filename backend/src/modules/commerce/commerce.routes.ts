@@ -63,6 +63,7 @@ const orderWorkflowTargetSchema = z.enum([
   "New",
   "Accepted",
   "Preparing",
+  "Ready for Dispatch",
   "Out With Representative",
   "Representative On The Way",
   "Delivered",
@@ -72,6 +73,7 @@ const orderWorkflowTargetSchema = z.enum([
 
 const orderWorkflowInputSchema = z.object({
   expectedStatus: z.string().trim().min(1).max(80),
+  expectedVersion: z.number().int().positive().optional(),
   target: orderWorkflowTargetSchema,
   representativeId: z.string().trim().max(160).optional(),
   shippingCompanyId: z.string().trim().max(64).optional(),
@@ -84,6 +86,7 @@ const orderWorkflowInputSchema = z.object({
 
 const bulkOrderWorkflowInputSchema = orderWorkflowInputSchema.extend({
   orderRefs: z.array(z.string().trim().min(1).max(160)).min(1).max(100),
+  expectedVersions: z.record(z.string().min(1).max(160), z.number().int().positive()).optional(),
   expectedStatus: z.string().trim().min(1).max(80),
 }).superRefine((value, context) => {
   if (new Set(value.orderRefs).size !== value.orderRefs.length) {

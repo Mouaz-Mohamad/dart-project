@@ -50,13 +50,14 @@ import {
 } from "./commerce.operations-queries.js";
 import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-queries.js";
 import { returnMatchesSale } from "./commerce.returns.js";
-import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
+import { queueOrderConfirmation, queueOrderDispatch, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage } from "./shipping.coverage.js";
 import { checkoutEligibleCompanies, checkoutShippingRegions, isInsideEgyptEnvelope, type CheckoutShippingCompany } from "./shipping.checkout.js";
 import { matchesDeliveryGovernorate } from "./shipping.geography.js";
 import { DART_CARRIER, dispatchShipment, validTrackingPortal,
   type ShippingCompany, type DispatchedShipment } from "./shipping.core.js";
+import { validateDispatchAssignment, type DispatchAssignment } from "./commerce.dispatch.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
 
 // Keep imports used by existing routers, Set workflows and tests compatible.
@@ -4992,6 +4993,10 @@ export class CommerceService {
         throw new AppError(409, "ORDER_VERSION_CONFLICT", "The order changed after this form was opened; refresh it before saving");
       }
 
+      if (existing.status === "Ready for Dispatch") {
+        throw new AppError(409, "DISPATCH_PLAN_LOCKED", "Return to Preparing before editing order details; use Change Assignment for the courier");
+      }
+
       const itemCodes = [...new Set(
         input.itemCodes.map((code) => String(code || "").trim()).filter(Boolean),
       )];
@@ -5244,10 +5249,12 @@ export class CommerceService {
     orderRef: string,
     input: {
       expectedStatus: string;
+      expectedVersion?: number | undefined;
       target:
         | "New"
         | "Accepted"
         | "Preparing"
+        | "Ready for Dispatch"
         | "Out With Representative"
         | "Representative On The Way"
         | "Delivered"
@@ -5271,6 +5278,7 @@ export class CommerceService {
       "New",
       "Accepted",
       "Preparing",
+      "Ready for Dispatch",
       "Out With Representative",
       "Representative On The Way",
       "Delivered",
@@ -5293,12 +5301,13 @@ export class CommerceService {
         representative_user_id: string | null;
         customer_user_id: string | null;
         final_minor: string;
+        version: string;
         cod_verification_status: CodVerificationStatus;
         legacy: Record<string, unknown> | null;
       }>(
         `SELECT id::text, order_code, status, promotion, is_archived, is_deleted,
                 payment_method, representative_user_id::text, customer_user_id::text,
-                final_minor::text, cod_verification_status, legacy
+                final_minor::text, version::text, cod_verification_status, legacy
            FROM orders
           WHERE id::text=$1::text OR order_code=$1::text
           LIMIT 1
@@ -5315,6 +5324,12 @@ export class CommerceService {
 
       const previousStatus = String(order.status || "");
       const target = input.target;
+      if (input.expectedVersion !== undefined && input.expectedVersion !== Number(order.version)) {
+        throw new AppError(409, "ORDER_STATE_STALE", "Order assignment changed; refresh before confirming dispatch");
+      }
+      if (previousStatus === "Ready for Dispatch" && (target === "Out With Representative" || target === "Ready for Dispatch") && input.expectedVersion === undefined) {
+        throw new AppError(422, "ORDER_VERSION_REQUIRED", "Confirm the current order version before changing its dispatch assignment");
+      }
       if (previousStatus !== input.expectedStatus) {
         throw new AppError(
           409,
@@ -5322,7 +5337,8 @@ export class CommerceService {
           `Order state changed from ${input.expectedStatus} to ${previousStatus}; refresh and retry`,
         );
       }
-      if (previousStatus === target) {
+      const reassigning = previousStatus === "Ready for Dispatch" && target === previousStatus;
+      if (previousStatus === target && !reassigning) {
         const version = await client.query<{ version: string }>(
           "SELECT version::text FROM domain_state_versions WHERE domain='orders'",
         );
@@ -5349,6 +5365,11 @@ export class CommerceService {
       }
       const isForward = previousIndex >= 0 && targetIndex === previousIndex + 1 &&
         !(external && target==="Representative On The Way");
+      // Once handed over, moving back into preparation would erase a physical event.
+      if (["Out With Representative", "Representative On The Way"].includes(previousStatus) &&
+          ["Preparing", "Ready for Dispatch", "Cancelled"].includes(target)) {
+        throw new AppError(409, "DISPATCH_ALREADY_CONFIRMED", "Record a delivery exception or parcel return after handover");
+      }
       const isBack = previousIndex > 0 && targetIndex === previousIndex - 1;
       const isCancelled =
         target === "Cancelled" &&
@@ -5356,7 +5377,7 @@ export class CommerceService {
       const isRefused =
         target === "Refused" &&
         ["Out With Representative", "Representative On The Way"].includes(previousStatus);
-      if (!isForward && !isBack && !isCancelled && !isRefused && !externalDelivered) {
+      if (!isForward && !isBack && !isCancelled && !isRefused && !externalDelivered && !reassigning) {
         throw new AppError(
           409,
           "ORDER_STATE_INVALID",
@@ -5380,7 +5401,7 @@ export class CommerceService {
       }
 
       if (
-        target === "Preparing" &&
+        ((target === "Preparing" && !isBack) || (target === "Out With Representative" && previousStatus === "Ready for Dispatch")) &&
         String(order.payment_method || "").toLowerCase().includes("cash")
       ) {
         const risk = await this.refreshCodRiskForOrder(
@@ -5393,7 +5414,7 @@ export class CommerceService {
             actorType: "staff",
             actorId,
             requestId,
-            reason: "PREPARING_GATE_RECHECK",
+            reason: target === "Preparing" ? "PREPARING_GATE_RECHECK" : "DISPATCH_GATE_RECHECK",
           },
         );
         if (!["Not Required", "Verified"].includes(risk.verificationStatus)) {
@@ -5425,7 +5446,7 @@ export class CommerceService {
           throw new AppError(
             409,
             "COD_VERIFICATION_REQUIRED",
-            "COD verification must be completed before Preparing",
+            "COD verification must be completed before preparing or confirming dispatch",
             {
               riskLevel: risk.riskLevel,
               riskScore: risk.riskScore,
@@ -5437,43 +5458,32 @@ export class CommerceService {
       }
 
       let representativeUserId = order.representative_user_id;
-      let dispatchedShipment:DispatchedShipment|null=null;
-      if (target === "Out With Representative" && previousStatus === "Preparing") {
-        const companyId=String(input.shippingCompanyId||"dart").trim();
-        if(companyId!=="dart"){
-          const settings=await client.query<{data:Record<string,unknown>}>(
-            "SELECT data FROM site_settings WHERE id='main'");
-          const companies=Array.isArray(settings.rows[0]?.data?.shippingCompanies)
-             ?settings.rows[0].data.shippingCompanies as ShippingCompany[]:[];
-          const destination=await client.query<{governorate:string;city:string;area:string}>(
-            `SELECT COALESCE(delivery_address->>'governorate','') AS governorate,
-               COALESCE(delivery_address->>'city','') AS city,
-               COALESCE(delivery_address->>'coverageArea',delivery_address->>'area','') AS area FROM orders WHERE id=$1`,[order.id]);
-          try{dispatchedShipment=dispatchShipment([DART_CARRIER,...companies],{
-             companyId,trackingNumber:input.trackingNumber,governorate:destination.rows[0]?.governorate||"",
-             coverageConfirmed:input.coverageConfirmed,
-             city:destination.rows[0]?.city||"",area:destination.rows[0]?.area||"",
-             now:new Date().toISOString(),
-          });}
-          catch(error){throw new AppError(422,"EXTERNAL_DISPATCH_INVALID",
-            error instanceof Error?error.message:"Invalid shipping details");}
-          representativeUserId=null;
-        }else{
-          const representativeRef=String(input.representativeId||"").trim();
-          if(!representativeRef)throw new AppError(422,"REPRESENTATIVE_REQUIRED","Choose a representative before sending the order out");
-          const representativeResult=await client.query<{user_id:string}>(
-            `SELECT r.user_id::text FROM representatives r JOIN users u ON u.id=r.user_id
-             WHERE (r.user_id::text=$1::text OR r.representative_code=$1::text)
-             AND r.approval_status='approved' AND u.status='active' LIMIT 1`,[representativeRef]);
-          representativeUserId=representativeResult.rows[0]?.user_id||null;
-          if(!representativeUserId)throw new AppError(409,"REPRESENTATIVE_UNAVAILABLE","Choose an active representative");
-        }
+      let dispatchedShipment: DispatchedShipment | null = null;
+      let pendingDispatch = order.legacy?.pendingDispatch as DispatchAssignment | null | undefined;
+      if (target === "Ready for Dispatch" && (previousStatus === "Preparing" || reassigning)) {
+        const validated = await validateDispatchAssignment(client, order.id, input);
+        pendingDispatch = validated.assignment;
+        representativeUserId = null; // planned assignment is invisible to courier work/tracking
       }
-      if (
-        target === "Preparing" &&
-        previousStatus === "Out With Representative"
-      ) {
+      if (target === "Out With Representative" && previousStatus === "Ready for Dispatch") {
+        if (!pendingDispatch) throw new AppError(409, "DISPATCH_ASSIGNMENT_REQUIRED", "Prepare a dispatch assignment first");
+        if (input.representativeId || input.shippingCompanyId || input.trackingNumber || input.deliveryGroupId || input.coverageConfirmed !== undefined) {
+          throw new AppError(422, "DISPATCH_ASSIGNMENT_CHANGED", "Save assignment changes before confirming dispatch");
+        }
+        const validated = await validateDispatchAssignment(client, order.id, {
+          shippingCompanyId: pendingDispatch.companyId,
+          representativeId: pendingDispatch.representativeId || undefined,
+          trackingNumber: pendingDispatch.trackingNumber || undefined,
+          coverageConfirmed: pendingDispatch.coverageConfirmed,
+          deliveryGroupId: pendingDispatch.deliveryGroupId,
+        });
+        dispatchedShipment = validated.shipment;
+        representativeUserId = validated.assignment.representativeId;
+        pendingDispatch = validated.assignment;
+      }
+      if (previousStatus === "Ready for Dispatch" && ["Preparing", "Cancelled"].includes(target)) {
         representativeUserId = null;
+        pendingDispatch = null;
       }
 
       const now = new Date().toISOString();
@@ -5481,10 +5491,15 @@ export class CommerceService {
         ...(order.legacy && typeof order.legacy === "object" ? order.legacy : {}),
         ...(target === "Accepted" ? { acceptedAt: now } : {}),
         ...(target === "Preparing" ? { preparingAt: now } : {}),
-        ...(target === "Out With Representative"
+        ...(target === "Ready for Dispatch" ? { readyForDispatchAt: now, pendingDispatch, deliveryShipment: null } : {}),
+        ...(previousStatus === "Ready for Dispatch" && ["Preparing", "Cancelled"].includes(target)
+          ? { readyForDispatchAt: null, pendingDispatch: null, deliveryGroupId: "" } : {}),
+        ...(target === "Out With Representative" && previousStatus === "Ready for Dispatch"
           ? {
               outWithRepresentativeAt: now,
-              deliveryGroupId: dispatchedShipment ? "" : String(input.deliveryGroupId || ""),
+              dispatchConfirmedAt: now,
+              pendingDispatch: null,
+              deliveryGroupId: dispatchedShipment ? "" : String(pendingDispatch?.deliveryGroupId || ""),
               deliveryShipment: dispatchedShipment,
             }
           : {}),
@@ -5569,6 +5584,10 @@ export class CommerceService {
         actorId,
       );
 
+      if (previousStatus === "Ready for Dispatch" && target === "Out With Representative") {
+        await queueOrderDispatch(client, order.id);
+      }
+
       if (target === "Refused" && order.customer_user_id) {
         await this.refreshCodRiskForOrder(
           client,
@@ -5607,10 +5626,13 @@ export class CommerceService {
           actorId,
           order.id,
           requestId,
-          JSON.stringify({ status: previousStatus }),
+          JSON.stringify({ status: previousStatus, representativeId: order.representative_user_id,
+            pendingDispatch: order.legacy?.pendingDispatch, dispatchConfirmedAt: order.legacy?.dispatchConfirmedAt }),
           JSON.stringify({
             status: target,
             representativeId: representativeUserId,
+            pendingDispatch: legacy.pendingDispatch,
+            dispatchConfirmedAt: legacy.dispatchConfirmedAt,
           }),
           JSON.stringify({
             orderCode: order.order_code,
@@ -5644,11 +5666,13 @@ export class CommerceService {
     actorId: string,
     input: {
       orderRefs: string[];
+      expectedVersions?: Record<string, number> | undefined;
       expectedStatus: string;
       target:
         | "New"
         | "Accepted"
         | "Preparing"
+        | "Ready for Dispatch"
         | "Out With Representative"
         | "Representative On The Way"
         | "Delivered"
@@ -5673,7 +5697,7 @@ export class CommerceService {
     const failed: Array<{ orderRef: string; code: string; message: string }> = [];
     const deliveryGroupByOrderRef = new Map<string, string>();
 
-    if (input.target === "Out With Representative") {
+    if (input.target === "Ready for Dispatch") {
       const orderRows = await this.pool.query<{
         id: string;
         order_code: string;
@@ -5708,6 +5732,7 @@ export class CommerceService {
           orderRef,
           {
             expectedStatus: input.expectedStatus,
+            expectedVersion: input.expectedVersions?.[orderRef],
             target: input.target,
             representativeId: input.representativeId,
             deliveryGroupId: deliveryGroupByOrderRef.get(orderRef),
@@ -6585,7 +6610,7 @@ export class CommerceService {
         );
       }
     } else if (
-      ["New","Accepted","Preparing","Out With Representative","Representative On The Way","Needs Attention"].includes(nextStatus)
+      ["New","Accepted","Preparing","Ready for Dispatch","Out With Representative","Representative On The Way","Needs Attention"].includes(nextStatus)
     ) {
       const updated = await client.query(
         `UPDATE inventory_items i

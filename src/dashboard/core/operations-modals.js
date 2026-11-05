@@ -16,7 +16,10 @@ async function dartRequestOrderTransition(orders, target) {
     window.DartDialog.alert("حدد أوردرات من نفس الحالة الحالية.");
     return;
   }
-  if (target === "Out With Representative") {
+  if (target === "Out With Representative" && !await window.DartDialog.confirm(
+    `تأكيد تسليم ${orders.length} أوردر فعليًا للمندوب أو شركة الشحن؟ بعد التأكيد يظهر للعميل أن الأوردر خرج للتوصيل.`
+  )) return;
+  if (target === "Ready for Dispatch") {
     dartPendingOrderAction = { orders, target };
     try { await window.DartShipping.loadCompanies(); }
     catch (error) { window.DartDialog.alert(error.message || "Shipping partners could not be loaded");return; }
@@ -33,7 +36,10 @@ async function dartRequestOrderTransition(orders, target) {
     for (const company of window.DartShipping.companies().filter(row=>row.active)) {
       const opt=document.createElement("option");opt.value=company.id;opt.textContent=company.name;companySelect.append(opt);
     }
-    companySelect.value="dart";tracking.value="";
+    const planned = orders.length === 1 ? orders[0].pendingDispatch : null;
+    companySelect.value=planned?.companyId || "dart";
+    tracking.value=planned?.trackingNumber || "";
+    if (planned?.representativeId) sel.value=planned.representativeId;
     const toggle=()=>{const dart=companySelect.value==="dart";sel.disabled=!dart;tracking.disabled=dart;tracking.required=!dart;};
     companySelect.onchange=toggle;toggle();
     openModal(document.getElementById("rep-assignment-modal"));
