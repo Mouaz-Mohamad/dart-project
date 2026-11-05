@@ -18,3 +18,100 @@
 #shipping-coverage-warning:not(:empty){color:#aa2e35;font-weight:700}
 @media(max-width:620px){.dart-coverage-list{max-height:320px}.dart-coverage-fieldset{padding:9px}}
 .dart-blocked-governorates{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0}.dart-blocked-governorates label{display:flex;align-items:center;gap:6px}.dart-blocked-governorates input{width:auto}
+
+/* DART SHIPPING / primary dashboard section > four internal tabs */
+#shipping.dart-shipping-section{padding:18px;min-width:0;color:#2c2429}
+#shipping .dart-shipping-header{margin-bottom:20px}
+#shipping .dart-shipping-header h2{margin:0 0 5px;font-size:clamp(22px,2vw,29px);color:#3d1927}
+#shipping .dart-shipping-header p{margin:0;color:#706670;font-size:13px}
+#shipping .dart-shipping-tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 18px;padding:6px;border:1px solid #e8dce1;border-radius:14px;background:#fff}
+#shipping .dart-shipping-tab{display:inline-flex;align-items:center;justify-content:center;gap:9px;flex:1 1 165px;min-height:46px;padding:10px 15px;border:1px solid transparent;border-radius:10px;background:transparent;color:#59464e;font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s}
+#shipping .dart-shipping-tab:hover{background:#f8eff2}
+#shipping .dart-shipping-tab[aria-selected="true"]{background:#ab012b;color:#fff;box-shadow:0 3px 10px #ab012b22}
+#shipping .dart-shipping-panel{min-width:0;animation:dart-shipping-enter .18s ease-out}
+@keyframes dart-shipping-enter{from{opacity:.7;transform:translateY(4px)}to{opacity:1;transform:none}}
+#shipping .dart-shipping-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+#shipping .dart-shipping-stat{padding:17px 20px;background:#fff;border:1px solid #e7dde1;border-radius:13px;display:flex;flex-direction:column;gap:5px}
+#shipping .dart-shipping-stat small{font-size:12px;font-weight:600;color:#71646c}
+#shipping .dart-shipping-stat strong{font-size:27px;line-height:1.3;color:#411a2b}
+#shipping .dart-shipping-stat.is-positive strong{color:#236b45}
+#shipping .dart-shipping-stat.is-muted strong{color:#985060}
+#shipping .dart-shipping-card{padding:18px;background:#fff;border:1px solid #e6dce0;border-radius:14px;min-width:0}
+#shipping .dart-shipping-card+.dart-shipping-card{margin-top:14px}
+#shipping .dart-shipping-card-head{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+#shipping .dart-shipping-card-head h3{margin:0;color:#401b2b;font-size:17px}
+#shipping .dart-shipping-card-head p{font-size:12px;color:#70636c;margin:4px 0 0}
+#shipping .dart-shipping-toolbar{display:flex;align-items:flex-end;gap:9px;flex-wrap:wrap;margin:0 0 14px}
+#shipping .dart-shipping-toolbar label{display:flex;flex:1 1 145px;min-width:135px;gap:5px;flex-direction:column;font-size:11px;font-weight:700;color:#655660}
+#shipping .dart-shipping-toolbar label:first-child{flex:2 1 230px}
+#shipping .dart-shipping-toolbar select,#shipping .dart-shipping-toolbar input{width:100%;border:1px solid #d8cbd0;border-radius:9px;padding:9px 10px;min-height:43px;font:inherit;font-size:12px}
+#shipping .dart-shipping-primary{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:10px 16px;min-height:43px;border:1px solid #ab012b;border-radius:9px;background:#ab012b;color:#fff;font:inherit;font-weight:750;font-size:13px;cursor:pointer}
+#shipping .dart-shipping-primary:hover{background:#8e0023}
+#shipping .dart-shipping-secondary{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:37px;padding:8px 11px;border:1px solid #d3bfc7;border-radius:8px;background:#fff;color:#76213d;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+#shipping .dart-shipping-secondary:hover{background:#f9f0f3}
+#shipping .dart-shipping-count{color:#786b71;font-size:12px;margin:0 0 10px}
+#shipping .dart-shipping-table-scroll{width:100%;overflow-x:auto;border:1px solid #eadfe3;border-radius:11px}
+#shipping .dart-shipping-table{min-width:650px}
+#shipping .dart-shipping-company-head,#shipping .dart-shipping-company-row{display:grid;grid-template-columns:minmax(160px,2fr) minmax(90px,1fr) minmax(100px,1fr) minmax(110px,1fr) minmax(105px,auto);gap:12px;align-items:center;padding:13px 15px}
+#shipping .dart-shipping-company-head{background:#f7f1f3;color:#685b62;font-size:12px;font-weight:800;border-bottom:1px solid #e9dfe3}
+#shipping .dart-shipping-company-row{background:#fff;font-size:12px;border-bottom:1px solid #eee6e9;min-height:64px}
+#shipping .dart-shipping-company-row:last-child{border-bottom:0}
+#shipping .dart-shipping-company-row:hover{background:#fcf8f9}
+#shipping .dart-shipping-company-title{display:flex;flex-direction:column;min-width:0;gap:3px}
+#shipping .dart-shipping-company-title strong{font-size:13px;color:#3f2933;overflow-wrap:anywhere}
+#shipping .dart-shipping-company-title small{color:#887a82;font-size:10px;overflow-wrap:anywhere}
+#shipping .dart-shipping-badge{display:inline-block;padding:5px 9px;border-radius:100px;background:#f2ecef;color:#604e58;font-size:11px;font-weight:800;white-space:nowrap}
+#shipping .dart-shipping-badge.is-active,#shipping .dart-shipping-badge.is-enabled{background:#e4f5eb;color:#226a43}
+#shipping .dart-shipping-badge.is-inactive{background:#fce9e9;color:#a43b3b}
+#shipping .dart-shipping-badge.is-disabled{background:#f2eff1;color:#746671}
+#shipping .dart-shipping-empty{margin:14px 0;padding:22px;text-align:center;border:1px dashed #d6c6cd;border-radius:9px;background:#fdfafb;color:#756871;font-size:13px}
+#shipping .dart-shipping-coverage-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:12px}
+#shipping .dart-shipping-coverage-card{display:flex;flex-direction:column;align-items:flex-start;gap:10px;border:1px solid #e4d9df;border-radius:11px;background:#fff;padding:15px;min-width:0}
+#shipping .dart-shipping-coverage-card .dart-shipping-coverage-head{display:flex;align-items:center;justify-content:space-between;gap:9px;width:100%;flex-wrap:wrap}
+#shipping .dart-shipping-coverage-head strong{font-size:14px;overflow-wrap:anywhere}
+#shipping .dart-shipping-coverage-summary{font-size:12px;margin:0;color:#67545e;line-height:1.7;overflow-wrap:anywhere}
+#shipping .dart-shipping-coverage-card small{color:#796c76;font-size:11px}
+#shipping .dart-shipping-coverage-card button{margin-top:auto}
+#shipping #shipping-orders-list{display:grid;gap:10px}
+#shipping #shipping-orders-list .dart-shipping-row{margin:0;display:flex;align-items:center;gap:9px;border-color:#e7dce1;background:#fdfbfc;padding:13px}
+#shipping #shipping-orders-list .dart-shipping-row>div{flex:1 1 220px;overflow-wrap:anywhere;font-weight:650;font-size:12px}
+#shipping #shipping-orders-list .dart-shipping-row button{padding:8px 10px;border:1px solid #d6c3cb;color:#76213d;border-radius:8px;background:#fff;font-size:11px;cursor:pointer}
+#shipping #shipping-policy-form{display:grid;gap:12px;max-width:100%}
+#shipping #shipping-policy-form h3{margin:0;font-size:16px}
+#shipping #shipping-policy-form p{margin:0;font-size:12px;line-height:1.7}
+#shipping #shipping-policy-form .btn-done{justify-self:start;min-height:42px}
+#shipping .dart-shipping-note{padding:11px 13px;background:#f8eff2;border:1px solid #e6d6dd;border-radius:9px;color:#6e4555;font-size:12px;line-height:1.7;margin:0 0 14px}
+
+/* Drawer contains the original, server-connected company editor form. */
+.dart-shipping-editor-open{overflow:hidden}
+.dart-shipping-overlay[hidden]{display:none!important}
+.dart-shipping-overlay{position:fixed;inset:0;z-index:18000;background:#1f121bb3;display:flex;align-items:stretch;justify-content:flex-end}
+.dart-shipping-editor{width:min(670px,100vw);height:100%;overflow:auto;overscroll-behavior:contain;padding:22px clamp(15px,3vw,30px) 30px;background:#fffcfd;color:#2f2630;box-shadow:-10px 0 34px #0003;display:flex;flex-direction:column;gap:16px}
+.dart-shipping-editor-head{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e5d7de;padding-bottom:14px}
+.dart-shipping-editor-head h3{margin:0;color:#441c2c;font-size:21px}
+.dart-shipping-editor-head p{margin:4px 0 0;font-size:12px;color:#70636c}
+.dart-shipping-editor-head button{width:40px;height:40px;border:1px solid #d9c6ce;border-radius:9px;background:#fff;color:#662039;cursor:pointer}
+.dart-shipping-editor #shipping-company-form{display:grid;gap:14px;min-width:0}
+.dart-shipping-editor #shipping-company-form>label{display:grid;gap:6px;font-size:12px;font-weight:700}
+.dart-shipping-editor #shipping-company-form>label input:not([type=checkbox]){padding:10px;min-height:44px;border:1px solid #cfc1c9;border-radius:9px;width:100%}
+.dart-shipping-editor .dart-shipping-form-group{display:grid;gap:12px;border:1px solid #e9dce1;border-radius:11px;padding:16px;background:#fff}
+.dart-shipping-editor .dart-shipping-form-group h4{margin:0;color:#63213b;font-size:14px}
+.dart-shipping-editor .dart-shipping-form-group>label{font-size:12px;line-height:1.7;display:flex;align-items:flex-start;gap:9px}
+.dart-shipping-editor .dart-shipping-form-group>label input{margin-top:4px;accent-color:#ab012b}
+.dart-shipping-editor .dart-shipping-form-group small{font-size:11px;color:#73656c;line-height:1.7}
+.dart-shipping-editor .dart-shipping-form-actions{display:flex;gap:10px;flex-wrap:wrap;position:sticky;bottom:-30px;padding:14px 0;background:#fffcfd;border-top:1px solid #e7dce1}
+.dart-shipping-editor .dart-coverage-fieldset{margin:0;border:1px solid #eadce2;background:#fff}
+@media(max-width:760px){
+#shipping.dart-shipping-section{padding:12px}
+#shipping .dart-shipping-tabs{gap:6px}
+#shipping .dart-shipping-tab{flex:1 1 calc(50% - 8px);font-size:12px;min-height:42px;padding:8px 9px}
+#shipping .dart-shipping-stat-grid{gap:7px}
+#shipping .dart-shipping-stat{padding:12px;gap:3px}
+#shipping .dart-shipping-stat strong{font-size:21px}
+#shipping .dart-shipping-stat small{font-size:10px}
+#shipping .dart-shipping-card{padding:12px}
+#shipping .dart-shipping-toolbar label{flex:1 1 calc(50% - 7px);min-width:0}
+#shipping .dart-shipping-toolbar label:first-child{flex:1 1 100%}
+.dart-shipping-editor{width:100vw;padding:16px 13px 25px}
+}
+@media(prefers-reduced-motion:reduce){#shipping .dart-shipping-panel{animation:none}#shipping .dart-shipping-tab{transition:none}}
