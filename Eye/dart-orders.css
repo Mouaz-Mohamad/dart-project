@@ -525,3 +525,35 @@
   #orders .dart-compact-record,
   #orders .dart-orders-bulk-chevron{transition:none}
 }
+
+/* The legacy mobile dashboard has !important rules for all KPI cards.
+   Override only Orders so its amounts remain readable on phones. */
+@media(max-width:768px){
+  #orders .cont-card-info{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+    padding:0 !important;
+  }
+  #orders .cont-card-info .card-inf{
+    padding:12px !important;
+    text-align:left !important;
+    border-radius:12px !important;
+  }
+  #orders .cont-card-info .card-inf .span-img{
+    flex-direction:row !important;
+    gap:8px !important;
+    font-size:20px !important;
+  }
+  #orders .cont-card-info .card-inf .numebr{
+    font-size:19px !important;
+    overflow:visible !important;
+    white-space:normal !important;
+  }
+  #orders .cont-card-info .card-inf h5{
+    white-space:normal !important;
+    text-overflow:clip !important;
+  }
+}
+@media(max-width:390px){
+  #orders .cont-card-info .card-inf .numebr{font-size:16px !important}
+}
