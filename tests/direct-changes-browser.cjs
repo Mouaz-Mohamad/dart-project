@@ -55,9 +55,21 @@ const server = http.createServer((req, res) => {
     assert.equal(opened, 3, "an older/disabled API never opens an incompatible event source");
     await fallback.close(); supported = true; limited = true;
     const saturated = await browser.newPage(), capacityErrors = [];
+    await saturated.addInitScript(() => {
+      const NativeSource = window.EventSource;
+      window.EventSource = class extends NativeSource {
+        constructor(...args) {
+          super(...args);
+          this.addEventListener('unavailable', () => { window.capacityUnavailable = true; });
+        }
+      };
+    });
     saturated.on('console', message => { if (message.type() === 'error') capacityErrors.push(message.text()); });
     const capacityResponse = saturated.waitForResponse(response => response.url().endsWith('/api/v1/catalog/changes'));
-    await saturated.goto(origin); await (await capacityResponse).finished();
+    await saturated.goto(origin); await capacityResponse;
+    // An EventSource response is a stream: loadingFinished is not portable
+    // across Chromium versions. Wait for the actual protocol event instead.
+    await saturated.waitForFunction(() => window.capacityUnavailable === true);
     await saturated.waitForTimeout(1100);
     assert.equal(await saturated.evaluate(() => window.DartChanges.active), false);
     assert.equal(opened, 4, "a saturated stream uses the minute cooldown rather than immediate EventSource retries");
