@@ -186,7 +186,7 @@ const server = http.createServer(async (request, response) => {
       return json(response, 200, { version: 1 });
     }
 
-    if (pathname === "/api/v1/me") {
+    if (pathname === "/api/v1/me" || pathname === "/api/v1/admin/auth/me") {
       return json(response, 200, {
         user: { accountType: "staff", name: "CI Owner" },
         session: { mfaRequired: false, mfaSatisfied: true },
@@ -258,7 +258,7 @@ const server = http.createServer(async (request, response) => {
 (async () => {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE || chromium.executablePath(), args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 
   const products = await context.newPage();
@@ -281,6 +281,7 @@ const server = http.createServer(async (request, response) => {
 
   const dashboard = await context.newPage();
   await dashboard.goto(`${origin}/Eye/Dart%20Eye.html`, { waitUntil: "domcontentloaded" });
+  await dashboard.waitForFunction(() => window.DartAdminHydration?.ready === true);
   await dashboard.evaluate(() => {
     document.body.classList.remove("dart-admin-locked");
     const gate = document.getElementById("dart-admin-auth");
@@ -447,10 +448,12 @@ const server = http.createServer(async (request, response) => {
     modelsData.push({...modelsData[0],id:'related-2',modelId:'RELATED-2',name:'Related 2'}, {...modelsData[0],id:'related-3',modelId:'RELATED-3',name:'Related 3'});
     window.DartInventory.openEditor('model-regression','models');
   });
-  assert.equal(await dashboard.locator('#modal-related-models option[value="DT-TEST-1"]').count(),0);
-  await dashboard.locator('#modal-related-models').selectOption(['RELATED-2','RELATED-3']);
+  assert.equal(await dashboard.locator('#modal-related-models [data-related-model="DT-TEST-1"]').count(),0);
+  await dashboard.locator('#modal-related-models [data-related-model="RELATED-2"]').click();
+  await dashboard.locator('#modal-related-models [data-related-model="RELATED-3"]').click();
+  assert.equal(await dashboard.locator('#modal-related-models [aria-pressed="true"]').count(),2);
   await dashboard.locator('#modal-related-order [data-related-index="1"][data-related-move="-1"]').click();
-  assert.deepEqual(await dashboard.locator('#modal-related-order span').allTextContents(),['RELATED-3','RELATED-2']);
+  assert.deepEqual(await dashboard.locator('#modal-related-order .dart-related-selected-name').allTextContents(),['Related 3 · RELATED-3','Related 2 · RELATED-2']);
 
   await about.close();
   await dashboard.close();
