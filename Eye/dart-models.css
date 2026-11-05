@@ -493,3 +493,132 @@
 @media(prefers-reduced-motion:reduce){
   #models #models-container>.dart-compact-record{transition:none}
 }
+
+
+/* Model editor / visual related-model multi-picker.
+   Each model is one selectable card; saved IDs and display order are unchanged. */
+#model-modal .dart-related-models-field{min-width:0;max-width:100%;margin:3px 0 15px}
+#model-modal .dart-related-models-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+}
+#model-modal .dart-related-models-heading label{margin:0}
+#model-modal #modal-related-count{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:28px;padding:5px 10px;
+  border-radius:99px;border:1px solid #e7d2dc;background:#f9ecf1;
+  color:#7e2948;font-size:11px;font-weight:800;
+}
+#model-modal .dart-related-models-intro{
+  margin:7px 0 11px;color:#776773;font-size:11px;line-height:1.65;
+}
+#model-modal #modal-related-search{
+  display:block;width:100%;min-height:43px;margin:0 0 11px;
+  padding:10px 13px;border:1px solid #d6c2cc;border-radius:9px;
+  outline-offset:2px;background:#fff;color:#40313a;font-size:12px;
+}
+#model-modal #modal-related-search:focus-visible{outline:2px solid #ab012b}
+#model-modal .dart-related-models-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;min-width:0;max-height:340px;overflow:auto;overscroll-behavior:contain;
+  padding:3px 4px 7px 2px;
+}
+#model-modal .dart-related-card{
+  position:relative;display:flex;align-items:center;gap:10px;
+  text-align:left;min-width:0;min-height:89px;width:100%;
+  padding:9px 31px 9px 9px;cursor:pointer;
+  border:1px solid #e6dae1;border-radius:11px;background:#fff;color:#3c2b35;
+  font:inherit;box-shadow:0 1px 5px #401c2a06;
+  transition:border-color .16s ease,background .16s ease,box-shadow .16s ease;
+}
+#model-modal .dart-related-card[hidden]{display:none!important}
+#model-modal .dart-related-card:hover{
+  border-color:#c99cac;background:#fff9fb;box-shadow:0 3px 13px #521c3410;
+}
+#model-modal .dart-related-card:focus-visible{
+  outline:2px solid #ab012b;outline-offset:2px;
+}
+#model-modal .dart-related-card[aria-pressed="true"]{
+  border:2px solid #ab012b;padding:8px 30px 8px 8px;
+  background:#fff1f5;box-shadow:0 3px 13px #ab012b12;
+}
+#model-modal .dart-related-card-image{
+  flex:0 0 64px;width:64px;height:82px;object-fit:cover;
+  background:#f3eef1;border-radius:7px;
+}
+#model-modal .dart-related-card-details{
+  min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;line-height:1.4;
+}
+#model-modal .dart-related-card-details strong{
+  font-size:12px;font-weight:800;color:#352630;overflow-wrap:anywhere;
+}
+#model-modal .dart-related-card-details small{
+  font-size:11px;font-weight:750;color:#8b3151;overflow-wrap:anywhere;
+}
+#model-modal .dart-related-card-category{
+  font-size:10px;color:#7b6e77;overflow-wrap:anywhere;
+}
+#model-modal .dart-related-card-check{
+  position:absolute;top:8px;right:8px;display:grid;place-items:center;
+  width:19px;height:19px;border:1px solid #d5c5cc;border-radius:50%;
+  color:transparent;background:#fff;font-size:12px;font-weight:900;
+}
+#model-modal .dart-related-card[aria-pressed="true"] .dart-related-card-check{
+  border-color:#ab012b;background:#ab012b;color:#fff;
+}
+#model-modal .dart-related-models-empty{
+  padding:17px;margin:0 0 10px;text-align:center;color:#786974;
+  background:#fcf8fa;border:1px dashed #dbc8d1;border-radius:9px;font-size:12px;
+}
+#model-modal .dart-related-models-empty[hidden]{display:none!important}
+#model-modal .dart-related-selected-title{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:8px;margin:14px 0 9px;color:#43293a;
+  font-size:12px;font-weight:800;
+}
+#model-modal .dart-related-selected-title small{font-size:10px;color:#81737b;font-weight:500}
+#model-modal .dart-related-order{
+  display:grid;gap:7px;min-width:0;max-height:245px;overflow-y:auto;
+}
+#model-modal .dart-related-selected-item{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:9px;padding:8px 10px;border-radius:9px;
+  background:#f9f4f6;border:1px solid #e8dbe1;
+}
+#model-modal .dart-related-selected-name{
+  flex:1;min-width:0;font-weight:750;color:#4c2d3e;
+  font-size:11px;overflow-wrap:anywhere;
+}
+#model-modal .dart-related-selected-controls{
+  flex:none;display:flex;align-items:center;gap:5px;
+}
+#model-modal .dart-related-selected-controls button{
+  display:grid;place-items:center;min-height:30px;width:30px;
+  padding:0;border:1px solid #d7c3cc;border-radius:7px;background:#fff;
+  color:#6d2c45;font-size:15px;cursor:pointer;
+}
+#model-modal .dart-related-selected-controls button:not(:disabled):hover{
+  background:#f4e2e9;border-color:#bc91a1;
+}
+#model-modal .dart-related-selected-controls button:disabled{
+  cursor:not-allowed;opacity:.4;
+}
+#model-modal .dart-related-selected-controls .dart-related-remove{
+  color:#a22636;border-color:#e9c8ce;background:#fff8f9;
+}
+#model-modal .dart-related-selected-empty{
+  margin:0;padding:11px 12px;border:1px dashed #e1d3da;
+  border-radius:8px;color:#8c7e86;font-size:11px;
+}
+#model-modal #modal-related-help{
+  display:block;margin-top:9px;color:#806c79;font-size:11px;line-height:1.65;
+}
+@media(max-width:560px){
+  #model-modal .dart-related-models-grid{
+    grid-template-columns:minmax(0,1fr);max-height:315px;
+  }
+  #model-modal .dart-related-card{min-height:82px}
+  #model-modal .dart-related-card-image{width:58px;height:72px;flex-basis:58px}
+}
+@media(prefers-reduced-motion:reduce){
+  #model-modal .dart-related-card{transition:none}
+}
