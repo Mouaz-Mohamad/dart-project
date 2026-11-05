@@ -13,7 +13,6 @@
   // valid address anywhere in Cairo or Giza is not rejected by a city-centre
   // radius while every other governorate is still refused.
   const DELIVERY_BOUNDS = [[21.50, 24.50], [32.10, 36.20]];
-  const LEGACY_RETURN_BOUNDS = [[27.00, 27.00], [30.65, 32.25]];
   const DELIVERY_VIEWBOX = '24.50,32.10,36.20,21.50';
   const DEFAULT_CENTER = [30.0444, 31.2357];
   const controllers = new Map();
@@ -134,7 +133,7 @@
     const map = L.map(mapElement, {
       attributionControl: true,
       zoomControl: false,
-      maxBounds: options.form === '#checkoutForm' ? DELIVERY_BOUNDS : LEGACY_RETURN_BOUNDS,
+      maxBounds: DELIVERY_BOUNDS,
       maxBoundsViscosity: 1
     }).setView(DEFAULT_CENTER, 11);
 
@@ -252,7 +251,7 @@
         return true;
       } catch (error) {
         if (version !== requestVersion) return false;
-        rejectVerification(navigator.onLine ? 'The location could not be verified. Try again or enter the Cairo/Giza address manually.' : 'You are offline. Reconnect to verify the delivery location.');
+        rejectVerification(navigator.onLine ? 'The location could not be verified. Try again or enter the address manually.' : 'You are offline. Reconnect to verify the delivery location.');
         return false;
       }
     }
@@ -270,7 +269,7 @@
         return false;
       }
       if (!isSupportedGovernorateName(value(fields.governorate))) {
-        rejectVerification('Delivery is currently available in Cairo and Giza only.');
+        rejectVerification('This governorate is unavailable. Wait for the location regions to load and try again.');
         return false;
       }
       try {
@@ -278,7 +277,7 @@
         if (version !== requestVersion) return false;
         const result = results.find(isSupportedDeliveryResult);
         if (!result) {
-          rejectVerification('This address could not be verified inside Cairo or Giza. Refine it or choose a pin inside the delivery zone.');
+          rejectVerification('This address could not be verified in a supported governorate. Refine it or choose a map pin.');
           return false;
         }
         const lat = Number(result.lat), lng = Number(result.lon);
@@ -293,7 +292,7 @@
         if (fields.fullAddress) fields.fullAddress.value = result.display_name || query;
         if (fields.search) fields.search.value = result.display_name || query;
         setMarker(lat, lng, false);
-        status('Manual address matched to the Cairo/Giza delivery map.', 'success');
+        status('Manual address matched to the selected governorate.', 'success');
         form.dispatchEvent(new CustomEvent('dart:address-selected', { bubbles: true, detail: { lat, lng, parts: addressParts(result) } }));
         return true;
       } catch (error) {
@@ -371,7 +370,7 @@
           fields.results.innerHTML = '<li class="dart-address-loading">Searching…</li>';
           try {
             const results = (await nominatim('search', { q: query, countrycodes: 'eg', viewbox:DELIVERY_VIEWBOX, bounded:'1', limit: '8' })).filter(isSupportedDeliveryResult).slice(0, 5);
-            fields.results.innerHTML = results.length ? '' : '<li class="dart-address-empty">No verified address found inside Cairo or Giza.</li>';
+            fields.results.innerHTML = results.length ? '' : '<li class="dart-address-empty">No verified address found in a supported governorate.</li>';
             results.forEach(result => {
               const item = document.createElement('li');
               const button = document.createElement('button');

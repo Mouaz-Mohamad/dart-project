@@ -134,19 +134,29 @@ function sessionCleanup() {
   const start = source.indexOf("  async function verifyEmail(");
   assert.match(source.slice(start), /await claimGuestCartAfterAuth\(\)/, "email verification must recover guest ownership before redirect");
 }
-async function availability() {
+async function availability(pickup = false) {
   let offline = false;
   const regions = Array.from({ length: 27 }, (_, index) => ({ id: ["Cairo", "Giza", "Alexandria"][index] || `Region${index}`,
     en: ["Cairo", "Giza", "Alexandria"][index] || `Region${index}`, ar: `منطقة${index}`, cities: [],
     available: index === 1 || index === 2, blocked: index === 0, carriers: index === 1 ? ["dart"] : index === 2 ? ["carrier"] : [] }));
-  const c = { document: { readyState: "loading", addEventListener() {}, getElementById() { return null; } },
+  let endpoint = "";
+  const c = { document: { readyState: "loading", addEventListener() {}, getElementById(id) { return pickup && id === "returnRequestForm" ? {} : null; } },
     window: { dispatchEvent() {} }, location: { origin: "https://dart.test" }, Event: class {},
-    fetch: async () => { if (offline) throw new Error("Synthetic outage"); return { ok: true, json: async () => ({ governorates: regions,
+    fetch: async url => { endpoint = url; if (offline) throw new Error("Synthetic outage"); return { ok: true, json: async () => ({ governorates: regions,
       companies: [{ id: "carrier", name: "Test Carrier", coverage: { Alexandria: { all: true } } }] }) }; } };
   vm.createContext(c); vm.runInContext(read("Js/dart-checkout-regions.js"), c);
   const service = c.window.DartShippingAvailability;
   assert.equal(service.isGovernorateOpen("Giza"), false, "coverage must be fetched before granting local delivery");
   await service.load();
+  if (pickup) {
+    assert.match(endpoint, /\/shipping\/coverage-catalog$/);
+    assert.equal(service.isGovernorateOpen("Alexandria"), true);
+    assert.equal(service.isGovernorateOpen("Region26"), true, "returns remain possible after checkout coverage is removed");
+    assert.equal(service.isGovernorateOpen("Unknown"), false);
+    offline = true; await assert.rejects(service.load({ force: true }), /Synthetic outage/);
+    assert.equal(service.isGovernorateOpen("Alexandria"), false, "pickup must wait for a verified region catalog");
+    return;
+  }
   assert.equal(service.isGovernorateOpen("Cairo"), false);
   assert.equal(service.availableCompanies({ governorate: "Cairo" }).length, 0);
   assert.equal(service.isAddressCovered({ governorate: "Alexandria" }), true);
@@ -154,5 +164,5 @@ async function availability() {
   offline = true; await assert.rejects(service.load({ force: true }), /Synthetic outage/);
   assert.equal(service.isAddressCovered({ governorate: "Giza" }), false, "outage must not silently restore Cairo/Giza");
 }
-(async () => { await recovery(); await conflict(); await staleHydration(); await checkoutRetry(); sessionCleanup(); await availability(); console.log("PASS guest navigation recovery, explicit cart conflicts, stale GET/mutation races, authenticated cart readiness, email verification, external checkout and shipping outage retries"); })()
+(async () => { await recovery(); await conflict(); await staleHydration(); await checkoutRetry(); sessionCleanup(); await availability(); await availability(true); console.log("PASS guest navigation recovery, explicit cart conflicts, stale GET/mutation races, authenticated cart readiness, email verification, external checkout and nationwide pickup coverage retries"); })()
   .catch(error => { console.error(error); process.exitCode = 1; });

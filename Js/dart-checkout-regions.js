@@ -3,6 +3,7 @@
 (() => {
 "use strict";
 const $=id=>document.getElementById(id);
+const pickup=Boolean($("returnRequestForm"));
 const norm=value=>String(value||"").trim().toLowerCase()
 .replace(/[\u064b-\u065f\u0670\u0640]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه")
 .replace(/[\s_-]+/g,"");
@@ -52,13 +53,15 @@ if(ready&&!force)return;
 ready=false;
 const task=(async()=>{
 const base=String(window.DART_API_BASE_URL||location.origin).replace(/\/$/,"");
-const response=await fetch(base+"/api/v1/shipping/checkout-coverage",{cache:"no-store"});
+const endpoint=pickup?"coverage-catalog":"checkout-coverage";
+const response=await fetch(base+"/api/v1/shipping/"+endpoint,{cache:"no-store"});
 if(!response.ok)throw Error("Delivery coverage temporarily unavailable");
 const data=await response.json();
 if(!Array.isArray(data.governorates))throw Error("Invalid region catalog");
 const received=data.governorates.filter(x=>typeof x.id==="string"&&Array.isArray(x.cities));
 if(received.length!==27)throw Error("Incomplete delivery regions");
-regions=received;
+// A purchased item's return must not depend on today's checkout carrier settings.
+regions=pickup?received.map(region=>({...region,available:true})):received;
 companies=Array.isArray(data.companies)?data.companies:[];
 ready=true;
 window.dispatchEvent(new Event("dart:shipping-coverage-loaded"));
@@ -73,6 +76,23 @@ load,canonical,isGovernorateOpen,isAddressCovered,availableCompanies,
 get ready(){return ready},
 });
 function init(){
+if(pickup){
+const governorate=$("return-governorate"),status=$("return-address-status");
+const refresh=()=>{
+const previous=governorate.value;
+governorate.replaceChildren();
+for(const region of regions){const option=document.createElement("option");
+option.value=region.id;option.textContent=region.ar+" / "+region.en;governorate.append(option);}
+governorate.value=regions.some(region=>region.id===previous)?previous:"Cairo";
+};
+const retry=document.createElement("button");retry.type="button";retry.textContent="Retry Pickup Regions";
+const reload=async()=>{retry.disabled=true;try{await load({force:true});refresh();retry.remove();
+status.textContent="Select an Egypt pickup pin or enter the complete pickup address.";
+}catch{status.textContent="Pickup regions could not be loaded. Retry before verifying your address.";
+status.after(retry);}finally{retry.disabled=false;}};
+retry.addEventListener("click",()=>void reload());
+void reload();return;
+}
 const form=$("checkoutForm"),governorate=$("governorate-select"),area=$("area-input");
 if(!form||!governorate||!area)return;
 const helper=document.createElement("div");helper.className="dart-checkout-region-helper";
