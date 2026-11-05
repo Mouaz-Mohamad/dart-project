@@ -160,7 +160,6 @@ jobs:
         run: |
           node tests/checkout-address-browser.cjs
           node tests/direct-changes-browser.cjs
-          DART_CSS_BASE_REF=HEAD^ node tests/css-cascade-browser.cjs
           node tests/dashboard-groups-browser.cjs
           node tests/brand-details-browser.cjs
           node tests/navigation-browser.cjs
@@ -176,3 +175,4 @@ jobs:
           node tests/coming-soon-browser.cjs
           node tests/storefront-settings-regression.js
           node tests/full-site-browser.js
+          DART_CSS_BASE_REF=HEAD^ node tests/css-cascade-browser.cjs

@@ -408,6 +408,10 @@ const server = http.createServer(async (request, response) => {
   await dashboard.evaluate(()=>window.dispatchEvent(new CustomEvent('dart:site-settings-changed',{detail:window.DartSiteSettings.get()})));
   assert.equal(await scenes.count(),3,'background settings refresh preserves unsaved sentence structure');
   const checks=path.join(root,'..','checks');fs.mkdirSync(checks,{recursive:true});
+  // About was the most recently opened tab. Full Chromium can throttle animation
+  // frames in background tabs, preventing screenshot stability checks on CI.
+  await dashboard.bringToFront();
+  await dashboard.waitForFunction(() => document.visibilityState === 'visible');
   for(const width of [390,1366]){
     await dashboard.setViewportSize({width,height:900});
     await dashboard.locator('#settings-typing-card').scrollIntoViewIfNeeded();
