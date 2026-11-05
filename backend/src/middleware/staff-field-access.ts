@@ -20,6 +20,10 @@ function project(value: unknown, costs: boolean, profit: boolean, buyers: boolea
 export const staffFieldAccess: RequestHandler = (request, response, next) => {
     const json = response.json;
     response.json = function (body: unknown) {
+        // Customer/courier projections can contain nested return snapshots.
+        // Internal inventory costs and profit never belong in those responses.
+        if (request.auth && request.auth.accountType !== "staff")
+            return json.call(this, project(body, false, false, true));
         if (!/^\/api\/v1\/admin(?:\/|\?|$)/i.test(request.originalUrl) || request.auth?.accountType !== "staff")
             return json.call(this, body);
         const permissions = request.auth.permissions;

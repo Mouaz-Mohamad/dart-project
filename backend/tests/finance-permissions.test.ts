@@ -3,6 +3,10 @@
 import { describe, expect, it } from "vitest";
 import { financeSummarySection } from "../src/modules/finance/finance.routes.js";
 import type { FinanceSummary } from "../src/modules/finance/finance.service.js";
+import express from "express";
+import request from "supertest";
+import { staffFieldAccess } from "../src/middleware/staff-field-access.js";
+import type { AuthenticatedAccount } from "../src/modules/identity/identity.types.js";
 
 const summary = {
   grossRevenue: 1000, refunds: 100, netRevenue: 900,
@@ -22,6 +26,27 @@ const summary = {
 } satisfies FinanceSummary;
 
 describe("granular finance summary sections", () => {
+  it.each(["customer", "representative"] as const)("hides nested return costs from %s while preserving their refund and delivery amounts", async accountType => {
+    const app = express(); app.use(staffFieldAccess);
+    app.get("/api/v1/me/commerce", (req, res) => {
+      req.auth = { accountType, permissions: [] } as unknown as AuthenticatedAccount;
+      res.json({ returns: [{ refundAmount: 500, deliveryCost: 50, originalLineSnapshot: { costSnapshot: 300, finalUnitPrice: 500 },
+        replacementLineSnapshot: { cost_snapshot_minor: 40000 }, audit: [{ cost: 400, grossProfit: 100 }] }] });
+    });
+    const response = await request(app).get("/api/v1/me/commerce").expect(200);
+    expect(response.body.returns[0]).toMatchObject({ refundAmount: 500, deliveryCost: 50, originalLineSnapshot: { finalUnitPrice: 500 } });
+    expect(JSON.stringify(response.body)).not.toMatch(/"(?:costSnapshot|cost_snapshot_minor|cost|grossProfit)"/);
+  });
+
+  it("retains the permitted cost projection for authorized finance staff", async () => {
+    const app = express(); app.use(staffFieldAccess);
+    app.get("/api/v1/admin/returns", (req, res) => {
+      req.auth = { accountType: "staff", permissions: ["finance.view_cost"] } as unknown as AuthenticatedAccount;
+      res.json({ originalLineSnapshot: { costSnapshot: 300 }, grossProfit: 100 });
+    });
+    const response = await request(app).get("/api/v1/admin/returns").expect(200);
+    expect(response.body).toEqual({ originalLineSnapshot: { costSnapshot: 300 } });
+  });
   it("revenue does not expose cost, profit or cash-flow values", () => {
     const selected = financeSummarySection(summary, "revenue");
     expect(selected.netRevenue).toBe(900);
