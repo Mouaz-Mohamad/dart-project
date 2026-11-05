@@ -41,7 +41,7 @@
     if (csrfMemory) return csrfMemory;
     return document.cookie
       .split("; ")
-      .find((row) => row.startsWith("dart_csrf="))
+      .find((row) => row.startsWith("dart_staff_csrf="))
       ?.split("=")
       .slice(1)
       .join("=");
@@ -408,7 +408,7 @@
 
   logoutButton.addEventListener("click", async () => {
     try {
-      await request("/api/v1/auth/logout", { method: "POST" });
+      await request("/api/v1/admin/auth/logout", { method: "POST" });
     } finally {
       clearAdminPrivateCache();
       resetVerification();
@@ -425,7 +425,7 @@
   void (async () => {
     try {
       await ensureApiCompatibility();
-      const payload = await request("/api/v1/me");
+      const payload = await request("/api/v1/admin/auth/me");
       if (payload.user?.accountType !== "staff") {
         throw new Error("Staff account required");
       }
