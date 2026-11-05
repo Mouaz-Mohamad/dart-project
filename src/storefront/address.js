@@ -12,8 +12,8 @@
   // decided by the reverse-geocoded administrative governorate below, so a
   // valid address anywhere in Cairo or Giza is not rejected by a city-centre
   // radius while every other governorate is still refused.
-  const DELIVERY_BOUNDS = [[27.00, 27.00], [30.65, 32.25]];
-  const DELIVERY_VIEWBOX = '27.00,30.65,32.25,27.00';
+  const DELIVERY_BOUNDS = [[21.50, 24.50], [32.10, 36.20]];
+  const DELIVERY_VIEWBOX = '24.50,32.10,36.20,21.50';
   const DEFAULT_CENTER = [30.0444, 31.2357];
   const controllers = new Map();
   let lastRequestAt = 0;
@@ -84,7 +84,8 @@
         name === 'القاهرة' || name === 'محافظة القاهرة') return 'Cairo';
     if (name === 'giza' || name === 'giza governorate' || name === 'al jizah' ||
         name === 'الجيزة' || name === 'محافظة الجيزة') return 'Giza';
-    return '';
+    const enabled = window.DartShippingAvailability?.canonical?.(value);
+    return enabled && window.DartShippingAvailability?.isGovernorateOpen?.(enabled) ? enabled : '';
   }
 
   function isSupportedGovernorateName(value) {
@@ -241,6 +242,7 @@
         setCoordinates(lat, lng, 'map');
         setMarker(lat, lng);
         applyParts(parts, Boolean(options.overwriteFromMap));
+        form.dataset.dartDeliveryZone = ['Cairo', 'Giza'].includes(parts.governorate) ? 'cairo-giza' : 'coverage-enabled';
         marker.bindPopup(parts.fullAddress || 'Delivery location').openPopup();
         status(`${parts.governorate} location selected. Complete the building and floor details.`, 'success');
         form.dispatchEvent(new CustomEvent('dart:address-selected', { bubbles: true, detail: { lat, lng, parts } }));
@@ -310,11 +312,12 @@
       if (!value(fields.floor)) missing.push('floor');
       const hasCoordinates = Boolean(value(fields.latitude) && value(fields.longitude));
       if (missing.length) return { ok: false, message: `Complete: ${missing.join(', ')}.` };
-      if (!isSupportedGovernorateName(value(fields.governorate)) || form.dataset.dartDeliveryZone !== 'cairo-giza') {
+      if (!isSupportedGovernorateName(value(fields.governorate)) ||
+          !['cairo-giza','coverage-enabled'].includes(form.dataset.dartDeliveryZone)) {
         return { ok:false, message:'Delivery is currently available in Cairo and Giza only. Verify the address on the map.' };
       }
       if (!hasCoordinates) return { ok: false, message: 'Select a location on the map or locate the manually entered address.' };
-      return { ok: true, source: form.dataset.dartAddressSource || 'map', zone:'cairo-giza' };
+      return { ok: true, source: form.dataset.dartAddressSource || 'map', zone:form.dataset.dartDeliveryZone };
     }
 
     function snapshot() {
@@ -391,7 +394,7 @@
       const lat = Number(value(fields.latitude));
       const lng = Number(value(fields.longitude));
       return Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0 &&
-        form.dataset.dartDeliveryZone === 'cairo-giza';
+        ['cairo-giza','coverage-enabled'].includes(form.dataset.dartDeliveryZone);
     };
     const onManualAddressInput = () => {
       if (form.dataset.dartAddressApplying === 'true') return;
@@ -444,6 +447,7 @@
         if (fields.fullAddress && savedText) fields.fullAddress.value = savedText;
         if (fields.search && savedText) fields.search.value = savedText;
         setCoordinates(lat, lng, 'map');
+        form.dataset.dartDeliveryZone = ['Cairo','Giza'].includes(governorate) ? 'cairo-giza' : 'coverage-enabled';
         setMarker(lat, lng, false);
         status('Saved exact delivery pin restored. Review the address details before ordering.', 'success');
       } finally {
