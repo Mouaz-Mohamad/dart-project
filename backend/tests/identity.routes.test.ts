@@ -368,6 +368,26 @@ describe("identity HTTP boundaries", () => {
     expect(response.body.error.code).toBe("MFA_REQUIRED");
   });
 
+  it("requires the dedicated Staff cookie for dashboard access", async () => {
+    const service = fakeService(account({ accountType: "staff" }));
+    const websiteCookieOnly = await request(app(service))
+      .get("/api/v1/admin/auth/me")
+      .set("Cookie", `dart_session=${sessionId}.${secret}`);
+    expect(websiteCookieOnly.status).toBe(401);
+    const staffCookieOnly = await request(app(service))
+      .get("/api/v1/admin/auth/me")
+      .set("Cookie", `dart_session_staff=${sessionId}.${secret}`);
+    expect(staffCookieOnly.status).toBe(200);
+    expect(staffCookieOnly.body.user.accountType).toBe("staff");
+  });
+
+  it("does not accept the Staff cookie as a storefront login", async () => {
+    const response = await request(app(fakeService()))
+      .get("/api/v1/me")
+      .set("Cookie", `dart_session_staff=${sessionId}.${secret}`);
+    expect(response.status).toBe(401);
+  });
+
   it("accepts representative applications with private verification documents", async () => {
     const service = fakeService();
     const response = await request(app(service)).post("/api/v1/representatives/register").send({
