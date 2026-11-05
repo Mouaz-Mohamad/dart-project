@@ -27,7 +27,7 @@ function poolFor(db: PGlite, fail?: (sql: string) => boolean): Pool {
     return { query, connect: async () => ({ query, release() { } }) } as unknown as Pool;
 }
 const config = loadConfig({ NODE_ENV: "test", DATABASE_URL: "postgresql://unused/test", LOG_LEVEL: "silent" });
-const csrf = "synthetic-csrf", sessionId = randomUUID(), cookie = `dart_session=${sessionId}.${"a".repeat(43)}`;
+const csrf = "synthetic-csrf", sessionId = randomUUID(), cookie = `dart_session_staff=${sessionId}.${"a".repeat(43)}`;
 function appFor(permissions: string[], pendingMfa = false) {
     const account = { userId: randomUUID(), accountType: "staff", status: "active", email: "staff@example.test", emailVerified: true,
         mustChangePassword: false, sessionId, sessionFamilyId: randomUUID(), csrfTokenHash: hashCsrfToken(csrf, config.authPepper),
