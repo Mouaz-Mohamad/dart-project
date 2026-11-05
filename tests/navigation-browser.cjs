@@ -44,6 +44,7 @@ const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json'); res.setHeader('Cache-Control', 'no-store');
     let payload = {};
     if (url.pathname === '/api/v1/catalog') payload = { version: 1, models: [model], stock: { '["DW-NAV","Black","M"]': 3 } };
+    if (url.pathname === '/api/v1/catalog/version') payload = { version: 1 };
     if (url.pathname === '/api/v1/site-settings') payload = { version: 1, settings: {} };
     if (url.pathname === '/api/v1/sets') payload = { sets: [] };
     if (url.pathname === '/api/v1/reviews') payload = { reviews: [] };
@@ -74,6 +75,14 @@ const server = http.createServer((req, res) => {
 // Drive this scenario in the real documents and report observations to the fixture server.
 // No request interception, SPA replacement, or browser cache emulation is used.
 function nativeScenario(origin) {
+  let catalogReads = 0, catalogVersionReads = 0;
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, ...options) => {
+    const pathname = new URL(input?.url || String(input), location.href).pathname;
+    if (pathname === '/api/v1/catalog') catalogReads++;
+    if (pathname === '/api/v1/catalog/version') catalogVersionReads++;
+    return nativeFetch(input, ...options);
+  };
   window.__documentToken = crypto.randomUUID();
   window.__restored = false;
   const errors = [];
@@ -99,7 +108,7 @@ function nativeScenario(origin) {
       sort: document.getElementById('productSortSelect')?.value,
       filtersVisible: !!panel && panel.getBoundingClientRect().height > 0,
       scrollY: window.scrollY,
-      cartLength: cart().length, errors: [...errors] };
+      cartLength: cart().length, catalogReads, catalogVersionReads, errors: [...errors] };
     const response = await fetch(origin + '/__dart_test/navigation', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot),
     });
@@ -194,8 +203,11 @@ function nativeScenario(origin) {
     assert.ok(nativeRestore || unsupportedLocalShell,
       'Home must restore its document in full Chromium; reasons: ' + [...restoreReasons].join(','));
     if (nativeRestore) {
+      assert.equal(homeReturn.catalogReads, home.catalogReads, 'unchanged Home restoration does not replace the catalog');
       assert.equal(homeReturn.restored, true);
       for (const row of [productsReturn, forward]) {
+        assert.equal(row.catalogReads, products.catalogReads, 'unchanged Products restoration preserves its catalog DOM and scroll');
+        assert.ok(row.catalogVersionReads > products.catalogVersionReads, 'restored Products still verifies the authoritative catalog version');
         assert.equal(row.token, products.token, 'Products reuses its original document');
         assert.equal(row.restored, true);
         assert.equal(row.search, 'Navigation');

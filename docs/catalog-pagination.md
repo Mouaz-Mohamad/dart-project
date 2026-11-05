@@ -4,6 +4,8 @@ The storefront now requests the existing `/api/v1/catalog?page=N&limit=100` cont
 
 No endpoint, database migration, price/discount rule or product layout changes. Existing filters and related-model lookup still use the complete catalog in browser memory. This bounds individual response sizes, not total browser memory. The existing backend maximum of 10,000 pages is enforced without silently truncating the result.
 
+Native Back/Forward restoration verifies the catalog version before replacing the retained projection. An unchanged catalog no longer triggers a full DOM replacement that can race with native scroll restoration. Account and cart projections are still cleared and revalidated; failed restoration can retry. Runtime tests cover concurrent restoration, denied access and recovery. The full Chromium history test checks native document/filter/scroll retention and counts catalog/version reads within each original document.
+
 Manual check: open Products, filter by category, open a model and verify related products and stock. In Network, catalog requests include `page` and `limit=100`. With more than 100 models, later pages load before the confirmed projection changes. An interrupted later page retains the previous products; reconnect/focus triggers the existing version reconciliation.
 
 | Quality review | Result |

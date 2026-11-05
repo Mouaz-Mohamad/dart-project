@@ -29,6 +29,36 @@ async function fixture(file) {
   return { catalog: window.DartCatalog, memory, writes, requests,
     respond: fn => { responder = fn; requests.length = writes.length = 0; } };
 }
+async function verifyRestore() {
+  const handlers = new Map(), events = [], removed = [];
+  let checks = 0, carts = 0, release, fail = false, allowed = true;
+  const context = {
+    window: { addEventListener: (name, fn) => handlers.set(name, fn), dispatchEvent: event => events.push(event),
+      DartCatalog: { hydrate: () => assert.fail("a restored document must not force a full catalog snapshot"),
+        refreshChanged: async () => { checks++; if (fail) throw Error("Synthetic offline"); await new Promise(resolve => { release = resolve; }); } },
+      DartSets: { clearDrafts() {} }, DartState: { remove: key => removed.push(key) } },
+    document: { prerendering: false, addEventListener() {}, body: { hasAttribute: () => false } },
+    bindAuth() {}, setInterval() {}, apiSessionChecked: true, apiSessionGeneration: 0, apiSessionPromise: null, apiUserCache: {},
+    KEYS: { customers: "customers", orders: "orders", returns: "returns", cards: "cards" },
+    cartData: ["stale"], updateCartCount() {}, setCartReservationId() {}, uid: () => "CART-RESTORE",
+    sessionStorage: { getItem: () => "CART-RESTORE" }, hydrateApiSession: async () => {},
+    enforceCustomerAccountAccess: () => allowed, hydrateCustomerCart: async options => { assert.equal(options.claimLocal, false); carts++; },
+    updateCartReservationTimer() {}, renderBirthdayExperience() {}, wireAccountLink() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
+  };
+  vm.runInNewContext(fs.readFileSync("src/storefront/platform/lifecycle.js", "utf8"), context);
+  const show = handlers.get("pageshow");
+  await show({ persisted: false }); assert.equal(checks, 0);
+  const first = show({ persisted: true }); await tick(); await show({ persisted: true });
+  assert.equal(checks, 1, "overlapping restoration events share one refresh"); assert.equal(carts, 1);
+  assert.equal(context.cartData.length, 0); assert.ok(removed.includes("dart_cart"), "private/cart projections are still cleared before account revalidation");
+  release(); await first;
+  fail = true; await show({ persisted: true });
+  assert.equal(events.at(-1).detail.code, "RESTORE_REFRESH_FAILED");
+  fail = false; const retry = show({ persisted: true }); await tick(); release(); await retry;
+  assert.equal(checks, 3, "a failed restoration releases its guard for the next attempt");
+  allowed = false; await show({ persisted: true }); assert.equal(checks, 3, "denied private-route access cannot refresh catalog or commerce");
+}
 async function verify(file) {
   const f = await fixture(file); let release;
   f.respond(async page => page === 3 ? new Promise(resolve => { release = () => resolve(chunk(page)); }) : chunk(page));
@@ -80,5 +110,6 @@ async function verify(file) {
 }
 (async () => {
   for (const file of ["src/storefront/catalog.js", "Js/dart-catalog.js"]) await verify(file);
+  await verifyRestore();
   console.log("PASS catalog pagination: bounded requests, atomic complete projection, stock merge, version restarts, offline/invalid recovery and stale-read isolation");
 })().catch(error => { console.error(error); process.exitCode = 1; });

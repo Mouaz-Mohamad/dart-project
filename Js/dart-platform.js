@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:e85b015c8cfce4f81068347f684543c19a5e06deab9efc2058c56cdd10df0787 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:b96f71c11aa91339df1ecf0cc828ecf1282bce87843c0b242bb3f552665bb3f4 */
 (function () {
   "use strict";
 
@@ -4564,7 +4564,9 @@
     try {
       await hydrateApiSession();
       if (!enforceCustomerAccountAccess()) return;
-      await Promise.all([window.DartCatalog?.hydrate?.(), hydrateCustomerCart({ claimLocal: false })]);
+      // BFCache already holds a confirmed catalog and the customer's scroll/filter
+      // state. Only replace its DOM projection when the server version changed.
+      await Promise.all([window.DartCatalog?.refreshChanged?.(), hydrateCustomerCart({ claimLocal: false })]);
       updateCartReservationTimer();
       renderBirthdayExperience();
       wireAccountLink();

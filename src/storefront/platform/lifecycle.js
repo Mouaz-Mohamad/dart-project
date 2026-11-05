@@ -146,7 +146,9 @@
     try {
       await hydrateApiSession();
       if (!enforceCustomerAccountAccess()) return;
-      await Promise.all([window.DartCatalog?.hydrate?.(), hydrateCustomerCart({ claimLocal: false })]);
+      // BFCache already holds a confirmed catalog and the customer's scroll/filter
+      // state. Only replace its DOM projection when the server version changed.
+      await Promise.all([window.DartCatalog?.refreshChanged?.(), hydrateCustomerCart({ claimLocal: false })]);
       updateCartReservationTimer();
       renderBirthdayExperience();
       wireAccountLink();
