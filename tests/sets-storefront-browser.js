@@ -204,6 +204,7 @@ const server = http.createServer(async (request, response) => {
   });
 
   await page.goto(`${origin}/products`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.getElementById('toggleProductFilters')?.dataset.bound === '1');
   await page.locator('#toggleProductFilters').click();
   await page.locator('#filterContainer .filter-btn[data-category="Sets"]').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelectorAll('[data-dart-set-card="1"]').length === 1);
