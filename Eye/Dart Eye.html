@@ -1664,10 +1664,20 @@
 
 
 <!--============================ damage =======================-->
-        <section id="damage" class="dashboard-section">
+        <section id="damage" class="dashboard-section" aria-labelledby="dart-damage-title">
+            <header class="dart-operations-page-head">
+                <div class="dart-operations-page-copy">
+                    <p class="dart-operations-eyebrow"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> INVENTORY QUALITY</p>
+                    <h2 id="dart-damage-title">Damage</h2>
+                    <p>Track damaged pieces, repair decisions and removed stock without losing the original record.</p>
+                </div>
+                <span class="dart-operations-page-badge"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Dart Operations</span>
+            </header>
+            <article class="dart-operations-workspace" aria-label="Damage Records">
+                <div class="dart-operations-workspace-head"><div><h3>Damage Records</h3><p>Find an item by code, status or archive state. Open Details for the complete record.</p></div></div>
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search damage / item code">
+                    <input type="search" placeholder="Search damage ID or item code" aria-label="Search damage records" autocomplete="off">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
@@ -1711,6 +1721,7 @@
                 </div>
                 <div id="damage-container"></div>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Damage modals: kept beside the owning dashboard section. -->
@@ -1718,15 +1729,25 @@
 <!--============================= END Damage modals. ============================ -->
 
 <!--============================= review  ============================-->
-        <section id="review" class="dashboard-section">
+        <section id="review" class="dashboard-section" aria-labelledby="dart-review-title">
+            <header class="dart-operations-page-head">
+                <div class="dart-operations-page-copy">
+                    <p class="dart-operations-eyebrow"><i class="fa-solid fa-star" aria-hidden="true"></i> CUSTOMER FEEDBACK</p>
+                    <h2 id="dart-review-title">Reviews & Messages</h2>
+                    <p>Keep customer reviews and Contact Us messages clear, searchable and easy to manage.</p>
+                </div>
+                <span class="dart-operations-page-badge"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Dart Operations</span>
+            </header>
+            <article class="dart-operations-workspace" aria-label="Customer Feedback">
+                <div class="dart-operations-workspace-head"><div><h3>Customer Feedback</h3><p>Customer reviews stay grouped per client. Expand a group or open Details for the full message.</p></div></div>
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search product name">
+                    <input type="search" placeholder="Search client, rating or message" aria-label="Search reviews and messages" autocomplete="off">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="all">None</option>
+                        <option value="all">All Ratings</option>
                         <option value="Up">Up</option>
                         <option value="low">Low</option>
                     </select>
@@ -1734,7 +1755,7 @@
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="all">None</option>
+                        <option value="all">All Visibility</option>
                         <option value="active">Active</option>
                         <option value="hidden">Hidden</option>
                     </select>
@@ -1778,6 +1799,7 @@
                 </div>
                 <div id="review-container"></div>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Review modals: kept beside the owning dashboard section. -->
@@ -1842,15 +1864,25 @@
 <!--============================= END Review modals. ============================ -->
 
 <!--============================= representative ============================ -->
-        <section id="representative" class="dashboard-section">
+        <section id="representative" class="dashboard-section" aria-labelledby="dart-representative-title">
+            <header class="dart-operations-page-head">
+                <div class="dart-operations-page-copy">
+                    <p class="dart-operations-eyebrow"><i class="fa-solid fa-motorcycle" aria-hidden="true"></i> DELIVERY TEAM</p>
+                    <h2 id="dart-representative-title">Representatives</h2>
+                    <p>Manage courier profiles, workload, approvals and verification securely.</p>
+                </div>
+                <span class="dart-operations-page-badge"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Dart Operations</span>
+            </header>
+            <article class="dart-operations-workspace" aria-label="Representative Directory">
+                <div class="dart-operations-workspace-head"><div><h3>Representative Directory</h3><p>Review status and workload at a glance. Use Details for contact information and authorized actions.</p></div></div>
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search product name">
+                    <input type="search" placeholder="Search representative name, code or phone" aria-label="Search representatives" autocomplete="off">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="all">None</option>
+                        <option value="all">All Statuses</option>
                         <option value="active">Active</option>
                         <option value="Pending Approval">Pending Approval</option>
                         <option value="Rejected">Rejected</option>
@@ -1889,6 +1921,7 @@
                 </div>
                 <div id="representative-container"></div>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Representative modals: kept beside the owning dashboard section. -->
