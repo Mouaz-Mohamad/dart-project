@@ -32,6 +32,7 @@ import { FinanceService } from "./modules/finance/finance.service.js";
 import { TrafficAnalyticsService } from "./modules/analytics/traffic-analytics.service.js";
 import { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { OutboxService } from "./modules/outbox/outbox.service.js";
+import { runMaintenanceTasks } from "./modules/outbox/maintenance.js";
 import { BirthdayMessagingService } from "./modules/outbox/birthday-messaging.service.js";
 import { WaitingService } from "./modules/waiting/waiting.service.js";
 import { PromotionService } from "./modules/promotions/promotion.service.js";
@@ -149,11 +150,11 @@ export function createRuntimeApplication(
     whatsappWebhookPool: database,
     customerNotificationService: new CustomerNotificationService(database,config),
     birthdayMessagingService,
-    maintenanceJob: async () => {
-      await catalogService.cleanupReservations();
-      if (config.rateLimitStore === "postgres") await pruneRateLimits(database);
-      if (outboxService.configured("whatsapp")) await birthdayMessagingService.queueToday();
-    },
+    maintenanceJob: () => runMaintenanceTasks([
+      ["reservation_cleanup", () => catalogService.cleanupReservations()],
+      ["rate_limit_pruning", async () => { if (config.rateLimitStore === "postgres") await pruneRateLimits(database); }],
+      ["birthday_queue", async () => { if (outboxService.configured("whatsapp")) await birthdayMessagingService.queueToday(); }],
+    ], job => logger.error({ job }, "Outbox maintenance job failed")),
     waitingService,
     operationalAlerts,
   });

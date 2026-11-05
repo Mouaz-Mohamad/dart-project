@@ -48,6 +48,7 @@ import type { TrafficAnalyticsService } from "./modules/analytics/traffic-analyt
 import type { OperationalAlertService } from "./modules/monitoring/operational-alert.service.js";
 import { createOutboxRouter } from "./modules/outbox/outbox.routes.js";
 import type { OutboxService } from "./modules/outbox/outbox.service.js";
+import type { MaintenanceResult } from "./modules/outbox/maintenance.js";
 import type { BirthdayMessagingService } from "./modules/outbox/birthday-messaging.service.js";
 import { createBirthdayMessagingRouter } from "./modules/outbox/birthday-messaging.routes.js";
 import { createWaitingRouter } from "./modules/waiting/waiting.routes.js";
@@ -90,7 +91,7 @@ export interface AppDependencies extends HealthDependencies {
   outboxService?: OutboxService;
   whatsappWebhookPool?: Pool;
   birthdayMessagingService?: BirthdayMessagingService;
-  maintenanceJob?: () => Promise<void>;
+  maintenanceJob?: () => Promise<void | MaintenanceResult>;
   waitingService?: WaitingService;
   operationalAlerts?: Pick<OperationalAlertService, "report">;
 }

@@ -24,6 +24,7 @@ jobs:
           trap 'rm -f -- "$response_file"' EXIT
           deadline=$((SECONDS + 90))
           delivery_issues=0
+          maintenance_issues=0
           pending_overdue=0
           for batch in $(seq 1 12); do
             remaining=$((deadline - SECONDS))
@@ -50,14 +51,17 @@ jobs:
           }
           const overdue = health.duePending > 0 && health.oldestDueSeconds >= 900 ? 1 : 0;
           if (!Number.isInteger(health.deliveryFailed) || health.deliveryFailed < 0) throw new Error('Invalid delivery failure health');
-          process.stdout.write(`${result.claimed} ${result.failed + result.uncertain + result.terminal + health.uncertain + health.exhausted + health.terminal + health.deliveryFailed} ${overdue}`);
+          const maintenance = result.maintenance;
+          const maintenanceFailure = maintenance?.ok === false ? 1 : 0;
+          process.stdout.write(`${result.claimed} ${result.failed + result.uncertain + result.terminal + health.uncertain + health.exhausted + health.terminal + health.deliveryFailed} ${overdue} ${maintenanceFailure}`);
           NODE
             )"
-            read -r claimed issues pending_overdue <<< "$result"
+            read -r claimed issues pending_overdue maintenance_failure <<< "$result"
             delivery_issues=$((delivery_issues + issues))
+            maintenance_issues=$((maintenance_issues + maintenance_failure))
             if (( claimed == 0 )); then break; fi
           done
-          if (( delivery_issues + pending_overdue > 0 )); then
-            echo "Outbox completed with $delivery_issues delivery issues and $pending_overdue overdue backlog alerts requiring review"
+          if (( delivery_issues + pending_overdue + maintenance_issues > 0 )); then
+            echo "Outbox completed with $delivery_issues delivery issues, $pending_overdue overdue backlog alerts and $maintenance_issues maintenance failures requiring review"
             exit 1
           fi

@@ -4,7 +4,7 @@ import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-function runWorker(mode: "empty" | "full" | "provider" | "network" | "uncertain" | "exhausted" | "delivery-failed" | "missing-health" | "overdue" | "future" | "recovered-backlog") {
+function runWorker(mode: "empty" | "full" | "provider" | "network" | "uncertain" | "exhausted" | "delivery-failed" | "missing-health" | "overdue" | "future" | "recovered-backlog" | "maintenance-failed") {
   const directory = mkdtempSync(join(tmpdir(), "dart-worker-test-"));
   try {
     const workflow = readFileSync(resolve(process.cwd(), "../.github/workflows/outbox-worker.yml"), "utf8");
@@ -18,10 +18,13 @@ if (process.env.DART_TEST_MODE === 'network') process.exit(22);
 const args = process.argv.slice(2);
 const target = args[args.indexOf('--output') + 1];
 const full = process.env.DART_TEST_MODE === 'full';
+const maintenanceFailed = process.env.DART_TEST_MODE === 'maintenance-failed';
+const maintenanceFirst = maintenanceFailed && fs.readFileSync(process.env.DART_TEST_COUNTER,'utf8').trim().split('\\n').length === 1;
 const providerFailure = process.env.DART_TEST_MODE === 'provider' && fs.readFileSync(process.env.DART_TEST_COUNTER,'utf8').trim().split('\\n').length === 1;
 const recovering = process.env.DART_TEST_MODE === 'recovered-backlog' && fs.readFileSync(process.env.DART_TEST_COUNTER,'utf8').trim().split('\\n').length === 1;
-fs.writeFileSync(target, JSON.stringify({ configured: true, claimed: full || providerFailure || recovering ? 5 : 0,
-  published: full || recovering ? 5 : providerFailure ? 4 : 0, failed: providerFailure ? 1 : 0,
+fs.writeFileSync(target, JSON.stringify({ configured: true, claimed: full || providerFailure || recovering || maintenanceFirst ? 5 : 0,
+  maintenance: { ok: !maintenanceFailed, failedJobs: maintenanceFailed ? ["birthday_queue"] : [] },
+  published: full || recovering || maintenanceFirst ? 5 : providerFailure ? 4 : 0, failed: providerFailure ? 1 : 0,
   health: process.env.DART_TEST_MODE === 'missing-health' ? undefined : {
     uncertain: process.env.DART_TEST_MODE === 'uncertain' ? 2 : 0,
     exhausted: process.env.DART_TEST_MODE === 'exhausted' ? 1 : 0, terminal: 0,
@@ -47,6 +50,9 @@ describe("bounded durable outbox worker", () => {
   }, 30_000);
   it("drains subsequent batches after a provider failure and then makes the failure visible", () => {
     expect(runWorker("provider")).toMatchObject({ status: 1, calls: 2 });
+  });
+  it("continues draining after maintenance failure and reports it separately", () => {
+    expect(runWorker("maintenance-failed")).toMatchObject({ status: 1, calls: 2 });
   });
   it("stops after an HTTP or network failure", () => {
     expect(runWorker("network")).toMatchObject({ status: 22, calls: 1 });

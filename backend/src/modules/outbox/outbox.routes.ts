@@ -5,6 +5,7 @@ import { z } from "zod";
 import { timingSafeEqual } from "node:crypto";
 import type { AppConfig } from "../../config/env.js";
 import type { OutboxService } from "./outbox.service.js";
+import type { MaintenanceResult } from "./maintenance.js";
 
 function safeTokenEquals(actual: string, expected: string): boolean {
   const left = Buffer.from(actual);
@@ -15,7 +16,7 @@ function safeTokenEquals(actual: string, expected: string): boolean {
 export function createOutboxRouter(
   outbox: OutboxService,
   config: Pick<AppConfig, "outboxCronSecret">,
-  maintenance?: () => Promise<void>,
+  maintenance?: () => Promise<void | MaintenanceResult>,
 ): Router {
   const router = Router();
 
@@ -35,9 +36,15 @@ export function createOutboxRouter(
       return;
     }
     const query = z.object({ limit: z.coerce.number().int().min(1).max(10).default(5) }).parse(request.query);
-    await maintenance?.();
+    let maintenanceResult: MaintenanceResult = { ok: true, failedJobs: [] };
+    try {
+      maintenanceResult = await maintenance?.() || maintenanceResult;
+    } catch {
+      // Report a bounded, non-sensitive failure while still draining the outbox.
+      maintenanceResult = { ok: false, failedJobs: ["maintenance"] };
+    }
     const result = await outbox.processBatch(query.limit);
-    response.status(200).json({ ...result, health: await outbox.health() });
+    response.status(200).json({ ...result, maintenance: maintenanceResult, health: await outbox.health() });
   }
 
   router.post("/internal/outbox/process", process);
