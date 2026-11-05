@@ -2061,16 +2061,29 @@
         </section>
 
 <!--============================= dart card ============================ -->
-        <section id="card" class="dashboard-section">
+        <section id="card" class="dashboard-section" aria-labelledby="dart-card-page-title">
+            <header class="dart-card-page-header">
+                <div class="dart-card-page-heading">
+                    <p class="dart-card-eyebrow"><i class="fa-solid fa-id-card" aria-hidden="true"></i> DART LOYALTY</p>
+                    <h2 id="dart-card-page-title">Dart Card</h2>
+                    <p>Manage card benefits, purchase usage, expiry dates and customer eligibility in one place.</p>
+                </div>
+                <span class="dart-card-page-badge"><i class="fa-solid fa-gift" aria-hidden="true"></i> Customer Benefits</span>
+            </header>
+            <article class="dart-card-workspace" aria-label="Dart Card records and controls">
+                <div class="dart-card-workspace-heading">
+                    <div><h3>Card Holders</h3><p>Search and filter cards, then open Details to review every field and available action.</p></div>
+                </div>
             <div class="filter-bar overflow">
                 <div class="search-box">
-                    <input type="text" placeholder="search product name">
+                    <input type="search" placeholder="Search card, client or contact" aria-label="Search Dart Card records" autocomplete="off">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
                     <select>
-                        <option value="" disabled selected hidden>Status</option>
+                        <option value="" selected>All Statuses</option>
                         <option value="active">Active</option>
+                        <option value="expired">Expired</option>
                         <option value="hidden">Hidden</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
@@ -2103,7 +2116,7 @@
                 <div id="card-container"></div>
             </div>
 
-            
+            </article>
         </section>
 
         <!-- BEGIN Card modals: kept beside the owning dashboard section. -->
