@@ -115,3 +115,8 @@
 .dart-shipping-editor{width:100vw;padding:16px 13px 25px}
 }
 @media(prefers-reduced-motion:reduce){#shipping .dart-shipping-panel{animation:none}#shipping .dart-shipping-tab{transition:none}}
+
+/* The text fields are stacked; only the on/off settings use inline checkboxes. */
+.dart-shipping-editor .dart-shipping-info-group>label{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:7px;font-size:12px;font-weight:700}
+.dart-shipping-editor .dart-shipping-info-group>label input{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:44px;border:1px solid #cfc1c9;border-radius:9px;padding:10px;font:inherit}
+.dart-shipping-editor .dart-shipping-settings-group>label{display:flex;align-items:flex-start;gap:9px;line-height:1.7}
