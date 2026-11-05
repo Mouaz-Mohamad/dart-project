@@ -29,7 +29,7 @@ function fixture(permissions = ["finance.manage_settlements"]) {
   const app = express();
   app.use(express.json(), (req, _res, next) => {
     // Synthetic test session; the real authentication and CSRF middleware run.
-    req.cookies = { dart_session: `11111111-1111-4111-8111-111111111111.${"a".repeat(43)}` };
+    req.cookies = { dart_session_staff: `11111111-1111-4111-8111-111111111111.${"a".repeat(43)}` };
     next();
   });
   app.use("/api/v1", createFinanceRouter(
@@ -46,7 +46,7 @@ function browser(app: ReturnType<typeof express>) {
   const context = createContext({
     window, globalThis: window, console, crypto, structuredClone, TextEncoder,
     location: { origin: "https://fixture.invalid" },
-    document: { readyState: "loading", cookie: `dart_csrf=${csrf}`, addEventListener() {} },
+    document: { readyState: "loading", cookie: `dart_staff_csrf=${csrf}`, addEventListener() {} },
     CustomEvent: class {}, setTimeout, clearTimeout,
     fetch: async (url: string, options: { method: string; body?: string; headers: Record<string, string> }) => {
       if (options.method !== "POST") {
