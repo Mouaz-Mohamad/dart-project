@@ -49,7 +49,7 @@ import {
   readRepresentativeWork,
 } from "./commerce.operations-queries.js";
 import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-queries.js";
-import { returnMatchesSale } from "./commerce.returns.js";
+import { assertExchangeableSale, returnMatchesSale } from "./commerce.returns.js";
 import { queueOrderConfirmation, queueOrderDispatch, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage } from "./shipping.coverage.js";
@@ -3721,6 +3721,7 @@ export class CommerceService {
         }
 
         if (String(record.requestType || "") === "Exchange") {
+          await assertExchangeableSale(client, String(record.orderId || ""), String(record.itemCode || ""));
           const replacementCode = String(input.replacementItemCode || "").trim();
           if (!replacementCode) {
             throw new AppError(422, "EXCHANGE_REPLACEMENT_REQUIRED", "Choose a replacement item");
@@ -4275,6 +4276,9 @@ export class CommerceService {
         const returnedDiscountSource = returnedLine.discount_source || "None";
 
         const requestType = String(record.requestType || "");
+        if (requestType === "Exchange") {
+          await assertExchangeableSale(client, orderCode, itemCode);
+        }
         await client.query(
           `UPDATE inventory_items
               SET status='Return Inspection',

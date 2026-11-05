@@ -257,6 +257,10 @@
             setStatus(form, "اختر استبدال أو استرجاع.", true);
             return;
           }
+          if (requestType === "Exchange" && isSetReturnItem(values.item_code)) {
+            setStatus(form, "قطع الطقم لا تُستبدل. يمكنك تقديم طلب استرجاع حسب الشروط.", true);
+            return;
+          }
           if (API_BASE) {
             try {
               const result = await apiRequest("/api/v1/returns", {

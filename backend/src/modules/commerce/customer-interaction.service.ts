@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
-import { returnMatchesSale } from "./commerce.returns.js";
+import { assertExchangeableSale, returnMatchesSale } from "./commerce.returns.js";
 import { matchesDeliveryGovernorate } from "./shipping.geography.js";
 
 type JsonRow = Record<string, unknown>;
@@ -415,6 +415,7 @@ export class CustomerInteractionService {
       let requestedExchangeColor = "";
       let requestedExchangeSize = "";
       if (input.requestType === "Exchange") {
+        await assertExchangeableSale(client, line.order_code, line.item_code);
         const requestedVariant = resolveRequestedExchangeVariant(input);
         const replacement = await client.query<{
           color: string;

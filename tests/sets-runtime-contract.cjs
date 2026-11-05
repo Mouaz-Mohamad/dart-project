@@ -124,3 +124,47 @@ assert(admin.includes('function syncAccess()') && admin.includes('dart:admin-aut
 assert(admin.includes("Selling Below Cost"), "Owner below-cost override must remain visibly warned");
 
 console.log("PASS Sets lazy runtime, storefront and Dart Eye contracts");
+
+// Execute the return form against server-projected Set membership, without using discount names.
+{
+  class Field {
+    constructor() { Object.assign(this, { value: "", dataset: {}, children: [], listeners: {}, hidden: false, disabled: false }); }
+    addEventListener(name, fn) { this.listeners[name] = fn; }
+    appendChild(child) { this.children.push(child); }
+    replaceChildren() { this.children = []; }
+  }
+  const ids = ["returnRequestForm", "return-request-type", "return-item-code", "return-exchange-options", "return-exchange-color", "return-exchange-size", "return-fee-summary", "return-fee-summary-text"];
+  const fields = Object.fromEntries(ids.map(id => [id, new Field()]));
+  const exchange = new Field();
+  fields["return-request-type"].querySelector = () => exchange;
+  const orders = [{ status: "Delivered", items: ["SET-1", "PLAIN-1"], priceSnapshot: [
+    { itemCode: "SET-1", modelCode: "M1", setComponent: true, discountSource: "Birthday" },
+    { itemCode: "PLAIN-1", modelCode: "M1", setComponent: false },
+  ] }];
+  const context = {
+    window: { addEventListener() {}, DartReturns: { normalizeType: value => value, chainIdForItem: () => "chain", completedExchangeCount: () => 0, courierPolicy: () => ({ label: "Existing fee policy" }) },
+      DartCatalog: { model: () => ({ modelId: "M1", sizeOptions: ["M"], colorOptions: ["Black"] }), available: () => 1 } },
+    document: { getElementById: id => fields[id], createElement: () => new Field() },
+    currentUser: () => null, read: key => key === "orders" ? orders : [], KEYS: { orders: "orders", items: "items", returns: "returns", models: "models" }, displayPhone: value => value,
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync("src/storefront/platform/return-form.js", "utf8"), context);
+  fields["return-item-code"].value = "SET-1";
+  fields["return-request-type"].value = "Exchange";
+  vm.runInContext("initializeReturnRequestForm()", context);
+  assert.equal(exchange.disabled, true);
+  assert.equal(fields["return-request-type"].value, "", "must not silently turn Exchange into Refund");
+  assert.equal(fields["return-exchange-options"].hidden, true);
+  assert.match(fields["return-fee-summary-text"].textContent, /لا تُستبدل/);
+  fields["return-request-type"].value = "Refund";
+  fields["return-request-type"].listeners.change();
+  assert.equal(fields["return-fee-summary-text"].textContent, "Existing fee policy", "Set refunds retain the existing policy");
+  fields["return-item-code"].value = "PLAIN-1";
+  fields["return-item-code"].listeners.change();
+  assert.equal(exchange.disabled, false, "standalone sale of the same model remains exchangeable");
+  fields["return-request-type"].value = "Exchange";
+  fields["return-request-type"].listeners.change();
+  assert.equal(fields["return-exchange-options"].hidden, false);
+  assert.equal(fields["return-exchange-color"].children[1].value, "Black");
+  console.log("PASS Set-component exchange denial and standalone/refund return-form behavior");
+}

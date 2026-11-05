@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:b96f71c11aa91339df1ecf0cc828ecf1282bce87843c0b242bb3f552665bb3f4 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:053c940255ff84de6d63460d563c5d72542b76564f204f1fac16626a4741836e */
 (function () {
   "use strict";
 
@@ -3030,6 +3030,10 @@
     ).trim();
   }
 
+  function isSetReturnItem(itemCode) {
+    return returnOrderLineForItem(deliveredOrderForItem(itemCode), itemCode)?.setComponent === true;
+  }
+
   function resolveReturnCatalogModel(modelId) {
     const wanted = normalizeReturnLookupValue(modelId);
     if (!wanted) return null;
@@ -3129,6 +3133,7 @@
       const itemCode = String(code?.value || "").trim();
       const order = deliveredOrderForItem(itemCode);
       const line = returnOrderLineForItem(order, itemCode);
+      if (line?.setComponent === true) return [];
       const modelId = returnModelIdFromLine(line);
       const model = resolveReturnCatalogModel(modelId);
       if (!model || !modelId) return [];
@@ -3171,6 +3176,10 @@
 
     const refresh = () => {
       const rules = returnRules();
+      const setComponent = isSetReturnItem(code?.value);
+      const exchangeOption = type?.querySelector('option[value="Exchange"]');
+      if (exchangeOption) exchangeOption.disabled = setComponent;
+      if (setComponent && rules?.normalizeType(type?.value) === "Exchange") type.value = "";
       const normalizedType = rules?.normalizeType(type?.value) || "";
       const isExchange = normalizedType === "Exchange";
       if (group) {
@@ -3191,7 +3200,8 @@
       }
 
       if (!normalizedType) {
-        if (feeBox) feeBox.hidden = true;
+        if (feeText) feeText.textContent = setComponent ? "قطع الطقم لا تُستبدل. يمكنك اختيار Refund للاسترجاع حسب الشروط." : "";
+        if (feeBox) feeBox.hidden = !setComponent;
         return;
       }
       const items = read(KEYS.items, []);
@@ -3479,6 +3489,10 @@
           const requestType = rules?.normalizeType(values.request_type) || "";
           if (!requestType) {
             setStatus(form, "اختر استبدال أو استرجاع.", true);
+            return;
+          }
+          if (requestType === "Exchange" && isSetReturnItem(values.item_code)) {
+            setStatus(form, "قطع الطقم لا تُستبدل. يمكنك تقديم طلب استرجاع حسب الشروط.", true);
             return;
           }
           if (API_BASE) {

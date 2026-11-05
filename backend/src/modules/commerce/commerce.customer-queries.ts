@@ -414,6 +414,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
                   jsonb_build_object(
                     'itemId', oi.inventory_item_id,
                     'itemCode', oi.item_code,
+                    'setComponent', EXISTS (SELECT 1 FROM order_set_components osc WHERE osc.order_item_id=oi.id),
                     'modelCode', oi.model_id,
                     'name', oi.model_name,
                     'color', oi.color,

@@ -48,6 +48,10 @@
     ).trim();
   }
 
+  function isSetReturnItem(itemCode) {
+    return returnOrderLineForItem(deliveredOrderForItem(itemCode), itemCode)?.setComponent === true;
+  }
+
   function resolveReturnCatalogModel(modelId) {
     const wanted = normalizeReturnLookupValue(modelId);
     if (!wanted) return null;
@@ -147,6 +151,7 @@
       const itemCode = String(code?.value || "").trim();
       const order = deliveredOrderForItem(itemCode);
       const line = returnOrderLineForItem(order, itemCode);
+      if (line?.setComponent === true) return [];
       const modelId = returnModelIdFromLine(line);
       const model = resolveReturnCatalogModel(modelId);
       if (!model || !modelId) return [];
@@ -189,6 +194,10 @@
 
     const refresh = () => {
       const rules = returnRules();
+      const setComponent = isSetReturnItem(code?.value);
+      const exchangeOption = type?.querySelector('option[value="Exchange"]');
+      if (exchangeOption) exchangeOption.disabled = setComponent;
+      if (setComponent && rules?.normalizeType(type?.value) === "Exchange") type.value = "";
       const normalizedType = rules?.normalizeType(type?.value) || "";
       const isExchange = normalizedType === "Exchange";
       if (group) {
@@ -209,7 +218,8 @@
       }
 
       if (!normalizedType) {
-        if (feeBox) feeBox.hidden = true;
+        if (feeText) feeText.textContent = setComponent ? "قطع الطقم لا تُستبدل. يمكنك اختيار Refund للاسترجاع حسب الشروط." : "";
+        if (feeBox) feeBox.hidden = !setComponent;
         return;
       }
       const items = read(KEYS.items, []);

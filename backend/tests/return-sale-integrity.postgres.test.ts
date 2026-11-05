@@ -69,6 +69,68 @@ describe("returns preserve each sale's inventory and money on the production sch
     "SELECT status,order_id,cart_reservation_id,return_request_id FROM inventory_items WHERE id=$1", [piece])).rows[0];
   const address = { country: "Egypt", governorate: "Cairo" as const, area: "Nasr City", street: "Test", building: "1", floor: "1", latitude: 30.05, longitude: 31.35 };
 
+  async function markAsSet(f: Awaited<ReturnType<typeof fixture>>) {
+    const group = (await store.pool.query(`INSERT INTO order_set_groups(
+      order_id,set_id,set_name_snapshot,set_version_snapshot,components_total_minor,set_base_price_minor,final_minor,piece_count)
+      VALUES($1,$2,'Historical Set',1,100000,100000,100000,2) RETURNING id`, [f.id, `S-${randomUUID()}`])).rows[0].id;
+    await store.pool.query(`INSERT INTO order_set_components(
+      group_id,order_item_id,model_id,component_unit_index,original_model_selling_minor,allocated_base_minor,allocated_final_minor)
+      SELECT $1,id,model_id,row_number() OVER(ORDER BY id),50000,50000,50000 FROM order_items WHERE order_id=$2`, [group, f.id]);
+  }
+
+  it("rejects exchange of either Set component without side effects, projects membership and still accepts refunds", async () => {
+    const f = await fixture();
+    await markAsSet(f);
+    const snapshot = await commerce.customerSnapshot(f.user);
+    const sale = snapshot.orders.find(row => row.orderId === f.code)!;
+    expect(sale.priceSnapshot).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemCode: f.piece, setComponent: true }),
+      expect.objectContaining({ itemCode: f.second, setComponent: true }),
+    ]));
+    for (const itemCode of [f.piece, f.second]) {
+      await expect(customerReturns.submitReturn(f.user, { itemCode, requestType: "Exchange", requestedColor: "Navy", requestedSize: "L", reason: "Set exchange", address }, "set-denied"))
+        .rejects.toMatchObject({ statusCode: 422, code: "SET_EXCHANGE_NOT_ALLOWED" });
+      expect(await ownership(itemCode)).toMatchObject({ status: "Sold", order_id: f.code });
+    }
+    expect((await store.pool.query("SELECT count(*)::int AS count FROM return_requests WHERE payload->>'orderId'=$1", [f.code])).rows[0].count).toBe(0);
+    await expect(customerReturns.submitReturn(f.user, { itemCode: f.piece, requestType: "Refund", reason: "Set refund", address }, "set-refund")).resolves.toHaveProperty("id");
+    await expect(commerce.adminManualReturn(actor, manual(f.second), "set-manual-refund")).resolves.toMatchObject({ refundAmount: 500 });
+  });
+
+  it.each(["pending", "pickup"])("blocks legacy %s Set exchanges while allowing rejection/backward recovery", async phase => {
+    const f = await fixture(), replacement = `REPLACE-${randomUUID()}`, rep = randomUUID();
+    await store.pool.query(`INSERT INTO inventory_items(id,item_code,model_id,color,size,status,cost_snapshot_minor)
+      VALUES($1,$1,$2,'Navy','L','In stock',30000)`, [replacement, f.model]);
+    const exchange = await customerReturns.submitReturn(f.user, { itemCode: f.piece, requestType: "Exchange", requestedColor: "Navy", requestedSize: "L", reason: "Legacy exchange", address }, "legacy-set");
+    if (phase === "pickup") {
+      await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
+        VALUES($1,'representative',$2,$2,'synthetic','active',now())`, [rep, `${rep}@example.test`]);
+      await store.pool.query(`INSERT INTO representatives(user_id,full_name,national_id_hash,national_id_last4,approval_status,approved_by,approved_at)
+        VALUES($1::uuid,'Synthetic Courier',md5($1::text)||md5($1::text),'2222','approved',$2,now())`, [rep, actor]);
+      await commerce.adminReturnAction(actor, exchange.id, { action: "approve", replacementItemCode: replacement }, "legacy-set");
+      await commerce.adminReturnAction(actor, exchange.id, { action: "assign", representativeId: rep }, "legacy-set");
+      await commerce.representativeReturnAction(rep, exchange.id, "start");
+      await commerce.updateRepresentativeLocation(rep, address.latitude, address.longitude, 5);
+    }
+    // Historical Set membership survives removal of the catalog Set and any discount choice.
+    await markAsSet(f);
+    const before = await ownership(replacement);
+    await expect(phase === "pending"
+      ? commerce.adminReturnAction(actor, exchange.id, { action: "approve", replacementItemCode: replacement }, "legacy-set-denied")
+      : commerce.representativeReturnAction(rep, exchange.id, "complete"))
+      .rejects.toMatchObject({ code: "SET_EXCHANGE_NOT_ALLOWED" });
+    expect(await ownership(f.piece)).toMatchObject({ status: "Sold", order_id: f.code });
+    expect(await ownership(replacement)).toEqual(before);
+    expect(Number((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [f.id])).rows[0].amount_refunded_minor)).toBe(0);
+    if (phase === "pickup") {
+      await commerce.adminReturnAction(actor, exchange.id, { action: "back" }, "legacy-set-back");
+      await commerce.adminReturnAction(actor, exchange.id, { action: "back" }, "legacy-set-back");
+      await commerce.adminReturnAction(actor, exchange.id, { action: "back" }, "legacy-set-back");
+    }
+    await commerce.adminReturnAction(actor, exchange.id, { action: "reject", reason: "Set exchange unavailable" }, "legacy-set-reject");
+    expect(await ownership(replacement)).toMatchObject({ status: "In stock", order_id: null });
+  });
+
   it("completes a different-cost exchange, inspection and full refund without rewriting sale COGS or creating gross profit", async () => {
     const finance = new FinanceService(store.pool);
     const before = await finance.summary("2000-01-01", "2099-12-31");
@@ -76,7 +138,7 @@ describe("returns preserve each sale's inventory and money on the production sch
     await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
       VALUES($1,'representative',$2,$2,'synthetic','active',now())`, [rep, `${rep}@example.test`]);
     await store.pool.query(`INSERT INTO representatives(user_id,full_name,national_id_hash,national_id_last4,approval_status,approved_by,approved_at)
-      VALUES($1,'Synthetic Courier',repeat('2',64),'2222','approved',$2,now())`, [rep, actor]);
+      VALUES($1::uuid,'Synthetic Courier',md5($1::text)||md5($1::text),'2222','approved',$2,now())`, [rep, actor]);
     await store.pool.query(`INSERT INTO inventory_items(id,item_code,model_id,color,size,status,cost_snapshot_minor)
       VALUES($1,$1,$2,'Navy','L','In stock',40000)`, [replacement, f.model]);
     const exchange = await customerReturns.submitReturn(f.user, { itemCode: f.piece, requestType: "Exchange", requestedColor: "Navy", requestedSize: "L", reason: "Synthetic exchange", address }, "cost-chain");
