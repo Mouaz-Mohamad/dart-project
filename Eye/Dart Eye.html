@@ -2154,7 +2154,17 @@
 <!--============================= Finance: the fixed interface lives in HTML; JavaScript only fills saved data by ID. -->
 
         <!-- BEGIN News management: same First / Second / table structure as existing sections. -->
-        <section id="news" class="dashboard-section" hidden aria-label="News management">
+        <section id="news" class="dashboard-section" hidden aria-labelledby="dart-news-title">
+            <header class="dart-workspace-page-header">
+                <div><p class="dart-workspace-eyebrow"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> EDITORIAL CENTER</p>
+                <h2 id="dart-news-title">News Management</h2>
+                <p>Create, review and publish Dart updates. Keep drafts separate from live news.</p></div>
+                <span class="dart-workspace-badge"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Content Studio</span>
+            </header>
+            <article class="dart-news-workspace" aria-label="News records, search and publishing">
+                <div class="dart-workspace-inner-head">
+                    <div><h3>News Library</h3><p>Filter by publication status, preview before publishing, or edit existing stories.</p></div>
+                </div>
             <div class="first filter-bar">
                 <div class="search-box"><input type="search" id="news-search" placeholder="Search News" maxlength="160" aria-label="Search News"><i class="bx bx-search"></i></div>
                 <div class="select-box"><select id="news-status" aria-label="Publication status"><option value="all">All statuses</option><option value="draft">Draft</option><option value="published">Published</option></select><i class="bx bx-chevron-down arrow-icon"></i></div>
@@ -2169,6 +2179,7 @@
                 <div id="news-rows"></div>
             </div>
             <div class="dart-news-pagination"><button type="button" id="news-page-prev" disabled>Previous</button><span id="news-page-count"></span><button type="button" id="news-page-next" disabled>Next</button></div>
+            </article>
             <template id="news-row-template">
                 <div class="model-row dart-news-row">
                     <input class="news-checkbox" type="checkbox" data-news-select aria-label="Select News">
@@ -2214,6 +2225,10 @@
                 <button id="finance-add-expense-btn" type="button" class="dart-finance-primary" data-finance-add="expenses"><i class="fa-solid fa-plus"></i> Add Expense</button>
             </div>
 
+            <div class="dart-finance-period-heading">
+                <div><p class="dart-workspace-eyebrow">REPORTING PERIOD</p><h2>Choose a date range</h2></div>
+                <span>All finance views use the same period</span>
+            </div>
             <div id="dart-finance-period" data-finance-period="finance">
                 <div id="finance-period-control" class="dart-period-control">
                     <div class="dart-period-copy">
@@ -2242,20 +2257,44 @@
             </div>
 
             <nav id="finance-tabs" class="dart-finance-tabs" aria-label="Finance reports">
-                <button id="finance-tab-overview" type="button" data-finance-tab="overview" class="active">Overview</button>
-                <button id="finance-tab-expenses" type="button" data-finance-tab="expenses">Expenses</button>
-                <button id="finance-tab-budgets" type="button" data-finance-tab="budgets">Budgets</button>
-                <button id="finance-tab-invoices" type="button" data-finance-tab="invoices">Invoices</button>
-                <button id="finance-tab-goals" type="button" data-finance-tab="goals">Goals</button>
-                <button id="finance-tab-pnl" type="button" data-finance-tab="pnl">P&amp;L</button>
-                <button id="finance-tab-cashflow" type="button" data-finance-tab="cashflow">Cash Flow</button>
-                <button id="finance-tab-cod" type="button" data-finance-tab="cod">COD</button>
-                <button id="finance-tab-models" type="button" data-finance-tab="models">Models</button>
-                <button id="finance-tab-marketing" type="button" data-finance-tab="marketing">Marketing</button>
-                <button id="finance-tab-alerts" type="button" data-finance-tab="alerts">Alerts</button>
-                <button id="finance-tab-drawlog" type="button" data-finance-tab="drawlog">Draw Log</button>
+                <div class="dart-finance-tab-group" role="group" aria-label="Essentials">
+                    <div class="dart-finance-tab-group-head"><strong>Essentials</strong><small>Records & budgets</small></div>
+                    <div class="dart-finance-tab-group-buttons">
+                        <button id="finance-tab-overview" type="button" data-finance-tab="overview" class="active">Overview</button>
+                        <button id="finance-tab-expenses" type="button" data-finance-tab="expenses">Expenses</button>
+                        <button id="finance-tab-budgets" type="button" data-finance-tab="budgets">Budgets</button>
+                        <button id="finance-tab-invoices" type="button" data-finance-tab="invoices">Invoices</button>
+                    </div>
+                </div>
+                <div class="dart-finance-tab-group" role="group" aria-label="Financial Reports">
+                    <div class="dart-finance-tab-group-head"><strong>Financial Reports</strong><small>Accounting & collections</small></div>
+                    <div class="dart-finance-tab-group-buttons">
+                        <button id="finance-tab-pnl" type="button" data-finance-tab="pnl">P&amp;L</button>
+                        <button id="finance-tab-cashflow" type="button" data-finance-tab="cashflow">Cash Flow</button>
+                        <button id="finance-tab-cod" type="button" data-finance-tab="cod">COD</button>
+                    </div>
+                </div>
+                <div class="dart-finance-tab-group" role="group" aria-label="Performance">
+                    <div class="dart-finance-tab-group-head"><strong>Performance</strong><small>Targets & channels</small></div>
+                    <div class="dart-finance-tab-group-buttons">
+                        <button id="finance-tab-goals" type="button" data-finance-tab="goals">Goals</button>
+                        <button id="finance-tab-models" type="button" data-finance-tab="models">Models</button>
+                        <button id="finance-tab-marketing" type="button" data-finance-tab="marketing">Marketing</button>
+                    </div>
+                </div>
+                <div class="dart-finance-tab-group" role="group" aria-label="Monitoring">
+                    <div class="dart-finance-tab-group-head"><strong>Monitoring</strong><small>Alerts & draws</small></div>
+                    <div class="dart-finance-tab-group-buttons">
+                        <button id="finance-tab-alerts" type="button" data-finance-tab="alerts">Alerts</button>
+                        <button id="finance-tab-drawlog" type="button" data-finance-tab="drawlog">Draw Log</button>
+                    </div>
+                </div>
             </nav>
 
+            <div class="dart-finance-content-heading">
+                <span class="dart-workspace-eyebrow">SELECTED REPORT</span>
+                <span>Switch reports using the groups above; data and access are unchanged.</span>
+            </div>
             <div id="dart-finance-content" aria-live="polite"></div>
         </section>
 
@@ -2353,7 +2392,7 @@
                 <div>
                     <p class="dart-settings-eyebrow">DART CONTROL CENTER</p>
                     <h1 id="settings-page-title">Settings</h1>
-                    <p>Manage dashboard preferences and system data.</p>
+                    <p>Manage display preferences, sales rules, campaigns, media and staff access. Each group saves independently.</p>
                 </div>
                 <i class="fa-solid fa-gear" aria-hidden="true"></i>
             </header>
@@ -2374,6 +2413,19 @@
                 </button>
             </nav>
 
+            <nav id="settings-quick-nav" class="dart-settings-quick-nav" aria-label="Quick access to General settings">
+                <div class="dart-settings-quick-heading"><strong>Jump to a setting</strong><span>Go straight to the section you need — no changes are saved automatically.</span></div>
+                <div class="dart-settings-quick-links">
+                    <button type="button" data-settings-go="settings-display-card"><i class="fa-solid fa-table-columns" aria-hidden="true"></i> Display</button>
+                    <button type="button" data-settings-go="settings-commerce-card"><i class="fa-solid fa-calculator" aria-hidden="true"></i> Pricing &amp; fees</button>
+                    <button type="button" data-settings-go="settings-cod-risk-card"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> COD risk</button>
+                    <button type="button" data-settings-go="settings-waiting-card"><i class="fa-regular fa-clock" aria-hidden="true"></i> Waiting</button>
+                    <button type="button" data-settings-go="settings-site-discount-card"><i class="fa-solid fa-percent" aria-hidden="true"></i> Promotions</button>
+                    <button type="button" data-settings-go="settings-media-card"><i class="fa-regular fa-images" aria-hidden="true"></i> Images</button>
+                    <button type="button" data-settings-go="settings-announcements-card"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> Announcements</button>
+                    <button type="button" data-settings-go="settings-model-cards-card"><i class="fa-solid fa-shirt" aria-hidden="true"></i> Product cards</button>
+                </div>
+            </nav>
             <div id="settings-content" class="dart-settings-grid" data-active-settings-tab="general">
                 <article id="settings-display-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-table-columns"></i></div>
