@@ -1,0 +1,467 @@
+/* Dart Eye / Items and Clients refresh.
+   Scope everything to two dashboard sections and their existing client-detail drawer.
+   Existing permissions, saving, grouped inventory, filters, modal actions and APIs stay unchanged. */
+#items.dashboard-section,#customers.dashboard-section{
+  min-width:0;min-height:100dvh;height:auto;
+  overflow:visible;padding:24px clamp(16px,2.4vw,32px) 52px!important;
+  background:#f8f6f7;color:#382b35;
+}
+#items .dart-directory-header,#customers .dart-directory-header{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  gap:12px;margin:0 0 18px;padding:2px;
+}
+#items .dart-directory-header-copy,#customers .dart-directory-header-copy{min-width:0;flex:1 1 220px}
+#items .dart-directory-eyebrow,#customers .dart-directory-eyebrow{
+  display:flex;align-items:center;gap:8px;
+  margin:0 0 5px;color:#98324f;font-size:10px;font-weight:800;letter-spacing:.1em;
+}
+#items .dart-directory-header h2,#customers .dart-directory-header h2{
+  margin:0 0 6px;font-size:clamp(24px,2.4vw,31px);line-height:1.3;color:#421d2d;font-weight:800;
+}
+#items .dart-directory-header p:not(.dart-directory-eyebrow),
+#customers .dart-directory-header p:not(.dart-directory-eyebrow){
+  margin:0;color:#7b6b75;font-size:12px;line-height:1.65;max-width:720px;
+}
+#items .dart-directory-badge,#customers .dart-directory-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  min-height:41px;padding:10px 13px;border:1px solid #e5d4dc;
+  border-radius:10px;background:#fff;color:#783451;font-size:12px;font-weight:750;
+}
+#items .dart-directory-workspace,#customers .dart-directory-workspace{
+  display:block;position:relative;min-width:0;width:100%;
+  padding:18px;margin:0;border:1px solid #e9dde3;border-radius:15px;
+  background:#fff;box-shadow:none;
+}
+#items .dart-directory-workspace-head,#customers .dart-directory-workspace-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin:0 0 14px;
+}
+#items .dart-directory-workspace-head h3,#customers .dart-directory-workspace-head h3{
+  margin:0 0 4px;font-size:17px;line-height:1.4;font-weight:800;color:#452131;
+}
+#items .dart-directory-workspace-head p,#customers .dart-directory-workspace-head p{
+  margin:0;color:#847681;font-size:12px;line-height:1.55;
+}
+#items .first.filter-bar,#customers .first.filter-bar{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  width:100%;min-width:0;margin:0;padding:12px;
+  border:1px solid #eee4e8;border-radius:11px;box-shadow:none;background:#fcfafb;
+}
+#items .first.filter-bar .search-box,#customers .first.filter-bar .search-box{
+  flex:2 1 220px;max-width:none;min-width:0;
+}
+#items .first.filter-bar .search-box input,#customers .first.filter-bar .search-box input{
+  width:100%;min-height:42px;height:auto;
+  padding:10px 36px 10px 12px;border:1px solid #d9cbd3;border-radius:9px;
+  background:#fff;color:#42343d;font-size:12px;
+}
+#items .first.filter-bar .search-box i,#customers .first.filter-bar .search-box i{
+  left:auto;right:12px;color:#805069;opacity:.8;
+}
+#items .first.filter-bar .select-box,#customers .first.filter-bar .select-box{
+  flex:1 1 135px;min-width:125px;width:auto;max-width:100%;
+}
+#items .first.filter-bar .select-box select,#customers .first.filter-bar .select-box select{
+  display:block;width:100%;min-height:42px;height:auto;
+  padding:9px 30px 9px 11px;border:1px solid #d9cbd3;border-radius:9px;
+  background:#fff;color:#4d3b47;font-size:12px;
+}
+#items .first.filter-bar .select-box .arrow-icon,
+#customers .first.filter-bar .select-box .arrow-icon{
+  left:auto;right:9px;pointer-events:none;color:#7f5165;
+}
+#items .first.filter-bar .add-btn,#customers .first.filter-bar .add-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  flex:0 1 auto;min-height:42px;height:auto;width:auto;margin:0;
+  padding:9px 14px;border:1px solid #ab012b;border-radius:9px;
+  background:#ab012b;color:#fff;font-size:12px;font-weight:800;
+  white-space:nowrap;cursor:pointer;
+}
+#items .first.filter-bar .add-btn:hover,#customers .first.filter-bar .add-btn:hover{
+  border-color:#880022;background:#880022;
+}
+#customers .first.filter-bar .dart-reset-requests-btn{
+  border-color:#e1ced7;background:#fff;color:#7f3150;
+}
+#customers .first.filter-bar .dart-reset-requests-btn:hover{background:#f9eff3;border-color:#ca9cab}
+#customers #passwordRequestsCount{
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:99px;min-width:22px;padding:3px 5px;
+  background:#f6e8ee;color:#80304c;font-size:11px;font-weight:800;
+}
+#items .first.filter-bar .dart-clear-filters,#customers .first.filter-bar .dart-clear-filters{
+  min-height:42px;height:auto;border-radius:9px;
+  border:1px solid #dcc9d3;background:#fff;color:#78304b;font-size:12px;
+}
+#items .dart-filter-summary,#customers .dart-filter-summary{
+  display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+  margin:7px 0 10px;padding:7px 2px;color:#766a74;font-size:12px;
+}
+#items .dart-filter-summary button,#customers .dart-filter-summary button{
+  min-height:32px;border:1px solid #e7cfda;border-radius:99px;
+  background:#fcf2f5;color:#7f3050;font-size:11px;
+}
+#items .second,#customers .second{
+  display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;
+  gap:8px;margin:0 0 12px;padding:0;min-height:40px;width:100%;text-align:left;
+}
+#items .second button,#customers .second button{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:39px;height:auto;width:auto;padding:9px 13px;
+  border:1px solid #d7c3cc;border-radius:9px;
+  background:#fff;color:#73314a;font-size:12px;font-weight:700;
+}
+#items .second .delete-btn,#customers .second .delete-btn{
+  border-color:#edcbd0;color:#aa3241;background:#fff8f9;
+}
+#items .second button[hidden],#customers .second button[hidden],
+#items .first.filter-bar button[hidden],#customers .first.filter-bar button[hidden]{display:none!important}
+#items .second button:disabled,#customers .second button:disabled{opacity:.48;cursor:not-allowed}
+#items .inventory-view-buttons{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-inline-start:auto;
+}
+#items .inventory-view-buttons button{
+  min-height:39px;height:auto;padding:8px 13px;
+  border:1px solid #d7c0c9;border-radius:9px;background:#fff;color:#78304b;
+  font-size:12px;font-weight:750;
+}
+#items .inventory-view-buttons button.active,
+#items .inventory-view-buttons button[aria-pressed="true"]{
+  background:#ab012b;border-color:#ab012b;color:#fff;
+}
+#items .cont-titel,#customers .cont-titel{
+  position:relative;min-width:0;width:100%;
+  height:auto;max-height:none;
+  margin:0;padding:0;border:0;border-radius:0;background:transparent;
+}
+/* Keep the inventory Groups view's own scroll container for position restoration. */
+#items #groups-view{max-height:75dvh;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+#items #groups-view[hidden],#items #all-items-view[hidden],#items #items-groups-view[hidden]{display:none!important}
+#items #all-items-view,#items #items-groups-view,#customers .cont-titel{
+  overflow:visible!important;max-height:none!important;
+}
+#items .cont-titel>.title-name,#customers .cont-titel>.title-name{
+  display:flex!important;align-items:center;gap:11px!important;
+  position:relative;top:auto;z-index:1;width:100%!important;min-width:0!important;
+  margin:0 0 10px;padding:10px 13px!important;
+  border:0;border-radius:9px;background:#f7f1f4!important;color:#725665;
+}
+#items .cont-titel>.title-name h2,#customers .cont-titel>.title-name h2{display:none!important}
+#items .cont-titel>.title-name .dart-compact-heading,
+#customers .cont-titel>.title-name .dart-compact-heading{
+  font-size:12px;font-weight:750;color:#6c4e5e;
+}
+#items .cont-titel>.title-name input[type="checkbox"],
+#customers .cont-titel>.title-name input[type="checkbox"]{
+  flex:none;width:18px;height:18px;accent-color:#ab012b;
+}
+#items #groups-container{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));
+  align-items:start;gap:11px;
+}
+#items #groups-view .inventory-groups-heading{
+  margin:0 0 10px;padding:0 2px;color:#7c6b76;font-size:12px;
+}
+#items #groups-container>.group-row{
+  display:grid;width:100%;min-width:0;gap:12px;
+  margin:0!important;padding:13px!important;cursor:pointer;
+  border:1px solid #e7dbe1;border-radius:12px;background:#fff;
+  box-shadow:none;transition:border-color .14s ease,box-shadow .14s ease;
+}
+#items #groups-container>.group-row:hover,#items #groups-container>.group-row:focus-visible{
+  border-color:#c5a6b3;box-shadow:0 4px 16px #3b142109;
+  outline:none;
+}
+#items .inventory-group-identity{display:flex;align-items:center;gap:11px;min-width:0}
+#items .inventory-group-identity strong{font-size:13px;color:#4b2738;line-height:1.5}
+#items .inventory-group-identity span{font-size:11px;color:#83727d}
+#items .inventory-group-metrics{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0;
+}
+#items .inventory-group-metrics>div{
+  min-width:0;padding:9px 7px;border:1px solid #eee6ea;
+  border-radius:8px;background:#fcfafb;
+}
+#items .inventory-group-metrics dt{font-size:10px;line-height:1.4;color:#826f7a}
+#items .inventory-group-metrics dd{margin:4px 0 0;font-size:17px;font-weight:800;color:#3f2734}
+#items .inventory-group-footer{
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
+  gap:8px;border-top:1px solid #f0e9ec;padding-top:9px;
+  color:#7d3854;font-size:11px;
+}
+#items #models-container,#items #items-container,#customers #customers-container{
+  min-width:0;width:100%;
+}
+#items #items-container>.dart-compact-record,#customers #customers-container>.dart-compact-record{
+  width:100%;min-width:0;margin:0 0 9px;padding:0!important;
+  border:1px solid #e9dfe5;border-radius:11px;background:#fff;
+  box-shadow:none;
+}
+#items #items-container>.dart-compact-record:hover,#customers #customers-container>.dart-compact-record:hover{
+  border-color:#cab6c1;box-shadow:0 4px 14px #32111d0a;
+}
+#items #items-container .dart-record-main,#customers #customers-container .dart-record-main{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;min-width:0;
+}
+#items #items-container .dart-record-fields,#customers #customers-container .dart-record-fields{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px 13px;flex:1 1 auto;min-width:0;
+}
+#items .dart-record-field small,#customers .dart-record-field small{
+  color:#837581;font-size:10px;font-weight:650;line-height:1.35;
+}
+#items .dart-record-field strong,#customers .dart-record-field strong{
+  color:#362a33;font-size:12px;font-weight:750;line-height:1.55;overflow-wrap:anywhere;
+}
+#items .dart-record-field img{width:48px;height:61px;object-fit:cover;border-radius:8px;background:#faf4f6}
+#items #items-container .dart-record-controls,#customers #customers-container .dart-record-controls{
+  display:flex;align-items:center;justify-content:flex-end;gap:7px;
+  flex:0 0 auto;min-width:95px;
+}
+#items .dart-record-controls button,#customers .dart-record-controls button{
+  min-height:36px;height:auto;padding:8px 12px;
+  border:1px solid #d5c3cb;border-radius:8px;background:#fff;
+  color:#762b47;font-size:11px;font-weight:750;
+}
+#items .dart-record-controls button:hover,#customers .dart-record-controls button:hover{
+  background:#f9edf2;
+}
+#items .dart-record-controls button[hidden],#customers .dart-record-controls button[hidden]{
+  display:none!important;
+}
+/* Client rows intentionally remain neutral with no status tint. */
+#customers .model-row,#customers .dart-compact-record{background:#fff!important}
+#customers .dart-record-field [data-dart-kind="badge"]{
+  display:inline-flex;align-items:center;max-width:100%;
+  padding:4px 7px;border-radius:99px;line-height:1.35;
+}
+/* The customer's existing drawer is reused; summary content is not duplicated. */
+#customers .dart-record-dialog{
+  width:min(940px,97vw);max-width:none;
+  background:#f9f7f8;padding:0 22px 30px;border-left:1px solid #e3d5dd;
+}
+#customers .dart-record-dialog-head{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  gap:13px;position:sticky;top:0;z-index:5;
+  margin:0 -22px 17px;padding:20px 22px 15px;
+  background:#fff;border-bottom:1px solid #e9dce2;
+}
+#customers .dart-record-dialog-head h2{
+  color:#421d2e;font-size:clamp(18px,2vw,23px);font-weight:800;line-height:1.35;
+}
+#customers .dart-record-close{
+  min-height:40px;padding:9px 14px;border-radius:9px;
+  background:#fff;border:1px solid #d6c3cb;color:#7d3150;
+}
+#customers .dart-record-close:hover{background:#f9edf2}
+#customers .dart-client-panels{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:11px;
+  padding:0 0 15px;min-width:0;
+}
+#customers .dart-client-panels>details{
+  display:block;min-width:0;margin:0;border:1px solid #e5dae0;
+  border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 1px 6px #42172805;
+}
+#customers .dart-client-panels>details[open]{
+  border-color:#d5bfca;box-shadow:0 4px 16px #38152308;
+}
+#customers .dart-client-panels>details>summary{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  min-height:52px;padding:14px 17px;list-style:none;
+  border-bottom:1px solid transparent;
+  color:#4b2839;font-size:13px;font-weight:800;line-height:1.5;
+  background:#fff;cursor:pointer;
+}
+#customers .dart-client-panels>details>summary::-webkit-details-marker{display:none}
+#customers .dart-client-panels>details>summary::after{
+  content:"＋";display:grid;place-items:center;flex:none;
+  width:27px;height:27px;border:1px solid #e5d1da;border-radius:8px;
+  background:#faf0f4;color:#8d3455;font-size:18px;font-weight:500;
+}
+#customers .dart-client-panels>details[open]>summary{
+  color:#7b2646;background:#fcf7f9;border-bottom-color:#efe4e9;
+}
+#customers .dart-client-panels>details[open]>summary::after{
+  content:"−";background:#ab012b;border-color:#ab012b;color:#fff;
+}
+#customers .dart-client-panels>details>summary:hover{background:#f9eff3}
+#customers .dart-client-panels>details>summary:focus-visible{
+  outline:3px solid #ab012b;outline-offset:-3px;
+}
+#customers .dart-client-panels>details[data-client-panel="general"] .dart-record-detail-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+  min-width:0;padding:15px 17px 18px;
+}
+#customers .dart-client-panels .dart-record-detail-field{
+  min-width:0;display:grid;align-content:start;gap:5px;
+  padding:11px 12px;border:1px solid #eee4e9;border-radius:9px;
+  background:#fff;color:#342b34;
+}
+#customers .dart-client-panels .dart-record-detail-field>h3{
+  margin:0;color:#786674;font-size:10px;font-weight:750;line-height:1.4;
+}
+#customers .dart-client-panels .dart-record-detail-field .text-item{
+  margin:0;padding:0;font-size:12px;font-weight:700;line-height:1.6;
+}
+#customers .dart-client-panels .dart-record-detail-actions{
+  grid-column:1/-1;border-color:#e6d4dc;background:#fbf8fa;
+}
+#customers .dart-client-panels .dart-record-detail-actions .row-action-btns{
+  display:flex;flex-wrap:wrap;gap:8px;
+}
+#customers .dart-client-panels .dart-record-detail-actions button{
+  min-width:36px;min-height:36px;border:1px solid #d7c4cb;
+  border-radius:8px;background:#fff;color:#742c48;
+}
+#customers .dart-client-panel-body{
+  display:block;min-width:0;padding:14px 17px 18px;background:#fff;
+}
+#customers .dart-client-section-tools,#customers .dart-client-manual-actions{
+  display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;
+}
+#customers .dart-client-tool,#customers .dart-client-order,
+#customers .dart-client-discount-form button{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:36px;height:auto;padding:8px 12px;border:1px solid #d5bcc8;
+  border-radius:8px;background:#fff;color:#762c49;
+  font-size:11px;font-weight:750;cursor:pointer;
+}
+#customers .dart-client-tool:hover,#customers .dart-client-order:hover,
+#customers .dart-client-discount-form button:hover{background:#f8edf2}
+#customers .dart-client-tool:disabled,#customers .dart-client-order:disabled,
+#customers .dart-client-discount-form button:disabled{opacity:.5;cursor:not-allowed}
+#customers .dart-client-table-wrap{
+  min-width:0;max-width:100%;overflow-x:auto;
+  border:1px solid #ebe1e6;border-radius:10px;background:#fff;
+}
+#customers .dart-client-table{
+  width:100%;min-width:490px;border-collapse:separate;border-spacing:0;
+  font-size:12px;color:#42343e;
+}
+#customers .dart-client-table thead th{
+  position:sticky;top:0;z-index:1;padding:11px 12px;
+  background:#f7f0f4;color:#704357;border-bottom:1px solid #e9d8e1;
+  font-size:11px;font-weight:800;line-height:1.4;
+}
+#customers .dart-client-table tbody td{
+  padding:12px;border-bottom:1px solid #f0e8ec;
+  line-height:1.6;vertical-align:top;overflow-wrap:anywhere;
+}
+#customers .dart-client-table tbody tr:last-child td{border-bottom:0}
+#customers .dart-client-table tbody tr:hover{background:#fcf8fa}
+#customers .dart-client-table small{color:#837582;font-size:10px;line-height:1.5}
+#customers .dart-client-benefits{
+  display:grid;gap:8px;margin:0 0 16px;
+}
+#customers .dart-client-benefits h3{
+  margin:0;color:#4d2739;font-size:14px;font-weight:800;
+}
+#customers .dart-client-benefits article{
+  min-width:0;margin:0;padding:11px 13px;border:1px solid #eadce3;
+  border-radius:9px;background:#fdf9fb;font-size:12px;line-height:1.6;color:#47343d;
+}
+#customers .dart-client-benefits article b{color:#7d2e4a}
+#customers .dart-client-benefits>p{
+  margin:4px 0;padding:10px 12px;border-radius:8px;
+  background:#f7eef2;color:#70465a;font-size:11px;line-height:1.7;
+}
+#customers .dart-client-discount-form{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;margin:14px 0;padding:16px;border:1px solid #e5d1dc;
+  border-radius:12px;background:#fcf9fa;
+}
+#customers .dart-client-discount-form h3,#customers .dart-client-discount-form p,
+#customers .dart-client-discount-form>div{grid-column:1/-1}
+#customers .dart-client-discount-form h3{margin:0;color:#4b2638;font-size:15px}
+#customers .dart-client-discount-form p{margin:0;color:#796874;font-size:11px;line-height:1.6}
+#customers .dart-client-discount-form label{
+  display:grid;align-content:start;gap:6px;
+  min-width:0;color:#684f5e;font-size:11px;font-weight:700;
+}
+#customers .dart-client-discount-form input,
+#customers .dart-client-discount-form select{
+  box-sizing:border-box;width:100%;min-width:0;min-height:41px;
+  padding:9px 11px;border:1px solid #d9c7cf;border-radius:8px;
+  background:#fff;color:#3b2b35;font-size:12px;
+}
+#customers .dart-client-discount-form input:focus-visible,
+#customers .dart-client-discount-form select:focus-visible{
+  outline:2px solid #ab012b;outline-offset:1px;
+}
+#customers .dart-client-discount-form button[type="submit"]{
+  border-color:#ab012b;background:#ab012b;color:#fff;
+}
+#customers .dart-client-form-status{
+  color:#87304d;font-size:11px;line-height:1.7;
+}
+#customers .dart-empty-state{
+  padding:18px;border:1px dashed #e3d5dc;border-radius:9px;
+  background:#fcf9fa;color:#83737d;font-size:12px;line-height:1.6;
+}
+/* Global confirmation dialog for destructive customer actions must remain usable. */
+.dart-client-confirm{
+  width:min(460px,94vw);padding:24px;border:1px solid #d9c4ce;
+  border-radius:14px;background:#fff;color:#3d2733;
+}
+.dart-client-confirm::backdrop{background:#25131e99}
+@media(max-width:1200px){
+  #items #items-container .dart-record-fields,#customers #customers-container .dart-record-fields{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media(max-width:768px){
+  #items.dashboard-section,#customers.dashboard-section{
+    width:100%!important;margin-left:0!important;
+    min-height:100dvh;padding:16px 12px 100px!important;
+  }
+  #items .dart-directory-badge,#customers .dart-directory-badge{display:none}
+  #items .dart-directory-workspace,#customers .dart-directory-workspace{
+    padding:12px;border-radius:12px;
+  }
+  #items .first.filter-bar,#customers .first.filter-bar{gap:8px;padding:10px}
+  #items .first.filter-bar .search-box,#customers .first.filter-bar .search-box{flex:1 1 100%}
+  #items .first.filter-bar .select-box,#customers .first.filter-bar .select-box{
+    min-width:0;flex:1 1 calc(50% - 8px);
+  }
+  #items .first.filter-bar .add-btn,#customers .first.filter-bar .add-btn{flex:1 1 auto}
+  #items .second,#customers .second{gap:7px;flex-wrap:wrap}
+  #items .inventory-view-buttons{margin-inline-start:0}
+  #items #items-container .dart-record-main,#customers #customers-container .dart-record-main{
+    flex-wrap:wrap;align-items:flex-start;gap:10px;padding:11px;
+  }
+  #items #items-container .dart-record-fields,#customers #customers-container .dart-record-fields{
+    grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;
+  }
+  #items #items-container .dart-record-controls,#customers #customers-container .dart-record-controls{
+    flex:1 1 100%;justify-content:flex-end;
+    padding-top:9px;border-top:1px solid #f0e7eb;
+  }
+  #items #groups-container{grid-template-columns:minmax(0,1fr)}
+  #items #groups-view{max-height:70dvh}
+  #customers .dart-record-dialog{
+    width:100vw;max-width:100vw;padding:0 12px 25px;
+  }
+  #customers .dart-record-dialog-head{
+    margin:0 -12px 12px;padding:16px 12px 13px;
+  }
+  #customers .dart-client-panels{gap:9px}
+  #customers .dart-client-panels>details>summary{min-height:47px;padding:12px 13px;font-size:12px}
+  #customers .dart-client-panels>details[data-client-panel="general"] .dart-record-detail-grid{
+    gap:8px;padding:10px;
+  }
+  #customers .dart-client-panel-body{padding:12px}
+  #customers .dart-client-discount-form{grid-template-columns:minmax(0,1fr);padding:12px}
+  #customers .dart-client-table{min-width:440px}
+}
+@media(max-width:420px){
+  #items .inventory-group-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #customers .dart-client-panels>details[data-client-panel="general"] .dart-record-detail-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+  #customers .dart-client-panel-body{padding:10px}
+  #customers .dart-client-table{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){
+  #items #groups-container>.group-row,#items #items-container>.dart-compact-record,
+  #customers #customers-container>.dart-compact-record{transition:none}
+}
