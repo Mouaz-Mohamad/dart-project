@@ -196,7 +196,7 @@ const server = http.createServer((request, response) => {
       // known warnings despite a correct authentication redirect. Keep every
       // other warning (including real errors elsewhere) as a smoke failure.
       if (relativeUrl === "profile.html" && message.type() === "warning" &&
-          /^Dart (?:reviews are temporarily unavailable|Sets catalog unavailable) TypeError: Failed to fetch\b/.test(message.text())) return;
+          /^Dart (?:reviews are temporarily unavailable\.?|Sets catalog unavailable) TypeError: Failed to fetch\b/.test(message.text())) return;
       const source = String(message.location()?.url || "");
       if (!source.startsWith(origin)) return;
       failures.push(
