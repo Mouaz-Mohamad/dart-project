@@ -131,8 +131,8 @@ const server = http.createServer((request, response) => {
       response.end(JSON.stringify({ settings: { birthdayPercent: 10, dartCardPercent: 10, version: 1 } }));
       return;
     }
-    if (pathname.startsWith("/api/v1/cart/reservation/")) {
-      const reservationId = pathname.split("/").pop();
+    if (pathname === "/api/v1/cart/reservation" || pathname.startsWith("/api/v1/cart/reservation/")) {
+      const reservationId = pathname === "/api/v1/cart/reservation" ? "CART-HOME-HYDRATED" : pathname.split("/").pop();
       response.end(JSON.stringify({
         cart: {
           reservationId,

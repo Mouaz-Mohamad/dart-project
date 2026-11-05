@@ -35,7 +35,7 @@ const shippingCatalogFixture = { governorates: shippingGovernorateNames.map(id =
     areas:[{id:"district-1",en:"First District",ar:"الحي الأول"}],
   }]:[]
 })) };
-const shippingCompaniesFixture = { version:1, companies:[
+const shippingCompaniesFixture = { version:1, blockedGovernorates:[], companies:[
   {id:"dart",name:"Dart Delivery",trackingUrl:"",active:true,governorates:[]}
 ] };
 
@@ -47,7 +47,7 @@ const server = http.createServer((request, response) => {
       pathname === "/api/v1/shipping/coverage-catalog"
         ? shippingCatalogFixture
         : pathname === "/api/v1/shipping/checkout-coverage"
-          ? { governorates:shippingCatalogFixture.governorates.filter(g=>["Cairo","Giza"].includes(g.id)), companies:[] }
+          ? { governorates:shippingCatalogFixture.governorates.map(g=>({...g,blocked:false,available:["Cairo","Giza"].includes(g.id),carriers:["Cairo","Giza"].includes(g.id)?["dart"]:[]})), companies:[] }
           : pathname === "/api/v1/admin/shipping/companies"
             ? shippingCompaniesFixture
       : pathname === "/api/v1/health/live"

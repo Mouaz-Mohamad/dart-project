@@ -24,8 +24,8 @@ const server = http.createServer((req, res) => {
       data = { offers: [offer] };
     }
     if (pathname === '/api/v1/site-settings') data = { version: 1, settings: { modelCards: {}, announcements: [], typing: { scenes: [] } } };
-    if (pathname.startsWith('/api/v1/cart/reservation/')) data = { cart: {
-      reservationId: pathname.split('/').at(-1), expiresAt: new Date(Date.now()+15*60*1000).toISOString(),
+    if (pathname === '/api/v1/cart/reservation' || pathname.startsWith('/api/v1/cart/reservation/')) data = { cart: {
+      reservationId: pathname === '/api/v1/cart/reservation' ? 'CART-MERCHANDISING-LEGACY' : pathname.split('/').at(-1), expiresAt: new Date(Date.now()+15*60*1000).toISOString(),
       lines: [{ modelId:'A',color:'Black',size:'M',quantity:2 },{ modelId:'B',color:'Black',size:'M',quantity:1 }],
     } };
     if (pathname === '/api/v1/me') data = { user: null, permissions: [], session: null };

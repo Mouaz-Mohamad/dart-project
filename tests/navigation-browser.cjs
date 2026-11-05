@@ -48,8 +48,8 @@ const server = http.createServer((req, res) => {
     if (url.pathname === '/api/v1/sets') payload = { sets: [] };
     if (url.pathname === '/api/v1/reviews') payload = { reviews: [] };
     if (url.pathname === '/api/v1/news') payload = { news: [], total: 0, items: [] };
-    if (url.pathname.startsWith('/api/v1/cart/reservation/')) payload = { cart: cartExists ? {
-      reservationId: url.pathname.split('/').at(-1), expiresAt: new Date(Date.now() + 900000).toISOString(),
+    if (url.pathname === '/api/v1/cart/reservation' || url.pathname.startsWith('/api/v1/cart/reservation/')) payload = { cart: cartExists ? {
+      reservationId: url.pathname === '/api/v1/cart/reservation' ? 'CART-NAVIGATION-LEGACY' : url.pathname.split('/').at(-1), expiresAt: new Date(Date.now() + 900000).toISOString(),
       lines: [{ modelId: 'DW-NAV', color: 'Black', size: 'M', quantity: 1 }],
     } : null };
     if (url.pathname === '/api/v1/me') { res.statusCode = 401; payload = { error: { code: 'UNAUTHENTICATED', message: 'No session' } }; }
@@ -207,6 +207,8 @@ function nativeScenario(origin) {
       assert.equal(back.restored, true);
       assert.ok(requests.filter((req) => req.path === '/api/v1/analytics/events').length <= 2, 'restoration and prerendering do not invent visits');
     }
+    assert.ok(requests.some(req => req.path === '/api/v1/cart/reservation' && req.method === 'GET'), 'legacy guest holds recover by cookie-backed discovery');
+    assert.ok(!requests.some(req => req.path === '/api/v1/cart/reservation' && req.method === 'PUT'), 'navigation must not create guest holds');
     assert.equal(homeReturn.url, origin + '/'); assert.equal(back.url, origin + '/');
     assert.match(productsReturn.url, /\/products(?:\.html)?$/); assert.match(forward.url, /\/products(?:\.html)?$/);
     assert.equal(productsReturn.cartLength, 0); assert.equal(forward.cartLength, 0);

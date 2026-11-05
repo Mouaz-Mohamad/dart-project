@@ -78,6 +78,18 @@ const server = http.createServer(async (request, response) => {
           '["PANTS-202","Stone","M"]': 3,
         },
       });
+      if (pathname === '/api/v1/me') return json(response, 200, { user: {
+        id: 'customer-set-fixture', accountType: 'customer', code: 'DR-SET-TEST',
+        name: 'Synthetic Set Customer', email: 'sets@example.test', status: 'active', emailVerified: true,
+      }, session: {}, permissions: [] });
+      if (pathname === '/api/v1/cart/reservation' && request.method === 'GET') return json(response, 200, { cart: null });
+      if (pathname === '/api/v1/me/cart') return json(response, 200, { cart: cartState });
+      if (pathname === '/api/v1/me/cart/set-groups' && request.method === 'GET') return json(response, 200, {
+        reservationId: url.searchParams.get('reservationId'), groups: setGroupsState,
+      });
+      if (pathname === '/api/v1/me/cart/reservation' && request.method === 'DELETE') {
+        cartState = null; setGroupsState = []; return json(response, 200, { released: true });
+      }
       if (pathname === '/api/v1/catalog/version') return json(response, 200, { version: 7 });
       if (pathname === '/api/v1/site-settings') return json(response, 200, { version: 1, settings: {} });
       if (pathname === '/api/v1/reviews') return json(response, 200, { reviews: [] });
@@ -85,7 +97,7 @@ const server = http.createServer(async (request, response) => {
       if (pathname === '/api/v1/sets') return json(response, 200, { sets: [setFixture] });
       if (pathname === '/api/v1/sets/settings') return json(response, 200, { settings: { birthdayPercent: 10, dartCardPercent: 10, version: 1 } });
 
-      if (pathname === '/api/v1/cart/reservation' && request.method === 'PUT') {
+      if (pathname === '/api/v1/me/cart/reservation' && request.method === 'PUT') {
         const body = await readBody(request);
         await new Promise((resolve) => setTimeout(resolve, 250));
         reservationWriteCount += 1;
@@ -99,7 +111,7 @@ const server = http.createServer(async (request, response) => {
         cartState = null; setGroupsState = [];
         return json(response, 200, { released: true });
       }
-      if (pathname === '/api/v1/cart/set-groups' && request.method === 'PUT') {
+      if (pathname === '/api/v1/me/cart/set-groups' && request.method === 'PUT') {
         const body = await readBody(request);
         attachCount += 1;
         setGroupsState = (body.groups || []).map((group, groupIndex) => ({
@@ -283,7 +295,8 @@ const server = http.createServer(async (request, response) => {
   });
   await page.waitForFunction(() => {
     const button = document.querySelector('#dartSetModal [data-set-add]');
-    return button?.disabled && button.getAttribute('aria-busy') === 'true';
+    return button?.disabled && button.getAttribute('aria-busy') === 'true' &&
+      document.querySelector('.cart-count, #cartCount')?.textContent === '1';
   });
   assert.equal(await page.locator('.cart-count, #cartCount').first().textContent(), '1', 'One commercial Set must appear in the cart count before the reservation response');
   // Browser Back can close the overlay while its already-submitted reservation finishes.
