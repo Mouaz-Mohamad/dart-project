@@ -157,7 +157,7 @@ if (coverageFeatureBytes > 23 * 1024) {
 if (/src=["']dart-(?:shipping|coverage-picker)\.js["']/.test(dashboardHtml)) {
   failures.push("Shipping management must stay lazy-loaded on the dashboard");
 }
-if (!dashboardHtml.includes('src="dart-shipping-loader.js"')) {
+if (!/src="dart-shipping-loader\.js(?:\?[^\"]*)?"/.test(dashboardHtml)) {
   failures.push("Dashboard missing the lazy shipping loader");
 }
 if (!fs.readFileSync("cart-checkout.html","utf8").includes('src="Js/dart-checkout-regions.js"')) {
@@ -214,7 +214,7 @@ const generatedPlatformRuntime = ["Js/dart-platform.js", "Js/dart-platform.home.
 
 // Homepage UI is now a curated page-scoped runtime, not a minified copy of dart-ui.js.
 const curatedHomeUi = "Js/dart-ui.home.min.js";
-for (const [input, output] of [['src/storefront/address.js', 'Js/dart-address.js'], ['src/storefront/catalog.js', 'Js/dart-catalog.js'], ['src/storefront/profile-records.js', 'Js/dart-profile-records.js'], ['src/storefront/home-ui.js', curatedHomeUi], ['Js/dart-navigation.js', 'Js/dart-navigation.min.js'], ['src/dashboard/staff-admin.js', 'Eye/dart-staff.js'], ['src/dashboard/staff-permissions.js', 'Eye/dart-permissions.js'], ['src/dashboard/dashboard-ui.js','Eye/dart-dashboard-ui.js'], ['src/dashboard/news-admin.js','Eye/dart-news-admin.js'], ['src/dashboard/sets-admin.js','Eye/dart-sets-admin.js']]) {
+for (const [input, output] of [['src/dashboard/inventory.js','Eye/dart-inventory.js'], ['src/dashboard/settings.js','Eye/dart-settings.js'], ['src/dashboard/shipping-ui.js','Eye/dart-shipping-ui.js'], ['src/storefront/checkout-regions.js','Js/dart-checkout-regions.js'], ['src/storefront/address.js', 'Js/dart-address.js'], ['src/storefront/catalog.js', 'Js/dart-catalog.js'], ['src/storefront/profile-records.js', 'Js/dart-profile-records.js'], ['src/storefront/home-ui.js', curatedHomeUi], ['Js/dart-navigation.js', 'Js/dart-navigation.min.js'], ['src/dashboard/staff-admin.js', 'Eye/dart-staff.js'], ['src/dashboard/staff-permissions.js', 'Eye/dart-permissions.js'], ['src/dashboard/dashboard-ui.js','Eye/dart-dashboard-ui.js'], ['src/dashboard/news-admin.js','Eye/dart-news-admin.js'], ['src/dashboard/sets-admin.js','Eye/dart-sets-admin.js']]) {
   const text = require('../scripts/build-home-runtime.cjs').sourceText(input);
   const hash = crypto.createHash('sha256').update(text).digest('hex');
   if (!fs.readFileSync(output, 'utf8').startsWith(`/* source-sha256:${hash}; terser:5.44.0 */`)) {

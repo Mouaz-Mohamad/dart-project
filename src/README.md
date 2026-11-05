@@ -7,6 +7,10 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `dashboard/core/` | Existing dashboard state, renderers, workflows, editors and startup | `Eye/dart.js` |
 | `storefront/platform/` | Customer identity, analytics, cart, checkout, profile, rewards and startup | `Js/dart-platform.js` |
 | `dashboard/catalog-admin.js` | Versioned catalog record writes | `Eye/dart-catalog-admin.js` |
+| `dashboard/inventory.js` | Inventory, model and item editor UI | `Eye/dart-inventory.js` |
+| `dashboard/shipping-ui.js` | Shipping Companies tabs and editor presentation | `Eye/dart-shipping-ui.js` |
+| `dashboard/settings.js` | Settings forms and data reset UI | `Eye/dart-settings.js` |
+| `storefront/checkout-regions.js` | Checkout and return pickup region selectors | `Js/dart-checkout-regions.js` |
 | `dashboard/staff-admin.js` | Staff editor | `Eye/dart-staff.js` |
 | `dashboard/staff-permissions.js` | Dashboard permission adapter | `Eye/dart-permissions.js` |
 | `dashboard/dashboard-ui.js` | Dashboard record summaries, dialogs and status colors | `Eye/dart-dashboard-ui.js` |

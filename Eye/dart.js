@@ -498,7 +498,7 @@ function dartLoadFinance() {
   document.querySelector('script[data-dart-finance]')?.remove();
   dartFinanceLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "dart-finance.js?v=20261105-contrast-palette-1";
+    script.src = "dart-finance.js?v=20261006-finance-state-v1";
     script.defer = true;
     script.dataset.dartFinance = "1";
     script.onload = () => {

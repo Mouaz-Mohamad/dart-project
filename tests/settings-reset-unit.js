@@ -38,7 +38,7 @@ assert.equal(storage.getItem("unrelated_preference"), "keep-me", "Reset must pre
 
 const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "Eye", "Dart Eye.html"), "utf8");
-const script = fs.readFileSync(path.join(root, "Eye", "dart-settings.js"), "utf8");
+const script = fs.readFileSync(path.join(root, "src", "dashboard", "settings.js"), "utf8");
 for (const id of ["settings", "open-reset-data-modal", "reset-data-modal", "reset-confirmation-input", "reset-understand-checkbox", "confirm-reset-data"]) {
   assert(html.includes(`id="${id}"`), `Missing static settings HTML #${id}.`);
 }

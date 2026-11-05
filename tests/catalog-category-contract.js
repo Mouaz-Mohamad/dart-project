@@ -8,7 +8,7 @@ const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "Eye", "Dart Eye.html"), "utf8");
-const inventory = fs.readFileSync(path.join(root, "Eye", "dart-inventory.js"), "utf8");
+const inventory = fs.readFileSync(path.join(root, "src", "dashboard", "inventory.js"), "utf8");
 const storefront = fs.readFileSync(path.join(root, "Js", "dart-ui.js"), "utf8");
 
 assert(html.includes('id="modal-category" type="text"'), "Model Category must allow free text.");
