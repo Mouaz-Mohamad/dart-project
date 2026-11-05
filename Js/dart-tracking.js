@@ -560,12 +560,18 @@
     container.appendChild(fragment);
   }
 
+  function orderDisplayStatus(order) {
+    if (["Delivered", "Refused"].includes(order.status)) return order.status;
+    if (order.deliveryShipment?.type === "external" && order.deliveryShipment.status === "Returned to Sender") return "Returned to Sender";
+    return order.status || "New";
+  }
+
   function renderOrderUnit(order) {
     const fragment = templateFragment("order-tracking-unit-template");
     if (!fragment) return null;
     const unit = fragment.querySelector("[data-order-unit]");
     unit.querySelector('[data-order-unit-field="id"]').textContent = `Order #${order.orderId || "-"}`;
-    unit.querySelector('[data-order-unit-field="status"]').textContent = order.status || "New";
+    unit.querySelector('[data-order-unit-field="status"]').textContent = orderDisplayStatus(order);
     unit.querySelector('[data-order-unit-field="date"]').textContent = `${order.date || "-"} ${order.time || ""}`.trim();
     unit.querySelector('[data-order-unit-field="total"]').textContent = money(orderTotal(order));
     const lines = unit.querySelector("[data-order-unit-lines]");
@@ -634,7 +640,10 @@
         inserted.querySelector('[data-order-field="representative"]').textContent=shipment.companyName||"Shipping Company";
         inserted.querySelector('[data-order-field="representativeMeta"]').textContent="External shipping";
         inserted.querySelector("[data-order-call]").hidden=true;
-        inserted.querySelector("[data-order-eta]").textContent="Shipped";
+        const state=orderDisplayStatus(trackingRecord);
+        const label=["Returned to Sender","Delivered","Refused"].includes(state)?state:"Shipped";
+        box.querySelector("h3").textContent=label==="Shipped"?"Your Order Has Been Shipped!":label;
+        inserted.querySelector("[data-order-eta]").textContent=label;
       }else{
         inserted.querySelector("[data-external-shipping]")?.remove();
         createMap(inserted.querySelector("[data-order-map]"), trackingRecord, inserted.querySelector("[data-order-map-shell]"), inserted.querySelector("[data-order-map-disabled]"), inserted.querySelector("[data-order-map-summary]"), "order");

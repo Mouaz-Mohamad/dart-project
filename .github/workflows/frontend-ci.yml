@@ -90,6 +90,7 @@ jobs:
           node tests/cart-shipping-recovery-runtime.cjs
           node tests/order-dispatch-runtime.cjs
           node tests/auth-contract.js
+          node tests/tracking-shipment-runtime.cjs
           node tests/password-reset-runtime.cjs
           node tests/address-unit.js
           node tests/checkout-address-runtime.cjs
