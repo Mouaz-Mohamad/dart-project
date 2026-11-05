@@ -5,6 +5,8 @@ import { CustomerInteractionService } from "../src/modules/commerce/customer-int
 import { embeddedStore } from "./embedded-store.js";
 import { returnSchema } from "../src/modules/commerce/customer-interaction.routes.js";
 import { EGYPT_GOVERNORATES } from "../src/modules/commerce/shipping.core.js";
+import type { Pool } from "pg";
+import { setTimeout as delay } from "node:timers/promises";
 
 describe("returns preserve each sale's inventory and money on the production schema", () => {
   let store: Awaited<ReturnType<typeof embeddedStore>>;
@@ -88,6 +90,39 @@ describe("returns preserve each sale's inventory and money on the production sch
       .rejects.toMatchObject({ code: "REFUND_AMOUNT_TOO_HIGH" });
     expect(await ownership(f.piece)).toMatchObject({ status: "Sold", order_id: f.code });
     expect(Number((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [f.id])).rows[0].amount_refunded_minor)).toBe(0);
+  });
+
+  it.skipIf(!process.env.TEST_DATABASE_URL).each(["manual", "customer"])("%s return does not hold a sale row while waiting behind a representative's return-ledger lock", async mode => {
+    const f = await fixture(), blocker = await store.pool.connect(), worker = await store.pool.connect();
+    const workerPid = (await worker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    let pending: Promise<unknown> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SET LOCAL lock_timeout='1s'");
+      await blocker.query("SELECT version FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE");
+      const workerPool = { connect: async () => ({ query: worker.query.bind(worker), release() {} }) } as unknown as Pool;
+      pending = mode === "manual"
+        ? new CommerceService(workerPool).adminManualReturn(actor, manual(f.piece), "concurrent-manual-return")
+        : new CustomerInteractionService(workerPool).submitReturn(f.user, { itemCode: f.piece, requestType: "Refund", reason: "Synthetic concurrent pickup", address }, "concurrent-customer-return");
+      // Observe an actual blocked DB request, rather than relying on timer ordering.
+      let waiting = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        waiting = (await store.pool.query("SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1", [workerPid])).rows[0]?.wait_event_type === "Lock";
+        if (waiting) break;
+        await delay(20);
+      }
+      expect(waiting).toBe(true);
+      // This is the representative's next lock. The old manual order->returns
+      // sequence held this row and caused a lock timeout/deadlock here.
+      await blocker.query("SELECT id FROM orders WHERE id=$1 FOR UPDATE", [f.id]);
+      await blocker.query("COMMIT");
+      await expect(pending).resolves.toHaveProperty("id");
+      expect(Number((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [f.id])).rows[0].amount_refunded_minor)).toBe(mode === "manual" ? 50000 : 0);
+    } finally {
+      await blocker.query("ROLLBACK");
+      await pending?.catch(() => undefined);
+      worker.release(); blocker.release();
+    }
   });
 
   it("edits an old manual refund without releasing a new buyer's reservation", async () => {

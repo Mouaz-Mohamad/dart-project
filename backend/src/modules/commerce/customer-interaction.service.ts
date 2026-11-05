@@ -348,6 +348,8 @@ export class CustomerInteractionService {
       await client.query("BEGIN");
       const identity = await this.customerIdentity(client, customerUserId);
 
+      const returnsState = await this.lockDomain(client, "returns");
+
       const orderLine = await client.query<{
         order_item_id: string;
         order_id: string;
@@ -386,7 +388,6 @@ export class CustomerInteractionService {
         throw new AppError(422, "RETURN_WINDOW_EXPIRED", "The 14-day return window has expired");
       }
 
-      const returnsState = await this.lockDomain(client, "returns");
       const existingReturns = returnsState.data;
       const hasOpen = existingReturns.some((raw) => {
         const row = raw as JsonRow;

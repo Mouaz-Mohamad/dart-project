@@ -3244,6 +3244,11 @@ export class CommerceService {
     try {
       await client.query("BEGIN");
 
+      // Every return writer locks the shared return ledger before sale/item rows.
+      const returnsStateResult = await client.query<{ version: string }>(
+        "SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
+      );
+
       const itemResult = await client.query<{
         item_id: string;
         order_item_id: string;
@@ -3299,9 +3304,6 @@ export class CommerceService {
         );
       }
 
-      const returnsStateResult = await client.query<{ version: string }>(
-        "SELECT version::text FROM dashboard_domain_state WHERE domain='returns' FOR UPDATE",
-      );
       const returnsState = returnsStateResult.rows[0];
       const returnsRows = await readRelationalDashboardDomain(
         client,
