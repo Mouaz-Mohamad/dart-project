@@ -412,7 +412,9 @@ const server = http.createServer(async (request, response) => {
     await dashboard.setViewportSize({width,height:900});
     await dashboard.locator('#settings-typing-card').scrollIntoViewIfNeeded();
     await dashboard.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-    await dashboard.screenshot({path:path.join(checks,`dashboard-hero-${width}.png`)});
+    await dashboard.locator('#settings-typing-card').screenshot({
+      path:path.join(checks,`dashboard-hero-${width}.png`), animations:'disabled', caret:'hide',
+    });
     assert.equal(await dashboard.locator('#settings-typing-card').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`hero editor fits ${width}px`);
   }
   await dashboard.locator('#save-typing-settings').click();
