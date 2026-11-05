@@ -22,12 +22,31 @@ const contentTypes = {
   ".svg": "image/svg+xml",
 };
 
+const shippingGovernorateNames = [
+  "Cairo","Giza","Alexandria","Qalyubia","Sharqia","Dakahlia","Gharbia",
+  "Monufia","Beheira","Kafr El Sheikh","Damietta","Port Said","Ismailia",
+  "Suez","North Sinai","South Sinai","Red Sea","Fayoum","Beni Suef",
+  "Minya","Assiut","Sohag","Qena","Luxor","Aswan","New Valley","Matrouh"
+];
+const shippingCatalogFixture = { governorates: shippingGovernorateNames.map(id => ({
+  id, en:id, ar:id, cities:[]
+})) };
+const shippingCompaniesFixture = { version:1, companies:[
+  {id:"dart",name:"Dart Delivery",trackingUrl:"",active:true,governorates:[]}
+] };
+
 const server = http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, "http://test").pathname);
   if (pathname.startsWith("/api/")) {
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     const payload =
-      pathname === "/api/v1/health/live"
+      pathname === "/api/v1/shipping/coverage-catalog"
+        ? shippingCatalogFixture
+        : pathname === "/api/v1/shipping/checkout-coverage"
+          ? { governorates:shippingCatalogFixture.governorates.filter(g=>["Cairo","Giza"].includes(g.id)), companies:[] }
+          : pathname === "/api/v1/admin/shipping/companies"
+            ? shippingCompaniesFixture
+      : pathname === "/api/v1/health/live"
         ? {
             status: "ok",
             apiCompatibility: "dart-database-v1",
@@ -409,6 +428,11 @@ const server = http.createServer((request, response) => {
     });
     assert.deepEqual(unreadable,[],`${target} must not display white text on a white background`);
   }
+  // Unexpected application dialogs must be diagnosed at the source, not hidden behind
+  // Playwright's later timeout on an unrelated analytics button.
+  await dashboard.waitForTimeout(150);
+  const unexpectedDialog = await dashboard.locator('.dart-dialog-message').allTextContents();
+  assert.deepEqual(unexpectedDialog,[], 'dashboard navigation left an unexpected dialog open');
   // Real period controls and late-loaded analytics must agree for yearly/custom Hours.
   await dashboard.evaluate(()=>document.querySelector('a[data-target="brand"]').click());
   await dashboard.waitForSelector('#trafficVisitorDetailsTow tr');
