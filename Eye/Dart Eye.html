@@ -108,8 +108,20 @@
 
     <main>
 <!--=============== سكشن Brand Information ==============-->
-        <section id="brand" class="dashboard-section brand">
-            <div class="cards-one">
+        <section id="brand" class="dashboard-section brand" aria-labelledby="dart-brand-title">
+            <header class="dart-brand-page-header">
+                <div class="dart-brand-page-copy">
+                    <p class="dart-brand-eyebrow"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i> DART BUSINESS DASHBOARD</p>
+                    <h1 id="dart-brand-title">Brand Overview</h1>
+                    <p>Your business at a glance: customers, orders, inventory, financial performance and growth.</p>
+                </div>
+                <span class="dart-brand-header-mark"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Performance Center</span>
+            </header>
+            <div class="dart-brand-block-heading">
+                <div><p class="dart-brand-heading-eyebrow">SNAPSHOT</p><h2>At a Glance</h2></div>
+                <span>Quick business metrics</span>
+            </div>
+            <div class="cards-one" id="brand-overview-kpis">
                 <div class="cont-card-info-2">
                     <div class="card-inf-2 customar-card">
                         <button type="button" class="dart-info-btn" data-info-title="Customer" data-info-text="Customers created inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
@@ -156,6 +168,10 @@
 
             <div class="margen20"></div>
 
+            <div class="dart-brand-block-heading">
+                <div><p class="dart-brand-heading-eyebrow">PERFORMANCE</p><h2>Financial Overview</h2></div>
+                <span>Select a period to explore performance</span>
+            </div>
             <div id="dart-brand-finance" class="dart-brand-finance" data-finance-period="brand">
                 <div id="brand-finance-period-control" class="dart-period-control">
                     <div class="dart-period-copy">
@@ -226,6 +242,10 @@
                 </div>
             </div>
 
+            <div class="dart-brand-block-heading">
+                <div><p class="dart-brand-heading-eyebrow">METRICS</p><h2>Inventory &amp; Performance</h2></div>
+                <span>Detailed operational indicators</span>
+            </div>
             <div id="dart-analytics-grid" class="dart-analytics-grid">
                 <article id="brand-in-stock-selling-card" class="dart-analytics-card kpi-tone-0" data-brand-metric="inStockSelling">
                     <div class="kpi-card-head"><i class="fa-solid fa-tags"></i><span id="brand-in-stock-selling-change" class="dart-kpi-change is-flat">— 0%</span></div>
@@ -324,6 +344,10 @@
 
             <div class="margen20"></div>
             <!-- سكشن الإشعارات -->
+            <div class="dart-brand-block-heading">
+                <div><p class="dart-brand-heading-eyebrow">ACTIVITY</p><h2>Updates &amp; Customers</h2></div>
+                <span>Stay on top of recent activity</span>
+            </div>
             <div class="brand-widgets-container">
                 <!-- 1. أرتيكل آخر المستجدات -->
                 <article class="widget-card">
@@ -370,7 +394,7 @@
             <!-- top clintes -->
             <article class="widget-card">
                 <div class="widget-header bday-header">
-                    <h3><i class="fa-solid fa-ranking-star"></i> Top Clintes </h3>
+                    <h3><i class="fa-solid fa-ranking-star"></i> Top Clients </h3>
                     <div class="top-client-period-filters" aria-label="Top clients period">
                         <label>Month <select id="topClientsMonthFilter" aria-label="Top clients month"><option value="current">This Month</option><option value="none">None</option></select></label>
                         <label>Year <select id="topClientsYearFilter" aria-label="Top clients year"><option value="none">None</option></select></label>
@@ -382,6 +406,10 @@
             </article>
 
             <div class="margen20"></div>
+            <div class="dart-brand-block-heading">
+                <div><p class="dart-brand-heading-eyebrow">ACQUISITION</p><h2>Website Analytics</h2></div>
+                <span>Visitors, carts and conversions</span>
+            </div>
             <div class="chart-box-tow">
                 <div class="chart-header-tow">
                     <div class="chart-title-tow">
