@@ -1,0 +1,465 @@
+/* DART EYE | Waiting + Returns refinement.
+ * This file is presentation-only: status transitions, stock reservations,
+ * FIFO rules, audits, pickup assignment and return decisions remain server-owned.
+ */
+
+/* Shared section shell. */
+#waiting.dashboard-section,#returns.dashboard-section{
+  min-width:0;min-height:100dvh;height:auto;overflow:visible;
+  padding:24px clamp(16px,2.3vw,32px) 56px!important;
+  background:#f8f6f7;color:#332934;
+}
+#waiting .dart-waiting-head,#returns .dart-returns-header{
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:14px;margin:0 0 18px;
+}
+#waiting .dart-waiting-head>div:first-child,#returns .dart-returns-header>div:first-child{flex:1 1 220px;min-width:0}
+#waiting .dart-waiting-eyebrow,#returns .dart-returns-eyebrow{
+  display:flex;align-items:center;gap:7px;margin:0 0 5px;
+  font-size:10px!important;letter-spacing:.11em;font-weight:800;color:#96304e!important;
+}
+#waiting .dart-waiting-head h1,#returns .dart-returns-header h2{
+  margin:0 0 5px;color:#401c2c;
+  font-size:clamp(24px,2.3vw,31px);line-height:1.3;font-weight:800;
+}
+#waiting .dart-waiting-head p:not(.dart-waiting-eyebrow),
+#returns .dart-returns-header p:not(.dart-returns-eyebrow){
+  margin:0;max-width:740px;color:#7c6f79;font-size:12px;line-height:1.7;
+}
+#returns .dart-returns-badge{
+  display:inline-flex;gap:8px;align-items:center;min-height:41px;
+  padding:9px 13px;border:1px solid #e4d4db;border-radius:10px;
+  background:#fff;color:#7e3651;font-weight:750;font-size:12px;
+}
+#waiting .dart-waiting-head-actions{display:flex;gap:8px;flex-wrap:wrap}
+#waiting .dart-waiting-head-actions button{
+  display:inline-flex;align-items:center;gap:8px;
+  min-height:41px;padding:9px 13px;margin:0;
+  border:1px solid #d9c4ce;border-radius:9px;background:#fff;
+  color:#75324d;font-size:12px;font-weight:750;cursor:pointer;
+}
+#waiting #waiting-reconcile-btn{
+  background:#ab012b;border-color:#ab012b;color:#fff;
+}
+#waiting .dart-waiting-head-actions button:not([hidden]):hover{filter:brightness(.96)}
+#waiting .dart-waiting-head-actions button[hidden]{display:none!important}
+
+/* Waiting metrics and work area. */
+#waiting .dart-waiting-kpis{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:11px;margin:0 0 17px;
+}
+#waiting .dart-waiting-kpis article{
+  min-width:0;min-height:103px;
+  display:flex;flex-direction:column;justify-content:space-between;gap:6px;
+  padding:17px;border:1px solid #e8dee3;border-radius:12px;
+  background:#fff;box-shadow:none;
+}
+#waiting .dart-waiting-kpis article span{
+  color:#786b76;font-size:12px;font-weight:650;line-height:1.4;margin:0;
+}
+#waiting .dart-waiting-kpis article strong{
+  color:#442338;font-size:clamp(22px,2vw,27px);font-weight:800;line-height:1.2;
+  overflow-wrap:anywhere;
+}
+#waiting .dart-waiting-kpis article:nth-child(2) strong{color:#a06c17}
+#waiting .dart-waiting-kpis article:nth-child(3) strong{color:#167754}
+#waiting .dart-waiting-kpis article:nth-child(4) strong{color:#823251}
+#waiting .dart-waiting-workspace,#returns .dart-returns-workspace{
+  display:block;position:relative;min-width:0;width:100%;
+  padding:18px;margin:0;border:1px solid #e7dce2;
+  border-radius:15px;background:#fff;box-shadow:none;
+}
+#waiting .dart-ops-workspace-head,#returns .dart-ops-workspace-head{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;margin:0 0 13px;
+}
+#waiting .dart-ops-workspace-head h2,#returns .dart-ops-workspace-head h3{
+  margin:0 0 4px;font-size:17px;font-weight:800;color:#49223a;line-height:1.4;
+}
+#waiting .dart-ops-workspace-head p,#returns .dart-ops-workspace-head p{
+  margin:0;font-size:12px;line-height:1.6;color:#85757e;
+}
+
+/* The existing filter event handlers and select IDs stay exactly as they are. */
+#waiting .first.filter-bar,#returns .first.filter-bar{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  width:100%;min-width:0;margin:0;padding:12px;
+  background:#fcfafb;border:1px solid #eee4e8;border-radius:11px;box-shadow:none;
+}
+#waiting .first.filter-bar .search-box,#returns .first.filter-bar .search-box{
+  flex:2 1 235px;min-width:0;max-width:none;
+}
+#waiting .first.filter-bar .search-box input,#returns .first.filter-bar .search-box input{
+  display:block;min-height:42px;height:auto;width:100%;
+  padding:10px 37px 10px 12px;border:1px solid #d9cbd2;border-radius:9px;
+  background:#fff;color:#45323e;font-size:12px;
+}
+#waiting .first.filter-bar .search-box i,#returns .first.filter-bar .search-box i{
+  left:auto;right:12px;color:#795064;opacity:.8;
+}
+#waiting .first.filter-bar .select-box,#returns .first.filter-bar .select-box{
+  flex:1 1 145px;min-width:130px;max-width:100%;
+}
+#waiting .first.filter-bar .select-box select,#returns .first.filter-bar .select-box select{
+  display:block;min-height:42px;height:auto;width:100%;
+  padding:8px 30px 8px 11px;border:1px solid #d9cbd2;border-radius:9px;
+  background:#fff;color:#443440;font-size:12px;cursor:pointer;
+}
+#waiting .first.filter-bar .select-box .arrow-icon,
+#returns .first.filter-bar .select-box .arrow-icon{
+  left:auto;right:9px;color:#82506b;pointer-events:none;
+}
+#waiting .dart-waiting-date{
+  display:flex;flex:1 1 145px;align-items:center;justify-content:space-between;
+  min-width:125px;max-width:220px;gap:8px;padding:0 2px;
+  color:#74636e;font-size:11px;font-weight:700;
+}
+#waiting .dart-waiting-date input{
+  min-height:42px;min-width:0;flex:1 1 100px;max-width:155px;
+  border:1px solid #d9cbd2;border-radius:9px;
+  padding:7px 9px;background:#fff;color:#402a38;font-size:11px;
+}
+#waiting .first.filter-bar .dart-clear-filters,#returns .first.filter-bar .dart-clear-filters{
+  min-height:42px;height:auto;padding:9px 13px;
+  border:1px solid #d9c1cc;border-radius:9px;background:#fff;
+  color:#7a3050;font-size:12px;font-weight:750;
+}
+#returns .first.filter-bar .add-btn{
+  display:inline-flex;justify-content:center;align-items:center;gap:8px;
+  min-height:42px;height:auto;width:auto;margin:0;padding:9px 15px;
+  border:1px solid #ab012b;border-radius:9px;
+  background:#ab012b;color:#fff;font-size:12px;font-weight:800;
+  white-space:nowrap;cursor:pointer;
+}
+#returns .first.filter-bar button[hidden],#waiting .first.filter-bar button[hidden]{display:none!important}
+#waiting .dart-waiting-view-switch{
+  display:flex;justify-content:flex-start;align-items:center;gap:7px;
+  margin:13px 0;padding:0;min-height:41px;
+}
+#waiting .dart-waiting-view-switch button{
+  display:inline-flex;justify-content:center;align-items:center;
+  min-height:39px;height:auto;padding:9px 16px;margin:0;
+  border:1px solid #d5bfca;border-radius:9px;background:#fff;
+  color:#762b49;font-size:12px;font-weight:750;
+}
+#waiting .dart-waiting-view-switch button.is-active{
+  color:#fff;background:#ab012b;border-color:#ab012b;
+}
+#waiting #waiting-queue-view[hidden],#waiting #waiting-demand-view[hidden]{display:none!important}
+
+/* Dashboard's compact-row adapter is the owner of row details. 
+   Style its summary without breaking the action popup and detail dialog. */
+#waiting .dart-waiting-table-wrap{
+  display:block;width:100%;height:auto;max-height:75dvh;
+  min-width:0;overflow:auto;padding:0;
+  border:1px solid #ebdfe5;border-radius:11px;background:#fff;
+}
+#waiting .dart-waiting-table,#waiting .dart-waiting-table>tbody{
+  display:block;width:100%;min-width:0;
+}
+#waiting .dart-waiting-table tr.dart-compact-record{
+  display:block;width:100%;min-width:0;
+  margin:0;border:0;border-bottom:1px solid #ede3e7;
+  border-radius:0;background:#fff;box-shadow:none;
+}
+#waiting .dart-waiting-table tr.dart-compact-record:last-child{border-bottom:0}
+#waiting .dart-waiting-table tr.dart-compact-record:hover{background:#fcf8fa}
+#waiting .dart-waiting-table tr.dart-compact-record>td.dart-record-main{
+  display:flex;width:100%;min-width:0;
+  gap:12px;padding:13px 14px;align-items:center;
+  background:transparent;border:0;
+}
+#waiting .dart-waiting-table .dart-record-fields{
+  flex:1 1 auto;min-width:0;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 13px;
+}
+#waiting .dart-waiting-table .dart-record-field small{
+  color:#8a7783;font-size:10px;font-weight:650;line-height:1.35;
+}
+#waiting .dart-waiting-table .dart-record-field strong{
+  color:#3d2c38;font-size:12px;line-height:1.5;font-weight:750;
+  overflow-wrap:anywhere;
+}
+#waiting .dart-waiting-table .dart-record-controls{
+  flex:0 0 auto;min-width:103px;justify-content:flex-end;
+}
+#waiting .dart-waiting-table .dart-record-controls button{
+  min-height:35px;height:auto;padding:7px 11px;
+  border:1px solid #d9c4cf;border-radius:8px;
+  background:#fff;color:#772c4a;font-size:11px;font-weight:750;
+}
+#waiting .dart-waiting-status{
+  padding:4px 9px;border-radius:99px;
+  background:#f8edf1;color:#873451;font-size:11px;font-weight:800;
+}
+#waiting .dart-waiting-priority{color:#ab012b;font-weight:800}
+#waiting .dart-waiting-empty{
+  margin:0;padding:25px;border:0;color:#82737e;font-size:12px;
+  background:#fcfafb;text-align:center;
+}
+#waiting .dart-waiting-actions-menu{position:relative}
+#waiting .dart-waiting-actions-menu summary{
+  width:34px;height:34px;background:#fff;color:#75304a;border:1px solid #d6c3cd;border-radius:8px;
+}
+#waiting .dart-waiting-actions-pop{
+  width:min(235px,85vw);max-height:330px;overflow:auto;gap:5px;
+  padding:8px;border:1px solid #e5d7de;border-radius:10px;
+  background:#fff;box-shadow:0 12px 34px #24111d2b;z-index:35;
+}
+#waiting .dart-waiting-actions-pop button{
+  width:100%;min-height:34px;padding:8px 9px;border-radius:7px;
+  text-align:start;background:#fff;color:#4d3542;font-size:11px;
+}
+#waiting .dart-waiting-actions-pop button:hover{background:#f8ecf2}
+#waiting .dart-waiting-actions-pop .dart-waiting-action-danger{
+  background:#fff7f7;color:#b22d3e!important;
+}
+.dart-waiting-dialog{
+  width:min(780px,94vw);max-height:min(88dvh,850px);
+  padding:0;border:1px solid #e3d0d9;border-radius:14px;
+  background:#fffdfd;color:#3e2f3b;box-shadow:0 24px 65px #1c0c1c3d;
+}
+.dart-waiting-dialog::backdrop{background:#25111c99}
+.dart-waiting-dialog .dart-waiting-dialog-head{
+  position:sticky;top:0;z-index:3;display:flex;align-items:center;
+  gap:12px;padding:17px 20px;background:#fffdfd;border-bottom:1px solid #ecdee4;
+}
+.dart-waiting-dialog .dart-waiting-dialog-head h3{
+  margin:0;flex:1;color:#4e2134;font-size:17px;line-height:1.5;
+}
+.dart-waiting-dialog .dart-waiting-dialog-close{
+  width:37px;height:37px;border:1px solid #e0ced6;
+  border-radius:9px;background:#fff;color:#7b3751;font-size:22px;
+}
+.dart-waiting-dialog .dart-waiting-dialog-body{padding:17px 20px;overflow:auto;max-height:72dvh}
+.dart-waiting-dialog .dart-waiting-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.dart-waiting-dialog .dart-waiting-detail-grid>div{
+  display:grid;gap:5px;min-width:0;
+  padding:12px;border:1px solid #ece0e6;border-radius:9px;background:#fcf9fa;
+  color:#3b2935;overflow-wrap:anywhere;font-size:12px;
+}
+.dart-waiting-dialog .dart-waiting-detail-grid small{margin:0;color:#7f6e7a;font-size:10px;font-weight:750}
+.dart-waiting-dialog .dart-waiting-audit-row{
+  margin:0 0 8px;padding:13px;border:1px solid #ecdee5;
+  border-radius:9px;background:#fcf9fa;color:#4c3744;font-size:12px;
+}
+
+/* Returns: compact row summary + on-demand full record. */
+#returns .second{
+  display:flex;align-items:center;justify-content:flex-start;
+  flex-wrap:wrap;gap:8px;min-height:42px;margin:9px 0 12px;padding:0;text-align:left;
+}
+#returns .second button{
+  display:inline-flex;justify-content:center;align-items:center;gap:7px;
+  min-height:39px;height:auto;width:auto;margin:0;padding:9px 13px;
+  border:1px solid #d5bec9;border-radius:9px;background:#fff;
+  color:#723047;font-size:12px;font-weight:750;
+}
+#returns .second .delete-btn{border-color:#eac6ce;background:#fff8f9;color:#ae3444}
+#returns .second #assign-selected-returns{
+  border-color:#ab012b;background:#fff;color:#ab012b;
+}
+#returns .second button:disabled{opacity:.48;cursor:not-allowed}
+#returns .second button[hidden]{display:none!important}
+#returns .dart-filter-summary{
+  display:flex;gap:7px;flex-wrap:wrap;align-items:center;
+  min-height:0;margin:8px 0;padding:6px 2px;
+  color:#7c6c77;font-size:12px;
+}
+#returns .cont-titel{
+  position:relative;display:block;min-width:0;width:100%;
+  height:auto;min-height:150px;max-height:none!important;
+  margin:0;padding:0;border:0;background:transparent;overflow:visible!important;
+}
+#returns .cont-titel>.title-name{
+  display:flex!important;align-items:center;gap:11px!important;
+  position:relative;top:auto;z-index:1;
+  width:100%!important;min-width:0!important;
+  padding:10px 13px!important;margin:0 0 10px;border:0;
+  border-radius:9px;background:#f7f1f4!important;color:#6a5261;
+}
+#returns .cont-titel>.title-name h2{display:none!important}
+#returns .cont-titel>.title-name .dart-compact-heading{
+  font-size:12px;color:#6b5060;font-weight:750;
+}
+#returns .cont-titel>.title-name input[type="checkbox"]{
+  flex:none;width:18px;height:18px;accent-color:#ab012b;
+}
+#returns #returns-container{min-width:0;width:100%}
+#returns #returns-container>.dart-compact-record{
+  width:100%;min-width:0;margin:0 0 9px;padding:0!important;
+  border:1px solid #e9dfe4;border-radius:11px;background:#fff;box-shadow:none;
+}
+#returns #returns-container>.dart-compact-record:hover{
+  border-color:#cbb2be;box-shadow:0 4px 17px #3d1b290a;
+}
+#returns #returns-container .dart-record-main{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;min-width:0;
+}
+#returns #returns-container .dart-record-fields{
+  display:grid;flex:1 1 auto;min-width:0;
+  grid-template-columns:repeat(5,minmax(0,1fr));gap:9px 12px;
+}
+#returns #returns-container .dart-record-field small{
+  color:#897985;font-size:10px;font-weight:600;line-height:1.35;
+}
+#returns #returns-container .dart-record-field strong{
+  color:#412e3a;font-size:12px;font-weight:750;
+  line-height:1.5;overflow-wrap:anywhere;
+}
+#returns #returns-container .dart-record-controls{
+  flex:0 0 auto;min-width:105px;justify-content:flex-end;gap:7px;
+}
+#returns #returns-container .dart-record-controls button{
+  min-height:35px;height:auto;padding:7px 11px;
+  border:1px solid #d8c4ce;border-radius:8px;background:#fff;
+  color:#79314f;font-size:11px;font-weight:700;
+}
+#returns #returns-container .dart-record-controls button[hidden]{display:none!important}
+#returns #returns-container .dart-operation-group-head{
+  display:grid;gap:4px;min-width:0;width:100%;
+  margin:13px 0 9px;padding:12px 15px;
+  border:1px solid #eadbe2;border-inline-start:4px solid #ab012b;
+  border-radius:10px;background:#fcf6f9;color:#512238;
+}
+#returns #returns-container .dart-operation-group-head strong{font-size:13px;line-height:1.5}
+#returns #returns-container .dart-operation-group-head span,
+#returns #returns-container .dart-operation-group-head small{
+  color:#856f7b;font-size:11px;line-height:1.45;overflow-wrap:anywhere;
+}
+#returns .dart-record-dialog{
+  width:min(880px,97vw);max-width:none;
+  padding:0 21px 28px;background:#fdfbfc;color:#322834;
+}
+#returns .dart-record-dialog-head{
+  position:sticky;top:0;z-index:3;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:13px;padding:19px 0 14px;background:#fdfbfc;border-bottom:1px solid #eadde4;
+}
+#returns .dart-record-dialog-head h2{color:#451e31;font-size:20px;line-height:1.4}
+#returns .dart-record-detail-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;padding:0 0 18px;
+}
+#returns .dart-record-detail-field{
+  display:grid;align-content:start;gap:6px;
+  padding:12px;min-width:0;border:1px solid #ebdfe6;
+  border-radius:10px;background:#fff;overflow-wrap:anywhere;
+}
+#returns .dart-record-detail-field>h3{font-size:11px;font-weight:750;color:#816c79}
+#returns .dart-record-detail-actions{
+  grid-column:1/-1;background:#f9f4f7;border-color:#e8d3dd;
+}
+#returns .dart-record-detail-actions .row-action-btns{
+  display:flex;flex-wrap:wrap;gap:8px;max-width:100%;width:auto;min-width:0;
+}
+#returns .dart-record-detail-actions button{
+  min-height:37px;height:auto;padding:7px 11px;
+  border:1px solid #d7bcca;border-radius:8px;background:#fff;
+  color:#74304a;font-size:11px;
+}
+#returns .dart-record-detail-actions button[hidden]{display:none!important}
+#returns .return-status{
+  display:inline-flex;align-items:center;max-width:100%;gap:5px;
+  padding:5px 9px;border-radius:99px;
+  background:#f9eef2;color:#812d4e;
+  font-size:11px;font-weight:800;overflow-wrap:anywhere;
+}
+#returns .return-status-good{background:#e9f7ef;color:#17734d;border-color:#c6e6d3}
+#returns .w300.overflow{max-height:none;overflow:visible;white-space:normal;overflow-wrap:anywhere}
+
+/* Existing approval/rejection/assignment forms: same IDs and handlers, clearer UI. */
+#return-modal .modal-content{
+  width:min(920px,96vw);max-width:920px;max-height:90dvh;
+  padding:24px;border:1px solid #e9dbe3;border-radius:14px;background:#fffdfd;
+}
+#return-modal .modal-grid{gap:15px}
+#return-modal .form-group label{
+  color:#583d50;font-size:12px;font-weight:750;line-height:1.5;
+}
+#return-modal .form-group input,#return-modal .form-group select,
+#return-modal .form-group textarea{
+  min-height:41px;min-width:0;width:100%;
+  border:1px solid #d8c3ce;border-radius:9px;
+  background:#fff;color:#3e2b37;padding:9px 12px;font-size:12px;
+}
+#return-modal .form-group textarea{min-height:83px;resize:vertical}
+#return-approval-modal .modal-content,#return-rejection-modal .modal-content,
+#return-rep-assignment-modal .modal-content{
+  width:min(510px,94vw);max-width:510px;max-height:85dvh;
+  padding:23px;border:1px solid #e7d8e0;border-radius:14px;background:#fffdfd;
+}
+#return-approval-modal h3,#return-rejection-modal h3,#return-rep-assignment-modal h3{
+  margin:0 25px 12px 0;color:#4d2639;font-size:18px;line-height:1.5;
+}
+#return-approval-modal p,#return-rejection-modal p,#return-rep-assignment-modal p{
+  color:#756473;font-size:12px;line-height:1.65;
+}
+#return-approval-modal select,#return-rejection-modal textarea,
+#return-rep-assignment-modal select{
+  width:100%;min-height:42px;margin:8px 0 15px;
+  padding:10px 12px;border:1px solid #dcc8d1;
+  border-radius:9px;background:#fff;color:#382937;font-size:12px;
+}
+#return-rejection-modal textarea{resize:vertical;min-height:95px}
+#return-modal .close-modal,#return-approval-modal .close-modal,
+#return-rejection-modal .close-modal,#return-rep-assignment-modal .close-modal{
+  border-radius:8px;color:#773951;
+}
+@media(max-width:1180px){
+  #waiting .dart-waiting-table .dart-record-fields,#returns #returns-container .dart-record-fields{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media(max-width:900px){
+  #waiting .dart-waiting-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #waiting .dart-waiting-head,#returns .dart-returns-header{align-items:flex-start}
+}
+@media(max-width:768px){
+  #waiting.dashboard-section,#returns.dashboard-section{
+    width:100%!important;margin-left:0!important;
+    min-height:100dvh;padding:16px 12px 100px!important;
+  }
+  #waiting .dart-waiting-head,#returns .dart-returns-header{gap:10px}
+  #returns .dart-returns-badge{display:none}
+  #waiting .dart-waiting-head-actions button{flex:1 1 auto;justify-content:center}
+  #waiting .dart-waiting-kpis{gap:8px;margin-bottom:12px}
+  #waiting .dart-waiting-kpis article{min-height:88px;padding:12px}
+  #waiting .dart-waiting-kpis article strong{font-size:21px}
+  #waiting .dart-waiting-workspace,#returns .dart-returns-workspace{padding:12px;border-radius:12px}
+  #waiting .first.filter-bar,#returns .first.filter-bar{gap:8px;padding:10px}
+  #waiting .first.filter-bar .search-box,#returns .first.filter-bar .search-box{flex:1 1 100%}
+  #waiting .first.filter-bar .select-box,#returns .first.filter-bar .select-box{
+    flex:1 1 calc(50% - 8px);min-width:0;
+  }
+  #waiting .dart-waiting-date{flex:1 1 calc(50% - 8px);min-width:0;max-width:none}
+  #waiting .dart-waiting-date input{max-width:100%}
+  #returns .first.filter-bar .add-btn{flex:1 1 100%}
+  #waiting .dart-waiting-table-wrap{max-height:70dvh}
+  #waiting .dart-waiting-table tr.dart-compact-record>td.dart-record-main,
+  #returns #returns-container .dart-record-main{flex-wrap:wrap;gap:9px;padding:11px}
+  #waiting .dart-waiting-table .dart-record-fields,#returns #returns-container .dart-record-fields{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  #waiting .dart-waiting-table .dart-record-controls,#returns #returns-container .dart-record-controls{
+    flex:1 1 100%;justify-content:flex-end;
+    padding-top:9px;border-top:1px solid #f1e8ed;
+  }
+  #returns .second{flex-wrap:wrap;gap:7px}
+  #returns .dart-record-dialog{width:100vw;max-width:100vw;padding:0 12px 20px}
+  #returns .dart-record-detail-grid{grid-template-columns:1fr}
+  #return-modal .modal-content{width:calc(100vw - 18px);padding:16px}
+  #return-modal .modal-grid{grid-template-columns:1fr;gap:8px}
+  .dart-waiting-dialog{width:96vw;max-height:90dvh}
+  .dart-waiting-dialog .dart-waiting-dialog-body{padding:13px;max-height:77dvh}
+  .dart-waiting-dialog .dart-waiting-detail-grid{grid-template-columns:1fr}
+}
+@media(max-width:390px){
+  #waiting .dart-waiting-kpis article strong{font-size:19px}
+  #returns .first.filter-bar .select-box{flex:1 1 100%}
+}
+@media(prefers-reduced-motion:reduce){
+  #waiting .dart-waiting-table tr.dart-compact-record,
+  #returns #returns-container>.dart-compact-record{transition:none}
+}
