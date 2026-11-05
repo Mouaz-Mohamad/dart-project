@@ -19,7 +19,7 @@ const config = {
   smtpHost: null, smtpPort: 587, smtpSecure: false, smtpUser: null, smtpPass: null,
   emailFrom: null, outboxCronSecret: null, outboxBatchSize: 20,
 } as AppConfig;
-const cookie = `dart_session=123e4567-e89b-12d3-a456-426614174100.${"a".repeat(43)}`;
+const cookie = `dart_session_staff=123e4567-e89b-12d3-a456-426614174100.${"a".repeat(43)}`;
 const query = { start: "2026-10-01", end: "2026-10-31", previousStart: "2026-09-01", previousEnd: "2026-09-30" };
 
 function application(permissions: string[], options: { accountType?: "staff" | "customer"; mfaSatisfied?: boolean } = {}) {
