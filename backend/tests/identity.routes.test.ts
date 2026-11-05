@@ -263,8 +263,8 @@ describe("identity HTTP boundaries", () => {
     expect(response.status).toBe(200);
     expect(service.verifyStaffEmailAccess).toHaveBeenCalled();
     const cookies = response.headers["set-cookie"] as unknown as string[];
-    expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
-    expect(cookies.some((value) => value.startsWith("dart_csrf=") && !value.includes("HttpOnly"))).toBe(true);
+    expect(cookies.some((value) => value.startsWith("dart_session_staff=") && value.includes("HttpOnly"))).toBe(true);
+    expect(cookies.some((value) => value.startsWith("dart_staff_csrf=") && !value.includes("HttpOnly"))).toBe(true);
   });
 
   it("creates a customer session immediately without an email OTP signup gate", async () => {
@@ -362,7 +362,7 @@ describe("identity HTTP boundaries", () => {
     });
     const response = await request(app(fakeService(staff)))
       .post("/api/v1/admin/representatives/123e4567-e89b-12d3-a456-426614174009/approve")
-      .set("Cookie", `dart_session=${sessionId}.${secret}`)
+      .set("Cookie", `dart_session_staff=${sessionId}.${secret}`)
       .set("X-CSRF-Token", csrf);
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("MFA_REQUIRED");
