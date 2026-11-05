@@ -87,6 +87,7 @@ export const siteSettingsSchema = z.object({
     name: z.string().trim().min(2).max(100),
     trackingUrl: z.string().trim().min(1).max(2000),
     active: z.boolean(),
+    checkoutEnabled: z.boolean().optional(),
     governorates: z.array(z.string().trim().min(2).max(100)).max(27),
     coverage: z.record(z.string(),z.object({
       all:z.boolean(),

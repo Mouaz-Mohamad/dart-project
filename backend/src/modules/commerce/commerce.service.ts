@@ -53,6 +53,7 @@ import { returnMatchesSale } from "./commerce.returns.js";
 import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage } from "./shipping.coverage.js";
+import { checkoutEligibleCompanies, checkoutShippingRegions, type CheckoutShippingCompany } from "./shipping.checkout.js";
 import { DART_CARRIER, dispatchShipment, validTrackingPortal,
   type ShippingCompany, type DispatchedShipment } from "./shipping.core.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
@@ -100,6 +101,13 @@ export class CommerceService {
 
   public shippingCoverageCatalog() { return { governorates: EGYPT_COVERAGE_CATALOG }; }
 
+  public async publicShippingCoverage() {
+    const settings=await this.pool.query<{data:Record<string,unknown>}>("SELECT data FROM site_settings WHERE id='main'");
+    const raw=settings.rows[0]?.data?.shippingCompanies;
+    const companies=(Array.isArray(raw)?raw:[]) as CheckoutShippingCompany[];
+    return { governorates: checkoutShippingRegions(companies) };
+  }
+
   public async shippingCompanies(): Promise<{version:number;companies:ShippingCompany[]}> {
     const rows=await this.pool.query<{version:string;data:Record<string,unknown>}>(
       "SELECT version::text,data FROM site_settings WHERE id='main'");
@@ -117,6 +125,9 @@ export class CommerceService {
       try {
         validTrackingPortal(company.trackingUrl);
         validateCompanyCoverage(company);
+        if(company.checkoutEnabled === true && !company.coverage) {
+          throw new Error("Choose structured coverage before enabling this carrier at checkout.");
+        }
       } catch (error) {
         throw new AppError(422,"SHIPPING_COMPANY_COVERAGE",
           error instanceof Error ? error.message : "Invalid shipping coverage");
@@ -1893,6 +1904,16 @@ export class CommerceService {
         "SELECT data FROM site_settings WHERE id='main'",
       );
       const settings = settingsResult.rows[0]?.data || {};
+      const shippingPartners=(Array.isArray(settings.shippingCompanies)?settings.shippingCompanies:[]) as CheckoutShippingCompany[];
+      if(!checkoutEligibleCompanies(shippingPartners,{
+        governorate:input.address.governorate,
+        city:input.address.city,
+        coverageArea:input.address.coverageArea,
+        area:input.address.area,
+      }).length) {
+        throw new AppError(422,"DELIVERY_REGION_UNAVAILABLE",
+          "No active shipping company currently covers the selected delivery location.");
+      }
       const configuredCourierFee = Number(
         settings.courierFeePerOrder ?? settings.deliveryCostPerPiece,
       );

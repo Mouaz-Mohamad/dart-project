@@ -52,6 +52,8 @@ export interface CheckoutInput {
   address: {
     country: string;
     governorate: string;
+    city?: string | undefined;
+    coverageArea?: string | undefined;
     area: string;
     street: string;
     building: string;

@@ -122,7 +122,9 @@ const checkoutSchema = z.object({
   }),
   address: z.object({
     country: z.string().trim().min(2).max(120),
-    governorate: z.enum(["Cairo", "Giza"]),
+    governorate: z.string().trim().min(2).max(100),
+    city: z.string().trim().min(1).max(100).optional(),
+    coverageArea: z.string().trim().min(1).max(100).optional(),
     area: z.string().trim().min(1).max(160),
     street: z.string().trim().min(1).max(200),
     building: z.string().trim().min(1).max(120),
@@ -334,6 +336,7 @@ export function createCommerceRouter(
     name:z.string().trim().min(2).max(100),
     trackingUrl:z.string().trim().url().max(2000),
     active:z.boolean(),
+    checkoutEnabled:z.boolean().optional(),
     governorates:z.array(z.string().trim().min(2).max(100)).max(27),
     coverage: z.record(z.string(),z.object({
       all:z.boolean(),
@@ -342,6 +345,10 @@ export function createCommerceRouter(
     }).strict()).optional(),
   }).strict();
 
+  router.get("/shipping/checkout-coverage",async(_request,response)=>{
+    response.setHeader("Cache-Control","public,max-age=30");
+    response.status(200).json(await commerce.publicShippingCoverage());
+  });
   router.get("/shipping/coverage-catalog",async(_request,response)=>{
     response.setHeader("Cache-Control","public, max-age=3600");
     response.status(200).json(commerce.shippingCoverageCatalog());

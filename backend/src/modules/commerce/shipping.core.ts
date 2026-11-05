@@ -16,6 +16,7 @@ export interface ShippingCompany {
   name: string;
   trackingUrl: string;
   active: boolean;
+  checkoutEnabled?: boolean | undefined;
   governorates: string[];
   // Absent coverage means old company records: governorates [] = entire Egypt.
   coverage?: CompanyCoverage | undefined;
