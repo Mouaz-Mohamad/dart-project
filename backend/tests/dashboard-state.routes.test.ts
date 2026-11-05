@@ -97,7 +97,7 @@ describe("dashboard domain permissions", () => {
 
     const response = await request(app)
       .get("/api/v1/admin/domain-state/contacts")
-      .set("Cookie", `dart_session=${sessionToken}`);
+      .set("Cookie", `dart_session_staff=${sessionToken}`);
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN");
@@ -112,7 +112,7 @@ describe("dashboard domain permissions", () => {
 
     const response = await request(app)
       .get("/api/v1/admin/domain-state/contacts")
-      .set("Cookie", `dart_session=${sessionToken}`);
+      .set("Cookie", `dart_session_staff=${sessionToken}`);
 
     expect(response.status).toBe(200);
     expect(response.body.domain).toBe("contacts");
@@ -121,7 +121,7 @@ describe("dashboard domain permissions", () => {
 
   it("hydrates only contact data and versions for a contact-only employee", async () => {
     const { app, state } = application(["contacts.read"]);
-    const cookie = `dart_session=${sessionToken}`;
+    const cookie = `dart_session_staff=${sessionToken}`;
     const contact = await request(app).get("/api/v1/admin/domain-state/contacts").set("Cookie", cookie);
     expect(contact.status).toBe(200);
     const domains = await request(app).get("/api/v1/admin/domain-state").set("Cookie", cookie);
@@ -137,14 +137,14 @@ describe("dashboard domain permissions", () => {
 
   it("allows a customer-only employee to read customers but not contacts", async () => {
     const { app } = application(["customers.read"]);
-    const cookie = `dart_session=${sessionToken}`;
+    const cookie = `dart_session_staff=${sessionToken}`;
     expect((await request(app).get("/api/v1/admin/domain-state/customers").set("Cookie", cookie)).status).toBe(200);
     expect((await request(app).get("/api/v1/admin/domain-state/contacts").set("Cookie", cookie)).status).toBe(403);
   });
 
   it("hydrates only returns for a returns-only employee and rejects other private domains", async () => {
     const { app, state } = application(["returns.read"]);
-    const cookie = `dart_session=${sessionToken}`;
+    const cookie = `dart_session_staff=${sessionToken}`;
     const response = await request(app).get("/api/v1/admin/domain-state").set("Cookie", cookie);
     expect(response.status).toBe(200);
     expect(response.body.domains.map((row: { domain: string }) => row.domain)).toEqual(["returns"]);
@@ -164,7 +164,7 @@ describe("dashboard domain permissions", () => {
     const { app, state } = application(["contacts.manage"]);
     const put = (domain: string) => request(app)
       .put(`/api/v1/admin/domain-state/${domain}`)
-      .set("Cookie", `dart_session=${sessionToken}`)
+      .set("Cookie", `dart_session_staff=${sessionToken}`)
       .set("X-CSRF-Token", "staff-csrf-token")
       .send({ expectedVersion: 2, data: [] });
     expect((await put("contacts")).status).toBe(200);
@@ -178,13 +178,13 @@ describe("dashboard domain permissions", () => {
 
     const allowed = await request(app)
       .get("/api/v1/admin/domain-state/finance_expenses")
-      .set("Cookie", `dart_session=${sessionToken}`);
+      .set("Cookie", `dart_session_staff=${sessionToken}`);
     expect(allowed.status).toBe(200);
     expect(state.read).toHaveBeenCalledWith("finance_expenses");
 
     const denied = await request(app)
       .get("/api/v1/admin/domain-state/customers")
-      .set("Cookie", `dart_session=${sessionToken}`);
+      .set("Cookie", `dart_session_staff=${sessionToken}`);
     expect(denied.status).toBe(403);
   });
 
@@ -192,7 +192,7 @@ describe("dashboard domain permissions", () => {
     const { app } = application(["finance.view_cost"]);
     const response = await request(app)
       .get("/api/v1/admin/domain-state-versions")
-      .set("Cookie", `dart_session=${sessionToken}`);
+      .set("Cookie", `dart_session_staff=${sessionToken}`);
 
     expect(response.status).toBe(200);
     expect(response.body.versions).toHaveProperty("finance_expenses", 4);
