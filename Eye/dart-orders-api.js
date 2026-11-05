@@ -101,7 +101,7 @@
   }
   function csrfToken() {
     return document.cookie.split("; ")
-      .find((row) => row.startsWith("dart_csrf="))?.split("=").slice(1).join("=");
+      .find((row) => row.startsWith("dart_staff_csrf="))?.split("=").slice(1).join("=");
   }
   async function api(path, options = {}) {
     const method = String(options.method || "GET").toUpperCase();
