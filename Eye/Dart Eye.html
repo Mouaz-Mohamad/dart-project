@@ -578,11 +578,18 @@
                                 <label for="modal-description">Description</label>
                                 <textarea id="modal-description" placeholder="+ Value" rows="4"></textarea>
                             </div>
-                            <div class="form-group">
-                                <label for="modal-related-models">Related Models</label>
-                                <select id="modal-related-models" multiple size="6" aria-describedby="modal-related-help"></select>
-                                <div id="modal-related-order" class="dart-related-order"></div>
-                                <small id="modal-related-help">اختر حتى 12 موديلًا مختلفًا ليظهروا تحت زر الشراء. اللون والمقاس لا يُعتبران موديلًا مختلفًا.</small>
+                            <div class="form-group dart-related-models-field">
+                                <div class="dart-related-models-heading">
+                                    <label id="modal-related-title">Related Models</label>
+                                    <span id="modal-related-count" aria-live="polite">0 / 12 selected</span>
+                                </div>
+                                <p class="dart-related-models-intro">Select several different models that complete this look. Just tap each card — no Ctrl key needed.</p>
+                                <input type="search" id="modal-related-search" placeholder="Search by model name or code" aria-label="Search related models" autocomplete="off">
+                                <div id="modal-related-models" class="dart-related-models-grid" role="group" aria-labelledby="modal-related-title" aria-describedby="modal-related-help"></div>
+                                <p id="modal-related-empty" class="dart-related-models-empty" hidden>No matching models available.</p>
+                                <div class="dart-related-selected-title">Selected models <small>Use arrows to change display order</small></div>
+                                <div id="modal-related-order" class="dart-related-order" aria-label="Selected models in display order"></div>
+                                <small id="modal-related-help">اختار أكثر من موديل بضغطة على كل كارت، بحد أقصى 12 موديلًا مختلفًا. الموديل الحالي مش هيظهر في الاختيارات.</small>
                             </div>
                             <div class="form-group">
                                 <label for="modal-discount">Discount %</label>
