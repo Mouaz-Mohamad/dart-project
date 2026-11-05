@@ -247,9 +247,21 @@
         .forEach(id => { if (byId(id)) byId(id).value = ""; });
       applyShipmentFilters();
     });
-    byId("shipping-add-company")?.addEventListener("click", () => {
-      byId("shipping-company-cancel")?.click(); // Existing reset also clears the coverage picker.
-      openEditor("add");
+    byId("shipping-add-company")?.addEventListener("click", async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      try {
+        // Shipping management is lazily loaded; do not open an unbound form.
+        await window.DartShipping?.loadCompanies?.();
+        byId("shipping-company-cancel")?.click(); // Existing reset clears the coverage picker.
+        openEditor("add");
+      } catch (error) {
+        window.DartDialog?.alert?.(error?.message || "Unable to load shipping companies. Please try again.");
+      } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      }
     });
     byId("shipping-editor-close")?.addEventListener("click", closeEditor);
     byId("shipping-company-cancel")?.addEventListener("click", closeEditor);
