@@ -53,7 +53,7 @@ import { returnMatchesSale } from "./commerce.returns.js";
 import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage } from "./shipping.coverage.js";
-import { checkoutEligibleCompanies, checkoutShippingRegions, type CheckoutShippingCompany } from "./shipping.checkout.js";
+import { checkoutEligibleCompanies, checkoutShippingRegions, isInsideEgyptEnvelope, type CheckoutShippingCompany } from "./shipping.checkout.js";
 import { DART_CARRIER, dispatchShipment, validTrackingPortal,
   type ShippingCompany, type DispatchedShipment } from "./shipping.core.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
@@ -1909,6 +1909,11 @@ export class CommerceService {
       );
       const settings = settingsResult.rows[0]?.data || {};
       const shippingPartners=(Array.isArray(settings.shippingCompanies)?settings.shippingCompanies:[]) as CheckoutShippingCompany[];
+      if(String(input.address.country).trim().toLowerCase()!=="egypt" ||
+         !isInsideEgyptEnvelope(input.address.latitude,input.address.longitude)) {
+        throw new AppError(422,"DELIVERY_LOCATION_OUTSIDE_EGYPT",
+          "Delivery coordinates and country must be inside Egypt.");
+      }
       if(!checkoutEligibleCompanies(shippingPartners,{
         governorate:input.address.governorate,
         city:input.address.city,
