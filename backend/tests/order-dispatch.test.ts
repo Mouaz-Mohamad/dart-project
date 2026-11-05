@@ -105,6 +105,13 @@ describe("reversible dispatch preparation and physical handover", () => {
     await expect(confirm(f)).rejects.toMatchObject({code:"ORDER_ITEM_OWNERSHIP_CHANGED"});
     expect((await snapshot(f.id)).status).toBe("Ready for Dispatch"); expect(await events(f.id)).toHaveLength(0);
   });
+  it("retains completed COD verification when confirming an unchanged verified policy",async () => {
+    const f=await fixture();
+    await store.pool.query("UPDATE orders SET payment_method='Cash on Delivery',cod_verification_status='Verified' WHERE id=$1",[f.id]);
+    await prepare(f); await confirm(f);
+    expect((await snapshot(f.id)).status).toBe("Out With Representative"); expect(await events(f.id)).toHaveLength(1);
+    expect((await store.pool.query("SELECT cod_verification_status FROM orders WHERE id=$1",[f.id])).rows[0].cod_verification_status).toBe("Verified");
+  });
   it("rechecks changed COD policy at confirmation but allows returning the held parcel to preparation",async () => {
     const f=await fixture();
     await store.pool.query("UPDATE orders SET payment_method='Cash on Delivery',cod_verification_status='Verified' WHERE id=$1",[f.id]);

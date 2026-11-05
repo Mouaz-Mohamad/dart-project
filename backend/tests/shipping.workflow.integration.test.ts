@@ -36,8 +36,8 @@ describe.skipIf(!databaseUrl)("external shipping warehouse -> carrier -> return 
     await db!.query(`INSERT INTO inventory_items(id,item_code,model_id,color,size,status,cost_snapshot_minor,order_id)
       VALUES($1,$1,$2,'Black','M','Processing/Held',40000,$3)`,[item,model,code]);
     await db!.query(`INSERT INTO orders(id,order_code,status,payment_method,payment_status,
-      subtotal_minor,final_minor,contact_snapshot,delivery_address)
-      VALUES($1,$2,'Preparing','Cash on Delivery','Unpaid',60000,60000,$3::jsonb,$4::jsonb)`,
+      subtotal_minor,final_minor,contact_snapshot,delivery_address,cod_verification_status)
+      VALUES($1,$2,'Preparing','Cash on Delivery','Unpaid',60000,60000,$3::jsonb,$4::jsonb,'Verified')`,
       [orderId,code,JSON.stringify({name:"Test Recipient",phone1:"+201000000001"}),
         JSON.stringify({country:"Egypt",governorate:"Alexandria",city:"montaza",area:"Sidi Bishr",
           street:"Test St",building:"1",floor:"1"})]);
