@@ -68,7 +68,7 @@ function application(permissions: string[]) {
     databasePing: async () => undefined, logger: pino({ level: "silent" }), startedAt: new Date(), version: "test" }) };
 }
 function post(app: ReturnType<typeof application>["app"], path: string, body: Record<string, unknown>) {
-  return request(app).post(`/api/v1/admin/orders/${path}`).set("Cookie", `dart_session=${sessionToken}`)
+  return request(app).post(`/api/v1/admin/orders/${path}`).set("Cookie", `dart_session_staff=${sessionToken}`)
     .set("X-CSRF-Token", "staff-csrf-token").send(body);
 }
 
@@ -91,7 +91,7 @@ describe("order command boundary", () => {
   it("rejects arbitrary price/status/item replacement even for an order manager", async () => {
     const { app, commerce } = application(["orders.manage"]);
     const response = await request(app).put("/api/v1/admin/orders-state")
-      .set("Cookie", `dart_session=${sessionToken}`).set("X-CSRF-Token", "staff-csrf-token")
+      .set("Cookie", `dart_session_staff=${sessionToken}`).set("X-CSRF-Token", "staff-csrf-token")
       .send({ expectedVersion: 2, orders: [{ orderId: "K-1", status: "Delivered", finalAmount: 0, items: [] }] });
     expect(response.status).toBe(405);
     expect(response.body.error.code).toBe("ORDER_COMMAND_REQUIRED");
