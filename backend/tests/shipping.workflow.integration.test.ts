@@ -86,4 +86,18 @@ describe.skipIf(!databaseUrl)("external shipping warehouse -> carrier -> return 
     // Refusal only starts return inspection; it does not declare physically returned stock sellable.
     expect(stock.rows[0]?.status).not.toBe("Available");
   });
+  it("marks delivered goods sold but keeps the courier COD remittance unsettled",async()=>{
+    const f=await fixture("DELIVERY"),commerce=new CommerceService(db!);
+    await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
+      {expectedStatus:"Preparing",target:"Out With Representative",
+        shippingCompanyId:"carrier-test",trackingNumber:"SHIP-789"},randomUUID(),false);
+    await commerce.adminOrderWorkflowAction(randomUUID(),f.code,
+      {expectedStatus:"Out With Representative",target:"Delivered"},randomUUID(),false);
+    const row=await db!.query<{status:string;payment_status:string;cod_settled_minor:string}>(
+      "SELECT status,payment_status,cod_settled_minor::text FROM orders WHERE id=$1",[f.orderId]);
+    expect(row.rows[0]?.status).toBe("Delivered");
+    expect(Number(row.rows[0]?.cod_settled_minor||0)).toBe(0);
+    const stock=await db!.query<{status:string}>("SELECT status FROM inventory_items WHERE id=$1",[f.item]);
+    expect(stock.rows[0]?.status).toBe("Sold");
+  });
 });
