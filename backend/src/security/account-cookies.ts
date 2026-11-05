@@ -8,5 +8,5 @@ export function staffSessionCookieName(customerSessionCookieName: string): strin
 }
 
 export function isStaffApiRequest(originalUrl: string): boolean {
-  return /^\/api\/v1\/admin(?:\/|\?|$)/.test(originalUrl);
+  return /^\/api\/v1\/admin(?:\/|\?|$)/i.test(originalUrl);
 }
