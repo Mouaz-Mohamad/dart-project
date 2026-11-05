@@ -171,6 +171,38 @@
     }
   };
 
+  async function publicCatalogSnapshot(session) {
+    const limit = 100;
+    const invalid = () => Object.assign(new Error("Catalogue pages could not be verified. Please retry."), { code: "CATALOG_PAGE_INVALID" });
+    // Keep the current complete projection until every bounded page is verified.
+    // A stock/model mutation between pages restarts the read, never mixes versions.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let version = 0, total = 0;
+      const models = [], stock = Object.create(null), seen = new Set();
+      for (let page = 1; page <= 10000; page++) {
+        if (session !== sessionEpoch) return null;
+        const state = await api(`/api/v1/catalog?page=${page}&limit=${limit}`);
+        if (session !== sessionEpoch) return null;
+        // Compatibility with an older API during an independent deployment.
+        if (page === 1 && !state.pagination) return state;
+        const paging = state.pagination, nextVersion = Number(state.version);
+        if (!paging || paging.page !== page || paging.limit !== limit ||
+            !Number.isSafeInteger(paging.total) || paging.total < 0 || paging.total > limit * 10000 ||
+            !Number.isSafeInteger(nextVersion) || nextVersion < 1 || !Array.isArray(state.models)) throw invalid();
+        if (page === 1) { version = nextVersion; total = paging.total; }
+        else if (nextVersion !== version) break;
+        if (paging.total !== total || state.models.length !== Math.min(limit, total - models.length)) throw invalid();
+        for (const model of state.models) {
+          if (typeof model?.modelId !== "string" || !model.modelId || seen.has(model.modelId)) throw invalid();
+          seen.add(model.modelId); models.push(model);
+        }
+        Object.assign(stock, state.stock || {});
+        if (models.length === total) return { version, models, stock };
+      }
+    }
+    throw Object.assign(new Error("Catalogue changed while loading. Please retry."), { code: "CATALOG_CHANGED_DURING_READ" });
+  }
+
   async function hydrateCatalog(_force = false) {
     if (!API_BASE) throw new Error("Catalogue API is not configured.");
     if (IS_ADMIN && (!canReadAdmin() || adminReadDenied)) return;
@@ -190,7 +222,8 @@
       cacheWrite("dart_items", state.items || []);
       remoteStock = null;
     } else {
-      const state = await api("/api/v1/catalog");
+      const state = await publicCatalogSnapshot(session);
+      if (!state) return;
       const version = Number(state.version || 1);
       if (session !== sessionEpoch || version < serverVersion) return;
       serverVersion = version;

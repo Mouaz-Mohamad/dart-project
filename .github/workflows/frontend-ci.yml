@@ -92,6 +92,7 @@ jobs:
           node tests/auth-contract.js
           node tests/tracking-shipment-runtime.cjs
           node tests/direct-changes-runtime.cjs
+          node tests/catalog-pagination-runtime.cjs
           node tests/password-reset-runtime.cjs
           node tests/address-unit.js
           node tests/checkout-address-runtime.cjs
