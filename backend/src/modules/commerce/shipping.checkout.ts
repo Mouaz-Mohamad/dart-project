@@ -15,6 +15,13 @@ export interface CheckoutShippingCompany extends ShippingCompany {
   checkoutEnabled?: boolean | undefined;
 }
 const LOCAL_GOVERNORATES = new Set(["Cairo", "Giza"]);
+// Coarse country envelope is a defense-in-depth check, not a substitute for geocoded
+// administrative boundaries. The client still verifies the specific map pin.
+export function isInsideEgyptEnvelope(latitude:unknown, longitude:unknown):boolean {
+  const lat=Number(latitude),lng=Number(longitude);
+  return Number.isFinite(lat)&&Number.isFinite(lng)&&
+    lat>=21.5&&lat<=32.1&&lng>=24.5&&lng<=36.2;
+}
 export function checkoutEligibleCompanies(companies: readonly CheckoutShippingCompany[],
   address:CheckoutShippingAddress): CheckoutShippingCompany[] {
   const governorate=governorateFromText(address.governorate);
