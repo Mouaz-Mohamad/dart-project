@@ -39,7 +39,12 @@ const server = http.createServer((req, res) => {
     await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, value: false }); document.dispatchEvent(new Event("visibilitychange")); });
     await page.waitForFunction(() => window.DartChanges.active);
     assert.equal(opened, 3);
+    // Restore the native visibility getter before closing. Keeping hidden=false
+    // during teardown can make Chromium's closing visibility event reconnect.
+    await page.evaluate(() => { delete document.hidden; });
     await page.close(); supported = false;
+    for (let attempt = 0; attempt < 100 && streams.size; attempt++) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(streams.size, 0, "closing the supported tab releases its stream before testing the older API");
     const fallback = await browser.newPage(); await fallback.goto(origin);
     await fallback.waitForLoadState("networkidle");
     assert.equal(await fallback.evaluate(() => window.DartChanges.active), false);
