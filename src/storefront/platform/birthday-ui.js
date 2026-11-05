@@ -62,6 +62,16 @@
   function requestedAuthDestination() {
     const params = new URLSearchParams(location.search || "");
     const requested = params.get("next") || "";
+    if (requested === "product") {
+      const path = params.get("productPath") || "";
+      if (/^(?:\/products\/[a-z0-9\u0600-\u06ff-]+|\/sets\/[a-z0-9_-]{1,120})$/i.test(path)) {
+        const choice = params.get("cartChoice") || "";
+        return path + (choice.length <= 4000 && readCartReturnChoice(params.toString())
+          ? `?${new URLSearchParams({ cartChoice: choice })}` : "");
+      }
+      return "/products";
+    }
+    if (requested === "products") return "/products";
     if (requested === "checkout") return "cart-checkout.html";
     if (requested === "track") {
       const query = new URLSearchParams();

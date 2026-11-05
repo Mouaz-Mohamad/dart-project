@@ -167,6 +167,17 @@
       sync();
       return false;
     }
+    {
+      purchaseBusy = true;
+      sync();
+      try {
+        const path = root.DartProductLinks?.pathFor?.(item) || "";
+        if (!await root.DartPlatform?.requireCartAccount?.(path, [{ modelId: String(item.id),
+          size: String(selectedSizeValue), color: String(selectedColorValue), quantity: quantity() }])) return false;
+        // Authentication can take long enough for the selected product to change.
+        if (product() !== item || size() !== selectedSizeValue || color() !== selectedColorValue) return false;
+      } finally { purchaseBusy = false; sync(); }
+    }
     if (typeof cartData === "undefined" || !Array.isArray(cartData)) {
       toast("Cart is not ready yet. Please try again.");
       return false;
@@ -260,11 +271,7 @@
       return false;
     }
     if (!root.DartPlatform?.currentUser?.()) {
-      root.sessionStorage?.setItem?.("dart_internal_navigation", "1");
-      const next = root.location?.pathname?.split("/").pop() || "products.html";
-      root.location?.assign?.(
-        `Sign Up modern.html?next=${encodeURIComponent(next)}`,
-      );
+      await root.DartPlatform?.requireCartAccount?.(root.DartProductLinks?.pathFor?.(item) || "");
       return false;
     }
 

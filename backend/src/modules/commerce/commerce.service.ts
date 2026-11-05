@@ -54,6 +54,7 @@ import { queueOrderConfirmation, type OrderWhatsAppReply } from "./commerce.what
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage } from "./shipping.coverage.js";
 import { checkoutEligibleCompanies, checkoutShippingRegions, isInsideEgyptEnvelope, type CheckoutShippingCompany } from "./shipping.checkout.js";
+import { matchesDeliveryGovernorate } from "./shipping.geography.js";
 import { DART_CARRIER, dispatchShipment, validTrackingPortal,
   type ShippingCompany, type DispatchedShipment } from "./shipping.core.js";
 import { queueOrderNotifications } from "./commerce.notifications.js";
@@ -106,22 +107,23 @@ export class CommerceService {
     const raw=settings.rows[0]?.data?.shippingCompanies;
     const companies=(Array.isArray(raw)?raw:[]) as CheckoutShippingCompany[];
     return {
-      governorates: checkoutShippingRegions(companies),
+      governorates: checkoutShippingRegions(companies, (settings.rows[0]?.data?.blockedGovernorates || []) as string[]),
       companies: companies.filter(c=>c.active===true&&c.checkoutEnabled===true&&c.coverage)
         .map(({id,name,governorates,coverage})=>({id,name,governorates,coverage})),
     };
   }
 
-  public async shippingCompanies(): Promise<{version:number;companies:ShippingCompany[]}> {
+  public async shippingCompanies(): Promise<{version:number;companies:ShippingCompany[];blockedGovernorates:string[]}> {
     const rows=await this.pool.query<{version:string;data:Record<string,unknown>}>(
       "SELECT version::text,data FROM site_settings WHERE id='main'");
     const raw=rows.rows[0]?.data?.shippingCompanies;
     const companies=Array.isArray(raw)?raw as ShippingCompany[]:[];
-    return {version:Number(rows.rows[0]?.version||1),companies:[DART_CARRIER,...companies]};
+    return {version:Number(rows.rows[0]?.version||1),companies:[DART_CARRIER,...companies],
+      blockedGovernorates:(rows.rows[0]?.data?.blockedGovernorates || []) as string[]};
   }
 
   public async saveShippingCompanies(actorId:string,expectedVersion:number,
-      companies:ShippingCompany[],requestId:string):Promise<{version:number;companies:ShippingCompany[]}>{
+      companies:ShippingCompany[],requestId:string,blockedGovernorates?:string[]):Promise<{version:number;companies:ShippingCompany[];blockedGovernorates:string[]}>{
     const ids=companies.map(company=>company.id);
     if(ids.includes("dart") || new Set(ids).size!==ids.length)
       throw new AppError(422,"SHIPPING_COMPANY_DUPLICATE","Shipping company IDs must be unique, and Dart cannot be modified");
@@ -140,21 +142,26 @@ export class CommerceService {
     const client=await this.pool.connect();
     try{
       await client.query("BEGIN");
-      const existing=await client.query<{version:string}>(
-        "SELECT version::text FROM site_settings WHERE id='main' FOR UPDATE");
+      const existing=await client.query<{version:string;data:Record<string,unknown>}>(
+        "SELECT version::text,data FROM site_settings WHERE id='main' FOR UPDATE");
       const current=Number(existing.rows[0]?.version||1);
       if(expectedVersion!==current)
         throw new AppError(409,"SETTINGS_VERSION_CONFLICT","Shipping settings changed; refresh and retry");
       const changed=await client.query<{version:string}>(
-        `UPDATE site_settings SET data=jsonb_set(COALESCE(data,'{}'::jsonb),'{shippingCompanies}',$1::jsonb,true),
+        `UPDATE site_settings SET data=jsonb_set(CASE WHEN $3::jsonb IS NULL THEN COALESCE(data,'{}'::jsonb)
+             ELSE jsonb_set(COALESCE(data,'{}'::jsonb),'{blockedGovernorates}',$3::jsonb,true) END,
+             '{shippingCompanies}',$1::jsonb,true),
            version=version+1,updated_by=$2,updated_at=now()
-         WHERE id='main' RETURNING version::text`,[JSON.stringify(companies),actorId]);
+         WHERE id='main' RETURNING version::text`,[JSON.stringify(companies),actorId,blockedGovernorates ? JSON.stringify(blockedGovernorates) : null]);
       await client.query(
         `INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,metadata)
          VALUES('staff',$1,'SHIPPING_COMPANIES_UPDATED','site_settings','main',$2,$3::jsonb)`,
-        [actorId,requestId,JSON.stringify({companyIds:ids,previousVersion:current})]);
+        [actorId,requestId,JSON.stringify({companyIds:ids,previousVersion:current,
+          previousBlockedGovernorates:existing.rows[0]?.data?.blockedGovernorates || [],
+          blockedGovernorates:blockedGovernorates || existing.rows[0]?.data?.blockedGovernorates || []})]);
       await client.query("COMMIT");
-      return {version:Number(changed.rows[0]?.version||current+1),companies:[DART_CARRIER,...companies]};
+      return {version:Number(changed.rows[0]?.version||current+1),companies:[DART_CARRIER,...companies],
+        blockedGovernorates:blockedGovernorates || (existing.rows[0]?.data?.blockedGovernorates || []) as string[]};
     }catch(error){await client.query("ROLLBACK").catch(()=>undefined);throw error;}
     finally{client.release();}
   }
@@ -192,7 +199,7 @@ export class CommerceService {
   }
 
   public async correctOrderShipment(actorId:string,orderRef:string,expectedVersion:number,
-       companyId:string,trackingNumber:string,requestId:string):Promise<AdminOrdersState>{
+       companyId:string,trackingNumber:string,requestId:string,coverageConfirmed?:boolean):Promise<AdminOrdersState>{
     const client=await this.pool.connect();
     let orderId="",customerId:string|null=null,version=0;
     try{
@@ -219,6 +226,7 @@ export class CommerceService {
       let next:DispatchedShipment;
       try{next=dispatchShipment([DART_CARRIER,...companies],{
           companyId,trackingNumber,governorate:String(order.delivery_address?.governorate||""),
+          coverageConfirmed,
           city:String(order.delivery_address?.city||""),area:String(order.delivery_address?.coverageArea||order.delivery_address?.area||""),
           now:old.dispatchedAt,
         });}
@@ -673,6 +681,9 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // Serialize every cart mutation for this owner before locking reservation rows.
+      if (customerUserId) await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:cart:${reservationId}`]);
       await this.releaseExpired(client);
       await client.query(
         "SELECT set_config('dart.skip_waitlist_allocation','1',true)",
@@ -746,21 +757,8 @@ export class CommerceService {
         );
         const otherIds = otherReservations.rows.map((row) => row.id);
         if (otherIds.length) {
-          await client.query(
-            `UPDATE inventory_items
-                SET status='In stock',
-                    cart_reservation_id=NULL,
-                    reservation_until=NULL,
-                    version=version+1,
-                    updated_at=now()
-              WHERE cart_reservation_id = ANY($1::text[])
-                AND lower(status)='cart reserved'`,
-            [otherIds],
-          );
-          await client.query(
-            "DELETE FROM cart_reservations WHERE id = ANY($1::text[])",
-            [otherIds],
-          );
+          throw new AppError(409, "CART_CONFLICT", "Your account already has a cart. Reload it before editing.",
+            { reservationId: otherIds[0] });
         }
       } else if (guestOwnerHash) {
         const otherReservations = await client.query<{ id: string }>(
@@ -1171,6 +1169,14 @@ export class CommerceService {
     }
   }
 
+  public async guestCartForOwner(guestOwnerHash: string) {
+    const result = await this.pool.query<{ id: string }>(
+      `SELECT id FROM cart_reservations
+        WHERE customer_user_id IS NULL AND guest_owner_hash=$1 AND source='cart'
+          AND expires_at > now() ORDER BY updated_at DESC LIMIT 1`, [guestOwnerHash]);
+    return result.rows[0] ? this.guestCart(result.rows[0].id, guestOwnerHash) : { cart: null };
+  }
+
   public async guestCart(
     reservationId: string,
     guestOwnerHash: string,
@@ -1229,10 +1235,14 @@ export class CommerceService {
     reservationId: string,
     customerUserId: string,
     guestOwnerHash?: string,
+    replaceReservationId?: string,
+    replaceCartVersion?: string,
   ): Promise<{ reservationId: string; expiresAt: Date; reservedItems: number }> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:cart:${reservationId}`]);
       await this.releaseExpired(client);
 
       const reservationResult = await client.query<{
@@ -1280,16 +1290,20 @@ export class CommerceService {
         );
       }
 
-      const otherReservations = await client.query<{ id: string }>(
-        `SELECT id
+      const otherReservations = await client.query<{ id: string; cart_version: string }>(
+        `SELECT id, updated_at::text AS cart_version
            FROM cart_reservations
           WHERE customer_user_id=$1
             AND source='cart'
-            AND id<>$2
+            AND id<>$2 AND expires_at > now()
           FOR UPDATE`,
         [customerUserId, reservationId],
       );
       const otherIds = otherReservations.rows.map((row) => row.id);
+      if (otherIds.length && (otherIds.length !== 1 || otherIds[0] !== replaceReservationId || otherReservations.rows[0]?.cart_version !== replaceCartVersion)) {
+        throw new AppError(409, "CART_CONFLICT", "Your account already has a cart. Choose which cart to keep.",
+          { reservationId: otherIds[0], cartVersion: otherReservations.rows[0]?.cart_version });
+      }
       if (otherIds.length) {
         await client.query(
           `UPDATE inventory_items
@@ -1344,6 +1358,10 @@ export class CommerceService {
           "UPDATE domain_state_versions SET version=version+1, updated_at=now() WHERE domain='catalog_inventory'",
         );
       }
+      await client.query(
+        `INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,metadata)
+          VALUES('customer',$1,'CART_CLAIMED','cart_reservations',$2,$3::jsonb)`,
+        [customerUserId, reservationId, JSON.stringify({ replacedReservationId: otherIds[0] || null })]);
       await client.query("COMMIT");
       return {
         reservationId,
@@ -1362,6 +1380,7 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
       const reservations = await client.query<{ id: string }>(
         `SELECT id
            FROM cart_reservations
@@ -1919,9 +1938,13 @@ export class CommerceService {
         city:input.address.city,
         coverageArea:input.address.coverageArea,
         area:input.address.area,
-      }).length) {
+      },(settings.blockedGovernorates || []) as string[]).length) {
         throw new AppError(422,"DELIVERY_REGION_UNAVAILABLE",
           "No active shipping company currently covers the selected delivery location.");
+      }
+      if (!matchesDeliveryGovernorate(input.address.governorate, input.address.latitude, input.address.longitude)) {
+        throw new AppError(422, "DELIVERY_GOVERNORATE_MISMATCH",
+          "The map pin must be inside the selected governorate. Verify the delivery location again.");
       }
       const configuredCourierFee = Number(
         settings.courierFeePerOrder ?? settings.deliveryCostPerPiece,
@@ -5233,6 +5256,7 @@ export class CommerceService {
       representativeId?: string | undefined;
       shippingCompanyId?: string | undefined;
       trackingNumber?: string | undefined;
+      coverageConfirmed?: boolean | undefined;
       deliveryGroupId?: string | undefined;
       reason?: string | undefined;
       notes?: string | undefined;
@@ -5427,6 +5451,7 @@ export class CommerceService {
                COALESCE(delivery_address->>'coverageArea',delivery_address->>'area','') AS area FROM orders WHERE id=$1`,[order.id]);
           try{dispatchedShipment=dispatchShipment([DART_CARRIER,...companies],{
              companyId,trackingNumber:input.trackingNumber,governorate:destination.rows[0]?.governorate||"",
+             coverageConfirmed:input.coverageConfirmed,
              city:destination.rows[0]?.city||"",area:destination.rows[0]?.area||"",
              now:new Date().toISOString(),
           });}

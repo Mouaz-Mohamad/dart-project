@@ -1,6 +1,6 @@
 // DART | Shipping & Fulfillment: pure domain rules.
 // A shipment is not a second order. External carriers do not receive representative credentials.
-import { isCompanyAddressCovered, type CompanyCoverage } from "./shipping.coverage.js";
+import { governorateFromText, isCompanyAddressCovered, type CompanyCoverage } from "./shipping.coverage.js";
 export const EGYPT_GOVERNORATES = Object.freeze([
   "Cairo", "Giza", "Alexandria", "Qalyubia", "Sharqia", "Dakahlia",
   "Gharbia", "Monufia", "Beheira", "Kafr El Sheikh", "Damietta",
@@ -30,6 +30,7 @@ export interface DispatchedShipment {
   trackingUrl: string | null;
   dispatchedAt: string;
   status: "Handed Over" | "Returned to Sender";
+  coverageConfirmedAt?: string;
 }
 
 export const DART_CARRIER: ShippingCompany = Object.freeze({
@@ -77,6 +78,7 @@ export function dispatchShipment(
     governorate: string;
     city?: string | undefined;
     area?: string | undefined;
+    coverageConfirmed?: boolean | undefined;
     now: string;
   },
 ): DispatchedShipment {
@@ -91,10 +93,15 @@ export function dispatchShipment(
     };
   }
   if (input.representativeId) throw new Error("External shipping cannot assign a Dart representative.");
+  const partialCoverage = company.coverage && !company.coverage[governorateFromText(input.governorate) || ""]?.all;
+  if (partialCoverage && input.coverageConfirmed !== true) {
+    throw new Error("This carrier covers selected cities/areas only. Staff must verify the actual delivery address before dispatch.");
+  }
   return {
     type: "external", companyId: company.id, companyName: company.name,
     trackingNumber: normalizeTrackingNumber(input.trackingNumber),
     trackingUrl: validTrackingPortal(company.trackingUrl),
     dispatchedAt: input.now, status: "Handed Over",
+    ...(partialCoverage ? { coverageConfirmedAt: input.now } : {}),
   };
 }

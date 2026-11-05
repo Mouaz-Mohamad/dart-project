@@ -95,6 +95,8 @@
             showState("Please wait for the current Set to finish adding.");
             return;
           }
+          const choice = root.DartPlatform?.readCartReturnChoice?.(root.location.search || "");
+          root.DartPlatform?.restoreCartReturnChoice?.(doc.getElementById("dartSetModal"), choice);
           hideState();
         } catch {
           if (version !== requestVersion) return;

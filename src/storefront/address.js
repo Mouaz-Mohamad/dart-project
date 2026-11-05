@@ -90,7 +90,9 @@
   }
 
   function isSupportedGovernorateName(value) {
-    return Boolean(canonicalDeliveryGovernorate(value));
+    const governorate = canonicalDeliveryGovernorate(value);
+    if (window.DartShippingAvailability) return Boolean(governorate && window.DartShippingAvailability.isGovernorateOpen(governorate));
+    return Boolean(governorate);
   }
 
   function isInsideDeliveryBounds(lat, lng) {
@@ -104,7 +106,7 @@
     const a = result?.address || {};
     const iso = String(a['ISO3166-2-lvl4'] || a['ISO3166-2-lvl3'] || '').toUpperCase();
     const governorate = a.state || a.governorate || a.region || '';
-    const administrativeMatch = ['EG-C', 'EG-GZ'].includes(iso) || isSupportedGovernorateName(governorate);
+    const administrativeMatch = isSupportedGovernorateName(governorate || ({ 'EG-C':'Cairo', 'EG-GZ':'Giza' }[iso] || ''));
     return administrativeMatch && isInsideDeliveryBounds(result?.lat, result?.lon);
   }
 
@@ -228,13 +230,13 @@
 
     async function selectLocation(lat, lng, knownResult = null, selectionVersion = null) {
       if (selectionVersion !== null && selectionVersion !== requestVersion) return false;
-      const version = selectionVersion ?? beginVerification('Checking that this delivery location is inside Cairo or Giza…');
+      const version = selectionVersion ?? beginVerification('Checking delivery coverage for this location…');
       setMarker(lat, lng, false);
       try {
         const result = knownResult || await nominatim('reverse', { lat, lon: lng, zoom: '18', namedetails: '1', extratags: '1' });
         if (version !== requestVersion) return;
         if (!isSupportedDeliveryResult(result)) {
-          rejectVerification('Delivery is currently available in Cairo and Giza only. Choose a location inside the delivery zone.');
+          rejectVerification('Delivery is not available for this governorate. Choose an address in a supported governorate.');
           return false;
         }
         const parts = addressParts(result);
@@ -315,7 +317,7 @@
       if (missing.length) return { ok: false, message: `Complete: ${missing.join(', ')}.` };
       if (!isSupportedGovernorateName(value(fields.governorate)) ||
           !['cairo-giza','coverage-enabled'].includes(form.dataset.dartDeliveryZone)) {
-        return { ok:false, message:'Delivery is currently available in Cairo and Giza only. Verify the address on the map.' };
+        return { ok:false, message:'Delivery is not available for this governorate. Verify the address on the map.' };
       }
       if (!hasCoordinates) return { ok: false, message: 'Select a location on the map or locate the manually entered address.' };
       return { ok: true, source: form.dataset.dartAddressSource || 'map', zone:form.dataset.dartDeliveryZone };

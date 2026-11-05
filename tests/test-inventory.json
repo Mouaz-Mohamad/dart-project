@@ -5,6 +5,7 @@
     "address-unit.js",
     "auth-contract.js",
     "cache-revalidation-contract.cjs",
+    "cart-shipping-recovery-runtime.cjs",
     "catalog-category-contract.js",
     "checkout-address-runtime.cjs",
     "council-browser-runtime.cjs",

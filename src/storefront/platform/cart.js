@@ -1,44 +1,176 @@
+  function readCartReturnChoice(search = "") {
+    try {
+      const raw = new URLSearchParams(search).get("cartChoice") || "";
+      if (raw.length > 4000) return null;
+      const intent = JSON.parse(raw);
+      if (!Number.isFinite(intent.at) || intent.at > Date.now() || Date.now() - intent.at > 30 * 60 * 1000 ||
+          !Array.isArray(intent.choices) || !intent.choices.length || intent.choices.length > 20) return null;
+      if (intent.choices.some(choice => ![choice.modelId, choice.color, choice.size].every(value =>
+        typeof value === "string" && value.length > 0 && value.length <= 120) ||
+        !Number.isInteger(choice.quantity || 1) || (choice.quantity || 1) < 1 || (choice.quantity || 1) > 20)) return null;
+      return intent.choices;
+    } catch { return null; }
+  }
+
+  function restoreCartReturnChoice(modal, choices) {
+    if (!modal || !choices?.length) return;
+    if (modal.id === "SectionModel") {
+      const choice = choices[0];
+      if (typeof activeProduct === "undefined" || String(activeProduct?.id) !== choice.modelId) return;
+      for (const [selector, field] of [[".color-btn", "color"], [".size-btn", "size"]]) {
+        [...modal.querySelectorAll(selector)].find(button => button.dataset[field] === choice[field] && !button.disabled)?.click();
+      }
+      const increase = modal.querySelector("#modalQtyIncrease");
+      for (let i = 1; i < (choice.quantity || 1) && increase && !increase.disabled; i++) increase.click();
+      return;
+    }
+    const components = [...modal.querySelectorAll(".dart-set-component")];
+    if (components.length !== choices.length) return;
+    components.forEach((block, index) => {
+      const choice = choices[index];
+      if (block.dataset.modelId !== choice.modelId) return;
+      for (const field of ["color", "size"]) {
+        const select = block.querySelector(`[data-set-${field}]`);
+        if (select && [...select.options].some(option => option.value === choice[field])) {
+          select.value = choice[field]; select.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      }
+    });
+  }
+
+  async function requireCartAccount(productPath = "", choices = []) {
+    if (API_BASE && !currentUser()) await hydrateApiSession();
+    if (currentUser()) {
+      if (API_BASE && hydratedCartOwnerId !== currentUser().id) await hydrateCustomerCart();
+      return true;
+    }
+    sessionStorage.setItem("dart_internal_navigation", "1");
+    const params = new URLSearchParams({ next: productPath ? "product" : "products" });
+    if (/^(?:\/products\/[a-z0-9\u0600-\u06ff-]+|\/sets\/[a-z0-9_-]{1,120})$/i.test(productPath)) params.set("productPath", productPath);
+    // Only UI choices travel with navigation. No cart, prices or reservation are persisted.
+    const intent = JSON.stringify({ at: Date.now(), choices });
+    if (intent.length <= 4000 && readCartReturnChoice(new URLSearchParams({ cartChoice: intent }).toString())) params.set("cartChoice", intent);
+    location.assign(`Sign%20Up%20modern.html?${params}`);
+    return false;
+  }
+
+  function showGuestCartConflict(guestId, accountId, cartVersion) {
+    document.getElementById("dart-cart-conflict")?.remove();
+    const ownerId = currentUser()?.id;
+    const notice = document.createElement("aside");
+    notice.id = "dart-cart-conflict";
+    notice.className = "dart-cart-conflict";
+    notice.setAttribute("role", "region");
+    notice.setAttribute("aria-label", "Choose your cart");
+    const text = document.createElement("p");
+    text.textContent = "عندك سلة سابقة وسلة على حسابك. اختر السلة التي تريد الاحتفاظ بها؛ سيتم إلغاء حجز السلة الأخرى.";
+    const result = document.createElement("p");
+    result.setAttribute("role", "status");
+    notice.append(text);
+    let committed = false;
+    for (const [label, keepGuest] of [["Use previous cart", true], ["Keep account cart", false]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.addEventListener("click", async () => {
+        if (!ownerId || currentUser()?.id !== ownerId) return notice.remove();
+        const buttons = notice.querySelectorAll("button");
+        buttons.forEach((control) => { control.disabled = true; });
+        try {
+          if (!committed) {
+          await enqueueCartMutation(async () => {
+          if (keepGuest) {
+            await apiRequest("/api/v1/me/cart/claim", { method: "POST",
+              body: { reservationId: guestId, replaceReservationId: accountId, replaceCartVersion: cartVersion } });
+          } else {
+            await apiRequest(`/api/v1/cart/reservation/${encodeURIComponent(guestId)}`, { method: "DELETE" });
+          }
+          });
+          committed = true;
+          cartHydrationPromise = null;
+          invalidateCartQuote();
+          hydratedCartOwnerId = null;
+          buttons.forEach((control) => { if (control !== button) control.remove(); });
+          button.textContent = "Retry Cart Refresh";
+          }
+          await hydrateCustomerCart({ claimLocal: false });
+          notice.remove();
+        } catch (error) {
+          result.textContent = error?.code === "CART_CONFLICT"
+            ? "السلة تغيرت. أعد تحميل الصفحة لمراجعة السلتين قبل الاختيار."
+            : "تعذر تحديث السلة. حاول مرة أخرى؛ لم يتم مسحها من المتصفح.";
+        } finally { buttons.forEach((control) => { control.disabled = false; }); }
+      });
+      notice.append(button);
+    }
+    notice.append(result);
+    document.body.prepend(notice);
+  }
+
+  let guestCartClaimPromise = null;
   async function claimGuestCartAfterAuth() {
     if (!API_BASE || !currentUser()) return null;
-    const localCart = read("dart_cart", []);
-    if (!Array.isArray(localCart) || !localCart.length) return null;
-    try {
+    if (guestCartClaimPromise) return guestCartClaimPromise;
+    const ownerId = currentUser().id;
+    const task = (async () => {
+      const recovered = await apiRequest("/api/v1/cart/reservation");
+      const guestId = recovered?.cart?.reservationId;
+      if (!guestId || currentUser()?.id !== ownerId) return null;
+      try {
       const result = await apiRequest("/api/v1/me/cart/claim", {
         method: "POST",
-        body: { reservationId: CART_RESERVATION_ID },
+        body: { reservationId: guestId },
       });
-      if (result?.reservationId) setCartReservationId(result.reservationId);
+      if (currentUser()?.id === ownerId && result?.reservationId) setCartReservationId(result.reservationId);
       return result;
     } catch (error) {
+      if (error?.code === "CART_CONFLICT") {
+        if (currentUser()?.id === ownerId) showGuestCartConflict(guestId, error.details?.reservationId, error.details?.cartVersion);
+        return null;
+      }
       if (error?.code === "CART_RESERVATION_EXPIRED") {
-        write("dart_cart", []);
-        if (typeof cartData !== "undefined") cartData = [];
         return null;
       }
       throw error;
     }
+    })();
+    guestCartClaimPromise = task;
+    try { return await task; }
+    finally { if (guestCartClaimPromise === task) guestCartClaimPromise = null; }
   }
 
-  async function hydrateCustomerCart({ claimLocal = true } = {}) {
+  let cartHydrationPromise = null;
+  let hydratedCartOwnerId = null;
+  async function hydrateCustomerCart(options = {}) {
+    const ownerId = currentUser()?.id || null;
+    if (cartHydrationPromise?.ownerId === ownerId) return cartHydrationPromise.task;
+    const task = hydrateCustomerCartNow(options);
+    cartHydrationPromise = { ownerId, task };
+    try { return await task; }
+    finally { if (cartHydrationPromise?.task === task) cartHydrationPromise = null; }
+  }
+  async function hydrateCustomerCartNow({ claimLocal = true } = {}) {
     if (!API_BASE) return read("dart_cart", []);
+    await settleCartMutations();
+    const mutationSequence = cartMutationSequence;
+    const ownerId = currentUser()?.id || null;
     let payload;
     if (currentUser()) {
-      const localCart = read("dart_cart", []);
-      if (claimLocal && Array.isArray(localCart) && localCart.length) {
-        await claimGuestCartAfterAuth();
-      }
+      if (claimLocal) await claimGuestCartAfterAuth();
       payload = await apiRequest("/api/v1/me/cart");
     } else {
-      payload = await apiRequest(`/api/v1/cart/reservation/${encodeURIComponent(CART_RESERVATION_ID)}`).catch((error) => {
+      payload = await apiRequest("/api/v1/cart/reservation").catch((error) => {
         if ([404, 409].includes(error.status)) return { cart: null };
         throw error;
       });
     }
+    if ((currentUser()?.id || null) !== ownerId || mutationSequence !== cartMutationSequence) return read("dart_cart", []);
     const remote = payload?.cart || null;
     if (!remote) {
       // Checkout consumes the reservation. Recover its committed reply before
       // a reload can present that consumed cart as an unexplained empty cart.
       const completedOrder = await recoverCompletedCheckout();
+      if ((currentUser()?.id || null) !== ownerId || mutationSequence !== cartMutationSequence) return read("dart_cart", []);
       if (completedOrder) {
         if (typeof showToast === "function") showToast(`تم تأكيد الطلب ${completedOrder.orderId}. يمكنك متابعته من حسابك.`);
       }
@@ -46,6 +178,7 @@
       write("dart_cart", []);
       if (typeof renderCart === "function") renderCart();
       if (typeof updateCartCount === "function") updateCartCount();
+      hydratedCartOwnerId = ownerId;
       return [];
     }
     setCartReservationId(remote.reservationId);
@@ -84,6 +217,7 @@
     if (typeof renderCart === "function") renderCart();
     if (typeof updateCartCount === "function") updateCartCount();
     updateCartReservationTimer();
+    hydratedCartOwnerId = ownerId;
     return hydrated;
   }
 
@@ -221,6 +355,7 @@
   async function reserveCartSnapshot(cart, sequence) {
     invalidateCartQuote();
     if (API_BASE) {
+      if (!currentUser()) throw Object.assign(new Error("سجل الدخول أولًا لإضافة قطعة للسلة."), { code: "AUTH_REQUIRED", status: 401 });
       if (!cart.length) {
         await releaseCartReservationNow(false);
         if (sequence === cartMutationSequence) { write("dart_cart", []); if (typeof cartData !== "undefined") cartData = []; }

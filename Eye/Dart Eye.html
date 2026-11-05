@@ -1147,6 +1147,13 @@
         <section id="shipping" class="dashboard-section dart-shipping-section">
           <h2>Shipping Companies</h2><p>External shipments remain visible in Orders.</p>
           <div class="dart-shipping-grid"><div>
+            <form id="shipping-policy-form">
+              <h3>Blocked Governorates</h3>
+              <p>حدد المحافظات التي لا نستقبل طلبات توصيل لها. المنع يشمل توصيل Dart وجميع شركات الشحن.</p>
+              <div id="shipping-blocked-governorates" class="dart-blocked-governorates"></div>
+              <button type="submit" class="btn-done" disabled>Save Delivery Policy</button>
+              <p id="shipping-policy-status" role="status" aria-live="polite">افتح القسم لتحميل سياسة التوصيل.</p>
+            </form>
             <h3>Companies</h3>
             <form id="shipping-company-form">
               <input type="hidden" id="shipping-company-id">
@@ -1155,7 +1162,7 @@
               <section class="dart-coverage-fieldset" aria-labelledby="shipping-coverage-heading">
                 <h4 id="shipping-coverage-heading">Delivery Coverage · مناطق التوصيل</h4>
                 <p>اختر المحافظات ثم خصّص المدن والمناطق. لا توجد كتابة يدوية للأسماء.</p>
-                <p>تنبيه: إضافة محافظة لشركة شحن لا تفتح Checkout تلقائيًا خارج القاهرة والجيزة؛ التوسع يتطلب تفعيل التوصيل والتحقق الجغرافي أولًا.</p>
+                <p>لتلقي طلبات من المحافظة، فعّل الشركة وAccept orders in Checkout، وتأكد أن المحافظة غير موقوفة بالأعلى.</p>
                 <div id="shipping-coverage-picker"></div>
                 <p id="shipping-coverage-warning" role="status" aria-live="polite"></p>
               </section>

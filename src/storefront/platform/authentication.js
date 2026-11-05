@@ -381,7 +381,7 @@
     return stored;
   }
 
-  function clearCustomerPrivateCache() {
+  function clearCustomerPrivateCache({ preserveCartIdentifier = false, preserveGuestCart = false } = {}) {
     [
       KEYS.customers,
       KEYS.orders,
@@ -391,15 +391,20 @@
       KEYS.birthdayMessages,
       "dart_cart",
       "user_last_address",
-    ].forEach((key) => window.DartState?.remove?.(key, { source: "logout" }));
+    ].filter((key) => !preserveGuestCart || key !== "dart_cart")
+      .forEach((key) => window.DartState?.remove?.(key, { source: "logout" }));
     [
       API_USER_CACHE_KEY,
       "dart_cart_reservation_id",
       "dart_pending_email_verification",
       CART_UI_CACHE_KEY,
-    ].forEach((key) => sessionStorage.removeItem(key));
-    if (typeof cartData !== "undefined") cartData = [];
-    window.DartSets?.clearDrafts?.();
+    ].filter((key) => !preserveCartIdentifier || key !== "dart_cart_reservation_id")
+      .forEach((key) => sessionStorage.removeItem(key));
+    if (!preserveGuestCart) {
+      if (typeof hydratedCartOwnerId !== "undefined") hydratedCartOwnerId = null;
+      if (typeof cartData !== "undefined") cartData = [];
+      window.DartSets?.clearDrafts?.();
+    }
   }
 
   async function logout() {
@@ -426,7 +431,10 @@
       method: "POST",
       body: { challengeId, code },
     });
-    return cacheApiUser(payload.user);
+    const user = cacheApiUser(payload.user);
+    await claimGuestCartAfterAuth();
+    refreshCustomerCommerceInBackground();
+    return user;
   }
 
 

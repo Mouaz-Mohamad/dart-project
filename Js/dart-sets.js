@@ -751,6 +751,14 @@
     const set=activeSet;
     const selections=selectedComponents();
     if (!exactSelectionsAvailable(selections)) return updateModalAvailability();
+    {
+      setPurchaseBusy=true; updateModalAvailability();
+      try {
+        const path = root.DartSetNavigation?.pathFor?.(set) || `/sets/${encodeURIComponent(set.setId)}`;
+        if (!await root.DartPlatform?.requireCartAccount?.(path, selections)) return;
+        if (activeSet!==set || JSON.stringify(selectedComponents())!==JSON.stringify(selections)) return;
+      } finally { setPurchaseBusy=false; updateModalAvailability(); }
+    }
     setPurchaseBusy=true; updateModalAvailability();
     const current=cartRef(), previousCart=clone(current), previousGroups=drafts();
     const unitIndex=nextUnitIndex(set.setId,previousGroups), key=`${set.setId}:${unitIndex}`;

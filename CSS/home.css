@@ -6067,6 +6067,11 @@ body[data-customer-auth="ready"] .dart-account-access-status { display: none; }
 
 .dart-account-back { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
 .dart-account-back:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+/* Cart recovery: both server reservations remain held until an explicit choice. */
+.dart-cart-conflict { position: relative; z-index: 10001; padding: 16px; background: #fffaf3; color: #29171c; border: 1px solid #ab012b; text-align: center; }
+.dart-cart-conflict p { margin: 8px 0; }
+.dart-cart-conflict button { margin: 4px; padding: 10px 16px; background: #ab012b; color: #fff; border: 0; border-radius: 8px; cursor: pointer; }
+.dart-cart-conflict button:disabled { opacity: .6; cursor: wait; }
 
 /* === CSS/base.css === */
 /* DART CODE GUIDE | CSS/base.css

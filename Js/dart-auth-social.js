@@ -17,6 +17,7 @@
   function destinationUrl(next) {
     const saved = sessionStorage.getItem("dart_customer_auth_return");
     sessionStorage.removeItem("dart_customer_auth_return");
+    if (saved && saved.length <= 12000 && /^(?:\/products(?:\/[a-z0-9\u0600-\u06ff-]+)?|\/sets\/[a-z0-9_-]{1,120})(?:\?cartChoice=[^#]*)?$/i.test(saved)) return saved;
     if (saved && /^(?:profile\.html(?:\?view=(?:profile|orders|waiting|returns))?|form-return\.html|track\.html(?:\?(?:order|return)=[^#]*)?)$/.test(saved)) return saved;
     return requestedDestination(next) === "checkout"
       ? "cart-checkout.html"

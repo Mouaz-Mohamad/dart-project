@@ -184,7 +184,7 @@
       } catch (error) {
         if (generation !== apiSessionGeneration) return currentUser();
         if (error.status === 401) {
-          clearCustomerPrivateCache();
+          clearCustomerPrivateCache({ preserveCartIdentifier: true, preserveGuestCart: !apiUserCache });
           return cacheApiUser(null);
         }
         apiSessionUnavailable = true;

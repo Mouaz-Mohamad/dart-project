@@ -16,6 +16,9 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `dashboard/news-admin.js` | News management and authorized prefetch | `Eye/dart-news-admin.js` |
 | `dashboard/sets-admin.js` | Set editor and authorized prefetch | `Eye/dart-sets-admin.js` |
 | `storefront/storefront.js` | Shared product modal, variants and lazy merchandising loader | `Js/dart-storefront.js` |
+| `storefront/product-links.js` | Product deep links and safe selection restoration | `Js/dart-product-links.js` |
+| `dashboard/coverage-picker.js` | Structured carrier coverage selector | `Eye/dart-coverage-picker.js` |
+| `dashboard/shipping-admin.js` | Shipping companies and governorate block policy | `Eye/dart-shipping.js` |
 | `storefront/merchandising.js` | Lazy related-model suggestions and quantity-offer messaging | `Js/dart-merchandising.js` |
 | `storefront/catalog.js` | Catalog hydration, version recovery and projections | `Js/dart-catalog.js` |
 | `storefront/address.js` | Delivery pin verification, address state and lookup concurrency | `Js/dart-address.js` |

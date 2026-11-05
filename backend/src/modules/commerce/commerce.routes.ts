@@ -6,6 +6,7 @@ import { Router, type Request, type Response } from "express";
 import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
+import { blockedGovernoratesSchema, shippingCompanySchema } from "../settings/site-settings.schema.js";
 import { AppError } from "../../http/app-error.js";
 import type { AppConfig } from "../../config/env.js";
 import { GUEST_CART_COOKIE, hashGuestCartToken } from "../../security/guest-cart-owner.js";
@@ -75,6 +76,7 @@ const orderWorkflowInputSchema = z.object({
   representativeId: z.string().trim().max(160).optional(),
   shippingCompanyId: z.string().trim().max(64).optional(),
   trackingNumber: z.string().trim().max(80).optional(),
+  coverageConfirmed: z.boolean().optional(),
   deliveryGroupId: z.string().trim().max(160).optional(),
   reason: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(1500).optional(),
@@ -253,11 +255,13 @@ export function createCommerceRouter(
     csrf,
     requireAccountType("customer"),
     async (request, response) => {
-      const body = z.object({ reservationId }).parse(request.body);
+      const body = z.object({ reservationId, replaceReservationId: reservationId.optional(), replaceCartVersion: z.string().max(120).optional() }).strict().parse(request.body);
       const result = await commerce.claimGuestCart(
         body.reservationId,
         request.auth!.userId,
         guestCartOwnerHash(request, response, config, false) ?? undefined,
+        body.replaceReservationId,
+        body.replaceCartVersion,
       );
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json(result);
@@ -293,7 +297,8 @@ export function createCommerceRouter(
     },
   );
 
-  router.put("/cart/reservation", rateLimit({ store: sharedRateLimitStore(config, "commerce-1"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+  // Compatibility URL: old clients must authenticate before reserving inventory too.
+  router.put("/cart/reservation", signedIn, csrf, requireAccountType("customer"), rateLimit({ store: sharedRateLimitStore(config, "commerce-1"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const body = reserveSchema.parse(request.body);
     const ownerHash = guestCartOwnerHash(request, response, config, true);
     if (!ownerHash) {
@@ -302,11 +307,17 @@ export function createCommerceRouter(
     const result = await commerce.reserveCart(
       body.reservationId,
       body.lines,
-      undefined,
+      request.auth!.userId,
       ownerHash,
     );
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json(result);
+  });
+
+  router.get("/cart/reservation", rateLimit({ store: sharedRateLimitStore(config, "commerce-guest-recovery"), windowMs: 600000, limit: 80, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    const ownerHash = guestCartOwnerHash(request, response, config, false);
+    response.status(200).json(ownerHash ? await commerce.guestCartForOwner(ownerHash) : { cart: null });
   });
 
   router.get(
@@ -331,22 +342,9 @@ export function createCommerceRouter(
     response.status(204).end();
   });
 
-  const shippingCompanySchema=z.object({
-    id:z.string().regex(/^[a-z0-9_-]{2,64}$/),
-    name:z.string().trim().min(2).max(100),
-    trackingUrl:z.string().trim().url().max(2000),
-    active:z.boolean(),
-    checkoutEnabled:z.boolean().optional(),
-    governorates:z.array(z.string().trim().min(2).max(100)).max(27),
-    coverage: z.record(z.string(),z.object({
-      all:z.boolean(),
-      cities:z.record(z.string(),z.object({all:z.boolean(),
-        areas:z.array(z.string().trim().min(1).max(100)).max(200)}).strict()),
-    }).strict()).optional(),
-  }).strict();
 
   router.get("/shipping/checkout-coverage",async(_request,response)=>{
-    response.setHeader("Cache-Control","public,max-age=30");
+    response.setHeader("Cache-Control","private,no-store");
     response.status(200).json(await commerce.publicShippingCoverage());
   });
   router.get("/shipping/coverage-catalog",async(_request,response)=>{
@@ -361,9 +359,9 @@ export function createCommerceRouter(
     requirePermission("settings.manage"),
     async(request,response)=>{
       const input=z.object({expectedVersion:z.number().int().positive(),
-        companies:z.array(shippingCompanySchema).max(50)}).strict().parse(request.body);
+        companies:z.array(shippingCompanySchema).max(50),blockedGovernorates:blockedGovernoratesSchema.optional()}).strict().parse(request.body);
       response.status(200).json(await commerce.saveShippingCompanies(
-        request.auth!.userId,input.expectedVersion,input.companies,String(request.id)));
+        request.auth!.userId,input.expectedVersion,input.companies,String(request.id),input.blockedGovernorates));
     });
   router.patch("/admin/orders/:orderRef/shipment-return",signedIn,csrf,requireAccountType("staff"),requireMfa,
     requirePermission("orders.manage"),async(request,response)=>{
@@ -377,10 +375,10 @@ export function createCommerceRouter(
     async(request,response)=>{
       const input=z.object({expectedVersion:z.number().int().positive(),
         companyId:z.string().regex(/^[a-z0-9_-]{2,64}$/),
-        trackingNumber:z.string().trim().min(2).max(80)}).strict().parse(request.body);
+        trackingNumber:z.string().trim().min(2).max(80),coverageConfirmed:z.boolean().optional()}).strict().parse(request.body);
       const orderRef=z.string().trim().min(1).max(160).parse(request.params.orderRef);
       response.status(200).json(await commerce.correctOrderShipment(request.auth!.userId,orderRef,
-        input.expectedVersion,input.companyId,input.trackingNumber,String(request.id)));
+        input.expectedVersion,input.companyId,input.trackingNumber,String(request.id),input.coverageConfirmed));
     });
   router.post(
     "/admin/orders/:orderRef/workflow",

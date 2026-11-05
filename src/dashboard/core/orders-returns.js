@@ -133,7 +133,8 @@ function renderOrders(dataArray) {
     return;
   }
   sorted.forEach((o) => {
-    const next = dartNextStatus(o.status),
+    const next = o.deliveryShipment?.type==="external" && o.status==="Out With Representative"
+      ? "Delivered" : dartNextStatus(o.status),
       net = dartOrderNet(o),
       verificationStatus = String(
         o.verificationStatus || o.codVerificationStatus || "Not Required",

@@ -129,13 +129,13 @@ export function createSetCartRouter(
     },
   );
 
-  router.put("/cart/set-groups", guestWriteLimit, async (request, response) => {
+  router.put("/cart/set-groups", signedIn, csrf, requireAccountType("customer"), guestWriteLimit, async (request, response) => {
     const body = attachSchema.parse(request.body);
     const ownerHash = guestCartOwnerHash(request, response, config, true);
     if (!ownerHash) throw new Error("Unable to establish guest cart ownership");
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json(
-      await setCart.attachGroups(body.reservationId, body.groups, undefined, ownerHash),
+      await setCart.attachGroups(body.reservationId, body.groups, request.auth!.userId, ownerHash),
     );
   });
 

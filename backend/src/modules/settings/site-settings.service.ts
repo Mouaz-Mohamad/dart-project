@@ -61,6 +61,10 @@ export class SiteSettingsService {
           Array.isArray(currentSettings.shippingCompanies)) {
         nextSettings.shippingCompanies = currentSettings.shippingCompanies;
       }
+      if (!Object.prototype.hasOwnProperty.call(nextSettings, "blockedGovernorates") &&
+          Array.isArray(currentSettings.blockedGovernorates)) {
+        nextSettings.blockedGovernorates = currentSettings.blockedGovernorates;
+      }
       let codRiskPolicyVersion = Number(currentCodRisk?.version || 1);
 
       if (currentCodRisk && !incomingCodRisk) {

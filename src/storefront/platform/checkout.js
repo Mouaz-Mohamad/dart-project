@@ -103,6 +103,8 @@
     const logged = currentUser();
     if (!logged)
       throw new Error("يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.");
+    // Retry shipping even after a previous outage made the address temporarily ineligible.
+    if (window.DartShippingAvailability) await window.DartShippingAvailability.load({ force: true });
     const details = {
       name: getCheckoutField(form, "customer_name") || logged?.name || "",
       phone1: getCheckoutField(form, "phone1") || displayPhone(logged?.phone1),
@@ -153,15 +155,17 @@
         "Select the location on the map or locate the manually entered address.",
       );
     const acceptedGovernorate = deliveryGovernorate(details.governorate);
-    if (!acceptedGovernorate || addressValidation?.zone !== "cairo-giza")
+    if (!acceptedGovernorate || !["cairo-giza", "coverage-enabled"].includes(addressValidation?.zone))
       throw new Error(
-        "Delivery is currently available in Cairo and Giza only. Verify the address on the map.",
+        "للأسف، التوصيل مش متاح للمنطقة دي حاليًا. تحقق من العنوان على الخريطة.",
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
-    if (!["Cairo","Giza"].includes(acceptedGovernorate) &&
-        window.DartShippingAvailability?.isAddressCovered?.(details) !== true) {
-      throw new Error("No active shipping service covers this selected governorate/city/area.");
+    if (window.DartShippingAvailability) {
+      // Re-read policy at confirmation; an open page must not reopen a disabled province.
+      if (window.DartShippingAvailability.isAddressCovered(details) !== true) {
+        throw new Error("للأسف، التوصيل مش متاح للمنطقة دي حاليًا. اختار عنوانًا آخر.");
+      }
     }
 
     if (API_BASE) {

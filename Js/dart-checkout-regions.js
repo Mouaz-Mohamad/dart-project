@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const norm=value=>String(value||"").trim().toLowerCase()
 .replace(/[\u064b-\u065f\u0670\u0640]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه")
 .replace(/[\s_-]+/g,"");
-const defaults=new Set(["Cairo","Giza"]);
+
 let regions=[
 {id:"Cairo",en:"Cairo",ar:"القاهرة",cities:[]},
 {id:"Giza",en:"Giza",ar:"الجيزة",cities:[]}
@@ -32,13 +32,13 @@ return Boolean(match.all||(area&&match.areas?.includes(area)));
 }
 const isGovernorateOpen=value=>{
 const id=canonical(value);
-return defaults.has(id)||regions.some(x=>x.id===id);
+return ready&&regions.some(x=>x.id===id&&x.available===true);
 };
 function availableCompanies({governorate,city,coverageArea}={}){
 const gov=canonical(governorate);
-if(!gov)return [];
+if(!gov||!isGovernorateOpen(gov))return [];
 const selected=companies.filter(x=>coveredBy(x,gov,city,coverageArea));
-if(defaults.has(gov))selected.unshift({id:"dart",name:"Dart Delivery"});
+if(regions.find(x=>x.id===gov)?.carriers?.includes("dart"))selected.unshift({id:"dart",name:"Dart Delivery"});
 return selected;
 }
 function isAddressCovered(addr){
@@ -46,22 +46,27 @@ const g=canonical(addr?.governorate);
 if(!g)return false;
 return availableCompanies({governorate:g,city:addr.city,coverageArea:addr.coverageArea}).length>0;
 }
-async function load(){
+async function load({force=false}={}){
 if(activePromise)return activePromise;
-activePromise=(async()=>{
+if(ready&&!force)return;
+ready=false;
+const task=(async()=>{
 const base=String(window.DART_API_BASE_URL||location.origin).replace(/\/$/,"");
 const response=await fetch(base+"/api/v1/shipping/checkout-coverage",{cache:"no-store"});
 if(!response.ok)throw Error("Delivery coverage temporarily unavailable");
 const data=await response.json();
 if(!Array.isArray(data.governorates))throw Error("Invalid region catalog");
 const received=data.governorates.filter(x=>typeof x.id==="string"&&Array.isArray(x.cities));
-if(!received.some(x=>x.id==="Cairo")||!received.some(x=>x.id==="Giza"))throw Error("Missing local delivery regions");
+if(received.length!==27)throw Error("Incomplete delivery regions");
 regions=received;
 companies=Array.isArray(data.companies)?data.companies:[];
 ready=true;
 window.dispatchEvent(new Event("dart:shipping-coverage-loaded"));
-})().catch(error=>{activePromise=null;throw error});
-return activePromise;
+})();
+activePromise=task;
+try{return await task;}
+catch(error){ready=false;throw error;}
+finally{if(activePromise===task)activePromise=null;}
 }
 window.DartShippingAvailability=Object.freeze({
 load,canonical,isGovernorateOpen,isAddressCovered,availableCompanies,
@@ -125,7 +130,7 @@ function syncStatus(){
 const opts=availableCompanies({governorate:governorate.value,city:city.value,coverageArea:district.value});
 status.textContent=opts.length?
 "متاح التوصيل عبر: "+opts.map(c=>c.name).join("، "):
-"المكان ده غير مغطى بالكامل؛ اختار مدينة/منطقة أخرى أو فعّل شركة شحن تغطيه.";
+"للأسف، التوصيل مش متاح للمنطقة دي حاليًا. اختار عنوانًا آخر.";
 status.dataset.dartCoverageState=opts.length?"available":"unavailable";
 }
 function fillArea(){
@@ -147,11 +152,15 @@ governorateOptions();
 void load().then(()=>{
 governorateOptions();
 const note=document.querySelector(".dart-delivery-zone-note");
-if(note&&regions.length>2)note.textContent="Delivery areas depend on available shipping companies. Cairo & Giza retain Dart delivery.";
+if(note&&regions.length>2)note.textContent="التوصيل حسب المحافظة وتغطية شركات الشحن المتاحة.";
 }).catch(()=>{
-status.textContent="تعذر تحديث تغطية شركات الشحن؛ التوصيل متاح بالقاهرة والجيزة فقط.";
+status.textContent="تعذر التحقق من مناطق التوصيل. أعد المحاولة قبل تأكيد الطلب.";
+const retry=document.createElement("button");retry.type="button";retry.textContent="Retry Delivery Coverage";
+retry.addEventListener("click",()=>{retry.disabled=true;void load({force:true}).then(()=>{governorateOptions();retry.remove();})
+.catch(()=>{retry.disabled=false;status.textContent="تعذر التحقق من مناطق التوصيل. حاول مجددًا.";});});
+helper.append(retry);
 // Fail closed for any newly configured location while offline.
-regions=regions.filter(x=>defaults.has(x.id));companies=[];governorateOptions();
+ready=false;companies=[];
 });
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();

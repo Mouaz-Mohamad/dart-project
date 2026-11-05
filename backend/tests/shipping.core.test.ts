@@ -39,6 +39,13 @@ describe("Dart manual shipping core", () => {
     expect(() => selectShippingCompany([bosta],"bosta","Cairo")).toThrow(/cover/i);
     expect(() => selectShippingCompany([{...bosta,active:false}],"bosta","Alexandria")).toThrow(/inactive/i);
   });
+  it("requires explicit staff verification before dispatching partial city/area coverage", () => {
+    const scoped = { ...bosta, coverage: { Alexandria: { all: false, cities: { montaza: { all: true, areas: [] } } } } };
+    const input = { companyId: "bosta", governorate: "Alexandria", city: "montaza", trackingNumber: "SHIP-123", now: "2026-11-05T12:00:00Z" };
+    expect(() => dispatchShipment([scoped], input)).toThrow(/verify.*address/i);
+    expect(dispatchShipment([scoped], { ...input, coverageConfirmed: true }).coverageConfirmedAt).toBe(input.now);
+    expect(() => dispatchShipment([scoped], { ...input, city: "unknown", coverageConfirmed: true })).toThrow(/cover/i);
+  });
   it("does not assign internal representative to an external shipment", () => {
     expect(() => dispatchShipment([bosta],{
       companyId:"bosta",representativeId:"rep-123",trackingNumber:"12345",

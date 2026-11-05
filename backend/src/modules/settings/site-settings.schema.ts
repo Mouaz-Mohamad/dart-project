@@ -1,6 +1,8 @@
 // DART CODE GUIDE | backend/src/modules/settings/site-settings.schema.ts
 // الغرض: Contract مركزي وصارم لكل Settings المعروفة؛ أي root key غير معروفة تُرفض.
 import { z } from "zod";
+import { EGYPT_GOVERNORATES, validTrackingPortal } from "../commerce/shipping.core.js";
+import { validateCompanyCoverage } from "../commerce/shipping.coverage.js";
 
 const mediaAsset = z.union([
   z.string().max(4000),
@@ -64,6 +66,32 @@ const codRisk = z.object({
   }
 });
 
+export const blockedGovernoratesSchema = z.array(z.enum(EGYPT_GOVERNORATES)).max(27)
+  .refine(value => new Set(value).size === value.length, "Governorates must be unique");
+
+export const shippingCompanySchema = z.object({
+    id: z.string().regex(/^[a-z0-9_-]{2,64}$/),
+    name: z.string().trim().min(2).max(100),
+    trackingUrl: z.string().trim().min(1).max(2000),
+    active: z.boolean(),
+    checkoutEnabled: z.boolean().optional(),
+    governorates: z.array(z.string().trim().min(2).max(100)).max(27),
+    coverage: z.record(z.string(),z.object({
+      all:z.boolean(),
+      cities:z.record(z.string(),z.object({all:z.boolean(),
+        areas:z.array(z.string().trim().min(1).max(100)).max(200)}).strict()),
+    }).strict()).optional(),
+  }).strict().superRefine((company, context) => {
+  try {
+    if (company.id === "dart") throw new Error("Dart is the internal carrier and cannot be overwritten.");
+    validTrackingPortal(company.trackingUrl);
+    validateCompanyCoverage(company);
+    if (company.checkoutEnabled && !company.coverage) throw new Error("Choose structured coverage before enabling checkout.");
+  } catch (error) {
+    context.addIssue({ code: "custom", message: error instanceof Error ? error.message : "Invalid shipping coverage" });
+  }
+});
+
 export const siteSettingsSchema = z.object({
   version: z.number().int().positive().optional(),
   heroDayImage: mediaAsset.optional(),
@@ -82,19 +110,9 @@ export const siteSettingsSchema = z.object({
   modelCards: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   typing: typing.optional(),
   codRisk: codRisk.optional(),
-  shippingCompanies: z.array(z.object({
-    id: z.string().regex(/^[a-z0-9_-]{2,64}$/),
-    name: z.string().trim().min(2).max(100),
-    trackingUrl: z.string().trim().min(1).max(2000),
-    active: z.boolean(),
-    checkoutEnabled: z.boolean().optional(),
-    governorates: z.array(z.string().trim().min(2).max(100)).max(27),
-    coverage: z.record(z.string(),z.object({
-      all:z.boolean(),
-      cities:z.record(z.string(),z.object({all:z.boolean(),
-        areas:z.array(z.string().trim().min(1).max(100)).max(200)}).strict()),
-    }).strict()).optional(),
-  }).strict()).max(50).optional(),
+  blockedGovernorates: blockedGovernoratesSchema.optional(),
+  shippingCompanies: z.array(shippingCompanySchema).max(50)
+    .refine(companies => new Set(companies.map(company => company.id)).size === companies.length, "Shipping company IDs must be unique").optional(),
 }).strict();
 
 export type SiteSettings = z.infer<typeof siteSettingsSchema>;

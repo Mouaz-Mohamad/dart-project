@@ -32,7 +32,7 @@ describe("Shipping checkout coverage (fail closed)",()=>{
     expect(EGYPT_COVERAGE_CATALOG).toHaveLength(27);
     expect(new Set(EGYPT_COVERAGE_CATALOG.map(g=>g.id)).size).toBe(27);
     expect(governorateFromText("محافظة الإسكندرية")).toBe("Alexandria");
-    expect(checkoutShippingRegions([]).map(x=>x.id)).toEqual(["Cairo","Giza"]);
+    expect(checkoutShippingRegions([]).filter(x=>x.available).map(x=>x.id)).toEqual(["Cairo","Giza"]);
     expect(checkoutShippingRegions([carrier]).map(x=>x.id)).toContain("Alexandria");
     expect(()=>validateCompanyCoverage(carrier)).not.toThrow();
     expect(()=>validateCompanyCoverage({...carrier,governorates:["Alexandrria"]})).toThrow();

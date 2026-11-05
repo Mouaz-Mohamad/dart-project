@@ -4,7 +4,8 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const source = fs.readFileSync(path.join(root, 'Js/dart-product-links.js'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'src/storefront/product-links.js'), 'utf8');
+const delivery = fs.readFileSync(path.join(root, 'Js/dart-product-links.js'), 'utf8');
 const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
 const dialog = fs.readFileSync(path.join(root, 'Js/dart-dialog.js'), 'utf8');
 
@@ -26,7 +27,7 @@ const sandbox = {
   clearTimeout,
   queueMicrotask,
 };
-vm.runInNewContext(source, sandbox, { filename: 'dart-product-links.js' });
+vm.runInNewContext(delivery, sandbox, { filename: 'dart-product-links.js' });
 const links = windowMock.DartProductLinks;
 assert(links, 'DartProductLinks API should be installed before DOM initialization');
 

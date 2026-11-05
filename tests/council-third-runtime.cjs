@@ -55,6 +55,7 @@ async function recovery() {
     async hydrateCustomerCommerce() {}, async saveCustomerAddress() {},
     window: { dartCheckoutAddress: { validate: () => ({ ok: true, zone: "cairo-giza" }) } },
     async apiRequest(url) {
+      if (url === "/api/v1/cart/reservation") return { cart: null };
       if (url === "/api/v1/me/cart") return { cart: null };
       if (url.includes("/cart/quote")) { quoteCalls++; return committed ? { completedOrder: { orderId: "K-COMMITTED" } } : { lines: [{ modelId: "M1", color: "Black", size: "M" }], fingerprint: "a".repeat(64), totalMinor: 12075 }; }
       posts++; committed = true; throw new TypeError("Synthetic lost reply");

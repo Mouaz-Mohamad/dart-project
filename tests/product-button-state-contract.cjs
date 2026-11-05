@@ -113,6 +113,7 @@ function makeButton(text = "") {
     DartCatalog: { model: () => ({}), cover: () => "cover.jpg" },
     DartPlatform: {
       currentUser: () => ({ id: "C1" }),
+      requireCartAccount: async () => true,
       cartReservationId: "CART-1",
       joinWaiting: async (...args) => {
         waitingCalls.push(args);
@@ -147,7 +148,8 @@ function makeButton(text = "") {
   const firstBuy = actions.handleBuy();
   assert.equal(buy.disabled, true);
   assert.equal(buy.textContent, "Adding…");
-  assert.equal(context.cartData.length, 1, "optimistic cart update must be immediate");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(context.cartData.length, 1, "cart update follows authenticated cart recovery");
   const secondBuy = actions.handleBuy();
   assert.equal(persistCalls, 1, "two immediate Buy attempts must create one reservation write");
   resolvePersist(true);

@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:1a475cf2fa20f9feb45796b4fe2073121d8d0dc76aa09b4146156395c4306a20 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:05f86e861757b1a992d32b06ebd0b43e3b01a85e888cbe236f6f7b39750a2d9c */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -1656,6 +1656,7 @@ async function dartApplyTransition(order, target, meta = {}) {
         target,
         ...(meta.representativeId ? { representativeId: String(meta.representativeId) } : {}),
         ...(meta.shippingCompanyId ? { shippingCompanyId: String(meta.shippingCompanyId), trackingNumber: String(meta.trackingNumber || "") } : {}),
+        ...(meta.coverageConfirmed === true ? { coverageConfirmed: true } : {}),
         ...(meta.deliveryGroupId
           ? { deliveryGroupId: String(meta.deliveryGroupId) }
           : {}),
@@ -3156,9 +3157,10 @@ function dartSetupOperationalModals() {
       if(companyId!=="dart"&&orders.length!==1){
         button.disabled=false;window.DartDialog.alert("Select one external order at a time, so each has its own tracking code.");return;}
       try {
+        if(companyId!=="dart" && !await window.DartDialog.confirm("هل راجعت عنوان العميل وتأكدت مع شركة الشحن أنه داخل تغطيتها الفعلية؟ بعض الشركات تغطي مدنًا ومناطق محددة فقط.")) return;
         const res =
           orders.length === 1
-            ? await dartApplyTransition(orders[0], target, companyId==="dart" ? {representativeId:rep} : {shippingCompanyId:companyId,trackingNumber})
+            ? await dartApplyTransition(orders[0], target, companyId==="dart" ? {representativeId:rep} : {shippingCompanyId:companyId,trackingNumber,coverageConfirmed:true})
             : await dartBatchTransition(orders, target, { representativeId: rep });
         if (!res.ok) {
           window.DartDialog.alert(res.message || "Operation failed");

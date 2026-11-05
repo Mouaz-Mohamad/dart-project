@@ -140,7 +140,7 @@ export class SetCartService {
       if (row.customer_user_id && row.customer_user_id !== customerUserId) {
         throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "This cart reservation belongs to another account");
       }
-      if (!row.customer_user_id && guestOwnerHash && row.guest_owner_hash !== guestOwnerHash) {
+      if (!row.customer_user_id && (!guestOwnerHash || !row.guest_owner_hash || row.guest_owner_hash !== guestOwnerHash)) {
         throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "This guest cart belongs to another browser");
       }
       return row;

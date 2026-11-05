@@ -23,9 +23,9 @@ export function isInsideEgyptEnvelope(latitude:unknown, longitude:unknown):boole
     lat>=21.5&&lat<=32.1&&lng>=24.5&&lng<=36.2;
 }
 export function checkoutEligibleCompanies(companies: readonly CheckoutShippingCompany[],
-  address:CheckoutShippingAddress): CheckoutShippingCompany[] {
+  address:CheckoutShippingAddress, blockedGovernorates: readonly string[] = []): CheckoutShippingCompany[] {
   const governorate=governorateFromText(address.governorate);
-  if(!governorate)return [];
+  if(!governorate || blockedGovernorates.some(g=>governorateFromText(g)===governorate))return [];
   const result:CheckoutShippingCompany[]=[];
   // Dart delivery is a distinct internal path, not a public configurable provider.
   if(LOCAL_GOVERNORATES.has(governorate)) {
@@ -41,13 +41,14 @@ export function checkoutEligibleCompanies(companies: readonly CheckoutShippingCo
   }
   return result;
 }
-export function checkoutShippingRegions(companies: readonly CheckoutShippingCompany[]) {
+export function checkoutShippingRegions(companies: readonly CheckoutShippingCompany[], blockedGovernorates: readonly string[] = []) {
   return EGYPT_COVERAGE_CATALOG.map(g=>({
     id:g.id,ar:g.ar,en:g.en,
     cities:g.cities.map(c=>({id:c.id,ar:c.ar,en:c.en,
       areas:c.areas.map(a=>({id:a.id,ar:a.ar,en:a.en}))})),
-    carriers:checkoutEligibleCompanies(companies,{governorate:g.id}).map(c=>c.id),
+    carriers:checkoutEligibleCompanies(companies,{governorate:g.id},blockedGovernorates).map(c=>c.id),
     // Area-specific scopes need the city/area chosen; province is still selectable if some region is enabled.
-    available:g.id==="Cairo"||g.id==="Giza"||companies.some(company=>company.active&&company.checkoutEnabled&&company.coverage?.[g.id]),
-  })).filter(g=>g.available);
+    blocked:blockedGovernorates.includes(g.id),
+    available:!blockedGovernorates.includes(g.id) && (g.id==="Cairo"||g.id==="Giza"||companies.some(company=>company.active&&company.checkoutEnabled&&company.coverage?.[g.id])),
+  }));
 }

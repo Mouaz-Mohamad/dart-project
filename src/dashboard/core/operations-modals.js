@@ -18,6 +18,8 @@ async function dartRequestOrderTransition(orders, target) {
   }
   if (target === "Out With Representative") {
     dartPendingOrderAction = { orders, target };
+    try { await window.DartShipping.loadCompanies(); }
+    catch (error) { window.DartDialog.alert(error.message || "Shipping partners could not be loaded");return; }
     const sel = document.getElementById("rep-assignment-select");
     sel.innerHTML = dartActiveReps()
       .map(
@@ -25,10 +27,15 @@ async function dartRequestOrderTransition(orders, target) {
           `<option value="${dartEsc(r.id)}">${dartEsc(r.name)} — ${dartEsc(r.repId)}</option>`,
       )
       .join("");
-    if (!sel.options.length) {
-      window.DartDialog.alert("لا يوجد مندوب Active وغير مشطوب.");
-      return;
+    const companySelect=document.getElementById("shipping-company-select");
+    const tracking=document.getElementById("shipping-tracking-number");
+    companySelect.replaceChildren();
+    for (const company of window.DartShipping.companies().filter(row=>row.active)) {
+      const opt=document.createElement("option");opt.value=company.id;opt.textContent=company.name;companySelect.append(opt);
     }
+    companySelect.value="dart";tracking.value="";
+    const toggle=()=>{const dart=companySelect.value==="dart";sel.disabled=!dart;tracking.disabled=dart;tracking.required=!dart;};
+    companySelect.onchange=toggle;toggle();
     openModal(document.getElementById("rep-assignment-modal"));
     return;
   }
@@ -150,12 +157,20 @@ function dartSetupOperationalModals() {
       if (!dartPendingOrderAction) return;
       const button = event.currentTarget;
       button.disabled = true;
-      const rep = document.getElementById("rep-assignment-select").value;
-      const { orders, target } = dartPendingOrderAction;
+      const rep=document.getElementById("rep-assignment-select").value;
+      const companyId=document.getElementById("shipping-company-select").value;
+      const trackingNumber=document.getElementById("shipping-tracking-number").value.trim();
+      const {orders,target}=dartPendingOrderAction;
+      if(companyId==="dart"&&!rep){button.disabled=false;window.DartDialog.alert("Choose a Dart representative.");return;}
+      if(companyId!=="dart"&&!/^[A-Za-z0-9][A-Za-z0-9/_-]{1,79}$/.test(trackingNumber)){
+        button.disabled=false;window.DartDialog.alert("Enter the shipment tracking code.");return;}
+      if(companyId!=="dart"&&orders.length!==1){
+        button.disabled=false;window.DartDialog.alert("Select one external order at a time, so each has its own tracking code.");return;}
       try {
+        if(companyId!=="dart" && !await window.DartDialog.confirm("هل راجعت عنوان العميل وتأكدت مع شركة الشحن أنه داخل تغطيتها الفعلية؟ بعض الشركات تغطي مدنًا ومناطق محددة فقط.")) return;
         const res =
           orders.length === 1
-            ? await dartApplyTransition(orders[0], target, { representativeId: rep })
+            ? await dartApplyTransition(orders[0], target, companyId==="dart" ? {representativeId:rep} : {shippingCompanyId:companyId,trackingNumber,coverageConfirmed:true})
             : await dartBatchTransition(orders, target, { representativeId: rep });
         if (!res.ok) {
           window.DartDialog.alert(res.message || "Operation failed");

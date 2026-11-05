@@ -17,3 +17,4 @@
 .dart-coverage-help,.dart-coverage-empty{display:block;font-size:12px;opacity:.8;padding:5px}
 #shipping-coverage-warning:not(:empty){color:#aa2e35;font-weight:700}
 @media(max-width:620px){.dart-coverage-list{max-height:320px}.dart-coverage-fieldset{padding:9px}}
+.dart-blocked-governorates{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0}.dart-blocked-governorates label{display:flex;align-items:center;gap:6px}.dart-blocked-governorates input{width:auto}
