@@ -10,7 +10,7 @@ import type { AuthenticatedAccount } from "../src/modules/identity/identity.type
 import type { CatalogService } from "../src/modules/catalog/catalog.service.js";
 
 const sessionId = randomUUID(), csrf = "c".repeat(43);
-const cookie = `dart_session=${sessionId}.${"b".repeat(43)}; dart_csrf=${csrf}`;
+const cookie = `dart_session_staff=${sessionId}.${"b".repeat(43)}; dart_staff_csrf=${csrf}`;
 function application(options: { permissions?: string[]; mfaSatisfied?: boolean; accountType?: "staff" | "customer" } = {}) {
   const config = loadConfig({ NODE_ENV: "test", DATABASE_URL: "postgresql://unused/test", LOG_LEVEL: "silent" });
   const account: AuthenticatedAccount = { userId: randomUUID(), accountType: options.accountType ?? "staff", status: "active",
