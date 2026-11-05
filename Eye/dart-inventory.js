@@ -725,7 +725,7 @@
       $("modal-related-search").value = "";
       $("modal-edit-id").value = id || "";
       draft = {
-        related: [...(m?.relatedModelIds || [])].filter((id) => modelsData.some((candidate) => candidate.modelId === id && !candidate.isDeleted && !candidate.isArchived)),
+        related: [...(m?.relatedModelIds || [])].filter((relatedId) => modelsData.some((candidate) => candidate.modelId === relatedId && candidate.modelId !== m?.modelId && !candidate.isDeleted && !candidate.isArchived)),
         sizes: structuredClone(C.sizes(m)),
         colors: structuredClone(C.colors(m)),
       };
