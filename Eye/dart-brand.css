@@ -1,0 +1,818 @@
+/* ==========================================================================
+   DART EYE — Brand Overview refinement
+   Presentation only. Preserve all existing metric IDs, period controls,
+   chart canvases, event handlers and revenue/profit calculations.
+   Scoped to #brand so Orders / Shipping / Finance are untouched.
+   ========================================================================== */
+#brand.dashboard-section{
+  min-width:0;
+  height:auto;
+  min-height:100dvh;
+  overflow:visible;
+  padding:24px clamp(16px,2.3vw,32px) 54px !important;
+  color:#332832;
+  background:#f8f6f7;
+}
+#brand > *{min-width:0;box-sizing:border-box}
+#brand > .margen20,#brand > .strok{display:none}
+#brand .dart-brand-page-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:16px;
+  padding:22px 24px;
+  margin:0 0 24px;
+  border:1px solid #eadde2;
+  border-radius:16px;
+  background:linear-gradient(115deg,#fff 0%,#fff9fa 72%,#f9edef 100%);
+}
+#brand .dart-brand-page-copy{min-width:0;flex:1 1 250px}
+#brand .dart-brand-eyebrow,
+#brand .dart-brand-heading-eyebrow{
+  margin:0 0 5px;
+  color:#8d2b4b;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+#brand .dart-brand-eyebrow{display:flex;align-items:center;gap:7px}
+#brand .dart-brand-page-header h1{
+  margin:0 0 7px;
+  color:#3d1929;
+  font-size:clamp(24px,2.5vw,34px);
+  line-height:1.2;
+  font-weight:800;
+}
+#brand .dart-brand-page-header p:not(.dart-brand-eyebrow){
+  margin:0;
+  max-width:700px;
+  color:#776872;
+  font-size:12px;
+  line-height:1.7;
+}
+#brand .dart-brand-header-mark{
+  display:inline-flex;
+  align-items:center;
+  gap:9px;
+  padding:11px 14px;
+  border:1px solid #e4cdd6;
+  border-radius:10px;
+  background:#fff;
+  color:#722644;
+  font-size:12px;
+  font-weight:750;
+}
+#brand .dart-brand-block-heading{
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px 16px;
+  margin:22px 1px 12px;
+  min-width:0;
+}
+#brand .dart-brand-block-heading:first-of-type{margin-top:0}
+#brand .dart-brand-block-heading h2{
+  margin:0;
+  color:#421c2d;
+  font-size:clamp(17px,1.5vw,20px);
+  font-weight:800;
+  line-height:1.35;
+}
+#brand .dart-brand-block-heading>span{
+  color:#877881;
+  font-size:11px;
+  line-height:1.6;
+}
+/* Overview cards: compact, consistent and readable. */
+#brand .cards-one{display:block;width:100%;padding:0;margin:0 0 21px}
+#brand .cont-card-info-2{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  justify-content:stretch;
+  gap:12px;
+  width:100%;
+  min-width:0;
+  padding:0;
+  margin:0;
+}
+#brand .cards-one .cont-card-info-2>.card-inf-2{
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:12px;
+  min-width:0;
+  min-height:118px;
+  padding:17px 16px 15px;
+  border:1px solid #e7dde2;
+  border-radius:13px;
+  background:#fff;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  text-align:left;
+}
+#brand .cards-one .cont-card-info-2>.card-inf-2:hover{border-color:#cdb5c0}
+#brand .cards-one .card-inf-2 h5{
+  order:0;
+  margin:0;
+  padding-right:21px;
+  color:#736570;
+  font-size:12px;
+  font-weight:700;
+  line-height:1.5;
+  white-space:normal;
+}
+#brand .cards-one .card-inf-2 .span-img{
+  order:1;
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  width:100%;
+  min-width:0;
+  margin:0;
+  font-size:22px;
+}
+#brand .cards-one .card-inf-2 .numebr{
+  min-width:0;
+  color:#3d2530;
+  font-size:clamp(19px,2vw,27px);
+  font-weight:800;
+  line-height:1.2;
+  overflow-wrap:anywhere;
+  white-space:normal;
+}
+#brand .cards-one .card-inf-2 .span-img>i{
+  display:grid;
+  place-items:center;
+  flex:none;
+  width:42px;
+  height:42px;
+  padding:10px;
+  border-radius:11px;
+  background:#f8f0f3;
+  font-size:18px;
+}
+#brand .cards-one .card-inf-2 .dart-info-btn{
+  top:12px;
+  right:12px;
+  width:19px;
+  height:19px;
+  min-width:19px;
+  background:#fff!important;
+  box-shadow:none;
+  opacity:.85;
+}
+/* One period control shared by the original finance and analytics widgets. */
+#brand #dart-brand-finance{margin:0 0 13px}
+#brand #brand-finance-period-control{
+  display:grid;
+  grid-template-columns:minmax(190px,1fr) minmax(165px,220px) auto;
+  align-items:end;
+  gap:14px;
+  margin:0;
+  padding:16px 18px;
+  border:1px solid #e7dce1;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:none;
+}
+#brand #brand-finance-period-control .dart-period-copy>span{
+  color:#8b2d4c;
+  font-size:11px;
+}
+#brand #brand-finance-period-control .dart-period-copy strong{
+  color:#352531;
+  font-size:15px;
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+#brand #brand-finance-period-control .dart-period-copy small{
+  color:#81737b;
+  line-height:1.4;
+}
+#brand #brand-finance-period-control select,
+#brand #brand-finance-period-control input{
+  min-height:42px;
+  border-radius:9px;
+  border:1px solid #d7cbd1;
+  color:#3b2b34;
+  background:#fff;
+  font-size:12px;
+}
+#brand #brand-finance-period-control .dart-custom-period{
+  min-width:0;
+  grid-template-columns:repeat(2,minmax(120px,1fr));
+}
+/* Finance workspace: preserve a dark graph panel because ApexCharts
+   currently uses pale axis-label colors configured by dart.js. */
+#brand>.chart-one{
+  display:grid;
+  grid-template-columns:minmax(240px,.87fr) minmax(0,1.7fr);
+  align-items:stretch;
+  gap:14px!important;
+  width:100%;
+  min-width:0;
+  margin:0 0 21px;
+  padding:0;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+#brand .chart-one>.financial-summary{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:10px;
+  width:100%;
+  min-width:0;
+  height:auto!important;
+}
+#brand .chart-one>.financial-summary>*:first-child{grid-column:auto}
+#brand .chart-one .financial-summary>.sales-cont,
+#brand .chart-one .financial-summary>.cost-cont,
+#brand .chart-one .financial-summary>.profit-cont{
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  align-items:stretch;
+  gap:13px;
+  min-width:0;
+  min-height:112px;
+  padding:17px;
+  border:1px solid #e5dbe0;
+  border-radius:12px;
+  background:#fff!important;
+  box-shadow:none;
+  transform:none;
+}
+#brand .chart-one .financial-summary>.sales-cont:hover,
+#brand .chart-one .financial-summary>.cost-cont:hover,
+#brand .chart-one .financial-summary>.profit-cont:hover{
+  transform:none;
+  border-color:#cdb7c0;
+  box-shadow:none;
+}
+#brand .chart-one .financial-summary .card-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  gap:8px;
+  min-width:0;
+  padding-right:17px;
+}
+#brand .chart-one .financial-summary h4{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin:0;
+  color:#655560;
+  font-size:12px;
+  font-weight:750;
+  white-space:normal;
+}
+#brand .chart-one .financial-summary .sales{
+  display:block;
+  min-width:0;
+  color:#3b1e2d;
+  font-size:clamp(21px,2vw,27px);
+  font-weight:800;
+  line-height:1.3;
+  overflow-wrap:anywhere;
+  text-align:start;
+}
+#brand .chart-one .financial-summary .variance{
+  width:auto;
+  margin:0;
+  color:#496650;
+  background:#eef5ef;
+  padding:5px 8px;
+  border-radius:20px;
+  font-size:10px;
+  text-align:left;
+}
+#brand .chart-one .financial-summary>.profit-cont .sales{color:#8b2344}
+#brand .chart-one .financial-summary>.cost-cont .sales{color:#4d434a}
+#brand .chart-one>.dart-chart-card{
+  width:100%;
+  height:auto!important;
+  min-width:0;
+  min-height:365px;
+  padding:18px 20px;
+  border:1px solid #4d2638;
+  border-radius:13px;
+  background:linear-gradient(145deg,#351a2a 0%,#482136 100%);
+  box-shadow:none;
+  color:#fff;
+}
+#brand .dart-chart-card .dart-controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-bottom:14px;
+}
+#brand .dart-chart-card .dart-chart-title strong{
+  color:#fff;
+  font-size:16px;
+  font-weight:750;
+}
+#brand .dart-chart-card .dart-chart-title small{color:#e7d8e0;font-size:11px}
+#brand .dart-chart-card .dart-nav-controls{
+  display:flex;
+  gap:7px;
+  padding:5px 7px;
+  background:#ffffff19;
+  border:1px solid #ffffff38;
+  border-radius:9px;
+  backdrop-filter:none;
+}
+#brand .dart-chart-card .dart-nav-btn{
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  color:#fff;
+  border-radius:7px;
+  background:#ffffff23;
+}
+#brand .dart-chart-card .dart-nav-btn:hover{background:#85284a}
+#brand .dart-chart-card #displayLabel{color:#fff}
+#brand #myChart{min-width:0;width:100%;flex:1}
+/* Operational KPI grid: calm white cards instead of a patchwork of colors. */
+#brand #dart-analytics-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  align-items:stretch;
+  gap:11px;
+  padding:0;
+  margin:0 0 22px;
+}
+#brand #dart-analytics-grid>.dart-analytics-card{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  min-width:0;
+  min-height:145px;
+  padding:16px;
+  border:1px solid #e7dce1;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:none;
+  color:#352a33;
+  overflow:hidden;
+}
+#brand #dart-analytics-grid>.dart-analytics-card:hover{border-color:#d3bec7}
+#brand #dart-analytics-grid .kpi-card-head{
+  align-items:start;
+  min-height:24px;
+  font-size:17px;
+  color:#8b2949;
+}
+#brand #dart-analytics-grid .kpi-card-head>i{color:#8c2a49;opacity:1}
+#brand #dart-analytics-grid .dart-analytics-card h6{
+  margin:0;
+  color:#736570;
+  font-size:12px;
+  font-weight:700;
+  line-height:1.4;
+}
+#brand #dart-analytics-grid .dart-analytics-card>strong{
+  color:#3f2331;
+  font-size:clamp(17px,1.65vw,23px);
+  line-height:1.35;
+  font-weight:800;
+  overflow-wrap:anywhere;
+}
+#brand #dart-analytics-grid .dart-analytics-card>small{
+  margin-top:auto;
+  color:#8a7d86;
+  font-size:10px;
+  line-height:1.5;
+}
+#brand #dart-analytics-grid .dart-kpi-change{white-space:nowrap;max-width:100%;font-size:10px}
+/* Insights and customer activity. */
+#brand #dart-brand-insights{
+  margin:3px 0 22px;
+  overflow:visible;
+}
+#brand #dart-brand-insights .dart-section-heading{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:12px;
+  margin:0 0 12px;
+}
+#brand #dart-brand-insights .dart-section-heading h2{color:#421c2d;font-size:20px}
+#brand #dart-brand-insights .dart-finance-secondary{
+  min-height:39px;
+  height:auto;
+  border-color:#cfb7c1;
+  background:#fff;
+  color:#792944;
+  font-size:12px;
+}
+#brand #dart-brand-chart-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+#brand #dart-brand-chart-grid>.dart-finance-panel{
+  min-width:0;
+  padding:17px;
+  border:1px solid #e7dce1;
+  border-radius:13px;
+  background:#fff;
+  box-shadow:none;
+}
+#brand #dart-brand-chart-grid>.dart-financial-analysis-panel{grid-column:1/-1}
+#brand #dart-brand-chart-grid .dart-panel-head{gap:12px}
+#brand #dart-brand-chart-grid .dart-panel-head h3{
+  color:#3e2532;
+  font-size:15px;
+  line-height:1.4;
+}
+#brand #dart-brand-chart-grid .dart-panel-head p{color:#81717c}
+#brand #dart-brand-chart-grid .dart-panel-badge{background:#f9eef2;color:#84324e}
+#brand .brand-widgets-container{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:stretch;
+  gap:12px;
+  width:100%;
+  min-width:0;
+  height:auto;
+  margin:0 0 12px;
+}
+#brand .brand-widgets-container>.widget-card,
+#brand>.widget-card{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  width:100%;
+  height:auto;
+  min-height:260px;
+  max-height:none;
+  margin:0;
+  padding:16px;
+  border:1px solid #e9dfe3;
+  border-radius:13px;
+  background:#fff;
+  box-shadow:none;
+  overflow:hidden;
+}
+#brand .widget-card .widget-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  gap:10px 16px;
+  padding:0 0 12px;
+  margin:0 0 12px;
+  border-bottom:1px solid #f0e7eb;
+}
+#brand .widget-card .widget-header h3{
+  margin:0;
+  color:#41202f;
+  font-size:15px;
+  font-weight:750;
+  line-height:1.4;
+}
+#brand .widget-card .widget-header h3 i{color:#9a3050}
+#brand .widget-card .widget-header small{
+  display:block;
+  margin-top:4px;
+  color:#81747e;
+  font-size:10px;
+  line-height:1.5;
+}
+#brand .widget-card .widget-content{
+  min-width:0;
+  max-height:325px;
+  overflow-y:auto;
+  overflow-x:auto;
+  flex:1;
+  padding:1px 3px;
+  gap:8px;
+}
+#brand #top-clients-feed{max-height:300px}
+#brand .widget-card .dart-notification,
+#brand .widget-card .feed-item{
+  min-width:0;
+  border-radius:9px;
+  padding:10px;
+}
+#brand .widget-card select{
+  min-height:37px;
+  width:auto;
+  max-width:100%;
+  padding:7px 10px;
+  color:#483440;
+  border:1px solid #d7c5cf;
+  border-radius:9px;
+  background:#fff;
+  font-size:11px;
+}
+#brand .widget-card .bday-actions{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+}
+#brand .widget-card .btn-send-bday{
+  min-height:36px;
+  height:auto;
+  padding:7px 11px;
+  border:1px solid #ab012b;
+  border-radius:8px;
+  color:#fff;
+  background:#ab012b;
+  font-weight:750;
+}
+#brand .top-client-period-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#brand .top-client-period-filters label{display:flex;align-items:center;gap:6px;color:#75656d;font-size:11px}
+/* Traffic details: self-contained white surface, readable tables and controls. */
+#brand>.chart-box-tow{
+  width:100%;
+  min-width:0;
+  margin:0!important;
+  padding:17px;
+  border:1px solid #e7dce2;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:none;
+}
+#brand .chart-box-tow .chart-header-tow{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin:0 0 15px;
+}
+#brand .chart-box-tow .chart-title-tow h3{
+  color:#422133;
+  font-size:16px;
+  line-height:1.45;
+}
+#brand .chart-box-tow .chart-title-tow small{color:#877983;font-size:11px}
+#brand .chart-box-tow .header-actions-tow{min-width:0;gap:9px}
+#brand .chart-box-tow .export-btn-tow{
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  min-height:38px;
+  height:auto;
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid #d5bdc7;
+  background:#fff;
+  color:#7c2843;
+  font-size:11px;
+}
+#brand .chart-box-tow .filter-btns-tow{
+  max-width:100%;
+  display:flex;
+  gap:3px;
+  border:1px solid #eadfe4;
+  border-radius:9px;
+  background:#faf5f7;
+}
+#brand .chart-box-tow .filter-btn-tow{
+  min-height:32px;
+  height:auto;
+  padding:6px 10px;
+  font-size:11px;
+}
+#brand .chart-box-tow .filter-btn-tow.active-tow{
+  color:#fff;
+  background:#ab012b;
+}
+#brand .chart-box-tow .traffic-kpi-grid-tow{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+  margin:0 0 15px;
+}
+#brand .chart-box-tow .traffic-kpi-card-tow{
+  min-width:0;
+  min-height:112px;
+  padding:13px;
+  border:1px solid #ece2e6;
+  border-radius:10px;
+  background:#fcfafb;
+}
+#brand .traffic-kpi-card-tow span{
+  color:#786a74;
+  font-weight:700;
+  font-size:10px;
+}
+#brand .traffic-kpi-card-tow strong{
+  color:#422434;
+  font-size:clamp(16px,1.6vw,22px);
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+#brand .traffic-kpi-card-tow small{
+  margin-top:5px;
+  color:#897e85;
+  font-size:10px;
+  line-height:1.4;
+}
+#brand .chart-box-tow .chart-body-tow{
+  width:100%;
+  height:300px;
+  min-height:260px;
+  overflow:hidden;
+  border:1px solid #f1e8ec;
+  border-radius:10px;
+  padding:8px;
+}
+#brand .chart-box-tow .note-item-tow{
+  background:#faf5f7;
+  color:#62515b;
+  border-right:3px solid #9d3152;
+  border-radius:9px;
+  font-size:12px;
+}
+#brand .chart-box-tow .traffic-details-tow{
+  margin-top:17px;
+  padding-top:15px;
+  border-top:1px solid #f0e7ea;
+}
+#brand .chart-box-tow .traffic-table-wrap-tow{
+  width:100%;
+  max-width:100%;
+  overflow:auto;
+  border:1px solid #e9e1e4;
+  border-radius:9px;
+}
+#brand .chart-box-tow .traffic-table-tow th{
+  color:#654654;
+  background:#f9f4f6;
+}
+#brand .chart-box-tow .traffic-table-tow td{color:#41343c}
+@media(max-width:1250px){
+  #brand .cont-card-info-2{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #brand #dart-analytics-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #brand>.chart-one{grid-template-columns:minmax(215px,.85fr) minmax(0,1.35fr)}
+}
+@media(max-width:1000px){
+  #brand .cont-card-info-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #brand #brand-finance-period-control{grid-template-columns:minmax(0,1fr) minmax(160px,1fr)}
+  #brand #brand-finance-period-control .dart-custom-period{grid-column:1/-1}
+  #brand>.chart-one{grid-template-columns:minmax(0,1fr)}
+  #brand .chart-one>.financial-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #brand .chart-one .financial-summary>.sales-cont,
+  #brand .chart-one .financial-summary>.cost-cont,
+  #brand .chart-one .financial-summary>.profit-cont{min-height:132px}
+  #brand #dart-analytics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #brand .chart-box-tow .traffic-kpi-grid-tow{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:768px){
+  #brand.dashboard-section{
+    margin-left:0!important;
+    width:100%!important;
+    min-height:100dvh;
+    padding:16px 12px 100px!important;
+  }
+  #brand .dart-brand-page-header{padding:17px;margin-bottom:18px}
+  #brand .dart-brand-header-mark{display:none}
+  #brand .dart-brand-block-heading{align-items:start;margin:19px 1px 10px}
+  #brand .dart-brand-block-heading>span{font-size:10px}
+  #brand .cards-one{padding:0!important;margin-bottom:18px}
+  #brand .cont-card-info-2{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;
+    padding:0!important;
+  }
+  #brand .cards-one .cont-card-info-2>.card-inf-2{
+    min-height:105px;
+    padding:13px!important;
+    border-radius:11px!important;
+    text-align:left!important;
+  }
+  #brand .cards-one .card-inf-2 .span-img{
+    flex-direction:row!important;
+    width:100%!important;
+    gap:7px!important;
+    font-size:20px!important;
+  }
+  #brand .cards-one .card-inf-2 .numebr{
+    font-size:21px!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+    text-overflow:clip!important;
+  }
+  #brand .cards-one .card-inf-2 h5{
+    font-size:11px!important;
+    white-space:normal!important;
+    overflow:visible!important;
+  }
+  #brand #brand-finance-period-control{
+    grid-template-columns:minmax(0,1fr);
+    padding:13px;
+    gap:10px;
+  }
+  #brand #brand-finance-period-control .dart-custom-period{
+    grid-column:1;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  #brand>.chart-one{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:11px!important;
+    padding:0!important;
+  }
+  #brand .chart-one>.financial-summary{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:7px!important;
+    width:100%!important;
+  }
+  #brand .chart-one .financial-summary>.sales-cont,
+  #brand .chart-one .financial-summary>.cost-cont,
+  #brand .chart-one .financial-summary>.profit-cont{
+    min-width:0;
+    min-height:115px;
+    padding:11px!important;
+    border-radius:10px!important;
+    text-align:left!important;
+    align-items:stretch!important;
+    justify-content:space-between!important;
+  }
+  #brand .chart-one .financial-summary>*:first-child{grid-column:auto!important}
+  #brand .chart-one .financial-summary h4{
+    font-size:11px!important;
+    white-space:normal!important;
+    text-overflow:clip!important;
+  }
+  #brand .chart-one .financial-summary .sales{
+    font-size:clamp(14px,3.5vw,20px)!important;
+    text-align:left!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+    line-height:1.35!important;
+  }
+  #brand .chart-one .financial-summary .variance{
+    width:auto!important;
+    max-width:100%;
+    align-self:start;
+    padding:4px 6px!important;
+    font-size:9px!important;
+    text-align:left!important;
+  }
+  #brand .chart-one>.dart-chart-card{
+    width:100%!important;
+    min-height:280px;
+    padding:14px;
+  }
+  #brand #dart-analytics-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  #brand #dart-analytics-grid>.dart-analytics-card{min-height:126px;padding:12px}
+  #brand #dart-analytics-grid .dart-analytics-card>strong{font-size:18px}
+  #brand #dart-brand-chart-grid{grid-template-columns:minmax(0,1fr)}
+  #brand #dart-brand-chart-grid>.dart-financial-analysis-panel{grid-column:auto}
+  #brand #dart-brand-chart-grid .dart-chart-frame{height:250px}
+  #brand .brand-widgets-container{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr);
+    gap:10px!important;
+    height:auto!important;
+  }
+  #brand .brand-widgets-container>.widget-card,
+  #brand>.widget-card{
+    width:100%!important;
+    height:auto!important;
+    max-height:none!important;
+    min-height:220px;
+    padding:13px!important;
+  }
+  #brand .widget-card .widget-header{gap:9px}
+  #brand .widget-card .widget-content{max-height:290px}
+  #brand>.chart-box-tow{padding:13px}
+  #brand .chart-box-tow .traffic-kpi-grid-tow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #brand .chart-box-tow .chart-body-tow{height:260px}
+  #brand .chart-box-tow .header-actions-tow{width:100%;justify-content:space-between}
+  #brand .chart-box-tow .filter-btns-tow{overflow-x:auto}
+}
+@media(max-width:420px){
+  #brand .cards-one .cont-card-info-2>.card-inf-2{padding:11px!important}
+  #brand .cards-one .card-inf-2 .numebr{font-size:18px!important}
+  #brand .cards-one .card-inf-2 .span-img>i{width:34px;height:34px;padding:8px;font-size:15px}
+  #brand .chart-one>.financial-summary{grid-template-columns:minmax(0,1fr)!important}
+  #brand .chart-one .financial-summary>.sales-cont,
+  #brand .chart-one .financial-summary>.cost-cont,
+  #brand .chart-one .financial-summary>.profit-cont{min-height:85px}
+  #brand .chart-one .financial-summary .sales{font-size:20px!important}
+  #brand .dart-brand-block-heading>span{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  #brand .cards-one .card-inf-2,
+  #brand #dart-analytics-grid .dart-analytics-card{transition:none}
+}
