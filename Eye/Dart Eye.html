@@ -653,10 +653,22 @@
 <!--==================== END Models modals. ==================-->
 
         <!-- items -->
-        <section id="items" class="dashboard-section">
+        <section id="items" class="dashboard-section" aria-labelledby="dart-items-page-title">
+            <header class="dart-directory-header">
+                <div class="dart-directory-header-copy">
+                    <p class="dart-directory-eyebrow"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i> INVENTORY MANAGEMENT</p>
+                    <h2 id="dart-items-page-title">Items</h2>
+                    <p>Monitor individual pieces, grouped stock and item history in one organized workspace.</p>
+                </div>
+                <span class="dart-directory-badge"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Dart Operations</span>
+            </header>
+            <article class="dart-directory-workspace" aria-label="Items workspace">
+                <div class="dart-directory-workspace-head">
+                    <div><h3>Inventory Records</h3><p>Switch between Groups and All Items, then open Details for every field.</p></div>
+                </div>
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search product name">
+                    <input type="search" placeholder="Search by model or item code" aria-label="Search inventory items" autocomplete="off">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
@@ -729,6 +741,7 @@
                 </div>
                 <div id="items-container"></div>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Items modals: kept beside the owning dashboard section. -->
@@ -773,10 +786,22 @@
         <!-- END Items modals. -->
 
         <!-- Customers -->
-        <section id="customers" class="dashboard-section">
+        <section id="customers" class="dashboard-section" aria-labelledby="dart-customers-page-title">
+            <header class="dart-directory-header">
+                <div class="dart-directory-header-copy">
+                    <p class="dart-directory-eyebrow"><i class="fa-solid fa-users" aria-hidden="true"></i> CUSTOMER RELATIONSHIPS</p>
+                    <h2 id="dart-customers-page-title">Clients</h2>
+                    <p>Manage customer records and open the complete client profile, orders and benefits.</p>
+                </div>
+                <span class="dart-directory-badge"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Dart Operations</span>
+            </header>
+            <article class="dart-directory-workspace" aria-label="Clients workspace">
+                <div class="dart-directory-workspace-head">
+                    <div><h3>Customer Directory</h3><p>Search and filter clients, or open Details for full account history and discounts.</p></div>
+                </div>
             <div class="first filter-bar">
                 <div class="search-box">
-                    <input type="text" placeholder="search product name">
+                    <input type="search" placeholder="Search customer, phone or email" aria-label="Search customers" autocomplete="off">
                     <i class="bx bx-search"></i>
                 </div>
                 <div class="select-box">
@@ -805,7 +830,7 @@
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
                 <button type="button" class="add-btn" id="openCustomerModalBtn">
-                    <span>+</span> Add Clintes
+                    <span>+</span> Add Client
                 </button>
                 <button type="button" class="add-btn dart-reset-requests-btn" id="openPasswordRequestsBtn">
                     <i class="bx bx-key"></i> Password Requests <span id="passwordRequestsCount">0</span>
@@ -845,6 +870,7 @@
                     </span>
                 </template>
             </div>
+            </article>
         </section>
 
         <!-- BEGIN Customers modals: kept beside the owning dashboard section. -->
