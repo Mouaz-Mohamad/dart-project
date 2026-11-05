@@ -6,6 +6,7 @@ import { AppError } from "../http/app-error.js";
 import type { IdentityService } from "../modules/identity/identity.service.js";
 import type { AccountType } from "../modules/identity/identity.types.js";
 import { safeEqual } from "../security/crypto.js";
+import { isStaffApiRequest, staffSessionCookieName } from "../security/account-cookies.js";
 import { hashCsrfToken, parseSessionToken } from "../security/session-token.js";
 
 export function authenticate(
@@ -14,7 +15,10 @@ export function authenticate(
 ): RequestHandler {
   return async (request, _response, next) => {
     try {
-      const parsed = parseSessionToken(request.cookies?.[config.sessionCookieName] as string | undefined);
+      const cookieName = isStaffApiRequest(request.originalUrl)
+        ? staffSessionCookieName(config.sessionCookieName)
+        : config.sessionCookieName;
+      const parsed = parseSessionToken(request.cookies?.[cookieName] as string | undefined);
       if (!parsed) throw new AppError(401, "AUTH_REQUIRED", "Sign in to continue");
       const account = await service.authenticate(parsed.id, parsed.secret);
       if (!account) throw new AppError(401, "SESSION_INVALID", "The session is invalid or expired");
