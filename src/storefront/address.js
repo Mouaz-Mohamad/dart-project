@@ -13,6 +13,7 @@
   // valid address anywhere in Cairo or Giza is not rejected by a city-centre
   // radius while every other governorate is still refused.
   const DELIVERY_BOUNDS = [[21.50, 24.50], [32.10, 36.20]];
+  const LEGACY_RETURN_BOUNDS = [[27.00, 27.00], [30.65, 32.25]];
   const DELIVERY_VIEWBOX = '24.50,32.10,36.20,21.50';
   const DEFAULT_CENTER = [30.0444, 31.2357];
   const controllers = new Map();
@@ -131,7 +132,7 @@
     const map = L.map(mapElement, {
       attributionControl: true,
       zoomControl: false,
-      maxBounds: DELIVERY_BOUNDS,
+      maxBounds: options.form === '#checkoutForm' ? DELIVERY_BOUNDS : LEGACY_RETURN_BOUNDS,
       maxBoundsViscosity: 1
     }).setView(DEFAULT_CENTER, 11);
 
