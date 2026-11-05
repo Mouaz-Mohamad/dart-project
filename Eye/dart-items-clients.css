@@ -3,7 +3,7 @@
    Existing permissions, saving, grouped inventory, filters, modal actions and APIs stay unchanged. */
 #items.dashboard-section,#customers.dashboard-section{
   min-width:0;min-height:100dvh;height:auto;
-  overflow:visible;padding:24px clamp(16px,2.4vw,32px) 52px!important;
+  overflow:visible;padding:10px clamp(6px,0.4vw,32px) 10px!important;
   background:#f8f6f7;color:#382b35;
 }
 #items .dart-directory-header,#customers .dart-directory-header{

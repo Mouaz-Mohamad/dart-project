@@ -4,7 +4,7 @@
   height:auto;
   min-width:0;
   overflow:visible;
-  padding:24px clamp(16px,2.4vw,32px) 50px!important;
+padding:10px clamp(6px,0.4vw,32px) 10px!important;
   background:#f8f6f7;
   color:#342931;
 }
