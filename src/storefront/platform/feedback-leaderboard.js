@@ -47,6 +47,10 @@
   let publicLeaderboardFailed = false;
 
   async function hydratePublicLeaderboard() {
+    if (window.DartSiteSettings?.get?.().dartCardEnabled !== true) {
+      publicLeaderboardRows = [];
+      return [];
+    }
     if (!API_BASE || publicLeaderboardLoading) return publicLeaderboardRows || [];
     publicLeaderboardLoading = true;
     try {
@@ -71,6 +75,7 @@
   }
 
   function renderLeaderboard() {
+    if (window.DartSiteSettings?.get?.().dartCardEnabled !== true) return;
     const list = document.querySelector(".leaderboard-list");
     if (!list) return;
 

@@ -192,6 +192,7 @@
   }
 
   function activeDartCard(user = currentUser(), requestedItems = 0) {
+    if (window.DartSiteSettings?.get?.().dartCardEnabled !== true) return null;
     if (!user?.customerId) return null;
     const quantity = Math.max(0, Math.trunc(Number(requestedItems) || 0));
     return (
