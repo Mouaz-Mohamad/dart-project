@@ -58,9 +58,6 @@ const jsFiles = ["Js", "Eye"]
 const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
-  "Eye/dart-settings-shortcuts.js",
-  "Eye/dart-return-policy-settings.js",
-  "Eye/dart-card-system-settings.js",
   "Eye/dart-traffic-analytics.js",
   "Eye/dart-finance.js",
   "Js/dart-rep.js",
@@ -122,6 +119,11 @@ if (!settingsRuntime.includes('[data-target="models"]')) {
 // This script is loaded only by the standalone WhatsApp feedback page, not
 // by any general storefront/dashboard page. Budget it independently.
 const standaloneScripts = new Set(["Js/dart-public-feedback.js"]);
+const settingsFeatureFiles = new Set([
+  "Eye/dart-settings-shortcuts.js",
+  "Eye/dart-return-policy-settings.js",
+  "Eye/dart-card-system-settings.js",
+]);
 // New coverage editors are isolated from core and older lazy sections:
 // shipping is loaded only when a shipment/Shipping section is opened;
 // checkout suggestions appear only on cart-checkout.html.
@@ -136,6 +138,7 @@ let coreJsBytes = 0;
 let lazyJsBytes = 0;
 let standaloneJsBytes = 0;
 let coverageFeatureBytes = 0;
+let settingsFeatureBytes = 0;
 let brandDetailsBytes = 0;
 let customerDetailsBytes = 0;
 let merchandisingBytes = 0;
@@ -147,11 +150,19 @@ for (const file of jsFiles) {
   else if (file === "Eye/dart-brand-details.js") brandDetailsBytes += size;
   else if (standaloneScripts.has(file)) standaloneJsBytes += size;
   else if (coverageFeatureFiles.has(file)) coverageFeatureBytes += size;
+  else if (settingsFeatureFiles.has(file)) settingsFeatureBytes += size;
   else if (pageScopedFeatureFiles.has(file)) lazyJsBytes += size;
   else coreJsBytes += size;
   if (size > maxJsBytes) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
+}
+// Settings subfeatures are downloaded only when opening the Settings workspace.
+if (settingsFeatureBytes > 8 * 1024) {
+  failures.push("Settings-only controls exceed the independent 8 KiB cap");
+}
+if (/src="dart-(?:settings-shortcuts|return-policy-settings|card-system-settings)\.js/.test(dashboardHtml)) {
+  failures.push("Settings-only controls must be loaded on demand");
 }
 // Independent 23 KiB cap; do not change core/lazy budgets.
 if (coverageFeatureBytes > 23 * 1024) {
