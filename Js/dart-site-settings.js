@@ -31,6 +31,7 @@
     courierFeePerOrder: 100,
     birthdayDiscountPercent: 30,
     dartCardDiscountPercent: 40,
+    dartCardEnabled: false,
     refundCustomerFee: 100,
     repeatExchangeCustomerFee: 50,
     exchangePeriodDays: 14,

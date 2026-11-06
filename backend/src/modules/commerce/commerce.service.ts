@@ -50,6 +50,7 @@ import {
 } from "./commerce.operations-queries.js";
 import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-queries.js";
 import { assertExchangeableSale, returnMatchesSale } from "./commerce.returns.js";
+import { isDartCardEnabled } from "../settings/dart-card-switch.js";
 import { snapshotReturnPeriods } from "./return-window.js";
 import { queueOrderConfirmation, queueOrderDispatch, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
@@ -623,6 +624,10 @@ export class CommerceService {
       items: number;
     }>;
   }> {
+    const policy = await this.pool.query<{data: Record<string, unknown>}>(
+      "SELECT data FROM site_settings WHERE id='main'"
+    );
+    if (!isDartCardEnabled(policy.rows[0]?.data)) return { period: "", rows: [] };
     return readPublicLeaderboard(this.pool);
   }
 
@@ -1718,7 +1723,7 @@ export class CommerceService {
         }
       }
 
-      if (hasUndiscountedItems || setCardCodes.size) {
+      if (isDartCardEnabled(settings) && (hasUndiscountedItems || setCardCodes.size)) {
         const nowMs = Date.now();
         appliedCard = (cardState.data as Record<string, unknown>[]).find((row) => {
           if (
@@ -1852,7 +1857,7 @@ export class CommerceService {
       }
       await this.checkoutReservation(client, customerUserId, reservationId, guestOwnerHash);
       const items = await this.checkoutInventory(client, reservationId);
-      const settings = await client.query<{ data: Record<string, unknown> }>("SELECT data FROM site_settings WHERE id='main'");
+      const settings = await client.query<{ data: Record<string, unknown> }>("SELECT data FROM site_settings WHERE id='main' FOR SHARE");
       const pricing = await this.checkoutPricing(client, customerUserId, reservationId, items.rows, settings.rows[0]?.data || {}, promotionCode);
       await client.query("COMMIT");
       return this.cartQuoteView(pricing);
@@ -1926,7 +1931,7 @@ export class CommerceService {
       const itemResult = await this.checkoutInventory(client, input.reservationId);
 
       const settingsResult = await client.query<{ data: Record<string, unknown> }>(
-        "SELECT data FROM site_settings WHERE id='main'",
+        "SELECT data FROM site_settings WHERE id='main' FOR SHARE",
       );
       const settings = settingsResult.rows[0]?.data || {};
       const shippingPartners=(Array.isArray(settings.shippingCompanies)?settings.shippingCompanies:[]) as CheckoutShippingCompany[];

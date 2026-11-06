@@ -47,6 +47,15 @@
     "isPartOf": { "@id": "https://www.dartofficial.com/#website" }
   }
   </script>
+    <style id="dart-card-visibility-policy">
+        html:not(.dart-card-enabled) .dart-card-acount,
+        html:not(.dart-card-enabled) #leaderboard-card,
+        html:not(.dart-card-enabled) #card-details,
+        html:not(.dart-card-enabled) #dart-card-details,
+        html:not(.dart-card-enabled) [data-dart-card-public],
+        html:not(.dart-card-enabled) #card-details + .margen2020,
+        html:not(.dart-card-enabled) #leaderboard-card + .margen2020 {display:none!important;}
+    </style>
 </head>
 <body class="dja-flexdir">
   <div class="mother">
@@ -61,7 +70,8 @@
       <p>يمكن تقديم طلب الاستبدال خلال <strong id="dart-exchange-policy-days">14 يومًا</strong> من تاريخ الاستلام، والاسترجاع خلال <strong id="dart-refund-policy-days">14 يومًا</strong> من تاريخ الاستلام، بشرط ارتباط القطعة بطلب مكتمل وبقاء حالتها ملائمة للفحص. يخضع رد المبلغ لنتيجة الفحص. تسري مدة كل أوردر وفق الإعدادات المطبقة وقت إنشائه.</p>
       <p>الطقم (Set) وأي قطعة تم شراؤها ضمن طقم لا تُستبدل. يمكن تقديم طلب استرجاع لهذه القطع وفق شروط الاسترجاع والفحص.</p>
       <h2>العروض</h2>
-      <p>خصم عيد الميلاد 30% وفق شروط الحملة. تمنح Dart Card خصمًا 40% حتى 10 قطع أو لمدة سنة من تاريخ الإصدار، أيهما أقرب.</p>
+      <p>خصم عيد الميلاد 30% وفق شروط الحملة.</p>
+      <p data-dart-card-public>تمنح Dart Card خصمًا 40% حتى 10 قطع أو لمدة سنة من تاريخ الإصدار، أيهما أقرب.</p>
       <h2>الخصوصية</h2>
       <p>يعمل المتجر بقاعدة بيانات فعلية. نستخدم بيانات الحساب والتواصل، وتاريخ الميلاد، وعنوان التوصيل والموقع الذي تختاره، وسجل الطلبات والاسترجاع لتشغيل حسابك وتنفيذ الطلبات وخدمة العملاء وإدارة الخصومات ومزايا الولاء والإشعارات المرتبطة بها.</p>
       <p>نستخدم بيانات الزيارات والتفاعل الأساسية لفهم استخدام المتجر وتحسينه والحد من إساءة الاستخدام. تُستخدم ملفات تعريف الارتباط لحفظ جلسة تسجيل الدخول، ويحتفظ المتصفح بتفضيلات الواجهة. يخضع الوصول إلى أدوات الإدارة والبيانات لصلاحيات محددة.</p>
@@ -71,6 +81,7 @@
     <footer id="footer" aria-label="footer"></footer>
   </div>
   <script  src="Js/dart-site-settings.js" defer></script>
+    <script src="Js/dart-card-visibility.js?v=20261107-1" defer></script>
   <script src="Js/dart-return-policy-copy.js" defer></script>
   <script  src="Js/dart-groups.js" defer></script>
   <script  src="Js/dart-catalog.js" defer></script>

@@ -102,6 +102,9 @@ export const siteSettingsSchema = z.object({
   deliveryCostPerPiece: z.number().finite().min(0).max(1_000_000).optional(),
   birthdayDiscountPercent: z.number().finite().min(0).max(100).optional(),
   dartCardDiscountPercent: z.number().finite().min(0).max(100).optional(),
+  dartCardEnabled: z.boolean().optional(),
+  dartCardPausedAt: z.iso.datetime().nullable().optional(),
+  dartCardResumedAt: z.iso.datetime().nullable().optional(),
   refundCustomerFee: z.number().finite().min(0).max(1_000_000).optional(),
   repeatExchangeCustomerFee: z.number().finite().min(0).max(1_000_000).optional(),
   exchangePeriodDays: z.number().int().nonnegative().optional(),
@@ -122,6 +125,7 @@ export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 const PUBLIC_KEYS = [
   "version","heroDayImage","heroNightImage","founderImage","defaultMarkupPercent",
   "courierFeePerOrder","deliveryCostPerPiece","birthdayDiscountPercent","dartCardDiscountPercent",
+  "dartCardEnabled",
   "refundCustomerFee","repeatExchangeCustomerFee","exchangePeriodDays","refundPeriodDays",
   "siteDiscount","waiting","announcements",
   "modelCards","typing",

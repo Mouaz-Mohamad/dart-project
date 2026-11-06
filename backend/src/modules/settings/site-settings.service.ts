@@ -3,6 +3,7 @@
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { publicSiteSettings, siteSettingsSchema } from "./site-settings.schema.js";
+import { isDartCardEnabled, extendedDartCardExpiry } from "./dart-card-switch.js";
 
 export class SiteSettingsService {
   public constructor(private readonly pool: Pool) {}
@@ -68,6 +69,47 @@ export class SiteSettingsService {
       // Older clients cannot erase configured durations by omitting newer keys.
       for (const key of ["exchangePeriodDays", "refundPeriodDays"] as const) {
         if (!(key in nextSettings) && key in currentSettings) nextSettings[key] = currentSettings[key];
+      }
+
+      // The switch is server-controlled; ignore client-supplied timestamps.
+      const wasEnabled = isDartCardEnabled(currentSettings);
+      const nowEnabled = parsedSettings.dartCardEnabled ?? wasEnabled;
+      nextSettings.dartCardEnabled = nowEnabled;
+      if (!nowEnabled) {
+        nextSettings.dartCardPausedAt = wasEnabled
+          ? new Date().toISOString()
+          : currentSettings.dartCardPausedAt || new Date().toISOString();
+        nextSettings.dartCardResumedAt = currentSettings.dartCardResumedAt || null;
+      } else {
+        nextSettings.dartCardPausedAt = null;
+        nextSettings.dartCardResumedAt = wasEnabled
+          ? currentSettings.dartCardResumedAt || null : new Date().toISOString();
+        if (!wasEnabled) {
+          const pausedAt = Date.parse(String(currentSettings.dartCardPausedAt || ""));
+          if (Number.isFinite(pausedAt)) {
+            const days = Math.ceil(Math.max(0, Date.now() - pausedAt) / 86_400_000);
+            if (days > 0) {
+              const cards = await client.query<{record_id: string;payload: Record<string, unknown>}>(
+                "SELECT record_id,payload FROM loyalty_cards FOR UPDATE"
+              );
+              for (const card of cards.rows) {
+                if (card.payload.status !== "Active" || card.payload.isDeleted || card.payload.isArchived) continue;
+                const originalExpiry = String(card.payload.expDate || "");
+                // A card already expired before suspension is not resurrected.
+                if (originalExpiry.slice(0, 10) < new Date(pausedAt).toISOString().slice(0, 10)) continue;
+                const expiry = extendedDartCardExpiry(originalExpiry, days);
+                if (!expiry) continue;
+                await client.query(
+                  "UPDATE loyalty_cards SET payload=jsonb_set(payload,'{expDate}',to_jsonb($2::text),true) WHERE record_id=$1",
+                  [card.record_id, expiry],
+                );
+              }
+              await client.query(
+                "UPDATE dashboard_domain_state SET version=version+1,updated_at=now() WHERE domain='cards'",
+              );
+            }
+          }
+        }
       }
       let codRiskPolicyVersion = Number(currentCodRisk?.version || 1);
 

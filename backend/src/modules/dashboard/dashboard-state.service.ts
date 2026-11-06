@@ -2,6 +2,7 @@
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { isDartCardEnabled } from "../settings/dart-card-switch.js";
 import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "./relational-domain.store.js";
 
 export const DASHBOARD_DOMAINS = [
@@ -142,6 +143,14 @@ export class DashboardStateService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      if (domain === "cards") {
+        const policy = await client.query<{data: Record<string, unknown>}>(
+          "SELECT data FROM site_settings WHERE id='main' FOR SHARE"
+        );
+        if (!isDartCardEnabled(policy.rows[0]?.data)) {
+          throw new AppError(409, "DART_CARD_DISABLED", "Dart Card is paused; existing records are read-only.");
+        }
+      }
       const current = await client.query<{ version: string }>(
         "SELECT version::text FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE",
         [domain],

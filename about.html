@@ -61,6 +61,15 @@
       "isPartOf": { "@id": "https://www.dartofficial.com/#website" }
     }
     </script>
+    <style id="dart-card-visibility-policy">
+        html:not(.dart-card-enabled) .dart-card-acount,
+        html:not(.dart-card-enabled) #leaderboard-card,
+        html:not(.dart-card-enabled) #card-details,
+        html:not(.dart-card-enabled) #dart-card-details,
+        html:not(.dart-card-enabled) [data-dart-card-public],
+        html:not(.dart-card-enabled) #card-details + .margen2020,
+        html:not(.dart-card-enabled) #leaderboard-card + .margen2020 {display:none!important;}
+    </style>
 </head>
 <body class='dja-flexdir'>
     <div class="mother">
@@ -184,6 +193,7 @@
     </div>
     <script  src="Js/dart-state.js" defer></script>
     <script  src="Js/dart-site-settings.js" defer></script>
+    <script src="Js/dart-card-visibility.js?v=20261107-1" defer></script>
     <script  src="Js/dart-catalog.js" defer></script>
     <script  src="Js/dart-about-cache.js?v=11" defer></script>
     <script src="Js/dart-navigation.min.js" defer></script>

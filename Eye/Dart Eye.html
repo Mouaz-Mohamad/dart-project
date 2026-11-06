@@ -2072,6 +2072,7 @@
                 </div>
                 <span class="dart-card-page-badge"><i class="fa-solid fa-gift" aria-hidden="true"></i> Customer Benefits</span>
             </header>
+            <p id="dart-card-paused-notice" role="status" hidden>System paused — existing cards are available for review only.</p>
             <article class="dart-card-workspace" aria-label="Dart Card records and controls">
                 <div class="dart-card-workspace-heading">
                     <div><h3>Card Holders</h3><p>Search and filter cards, then open Details to review every field and available action.</p></div>
@@ -2420,6 +2421,7 @@
                     <button type="button" data-settings-go="settings-display-card"><i class="fa-solid fa-table-columns" aria-hidden="true"></i> Display</button>
                     <button type="button" data-settings-go="settings-commerce-card"><i class="fa-solid fa-calculator" aria-hidden="true"></i> Pricing &amp; fees</button>
                     <button type="button" data-settings-go="settings-return-period-card"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Return periods</button>
+                    <button type="button" data-settings-go="settings-dart-card-system"><i class="fa-solid fa-id-card" aria-hidden="true"></i> Dart Card</button>
                     <button type="button" data-settings-go="settings-cod-risk-card"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> COD risk</button>
                     <button type="button" data-settings-go="settings-waiting-card"><i class="fa-regular fa-clock" aria-hidden="true"></i> Waiting</button>
                     <button type="button" data-settings-go="settings-site-discount-card"><i class="fa-solid fa-percent" aria-hidden="true"></i> Promotions</button>
@@ -2441,6 +2443,18 @@
                         </details>
                         <button type="submit" class="dart-settings-save">Save display</button><button type="button" id="settings-display-reset" class="dart-settings-secondary">Reset display</button>
                         <p id="settings-display-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
+                    </form>
+                </article>
+                <article id="settings-dart-card-system" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-id-card"></i></div>
+                    <div class="dart-settings-card-copy"><span>LOYALTY SYSTEM</span><h2>Dart Card System</h2>
+                        <p>OFF يوقف الخصم والسحب والإصدار ويخفي النظام عن العملاء، مع حفظ البطاقات وتجميد مدة الصلاحية.</p></div>
+                    <form id="settings-dart-card-switch-form" class="dart-settings-fields">
+                        <label class="dart-settings-check" for="settings-dart-card-enabled">
+                            <input id="settings-dart-card-enabled" type="checkbox"> Enable Dart Card System
+                        </label>
+                        <button type="submit" class="dart-settings-save">Save Dart Card status</button>
+                        <p id="settings-dart-card-switch-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
                     </form>
                 </article>
                 <article id="settings-commerce-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
@@ -2779,6 +2793,7 @@
     <script src="dart-size-chart.js"></script>
     <script src="dart-settings.js"></script>
     <script src="dart-return-policy-settings.js?v=20261107-1"></script>
+    <script src="dart-card-system-settings.js?v=20261107-1"></script>
     <script src="dart-settings-shortcuts.js?v=20261105-final-three-1"></script>
     <script src="dart-staff.js"></script>
     <script src="../Js/dart-news.js?v=20261008-news-v1" defer></script>

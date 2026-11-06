@@ -3,6 +3,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { isDartCardEnabled } from "../settings/dart-card-switch.js";
 
 export type DartCardCandidate = {
   userId: string;
@@ -229,6 +230,12 @@ export class DartCardDrawService {
     const period = assertPeriod(periodInput);
     const client = await this.pool.connect();
     try {
+      const policy = await client.query<{data: Record<string, unknown>}>(
+        "SELECT data FROM site_settings WHERE id='main'"
+      );
+      if (!isDartCardEnabled(policy.rows[0]?.data)) {
+        return { period, disabled: true, ranking: [], projectedWinnerCount: 0 };
+      }
       const raw = await this.candidates(client, period);
       const eligible = await this.excludeActiveCards(client, raw);
       eligible.sort(
@@ -289,6 +296,19 @@ export class DartCardDrawService {
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
         `dart-card-draw:${period}`,
       ]);
+      const policy = await client.query<{data: Record<string, unknown>}>(
+        "SELECT data FROM site_settings WHERE id='main' FOR SHARE"
+      );
+      if (!isDartCardEnabled(policy.rows[0]?.data)) {
+        await client.query("COMMIT");
+        return { disabled: true, skipped: true, period, winners: [] };
+      }
+      // Never backfill a draw from a month preceding reactivation.
+      const resumedMonth = String(policy.rows[0]?.data?.dartCardResumedAt || "").slice(0, 7);
+      if (resumedMonth && period < resumedMonth) {
+        await client.query("COMMIT");
+        return { disabled: false, skipped: true, period, reason: "Paused month" };
+      }
       const existing = await this.existingDraw(client, period);
       if (existing) {
         await client.query("COMMIT");
