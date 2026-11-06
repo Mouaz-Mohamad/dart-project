@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:053c940255ff84de6d63460d563c5d72542b76564f204f1fac16626a4741836e */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:2e8aa0a61746a9efe99c5e7268f2d86c04d9e0e12213b10be6e85840742e2500 */
 (function () {
   "use strict";
 
@@ -1324,7 +1324,7 @@
         completeForm.elements.code.focus();
         setStatus(
           completeForm,
-          "If the account exists, a 6-digit code was sent to its registered email. Check your inbox and Spam folder, then enter it below.",
+          "If the account exists, use a code from its registered email. Requests are limited to one email per minute and three per 15 minutes. Existing codes remain valid until expiry. Check your inbox and Spam folder.",
         );
       } catch (error) {
         if (active(generation)) setStatus(requestForm, errorMessage(error), true);
@@ -1375,7 +1375,7 @@
       requestForm.hidden = false;
       requestForm.elements.identifier.value = dialog.dataset.identifier || "";
       requestForm.elements.identifier.focus();
-      setStatus(requestForm, "Request a fresh OTP. Any previous OTP will stop working.");
+      setStatus(requestForm, "Request another OTP after one minute. Existing codes remain valid until expiry; at most three emails are sent per 15 minutes.");
     });
     dialog.querySelector("[data-reset-close]").addEventListener("click", () => {
       closePasswordResetDialog(dialog);

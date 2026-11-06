@@ -2356,15 +2356,32 @@ export class IdentityService {
     try {
       await client.query("BEGIN");
       if (user) {
+        // Same lock order as OTP completion: account before reset rows. This also
+        // shares the recipient budget across email, phone and public account ID.
         await client.query(
-          `UPDATE password_reset_requests
-              SET status='expired', consumed_at=COALESCE(consumed_at, now())
-            WHERE user_id=$1
-              AND account_type=$2
-              AND status='pending'
-              AND code_hash IS NOT NULL`,
-          [user.id, accountType],
+          "SELECT id FROM users WHERE id=$1 FOR UPDATE", [user.id],
         );
+      } else {
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`password-reset:${accountType}:${identifierHash}`]);
+      }
+      const recent = await client.query<{ id: string; expires_at: Date; cooling_down: boolean; count: string }>(
+        `SELECT id::text,expires_at,requested_at>now()-interval '60 seconds' AS cooling_down,
+                count(*) OVER()::text AS count
+           FROM password_reset_requests
+          WHERE account_type=$1 AND requested_at>now()-interval '15 minutes'
+            AND expires_at IS NOT NULL
+            AND (($2::uuid IS NOT NULL AND user_id=$2::uuid)
+              OR ($2::uuid IS NULL AND user_id IS NULL AND identifier_hash=$3))
+          ORDER BY requested_at DESC,id DESC LIMIT 1`,
+        [accountType, user?.id ?? null, identifierHash],
+      );
+      const latest = recent.rows[0];
+      // Identical behavior for unknown identifiers: never reveal account existence.
+      // Reuse the challenge/attempt budget instead of flooding email or replacing a
+      // valid code. Even exhausted challenges cannot reset the recipient budget.
+      if (latest && (latest.cooling_down || Number(latest.count) >= 3)) {
+        await client.query("COMMIT");
+        return { challengeId: latest.id, expiresAt: latest.expires_at };
       }
       const codeHash = user
         ? digest(`password-reset:${challengeId}:${otp}`, this.config.authPepper)
@@ -2548,6 +2565,12 @@ export class IdentityService {
             SET status='resolved', resolved_at=now(), consumed_at=now()
           WHERE id=$1`,
         [challengeId],
+      );
+      await client.query(
+        `UPDATE password_reset_requests
+            SET status='expired', consumed_at=COALESCE(consumed_at,now())
+          WHERE user_id=$1 AND id<>$2 AND status='pending'`,
+        [row.user_id, challengeId],
       );
       await this.audit(
         client,

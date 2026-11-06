@@ -699,7 +699,7 @@ paths:
       tags: [Customer Auth, Representative Auth]
       operationId: requestPasswordReset
       responses:
-        "202": { description: Non-enumerating reset challenge response }
+        "202": { description: Non-enumerating reset challenge response. Requests within 60 seconds or after three emails in 15 minutes reuse the latest challenge without resetting attempts. Existing codes expire naturally and all outstanding codes are invalidated after a successful reset. }
   /auth/reset-password:
     post:
       tags: [Customer Auth, Representative Auth]

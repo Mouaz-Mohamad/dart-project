@@ -214,7 +214,7 @@ export function createIdentityRouter(
     );
     await dispatchOutbox(outbox, 1, `password-reset-code:${result.challengeId}`);
     response.status(202).json({
-      message: "If the account exists, a verification code has been sent to its registered email",
+      message: "If the account exists, use a verification code sent to its registered email. Email requests are limited; existing codes remain valid until expiry.",
       challengeId: result.challengeId,
       expiresAt: result.expiresAt.toISOString(),
     });

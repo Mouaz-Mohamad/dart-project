@@ -36,13 +36,44 @@ describe("customer password recovery", () => {
     const audit = await store.pool.query("SELECT id FROM audit_logs WHERE action='PASSWORD_RESET_COMPLETED' AND entity_id=$1", [f.session.account.userId]);
     expect(audit.rows).toHaveLength(1);
   });
-  it("uses phone/account ID only to locate the registered email and invalidates the old code on resend", async () => {
+  it("shares recipient cooldown across aliases and keeps an existing code valid until a successful reset", async () => {
     const f = await fixture(), first = await request(f.phone);
     const customer = (await store.pool.query("SELECT client_code FROM customers WHERE user_id=$1", [f.session.account.userId])).rows[0];
-    const next = await request(customer.client_code as string);
+    const cooled = await request(customer.client_code as string);
+    expect(cooled.challengeId).toBe(first.challengeId);
+    await store.pool.query("UPDATE password_reset_requests SET requested_at=requested_at-interval '61 seconds' WHERE user_id=$1", [f.session.account.userId]);
+    const next = await request(f.email);
+    expect(next.challengeId).not.toBe(first.challengeId);
     expect(first.event.payload.to).toBe(f.email); expect(next.event.payload.to).toBe(f.email);
-    await expect(identity.resetPasswordWithOtp(first.challengeId, first.code, "another123", metadata)).rejects.toMatchObject({ code: "OTP_INVALID" });
-    await expect(identity.resetPasswordWithOtp(next.challengeId, next.code, "another123", metadata)).resolves.toBeUndefined();
+    await expect(identity.resetPasswordWithOtp(first.challengeId, first.code, "another123", metadata)).resolves.toBeUndefined();
+    await expect(identity.resetPasswordWithOtp(next.challengeId, next.code, "other123", metadata)).rejects.toMatchObject({ code: "OTP_INVALID" });
+  });
+  it("caps emails at three per rolling 15 minutes and never refreshes attempts on a reused challenge", async () => {
+    const f = await fixture(), ids = new Set<string>();
+    for (let count = 0; count < 3; count++) {
+      const reset = await request(f.email); ids.add(reset.challengeId);
+      await store.pool.query("UPDATE password_reset_requests SET requested_at=requested_at-interval '61 seconds' WHERE user_id=$1", [f.session.account.userId]);
+    }
+    const last = await request(f.phone);
+    expect(ids.size).toBe(3); expect(ids.has(last.challengeId)).toBe(true);
+    expect(Number((await store.pool.query("SELECT count(*) FROM outbox_events WHERE aggregate_id=$1 AND event_type='PASSWORD_RESET_CODE_REQUESTED'", [f.session.account.userId])).rows[0].count)).toBe(3);
+    const wrong = last.code === "000000" ? "000001" : "000000";
+    await expect(identity.resetPasswordWithOtp(last.challengeId, wrong, "another123", metadata)).rejects.toMatchObject({ code: "OTP_INVALID" });
+    expect((await request(f.email)).challengeId).toBe(last.challengeId);
+    expect((await store.pool.query("SELECT attempts_remaining FROM password_reset_requests WHERE id=$1", [last.challengeId])).rows[0].attempts_remaining).toBe(4);
+    await store.pool.query("UPDATE password_reset_requests SET requested_at=requested_at-interval '16 minutes' WHERE user_id=$1", [f.session.account.userId]);
+    expect((await request(f.email)).challengeId).not.toBe(last.challengeId);
+  });
+  it.skipIf(!process.env.TEST_DATABASE_URL)("serializes simultaneous requests across API instances for known and unknown recipients", async () => {
+    const f = await fixture(), another = new IdentityService(store.pool, config);
+    for (const identifier of [f.email, `${randomUUID()}@example.test`]) {
+      const responses = await Promise.all([
+        identity.requestPasswordReset("customer", identifier, metadata),
+        another.requestPasswordReset("customer", identifier, { ...metadata, ipAddress: "127.0.0.2" }),
+      ]);
+      expect(responses[0]!.challengeId).toBe(responses[1]!.challengeId);
+    }
+    expect(Number((await store.pool.query("SELECT count(*) FROM outbox_events WHERE aggregate_id=$1 AND event_type='PASSWORD_RESET_CODE_REQUESTED'", [f.session.account.userId])).rows[0].count)).toBe(1);
   });
   it("limits incorrect attempts and rejects expired codes", async () => {
     const f = await fixture(), reset = await request(f.email);
@@ -51,6 +82,7 @@ describe("customer password recovery", () => {
       await expect(identity.resetPasswordWithOtp(reset.challengeId, wrong, "another123", metadata)).rejects.toMatchObject({ code: "OTP_INVALID" });
     }
     await expect(identity.resetPasswordWithOtp(reset.challengeId, reset.code, "another123", metadata)).rejects.toMatchObject({ code: "OTP_EXPIRED" });
+    await store.pool.query("UPDATE password_reset_requests SET requested_at=requested_at-interval '61 seconds' WHERE user_id=$1", [f.session.account.userId]);
     const expired = await request(f.email);
     await store.pool.query("UPDATE password_reset_requests SET expires_at=now()-interval '1 second' WHERE id=$1", [expired.challengeId]);
     await expect(identity.resetPasswordWithOtp(expired.challengeId, expired.code, "another123", metadata)).rejects.toMatchObject({ code: "OTP_EXPIRED" });
@@ -58,6 +90,8 @@ describe("customer password recovery", () => {
   it("keeps account existence private and enforces password policy/history", async () => {
     const unknown = await request(`${randomUUID()}@example.test`);
     expect(unknown.challengeId).toBeTruthy(); expect(unknown.event).toBeUndefined();
+    const otherUnknown = `${randomUUID()}@example.test`;
+    expect((await request(otherUnknown.toUpperCase())).challengeId).toBe((await request(otherUnknown)).challengeId);
     await expect(identity.resetPasswordWithOtp(unknown.challengeId, "123456", "another123", metadata)).rejects.toMatchObject({ code: "OTP_INVALID" });
     const f = await fixture(), reset = await request(f.email);
     await expect(identity.resetPasswordWithOtp(reset.challengeId, reset.code, "12345", metadata)).rejects.toMatchObject({ code: "WEAK_PASSWORD" });
