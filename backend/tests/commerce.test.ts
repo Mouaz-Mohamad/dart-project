@@ -151,6 +151,7 @@ describe("CommerceService public leaderboard", () => {
 
     const release = vi.fn();
     const pool = {
+      query: vi.fn().mockResolvedValue({ rows: [{ data: { dartCardEnabled: true } }] }),
       connect: vi.fn().mockResolvedValue({ query, release }),
     } as unknown as Pool;
 

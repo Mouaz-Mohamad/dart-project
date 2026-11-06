@@ -13,6 +13,8 @@ describe("mixed line discounts and reward ledgers on the production schema", () 
   const actor = randomUUID();
   beforeAll(async () => {
     store = await embeddedStore(); commerce = new CommerceService(store.pool); promotions = new PromotionService(store.pool);
+    // ON-mode accounting fixtures, isolated from the newly default-paused program.
+    await store.pool.query("UPDATE site_settings SET data=data || '{\"dartCardEnabled\":true}'::jsonb WHERE id='main'");
     await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
       VALUES($1,'staff','mixed-staff@example.test','mixed-staff@example.test','test-only-hash','active',now())`, [actor]);
     await store.pool.query("INSERT INTO staff_users(user_id,display_name) VALUES($1,'Mixed test')", [actor]);
