@@ -22,6 +22,8 @@ import {
 import type { IdentityService } from "../identity/identity.service.js";
 import type { CommerceService, OrderResponseOptions } from "./commerce.service.js";
 import { fetchRoadRoute } from "./road-routing-provider.js";
+import { matchesDeliveryGovernorate } from "./shipping.geography.js";
+import { EGYPT_GOVERNORATES } from "./shipping.core.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
 const reservationId = z.string().trim().min(16).max(160).regex(/^[A-Za-z0-9_-]+$/);
@@ -346,6 +348,18 @@ export function createCommerceRouter(
   });
 
 
+  // Read-only geometry validation for an explicitly selected pin, independent
+  // of geocoding providers. Checkout/pickup still revalidate their full policy.
+  router.post("/shipping/validate-point", rateLimit({ store: sharedRateLimitStore(config, "address-geography"),
+    windowMs: 60_000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false }), (request,response)=>{
+    const point = z.object({
+      governorate: z.enum(EGYPT_GOVERNORATES),
+      latitude: z.number().finite().min(-90).max(90),
+      longitude: z.number().finite().min(-180).max(180),
+    }).strict().parse(request.body);
+    response.setHeader("Cache-Control","private,no-store");
+    response.status(200).json({ valid: matchesDeliveryGovernorate(point.governorate,point.latitude,point.longitude) });
+  });
   router.get("/shipping/checkout-coverage",async(_request,response)=>{
     response.setHeader("Cache-Control","private,no-store");
     response.status(200).json(await commerce.publicShippingCoverage());

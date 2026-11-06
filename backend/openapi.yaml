@@ -694,6 +694,37 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
+  /shipping/validate-point:
+    post:
+      tags: [Commerce]
+      summary: Validate an explicitly chosen Egypt pin without geocoding
+      description: Read-only and public. Rate-limited to 20 checks per minute per IP; no coordinates are cached. Final checkout or return submission revalidates coordinates and its own coverage policy.
+      operationId: validateAddressPoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [governorate, latitude, longitude]
+              properties:
+                governorate: { type: string, enum: ["Cairo", "Giza", "Alexandria", "Qalyubia", "Sharqia", "Dakahlia", "Gharbia", "Monufia", "Beheira", "Kafr El Sheikh", "Damietta", "Port Said", "Ismailia", "Suez", "North Sinai", "South Sinai", "Red Sea", "Fayoum", "Beni Suef", "Minya", "Assiut", "Sohag", "Qena", "Luxor", "Aswan", "New Valley", "Matrouh"] }
+                latitude: { type: number, minimum: -90, maximum: 90 }
+                longitude: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        "200":
+          description: Pin matches the selected governorate or is refused
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid]
+                properties:
+                  valid: { type: boolean }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { description: Too many geometry checks }
+
   /auth/forgot-password:
     post:
       tags: [Customer Auth, Representative Auth]

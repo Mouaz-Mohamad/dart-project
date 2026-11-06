@@ -29,7 +29,7 @@ function fixture(saved = true) {
   submit.textContent = "Order";
   form.querySelector = () => submit;
   const selectors = { form, map: mapElement };
-  for (const name of ["latitude", "longitude", "fullAddress", "country", "governorate", "area", "street", "building", "floor", "status"]) selectors[name] = new Element();
+  for (const name of ["latitude", "longitude", "fullAddress", "country", "governorate", "area", "street", "building", "floor", "status", "confirmPinButton"]) selectors[name] = new Element();
   Object.assign(selectors.country, { value: "Egypt" });
   Object.assign(selectors.governorate, { value: "Cairo" });
   Object.assign(selectors.area, { value: "Old area" });
@@ -53,14 +53,14 @@ function fixture(saved = true) {
     lat: 30.04, lng: 31.23, country: "Egypt", governorate: "Cairo", area: "Old area", street: "Old street", building: "10", floor: "2", address: "Old destination",
   } : null } };
   const c = {
-    window, L, document: { readyState: "complete", querySelector: (key) => selectors[key], getElementById: (key) => key === "checkoutForm" ? form : null },
+    window, L, location: { origin: "http://synthetic.test" }, document: { readyState: "complete", querySelector: (key) => selectors[key], getElementById: (key) => key === "checkoutForm" ? form : null },
     navigator: { onLine: true, geolocation: { getCurrentPosition(success, error) { gps.push({ success, error }); } } },
     Event, CustomEvent: DetailEvent, AbortController, URLSearchParams,
     MutationObserver: class { observe() {} },
     Date: class extends Date { static now() { now += 2000; return now; } },
     setTimeout(fn, delay) { const id = ++timerId; timers.set(id, { fn, delay }); return id; }, clearTimeout(id) { timers.delete(id); },
-    fetch(url, { signal }) {
-      const gate = deferred(); requests.push({ url, ...gate });
+    fetch(url, { signal, ...options }) {
+      const gate = deferred(); requests.push({ url, options, ...gate });
       signal.addEventListener("abort", () => gate.reject(new Error("Synthetic timeout")), { once: true });
       return gate.promise;
     },
@@ -136,6 +136,39 @@ async function gpsRaces() {
   f.buttons[0].dispatchEvent(new Event("click")); f.gps[1].error();
   assert.equal(f.controller.validate().ok, false); assert.equal(f.fields.latitude.value, "");
 }
+async function manualPinFallback() {
+  const f = fixture(false);
+  const lookup = f.controller.selectLocation(30.05, 31.35);
+  f.requests[0].reject(new Error("Synthetic geocoder outage")); await lookup;
+  assert.equal(f.controller.validate().ok, false);
+  assert.equal(f.fields.confirmPinButton.hidden, false);
+  const verify = f.controller.confirmManualPin();
+  assert.match(f.requests[1].url, /\/shipping\/validate-point$/);
+  assert.deepEqual(JSON.parse(f.requests[1].options.body), { governorate: "Cairo", latitude: 30.05, longitude: 31.35 });
+  f.respond(1, { valid: true }); assert.equal(await verify, true);
+  assert.equal(f.form.dataset.dartAddressSource, "manual-pin");
+  assert.equal(f.fields.latitude.value, "30.0500000"); assert.equal(f.controller.validate().ok, true);
+  f.fields.street.value = "Corrected street"; f.fields.street.dispatchEvent(new Event("input"));
+  assert.equal(f.controller.validate().ok, false, "typed address edits require explicit reconfirmation");
+  assert.equal(f.requests.length, 2, "fallback edits never call the unavailable geocoder again");
+  const stale = f.controller.confirmManualPin();
+  f.fields.floor.value = "4"; f.fields.floor.dispatchEvent(new Event("input"));
+  f.respond(2, { valid: true }); assert.equal(await stale, false);
+  assert.equal(f.controller.validate().ok, false, "late geometry response cannot approve edited details");
+  const wrongGovernorate = f.controller.confirmManualPin(); f.respond(3, { valid: false });
+  assert.equal(await wrongGovernorate, false); assert.equal(f.controller.validate().ok, false);
+  const retry = f.controller.confirmManualPin(); f.requests[4].reject(new Error("Synthetic API outage"));
+  assert.equal(await retry, false); assert.equal(f.fields.confirmPinButton.disabled, false);
+  assert.equal(f.controller.validate().ok, false, "API outage never approves a pin");
+  f.fields.country.value = "France";
+  assert.equal(await f.controller.confirmManualPin(), false); assert.equal(f.requests.length, 5);
+  f.fields.country.value = "Egypt";
+  const final = f.controller.confirmManualPin(); f.respond(5, { valid: true });
+  assert.equal(await final, true);
+  f.markers.at(-1).events.dragstart();
+  assert.equal(f.fields.confirmPinButton.hidden, true, "moving the pin invalidates the old candidate and approval");
+  assert.equal(f.controller.validate().ok, false);
+}
 function checkoutContext(f, quoteGate) {
   const fields = { customer_name: "Synthetic", phone1: "01000000001", email: "synthetic@example.test" };
   f.form.elements = { namedItem(name) {
@@ -174,6 +207,6 @@ async function checkoutRaces() {
   await assert.rejects(blocked.c.checkout(blocked.form), /Verify the delivery/); assert.equal(blockedCalls.length, 0);
 }
 (async () => {
-  await selectionRaces(); await failuresAndManual(); await gpsRaces(); await checkoutRaces();
+  await selectionRaces(); await failuresAndManual(); await gpsRaces(); await manualPinFallback(); await checkoutRaces();
   console.log("PASS checkout address races: immediate invalidation, delayed/out-of-order success/errors, manual edits/debounce, GPS/drag, timeout, zone rejection and pre-POST snapshot");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

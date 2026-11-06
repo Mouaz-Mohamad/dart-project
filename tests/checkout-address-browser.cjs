@@ -38,8 +38,8 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
         control: () => ({ addTo() { this.onAdd(); } }), DomUtil: { create: (tag) => document.createElement(tag) }, DomEvent: { disableClickPropagation() {}, on(el, type, fn) { el.addEventListener(type, fn); } },
       };
       window.lookups = [];
-      window.fetch = (_url, { signal }) => new Promise((resolve, reject) => {
-        window.lookups.push({ resolve: (result) => resolve({ ok: true, json: async () => result }), reject });
+      window.fetch = (_url, { signal, ...options }) => new Promise((resolve, reject) => {
+        window.lookups.push({ url: _url, options, resolve: (result) => resolve({ ok: true, json: async () => result }), reject });
         signal.addEventListener("abort", () => reject(new Error("Synthetic timeout")), { once: true });
       });
       window.syntheticResult = (name, lat, lon) => ({ lat, lon, display_name: name, address: { country: "Egypt", state: "Cairo", suburb: `${name} area`, road: `${name} street` } });
@@ -87,6 +87,24 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
     assert.equal(await page.evaluate(() => dartCheckoutAddress.validate().ok), false);
     assert.equal(await page.locator("#lat-input").inputValue(), "");
     assert.equal(await page.evaluate(() => submits), 1);
+    await page.locator('#confirm-manual-pin').click();
+    assert.equal(await page.evaluate(() => lookups.at(-1).url.endsWith('/shipping/validate-point')), true);
+    assert.equal(await page.evaluate(() => JSON.parse(lookups.at(-1).options.body).governorate), 'Cairo');
+    assert.equal(await submit.isDisabled(), true, 'server geometry must finish before ordering');
+    await page.evaluate(() => lookups.at(-1).resolve({ valid: true }));
+    await page.waitForFunction(() => dartCheckoutAddress.validate().ok);
+    assert.equal(await page.locator('#lat-input').inputValue(), '30.0600000');
+    assert.equal(await page.evaluate(() => document.getElementById('checkoutForm').dataset.dartAddressSource), 'manual-pin');
+    await page.locator('#checkout-floor').fill('5');
+    assert.equal(await page.evaluate(() => dartCheckoutAddress.validate().ok), false, 'edited manual details need reconfirmation');
+    await page.locator('#confirm-manual-pin').click();
+    await page.evaluate(() => lookups.at(-1).resolve({ valid: false }));
+    await page.waitForFunction(() => document.getElementById('checkoutForm').dataset.dartAddressState === 'error');
+    assert.equal(await page.locator('#lat-input').inputValue(), '', 'a mismatched governorate cannot leave usable coordinates');
+    await page.locator('#confirm-manual-pin').click();
+    await page.evaluate(() => lookups.at(-1).resolve({ valid: true }));
+    await page.waitForFunction(() => dartCheckoutAddress.validate().ok);
+    assert.equal(await page.evaluate(() => submits), 1, 'confirmation never creates an order');
     for (const width of [370, 480, 767, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       const bounds = await submit.boundingBox(); assert.ok(bounds && bounds.width <= width, `button fits ${width}`);
