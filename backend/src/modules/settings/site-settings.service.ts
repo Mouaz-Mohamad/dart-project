@@ -65,6 +65,10 @@ export class SiteSettingsService {
           Array.isArray(currentSettings.blockedGovernorates)) {
         nextSettings.blockedGovernorates = currentSettings.blockedGovernorates;
       }
+      // Older clients cannot erase configured durations by omitting newer keys.
+      for (const key of ["exchangePeriodDays", "refundPeriodDays"] as const) {
+        if (!(key in nextSettings) && key in currentSettings) nextSettings[key] = currentSettings[key];
+      }
       let codRiskPolicyVersion = Number(currentCodRisk?.version || 1);
 
       if (currentCodRisk && !incomingCodRisk) {

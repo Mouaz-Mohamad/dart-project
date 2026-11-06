@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 import { assertExchangeableSale, returnMatchesSale } from "./commerce.returns.js";
+import { isReturnPeriodOpen, resolveReturnPeriodDays } from "./return-window.js";
 import { matchesDeliveryGovernorate } from "./shipping.geography.js";
 
 type JsonRow = Record<string, unknown>;
@@ -355,6 +356,7 @@ export class CustomerInteractionService {
         order_id: string;
         order_code: string;
         delivered_at: Date | null;
+        order_legacy: Record<string, unknown> | null;
         item_id: string;
         item_code: string;
         model_id: string;
@@ -365,6 +367,7 @@ export class CustomerInteractionService {
         physical_cost_minor: string;
       }>(
         `SELECT oi.id::text AS order_item_id, o.id::text AS order_id, o.order_code, o.delivered_at,
+                o.legacy AS order_legacy,
                 oi.inventory_item_id AS item_id, oi.item_code, oi.model_id,
                 oi.color, oi.size, oi.model_name, oi.final_unit_minor::text,
                 i.cost_snapshot_minor::text AS physical_cost_minor
@@ -386,8 +389,16 @@ export class CustomerInteractionService {
       if (!line || !line.delivered_at) {
         throw new AppError(422, "RETURN_NOT_ELIGIBLE", "The item must belong to a delivered order");
       }
-      if (Date.now() - line.delivered_at.getTime() > 14 * 86_400_000) {
-        throw new AppError(422, "RETURN_WINDOW_EXPIRED", "The 14-day return window has expired");
+      // Existing orders without a policy snapshot retain their original 14-day eligibility.
+      const rawPolicy = line.order_legacy?.returnPolicySnapshot;
+      const policy = rawPolicy && typeof rawPolicy === "object" && !Array.isArray(rawPolicy)
+        ? rawPolicy as Record<string, unknown> : null;
+      const returnWindowDays = resolveReturnPeriodDays(policy, input.requestType);
+      if (!isReturnPeriodOpen(line.delivered_at, Date.now(), returnWindowDays)) {
+        throw new AppError(422, "RETURN_WINDOW_EXPIRED",
+          returnWindowDays === 0
+            ? `${input.requestType} requests are disabled for this order`
+            : `The ${returnWindowDays}-day ${input.requestType.toLowerCase()} window has expired`);
       }
 
       const existingReturns = returnsState.data;
@@ -481,6 +492,7 @@ export class CustomerInteractionService {
         phone2: identity.phone2 || "-",
         email: identity.email,
         requestType: input.requestType,
+        returnWindowDays,
         reason: input.reason,
         status: "Pending Request",
         inspectionStatus: "Pending",

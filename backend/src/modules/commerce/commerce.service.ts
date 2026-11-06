@@ -50,6 +50,7 @@ import {
 } from "./commerce.operations-queries.js";
 import { readAdminOrdersVersion, readAdminOrders } from "./commerce.order-queries.js";
 import { assertExchangeableSale, returnMatchesSale } from "./commerce.returns.js";
+import { snapshotReturnPeriods } from "./return-window.js";
 import { queueOrderConfirmation, queueOrderDispatch, type OrderWhatsAppReply } from "./commerce.whatsapp.js";
 import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { EGYPT_COVERAGE_CATALOG, validateCompanyCoverage } from "./shipping.coverage.js";
@@ -2005,6 +2006,7 @@ export class CommerceService {
           JSON.stringify(input.address),
           input.deliveryNotes || "",
           JSON.stringify({
+            returnPolicySnapshot: snapshotReturnPeriods(settings),
             reservationId: input.reservationId,
             birthdayRewardId: orderBenefit(promotion, "Birthday")?.rewardId || "",
             dartCardId: orderBenefit(promotion, "Dart Card")?.cardId || "",
@@ -4809,6 +4811,7 @@ export class CommerceService {
           JSON.stringify({
             clientId: clientCode || "-",
             source: "Manual Admin",
+            returnPolicySnapshot: snapshotReturnPeriods(manualSettingsResult.rows[0]?.data || {}),
             deliveryCost: manualDeliveryCostMinor / 100,
             courierFee: manualDeliveryCostMinor / 100,
             courierFeePerOrder: manualCourierFeePerOrderMinor / 100,

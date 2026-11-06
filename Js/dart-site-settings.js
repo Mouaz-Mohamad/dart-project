@@ -33,6 +33,8 @@
     dartCardDiscountPercent: 40,
     refundCustomerFee: 100,
     repeatExchangeCustomerFee: 50,
+    exchangePeriodDays: 14,
+    refundPeriodDays: 14,
     siteDiscount: { enabled: false, percent: 0, startsAt: "", endsAt: "" },
     waiting: {
       enabled: true,

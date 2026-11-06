@@ -2419,6 +2419,7 @@
                 <div class="dart-settings-quick-links">
                     <button type="button" data-settings-go="settings-display-card"><i class="fa-solid fa-table-columns" aria-hidden="true"></i> Display</button>
                     <button type="button" data-settings-go="settings-commerce-card"><i class="fa-solid fa-calculator" aria-hidden="true"></i> Pricing &amp; fees</button>
+                    <button type="button" data-settings-go="settings-return-period-card"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Return periods</button>
                     <button type="button" data-settings-go="settings-cod-risk-card"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> COD risk</button>
                     <button type="button" data-settings-go="settings-waiting-card"><i class="fa-regular fa-clock" aria-hidden="true"></i> Waiting</button>
                     <button type="button" data-settings-go="settings-site-discount-card"><i class="fa-solid fa-percent" aria-hidden="true"></i> Promotions</button>
@@ -2460,6 +2461,23 @@
                     </form>
                 </article>
 
+
+                <!-- Order-snapshotted eligibility windows; each duration is independent. -->
+                <article id="settings-return-period-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-rotate-left"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>AFTER-SALES POLICY</span>
+                        <h2>Exchange &amp; refund periods</h2>
+                        <p>مدة كل خدمة مستقلة وتبدأ من وقت التسليم. التعديل يخص الأوردرات الجديدة فقط.</p>
+                    </div>
+                    <form id="settings-return-period-form" class="dart-settings-fields">
+                        <label for="settings-exchange-period">Exchange period (days)<input id="settings-exchange-period" type="number" min="0" step="1" required inputmode="numeric"></label>
+                        <label for="settings-refund-period">Refund period (days)<input id="settings-refund-period" type="number" min="0" step="1" required inputmode="numeric"></label>
+                        <p class="dart-settings-field-wide">0 = إيقاف طلبات هذا النوع للأوردرات الجديدة. الإعداد لا يغير الطلبات السابقة.</p>
+                        <button type="submit" class="dart-settings-save">Save return periods</button>
+                        <p id="settings-return-period-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
+                    </form>
+                </article>
 
                 <article id="settings-cod-risk-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></div>
@@ -2760,6 +2778,7 @@
     <script src="dart-operations.js"></script>
     <script src="dart-size-chart.js"></script>
     <script src="dart-settings.js"></script>
+    <script src="dart-return-policy-settings.js?v=20261107-1"></script>
     <script src="dart-settings-shortcuts.js?v=20261105-final-three-1"></script>
     <script src="dart-staff.js"></script>
     <script src="../Js/dart-news.js?v=20261008-news-v1" defer></script>
