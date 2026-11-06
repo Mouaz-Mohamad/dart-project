@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:41dc11df44abd470c4569e8ffade7661ea20512a024b542a1e463fc120ae98af */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:895881374fe4eb7428de635e9093d2c0f7c27a095e757ca85e0a3aba19bfa782 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -4127,32 +4127,79 @@ async function dartReviewRepresentativeDocuments(representativeId) {
     ["id_back", "National ID — back"],
     ["face", "Face verification"],
   ];
-  const documents = [];
-  for (const [type, label] of types) {
-    const payload = await window.DartAdminApi.request(
-      `/api/v1/admin/representatives/${encodeURIComponent(representativeId)}/documents/${type}`,
-    );
-    documents.push({ label, dataUrl: payload.document?.dataUrl || "" });
+  document.getElementById("dart-rep-document-viewer")?.close();
+  const viewer = document.createElement("dialog");
+  viewer.id = "dart-rep-document-viewer";
+  viewer.setAttribute("aria-labelledby", "dart-rep-document-title");
+  Object.assign(viewer.style, { boxSizing: "border-box", width: "min(900px, 92vw)", maxHeight: "88dvh", overflow: "auto", borderRadius: "16px", padding: "24px" });
+  const close = document.createElement("button");
+  close.type = "button";
+  close.textContent = "Close";
+  close.addEventListener("click", () => viewer.close());
+  const heading = document.createElement("h1");
+  heading.id = "dart-rep-document-title";
+  heading.textContent = "Representative verification";
+  const notice = document.createElement("p");
+  notice.textContent = "Private review session. Do not share these documents.";
+  const content = document.createElement("div");
+  content.setAttribute("role", "status");
+  content.setAttribute("aria-live", "polite");
+  viewer.append(close, heading, notice, content);
+  const dismiss = () => viewer.close();
+  viewer.addEventListener("close", () => {
+    window.removeEventListener("dart:admin-logged-out", dismiss);
+    viewer.querySelectorAll("img").forEach(image => image.removeAttribute("src"));
+    viewer.replaceChildren();
+    viewer.remove();
+  }, { once: true });
+  window.addEventListener("dart:admin-logged-out", dismiss);
+  document.body.appendChild(viewer);
+  viewer.showModal();
+
+  async function loadDocuments() {
+    content.textContent = "Loading verification documents…";
+    const results = await Promise.allSettled(types.map(async ([type, label]) => {
+      const payload = await window.DartAdminApi.request(
+        `/api/v1/admin/representatives/${encodeURIComponent(representativeId)}/documents/${type}`,
+      );
+      const dataUrl = payload.document?.dataUrl || "";
+      if (!/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(dataUrl)) {
+        throw new Error("Verification image is unavailable");
+      }
+      return { label, dataUrl };
+    }));
+    if (!viewer.open || !viewer.isConnected) return;
+    content.replaceChildren();
+    let failed = false;
+    results.forEach((result, index) => {
+      const section = document.createElement("section");
+      const title = document.createElement("h2");
+      title.textContent = types[index][1];
+      section.appendChild(title);
+      if (result.status === "fulfilled") {
+        const image = document.createElement("img");
+        image.src = result.value.dataUrl;
+        image.alt = result.value.label;
+        image.referrerPolicy = "no-referrer";
+        image.style.maxWidth = "100%";
+        section.appendChild(image);
+      } else {
+        failed = true;
+        const error = document.createElement("p");
+        error.textContent = "Unable to load this verification document. Check your access and try again.";
+        section.appendChild(error);
+      }
+      content.appendChild(section);
+    });
+    if (failed) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Retry";
+      retry.addEventListener("click", () => { void loadDocuments(); });
+      content.appendChild(retry);
+    }
   }
-  const viewer = window.open("", "_blank", "noopener,noreferrer");
-  if (!viewer) throw new Error("Allow pop-ups to review verification documents.");
-  viewer.document.title = "Dart Representative Verification";
-  viewer.document.body.innerHTML =
-    '<main style="font-family:Arial,sans-serif;max-width:900px;margin:30px auto;padding:0 20px"><h1>Representative verification</h1><p>Private review session. Do not share these documents.</p></main>';
-  const main = viewer.document.querySelector("main");
-  documents.forEach(({ label, dataUrl }) => {
-    const section = viewer.document.createElement("section");
-    section.style.marginBottom = "28px";
-    const heading = viewer.document.createElement("h2");
-    heading.textContent = label;
-    const image = viewer.document.createElement("img");
-    image.src = dataUrl;
-    image.alt = label;
-    image.style.maxWidth = "100%";
-    image.style.borderRadius = "12px";
-    section.append(heading, image);
-    main.appendChild(section);
-  });
+  await loadDocuments();
 }
 
 document.addEventListener("click", async (event) => {
