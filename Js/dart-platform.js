@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:2e8aa0a61746a9efe99c5e7268f2d86c04d9e0e12213b10be6e85840742e2500 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:dcf09d91902b6ed7a027cb7ad8f98b5079abfaf12c93b3b95a0c0565f2bcf171 */
 (function () {
   "use strict";
 
@@ -3723,11 +3723,6 @@
         event.preventDefault();
         const hint = document.getElementById("loginForm")?.elements?.identifier?.value || "";
         openPasswordReset("customer", hint);
-      }
-      const social = event.target.closest("[data-social-login]");
-      if (social) {
-        event.preventDefault();
-        window.DartDialog.alert("تسجيل الدخول الاجتماعي غير مفعّل حاليًا.");
       }
       const resend = event.target.closest("[data-resend-email-verification]");
       if (resend) {

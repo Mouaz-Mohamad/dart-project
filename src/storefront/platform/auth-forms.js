@@ -490,11 +490,6 @@
         const hint = document.getElementById("loginForm")?.elements?.identifier?.value || "";
         openPasswordReset("customer", hint);
       }
-      const social = event.target.closest("[data-social-login]");
-      if (social) {
-        event.preventDefault();
-        window.DartDialog.alert("تسجيل الدخول الاجتماعي غير مفعّل حاليًا.");
-      }
       const resend = event.target.closest("[data-resend-email-verification]");
       if (resend) {
         const form = document.getElementById("customerEmailVerificationForm");
