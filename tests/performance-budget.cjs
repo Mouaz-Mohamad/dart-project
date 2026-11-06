@@ -58,6 +58,9 @@ const jsFiles = ["Js", "Eye"]
 const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
+  "Eye/dart-settings-shortcuts.js",
+  "Eye/dart-return-policy-settings.js",
+  "Eye/dart-card-system-settings.js",
   "Eye/dart-traffic-analytics.js",
   "Eye/dart-finance.js",
   "Js/dart-rep.js",
