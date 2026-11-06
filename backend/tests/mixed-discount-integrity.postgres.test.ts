@@ -48,6 +48,53 @@ describe("mixed line discounts and reward ledgers on the production schema", () 
     return { user, client, models, pieces, campaign, reservation, input };
   }
 
+  async function campaignOrder(user: string, code: string) {
+    return (await store.pool.query(`INSERT INTO orders(customer_user_id,status,payment_method,subtotal_minor,order_discount_minor,final_minor,contact_snapshot,delivery_address,promotion)
+      VALUES($1,'New','Cash on Delivery',100000,10000,90000,'{}','{}',$2::jsonb) RETURNING id`,
+    [user, JSON.stringify({ type: "Promotion", code, discountMinor: 10000 })])).rows[0]!.id as string;
+  }
+
+  it.each(["customers", "orders"])("preserves per-customer caps while interpreting the global %s limit correctly", async basis => {
+    const f = await fixture(false), other = await fixture(false), code = String(f.campaign.code);
+    await store.pool.query("UPDATE promotion_records SET payload=payload || $2::jsonb WHERE record_id=$1", [f.campaign.id,
+      JSON.stringify({ limitBasis: basis, totalUsageLimit: 1, perCustomerUsageLimit: 2 })]);
+    await campaignOrder(f.user, code);
+    expect((await promotions.validateCode(other.user, code)).valid).toBe(false);
+    await expect(campaignOrder(other.user, code)).rejects.toMatchObject({ code: "23514", message: "PROMOTION_TOTAL_USAGE_LIMIT_REACHED" });
+    if (basis === "customers") {
+      expect((await promotions.resolveForCheckout(f.user, f.reservation)).code).toBe(code);
+      await campaignOrder(f.user, code);
+      expect((await promotions.validateCode(f.user, code)).valid).toBe(false);
+      await expect(campaignOrder(f.user, code)).rejects.toMatchObject({ code: "23514", message: "PROMOTION_CUSTOMER_USAGE_LIMIT_REACHED" });
+    } else {
+      expect((await promotions.validateCode(f.user, code)).valid).toBe(false);
+      await expect(campaignOrder(f.user, code)).rejects.toMatchObject({ code: "23514", message: "PROMOTION_TOTAL_USAGE_LIMIT_REACHED" });
+    }
+  });
+
+  it("allows a Used beneficiary to reuse a customer slot without releasing its previous usage", async () => {
+    const f = await fixture(false), code = String(f.campaign.code);
+    await store.pool.query("UPDATE promotion_records SET payload=payload || $2::jsonb WHERE record_id=$1", [f.campaign.id,
+      JSON.stringify({ limitBasis: "customers", totalUsageLimit: 1, perCustomerUsageLimit: 2 })]);
+    const first = await campaignOrder(f.user, code);
+    await store.pool.query("UPDATE promotion_usages SET status='Used',used_at=now() WHERE order_id=$1", [first]);
+    expect((await promotions.validateCode(f.user, code)).valid).toBe(true);
+    await campaignOrder(f.user, code);
+    expect((await promotions.validateCode(f.user, code)).valid).toBe(false);
+    expect((await store.pool.query("SELECT status FROM promotion_usages WHERE order_id=$1", [first])).rows[0].status).toBe("Used");
+  });
+
+  it.skipIf(!process.env.TEST_DATABASE_URL)("serializes two new beneficiaries for the last customer slot and lets its winner reuse it", async () => {
+    const f = await fixture(false), other = await fixture(false), code = String(f.campaign.code);
+    await store.pool.query("UPDATE promotion_records SET payload=payload || $2::jsonb WHERE record_id=$1", [f.campaign.id,
+      JSON.stringify({ limitBasis: "customers", totalUsageLimit: 1, perCustomerUsageLimit: 2 })]);
+    const results = await Promise.allSettled([campaignOrder(f.user, code), campaignOrder(other.user, code)]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    const winner = results[0]!.status === "fulfilled" ? f.user : other.user;
+    await campaignOrder(winner, code);
+    expect(Number((await store.pool.query("SELECT count(DISTINCT customer_user_id) FROM promotion_usages WHERE promotion_code=$1", [code])).rows[0].count)).toBe(1);
+  });
+
   async function deliver(order: Record<string, unknown>) {
     await store.pool.query("UPDATE orders SET status='Representative On The Way' WHERE id=$1", [order.id]);
     await commerce.adminOrderWorkflowAction(actor, String(order.orderId),

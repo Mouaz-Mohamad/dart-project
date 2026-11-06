@@ -322,7 +322,8 @@ export class PromotionService {
     );
     const total = Number(result.rows[0]?.total || 0);
     const customer = Number(result.rows[0]?.customer || 0);
-    return (!campaign.totalUsageLimit || total < campaign.totalUsageLimit)
+    return (!campaign.totalUsageLimit || total < campaign.totalUsageLimit
+        || (campaign.limitBasis === "customers" && customer > 0))
       && (!campaign.perCustomerUsageLimit || customer < campaign.perCustomerUsageLimit);
   }
 
