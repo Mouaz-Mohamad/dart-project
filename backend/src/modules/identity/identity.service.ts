@@ -3104,6 +3104,7 @@ export class IdentityService {
     account: AuthenticatedAccount,
     representativeUserId: string,
     documentType: "id_front" | "id_back" | "face",
+    metadata: RequestMetadata,
   ): Promise<{ contentType: string; dataUrl: string }> {
     if (
       !account.permissions.includes("representatives.read_applications") ||
@@ -3111,23 +3112,34 @@ export class IdentityService {
     ) {
       throw new AppError(403, "FORBIDDEN", "You do not have permission to review representative documents");
     }
-    const result = await this.pool.query<{
-      content_type: string;
-      encrypted_payload: Buffer;
-    }>(
-      `SELECT content_type, encrypted_payload
-         FROM representative_documents
-        WHERE representative_user_id=$1 AND document_type=$2`,
-      [representativeUserId, documentType],
-    );
-    const row = result.rows[0];
-    if (!row) {
-      throw new AppError(404, "REPRESENTATIVE_DOCUMENT_NOT_FOUND", "Verification document not found");
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<{
+        content_type: string;
+        encrypted_payload: Buffer;
+      }>(
+        `SELECT content_type, encrypted_payload
+           FROM representative_documents
+          WHERE representative_user_id=$1 AND document_type=$2`,
+        [representativeUserId, documentType],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        throw new AppError(404, "REPRESENTATIVE_DOCUMENT_NOT_FOUND", "Verification document not found");
+      }
+      const document = {
+        contentType: row.content_type,
+        dataUrl: decryptSecret(row.encrypted_payload, this.config.mfaEncryptionKey),
+      };
+      // Append metadata before returning private image bytes. Audit failures
+      // fail closed; no decrypted image or identity number enters the ledger.
+      await this.audit(client, account.accountType, account.userId,
+        "REPRESENTATIVE_DOCUMENT_ACCESSED", "representative_documents", representativeUserId,
+        metadata, { documentType });
+      return document;
+    } finally {
+      client.release();
     }
-    return {
-      contentType: row.content_type,
-      dataUrl: decryptSecret(row.encrypted_payload, this.config.mfaEncryptionKey),
-    };
   }
 
   public async decideRepresentative(

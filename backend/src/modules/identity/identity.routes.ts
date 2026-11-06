@@ -418,6 +418,7 @@ export function createIdentityRouter(
           request.auth!,
           uuid.parse(request.params.id),
           type,
+          metadata(request),
         ),
       });
     },
