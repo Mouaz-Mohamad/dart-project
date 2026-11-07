@@ -360,3 +360,42 @@ body.dart-auth-page {
   .dart-auth-page .form-box, .dart-auth-page .toggle-box::before,
   .dart-auth-page .toggle-panel, .dart-auth-page .btn.enter-btn { transition: none; }
 }
+
+
+/* Google sign-in: same placement in login and registration without moving primary actions. */
+.dart-google-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  color: #262626;
+  background: #fff;
+  border: 1px solid #dedede;
+  border-radius: 10px;
+  font: 600 14px/1.4 "Poppins", sans-serif;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.dart-google-login-btn:hover,
+.dart-google-login-btn:focus-visible {
+  border-color: #ab012b;
+  box-shadow: 0 0 0 2px rgb(171 1 43 / 10%);
+}
+.dart-google-login-btn:disabled,
+.dart-google-login-btn[aria-disabled="true"] {
+  opacity: .58;
+  cursor: not-allowed;
+}
+.dart-google-g {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #4285f4;
+  font: 700 22px/1 Arial, sans-serif;
+}
