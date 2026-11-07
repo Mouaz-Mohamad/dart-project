@@ -1,3 +1,4 @@
-purpose=smtp-credential-refresh
-triggered_at=2026-09-27T21:30:00Z
-source=manual-vercel-env-update
+purpose=whatsapp-approved-birthday-review-templates
+triggered_at=2026-11-07
+source=vercel-production-env-activation
+expected_templates=birthday,share_your_experience_2
