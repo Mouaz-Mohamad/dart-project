@@ -177,7 +177,7 @@ export class OutboxService {
           WHERE attempts < 12 AND available_at <= now()
             AND payload->>'channel' IN ('email','whatsapp','web_push')
             AND ($2::text IS NULL OR deduplication_key=$2)
-            AND (payload->>'channel'<>'whatsapp' OR CASE WHEN event_type='ORDER_WHATSAPP_DISPATCHED' THEN $7::boolean WHEN event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
+            AND (payload->>'channel'<>'whatsapp' OR CASE WHEN event_type='WAITLIST_WHATSAPP_RESTOCK' THEN ($3::boolean AND $8::boolean) WHEN event_type='ORDER_WHATSAPP_DISPATCHED' THEN $7::boolean WHEN event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
               THEN $6::boolean ELSE ($3::boolean AND $4::boolean
               AND (event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $5::boolean)) END)
             AND (event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $8::boolean)
@@ -264,12 +264,12 @@ export class OutboxService {
         count(*) FILTER (WHERE a.state='terminal')::text AS terminal,
         count(*) FILTER (WHERE a.delivery_status='failed')::text AS delivery_failed,
         count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
-          AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
+          AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='WAITLIST_WHATSAPP_RESTOCK' THEN ($1::boolean AND $6::boolean) WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
             THEN $4::boolean ELSE ($1::boolean AND $2::boolean
             AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean) AND (e.event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $6::boolean)) END))::text AS due_pending,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.available_at)) FILTER
           (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
-            AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
+            AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='WAITLIST_WHATSAPP_RESTOCK' THEN ($1::boolean AND $6::boolean) WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
               THEN $4::boolean ELSE ($1::boolean AND $2::boolean
               AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean) AND (e.event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $6::boolean)) END)),0)::text AS oldest_due_seconds,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.created_at)) FILTER
@@ -398,10 +398,12 @@ export class OutboxService {
   private async publishWhatsApp(row: OutboxRow, attemptId: string): Promise<{ providerMessageId?: string; suppressed?: boolean }> {
     const dispatch = row.event_type === "ORDER_WHATSAPP_DISPATCHED";
     const immediate = dispatch || ["ORDER_WHATSAPP_CONFIRMATION","ORDER_WHATSAPP_ACK"].includes(row.event_type);
+    // A reserved Waiting item expires after four hours; its requested restock alert must not wait for marketing quiet hours.
+    const bypassWindow = immediate || row.event_type === "WAITLIST_WHATSAPP_RESTOCK";
     if (!(dispatch ? this.dispatchMessagingConfigured() : immediate ? this.orderMessagingConfigured() : this.configured("whatsapp"))) {
       throw new DeferredWhatsAppDelivery("WhatsApp sending is disabled");
     }
-    if (!immediate && !whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
+    if (!bypassWindow && !whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
     if (dispatch) {
       if (!(new Date(String(row.payload.expiresAt || "")).getTime() > this.now().getTime())) return { suppressed: true };
       const eligible = await this.pool.query<{ allowed: boolean }>(`SELECT EXISTS (
@@ -529,7 +531,7 @@ export class OutboxService {
         : undefined;
 
     // Recheck immediately before the external call as a batch can cross 22:00.
-    if (!immediate && !whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
+    if (!bypassWindow && !whatsappSendWindow(this.now())) throw new DeferredWhatsAppDelivery("Waiting for WhatsApp send window");
     const response = await fetch(
       `https://graph.facebook.com/${this.config.whatsappGraphApiVersion || "v26.0"}/${this.config.whatsappPhoneNumberId}/messages`,
       {

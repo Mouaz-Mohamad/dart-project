@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(new URL("../migrations/0036_waitlist_reservations.sql", import.meta.url), "utf8");
 const restock = readFileSync(new URL("../migrations/0075_waitlist_whatsapp_restock.sql", import.meta.url), "utf8");
+const immediateRestock = readFileSync(new URL("../migrations/0076_waitlist_immediate_restock_whatsapp.sql", import.meta.url), "utf8");
 const sender = readFileSync(new URL("../src/modules/outbox/outbox.service.ts", import.meta.url), "utf8");
 const service = readFileSync(new URL("../src/modules/waiting/waiting.service.ts", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../src/modules/waiting/waiting.routes.ts", import.meta.url), "utf8");
@@ -21,6 +22,9 @@ describe("Waiting restock reservation contract", () => {
     expect(restock).toContain("NEW.whatsapp_restock_opt_in_at IS NULL");
     expect(restock).toContain("wa.match_type='exact'");
     expect(restock).toContain("v_due >= v_expires_at");
+    expect(immediateRestock).toContain("v_due := now()");
+    expect(immediateRestock).toContain("v_due >= v_expires_at");
+    expect(sender).toContain('const bypassWindow = immediate || row.event_type === "WAITLIST_WHATSAPP_RESTOCK"');
     expect(restock).toContain("'waitlist.whatsapp.restock:'||v_allocation_id::text");
     expect(restock).toContain("'category','marketing'");
     expect(sender).toContain("wa.expires_at=$4::timestamptz");

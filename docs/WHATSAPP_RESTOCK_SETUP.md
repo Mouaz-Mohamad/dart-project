@@ -10,11 +10,11 @@ Three body variables, in order: model name, actual color, actual size. The appro
 - Database allocates a physical item and reserves it first, then queues a single durable outbox event in the same transaction when the entry becomes Reserved.
 - The sender checks active allocation status, ownership, requested variant, inventory cart lock, consent phone vs current primary phone, user active state, and reservation expiry immediately before Meta.
 - The outbox deduplicates by allocation ID and quarantines uncertain provider outcomes.
-- Marketing is only sent within 13:00–22:00 Cairo. If a reservation expires before the next allowed window, the WhatsApp event is not queued. Existing other channels still work.
+- A customer-requested restock message is queued immediately when the exact item is reserved (including overnight); it does not use the birthday/review 13:00–22:00 quiet-hour gate. Other templates keep their existing send windows. The system always rechecks the 4-hour allocation expiration at send time.
 - No historical backfill or third-party automation.
 
 ## Deployment
-- Apply migrations in order with the checksummed runner: 0074 must precede 0075.
+- Apply migrations in order with the checksummed runner: 0076 must follow the already applied 0075.
 - Configure `WHATSAPP_RESTOCK_TEMPLATE=dart_restock_available` only on Vercel `dart-api` Production (with `WHATSAPP_SEND_ENABLED=true`). An empty value disables just restock WhatsApp.
 - Test fresh opt-in Waiting, exact match, alternative match, no opt-in, expired/cancelled/reassigned allocation, changed phone and duplicate trigger.
 - A successful API request is not proof of delivery; require `Delivered` webhook receipt.

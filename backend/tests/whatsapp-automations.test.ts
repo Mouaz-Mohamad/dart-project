@@ -143,22 +143,10 @@ describe("durable WhatsApp automations and receipts", () => {
     const waiting=new WaitingService(store.pool);
     const entry=await waiting.join(buyer.id,{modelId,size:"M",color:"Burgundy",whatsappRestockOptIn:optIn},randomUUID());
     const itemId="restock-item-"+randomUUID();
-    // Test an eligible 13:00 send even when the runner executes overnight.
-    // Production still uses the normal four-hour hold.
-    const prior=(await store.pool.query("SELECT data->'waiting' AS settings FROM site_settings WHERE id='main'")).rows[0]?.settings;
-    await store.pool.query(`UPDATE site_settings
-      SET data=jsonb_set(data,'{waiting}',
-        COALESCE(data->'waiting','{}'::jsonb)||'{"reservationHours":24}'::jsonb,true)
-      WHERE id='main'`);
-    try {
-      await store.pool.query(
-        `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
-         VALUES($1,$1,$2,'Burgundy','M',10000)`,[itemId,modelId]);
-    } finally {
-      await store.pool.query(`UPDATE site_settings SET data=
-        CASE WHEN $1::jsonb IS NULL THEN data-'waiting'
-        ELSE jsonb_set(data,'{waiting}',$1::jsonb,true) END WHERE id='main'`,[prior??null]);
-    }
+    // Restock holds remain the normal four hours, even outside WhatsApp quiet hours.
+    await store.pool.query(
+      `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
+       VALUES($1,$1,$2,'Burgundy','M',10000)`,[itemId,modelId]);
     const rows=await store.pool.query<{deduplication_key:string,payload:Record<string,unknown>}>(
       `SELECT deduplication_key,payload FROM outbox_events
        WHERE aggregate_type='waitlist' AND event_type='WAITLIST_WHATSAPP_RESTOCK' AND aggregate_id=$1`,[entry.id]);
@@ -195,6 +183,23 @@ describe("durable WhatsApp automations and receipts", () => {
       "SELECT count(*)::int AS total FROM outbox_events WHERE deduplication_key=$1",
       [withConsent.event!.deduplication_key])).rows[0]!.total;
     expect(Number(count)).toBe(1);
+  });
+  it("sends opted-in restock promptly even outside birthday/review WhatsApp hours",async()=>{
+    const fresh=await restockFixture(true);
+    expect(fresh.event).not.toBeNull();
+    const fetch=fakeProvider();
+    const send=new OutboxService(store.pool,{...config,whatsappRestockTemplate:"dart_restock_available"},null,null,quietClock);
+    expect(whatsappSendWindow(quietClock())).toBe(false);
+    expect((await send.health()).duePending).toBeGreaterThan(0);
+    expect((await send.processBatch(1,fresh.event!.deduplication_key)).published).toBe(1);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect((await send.processBatch(1,fresh.event!.deduplication_key)).claimed).toBe(0);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("dart_restock_available");
+    const queued=(await store.pool.query(
+      "SELECT available_at, created_at FROM outbox_events WHERE deduplication_key=$1",
+      [fresh.event!.deduplication_key])).rows[0];
+    expect(Math.abs(new Date(queued.available_at).getTime()-new Date(queued.created_at).getTime())).toBeLessThan(30000);
   });
   it("sends approved restock variables once; suppresses stale phone after consent",async()=>{
     const fresh=await restockFixture(true);
