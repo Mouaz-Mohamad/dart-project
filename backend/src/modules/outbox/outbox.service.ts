@@ -470,7 +470,11 @@ export class OutboxService {
     if (!languageCode) throw new DeliveryError("terminal", "WhatsApp template language is missing");
 
     const parameters = textParameters(payload);
-    const bodyComponent = parameters.length
+    // The approved Arabic customer templates use fixed text, not body placeholders.
+    // Birthday also has a required image header. Do not attach legacy text variables.
+    const fixedCustomerTemplate = (row.event_type === "CUSTOMER_BIRTHDAY_MESSAGE" && template === "birthday")
+      || (row.event_type === "CUSTOMER_POST_DELIVERY_REVIEW" && template === "share_your_experience_2");
+    const bodyComponent = !fixedCustomerTemplate && parameters.length
       ? {
           type: "body",
           parameters: parameters.map((text) => ({ type: "text", text })),
@@ -478,7 +482,12 @@ export class OutboxService {
       : undefined;
     const authenticationOtp = payload.authenticationOtp === true;
     const otp = parameters[0] || "";
-    const components = row.event_type === "ORDER_WHATSAPP_CONFIRMATION"
+    const birthdayImageHeader = row.event_type === "CUSTOMER_BIRTHDAY_MESSAGE" && template === "birthday"
+      ? [{ type: "header", parameters: [{ type: "image", image: { link: "https://www.dartofficial.com/Photos/birthday.webp" } }] }]
+      : undefined;
+    const components = birthdayImageHeader
+      ? birthdayImageHeader
+      : row.event_type === "ORDER_WHATSAPP_CONFIRMATION"
       ? [bodyComponent!, ...["confirm","cancel"].map((action,index) => ({type:"button",sub_type:"quick_reply",index:String(index),
           parameters:[{type:"payload",payload:`${action}:${payload.confirmationId}`}]}))]
       : authenticationOtp && otp
