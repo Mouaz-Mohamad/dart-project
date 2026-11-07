@@ -172,6 +172,7 @@ for (const required of [
 // The Maps JavaScript key is intentionally public and restricted by Google to Dart domains
 // and the three browser APIs. Never stage any OAuth client secret into static output.
 const mapsBrowserKey = String(process.env.DART_GOOGLE_MAPS_BROWSER_KEY || '').trim();
+console.log('Google Maps browser key configured at build:', Boolean(mapsBrowserKey));
 if (mapsBrowserKey && !/^AIza[0-9A-Za-z_-]{30,}$/.test(mapsBrowserKey)) {
   throw new Error('Invalid DART_GOOGLE_MAPS_BROWSER_KEY format (browser key only)');
 }
