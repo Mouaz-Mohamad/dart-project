@@ -282,17 +282,11 @@
     waitingBusy = true;
     sync();
     try {
-      if (!root.DartPlatform?.apiRequest) throw new Error("Waiting service is unavailable");
-      await root.DartPlatform.apiRequest("/api/v1/me/waiting", {
-        method: "POST",
-        body: {
-          modelId: String(item.id),
-          size: String(selectedSizeValue),
-          color: String(selectedColorValue),
-          whatsappRestockOptIn: true,
-        },
-      });
-      await root.DartPlatform.hydrateWaiting?.(true);
+      if (typeof root.DartPlatform?.joinWaiting !== "function") throw new Error("Waiting service is unavailable");
+      // All Waiting buttons use one canonical customer-requested notification path.
+      await root.DartPlatform.joinWaiting(
+        String(item.id), String(selectedSizeValue), String(selectedColorValue),
+      );
       reservedKey = key(item, selectedSizeValue, selectedColorValue);
       const message = `تم تسجيل حجز القطعة في Waiting: ${item.title} — المقاس: ${selectedSizeValue} — اللون: ${selectedColorValue}.`;
       status(message, "success");

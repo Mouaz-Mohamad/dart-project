@@ -87,7 +87,7 @@
   async function joinWaiting(modelId, size, color) {
     const payload = await apiRequest("/api/v1/me/waiting", {
       method: "POST",
-      body: { modelId, size, color },
+      body: { modelId, size, color, whatsappRestockOptIn: true },
     });
     await hydrateWaiting(true);
     return payload.entry;
