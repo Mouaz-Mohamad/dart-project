@@ -115,9 +115,22 @@
 <!-- نموذج تفاصيل العنوان -->
 <form id="checkoutForm" class="address-form">
     
-    <!-- Manual address only. Coverage is verified by the API. -->
+    <!-- Google Maps: maps are optional for checkout, never a substitute for courier coverage checks. -->
+<div class="form-group dart-checkout-location-search">
+  <label for="address-input">Search for your address on Google Maps</label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <input type="search" id="address-input" class="inp" placeholder="Street, area, city, Egypt" autocomplete="street-address" style="flex:1;min-width:160px">
+    <button type="button" id="dart-google-search" class="dart-locate-address-btn">Search</button>
+  </div>
+</div>
+<div id="dart-checkout-google-map" role="region" aria-label="Google delivery location map" style="height:280px;min-height:280px;width:100%;border-radius:10px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5;margin:10px 0">
+  <p style="padding:16px">Google Maps will load when you open checkout.</p>
+</div>
+<button id="dart-google-current-location" class="dart-locate-address-btn" type="button">◎ Use my location</button>
 <p class="dart-delivery-zone-note"><i class="fa-solid fa-truck" aria-hidden="true"></i> Delivery depends on the available shipping coverage.</p>
-<p id="checkout-address-status" class="dart-address-status" role="status" aria-live="polite">Enter your complete address and choose a covered delivery region below.</p>
+<p id="checkout-address-status" class="dart-address-status" role="status" aria-live="polite">Choose your location on Google Maps or complete the address manually below.</p>
+<input type="hidden" id="lat-input" name="latitude">
+<input type="hidden" id="lng-input" name="longitude">
 <input type="hidden" id="formatted-address-input" name="full_address">
 
     <div class="form-group"><label for="checkout-name">Name</label><input id="checkout-name" name="customer_name" class="inp" type="text" placeholder="Value" autocomplete="name" required></div>
@@ -226,7 +239,8 @@
         <footer id="footer" aria-label="footer."></footer>
     
     </div>
-    <script src="Js/dart-checkout-manual-address.js" defer></script>
+    <script src="Js/dart-google-maps-config.js" defer></script>
+    <script src="Js/dart-checkout-google.js" defer></script>
     <script  src="Js/dart-state.js" defer></script>
     <script  src="Js/dart-site-settings.js" defer></script>
     <script  src="Js/dart-catalog.js" defer></script>
