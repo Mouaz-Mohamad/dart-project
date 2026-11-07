@@ -40,7 +40,7 @@ assert(
 );
 assert(customerPasswordUi.includes('input.removeAttribute("pattern")'), "Customer password UI must allow any character composition");
 assert(customerPasswordUi.includes("letters, numbers and symbols are all allowed"), "Customer signup must explain the relaxed password rule");
-assert.equal((signup.match(/data-social-login="google"/g) || []).length, 0, "Google must stay hidden until OAuth credentials are configured");
+assert.equal((signup.match(/data-social-login="google"/g) || []).length, 2, "Google sign-in must exist in both forms; availability is checked through the server provider endpoint");
 assert.equal((signup.match(/data-social-login="facebook"/g) || []).length, 0, "Unavailable Facebook login must not be offered");
 for (const path of [
   "/api/v1/auth/social/providers",

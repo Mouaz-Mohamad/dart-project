@@ -50,6 +50,7 @@
   let lastLocationSyncAt = 0;
   const deliveryMaps = new Map();
   let lastOrderRenderSignature = "";
+  let navigationOrderId = "", navigationFocus = null, voiceEnabled = false, lastSpoken = "";
 
   const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
@@ -502,6 +503,7 @@
   }
 
   function showAuth(name = "login") {
+    if (navigationDialog()?.open) closeNavigation();
     document.getElementById("repAuthView").hidden = false;
     document.getElementById("repDashboardView").hidden = true;
     const login = document.getElementById("repLoginForm"),
@@ -659,67 +661,156 @@
     deliveryMaps.clear();
   }
 
-  function renderDeliveryMaps(orders) {
-    for (const order of orders) {
-      const el = [...document.querySelectorAll("[data-rep-live-map]")]
-        .find(node => String(node.dataset.orderId) === String(order.id));
-      if (!el) continue;
-      const lat = Number(order.latitude), lng = Number(order.longitude);
-      const destination = order.latitude !== "" && order.longitude !== "" &&
-        Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0
-          ? { lat, lng } : null;
-      const entry = { orderId: String(order.id), destination,
-        lastRoadRouteAt: 0, roadRouteRequestId: 0 };
-      deliveryMaps.set(entry.orderId, entry);
-      const courier = order.courierLocation || latestApiLocation;
-      if (destination && courier && Number.isFinite(Number(courier.lat)) &&
-          Number.isFinite(Number(courier.lng))) {
-        void refreshDeliveryRoadRoute(entry, courier, true);
-      }
-    }
-    void window.DartGoogleMaps?.attachRepresentatives?.(orders);
+  const navigationDialog = () => document.getElementById("repNavigationDialog");
+  const activeNavigationOrder = () => repOrders(currentRep()).find(order => String(order.id) === navigationOrderId);
+  function closeNavigation() {
+    navigationDialog()?.close();
+    document.body.classList.remove("dart-rep-navigating");
+    navigationOrderId = "";
+    clearDeliveryMaps();
+    if (voiceEnabled) window.speechSynthesis?.cancel();
+    lastSpoken = "";
+    if (navigationFocus?.isConnected) navigationFocus.focus();
   }
-
+  function speakInstruction(instruction) {
+    if (!voiceEnabled || instruction === lastSpoken || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    lastSpoken = instruction;
+    window.speechSynthesis.cancel();
+    const speech = new window.SpeechSynthesisUtterance(instruction);
+    speech.lang = "ar-EG";
+    window.speechSynthesis.speak(speech);
+  }
+  function distanceToRoadPath(location, path) {
+    if (!path?.length) return Infinity;
+    if (path.length === 1) return distanceKm(location.lat, location.lng, path[0].lat, path[0].lng);
+    const scale = Math.cos(Number(location.lat) * Math.PI / 180);
+    let nearest = Infinity;
+    for (let i = 1; i < path.length; i++) {
+      const a = { x: (path[i - 1].lng - location.lng) * scale, y: path[i - 1].lat - location.lat };
+      const b = { x: (path[i].lng - location.lng) * scale, y: path[i].lat - location.lat };
+      const dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
+      const t = length ? Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / length)) : 0;
+      nearest = Math.min(nearest, Math.hypot(a.x + t * dx, a.y + t * dy) * 111.195);
+    }
+    return nearest;
+  }
+  function showNavigationStep(entry, location) {
+    if (!navigationDialog()?.open || entry.orderId !== navigationOrderId || !entry.steps?.length) return;
+    const km = point => point ? distanceKm(location.lat, location.lng, point.lat, point.lng) : Infinity;
+    let nearest = entry.stepIndex || 0, nearestDistance = Infinity;
+    // Examine nearby steps only: crossing roads later in the route must not skip turns.
+    for (let i = Math.max(0, nearest - 1); i < Math.min(entry.steps.length, nearest + 5); i++) {
+      const step = entry.steps[i];
+      const distance = distanceToRoadPath(location, [step.start, ...(step.path || []), step.end].filter(Boolean));
+      if (distance < nearestDistance) { nearestDistance = distance; nearest = i; }
+    }
+    entry.offRoute = nearestDistance > 0.15;
+    entry.stepIndex = Math.max(entry.stepIndex || 0, nearest);
+    const current = entry.steps[entry.stepIndex];
+    const next = entry.steps[entry.stepIndex + 1];
+    const target = next && km(current.start) > 0.03 ? next : current;
+    const distance = km(target.start);
+    const instruction = target.instruction || "Continue to the delivery address";
+    document.getElementById("repNavigationInstruction").textContent = entry.offRoute ? "Updating route from your location..." : instruction;
+    const maneuver = target.maneuver.toUpperCase();
+    document.getElementById("repNavigationArrow").textContent = maneuver.includes("U_TURN") ? "↶" : maneuver.includes("LEFT") ? "↰" : maneuver.includes("RIGHT") ? "↱" : "↑";
+    document.getElementById("repNavigationDistance").textContent =
+      (Number.isFinite(distance) ? `${distance < 1 ? Math.round(distance * 1000) + " m" : distance.toFixed(1) + " km"} · ` : "") +
+      "Google Maps directions";
+    if (!entry.offRoute) speakInstruction(instruction);
+  }
+  function updateDeliveryControls() {
+    const orders = repOrders(currentRep());
+    for (const card of document.querySelectorAll("#repOrdersList [data-order-id]")) {
+      const order = orders.find(row => String(row.id) === card.dataset.orderId);
+      if (!order) continue;
+      const proximity = deliveryProximity(order);
+      const started = activeOrderIds.has(order.id) && Boolean(order.deliveryStartedAt);
+      const complete = card.querySelector('[data-action="complete"]');
+      if (complete) complete.hidden = !started || !proximity.ok;
+      const label = card.querySelector(".dart-rep-proximity");
+      if (label && started) { label.textContent = proximity.reason; label.classList.toggle("is-ready", proximity.ok); }
+    }
+    if (!navigationDialog()?.open) return;
+    const order = activeNavigationOrder();
+    if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) { closeNavigation(); return; }
+    const proximity = deliveryProximity(order);
+    document.getElementById("repNavigationProximity").textContent = proximity.reason;
+    // An unknown destination cannot satisfy the 1 km rule. Existing manual-order actions stay on the order card.
+    document.getElementById("repNavigationComplete").hidden = !proximity.ok || Boolean(proximity.manual);
+    const entry = deliveryMaps.get(navigationOrderId);
+    if (entry && order.courierLocation) {
+      const updatedAt = Date.parse(order.courierLocation.updatedAt || "");
+      if (Date.now() - updatedAt <= LOCATION_MAX_AGE_MS) showNavigationStep(entry, order.courierLocation);
+      else document.getElementById("repNavigationInstruction").textContent = "Waiting for a fresh GPS location...";
+    }
+  }
+  async function openNavigation(order) {
+    if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) return;
+    if (navigationDialog().open) closeNavigation();
+    navigationFocus = document.activeElement;
+    navigationOrderId = String(order.id);
+    const container = document.getElementById("repNavigationMap");
+    container.dataset.repLiveMap = ""; container.dataset.orderId = navigationOrderId;
+    container.textContent = "Loading Google Maps...";
+    document.getElementById("repNavigationInstruction").textContent = "Waiting for your location...";
+    document.getElementById("repNavigationDistance").textContent = "";
+    document.getElementById("repNavigationWarnings").textContent = "";
+    document.getElementById("repNavigationRetry").hidden = true;
+    navigationDialog().showModal();
+    document.body.classList.add("dart-rep-navigating");
+    const lat = Number(order.latitude), lng = Number(order.longitude);
+    const entry = { orderId: navigationOrderId,
+      destination: lat && lng && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null,
+      lastRoadRouteAt: 0, roadRouteRequestId: 0, steps: [] };
+    deliveryMaps.set(entry.orderId, entry);
+    updateDeliveryControls();
+    await window.DartGoogleMaps?.attachRepresentatives?.([order]);
+    if (deliveryMaps.get(entry.orderId) !== entry) return;
+    if (!entry.destination) {
+      document.getElementById("repNavigationInstruction").textContent = "Manual address — no verified destination pin.";
+      return;
+    }
+    const courier = order.courierLocation || latestApiLocation;
+    if (courier) void refreshDeliveryRoadRoute(entry, courier, true);
+  }
   async function refreshDeliveryRoadRoute(entry, location, force = false) {
-    if (!entry?.destination || !location) return;
-    const destination = entry.destination;
-    const now = Date.now();
-    if (!force && now - Number(entry.lastRoadRouteAt || 0) < ROAD_ROUTE_REFRESH_MS) return;
-    entry.lastRoadRouteAt = now;
-    const requestId = Number(entry.roadRouteRequestId || 0) + 1;
-    entry.roadRouteRequestId = requestId;
-    const points = `${Number(location.lng)},${Number(location.lat)};${destination.lng},${destination.lat}`;
-    let timeout = null;
+    if (!entry?.destination || !location || !navigationDialog()?.open || entry.pending) return;
+    const currentTime = Date.now();
+    if (!force && currentTime - entry.lastRoadRouteAt < ROAD_ROUTE_REFRESH_MS) return;
+    const moved = entry.lastRouteOrigin ? distanceKm(location.lat, location.lng, entry.lastRouteOrigin.lat, entry.lastRouteOrigin.lng) : Infinity;
+    if (!force && entry.steps.length && !entry.offRoute && (moved < 0.12 || currentTime - entry.lastRoadRouteAt < 60000)) return;
+    if (!force && entry.failed && currentTime - entry.lastRoadRouteAt < 60000) return;
+    if (Date.now() - Date.parse(location.updatedAt || "") > LOCATION_MAX_AGE_MS) return;
+    entry.lastRoadRouteAt = currentTime; entry.pending = true;
+    const requestId = ++entry.roadRouteRequestId;
+    let timeout;
     try {
-      const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), 4500);
-      const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false`,
-        { signal: controller.signal },
-      );
-      if (!response.ok) throw new Error("Routing provider unavailable");
-      const payload = await response.json();
-      const raw = payload.routes?.[0]?.geometry?.coordinates;
-      if (!Array.isArray(raw) || raw.length < 2 || entry.roadRouteRequestId !== requestId) return;
-      const geometry = raw.map(([lng, lat]) => [Number(lat), Number(lng)]);
-      if (geometry.some(([lat, lng]) => !Number.isFinite(lat) || !Number.isFinite(lng))) return;
-      document.dispatchEvent(new CustomEvent("dart:rep-road-route", {
-        detail: { orderId: entry.orderId, geometry },
-      }));
+      const route = await Promise.race([
+        window.DartGoogleMaps.computeRoute({ lat: Number(location.lat), lng: Number(location.lng) }, entry.destination),
+        new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("Route timeout")), 12000); }),
+      ]);
+      if (deliveryMaps.get(entry.orderId) !== entry || requestId !== entry.roadRouteRequestId) return;
+      entry.steps = route.steps; entry.stepIndex = 0; entry.failed = false;
+      entry.lastRouteOrigin = { lat: Number(location.lat), lng: Number(location.lng) };
+      document.dispatchEvent(new CustomEvent("dart:rep-road-route", { detail: { orderId: entry.orderId, geometry: route.geometry } }));
+      document.getElementById("repNavigationWarnings").textContent = route.warnings.join(" · ");
+      document.getElementById("repNavigationRetry").hidden = true;
+      updateDeliveryControls();
     } catch {
-      // Keep the last Google polyline if the external route provider is unavailable.
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
+      if (deliveryMaps.get(entry.orderId) !== entry) return;
+      entry.failed = true; entry.steps = [];
+      document.getElementById("repNavigationInstruction").textContent = "Google directions unavailable. Check Routes API access or retry.";
+      document.getElementById("repNavigationDistance").textContent = "";
+      document.getElementById("repNavigationRetry").hidden = false;
+    } finally { clearTimeout(timeout); entry.pending = false; }
   }
-
   function updateDeliveryMapsLocation(location) {
-    const lat = Number(location?.lat), lng = Number(location?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
-    for (const entry of deliveryMaps.values()) {
-      if (entry.destination) void refreshDeliveryRoadRoute(entry, location);
+    if (location && Number.isFinite(Number(location.lat)) && Number.isFinite(Number(location.lng))) {
+      window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
+      for (const entry of deliveryMaps.values()) void refreshDeliveryRoadRoute(entry, location);
     }
+    updateDeliveryControls();
   }
 
   function renderOrders() {
@@ -775,7 +866,6 @@
       ensureLocationWatch();
       return;
     }
-    clearDeliveryMaps();
     lastOrderRenderSignature = renderSignature;
     list.innerHTML =
       orders
@@ -814,22 +904,21 @@
         <div class="rep-info-box"><div class="rep-info-title">Customer &amp; address</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "Address missing")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
         <div class="rep-info-box"><div class="rep-info-title">Items &amp; cash collection</div>${items}<div class="dart-rep-total"><span>Collect cash</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>
         <p class="dart-rep-proximity ${proximity.ok ? "is-ready" : ""}" role="status">${esc(proximity.reason)}</p>
-        ${started ? `<div class="dart-rep-live-map" data-rep-live-map data-order-id="${esc(order.id)}" aria-label="Live delivery route"></div>` : ""}
         <div class="dart-rep-order-actions">
           <a href="tel:${esc(order.phone1)}" class="rep-btn rep-btn-call"><i class="fa-solid fa-phone"></i> Call customer</a>
           ${!started ? '<button type="button" class="rep-btn rep-btn-go" data-action="start"><i class="fa-solid fa-diamond-turn-right"></i> Start delivery</button>' : ""}
-          ${started ? `<a class="rep-btn rep-btn-go" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Open navigation</a>` : ""}
+          ${started ? `<button type="button" class="rep-btn rep-btn-go" data-action="navigate"><i class="fa-solid fa-map-location-dot"></i> Open navigation</button><a class="rep-btn rep-btn-call" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener">Open Google Maps app</a>` : ""}
           ${started ? '<button type="button" class="rep-btn rep-btn-wait" data-action="waiting"><i class="fa-solid fa-clock"></i> Waiting</button>' : ""}
           ${started ? '<button type="button" class="rep-btn rep-btn-problem" data-action="problem"><i class="fa-solid fa-triangle-exclamation"></i> Report problem</button>' : ""}
           ${started ? '<button type="button" class="rep-btn rep-btn-cancel" data-action="cancel"><i class="fa-solid fa-arrow-rotate-left"></i> Stop current delivery</button>' : ""}
-          ${started && proximity.ok ? '<button type="button" class="rep-btn rep-btn-complete" data-action="complete"><i class="fa-solid fa-circle-check"></i> Delivered</button>' : ""}
+          ${started ? `<button type="button" class="rep-btn rep-btn-complete" data-action="complete" ${proximity.ok ? "" : "hidden"}><i class="fa-solid fa-circle-check"></i> Delivered</button>` : ""}
         </div>
       </article>`;
         })
         .join("") ||
       '<div class="empty-state">No active orders are assigned to you.</div>';
     wrapOperationalGroups(list, orders, "order");
-    renderDeliveryMaps(orders);
+    updateDeliveryMapsLocation(latestApiLocation);
     renderReturns(rep);
     ensureLocationWatch();
   }
@@ -919,7 +1008,7 @@
         saveActiveIds();
         // Publish one fresh position immediately after Start. watchPosition can
         // otherwise wait for device movement before emitting another sample.
-        await syncFreshRepresentativeLocation();
+        void syncFreshRepresentativeLocation();
       }
       await refreshApiWork();
       if (status === "Delivered") activeOrderIds.delete(order.id);
@@ -1424,6 +1513,28 @@
       registerForm = document.getElementById("repRegisterForm"),
       changeForm = document.getElementById("repChangePasswordForm");
     bindImagePreviews(registerForm);
+    document.getElementById("repNavigationExit").addEventListener("click", closeNavigation);
+    navigationDialog().addEventListener("cancel", event => { event.preventDefault(); closeNavigation(); });
+    document.getElementById("repNavigationVoice").addEventListener("click", event => {
+      voiceEnabled = !voiceEnabled; lastSpoken = "";
+      event.currentTarget.setAttribute("aria-pressed", String(voiceEnabled));
+      event.currentTarget.textContent = voiceEnabled ? "Sound on" : "Sound off";
+      if (!voiceEnabled) window.speechSynthesis?.cancel();
+      updateDeliveryControls();
+    });
+    document.getElementById("repNavigationComplete").addEventListener("click", () => {
+      const card = [...document.querySelectorAll("#repOrdersList [data-order-id]")].find(el => el.dataset.orderId === navigationOrderId);
+      card?.querySelector('[data-action="complete"]')?.click();
+    });
+    document.getElementById("repNavigationRetry").addEventListener("click", async () => {
+      const order = activeNavigationOrder();
+      if (order) await openNavigation(order);
+    });
+    document.addEventListener("dart:google-maps-error", event => {
+      if (!navigationDialog()?.open) return;
+      document.getElementById("repNavigationInstruction").textContent = event.detail?.message || "Google Maps unavailable.";
+      document.getElementById("repNavigationRetry").hidden = false;
+    });
     document.getElementById("repLoginTab").onclick = () => showAuth("login");
     document.getElementById("repRegisterTab").onclick = () =>
       showAuth("register");
@@ -1528,13 +1639,17 @@
       .getElementById("repOrdersList")
       .addEventListener("click", async (event) => {
         const button = event.target.closest("[data-action]");
-        if (!button) return;
+        if (!button || button.disabled) return;
+        button.disabled = true;
+        const modalComplete = document.getElementById("repNavigationComplete");
+        modalComplete.disabled = true;
         const card = button.closest("[data-order-id]"),
           orderId = card?.dataset.orderId,
           orders = API_ENABLED ? apiWork.orders : read(KEYS.orders, []),
           order = orders.find((row) => String(row.id) === String(orderId));
         try {
           if (!order) throw new Error("The assigned order could not be found.");
+          if (button.dataset.action === "navigate") await openNavigation(order);
           if (button.dataset.action === "start") {
             if (
               ![
@@ -1547,9 +1662,10 @@
               );
             locationPermissionBlocked = false;
             activeOrderIds.add(order.id);
-            await updateOrderStatus(order.id, "Representative On The Way");
+            const startedOrder = await updateOrderStatus(order.id, "Representative On The Way");
             ensureLocationWatch();
             renderOrders();
+            await openNavigation(startedOrder);
           }
           if (button.dataset.action === "complete") {
             const freshOrder = (API_ENABLED ? apiWork.orders : read(KEYS.orders, [])).find(
@@ -1564,7 +1680,7 @@
             if (!proximity.ok) throw new Error(proximity.reason);
             const confirmation = proximity.manual
               ? `Manual address has no verified customer pin. Have you physically delivered ${freshOrder.orderId} and collected the payment?`
-              : `Mark ${freshOrder.orderId} as delivered and paid?`;
+              : `Confirm the customer received Order ${freshOrder.orderId} and you collected ${money(orderTotal(freshOrder))}?`;
             if (!await window.DartDialog.confirm(confirmation))
               return;
             await updateOrderStatus(freshOrder.id, "Delivered");
@@ -1591,6 +1707,10 @@
           }
         } catch (error) {
           window.DartDialog.alert(error.message);
+        } finally {
+          button.disabled = false;
+          modalComplete.disabled = false;
+          updateDeliveryControls();
         }
       });
     document
@@ -1648,7 +1768,7 @@
     distanceKm,
     deliveryProximity,
     googleMapsRoute,
-    // Called after the alternate Leaflet CDN recovers; re-render from current work.
+    // Re-render assigned work without replacing an open navigation map.
     renderOrders: () => { lastOrderRenderSignature = ""; renderOrders(); },
     startReturnPickup,
     cancelReturnPickup,

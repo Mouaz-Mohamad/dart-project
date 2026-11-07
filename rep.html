@@ -153,6 +153,24 @@
       </template>
     </section>
   </main>
+  <dialog id="repNavigationDialog" class="dart-rep-navigation" aria-labelledby="repNavigationTitle">
+    <header class="dart-rep-navigation-banner">
+      <span id="repNavigationArrow" class="dart-rep-navigation-arrow" aria-hidden="true">↑</span>
+      <div class="dart-rep-navigation-copy"><small id="repNavigationTitle">Delivery navigation · Google Maps</small>
+        <strong id="repNavigationInstruction" dir="auto" role="status">Waiting for your location...</strong>
+        <span id="repNavigationDistance"></span>
+      </div>
+      <button id="repNavigationVoice" type="button" aria-pressed="false">Sound off</button>
+    </header>
+    <div id="repNavigationMap" class="dart-rep-navigation-map" aria-label="Google delivery route"></div>
+    <footer class="dart-rep-navigation-footer">
+      <p id="repNavigationProximity" role="status"></p>
+      <p id="repNavigationWarnings" dir="auto"></p>
+      <div><button id="repNavigationExit" type="button" class="rep-btn rep-btn-call">Exit navigation</button>
+        <button id="repNavigationComplete" type="button" class="rep-btn rep-btn-complete" hidden>Delivered</button>
+        <button id="repNavigationRetry" type="button" class="rep-btn rep-btn-go" hidden>Retry Google route</button></div>
+    </footer>
+  </dialog>
 
   <footer id="footer" aria-label="Footer"></footer>
   <script  src="Js/dart-state.js" defer></script>

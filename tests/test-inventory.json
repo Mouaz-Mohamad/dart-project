@@ -72,7 +72,8 @@
     "sets-admin-browser.js",
     "sets-home-browser.js",
     "sets-storefront-browser.js",
-    "storefront-settings-regression.js"
+    "storefront-settings-regression.js",
+    "google-navigation-browser.cjs"
   ],
   "legacyRewrite": {
     "catalog-browser.js": "V7 browser-authoritative acceptance flow; rewrite useful scenarios around API fixtures and server-authoritative state before enabling.",

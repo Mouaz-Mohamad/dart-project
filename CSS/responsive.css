@@ -437,3 +437,7 @@
   .dart-related-card img { height: 122px; }
   .dart-quantity-offer { padding: 10px; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .product-filter-panel, .product-filter-toggle, .product-filter-toggle-arrow { transition: none; }
+}

@@ -1,14 +1,12 @@
-// Dart representative maps: native Google Maps JavaScript rendering only.
+// Shared Google Maps loader and courier route renderer. Browser key comes from deployment configuration.
 (() => {
   "use strict";
-  const key = String(window.DART_GOOGLE_MAPS_BROWSER_KEY || "").trim();
   const mounted = new Map();
-  const routes = new Map();
-  let request = null, authFailed = false, errorMessage = "";
-
-  function status(message) {
-    const field = document.getElementById("repLocationStatus");
-    if (field) { field.textContent = message; field.dataset.state = "error"; }
+  let request = null, authFailed = false, errorMessage = "", mountGeneration = 0;
+  const configurationError = "Google Maps authorization failed. Check Maps JavaScript API, billing and allowed Dart website domains in Google Cloud.";
+  function fail(message) {
+    errorMessage = message;
+    document.dispatchEvent(new CustomEvent("dart:google-maps-error", { detail: { message } }));
   }
   function coords(lat, lng) {
     if (lat === "" || lng === "" || lat == null || lng == null) return null;
@@ -16,137 +14,135 @@
     return Number.isFinite(a) && Number.isFinite(b) && a >= -90 && a <= 90 &&
       b >= -180 && b <= 180 && a !== 0 && b !== 0 ? { lat: a, lng: b } : null;
   }
+  function point(value) {
+    return coords(typeof value?.lat === "function" ? value.lat() : value?.lat,
+      typeof value?.lng === "function" ? value.lng() : value?.lng);
+  }
   function loadMaps() {
+    const key = String(window.DART_GOOGLE_MAPS_BROWSER_KEY || "").trim();
     if (authFailed || !key) {
-      errorMessage = key ? errorMessage : "Google Maps key is not configured for Dart.";
+      fail(authFailed ? configurationError : "Google Maps browser key is missing from this deployment.");
       return Promise.resolve(false);
     }
     if (window.google?.maps?.Map) return Promise.resolve(true);
     if (request) return request;
     request = new Promise(resolve => {
       let done = false;
-      const callback = "__dartCourierGoogleLoaded";
-      function finish(ok) {
+      const callback = "__dartGoogleLoaded";
+      const finish = ok => {
         if (done) return;
         done = true;
         window.clearTimeout(timer);
-        delete window[callback];
+        // Keep a harmless callback after timeout so a late Google response cannot throw.
+        window[callback] = () => {};
+        if (!ok) request = null;
         resolve(Boolean(ok && !authFailed && window.google?.maps?.Map));
-      }
+      };
       const timer = window.setTimeout(() => {
-        errorMessage = "Google Maps loading timed out. Please retry.";
+        fail("Google Maps loading timed out. Check your connection and retry.");
+        script.remove();
         finish(false);
-      }, 8000);
+      }, 15000);
       window[callback] = () => finish(true);
       const prior = window.gm_authFailure;
       window.gm_authFailure = () => {
         authFailed = true;
-        errorMessage = "Google Maps authentication failed. Check Dart website restrictions, billing and Maps JavaScript API.";
         destroyRepresentatives();
-        status(errorMessage);
+        fail(configurationError);
         finish(false);
         if (typeof prior === "function") prior();
       };
       const script = document.createElement("script");
-      script.src = "https://maps.googleapis.com/maps/api/js?" +
-        new URLSearchParams({ key, v: "weekly", loading: "async", callback });
+      script.src = "https://maps.googleapis.com/maps/api/js?" + new URLSearchParams({
+        key, v: "weekly", loading: "async", callback, language: "ar", region: "EG",
+      });
       script.async = true;
       script.referrerPolicy = "strict-origin-when-cross-origin";
-      script.onerror = () => { errorMessage = "Google Maps failed to load."; finish(false); };
+      script.onerror = () => { fail("Google Maps failed to load. Check your connection and retry."); script.remove(); finish(false); };
       document.head.appendChild(script);
     });
     return request;
   }
   function destroyRepresentatives() {
+    mountGeneration += 1;
     for (const entry of mounted.values()) {
       entry.destination?.setMap(null);
       entry.courier?.setMap(null);
       entry.route?.setMap(null);
+      window.google?.maps?.event?.clearInstanceListeners(entry.map);
       entry.container.replaceChildren();
     }
     mounted.clear();
   }
   async function attachRepresentatives(orders) {
-    if (!Array.isArray(orders) || !orders.length) return;
-    const nodes = [...document.querySelectorAll("[data-rep-live-map]")];
+    const generation = mountGeneration;
+    const nodes = [...document.querySelectorAll("[data-rep-live-map]")].filter(node => node.closest("dialog")?.open);
     if (!nodes.length) return;
-    for (const node of nodes) {
-      if (!mounted.has(String(node.dataset.orderId)))
-        node.textContent = "Loading Google Maps...";
-    }
     if (!await loadMaps()) {
-      for (const node of nodes) {
-        node.textContent = errorMessage || "Google Maps unavailable. Use Open navigation.";
-      }
-      status(errorMessage || "Google Maps unavailable. Use Open navigation.");
+      nodes.forEach(node => { node.textContent = errorMessage; });
       return;
     }
+    if (generation !== mountGeneration) return;
     for (const order of orders) {
       const id = String(order.id || "");
       const container = nodes.find(node => node.isConnected && node.dataset.orderId === id);
       if (!container || mounted.has(id)) continue;
       const destination = coords(order.latitude, order.longitude);
-      const courierPosition = coords(order.courierLocation?.lat, order.courierLocation?.lng) ||
-        coords(window.DART_REP_LAST_LOCATION?.lat, window.DART_REP_LAST_LOCATION?.lng);
-      const center = destination || courierPosition || { lat: 30.0444, lng: 31.2357 };
+      const courier = point(order.courierLocation) || point(window.DART_REP_LAST_LOCATION);
       container.replaceChildren();
-      if (!destination) {
-        const notice = document.createElement("p");
-        notice.className = "dart-rep-map-manual-notice";
-        notice.textContent = "Manual address — customer has no verified map pin. Open navigation to find the written address.";
-        notice.style.cssText = "padding:7px;font-size:12px;color:#ab012b;background:#fff;position:relative;z-index:2";
-        container.appendChild(notice);
-      }
       const canvas = document.createElement("div");
       canvas.className = "dart-google-map-overlay";
-      canvas.style.cssText = "height:100%;min-height:230px;width:100%;border-radius:8px";
       container.appendChild(canvas);
-      let map;
       try {
-        map = new google.maps.Map(canvas, { center, zoom: destination ? 15 : 12,
-          clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
-      } catch {
-        container.textContent = "Google Maps could not display. Use Open navigation.";
-        continue;
-      }
-      const destinationMarker = destination
-        ? new google.maps.Marker({ map, position: destination, title: "Verified customer destination" }) : null;
-      const courierMarker = courierPosition
-        ? new google.maps.Marker({ map, position: courierPosition, title: "You" }) : null;
-      const route = destination ? new google.maps.Polyline({ map, path: [],
-        strokeColor: "#ab012b", strokeWeight: 4, strokeOpacity: 0.85 }) : null;
-      if (destination && courierPosition) {
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(destination); bounds.extend(courierPosition);
-        map.fitBounds(bounds, 32);
-      }
-      mounted.set(id, { map, container, destination: destinationMarker, courier: courierMarker, route });
-      if (routes.has(id)) drawRoadRoute(id, routes.get(id));
+        const map = new google.maps.Map(canvas, { center: destination || courier || { lat: 30.0444, lng: 31.2357 },
+          zoom: 16, clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
+        const entry = { map, container,
+          destination: destination ? new google.maps.Marker({ map, position: destination, title: "Customer destination" }) : null,
+          courier: courier ? new google.maps.Marker({ map, position: courier, title: "You" }) : null,
+          route: new google.maps.Polyline({ map, path: [], strokeColor: "#ab012b", strokeWeight: 5 }),
+        };
+        if (destination && courier) {
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend(destination); bounds.extend(courier); map.fitBounds(bounds, 40);
+        }
+        mounted.set(id, entry);
+      } catch { container.textContent = "Google Maps could not display. Use Google Maps navigation or retry."; }
     }
   }
   function updateRepresentativeLocation(position) {
-    const point = coords(position?.lat, position?.lng);
-    if (!point) return;
-    window.DART_REP_LAST_LOCATION = point;
+    const location = point(position);
+    if (!location) return;
+    window.DART_REP_LAST_LOCATION = location;
     for (const entry of mounted.values()) {
-      if (!entry.courier) entry.courier = new google.maps.Marker({
-        map: entry.map, position: point, title: "You" });
-      else entry.courier.setPosition(point);
+      if (!entry.courier) entry.courier = new google.maps.Marker({ map: entry.map, position: location, title: "You" });
+      else entry.courier.setPosition(location);
     }
   }
-  function drawRoadRoute(id, geometry) {
-    const key = String(id || "");
-    if (!Array.isArray(geometry) || geometry.length < 2 || geometry.length > 15000) return;
-    const path = geometry.map(pair => Array.isArray(pair) ? coords(pair[0], pair[1]) : null);
-    if (path.some(point => !point)) return;
-    routes.set(key, geometry);
-    mounted.get(key)?.route?.setPath(path);
+  async function computeRoute(origin, destination) {
+    if (!await loadMaps()) throw new Error(errorMessage);
+    const { Route } = await google.maps.importLibrary("routes");
+    const result = await Route.computeRoutes({ origin, destination, travelMode: "DRIVING",
+      language: "ar", region: "eg", fields: ["path", "legs", "distanceMeters", "durationMillis", "warnings"],
+    });
+    const route = result.routes?.[0];
+    if (!route?.path?.length) throw new Error("Google could not find a driving route.");
+    return { geometry: route.path.map(p => { const c = point(p); return c ? [c.lat, c.lng] : null; }).filter(Boolean),
+      steps: (route.legs || []).flatMap(leg => leg.steps || []).map(step => ({
+        instruction: String(step.instructions || "Continue"), maneuver: String(step.maneuver || "STRAIGHT"),
+        start: point(step.startLocation), end: point(step.endLocation),
+        path: (step.path || []).map(point).filter(Boolean), distanceMeters: step.distanceMeters,
+      })), distanceMeters: route.distanceMeters, durationMillis: route.durationMillis,
+      warnings: (route.warnings || []).map(String),
+    };
   }
   document.addEventListener("dart:rep-road-route", event => {
-    drawRoadRoute(event.detail?.orderId, event.detail?.geometry);
+    const { orderId, geometry } = event.detail || {};
+    if (!Array.isArray(geometry) || geometry.length < 2 || geometry.length > 30000) return;
+    const path = geometry.map(pair => coords(pair?.[0], pair?.[1]));
+    if (path.every(Boolean)) mounted.get(String(orderId))?.route?.setPath(path);
   });
-  window.DartGoogleMaps = Object.freeze({
-    attachRepresentatives, updateRepresentativeLocation,
-    destroyRepresentatives, loadMaps,
+  window.DartGoogleMaps = Object.freeze({ loadMaps, attachRepresentatives,
+    updateRepresentativeLocation, destroyRepresentatives, computeRoute,
+    get errorMessage() { return errorMessage; },
   });
 })();

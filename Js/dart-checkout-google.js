@@ -1,5 +1,5 @@
 // Dart checkout: one Google Maps viewport, with a safe manual-address fallback.
-// No Leaflet, OpenStreetMap, Nominatim, or guessed delivery coordinates.
+// Google is the only address provider; delivery coordinates are never guessed.
 (() => {
   "use strict";
   const apiBase = () => String(window.DART_API_BASE_URL || location.origin).replace(/\/$/, "");
@@ -21,7 +21,8 @@
     const button = get("dart-google-search");
     const search = get("address-input");
     let map = null, marker = null, geocoder = null, loading = null;
-    let checked = false, version = 0, userEdited = false, errorMessage = "";
+    let checked = false, version = 0, userEdited = false, errorMessage = "", googleAddress = "";
+    let searchVersion = 0, gpsVersion = 0;
     form.dataset.dartAddressSource = "manual";
     form.dataset.dartAddressState = "ready";
 
@@ -37,10 +38,12 @@
       form.dataset.dartAddressState = state;
       form.dispatchEvent(new CustomEvent("dart:address-state", { bubbles: true, detail: { state } }));
     }
-    function refresh() { fields.fullAddress.value = addressString(); }
+    function refresh() { fields.fullAddress.value = checked && googleAddress
+      ? [read(fields.building), googleAddress].filter(Boolean).join(", ") : addressString(); }
     function clearPin() {
       version += 1;
       checked = false;
+      googleAddress = "";
       fields.latitude.value = "";
       fields.longitude.value = "";
       form.dataset.dartAddressSource = "manual";
@@ -87,78 +90,89 @@
       }
     };
     let pendingSavedPin = null;
-    async function selectLocation(lat, lng) {
+    const geocode = request => new Promise((resolve, reject) => {
+      geocoder.geocode(request, (results, resultStatus) => {
+        if (resultStatus === "OK" && results?.[0]) resolve(results[0]);
+        else reject(new Error(resultStatus === "ZERO_RESULTS" ? "No matching Google address found. Try a nearby street." :
+          "Google address lookup is unavailable. Check Geocoding API access or retry."));
+      });
+    });
+    function applyGoogleAddress(result) {
+      const parts = result.address_components || [];
+      const part = (...types) => parts.find(p => types.some(type => p.types.includes(type)))?.long_name || "";
+      const country = parts.find(p => p.types.includes("country"));
+      if (country?.short_name && country.short_name !== "EG") throw new Error("Choose an address inside Egypt.");
+      const province = part("administrative_area_level_1");
+      const canonical = window.DartShippingAvailability?.canonical(province);
+      if (!canonical) throw new Error("Google could not identify the governorate. Choose a more precise street location.");
+      if (fields.governorate.value !== canonical) {
+        fields.governorate.value = canonical;
+        // Refresh coverage selectors, without clearing the new pin as a manual edit.
+        applyingAddress = true;
+        try { fields.governorate.dispatchEvent(new Event("change", { bubbles: true })); }
+        finally { applyingAddress = false; }
+      }
+      fields.country.value = "Egypt";
+      fields.area.value = part("sublocality_level_1", "sublocality", "neighborhood", "administrative_area_level_2", "locality");
+      fields.street.value = part("route");
+      const building = part("street_number", "premise");
+      if (building) fields.building.value = building;
+      googleAddress = String(result.formatted_address || addressString());
+      if (search) search.value = googleAddress;
+      form.dispatchEvent(new CustomEvent("dart:address-selected", { bubbles: true }));
+    }
+    let applyingAddress = false;
+    async function selectLocation(lat, lng, resolvedAddress = null) {
       clearPin();
       const selection = version;
       if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 21.5 || lat > 32.1 || lng < 24.5 || lng > 36.2) {
         setStatus("Choose a point inside Egypt.", "error"); return false;
       }
-      if (!window.DartShippingAvailability?.ready) {
-        setStatus("Delivery coverage is loading. Retry selecting the location.", "error"); return false;
+      if (!window.DartShippingAvailability?.ready || !geocoder) {
+        setStatus("Delivery coverage and Google Maps must finish loading. Retry selecting the location.", "error"); return false;
       }
-      const governorate = read(fields.governorate);
-      if (!governorate) { setStatus("Choose a governorate before selecting a pin.", "error"); return false; }
-      setStatus("Checking Google Maps location against Dart delivery coverage...", "loading");
+      setStatus("Looking up your Google address and checking delivery coverage...", "loading");
       try {
+        const result = resolvedAddress || await geocode({ location: { lat, lng } });
+        if (selection !== version) return false;
+        applyGoogleAddress(result);
+        const governorate = read(fields.governorate);
         const response = await fetch(apiBase() + "/api/v1/shipping/validate-point", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ governorate, latitude: lat, longitude: lng }),
-          cache: "no-store",
+          body: JSON.stringify({ governorate, latitude: lat, longitude: lng }), cache: "no-store",
         });
-        if (!response.ok) throw new Error("Location verification is unavailable.");
-        const result = await response.json();
+        if (!response.ok) throw new Error("Location verification is unavailable. Retry or complete the address manually.");
+        const validation = await response.json();
         if (selection !== version) return false;
-        if (result.valid !== true) {
-          setStatus("النقطة خارج المحافظة المختارة. اختر موقعًا داخل المحافظة.", "error"); return false;
-        }
+        if (validation.valid !== true) throw new Error("The selected point is outside the identified governorate. Choose a precise street location.");
         fields.latitude.value = lat.toFixed(7);
         fields.longitude.value = lng.toFixed(7);
         checked = true;
         form.dataset.dartAddressSource = "map";
         if (map) {
           if (marker) marker.setMap(null);
-          marker = new google.maps.Marker({ position: { lat, lng }, map, title: "Verified delivery point" });
-          map.panTo({ lat, lng });
+          marker = new google.maps.Marker({ position: { lat, lng }, map, draggable: true, title: "Delivery location — drag to adjust" });
+          marker.addListener("dragend", event => {
+            if (event.latLng) void selectLocation(event.latLng.lat(), event.latLng.lng());
+          });
+          map.panTo({ lat, lng }); map.setZoom(16);
         }
         refresh();
-        setStatus("Location confirmed. Complete your address and check delivery coverage.", "success");
+        setStatus("Location and Google address confirmed. Check building, floor and delivery coverage.", "success");
         return true;
-      } catch {
+      } catch (error) {
         if (selection === version) {
-          clearPin();
-          setStatus("تعذر تأكيد الدبوس حاليًا. يمكنك كتابة العنوان يدويًا.", "error");
+          clearPin(); refresh();
+          setStatus(error.message || "Location lookup failed. Retry or enter the address manually.", "error");
         }
         return false;
       }
     }
     async function googleLoader() {
-      if (window.google?.maps?.Map) return true;
-      const key = String(window.DART_GOOGLE_MAPS_BROWSER_KEY || "").trim();
-      if (!key) { errorMessage = "Google Maps key is not configured."; return false; }
-      return new Promise((resolve) => {
-        const callback = "__dartCheckoutGoogleReady";
-        let done = false;
-        const finish = ok => {
-          if (done) return; done = true;
-          clearTimeout(timer); delete window[callback];
-          resolve(Boolean(ok && window.google?.maps?.Map));
-        };
-        const timer = window.setTimeout(() => finish(false), 8000);
-        window[callback] = () => finish(true);
-        const priorFailure = window.gm_authFailure;
-        window.gm_authFailure = () => {
-          errorMessage = "Google Maps authentication failed. Check the key, enabled APIs, billing and website restrictions.";
-          finish(false);
-          if (typeof priorFailure === "function") priorFailure();
-        };
-        const script = document.createElement("script");
-        script.async = true;
-        script.referrerPolicy = "strict-origin-when-cross-origin";
-        script.src = "https://maps.googleapis.com/maps/api/js?" +
-          new URLSearchParams({ key, v: "weekly", loading: "async", callback });
-        script.onerror = () => finish(false);
-        document.head.appendChild(script);
-      });
+      // https://maps.googleapis.com/maps/api/js is loaded once by the shared Google loader.
+      const ok = await window.DartGoogleMaps?.loadMaps();
+      errorMessage = window.DartGoogleMaps?.errorMessage || "Google Maps could not load.";
+      return Boolean(ok);
     }
     async function showMap() {
       if (map) return;
@@ -190,6 +204,7 @@
         if (window.google.maps.Geocoder) geocoder = new google.maps.Geocoder();
         map.addListener("click", (event) => {
           const point = event.latLng;
+          userEdited = true;
           if (point) void selectLocation(point.lat(), point.lng());
         });
         if (pendingSavedPin) void selectLocation(pendingSavedPin.lat, pendingSavedPin.lng);
@@ -207,45 +222,62 @@
       attributes: true, attributeFilter: ["style", "class", "hidden"],
     });
     button?.addEventListener("click", async () => {
+      userEdited = true;
+      const requestId = ++searchVersion;
+      clearPin();
+      const selection = version;
       await showMap();
       if (!geocoder || !map) {
         setStatus("Google search is unavailable. Enter the address manually.", "error"); return;
       }
       const query = read(search) || addressString();
       if (!query) return;
-      geocoder.geocode({ address: query + ", Egypt", componentRestrictions: { country: "EG" } },
-        (results, resultStatus) => {
-          if (resultStatus !== "OK" || !results?.[0]?.geometry?.location) {
-            setStatus("Google could not find that address. Select the pin manually.", "error"); return;
-          }
-          const point = results[0].geometry.location;
-          map.setCenter(point); map.setZoom(16);
-          void selectLocation(point.lat(), point.lng());
-        });
+      setStatus("Searching Google Maps...", "loading");
+      try {
+        const result = await geocode({ address: query, componentRestrictions: { country: "EG" } });
+        if (requestId !== searchVersion || selection !== version) return;
+        const point = result.geometry?.location;
+        if (!point) throw new Error("Google could not locate that address.");
+        void selectLocation(point.lat(), point.lng(), result);
+      } catch (error) {
+        if (requestId === searchVersion && selection === version) setStatus(error.message, "error");
+      }
     });
     search?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") { event.preventDefault(); button?.click(); }
     });
     get("dart-google-current-location")?.addEventListener("click", async () => {
+      userEdited = true;
+      const gpsRequest = ++gpsVersion;
+      clearPin();
+      const selection = version;
       await showMap();
       if (!map) return;
       if (!navigator.geolocation) {
         setStatus("GPS is unavailable. Select your location on the map.", "error"); return;
       }
+      setStatus("Finding your current location...", "loading");
       navigator.geolocation.getCurrentPosition(
-        pos => { void selectLocation(pos.coords.latitude, pos.coords.longitude); },
-        () => setStatus("Location permission denied. You can use manual address.", "error"),
+        pos => { if (gpsRequest === gpsVersion && selection === version) void selectLocation(pos.coords.latitude, pos.coords.longitude); },
+        () => { if (gpsRequest === gpsVersion && selection === version) setStatus("Location permission denied or GPS unavailable. Search for your address.", "error"); },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 },
       );
     });
+    document.addEventListener("dart:google-maps-error", event => {
+      clearPin(); map = null; geocoder = null;
+      panel.textContent = event.detail?.message || "Google Maps could not load.";
+      setStatus(panel.textContent, "error");
+    });
     form.addEventListener("input", (event) => {
+      if (applyingAddress) return;
       userEdited = true;
-      if (Object.values(fields).includes(event.target)) clearPin();
+      if (Object.values(fields).includes(event.target) || event.target === search) clearPin();
       refresh();
     });
     form.addEventListener("change", (event) => {
+      if (applyingAddress) return;
       userEdited = true;
-      if (Object.values(fields).includes(event.target) && event.target !== fields.fullAddress) clearPin();
+      if ((Object.values(fields).includes(event.target) && event.target !== fields.fullAddress) || ["city", "coverageArea"].includes(event.target?.name)) clearPin();
       refresh();
     });
     window.addEventListener("dart:saved-address-hydrated", (event) => restore(event.detail?.address));

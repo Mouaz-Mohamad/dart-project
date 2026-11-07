@@ -24,7 +24,7 @@ assert(dashboard.includes('"dart:orders-refresh-failed"'),
   "A failed secondary refresh must have an admin-facing error state");
 
 const checkoutSource = ui.slice(ui.indexOf("function initCartAndCheckoutEvents()"),
-  ui.indexOf("function initAddressMap()"));
+  ui.indexOf("function filterProductsByCategory("));
 let submitHandler;
 let checkoutCalls = 0;
 let rejectCheckout;

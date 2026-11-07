@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:2ded71a75462aae5d4eaea3898fcd13f9615e8515329775e15958b1221fb684e */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:b147a00f1ecb4b6c181df4ffd48b8e0273905172305e9f85834371352ac2e94d */
 (function () {
   "use strict";
 
@@ -450,6 +450,7 @@
   }
 
   function activeDartCard(user = currentUser(), requestedItems = 0) {
+    if (window.DartSiteSettings?.get?.().dartCardEnabled !== true) return null;
     if (!user?.customerId) return null;
     const quantity = Math.max(0, Math.trunc(Number(requestedItems) || 0));
     return (
@@ -639,7 +640,7 @@
   async function joinWaiting(modelId, size, color) {
     const payload = await apiRequest("/api/v1/me/waiting", {
       method: "POST",
-      body: { modelId, size, color },
+      body: { modelId, size, color, whatsappRestockOptIn: true },
     });
     await hydrateWaiting(true);
     return payload.entry;
@@ -2567,6 +2568,10 @@
   let publicLeaderboardFailed = false;
 
   async function hydratePublicLeaderboard() {
+    if (window.DartSiteSettings?.get?.().dartCardEnabled !== true) {
+      publicLeaderboardRows = [];
+      return [];
+    }
     if (!API_BASE || publicLeaderboardLoading) return publicLeaderboardRows || [];
     publicLeaderboardLoading = true;
     try {
@@ -2591,6 +2596,7 @@
   }
 
   function renderLeaderboard() {
+    if (window.DartSiteSettings?.get?.().dartCardEnabled !== true) return;
     const list = document.querySelector(".leaderboard-list");
     if (!list) return;
 

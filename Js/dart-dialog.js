@@ -121,9 +121,15 @@
     if (input) card.appendChild(input);
     card.appendChild(actions);
     layer.appendChild(card);
-    document.body.appendChild(layer);
+    // Native modal dialogs make body siblings inert; keep confirmation inside the active dialog.
+    const parentDialog = document.querySelector("dialog[open]");
+    (parentDialog || document.body).appendChild(layer);
+    const onParentClose = () => finish(mode === "confirm" ? false : mode === "prompt" ? null : true);
+    parentDialog?.addEventListener("close", onParentClose, { once: true });
 
     function finish(value) {
+      if (!layer.isConnected) return;
+      parentDialog?.removeEventListener("close", onParentClose);
       document.removeEventListener("keydown", onKeyDown, true);
       layer.remove();
       const resolve = active?.resolve;
