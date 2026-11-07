@@ -164,6 +164,25 @@ describe("durable WhatsApp automations and receipts", () => {
        WHERE aggregate_type='waitlist' AND event_type='WAITLIST_WHATSAPP_RESTOCK' AND aggregate_id=$1`,[entry.id]);
     return {...buyer,entry,itemId,event:rows.rows[0]||null};
   }
+  it("keeps Waiting available when WhatsApp is requested but the account has no primary phone",async()=>{
+    const buyer=await customer();
+    await store.pool.query("DELETE FROM account_phones WHERE user_id=$1",[buyer.id]);
+    const modelId="restock-no-phone-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Unstocked model','[{"name":"M","active":true}]','[{"name":"Burgundy","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{
+      modelId,size:"M",color:"Burgundy",whatsappRestockOptIn:true,
+    },randomUUID());
+    expect(entry.status).toBe("waiting");
+    const saved=(await store.pool.query(
+      "SELECT whatsapp_restock_opt_in_at,whatsapp_restock_phone_normalized FROM waitlist_entries WHERE id=$1",
+      [entry.id])).rows[0];
+    expect(saved).toMatchObject({
+      whatsapp_restock_opt_in_at:null,whatsapp_restock_phone_normalized:null,
+    });
+  });
   it("queues a single Marketing restock only after explicit consent for the exact item",async()=>{
     const without=await restockFixture(false);
     expect(without.event).toBeNull();

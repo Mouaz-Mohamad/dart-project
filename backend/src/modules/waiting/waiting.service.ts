@@ -180,7 +180,8 @@ export class WaitingService {
         );
       }
 
-      // Consent is specific to this Waiting request and bound to the existing primary account phone.
+      // The Waiting button clearly discloses the Dart WhatsApp restock message.
+      // Only a known primary phone can be bound to that customer request.
       let restockPhone: string | null = null;
       if (input.whatsappRestockOptIn === true) {
         const phone = await client.query<{phone_normalized:string}>(
@@ -189,8 +190,8 @@ export class WaitingService {
            LIMIT 1 FOR SHARE`, [customerUserId],
         );
         restockPhone = phone.rows[0]?.phone_normalized || null;
-        if (!restockPhone) throw new AppError(422,"WAITING_WHATSAPP_PHONE_REQUIRED",
-          "Add a primary account phone before enabling WhatsApp Waiting notifications");
+        // Missing phone must never block Waiting: email and in-site alerts still work.
+        // No WhatsApp notification will be queued without a bound phone.
       }
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO waitlist_entries (

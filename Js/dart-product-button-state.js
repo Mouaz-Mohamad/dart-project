@@ -69,20 +69,10 @@
     });
     const buy = $("modalBuyBtn");
     const waiting = $("modalWaitBtn");
-    let consent = $("dartRestockWhatsappConsent");
-    if (waiting && !consent && root.document?.createElement) {
-      consent = root.document.createElement("label");
-      consent.id = "dartRestockWhatsappConsent";
-      consent.dir = "rtl";
-      consent.style.cssText = "display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px;line-height:1.5;cursor:pointer";
-      const check = root.document.createElement("input");
-      check.type = "checkbox";
-      check.id = "dartRestockWhatsappOptIn";
-      check.checked = false;
-      consent.append(check, root.document.createTextNode("ابعتلي على واتساب لما القطعة ترجع (إشعار تسويقي اختياري)"));
-      waiting.insertAdjacentElement("beforebegin", consent);
-    }
-    if (consent) consent.style.display = state.showWaiting ? "flex" : "none";
+    // A Waiting request explicitly asks Dart for an availability message.
+    // The adjacent product-modal disclosure names the brand and WhatsApp channel.
+    const whatsappDisclosure = $("dartRestockWhatsAppDisclosure");
+    if (whatsappDisclosure) whatsappDisclosure.hidden = !state.showWaiting;
     const reserved =
       state.showWaiting &&
       key(item, selectedSizeValue, selectedColorValue) === reservedKey;
@@ -292,26 +282,17 @@
     waitingBusy = true;
     sync();
     try {
-      const wantsWhatsApp = $("dartRestockWhatsappOptIn")?.checked === true;
-      if (wantsWhatsApp) {
-        if (!root.DartPlatform?.apiRequest) throw new Error("WhatsApp Waiting enrollment is unavailable");
-        await root.DartPlatform.apiRequest("/api/v1/me/waiting", {
-          method: "POST",
-          body: {
-            modelId: String(item.id), size: String(selectedSizeValue),
-            color: String(selectedColorValue), whatsappRestockOptIn: true,
-          },
-        });
-        await root.DartPlatform.hydrateWaiting?.(true);
-        const checkbox = $("dartRestockWhatsappOptIn");
-        if (checkbox) checkbox.checked = false;
-      } else {
-        await root.DartPlatform.joinWaiting(
-          String(item.id),
-          String(selectedSizeValue),
-          String(selectedColorValue),
-        );
-      }
+      if (!root.DartPlatform?.apiRequest) throw new Error("Waiting service is unavailable");
+      await root.DartPlatform.apiRequest("/api/v1/me/waiting", {
+        method: "POST",
+        body: {
+          modelId: String(item.id),
+          size: String(selectedSizeValue),
+          color: String(selectedColorValue),
+          whatsappRestockOptIn: true,
+        },
+      });
+      await root.DartPlatform.hydrateWaiting?.(true);
       reservedKey = key(item, selectedSizeValue, selectedColorValue);
       const message = `تم تسجيل حجز القطعة في Waiting: ${item.title} — المقاس: ${selectedSizeValue} — اللون: ${selectedColorValue}.`;
       status(message, "success");

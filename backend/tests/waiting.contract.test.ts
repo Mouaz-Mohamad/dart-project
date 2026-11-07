@@ -27,7 +27,12 @@ describe("Waiting restock reservation contract", () => {
     expect(sender).toContain("w.whatsapp_restock_phone_normalized=$3");
     expect(sender).toContain("w.status='reserved'");
     expect(routes).toContain("whatsappRestockOptIn");
-    expect(productActions).toContain("dartRestockWhatsappOptIn");
+    expect(productActions).toContain("whatsappRestockOptIn: true");
+    expect(productActions).not.toContain("dartRestockWhatsappOptIn");
+    expect(productModal).toContain("dartRestockWhatsAppDisclosure");
+    expect(productModal).toContain("Dart | for you");
+    expect(productModal).toContain("واتساب");
+    expect(service).not.toContain("WAITING_WHATSAPP_PHONE_REQUIRED");
   });
 
   it("keeps Waiting separate from the normal 15-minute cart until customer confirmation", () => {
@@ -69,7 +74,7 @@ describe("Waiting restock reservation contract", () => {
   it("lets customers select unavailable variants and manage My Waiting", () => {
     expect(storefront).toContain("is-unavailable");
     expect(productModal).toContain("Notify me when available");
-    expect(productActions).toContain("DartPlatform.joinWaiting");
+    expect(productActions).toContain('apiRequest("/api/v1/me/waiting"');
     expect(platform).toContain("joinWaiting");
     expect(platform).toContain("cancelWaiting");
     expect(platform).toContain("confirmWaiting");

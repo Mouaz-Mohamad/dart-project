@@ -104,6 +104,12 @@ async function expectAction(page, expected) {
     assert.equal(await buy.isVisible(), false);
     assert.equal(await waiting.isVisible(), true);
     assert.equal((await waiting.textContent()).trim(), "Notify me when available");
+    assert.equal(await page.locator("#dartRestockWhatsappConsent").count(), 0);
+    assert.equal(await page.locator("#dartRestockWhatsappOptIn").count(), 0);
+    assert.equal(await page.locator("#dartRestockWhatsAppDisclosure").isVisible(), true);
+    const notice = await page.locator("#dartRestockWhatsAppDisclosure").textContent();
+    assert.match(notice, /Dart \| for you/);
+    assert.match(notice, /واتساب/);
   }
 }
 
