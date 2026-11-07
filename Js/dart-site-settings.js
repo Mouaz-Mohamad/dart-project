@@ -189,15 +189,10 @@
     syncTimer = 0;
     if (!serverVersion) await hydrate(true);
     const normalized = merge(value);
-    const requestOptions = {
+    const payload = await (root.DartAdminApi?.request || api)("/api/v1/admin/site-settings", {
       method: "PUT",
       body: { expectedVersion: serverVersion, settings: normalized },
-    };
-    // Use the existing Staff auth client: it retains a current CSRF token in
-    // memory when the API cookie is scoped to a different host.
-    const payload = root.DartAdminApi?.request
-      ? await root.DartAdminApi.request("/api/v1/admin/site-settings", requestOptions)
-      : await api("/api/v1/admin/site-settings", requestOptions);
+    });
     serverVersion = Number(payload.version || serverVersion);
     return setCache(payload.settings || normalized);
   }
