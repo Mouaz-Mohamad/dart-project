@@ -181,6 +181,8 @@ fs.writeFileSync(
   'utf8',
 );
 
+require('./check-google-setup.cjs');
+
 const cssBytesSaved = minifyStylesheets(OUTPUT_DIR);
 const inlined = inlineSharedShell();
 const versionedReferences = versionHtmlAssets();
