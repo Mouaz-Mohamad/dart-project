@@ -661,6 +661,8 @@
   }
 
   function renderDeliveryMaps(orders) {
+    // Google renders independently even if the legacy Leaflet CDN is unavailable.
+    void window.DartGoogleMaps?.attachRepresentatives?.(orders);
     if (typeof window.L === "undefined") return;
     document.querySelectorAll("[data-rep-live-map]").forEach((element) => {
       const order = orders.find(
@@ -725,7 +727,6 @@
       }
       window.setTimeout(() => map.invalidateSize(), 80);
     });
-    void window.DartGoogleMaps?.attachRepresentatives?.(orders);
   }
 
   async function refreshDeliveryRoadRoute(entry, location, force = false) {
@@ -1714,6 +1715,8 @@
     distanceKm,
     deliveryProximity,
     googleMapsRoute,
+    // Called after the alternate Leaflet CDN recovers; re-render from current work.
+    renderOrders: () => { lastOrderRenderSignature = ""; renderOrders(); },
     startReturnPickup,
     cancelReturnPickup,
     completeReturnPickup,
