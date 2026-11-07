@@ -522,6 +522,7 @@ export class SocialAuthService {
     userId: string;
     email: string;
     birthday: string | null;
+    linked: boolean;
   } | null> {
     const linked = await this.pool.query<{
       user_id: string;
@@ -542,6 +543,7 @@ export class SocialAuthService {
         userId: linked.rows[0].user_id,
         email: linked.rows[0].email,
         birthday: linked.rows[0].birthday,
+        linked: true,
       };
     }
     const byEmail = await this.pool.query<{
@@ -560,6 +562,7 @@ export class SocialAuthService {
           userId: byEmail.rows[0].user_id,
           email: byEmail.rows[0].email,
           birthday: byEmail.rows[0].birthday,
+          linked: false,
         }
       : null;
   }
@@ -576,6 +579,8 @@ export class SocialAuthService {
       accountExists: Boolean(existing),
       phoneRequired: !existing,
       birthdayAlreadySaved: Boolean(existing?.birthday),
+      passwordRequired: Boolean(existing && !existing.linked),
+      birthdayRequired: !existing?.birthday,
       next: row.next_destination,
       expiresAt: row.expires_at.toISOString(),
     };
@@ -622,23 +627,15 @@ export class SocialAuthService {
   public async complete(
     input: {
       token: string;
-      password: string;
-      confirmation: string;
-      birthday: string;
+      password?: string | undefined;
+      confirmation?: string | undefined;
+      birthday?: string | undefined;
       name?: string | undefined;
       phone1?: string | undefined;
       phone2?: string | undefined;
     },
     metadata: RequestMetadata,
   ): Promise<IssuedSession> {
-    if (input.password !== input.confirmation) {
-      throw new AppError(
-        422,
-        "PASSWORD_CONFIRMATION_MISMATCH",
-        "Passwords do not match",
-      );
-    }
-    customerPasswordOrThrow(input.password);
     const row = await this.challengeRow(input.token);
     if (
       !row.provider_subject ||
@@ -682,13 +679,21 @@ export class SocialAuthService {
       let session: IssuedSession;
       let newlyRegistered = false;
       if (existing) {
-        session = await this.identity.login(
-          "customer",
-          existing.email,
-          input.password,
-          metadata,
-        );
+        if (existing.linked) {
+          session = await this.identity.loginLinkedSocialCustomer(existing.userId, metadata);
+        } else {
+          // Never link an existing Dart account to Google by matching email alone.
+          // The original Dart password must be verified once before linking.
+          if (!input.password || input.password !== input.confirmation) {
+            throw new AppError(422, "PASSWORD_REQUIRED_FOR_LINKING",
+              "Enter your existing Dart account password to link Google");
+          }
+          session = await this.identity.login("customer", existing.email, input.password, metadata);
+        }
         if (!existing.birthday) {
+          if (!input.birthday) {
+            throw new AppError(422, "BIRTHDAY_REQUIRED", "Birthday is required");
+          }
           await client.query(
             `UPDATE customers SET birthday=$2::date,updated_at=now() WHERE user_id=$1`,
             [existing.userId, input.birthday],
@@ -706,6 +711,13 @@ export class SocialAuthService {
             "Name and primary phone are required for a new social account",
           );
         }
+        if (!input.birthday) {
+          throw new AppError(422, "BIRTHDAY_REQUIRED", "Birthday is required");
+        }
+        // Brand-new Google customers do not have to invent a second password.
+        // A random unguessable credential preserves legacy password_hash constraints;
+        // they can set their own password later through verified email recovery.
+        const generatedPassword = randomToken(32);
         session = await this.identity.registerCustomer(
           {
             name,
@@ -715,7 +727,7 @@ export class SocialAuthService {
               ? { phone2: input.phone2.trim() }
               : {}),
             birthday: input.birthday,
-            password: input.password,
+            password: generatedPassword,
           },
           metadata,
         );
