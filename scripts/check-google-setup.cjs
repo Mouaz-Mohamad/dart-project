@@ -35,12 +35,13 @@ present(social, 'claimGuestCartAfterAuth', 'guest cart recovery');
 present(googleCheckout, 'dart:checkout-address-ready', 'Google checkout validation bridge');
 present(courier, 'dart:rep-road-route', 'real road path bridge');
 present(maps, 'window.DART_GOOGLE_MAPS_BROWSER_KEY', 'browser map configuration');
-present(maps, 'dart:address-selected', 'checkout point updates');
+present(maps, 'dart:rep-road-route', 'courier polyline integration');
 present(maps, 'destroyRepresentatives', 'delivery map disposal');
 present(maps, 'gm_authFailure', 'visible Google Maps key error handling');
-present(maps, 'recoverLeaflet()', 'independent backup map source');
+assert.ok(!/leaflet|openstreetmap|nominatim/i.test(maps),
+  'Courier Google map must not load old third-party tiles');
 present(courier, 'void window.DartGoogleMaps?.attachRepresentatives?.(orders);', 'Google courier map called before legacy Leaflet guard');
-present(courier, 'renderOrders: () => { lastOrderRenderSignature = ""; renderOrders(); }', 'courier fallback map re-initialization');
+present(courier, 'addressSource', 'manual destination handling');
 present(csp, 'https://maps.googleapis.com', 'Google Maps CSP');
 present(csp, 'https://maps.gstatic.com', 'Google assets CSP');
 assert.match(config, /^window\.DART_GOOGLE_MAPS_BROWSER_KEY = "(?:AIza[0-9A-Za-z_-]{30,})?";\n$/,

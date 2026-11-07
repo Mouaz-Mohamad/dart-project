@@ -125,17 +125,14 @@
     const destinationLng = Number(order?.longitude);
     const courierLat = Number(order?.courierLocation?.lat);
     const courierLng = Number(order?.courierLocation?.lng);
-    if (
-      ![destinationLat, destinationLng, courierLat, courierLng].every(
-        Number.isFinite,
-      ) ||
-      !destinationLat ||
-      !destinationLng
-    ) {
-      return {
-        ok: false,
-        reason: "Waiting for a precise representative location.",
-      };
+    if (!Number.isFinite(courierLat) || !Number.isFinite(courierLng) ||
+        !courierLat || !courierLng) {
+      return { ok: false, reason: "Waiting for a precise representative location." };
+    }
+    const hasDestination = Number.isFinite(destinationLat) && Number.isFinite(destinationLng) &&
+      destinationLat !== 0 && destinationLng !== 0;
+    if (!hasDestination && order?.addressSource !== "manual") {
+      return { ok: false, reason: "Customer destination coordinates are missing." };
     }
     const updatedAt = Date.parse(order?.courierLocation?.updatedAt || 0);
     if (!updatedAt || Date.now() - updatedAt > LOCATION_MAX_AGE_MS) {
@@ -144,6 +141,10 @@
         reason:
           "Your location must be refreshed before delivery can be confirmed.",
       };
+    }
+    if (!hasDestination) {
+      return { ok: true, manual: true,
+        reason: "Manual address: no verified customer pin. Confirm delivery in person before marking Delivered." };
     }
     const distance = distanceKm(
       courierLat,
@@ -652,93 +653,42 @@
   }
 
 
+  // Google Maps is the only embedded map provider. Do not load Leaflet.
   function clearDeliveryMaps() {
     window.DartGoogleMaps?.destroyRepresentatives?.();
-    for (const entry of deliveryMaps.values()) {
-      try { entry.map.remove(); } catch {}
-    }
     deliveryMaps.clear();
   }
 
   function renderDeliveryMaps(orders) {
-    // Google renders independently even if the legacy Leaflet CDN is unavailable.
-    void window.DartGoogleMaps?.attachRepresentatives?.(orders);
-    if (typeof window.L === "undefined") return;
-    document.querySelectorAll("[data-rep-live-map]").forEach((element) => {
-      const order = orders.find(
-        (row) => String(row.id) === String(element.dataset.orderId),
-      );
-      if (!order) return;
-      const destinationLat = Number(order.latitude);
-      const destinationLng = Number(order.longitude);
-      if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) {
-        element.replaceChildren();
-        element.textContent = "Customer map location is unavailable.";
-        return;
-      }
+    for (const order of orders) {
+      const el = [...document.querySelectorAll("[data-rep-live-map]")]
+        .find(node => String(node.dataset.orderId) === String(order.id));
+      if (!el) continue;
+      const lat = Number(order.latitude), lng = Number(order.longitude);
+      const destination = order.latitude !== "" && order.longitude !== "" &&
+        Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0
+          ? { lat, lng } : null;
+      const entry = { orderId: String(order.id), destination,
+        lastRoadRouteAt: 0, roadRouteRequestId: 0 };
+      deliveryMaps.set(entry.orderId, entry);
       const courier = order.courierLocation || latestApiLocation;
-      const courierLat = Number(courier?.lat);
-      const courierLng = Number(courier?.lng);
-      const map = window.L.map(element, {
-        attributionControl: true,
-        zoomControl: false,
-      }).setView([destinationLat, destinationLng], 15);
-      map.attributionControl?.setPrefix(false);
-      window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4571_1_f3f5f58e8a8808e98e8b6df9", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-      }).addTo(map);
-      const destinationMarker = window.L.marker([destinationLat, destinationLng])
-        .addTo(map)
-        .bindPopup("Customer");
-      let courierMarker = null;
-      let route = null;
-      if (Number.isFinite(courierLat) && Number.isFinite(courierLng)) {
-        courierMarker = window.L.marker([courierLat, courierLng])
-          .addTo(map)
-          .bindPopup("You");
-        route = window.L.polyline([], {
-          color: "#8c1d2c",
-          weight: 4,
-          opacity: 0.82,
-        }).addTo(map);
-        map.fitBounds(
-          [[courierLat, courierLng], [destinationLat, destinationLng]],
-          { padding: [28, 28], maxZoom: 16 },
-        );
-      } else {
-        destinationMarker.openPopup();
+      if (destination && courier && Number.isFinite(Number(courier.lat)) &&
+          Number.isFinite(Number(courier.lng))) {
+        void refreshDeliveryRoadRoute(entry, courier, true);
       }
-      deliveryMaps.set(String(order.id), {
-        orderId: String(order.id),
-        map,
-        destinationMarker,
-        courierMarker,
-        route,
-        lastRoadRouteAt: 0,
-        roadRouteRequestId: 0,
-      });
-      if (courierMarker) {
-        void refreshDeliveryRoadRoute(
-          deliveryMaps.get(String(order.id)),
-          { lat: courierLat, lng: courierLng },
-          true,
-        );
-      }
-      window.setTimeout(() => map.invalidateSize(), 80);
-    });
+    }
+    void window.DartGoogleMaps?.attachRepresentatives?.(orders);
   }
 
   async function refreshDeliveryRoadRoute(entry, location, force = false) {
-    if (!entry?.route || !entry.destinationMarker || !location) return;
-    const destination = entry.destinationMarker.getLatLng?.();
-    if (!destination) return;
+    if (!entry?.destination || !location) return;
+    const destination = entry.destination;
     const now = Date.now();
     if (!force && now - Number(entry.lastRoadRouteAt || 0) < ROAD_ROUTE_REFRESH_MS) return;
     entry.lastRoadRouteAt = now;
     const requestId = Number(entry.roadRouteRequestId || 0) + 1;
     entry.roadRouteRequestId = requestId;
-    const points = `${Number(location.lng)},${Number(location.lat)};${Number(destination.lng)},${Number(destination.lat)}`;
+    const points = `${Number(location.lng)},${Number(location.lat)};${destination.lng},${destination.lat}`;
     let timeout = null;
     try {
       const controller = new AbortController();
@@ -753,44 +703,23 @@
       if (!Array.isArray(raw) || raw.length < 2 || entry.roadRouteRequestId !== requestId) return;
       const geometry = raw.map(([lng, lat]) => [Number(lat), Number(lng)]);
       if (geometry.some(([lat, lng]) => !Number.isFinite(lat) || !Number.isFinite(lng))) return;
-      entry.route.setLatLngs(geometry);
       document.dispatchEvent(new CustomEvent("dart:rep-road-route", {
         detail: { orderId: entry.orderId, geometry },
       }));
     } catch {
-      if (entry.roadRouteRequestId !== requestId) return;
-      // Keep the last valid road geometry visible while the routing provider recovers.
-      // Pins remain authoritative and no fake straight fallback is drawn.
+      // Keep the last Google polyline if the external route provider is unavailable.
     } finally {
       if (timeout) clearTimeout(timeout);
     }
   }
 
   function updateDeliveryMapsLocation(location) {
-    const courierLat = Number(location?.lat);
-    const courierLng = Number(location?.lng);
-    if (!Number.isFinite(courierLat) || !Number.isFinite(courierLng)) return;
-
-    for (const entry of deliveryMaps.values()) {
-      const destination = entry.destinationMarker?.getLatLng?.();
-      if (!destination) continue;
-      if (!entry.courierMarker) {
-        entry.courierMarker = window.L.marker([courierLat, courierLng])
-          .addTo(entry.map)
-          .bindPopup("You");
-      } else {
-        entry.courierMarker.setLatLng([courierLat, courierLng]);
-      }
-      if (!entry.route) {
-        entry.route = window.L.polyline([], {
-          color: "#8c1d2c",
-          weight: 4,
-          opacity: 0.82,
-        }).addTo(entry.map);
-      }
-      void refreshDeliveryRoadRoute(entry, { lat: courierLat, lng: courierLng });
-    }
+    const lat = Number(location?.lat), lng = Number(location?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
+    for (const entry of deliveryMaps.values()) {
+      if (entry.destination) void refreshDeliveryRoadRoute(entry, location);
+    }
   }
 
   function renderOrders() {
@@ -829,6 +758,7 @@
       Number(order.suggestedSequence || 0),
       String(order.latitude || ""),
       String(order.longitude || ""),
+      String(order.addressSource || ""),
     ]));
     activeOrderIds.clear();
     orders
@@ -1632,7 +1562,10 @@
             )
               throw new Error("Start delivery before confirming it.");
             if (!proximity.ok) throw new Error(proximity.reason);
-            if (!await window.DartDialog.confirm(`Mark ${freshOrder.orderId} as delivered and paid?`))
+            const confirmation = proximity.manual
+              ? `Manual address has no verified customer pin. Have you physically delivered ${freshOrder.orderId} and collected the payment?`
+              : `Mark ${freshOrder.orderId} as delivered and paid?`;
+            if (!await window.DartDialog.confirm(confirmation))
               return;
             await updateOrderStatus(freshOrder.id, "Delivered");
             renderOrders();

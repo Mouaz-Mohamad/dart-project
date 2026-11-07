@@ -50,7 +50,8 @@
     "settings-and-groups-unit.js",
     "settings-reset-unit.js",
     "source-layout-contract.cjs",
-    "test-inventory-contract.cjs"
+    "test-inventory-contract.cjs",
+    "rep-google-contract.cjs"
   ],
   "ciBrowser": [
     "brand-details-browser.cjs",
