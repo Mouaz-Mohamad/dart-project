@@ -15,7 +15,7 @@ Keep website restrictions enabled. Enable Maps JavaScript API, Geocoding API and
 ## Changed behavior
 
 - Checkout shares the Google loader with the courier map, searches written addresses with Google Geocoder, reverse-geocodes selected/GPS/dragged pins and updates governorate, district, street and formatted address. Building and floor still require customer review. Server point validation and shipping coverage remain authoritative.
-- Old search, GPS and pin-validation results cannot replace a newer selection. Manual edits invalidate the verified pin. Network/authentication failures leave a usable manual-address form and a visible error.
+- Old search, GPS and pin-validation results cannot replace a newer selection. Manual street/governorate edits invalidate the verified pin. Building/floor edits and coverage labels preserve it; these details supplement rather than move the physical location. Network/authentication failures leave a usable manual-address form and a visible error.
 - Start delivery opens a native full-screen dialog. Its map occupies 70% of the viewport, with directions above and actions below. The old card-sized map is removed. Exit closes the dialog without changing delivery status; Open navigation reopens it.
 - Google Routes supplies road geometry and turn instructions. GPS updates move the courier and update instructions locally. Route requests are throttled, skipped while stationary/closed, and retried explicitly after failures. Sound is an optional browser speech toggle; it is not Google's native Navigation SDK voice.
 - The Delivered button updates as accepted GPS readings change and is shown inside the modal only within 1 km of a known customer pin. Confirmation explicitly asks whether the customer received the order and the displayed cash amount was collected. The existing authenticated backend rechecks distance, state and ownership before marking delivery/payment.
@@ -57,3 +57,7 @@ The build refreshed previously stale generated CSS/JS from their checked-in cano
 1. Open checkout with an existing cart. Search an Egyptian street; inspect the pin, governorate, district and street. Tap another point, drag it, and use GPS. Verify building/floor and shipping coverage before placing any real order.
 2. For an assigned test order, Start delivery. Verify full-screen layout, turn banner, road path and optional sound. Exit and reopen; status must remain On The Way.
 3. With fresh GPS outside 1 km, Delivered stays hidden. Within 1 km it appears. Cancel confirmation first; then confirm actual physical receipt and collection only when a real delivery occurs.
+
+## Post-deployment CI observations
+
+Vercel production succeeded and served all four reviewed JavaScript files byte-for-byte; frontend/API health checks returned 200. GitHub static checks and the new Google browser test passed. The broader browser job stopped in the existing Products navigation/history scenario; backend checks stopped on the pre-existing unused `customerPasswordOrThrow` helper in social-auth.service.ts (not modified here). These unrelated checks are not represented as passing.

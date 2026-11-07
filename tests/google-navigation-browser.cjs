@@ -54,6 +54,11 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator("#street-input").inputValue(),"Test street");
     assert.equal(await page.locator("#area-input").inputValue(),"Test district");
     assert.equal(await page.locator("#lat-input").inputValue(),"30.0500000");
+    await page.locator("#checkout-building").fill("12");
+    await page.locator("#checkout-floor").fill("3");
+    assert.equal(await page.locator("#lat-input").inputValue(),"30.0500000","building/floor edits must preserve the chosen pin");
+    await page.evaluate(()=>{const field=document.getElementById("area-input");field.dataset.dartCoverageUpdate="1";field.value="Coverage district";field.dispatchEvent(new Event("input",{bubbles:true}));field.dispatchEvent(new Event("change",{bubbles:true}));delete field.dataset.dartCoverageUpdate});
+    assert.equal(await page.locator("#lat-input").inputValue(),"30.0500000","coverage selector labels supplement the verified pin");
     // A late address result cannot replace a newer pin or a manual edit.
     await page.evaluate(()=>{window.__delayGeocode=true});
     await page.locator("#address-input").fill("Old query");await page.locator("#dart-google-search").click();

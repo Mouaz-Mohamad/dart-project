@@ -116,7 +116,7 @@
       fields.area.value = part("sublocality_level_1", "sublocality", "neighborhood", "administrative_area_level_2", "locality");
       fields.street.value = part("route");
       const building = part("street_number", "premise");
-      if (building) fields.building.value = building;
+      if (building && !read(fields.building)) fields.building.value = building;
       googleAddress = String(result.formatted_address || addressString());
       if (search) search.value = googleAddress;
       form.dispatchEvent(new CustomEvent("dart:address-selected", { bubbles: true }));
@@ -271,13 +271,13 @@
     form.addEventListener("input", (event) => {
       if (applyingAddress) return;
       userEdited = true;
-      if (Object.values(fields).includes(event.target) || event.target === search) clearPin();
+      if ((Object.values(fields).includes(event.target) && ![fields.building, fields.floor].includes(event.target) && event.target.dataset.dartCoverageUpdate !== "1") || event.target === search) clearPin();
       refresh();
     });
     form.addEventListener("change", (event) => {
       if (applyingAddress) return;
       userEdited = true;
-      if ((Object.values(fields).includes(event.target) && event.target !== fields.fullAddress) || ["city", "coverageArea"].includes(event.target?.name)) clearPin();
+      if (Object.values(fields).includes(event.target) && ![fields.fullAddress, fields.building, fields.floor].includes(event.target) && event.target.dataset.dartCoverageUpdate !== "1") clearPin();
       refresh();
     });
     window.addEventListener("dart:saved-address-hydrated", (event) => restore(event.detail?.address));

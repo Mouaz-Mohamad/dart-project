@@ -158,9 +158,12 @@ if(!selected)return;
 const zone=selected.areas.find(x=>x.id===district.value);
 const next=selected.en+(zone?", "+zone.en:"");
 area.value=next;
-// A new manual address never inherits coordinates from an old verified pin.
+// Coverage labels supplement a pin; they do not move the physical location.
+area.dataset.dartCoverageUpdate="1";
+try{
 area.dispatchEvent(new Event("input",{bubbles:true}));
 area.dispatchEvent(new Event("change",{bubbles:true}));
+}finally{delete area.dataset.dartCoverageUpdate;}
 }
 governorate.addEventListener("change",()=>{city.value="";district.value="";search.value="";renderCities()});
 search.addEventListener("input",renderCities);
