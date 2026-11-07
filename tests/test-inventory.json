@@ -18,6 +18,7 @@
     "custom-domain-runtime.cjs",
     "customer-account-runtime.cjs",
     "customer-notifications-runtime.cjs",
+    "dart-card-toggle-contract.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",
     "database-authoritative-storage.cjs",
