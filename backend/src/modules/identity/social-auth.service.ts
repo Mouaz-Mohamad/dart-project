@@ -735,6 +735,7 @@ export class SocialAuthService {
           userId: session.account.userId,
           email: current.provider_email!,
           birthday: input.birthday,
+          linked: true,
         };
         newlyRegistered = true;
       }
