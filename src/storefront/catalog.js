@@ -85,14 +85,14 @@
   async function api(path, options = {}) {
     if (!API_BASE) throw new Error("Catalogue API is not configured.");
     const method = String(options.method || "GET").toUpperCase();
-    const csrf =
-      csrfMemory ||
-      document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("dart_csrf="))
-        ?.split("=")
-        .slice(1)
-        .join("=");
+    // Staff and customer sessions have separate CSRF tokens. Never take a
+    // customer's token when writing staff-owned catalogue / inventory data.
+    const csrfCookieName = IS_ADMIN ? "dart_staff_csrf" : "dart_csrf";
+    const cookieCsrf = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(csrfCookieName + "="))
+      ?.slice(csrfCookieName.length + 1);
+    const csrf = cookieCsrf || (!IS_ADMIN ? csrfMemory : "");
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
       method,
