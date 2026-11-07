@@ -45,6 +45,9 @@
       fields.longitude.value = "";
       form.dataset.dartAddressSource = "manual";
       if (marker) { marker.setMap(null); marker = null; }
+      // A form edit supersedes an in-flight pin check: never leave submit locked.
+      if (form.dataset.dartAddressState === "loading")
+        setStatus("Location changed. Choose a new pin or use the manual address.", "ready");
     }
     function validate() {
       if (form.dataset.dartAddressState === "loading") return {

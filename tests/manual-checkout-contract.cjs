@@ -11,6 +11,8 @@ assert.match(source,/shipping\/validate-point/);
 assert.match(source,/dart:checkout-address-ready/);
 assert.match(source,/isAddressCovered/);
 assert.match(source,/isCurrentSnapshot/);
+assert.match(source,/if \(form\.dataset\.dartAddressState === "loading"\)/,
+  "changing the address must clear pending verification status");
 assert.match(source,/"manual"/);
 assert.doesNotMatch(source,/openstreetmap|leaflet|nominatim/i);
 new Function(source);
