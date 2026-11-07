@@ -3642,79 +3642,119 @@ button,
 
 /* Product discovery, size chart and consistent loading/empty/error states. */
 /* DART-CSS-PRODUCT-FILTERS | Products filters and size chart */
+/* The original inline filter stays in place; grid rows animate its full height. */
+.product-filter-toggle {
+  display: flex; align-items: center; gap: 12px;
+  width: min(1180px, calc(100% - 28px)); min-height: 56px;
+  margin: 18px auto 8px; padding: 10px 16px;
+  border: 1px solid rgba(171, 1, 43, 0.2); border-radius: 16px;
+  background: linear-gradient(110deg, #fffefd, #fdf6f7); color: #851333;
+  box-shadow: 0 7px 24px rgba(62, 24, 34, 0.065);
+  font-family: inherit; font-size: 15px; font-weight: 700; line-height: 1.35;
+  text-align: start; cursor: pointer;
+  transition: border-color .24s ease, box-shadow .24s ease, background-color .24s ease;
+}
+.product-filter-toggle > .fa-sliders {
+  display: grid; place-items: center; flex: 0 0 36px; height: 36px;
+  border-radius: 11px; background: rgba(171, 1, 43, 0.085); color: #ab012b;
+}
+.product-filter-toggle span { flex: 1; text-align: start; }
+.product-filter-toggle-arrow {
+  display: grid; place-items: center; flex: 0 0 32px; height: 32px;
+  border-radius: 50%; background: #f8eaed; color: #8b1531;
+  transition: transform .4s cubic-bezier(.22, 1, .36, 1), background-color .24s ease;
+}
+.product-filter-toggle[aria-expanded="true"] {
+  border-color: rgba(171, 1, 43, .34); background: #fffafa;
+  box-shadow: 0 9px 26px rgba(62, 24, 34, .09);
+}
+.product-filter-toggle[aria-expanded="true"] .product-filter-toggle-arrow {
+  transform: rotate(180deg); background: #f3dde3;
+}
+.product-filter-toggle:hover { border-color: rgba(171, 1, 43, .42); }
+.product-filter-toggle:focus-visible {
+  outline: 3px solid rgba(171, 1, 43, .27); outline-offset: 3px;
+}
 .product-filter-panel {
-  width: min(1180px, calc(100% - 28px));
-  margin: 18px auto 8px;
-  padding: 14px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  display: grid; grid-template-rows: 1fr;
+  width: min(1180px, calc(100% - 28px)); margin: 8px auto;
+  opacity: 1; transform: translateY(0);
+  transition: grid-template-rows .4s cubic-bezier(.22, 1, .36, 1),
+    opacity .28s ease, transform .4s cubic-bezier(.22, 1, .36, 1),
+    margin-block .4s ease;
 }
-.product-filter-search {
-  position: relative;
-  margin-bottom: 10px;
+.product-filter-panel.is-collapsed {
+  grid-template-rows: 0fr; margin-block: 0; opacity: 0;
+  transform: translateY(-9px); pointer-events: none;
 }
+.product-filter-panel[hidden] { display: none !important; }
+.product-filter-panel-reveal { min-height: 0; overflow: hidden; }
+.product-filter-panel-card {
+  padding: clamp(14px, 2vw, 22px); border: 1px solid #ebdbdf;
+  border-radius: 18px; background: #fffdfb;
+  box-shadow: 0 14px 34px rgba(54, 22, 31, .075);
+}
+.product-filter-search { position: relative; margin-bottom: 14px; }
 .product-filter-search i {
-  position: absolute;
-  inset-inline-start: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #6b7280;
-  pointer-events: none;
+  position: absolute; inset-inline-start: 16px; top: 50%;
+  transform: translateY(-50%); color: #ab012b; pointer-events: none;
 }
 .product-filter-search input {
-  width: 100%;
-  min-height: 46px;
-  padding: 10px 14px 10px 42px;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  background: #fff;
-  color: #111827;
-  font: inherit;
+  box-sizing: border-box; width: 100%; min-height: 50px; padding: 11px 16px;
+  padding-inline-start: 46px; border: 1px solid #e5d8d9; border-radius: 12px;
+  background: #fff; color: #282024; font: inherit;
+  transition: border-color .2s ease, box-shadow .2s ease;
 }
+.product-filter-search input::placeholder { color: #91858b; }
 .product-filter-selects {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
 }
-.product-filter-selects select,
-.clear-product-filters {
-  min-height: 40px;
-  padding: 8px 11px;
-  border: 1px solid #d1d5db;
-  border-radius: 9px;
-  background: #fff;
+.product-filter-selects select, .clear-product-filters {
+  min-height: 44px; padding: 9px 12px; border: 1px solid #e5d8d9;
+  border-radius: 11px; background-color: #fff; font: inherit; font-size: 14px;
+  transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
 }
 .product-filter-selects select {
-  color: #111827;
-}
-.product-filter-selects select,
-.clear-product-filters {
-  font: inherit;
-}
-.product-filter-selects select {
-  flex: 1 1 150px;
+  flex: 1 1 150px; min-width: 0; color: #32252b; cursor: pointer;
 }
 .clear-product-filters {
-  flex: 0 0 auto;
-  border-color: #8c1d2c;
-  color: #8c1d2c;
-  font-weight: 700;
-  cursor: pointer;
+  flex: 0 0 auto; padding-inline: 19px;
+  border-color: rgba(171, 1, 43, .24); background-color: #fdf1f3;
+  color: #9d173a; font-weight: 700; cursor: pointer;
 }
-.product-filter-search input:focus,
-.product-filter-selects select:focus,
-.clear-product-filters:focus-visible {
-  outline: 2px solid rgba(140, 29, 44, 0.28);
-  border-color: #8c1d2c;
+.clear-product-filters:hover {
+  background-color: #f8e5e9; border-color: rgba(171, 1, 43, .46);
+}
+.product-filter-search input:focus, .product-filter-selects select:focus,
+.clear-product-filters:focus-visible, .product-filter-panel .filter-btn:focus-visible {
+  outline: none; border-color: #ab012b;
+  box-shadow: 0 0 0 3px rgba(171, 1, 43, .12);
+}
+.product-filter-categories {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid #efe5e5;
+}
+.product-filter-categories > span {
+  display: block; margin-bottom: 8px;
+  color: #6d545c; font-size: 13px; font-weight: 700;
+}
+.product-filter-panel .filter-container {
+  width: 100%; margin: 0; padding: 5px 2px; gap: 8px;
+}
+.product-filter-panel .filter-btn {
+  min-height: 38px; padding: 8px 16px; border: 1px solid #e9d7dc;
+  border-radius: 999px; background: #fff; color: #68434e;
+  font: inherit; font-size: 13px; font-weight: 600;
+  transition: border-color .2s ease, background-color .2s ease, color .2s ease;
+}
+.product-filter-panel .filter-btn:hover { border-color: #ab012b; color: #ab012b; }
+.product-filter-panel .filter-btn.active {
+  border-color: #ab012b; background: #ab012b; color: #fff;
 }
 .product-results-count {
-  min-height: 18px;
-  margin: 9px 2px 0;
-  color: #6b7280;
-  font-size: 13px;
+  min-height: 18px; margin: 12px 2px 0; color: #796c73; font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-filter-panel, .product-filter-toggle, .product-filter-toggle-arrow { transition: none; }
 }
 
 .dart-ui-state {
@@ -4033,54 +4073,7 @@ button,
 /* DART V6 — requested interface corrections                                  */
 /* ========================================================================== */
 
-/* Products: keep the complete filter working while its panel is collapsed. */
-.product-filter-toggle {
-  width: min(92%, 1100px);
-  min-height: 46px;
-  margin: 18px auto 8px;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  border: 1px solid rgba(171, 1, 43, 0.32);
-  border-radius: 12px;
-  background: #fff;
-  color: #ab012b;
-  font: 700 15px/1.2 inherit;
-  cursor: pointer;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-}
-.product-filter-toggle span {
-  flex: 1;
-  text-align: start;
-}
-.product-filter-toggle-arrow {
-  transition: transform 0.2s ease;
-}
-.product-filter-toggle[aria-expanded="true"] .product-filter-toggle-arrow {
-  transform: rotate(180deg);
-}
-.product-filter-panel[hidden] {
-  display: none !important;
-}
-.product-filter-panel {
-  margin-top: 8px;
-}
-.product-filter-categories {
-  margin-top: 12px;
-}
-.product-filter-categories > span {
-  display: block;
-  margin-bottom: 7px;
-  color: #475569;
-  font-size: 13px;
-  font-weight: 700;
-}
-.product-filter-panel .filter-container {
-  width: 100%;
-  margin: 0;
-}
+/* Product filter appearance is consolidated in DART-CSS-PRODUCT-FILTERS. */
 
 /* Size Chart: the page stays fixed; only the measurement viewport scrolls. */
 .product-size-chart-dialog {

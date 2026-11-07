@@ -1486,11 +1486,47 @@ function initProductFilterToggle() {
     const panel = document.getElementById('productFiltersPanel');
     if (!button || !panel || button.dataset.bound === '1') return;
     button.dataset.bound = '1';
+    const label = button.querySelector('span');
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let closeTimer = null;
+    const hideWhenClosed = () => {
+        if (button.getAttribute('aria-expanded') === 'false' && panel.classList.contains('is-collapsed')) {
+            panel.hidden = true;
+        }
+    };
+    panel.addEventListener('transitionend', event => {
+        if (event.target !== panel || event.propertyName !== 'grid-template-rows') return;
+        window.clearTimeout(closeTimer);
+        closeTimer = null;
+        hideWhenClosed();
+    });
     button.addEventListener('click', () => {
-        panel.hidden = !panel.hidden;
-        button.setAttribute('aria-expanded', String(!panel.hidden));
-        const label = button.querySelector('span');
-        if (label) label.textContent = panel.hidden ? 'Filter products' : 'Hide filters';
+        const opening = button.getAttribute('aria-expanded') !== 'true';
+        window.clearTimeout(closeTimer);
+        closeTimer = null;
+        button.setAttribute('aria-expanded', String(opening));
+        if (label) label.textContent = opening ? 'Hide filters' : 'Filter products';
+        if (reducedMotion?.matches) {
+            panel.hidden = !opening;
+            panel.inert = !opening;
+            panel.classList.toggle('is-collapsed', !opening);
+            return;
+        }
+        if (opening) {
+            if (panel.hidden) {
+                panel.classList.add('is-collapsed');
+                panel.hidden = false;
+                // Force the initial 0fr track into layout before expanding.
+                void panel.offsetHeight;
+            }
+            panel.inert = false;
+            panel.classList.remove('is-collapsed');
+        } else {
+            panel.inert = true;
+            panel.classList.add('is-collapsed');
+            // Fallback when a background tab suppresses transitionend.
+            closeTimer = window.setTimeout(hideWhenClosed, 480);
+        }
     });
 }
 function renderFilterButtons() {
