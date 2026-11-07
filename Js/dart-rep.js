@@ -653,6 +653,7 @@
 
 
   function clearDeliveryMaps() {
+    window.DartGoogleMaps?.destroyRepresentatives?.();
     for (const entry of deliveryMaps.values()) {
       try { entry.map.remove(); } catch {}
     }
@@ -707,6 +708,7 @@
         destinationMarker.openPopup();
       }
       deliveryMaps.set(String(order.id), {
+        orderId: String(order.id),
         map,
         destinationMarker,
         courierMarker,
@@ -723,6 +725,7 @@
       }
       window.setTimeout(() => map.invalidateSize(), 80);
     });
+    void window.DartGoogleMaps?.attachRepresentatives?.(orders);
   }
 
   async function refreshDeliveryRoadRoute(entry, location, force = false) {
@@ -750,6 +753,9 @@
       const geometry = raw.map(([lng, lat]) => [Number(lat), Number(lng)]);
       if (geometry.some(([lat, lng]) => !Number.isFinite(lat) || !Number.isFinite(lng))) return;
       entry.route.setLatLngs(geometry);
+      document.dispatchEvent(new CustomEvent("dart:rep-road-route", {
+        detail: { orderId: entry.orderId, geometry },
+      }));
     } catch {
       if (entry.roadRouteRequestId !== requestId) return;
       // Keep the last valid road geometry visible while the routing provider recovers.
@@ -783,6 +789,7 @@
       }
       void refreshDeliveryRoadRoute(entry, { lat: courierLat, lng: courierLng });
     }
+    window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
   }
 
   function renderOrders() {
