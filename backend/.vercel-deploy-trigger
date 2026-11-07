@@ -1,4 +1,5 @@
-purpose=whatsapp-approved-birthday-review-templates
+purpose=approved-restock-whatsapp-template-activation
 triggered_at=2026-11-07
-source=vercel-production-env-activation
-expected_templates=birthday,share_your_experience_2
+source=production-template-environment-update
+template=dart_restock_available
+migration=0075_waitlist_whatsapp_restock.sql
