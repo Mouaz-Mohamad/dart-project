@@ -2307,6 +2307,19 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // Acquire the same per-representative route lock before locking an order row
+      // to avoid deadlocking a concurrent courier Start request.
+      const assignment = await client.query<{ representative_user_id: string | null }>(
+        `SELECT representative_user_id::text
+           FROM orders
+          WHERE (id::text=$1 OR order_code=$1)
+            AND NOT is_deleted AND NOT is_archived
+          LIMIT 1`, [orderRef],
+      );
+      if (assignment.rows[0]?.representative_user_id) {
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",
+          [`dart:representative-route:${assignment.rows[0].representative_user_id}`]);
+      }
       const orderResult = await client.query<{
         id: string;
         order_code: string;
@@ -2325,6 +2338,9 @@ export class CommerceService {
       const order = orderResult.rows[0];
       if (!order || !order.representative_user_id) {
         throw new AppError(404, "LIVE_ORDER_NOT_FOUND", "Assigned live order not found");
+      }
+      if (assignment.rows[0]?.representative_user_id !== order.representative_user_id) {
+        throw new AppError(409, "LIVE_ROUTE_ASSIGNMENT_CHANGED", "Order assignment changed. Refresh and retry.");
       }
       if (!["Out With Representative", "Representative On The Way"].includes(order.status)) {
         throw new AppError(409, "LIVE_ORDER_STATE_INVALID", "Only active assigned orders can change live route state");
@@ -2381,6 +2397,16 @@ export class CommerceService {
         );
       }
 
+      if (state === "current") {
+        await client.query(
+          `UPDATE delivery_route_stops
+              SET route_state='upcoming', updated_at=now()
+            WHERE representative_user_id=$1
+              AND route_state='current'
+              AND order_id<>$2::uuid`,
+          [order.representative_user_id, order.id],
+        );
+      }
       await client.query(
         `INSERT INTO delivery_route_stops (
            representative_user_id,order_id,sequence_number,route_state,note,
@@ -2555,6 +2581,9 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // Serialize every route mutation by this courier, including two rapid Start clicks.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",
+        [`dart:representative-route:${representativeUserId}`]);
       const orderResult = await client.query<{
         id: string;
         status: string;
@@ -2579,6 +2608,16 @@ export class CommerceService {
       }
 
       if (action === "start") {
+        // Old workflow changes can leave a current route stop although its order
+        // is no longer On The Way. Heal it before the unique current-stop insert.
+        await client.query(
+          `UPDATE delivery_route_stops
+              SET route_state='upcoming', updated_at=now()
+            WHERE representative_user_id=$1
+              AND route_state='current'
+              AND order_id<>$2::uuid`,
+          [representativeUserId, order.id],
+        );
         const previousCurrent = await client.query<{ id: string; order_code: string }>(
           `SELECT id::text, order_code
              FROM orders
