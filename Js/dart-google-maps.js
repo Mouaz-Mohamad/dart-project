@@ -1,4 +1,4 @@
-// Dart Google Maps for representative deliveries. No Leaflet dependency.
+// Dart representative maps: native Google Maps JavaScript rendering only.
 (() => {
   "use strict";
   const key = String(window.DART_GOOGLE_MAPS_BROWSER_KEY || "").trim();
