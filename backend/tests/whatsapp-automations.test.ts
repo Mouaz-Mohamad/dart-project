@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { embeddedStore } from "./embedded-store.js";
 import { BirthdayMessagingService } from "../src/modules/outbox/birthday-messaging.service.js";
 import { WaitingService } from "../src/modules/waiting/waiting.service.js";
+import { CatalogService } from "../src/modules/catalog/catalog.service.js";
 import { OutboxService } from "../src/modules/outbox/outbox.service.js";
 import { createWhatsAppWebhookRouter } from "../src/modules/outbox/whatsapp-webhook.routes.js";
 import { whatsappSendWindow } from "../src/modules/outbox/whatsapp-schedule.js";
@@ -152,6 +153,37 @@ describe("durable WhatsApp automations and receipts", () => {
        WHERE aggregate_type='waitlist' AND event_type='WAITLIST_WHATSAPP_RESTOCK' AND aggregate_id=$1`,[entry.id]);
     return {...buyer,entry,itemId,event:rows.rows[0]||null};
   }
+  it("atomically reserves stock for Waiting when an admin adds the physical piece via CatalogService",async()=>{
+    const buyer=await customer();
+    const modelId="restock-admin-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Dashboard restock','[{"name":"M","active":true}]','[{"name":"Red","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{
+      modelId,size:"M",color:"Red",whatsappRestockOptIn:true,
+    },randomUUID());
+    const catalog=new CatalogService(store.pool);
+    const prior=await catalog.adminState();
+    const id=randomUUID();
+    await catalog.replaceState(prior.version,[],[{
+      id,itemCode:"test-"+id,modelId,color:"Red",size:"M",
+      status:"In stock",active:true,isArchived:false,isDeleted:false,
+    }],randomUUID(),"restock-admin-save",{models:{},items:{[id]:0}});
+    const allocation=(await store.pool.query(
+      `SELECT w.status,wa.status AS allocation_status,wa.match_type,i.status AS item_status,
+              e.event_type,e.available_at,e.created_at
+         FROM waitlist_entries w JOIN waitlist_allocations wa ON wa.waitlist_entry_id=w.id
+         JOIN inventory_items i ON i.id=wa.inventory_item_id
+         LEFT JOIN outbox_events e ON e.aggregate_id=w.id::text AND e.event_type='WAITLIST_WHATSAPP_RESTOCK'
+        WHERE w.id=$1`,[entry.id])).rows[0];
+    expect(allocation).toMatchObject({
+      status:"reserved",allocation_status:"active",match_type:"exact",
+      item_status:"Cart Reserved",event_type:"WAITLIST_WHATSAPP_RESTOCK",
+    });
+    expect(Math.abs(new Date(allocation.available_at).getTime()-new Date(allocation.created_at).getTime()))
+      .toBeLessThan(30000);
+  });
   it("keeps Waiting available when WhatsApp is requested but the account has no primary phone",async()=>{
     const buyer=await customer();
     await store.pool.query("DELETE FROM account_phones WHERE user_id=$1",[buyer.id]);
