@@ -33,6 +33,10 @@ present(courier, 'dart:rep-road-route', 'real road path bridge');
 present(maps, 'window.DART_GOOGLE_MAPS_BROWSER_KEY', 'browser map configuration');
 present(maps, 'dart:address-selected', 'checkout point updates');
 present(maps, 'destroyRepresentatives', 'delivery map disposal');
+present(maps, 'gm_authFailure', 'visible Google Maps key error handling');
+present(maps, 'recoverLeaflet()', 'independent backup map source');
+present(courier, 'void window.DartGoogleMaps?.attachRepresentatives?.(orders);', 'Google courier map called before legacy Leaflet guard');
+present(courier, 'renderOrders: () => { lastOrderRenderSignature = ""; renderOrders(); }', 'courier fallback map re-initialization');
 present(csp, 'https://maps.googleapis.com', 'Google Maps CSP');
 present(csp, 'https://maps.gstatic.com', 'Google assets CSP');
 assert.match(config, /^window\.DART_GOOGLE_MAPS_BROWSER_KEY = "(?:AIza[0-9A-Za-z_-]{30,})?";\n$/,
