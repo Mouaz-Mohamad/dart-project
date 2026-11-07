@@ -158,6 +158,17 @@ describe("durable WhatsApp automations and receipts", () => {
     const rows=await store.pool.query<{deduplication_key:string,payload:Record<string,unknown>}>(
       `SELECT deduplication_key,payload FROM outbox_events
        WHERE aggregate_type='waitlist' AND event_type='WAITLIST_WHATSAPP_RESTOCK' AND aggregate_id=$1`,[entry.id]);
+    if (optIn && !rows.rows[0]) {
+      const diagnostic = await store.pool.query(`SELECT w.status,w.whatsapp_restock_opt_in_at,
+        w.whatsapp_restock_phone_normalized,w.reserved_until,wa.match_type,wa.status AS allocation_status,
+        wa.expires_at,i.status AS item_status,i.cart_reservation_id,ph.phone_normalized AS primary_phone,
+        (SELECT dart_whatsapp_send_at(now())) AS send_at
+        FROM waitlist_entries w LEFT JOIN waitlist_allocations wa ON wa.waitlist_entry_id=w.id
+        LEFT JOIN inventory_items i ON i.id=wa.inventory_item_id
+        LEFT JOIN account_phones ph ON ph.user_id=w.customer_user_id AND ph.is_primary
+        WHERE w.id=$1`,[entry.id]);
+      throw new Error("Synthetic restock debug: "+JSON.stringify(diagnostic.rows));
+    }
     return {...buyer,entry,itemId,event:rows.rows[0]||null};
   }
   it("queues a single Marketing restock only after explicit consent for the exact item",async()=>{
