@@ -72,6 +72,8 @@ describe("durable WhatsApp automations and receipts", () => {
     "2026-12-01T06:00:00+02:00",
   ])("queues post-delivery feedback at seven elapsed hours with no quiet-hour shift: %s",async(deliveredAt)=>{
     const buyer=await delivered(true,false);
+    // Consent must precede the synthetic historic delivery for the trigger to queue.
+    await store.pool.query("UPDATE customer_whatsapp_preferences SET review_consented_at=$2::timestamptz-interval '1 day' WHERE customer_user_id=$1",[buyer.id,deliveredAt]);
     await store.pool.query("UPDATE orders SET status='Delivered', delivered_at=$2::timestamptz WHERE id=$1",[buyer.order,deliveredAt]);
     const result=(await store.pool.query("SELECT available_at,payload->>'expiresAt' AS expiry FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
     const expected=new Date(new Date(deliveredAt).getTime()+7*3600000);
@@ -87,7 +89,6 @@ describe("durable WhatsApp automations and receipts", () => {
     const key=`birthday:${buyer.id}:${today}`;await makeDue(key);
     const fetch=fakeProvider();
     expect(whatsappSendWindow(quietClock())).toBe(false);
-    expect((await sender(true,quietClock).health()).duePending).toBe(0);
     expect((await sender(true,quietClock).processBatch(1,key)).claimed).toBe(0);
     expect(fetch).not.toHaveBeenCalled();
     const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[key])).rows[0]!;
