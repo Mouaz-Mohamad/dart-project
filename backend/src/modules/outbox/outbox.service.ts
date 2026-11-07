@@ -178,7 +178,7 @@ export class OutboxService {
             AND payload->>'channel' IN ('email','whatsapp','web_push')
             AND ($2::text IS NULL OR deduplication_key=$2)
             AND (payload->>'channel'<>'whatsapp' OR CASE WHEN event_type='WAITLIST_WHATSAPP_RESTOCK' THEN ($3::boolean AND $8::boolean) WHEN event_type='ORDER_WHATSAPP_DISPATCHED' THEN $7::boolean WHEN event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
-              THEN $6::boolean ELSE ($3::boolean AND $4::boolean
+              THEN $6::boolean ELSE ($3::boolean AND (event_type<>'CUSTOMER_BIRTHDAY_MESSAGE' OR $4::boolean)
               AND (event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $5::boolean)) END)
             AND (event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $8::boolean)
             AND NOT EXISTS (SELECT 1 FROM outbox_delivery_attempts a
@@ -265,12 +265,12 @@ export class OutboxService {
         count(*) FILTER (WHERE a.delivery_status='failed')::text AS delivery_failed,
         count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
           AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='WAITLIST_WHATSAPP_RESTOCK' THEN ($1::boolean AND $6::boolean) WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
-            THEN $4::boolean ELSE ($1::boolean AND $2::boolean
+            THEN $4::boolean ELSE ($1::boolean AND (e.event_type<>'CUSTOMER_BIRTHDAY_MESSAGE' OR $2::boolean)
             AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean) AND (e.event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $6::boolean)) END))::text AS due_pending,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.available_at)) FILTER
           (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
             AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='WAITLIST_WHATSAPP_RESTOCK' THEN ($1::boolean AND $6::boolean) WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
-              THEN $4::boolean ELSE ($1::boolean AND $2::boolean
+              THEN $4::boolean ELSE ($1::boolean AND (e.event_type<>'CUSTOMER_BIRTHDAY_MESSAGE' OR $2::boolean)
               AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean) AND (e.event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $6::boolean)) END)),0)::text AS oldest_due_seconds,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.created_at)) FILTER
           (WHERE e.status<>'published' AND e.attempts<12 AND a.state IS NULL),0)::text AS oldest_seconds
@@ -402,8 +402,10 @@ export class OutboxService {
     if (row.event_type === "WAITLIST_WHATSAPP_ALTERNATIVE") return {suppressed:true};
     const dispatch = row.event_type === "ORDER_WHATSAPP_DISPATCHED";
     const immediate = dispatch || ["ORDER_WHATSAPP_CONFIRMATION","ORDER_WHATSAPP_ACK"].includes(row.event_type);
-    // A reserved Waiting item expires after four hours; its requested restock alert must not wait for marketing quiet hours.
-    const bypassWindow = immediate || row.event_type === "WAITLIST_WHATSAPP_RESTOCK";
+    // Restock's four-hour hold and transactional notifications must never wait for birthday hours.
+    // Only birthday greetings respect the Cairo 13:00–22:00 delivery window.
+    // All other approved WhatsApp flows can send whenever they become eligible.
+    const bypassWindow = row.event_type !== "CUSTOMER_BIRTHDAY_MESSAGE";
     if (!(dispatch ? this.dispatchMessagingConfigured() : immediate ? this.orderMessagingConfigured() : this.configured("whatsapp"))) {
       throw new DeferredWhatsAppDelivery("WhatsApp sending is disabled");
     }

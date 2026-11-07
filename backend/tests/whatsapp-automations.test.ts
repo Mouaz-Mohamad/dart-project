@@ -66,6 +66,33 @@ describe("durable WhatsApp automations and receipts", () => {
       AT TIME ZONE 'Africa/Cairo','YYYY-MM-DD HH24:MI') AS scheduled`,[input])).rows[0]!;
     expect(row.scheduled).toBe(expected);
   });
+  it.each([
+    "2026-10-28T05:00:00+03:00",
+    "2026-10-28T18:00:00+03:00",
+    "2026-12-01T06:00:00+02:00",
+  ])("queues post-delivery feedback at seven elapsed hours with no quiet-hour shift: %s",async(deliveredAt)=>{
+    const buyer=await delivered(true,false);
+    await store.pool.query("UPDATE orders SET status='Delivered', delivered_at=$2::timestamptz WHERE id=$1",[buyer.order,deliveredAt]);
+    const result=(await store.pool.query("SELECT available_at,payload->>'expiresAt' AS expiry FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
+    const expected=new Date(new Date(deliveredAt).getTime()+7*3600000);
+    expect(new Date(result.available_at).toISOString()).toBe(expected.toISOString());
+    expect(new Date(result.expiry).toISOString()).toBe(new Date(expected.getTime()+24*3600000).toISOString());
+  });
+  it("keeps birthday greetings queued outside 13:00–22:00 Cairo",async()=>{
+    const today=(await store.pool.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today")).rows[0]!.today as string;
+    const buyer=await customer(`2000-${today.slice(5)}`);
+    const birthday=new BirthdayMessagingService(store.pool,"birthday");
+    await birthday.setPreference(buyer.id,true,"birthday-quiet-test");
+    await birthday.queueToday();
+    const key=`birthday:${buyer.id}:${today}`;await makeDue(key);
+    const fetch=fakeProvider();
+    expect(whatsappSendWindow(quietClock())).toBe(false);
+    expect((await sender(true,quietClock).health()).duePending).toBe(0);
+    expect((await sender(true,quietClock).processBatch(1,key)).claimed).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[key])).rows[0]!;
+    expect(event).toMatchObject({status:"pending",attempts:0});
+  });
   it("requires independent review consent and queues only a new delivery, once",async()=>{
     const no=await delivered(false);
     expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[no.key])).rows).toHaveLength(0);
@@ -77,14 +104,15 @@ describe("durable WhatsApp automations and receipts", () => {
     expect((await yes.preferences.preference(yes.id)).postDeliveryReview).toBe(true);
     expect((await yes.preferences.preference(yes.id)).birthdayMarketing).toBe(false);
   });
-  it("keeps WhatsApp pending without using retries when disabled or outside the window",async()=>{
+  it("keeps reviews pending if disabled, but sends outside birthday hours",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();
     expect((await sender(false).processBatch(5,buyer.key)).claimed).toBe(0);
-    expect((await sender(true,quietClock).processBatch(5,buyer.key)).claimed).toBe(0);
-    const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
-    expect(event).toMatchObject({status:"pending",attempts:0});expect(fetch).not.toHaveBeenCalled();
     expect((await sender(false).health()).duePending).toBe(0);
-    expect((await sender(true,quietClock).health()).duePending).toBe(0);
+    expect((await sender(true,quietClock).health()).duePending).toBeGreaterThan(0);
+    expect((await sender(true,quietClock).processBatch(5,buyer.key)).published).toBe(1);
+    const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
+    expect(event).toMatchObject({status:"published",attempts:1});
+    expect(fetch).toHaveBeenCalledOnce();
   });
   it("keeps Email working when WhatsApp is disabled",async()=>{
     const key=`synthetic-email:${randomUUID()}`;
@@ -283,14 +311,14 @@ describe("durable WhatsApp automations and receipts", () => {
        WHERE e.deduplication_key=$1`,[changed.event!.deduplication_key])).rows[0];
     expect(suppressed.state).toBe("suppressed");
   });
-  it("defers without an external call or lost retry when a batch crosses 22:00",async()=>{
+  it("sends reviews when a batch crosses 22:00 rather than deferring them",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();let calls=0;
     const clock=()=>++calls<3?activeClock():quietClock();
-    expect(await sender(true,clock).processBatch(1,buyer.key)).toMatchObject({claimed:1,published:0,failed:0,uncertain:0});
-    expect(fetch).not.toHaveBeenCalled();
+    expect(await sender(true,clock).processBatch(1,buyer.key)).toMatchObject({claimed:1,published:1,failed:0,uncertain:0});
+    expect(fetch).toHaveBeenCalledOnce();
     const row=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
-    expect(row).toMatchObject({status:"pending",attempts:0});
-    await makeDue(buyer.key);expect((await sender().processBatch(1,buyer.key)).published).toBe(1);expect(fetch).toHaveBeenCalledOnce();
+    expect(row).toMatchObject({status:"published",attempts:1});
+    expect((await sender().processBatch(1,buyer.key)).claimed).toBe(0);
   });
   it("preserves and audits a callback that arrives before provider acknowledgement",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);
