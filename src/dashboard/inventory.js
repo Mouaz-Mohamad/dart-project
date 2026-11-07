@@ -645,7 +645,7 @@
       e.preventDefault();
       if (form.dataset.saving === "true") return;
       saveStatus.textContent = "";
-      if (!C.isServerAuthoritative?.() || typeof C.syncAdminState !== "function") {
+      if (!C.isServerAuthoritative?.() || typeof C.savePhysicalItem !== "function") {
         saveStatus.textContent = "تعذر الاتصال بالمخزون. حدّث لوحة التحكم ثم حاول مرة أخرى.";
         return;
       }
@@ -695,12 +695,10 @@
       }
       saveStatus.textContent = "جاري حفظ القطعة في المخزون…";
       try {
-        if (old) {
-          Object.assign(old, payload);
-        } else {
-          const it = {
+        const candidate = old ? { ...old, ...payload } : {
           id: newItemId,
           status: "In stock",
+          active: true,
           costSnapshot: Number(m.cost) || 0,
           createdAt: stamp(),
           regDate: new Date().toLocaleDateString("en-GB"),
@@ -709,13 +707,7 @@
           isChecked: false,
           ...payload,
         };
-          itemsData.push(it);
-        }
-        dartSaveAll();
-        // The in-memory list is optimistic. A successful Neon-backed API write
-        // and a fresh authoritative read must happen before confirming to staff.
-        await C.syncAdminState();
-        await C.hydrate(true);
+        await C.savePhysicalItem(candidate);
         itemsData = C.items();
         const saved = itemsData.find((row) => row.id === newItemId);
         if (!saved || saved.itemCode !== itemCode || saved.modelId !== m.modelId ||
@@ -738,14 +730,15 @@
           dartRefreshAll();
           refreshFilters();
         } catch {
-          if (before) Object.assign(old, before);
-          else itemsData = itemsData.filter((row) => row.id !== newItemId);
-          // Do not enqueue a blind retry after an uncertain network failure.
+          // Do not display an unconfirmed local save as successful.
+          // Never auto-retry an uncertain write: the backend may have committed.
         }
         console.warn("Inventory save was not confirmed", error?.code || "SAVE_FAILED");
         saveStatus.textContent = error?.status === 409
           ? "تم تعديل المخزون في جلسة أخرى. راجع البيانات وحاول الحفظ مجددًا."
-          : "لم يتم تأكيد حفظ القطعة في قاعدة البيانات. تحقق من المخزون ثم حاول مرة أخرى.";
+          : (error?.message && ["ITEM_FIELDS_REQUIRED","CATALOG_PENDING_CHANGES","ITEM_SAVE_UNCONFIRMED","CATALOG_NOT_READY"].includes(error.code))
+            ? error.message
+            : "لم يتم تأكيد حفظ القطعة في قاعدة البيانات. تحقق من المخزون ثم حاول مرة أخرى.";
         window.DartDialog?.alert?.(saveStatus.textContent);
       } finally {
         delete form.dataset.saving;
