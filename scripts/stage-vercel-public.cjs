@@ -177,7 +177,7 @@ if (mapsBrowserKey && !/^AIza[0-9A-Za-z_-]{30,}$/.test(mapsBrowserKey)) {
 }
 fs.writeFileSync(
   path.join(OUTPUT_DIR, 'Js', 'dart-google-maps-config.js'),
-  'window.DART_GOOGLE_MAPS_BROWSER_KEY = ' + JSON.stringify(mapsBrowserKey) + ';\\n',
+  'window.DART_GOOGLE_MAPS_BROWSER_KEY = ' + JSON.stringify(mapsBrowserKey) + ';\n',
   'utf8',
 );
 
