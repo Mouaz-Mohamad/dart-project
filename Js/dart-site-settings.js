@@ -130,7 +130,7 @@
   function setCache(value, persist = true) {
     const normalized = merge(value);
     cachedSettings = normalized;
-    root.document?.documentElement.classList.toggle("dart-card-enabled", normalized.dartCardEnabled === true);
+    root.document?.documentElement?.classList?.toggle?.("dart-card-enabled", normalized.dartCardEnabled === true);
     if (persist) {
       root.DartState?.write?.(STORAGE_KEY, normalized, { source: "site-settings" });
     }
