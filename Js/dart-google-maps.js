@@ -48,6 +48,7 @@
   }
 
   function latLng(lat, lng) {
+    if (lat == null || lng == null || String(lat).trim() === "" || String(lng).trim() === "") return null;
     const a = Number(lat), b = Number(lng);
     return Number.isFinite(a) && Number.isFinite(b) && a >= -90 && a <= 90 && b >= -180 && b <= 180
       ? { lat: a, lng: b } : null;
