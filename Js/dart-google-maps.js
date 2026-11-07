@@ -8,13 +8,62 @@
   const knownRoadRoutes = new Map();
   let mapsPromise = null;
   let checkoutMap = null;
+  let googleAuthFailed = false;
+  let leafletFallbackPending = false;
+
+  function status(message) {
+    const field = document.getElementById("checkout-address-status") || document.getElementById("repLocationStatus");
+    if (field) {
+      field.textContent = message;
+      field.dataset.state = "error";
+    }
+  }
+
+  // Google authenticates the browser key asynchronously; a successful script load
+  // does not imply that the domain, billing and API restrictions were accepted.
+  const originalGoogleAuthFailure = window.gm_authFailure;
+  window.gm_authFailure = () => {
+    googleAuthFailed = true;
+    if (checkoutMap?.canvas?.isConnected) checkoutMap.canvas.remove();
+    checkoutMap = null;
+    for (const entry of representativeMaps.values()) entry.canvas.remove();
+    representativeMaps.clear();
+    status("Google Maps couldn't authenticate this website. Check the Dart domain and Maps JavaScript API key restrictions.");
+    if (typeof originalGoogleAuthFailure === "function") originalGoogleAuthFailure();
+  };
+
+  // Both checkout address verification and the legacy courier fallback use Leaflet.
+  // If the primary CDN is blocked, recover from a second provider, then initialize
+  // the normal Dart controller without losing server-side shipping validation.
+  function recoverLeaflet() {
+    if (window.L || leafletFallbackPending || !document.querySelector("#map, #repOrdersList")) return;
+    leafletFallbackPending = true;
+    const cssId = "dart-leaflet-cdn-fallback-css";
+    if (!document.getElementById(cssId)) {
+      const link = document.createElement("link");
+      link.id = cssId;
+      link.rel = "stylesheet";
+      link.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css";
+      document.head.appendChild(link);
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js";
+    script.async = true;
+    script.onload = () => {
+      if (!window.L) return;
+      if (document.getElementById("checkoutForm")) window.DartAddress?.initCheckout?.();
+      if (document.getElementById("repOrdersList")) window.DartRepPortal?.renderOrders?.();
+    };
+    script.onerror = () => status("Map libraries are unavailable. Check your network connection and reload this page.");
+    document.head.appendChild(script);
+  }
 
   function mapsReady() {
     return Boolean(window.google?.maps?.Map && window.google?.maps?.Marker);
   }
 
   function loadMaps() {
-    if (!browserKey) return Promise.resolve(false);
+    if (!browserKey || googleAuthFailed) return Promise.resolve(false);
     if (mapsReady()) return Promise.resolve(true);
     if (mapsPromise) return mapsPromise;
     mapsPromise = new Promise((resolve) => {
@@ -26,7 +75,7 @@
       window[callback] = () => {
         window.clearTimeout(timer);
         delete window[callback];
-        resolve(mapsReady());
+        resolve(!googleAuthFailed && mapsReady());
       };
       const script = document.createElement("script");
       script.async = true;
@@ -78,7 +127,10 @@
     if (!providerReady || checkoutMap) return; // Retain original Leaflet UI.
     const bridge = window.dartCheckoutAddress;
     const container = document.getElementById("map");
-    if (!bridge?.selectLocation || !container?.isConnected) return;
+    if (!bridge?.selectLocation || !container?.isConnected) {
+      if (!window.L) recoverLeaflet();
+      return;
+    }
     const pin = latLng(bridge.fields?.latitude?.value, bridge.fields?.longitude?.value);
     const canvas = overlay(container);
     if (!canvas) return;
@@ -212,8 +264,12 @@
     void setupCheckout();
   });
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => { void setupCheckout(); }, { once: true });
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!window.L) recoverLeaflet();
+      void setupCheckout();
+    }, { once: true });
   } else {
+    if (!window.L) recoverLeaflet();
     void setupCheckout();
   }
   window.DartGoogleMaps = Object.freeze({
