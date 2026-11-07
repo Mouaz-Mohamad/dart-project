@@ -483,7 +483,7 @@ export class OutboxService {
     const authenticationOtp = payload.authenticationOtp === true;
     const otp = parameters[0] || "";
     const birthdayImageHeader = row.event_type === "CUSTOMER_BIRTHDAY_MESSAGE" && template === "birthday"
-      ? [{ type: "header", parameters: [{ type: "image", image: { link: "https://www.dartofficial.com/Photos/birthday.webp" } }] }]
+      ? [{ type: "header", parameters: [{ type: "image", image: { link: "https://www.dartofficial.com/Photos/dart-birthday-reward.jpg" } }] }]
       : undefined;
     const components = birthdayImageHeader
       ? birthdayImageHeader
