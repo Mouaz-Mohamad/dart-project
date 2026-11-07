@@ -1,4 +1,4 @@
-// Dart release contract: Google login and two browser maps must be wired at build time.
+// Dart release contract: manual-only checkout; Google login and courier map remain available.
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -19,10 +19,11 @@ const csp = JSON.parse(read('vercel.json')).headers
 function present(text, token, label) {
   assert.ok(text.includes(token), 'Missing Dart Google integration: ' + label);
 }
-for (const [html, page] of [[checkout, 'checkout'], [rep, 'representative']]) {
-  present(html, 'Js/dart-google-maps-config.js', page + ' browser key');
-  present(html, 'Js/dart-google-maps.js', page + ' Maps renderer');
-}
+present(rep, 'Js/dart-google-maps-config.js', 'representative browser key');
+present(rep, 'Js/dart-google-maps.js', 'representative Maps renderer');
+present(checkout, 'Js/dart-checkout-manual-address.js', 'manual checkout controller');
+assert.ok(!/leaflet|openstreetmap|dart-google-maps|id="map"/i.test(checkout),
+  'Checkout must not include map providers or map fallback');
 assert.equal((auth.match(/data-social-login="google"/g) || []).length, 2,
   'Both Dart customer login and registration need Google sign-in');
 present(auth, 'Js/dart-auth-social.js', 'Google auth handler');
@@ -44,4 +45,4 @@ assert.match(config, /^window\.DART_GOOGLE_MAPS_BROWSER_KEY = "(?:AIza[0-9A-Za-z
 for (const [file, source] of [['Maps JS', maps], ['Social JS', social], ['Address JS', address], ['Rep JS', courier]]) {
   try { new Function(source); } catch (error) { throw new Error(file + ' invalid JavaScript: ' + error.message); }
 }
-console.log('Dart Google sign-in and two-map build contracts passed.');
+console.log('Dart manual checkout, Google sign-in and courier-map build contracts passed.');

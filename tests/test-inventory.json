@@ -11,6 +11,7 @@
     "cart-shipping-recovery-runtime.cjs",
     "catalog-category-contract.js",
     "checkout-address-runtime.cjs",
+    "manual-checkout-contract.cjs",
     "council-browser-runtime.cjs",
     "council-fourth-runtime.cjs",
     "council-third-runtime.cjs",

@@ -47,8 +47,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="CSS/dart-checkout-regions.css">
     <link rel="stylesheet" href="/CSS/dart-card-visibility.css">
     <link rel="stylesheet" href="CSS/dart-headings.css">
@@ -117,22 +115,9 @@
 <!-- نموذج تفاصيل العنوان -->
 <form id="checkoutForm" class="address-form">
     
-    <!-- خانة البحث والاقتراحات من جوجل -->
-<div class="form-group" style="position: relative;">
-    <label for="address-input">Search for your address</label>
-    <input type="text" id="address-input" name="address_search" class="inp" placeholder="Enter an area or street in Cairo or Giza" autocomplete="street-address">
-    <ul id="results-list" class="results-list" style="display:none;"></ul>
-</div>
-
-<!-- حاوية الخريطة -->
-<div id="map" style="height: 250px; width: 100%; border-radius: 8px; margin: 10px 0; border: 1px solid #ccc; z-index: 1;"></div>
-
-<p class="dart-delivery-zone-note"><i class="fa-solid fa-clock" aria-hidden="true"></i> Delivery is currently available across Cairo and Giza, within 12 hours.</p>
-<p id="checkout-address-status" class="dart-address-status" role="status" aria-live="polite">Select a pin in an available Egypt governorate, or enter the complete address manually.</p>
-<button type="button" id="confirm-manual-pin" class="dart-locate-address-btn" hidden style="display:none">Confirm pin and typed address</button>
-
-<input type="hidden" id="lat-input" name="latitude">
-<input type="hidden" id="lng-input" name="longitude">
+    <!-- Manual address only. Coverage is verified by the API. -->
+<p class="dart-delivery-zone-note"><i class="fa-solid fa-truck" aria-hidden="true"></i> Delivery depends on the available shipping coverage.</p>
+<p id="checkout-address-status" class="dart-address-status" role="status" aria-live="polite">Enter your complete address and choose a covered delivery region below.</p>
 <input type="hidden" id="formatted-address-input" name="full_address">
 
     <div class="form-group"><label for="checkout-name">Name</label><input id="checkout-name" name="customer_name" class="inp" type="text" placeholder="Value" autocomplete="name" required></div>
@@ -142,10 +127,7 @@
     <div class="form-group"><label for="checkout-building">Building Number/Name</label><input id="checkout-building" name="building" class="inp" type="text" placeholder="Value" required></div>
     <div class="form-group"><label for="checkout-floor">Floor</label><input id="checkout-floor" name="floor" class="inp" type="text" placeholder="Value" required></div>
     <div class="form-group"><label for="checkout-notes">Delivery Notes</label><textarea id="checkout-notes" name="delivery_notes" class="inp" placeholder="Value"></textarea></div>
-    <div class="arrwo-for-other-adrees" role="button" tabindex="0" aria-expanded="false">=== &#9662; Alternative address entry &#9662; ===</div>
-
-
-    <div class="other-addres">
+    <div class="other-addres" style="display: block;">
         <div class="form-group">
             <label>Country</label>
             <select required class="select-cart" id="checkout-country" name="country">
@@ -170,7 +152,6 @@
             <label>Street Name</label>
             <input class="inp" type="text" id="street-input" name="street" placeholder="Street name" required>
         </div>
-        <button type="button" id="locate-manual-address" class="dart-locate-address-btn"><i class="fa-solid fa-location-crosshairs"></i> Locate this address on the map</button>
     </div>
 
 
@@ -245,9 +226,7 @@
         <footer id="footer" aria-label="footer."></footer>
     
     </div>
-    <script src="Js/dart-google-maps-config.js" defer></script>
-    <script src="Js/dart-google-maps.js" defer></script>
-    <script  src="Js/dart-address.js" defer></script>
+    <script src="Js/dart-checkout-manual-address.js" defer></script>
     <script  src="Js/dart-state.js" defer></script>
     <script  src="Js/dart-site-settings.js" defer></script>
     <script  src="Js/dart-catalog.js" defer></script>

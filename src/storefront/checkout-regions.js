@@ -99,7 +99,7 @@ const helper=document.createElement("div");helper.className="dart-checkout-regio
 const caption=document.createElement("p");
 caption.textContent="المحافظة ← المدينة ← المنطقة / Delivery coverage";
 const intro=document.createElement("small");
-intro.textContent="التوصيل متاح فقط في الأماكن المغطاة. اختار المدينة والمنطقة إن لزم، ثم أكد موقعك على الخريطة.";
+intro.textContent="التوصيل متاح فقط في الأماكن المغطاة. اختار المدينة والمنطقة إن لزم، ثم أكمل عنوان التوصيل.";
 const search=document.createElement("input");search.type="search";
 search.placeholder="ابحث عن مدينة أو منطقة · Search";search.setAttribute("aria-label","Search delivery districts");
 const city=document.createElement("select");city.name="city";city.id="checkout-city";

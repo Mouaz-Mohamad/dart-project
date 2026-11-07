@@ -1935,8 +1935,9 @@ export class CommerceService {
       );
       const settings = settingsResult.rows[0]?.data || {};
       const shippingPartners=(Array.isArray(settings.shippingCompanies)?settings.shippingCompanies:[]) as CheckoutShippingCompany[];
+      const hasDeliveryCoordinates = input.address.latitude !== undefined && input.address.longitude !== undefined;
       if(String(input.address.country).trim().toLowerCase()!=="egypt" ||
-         !isInsideEgyptEnvelope(input.address.latitude,input.address.longitude)) {
+         (hasDeliveryCoordinates && !isInsideEgyptEnvelope(input.address.latitude,input.address.longitude))) {
         throw new AppError(422,"DELIVERY_LOCATION_OUTSIDE_EGYPT",
           "Delivery coordinates and country must be inside Egypt.");
       }
@@ -1949,7 +1950,7 @@ export class CommerceService {
         throw new AppError(422,"DELIVERY_REGION_UNAVAILABLE",
           "No active shipping company currently covers the selected delivery location.");
       }
-      if (!matchesDeliveryGovernorate(input.address.governorate, input.address.latitude, input.address.longitude)) {
+      if (hasDeliveryCoordinates && !matchesDeliveryGovernorate(input.address.governorate, input.address.latitude, input.address.longitude)) {
         throw new AppError(422, "DELIVERY_GOVERNORATE_MISMATCH",
           "The map pin must be inside the selected governorate. Verify the delivery location again.");
       }
@@ -2665,26 +2666,21 @@ export class CommerceService {
         }
         const destinationLat = Number(order.delivery_address?.latitude);
         const destinationLng = Number(order.delivery_address?.longitude);
-        if (
-          !Number.isFinite(destinationLat) ||
-          !Number.isFinite(destinationLng) ||
-          !destinationLat ||
-          !destinationLng
-        ) {
+        const hasVerifiedPin = Number.isFinite(destinationLat) && Number.isFinite(destinationLng) &&
+          destinationLat !== 0 && destinationLng !== 0;
+        const manualWithoutPin = order.delivery_address?.addressSource === "manual" &&
+          !order.delivery_address?.latitude && !order.delivery_address?.longitude;
+        if (!hasVerifiedPin && !manualWithoutPin) {
           throw new AppError(409, "DELIVERY_COORDINATES_MISSING", "Customer delivery coordinates are missing");
         }
-        const distance = distanceKm(
-          location.latitude,
-          location.longitude,
-          destinationLat,
-          destinationLng,
-        );
-        if (distance > 1) {
-          throw new AppError(
-            409,
-            "DELIVERY_TOO_FAR",
-            `You must be within 1 km of the delivery address; current distance is ${distance.toFixed(2)} km`,
-          );
+        // A manual address has no geofence. A fresh authenticated courier GPS
+        // reading is still required above; never invent a destination pin.
+        if (hasVerifiedPin) {
+          const distance = distanceKm(location.latitude, location.longitude, destinationLat, destinationLng);
+          if (distance > 1) {
+            throw new AppError(409, "DELIVERY_TOO_FAR",
+              `You must be within 1 km of the delivery address; current distance is ${distance.toFixed(2)} km`);
+          }
         }
         nextStatus = "Delivered";
       }

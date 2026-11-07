@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:dcf09d91902b6ed7a027cb7ad8f98b5079abfaf12c93b3b95a0c0565f2bcf171 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:2ded71a75462aae5d4eaea3898fcd13f9615e8515329775e15958b1221fb684e */
 (function () {
   "use strict";
 
@@ -888,11 +888,11 @@
   }
 
   async function saveCustomerAddress(address) {
+    const hasCoordinates = address?.lat != null && address?.lng != null;
     const normalized = address && typeof address === "object"
       ? {
           address: String(address.address || "").trim(),
-          lat: Number(address.lat),
-          lng: Number(address.lng),
+          ...(hasCoordinates ? { lat: Number(address.lat), lng: Number(address.lng) } : {}),
           governorate: deliveryGovernorate(address.governorate),
           ...(address.country ? { country: String(address.country) } : {}),
           ...(address.area ? { area: String(address.area) } : {}),
@@ -904,9 +904,8 @@
     if (
       !normalized ||
       !normalized.address ||
-      !Number.isFinite(normalized.lat) ||
-      !Number.isFinite(normalized.lng) ||
-      !normalized.governorate
+      !normalized.governorate ||
+      (hasCoordinates && (!Number.isFinite(normalized.lat) || !Number.isFinite(normalized.lng)))
     ) {
       throw new Error("Saved address is incomplete.");
     }
@@ -1706,14 +1705,10 @@
         "Complete country, governorate, area, street, building number/name and floor.",
       );
     }
-    if (!details.latitude || !details.longitude)
-      throw new Error(
-        "Select the location on the map or locate the manually entered address.",
-      );
     const acceptedGovernorate = deliveryGovernorate(details.governorate);
     if (!acceptedGovernorate || !["cairo-giza", "coverage-enabled"].includes(addressValidation?.zone))
       throw new Error(
-        "للأسف، التوصيل مش متاح للمنطقة دي حاليًا. تحقق من العنوان على الخريطة.",
+        "للأسف، التوصيل مش متاح للمنطقة دي حاليًا. تحقق من المحافظة والمنطقة.",
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
@@ -1781,11 +1776,12 @@
             street: details.street,
             building: details.building,
             floor: details.floor,
-            latitude: String(details.latitude),
-            longitude: String(details.longitude),
+            ...(details.latitude && details.longitude
+              ? { latitude: String(details.latitude), longitude: String(details.longitude) }
+              : {}),
             ...(details.fullAddress ? { fullAddress: details.fullAddress } : {}),
             addressSource:
-              addressValidation?.source || form.dataset.dartAddressSource || "map",
+              addressValidation?.source || form.dataset.dartAddressSource || "manual",
           },
           deliveryNotes: details.deliveryNotes || "",
           ...(options.acceptPriceChanges ? { acceptPriceChanges: true } : {}),
@@ -1809,8 +1805,9 @@
       void Promise.allSettled([
         Promise.resolve().then(() => saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
-          lat: Number(details.latitude),
-          lng: Number(details.longitude),
+          ...(details.latitude && details.longitude
+            ? { lat: Number(details.latitude), lng: Number(details.longitude) }
+            : {}),
           country: details.country,
           governorate: details.governorate,
           area: details.area,
@@ -2014,7 +2011,7 @@
       longitude: details.longitude,
       fullAddress: details.fullAddress,
       addressSource:
-        addressValidation?.source || form.dataset.dartAddressSource || "map",
+        addressValidation?.source || form.dataset.dartAddressSource || "manual",
       activityLog: [
         {
           id: uid("EVT"),

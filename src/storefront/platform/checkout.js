@@ -150,14 +150,10 @@
         "Complete country, governorate, area, street, building number/name and floor.",
       );
     }
-    if (!details.latitude || !details.longitude)
-      throw new Error(
-        "Select the location on the map or locate the manually entered address.",
-      );
     const acceptedGovernorate = deliveryGovernorate(details.governorate);
     if (!acceptedGovernorate || !["cairo-giza", "coverage-enabled"].includes(addressValidation?.zone))
       throw new Error(
-        "للأسف، التوصيل مش متاح للمنطقة دي حاليًا. تحقق من العنوان على الخريطة.",
+        "للأسف، التوصيل مش متاح للمنطقة دي حاليًا. تحقق من المحافظة والمنطقة.",
       );
     details.country = "Egypt";
     details.governorate = acceptedGovernorate;
@@ -225,11 +221,12 @@
             street: details.street,
             building: details.building,
             floor: details.floor,
-            latitude: String(details.latitude),
-            longitude: String(details.longitude),
+            ...(details.latitude && details.longitude
+              ? { latitude: String(details.latitude), longitude: String(details.longitude) }
+              : {}),
             ...(details.fullAddress ? { fullAddress: details.fullAddress } : {}),
             addressSource:
-              addressValidation?.source || form.dataset.dartAddressSource || "map",
+              addressValidation?.source || form.dataset.dartAddressSource || "manual",
           },
           deliveryNotes: details.deliveryNotes || "",
           ...(options.acceptPriceChanges ? { acceptPriceChanges: true } : {}),
@@ -253,8 +250,9 @@
       void Promise.allSettled([
         Promise.resolve().then(() => saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
-          lat: Number(details.latitude),
-          lng: Number(details.longitude),
+          ...(details.latitude && details.longitude
+            ? { lat: Number(details.latitude), lng: Number(details.longitude) }
+            : {}),
           country: details.country,
           governorate: details.governorate,
           area: details.area,
@@ -458,7 +456,7 @@
       longitude: details.longitude,
       fullAddress: details.fullAddress,
       addressSource:
-        addressValidation?.source || form.dataset.dartAddressSource || "map",
+        addressValidation?.source || form.dataset.dartAddressSource || "manual",
       activityLog: [
         {
           id: uid("EVT"),
