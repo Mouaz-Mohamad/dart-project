@@ -6,6 +6,7 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { embeddedStore } from "./embedded-store.js";
 import { BirthdayMessagingService } from "../src/modules/outbox/birthday-messaging.service.js";
+import { WaitingService } from "../src/modules/waiting/waiting.service.js";
 import { OutboxService } from "../src/modules/outbox/outbox.service.js";
 import { createWhatsAppWebhookRouter } from "../src/modules/outbox/whatsapp-webhook.routes.js";
 import { whatsappSendWindow } from "../src/modules/outbox/whatsapp-schedule.js";
@@ -132,6 +133,61 @@ describe("durable WhatsApp automations and receipts", () => {
     expect(sent.template.components).toEqual([{
       type:"header",parameters:[{type:"image",image:{link:"https://www.dartofficial.com/Photos/dart-birthday-reward.jpg"}}],
     }]);
+  });
+  async function restockFixture(optIn: boolean) {
+    const buyer=await customer();
+    const modelId="restock-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Restock Test Shirt','[{"name":"M","active":true}]','[{"name":"Burgundy","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{modelId,size:"M",color:"Burgundy",whatsappRestockOptIn:optIn},randomUUID());
+    const itemId="restock-item-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
+       VALUES($1,$1,$2,'Burgundy','M',10000)`,[itemId,modelId]);
+    const rows=await store.pool.query<{deduplication_key:string,payload:Record<string,unknown>}>(
+      `SELECT deduplication_key,payload FROM outbox_events
+       WHERE aggregate_type='waitlist' AND event_type='WAITLIST_WHATSAPP_RESTOCK' AND aggregate_id=$1`,[entry.id]);
+    return {...buyer,entry,itemId,event:rows.rows[0]||null};
+  }
+  it("queues a single Marketing restock only after explicit consent for the exact item",async()=>{
+    const without=await restockFixture(false);
+    expect(without.event).toBeNull();
+    const withConsent=await restockFixture(true);
+    expect(withConsent.event?.payload).toMatchObject({
+      channel:"whatsapp",category:"marketing",to:withConsent.phone,
+      parameters:["Restock Test Shirt","Burgundy","M"],
+    });
+    const count=(await store.pool.query(
+      "SELECT count(*)::int AS total FROM outbox_events WHERE deduplication_key=$1",
+      [withConsent.event!.deduplication_key])).rows[0]!.total;
+    expect(Number(count)).toBe(1);
+  });
+  it("sends approved restock variables once; suppresses stale phone after consent",async()=>{
+    const fresh=await restockFixture(true);
+    expect(fresh.event).not.toBeNull();
+    await makeDue(fresh.event!.deduplication_key);
+    const fetch=fakeProvider();
+    const restockSender=new OutboxService(store.pool,{...config,whatsappRestockTemplate:"dart_restock_available"},null,null,activeClock);
+    expect((await restockSender.processBatch(1,fresh.event!.deduplication_key)).published).toBe(1);
+    expect((await restockSender.processBatch(1,fresh.event!.deduplication_key)).claimed).toBe(0);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("dart_restock_available");
+    expect(sent.template.components[0].parameters.map((p:{text:string})=>p.text))
+      .toEqual(["Restock Test Shirt","Burgundy","M"]);
+    expect(fetch).toHaveBeenCalledOnce();
+
+    const changed=await restockFixture(true);
+    await makeDue(changed.event!.deduplication_key);
+    await store.pool.query("UPDATE account_phones SET phone_normalized=$2 WHERE user_id=$1 AND is_primary",
+      [changed.id,"2011"+String(Math.floor(Math.random()*100000000)).padStart(8,"0")]);
+    expect((await restockSender.processBatch(1,changed.event!.deduplication_key)).published).toBe(1);
+    expect(fetch).toHaveBeenCalledOnce();
+    const suppressed=(await store.pool.query(
+      `SELECT a.state FROM outbox_delivery_attempts a JOIN outbox_events e ON e.id=a.event_id
+       WHERE e.deduplication_key=$1`,[changed.event!.deduplication_key])).rows[0];
+    expect(suppressed.state).toBe("suppressed");
   });
   it("defers without an external call or lost retry when a batch crosses 22:00",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();let calls=0;

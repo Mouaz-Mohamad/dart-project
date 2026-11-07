@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(new URL("../migrations/0036_waitlist_reservations.sql", import.meta.url), "utf8");
+const restock = readFileSync(new URL("../migrations/0075_waitlist_whatsapp_restock.sql", import.meta.url), "utf8");
+const sender = readFileSync(new URL("../src/modules/outbox/outbox.service.ts", import.meta.url), "utf8");
 const service = readFileSync(new URL("../src/modules/waiting/waiting.service.ts", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../src/modules/waiting/waiting.routes.ts", import.meta.url), "utf8");
 const commerce = readFileSync(new URL("../src/modules/commerce/commerce.service.ts", import.meta.url), "utf8");
@@ -15,6 +17,19 @@ const profile = readFileSync(new URL("../../profile.html", import.meta.url), "ut
 const dashboard = readFileSync(new URL("../../Eye/Dart Eye.html", import.meta.url), "utf8");
 
 describe("Waiting restock reservation contract", () => {
+  it("queues exact-variant restocks only with bound WhatsApp consent and a live hold", () => {
+    expect(restock).toContain("NEW.whatsapp_restock_opt_in_at IS NULL");
+    expect(restock).toContain("wa.match_type='exact'");
+    expect(restock).toContain("v_due >= v_expires_at");
+    expect(restock).toContain("'waitlist.whatsapp.restock:'||v_allocation_id::text");
+    expect(restock).toContain("'category','marketing'");
+    expect(sender).toContain("wa.expires_at=$4::timestamptz");
+    expect(sender).toContain("w.whatsapp_restock_phone_normalized=$3");
+    expect(sender).toContain("w.status='reserved'");
+    expect(routes).toContain("whatsappRestockOptIn");
+    expect(productActions).toContain("dartRestockWhatsappOptIn");
+  });
+
   it("keeps Waiting separate from the normal 15-minute cart until customer confirmation", () => {
     expect(migration).toContain("source IN ('cart','waitlist')");
     expect(commerce).toContain("source='cart'");

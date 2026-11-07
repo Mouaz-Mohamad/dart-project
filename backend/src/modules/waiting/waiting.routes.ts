@@ -23,6 +23,7 @@ const joinSchema = z.object({
   modelId: z.string().trim().min(1).max(120),
   size: z.string().trim().min(1).max(120),
   color: z.string().trim().min(1).max(120),
+  whatsappRestockOptIn: z.boolean().optional().default(false),
 });
 
 const adminActionSchema = z.object({

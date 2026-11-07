@@ -68,6 +68,7 @@ export class OutboxService {
       | "whatsappDispatchTemplate"
       | "whatsappOrderConfirmationTemplate"
       | "whatsappPostDeliveryTemplate"
+      | "whatsappRestockTemplate"
       | "whatsappPhoneNumberId"
       | "whatsappGraphApiVersion"
       | "whatsappTemplateLanguage"
@@ -179,12 +180,13 @@ export class OutboxService {
             AND (payload->>'channel'<>'whatsapp' OR CASE WHEN event_type='ORDER_WHATSAPP_DISPATCHED' THEN $7::boolean WHEN event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
               THEN $6::boolean ELSE ($3::boolean AND $4::boolean
               AND (event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $5::boolean)) END)
+            AND (event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $8::boolean)
             AND NOT EXISTS (SELECT 1 FROM outbox_delivery_attempts a
               WHERE a.event_id=outbox_events.id AND a.state IN ('executing','accepted','unknown','terminal','suppressed'))
             AND (status IN ('pending','failed') OR (status='processing' AND locked_at < now() - interval '5 minutes'))
           ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT $1`,
         [Math.min(100, Math.max(1, limit)), deduplicationKey || null,
-          this.configured("whatsapp"), whatsappSendWindow(this.now()), Boolean(this.config.whatsappPostDeliveryTemplate), this.orderMessagingConfigured(), this.dispatchMessagingConfigured()],
+          this.configured("whatsapp"), whatsappSendWindow(this.now()), Boolean(this.config.whatsappPostDeliveryTemplate), this.orderMessagingConfigured(), this.dispatchMessagingConfigured(),Boolean(this.config.whatsappRestockTemplate)],
       );
       rows = result.rows;
       if (rows.length) await client.query(`UPDATE outbox_events
@@ -264,18 +266,18 @@ export class OutboxService {
         count(*) FILTER (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
           AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
             THEN $4::boolean ELSE ($1::boolean AND $2::boolean
-            AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean)) END))::text AS due_pending,
+            AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean) AND (e.event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $6::boolean)) END))::text AS due_pending,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.available_at)) FILTER
           (WHERE e.status IN ('pending','failed','processing') AND e.attempts<12 AND a.state IS NULL AND e.available_at<=now()
             AND (e.payload->>'channel'<>'whatsapp' OR CASE WHEN e.event_type='ORDER_WHATSAPP_DISPATCHED' THEN $5::boolean WHEN e.event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
               THEN $4::boolean ELSE ($1::boolean AND $2::boolean
-              AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean)) END)),0)::text AS oldest_due_seconds,
+              AND (e.event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $3::boolean) AND (e.event_type<>'WAITLIST_WHATSAPP_RESTOCK' OR $6::boolean)) END)),0)::text AS oldest_due_seconds,
         COALESCE(max(EXTRACT(EPOCH FROM now()-e.created_at)) FILTER
           (WHERE e.status<>'published' AND e.attempts<12 AND a.state IS NULL),0)::text AS oldest_seconds
       FROM outbox_events e LEFT JOIN LATERAL (
         SELECT state,updated_at,delivery_status FROM outbox_delivery_attempts WHERE event_id=e.id AND state<>'retryable' ORDER BY created_at DESC,id DESC LIMIT 1
       ) a ON true WHERE e.payload->>'channel' IN ('email','whatsapp','web_push')`,
-      [this.configured("whatsapp"),whatsappSendWindow(this.now()),Boolean(this.config.whatsappPostDeliveryTemplate),this.orderMessagingConfigured(),this.dispatchMessagingConfigured()]);
+      [this.configured("whatsapp"),whatsappSendWindow(this.now()),Boolean(this.config.whatsappPostDeliveryTemplate),this.orderMessagingConfigured(),this.dispatchMessagingConfigured(),Boolean(this.config.whatsappRestockTemplate)]);
     const row=result.rows[0];
     return { pending:Number(row?.pending||0),exhausted:Number(row?.exhausted||0),uncertain:Number(row?.uncertain||0),
       terminal:Number(row?.terminal||0),deliveryFailed:Number(row?.delivery_failed||0),oldestSeconds:Math.max(0,Math.floor(Number(row?.oldest_seconds||0))),
@@ -429,6 +431,27 @@ export class OutboxService {
       if (!state.rows[0] || (row.payload.outcome === "confirmed" && !["Accepted","Preparing"].includes(state.rows[0].status))
         || (row.payload.outcome === "cancelled" && state.rows[0].status !== "Cancelled")) return {suppressed:true};
     }
+    if (row.event_type === "WAITLIST_WHATSAPP_RESTOCK") {
+      if (!this.config.whatsappRestockTemplate) return {suppressed:true};
+      const eligible = await this.pool.query<{allowed:boolean}>(`SELECT EXISTS(
+        SELECT 1 FROM waitlist_allocations wa
+        JOIN waitlist_entries w ON w.id=wa.waitlist_entry_id
+        JOIN inventory_items i ON i.id=wa.inventory_item_id
+        JOIN cart_reservations cr ON cr.id=wa.cart_reservation_id
+        JOIN users u ON u.id=w.customer_user_id
+        JOIN account_phones ph ON ph.user_id=w.customer_user_id AND ph.account_type='customer' AND ph.is_primary
+        WHERE wa.id::text=$1 AND w.id::text=$2 AND wa.status='active' AND wa.match_type='exact'
+          AND w.status='reserved' AND w.whatsapp_restock_opt_in_at IS NOT NULL
+          AND w.whatsapp_restock_phone_normalized=$3 AND ph.phone_normalized=$3
+          AND u.status='active' AND u.deleted_at IS NULL
+          AND i.active AND NOT i.is_deleted AND NOT i.is_archived
+          AND lower(i.status)='cart reserved' AND i.cart_reservation_id=wa.cart_reservation_id
+          AND w.model_id=i.model_id AND w.size=i.size AND w.desired_color=i.color
+          AND now()<wa.expires_at AND now()<cr.expires_at
+          AND wa.expires_at=$4::timestamptz) AS allowed`,
+        [String(row.payload.allocationId||""),row.aggregate_id,String(row.payload.to||""),String(row.payload.expiresAt||"")]);
+      if (!eligible.rows[0]?.allowed) return {suppressed:true};
+    }
     if (row.event_type === "CUSTOMER_BIRTHDAY_MESSAGE") {
       const eligible=await this.pool.query<{ allowed:boolean }>(`SELECT EXISTS (
         SELECT 1 FROM customer_whatsapp_preferences p JOIN users u ON u.id=p.customer_user_id
@@ -459,7 +482,8 @@ export class OutboxService {
     const payload = this.externalPayload(row.payload || {});
     const to = String(payload.to || "").replace(/\D/g, "");
     const template = String(dispatch ? this.config.whatsappDispatchTemplate || "" : row.event_type === "CUSTOMER_POST_DELIVERY_REVIEW"
-      ? this.config.whatsappPostDeliveryTemplate || "" : row.event_type === "ORDER_WHATSAPP_CONFIRMATION"
+      ? this.config.whatsappPostDeliveryTemplate || "" : row.event_type === "WAITLIST_WHATSAPP_RESTOCK"
+      ? this.config.whatsappRestockTemplate || "" : row.event_type === "ORDER_WHATSAPP_CONFIRMATION"
         ? this.config.whatsappOrderConfirmationTemplate || "dart_order_confirmation" : payload.template || "").trim();
     const languageCode = String(
       payload.languageCode || this.config.whatsappTemplateLanguage || "ar",

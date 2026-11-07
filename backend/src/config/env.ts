@@ -99,6 +99,7 @@ const environmentSchema = z.object({
   WHATSAPP_BIRTHDAY_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
   WHATSAPP_ORDER_CONFIRMATION_TEMPLATE: z.string().trim().regex(/^[a-z0-9_]+$/).default("dart_order_confirmation"),
   WHATSAPP_POST_DELIVERY_TEMPLATE: z.string().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
+  WHATSAPP_RESTOCK_TEMPLATE: z.string().trim().regex(/^[a-z0-9_]+$/).or(z.literal("")).default(""),
   OUTBOX_CRON_SECRET: z.string().trim().default(""),
   CRON_SECRET: z.string().trim().default(""),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
@@ -152,6 +153,7 @@ export interface AppConfig {
   whatsappBirthdayTemplate?: string;
   whatsappOrderConfirmationTemplate?: string;
   whatsappPostDeliveryTemplate?: string;
+  whatsappRestockTemplate?: string;
   outboxCronSecret: string | null;
   outboxBatchSize: number;
   webPushVapidPublicKey?: string;
@@ -255,6 +257,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     const missing = required.filter(key => !parsed.data[key]);
     if (missing.length) invalidEnvironment(...missing);
   }
+  if (parsed.data.WHATSAPP_RESTOCK_TEMPLATE && !parsed.data.WHATSAPP_SEND_ENABLED) {
+    invalidEnvironment("WHATSAPP_RESTOCK_TEMPLATE", "WHATSAPP_SEND_ENABLED");
+  }
   if (parsed.data.WHATSAPP_SEND_ENABLED) {
     const required = ["WHATSAPP_CLOUD_API_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET",
       "WHATSAPP_WEBHOOK_VERIFY_TOKEN", "WHATSAPP_BIRTHDAY_TEMPLATE", "WHATSAPP_POST_DELIVERY_TEMPLATE"] as const;
@@ -311,6 +316,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     whatsappBirthdayTemplate: parsed.data.WHATSAPP_BIRTHDAY_TEMPLATE,
     whatsappOrderConfirmationTemplate: parsed.data.WHATSAPP_ORDER_CONFIRMATION_TEMPLATE,
     whatsappPostDeliveryTemplate: parsed.data.WHATSAPP_POST_DELIVERY_TEMPLATE,
+    whatsappRestockTemplate: parsed.data.WHATSAPP_RESTOCK_TEMPLATE,
     outboxCronSecret: outboxCronSecret || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
     webPushVapidPublicKey: parsed.data.WEB_PUSH_VAPID_PUBLIC_KEY,

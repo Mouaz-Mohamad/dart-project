@@ -8,6 +8,7 @@ export interface JoinWaitingInput {
   modelId: string;
   size: string;
   color: string;
+  whatsappRestockOptIn?: boolean;
 }
 
 export type WaitingAdminAction =
@@ -179,10 +180,23 @@ export class WaitingService {
         );
       }
 
+      // Consent is specific to this Waiting request and bound to the existing primary account phone.
+      let restockPhone: string | null = null;
+      if (input.whatsappRestockOptIn === true) {
+        const phone = await client.query<{phone_normalized:string}>(
+          `SELECT phone_normalized FROM account_phones
+           WHERE user_id=$1 AND account_type='customer' AND is_primary
+           LIMIT 1 FOR SHARE`, [customerUserId],
+        );
+        restockPhone = phone.rows[0]?.phone_normalized || null;
+        if (!restockPhone) throw new AppError(422,"WAITING_WHATSAPP_PHONE_REQUIRED",
+          "Add a primary account phone before enabling WhatsApp Waiting notifications");
+      }
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO waitlist_entries (
-           customer_user_id, model_id, size, desired_color, allow_alternative_color
-         ) VALUES ($1,$2,$3,$4,$5)
+           customer_user_id, model_id, size, desired_color, allow_alternative_color,
+           whatsapp_restock_opt_in_at, whatsapp_restock_phone_normalized
+         ) VALUES ($1,$2,$3,$4,$5,CASE WHEN $6::text IS NULL THEN NULL ELSE now() END,$6)
          RETURNING id::text`,
         [
           customerUserId,
@@ -190,6 +204,7 @@ export class WaitingService {
           size,
           color,
           settings.alternativeColorsEnabled,
+          restockPhone,
         ],
       );
       const entryId = inserted.rows[0]!.id;
@@ -200,8 +215,8 @@ export class WaitingService {
         action: "WAITLIST_JOINED",
         entryId,
         requestId,
-        newValues: { modelId, size, color },
-        metadata: { fifo: true },
+        newValues: { modelId, size, color, whatsappRestockOptIn: Boolean(restockPhone) },
+        metadata: { fifo: true, consentVersion: restockPhone ? "waitlist-restock-whatsapp-v1" : null },
       });
       await this.bumpVersion(client);
 
