@@ -1,0 +1,24 @@
+/* Dart | for you — display typography for primary storefront headings.
+   English headings use Poppins; Arabic glyphs fall back to Readex Pro.
+   Product names, body copy, brand wordmarks, dashboard, and Coming Soon
+   retain their existing typography. */
+:root {
+  --dart-heading-font: "Poppins", "Readex Pro", sans-serif;
+}
+
+/* Primary page and section headings only; keep the current sizes and spacing. */
+body:not(.dart-auth-page) .mother main :is(h1, h2):not(.sr-only):not(.name),
+body:not(.dart-auth-page) .mother .feedback-section h1,
+body:not(.dart-auth-page) .mother .section-title-,
+body:not(.dart-auth-page) .mother .section-title-rep,
+body:not(.dart-auth-page) .mother .sopping,
+body:not(.dart-auth-page) .mother .dart-shipping-external h3,
+body:not(.dart-auth-page) .dart-rep-main :is(h1, h2) {
+  font-family: var(--dart-heading-font);
+}
+
+body:not(.dart-auth-page) .mother .section-title-,
+body:not(.dart-auth-page) .mother .section-title-rep,
+body:not(.dart-auth-page) .mother .sopping {
+  font-weight: 600;
+}
