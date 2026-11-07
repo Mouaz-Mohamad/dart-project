@@ -143,9 +143,18 @@ describe("durable WhatsApp automations and receipts", () => {
     const waiting=new WaitingService(store.pool);
     const entry=await waiting.join(buyer.id,{modelId,size:"M",color:"Burgundy",whatsappRestockOptIn:optIn},randomUUID());
     const itemId="restock-item-"+randomUUID();
-    await store.pool.query(
-      `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
-       VALUES($1,$1,$2,'Burgundy','M',10000)`,[itemId,modelId]);
+    // Test an eligible 13:00 send even when the runner executes overnight.
+    // Production still uses the normal four-hour hold.
+    await store.pool.query(`UPDATE site_settings
+      SET data=jsonb_set(data,'{waiting,reservationHours}','24'::jsonb,true) WHERE id='main'`);
+    try {
+      await store.pool.query(
+        `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
+         VALUES($1,$1,$2,'Burgundy','M',10000)`,[itemId,modelId]);
+    } finally {
+      await store.pool.query(`UPDATE site_settings
+        SET data=jsonb_set(data,'{waiting,reservationHours}','4'::jsonb,true) WHERE id='main'`);
+    }
     const rows=await store.pool.query<{deduplication_key:string,payload:Record<string,unknown>}>(
       `SELECT deduplication_key,payload FROM outbox_events
        WHERE aggregate_type='waitlist' AND event_type='WAITLIST_WHATSAPP_RESTOCK' AND aggregate_id=$1`,[entry.id]);
