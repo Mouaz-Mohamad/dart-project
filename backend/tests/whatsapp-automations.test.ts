@@ -110,6 +110,29 @@ describe("durable WhatsApp automations and receipts", () => {
     expect(payload.template.name).toBe("synthetic_review");
     expect(payload.template.components[0].parameters).toHaveLength(2);
   });
+  it("matches approved fixed-text review template without sending obsolete body variables",async()=>{
+    const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();
+    const approved=new OutboxService(store.pool,{...config,whatsappPostDeliveryTemplate:"share_your_experience_2"},null,null,activeClock);
+    expect((await approved.processBatch(1,buyer.key)).published).toBe(1);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("share_your_experience_2");
+    expect(sent.template.components).toBeUndefined();
+  });
+  it("matches approved birthday template with a required JPEG image header and no body variables",async()=>{
+    const today=(await store.pool.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today")).rows[0]!.today as string;
+    const buyer=await customer(`2000-${today.slice(5)}`);
+    const birthday=new BirthdayMessagingService(store.pool,"birthday");
+    await birthday.setPreference(buyer.id,true,"birthday-test");
+    await birthday.queueToday();
+    const key=`birthday:${buyer.id}:${today}`;await makeDue(key);
+    const fetch=fakeProvider();
+    expect((await sender().processBatch(1,key)).published).toBe(1);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("birthday");
+    expect(sent.template.components).toEqual([{
+      type:"header",parameters:[{type:"image",image:{link:"https://www.dartofficial.com/Photos/dart-birthday-reward.jpg"}}],
+    }]);
+  });
   it("defers without an external call or lost retry when a batch crosses 22:00",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();let calls=0;
     const clock=()=>++calls<3?activeClock():quietClock();
