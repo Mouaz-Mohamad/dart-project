@@ -396,6 +396,10 @@ export class OutboxService {
   }
 
   private async publishWhatsApp(row: OutboxRow, attemptId: string): Promise<{ providerMessageId?: string; suppressed?: boolean }> {
+    // There is no approved alternative-color WhatsApp workflow in Dart.
+    // Never use the exact-restock template for a different color, even if
+    // an event with an alternative label is accidentally enqueued.
+    if (row.event_type === "WAITLIST_WHATSAPP_ALTERNATIVE") return {suppressed:true};
     const dispatch = row.event_type === "ORDER_WHATSAPP_DISPATCHED";
     const immediate = dispatch || ["ORDER_WHATSAPP_CONFIRMATION","ORDER_WHATSAPP_ACK"].includes(row.event_type);
     // A reserved Waiting item expires after four hours; its requested restock alert must not wait for marketing quiet hours.

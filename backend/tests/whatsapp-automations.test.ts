@@ -203,6 +203,31 @@ describe("durable WhatsApp automations and receipts", () => {
       whatsapp_restock_opt_in_at:null,whatsapp_restock_phone_normalized:null,
     });
   });
+  it("reserves a different available color without queueing any WhatsApp message",async()=>{
+    const buyer=await customer();
+    const modelId="restock-alternative-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Alternative Restock Test','[{"name":"M","active":true}]','[{"name":"Black","active":true},{"name":"Begi","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{modelId,size:"M",color:"Black",whatsappRestockOptIn:true},randomUUID());
+    const id="alt-test-item-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
+       VALUES($1,$1,$2,'Begi','M',10000)`,[id,modelId]);
+    const r=(await store.pool.query(
+      `SELECT w.status,wa.match_type,wa.offered_color FROM waitlist_entries w
+       JOIN waitlist_allocations wa ON wa.waitlist_entry_id=w.id WHERE w.id=$1`,[entry.id])).rows[0];
+    expect(r).toMatchObject({status:"reserved",match_type:"alternative_color",offered_color:"Begi"});
+    const queued=await store.pool.query(
+      `SELECT event_type FROM outbox_events WHERE aggregate_type='waitlist'
+       AND aggregate_id=$1 AND payload->>'channel'='whatsapp'`,[entry.id]);
+    expect(queued.rows).toHaveLength(0);
+    const email=await store.pool.query(
+      `SELECT event_type FROM outbox_events WHERE aggregate_type='waitlist'
+       AND aggregate_id=$1 AND event_type='WAITLIST_ALTERNATIVE_RESERVED'`,[entry.id]);
+    expect(email.rows).toHaveLength(1);
+  });
   it("queues a single Marketing restock only after explicit consent for the exact item",async()=>{
     const without=await restockFixture(false);
     expect(without.event).toBeNull();

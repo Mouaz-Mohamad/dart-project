@@ -14,6 +14,7 @@ const storefront = readFileSync(new URL("../../src/storefront/storefront.js", im
 const productActions = readFileSync(new URL("../../Js/dart-product-button-state.js", import.meta.url), "utf8");
 const productModal = readFileSync(new URL("../../sections/product-modal.html", import.meta.url), "utf8");
 const platform = readFileSync(new URL("../../Js/dart-platform.js", import.meta.url), "utf8");
+const waitingSource = readFileSync(new URL("../../src/storefront/platform/waiting.js", import.meta.url), "utf8");
 const profile = readFileSync(new URL("../../profile.html", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../../Eye/Dart Eye.html", import.meta.url), "utf8");
 
@@ -33,11 +34,15 @@ describe("Waiting restock reservation contract", () => {
     expect(routes).toContain("{ ...body, whatsappRestockOptIn: true }");
     expect(routes).not.toContain("z.boolean().optional().default(false)");
     expect(productActions).toContain("DartPlatform.joinWaiting");
-    expect(platform).toContain("whatsappRestockOptIn: true");
+    expect(waitingSource).toContain("whatsappRestockOptIn: true");
+    expect(sender).toContain('wa.match_type=\'exact\'');
+    expect(sender).not.toContain('whatsappWaitingAlternativeTemplate');
+    expect(restock).not.toContain("WAITLIST_WHATSAPP_ALTERNATIVE");
     expect(productActions).not.toContain("dartRestockWhatsappOptIn");
     expect(productModal).toContain("dartRestockWhatsAppDisclosure");
     expect(productModal).toContain("Dart | for you");
     expect(productModal).toContain("واتساب");
+    expect(productModal).toContain("الإيميل");
     expect(service).not.toContain("WAITING_WHATSAPP_PHONE_REQUIRED");
   });
 
