@@ -24,7 +24,20 @@ assert(customer.includes("profile.accountType !== \"customer\""), "Customer cach
 assert(customer.includes("X-CSRF-Token"), "Customer mutations must forward the CSRF token");
 assert(!signup.includes('id="customerEmailVerificationForm"'), "Customer signup must not present an email OTP form");
 assert(signup.includes('minlength="6"'), "Customer signup must expose the 6-character minimum");
-assert(signup.includes('name="birthday"') && signup.includes('autocomplete="bday" required'), "Customer signup must require Birthday");
+assert(
+  signup.includes('id="dartBirthdayValue" type="hidden" name="birthday"') &&
+    ['dartBirthDay', 'dartBirthMonth', 'dartBirthYear'].every(id =>
+      new RegExp('<select id="' + id + '"[^>]*\\brequired').test(signup),
+    ) &&
+    signup.includes('src="Js/dart-auth-birthday.js"') &&
+    !signup.includes('type="date" name="birthday"'),
+  "Customer signup must collect a required birthday from the accessible selectors and submit one ISO field",
+);
+assert(
+  signup.includes('href="CSS/dart-auth.css"') &&
+    !/<input type="password"[^>]*>\\s*<svg class="dart-auth-icon"/.test(signup),
+  "Customer authentication must load its dedicated design and keep only the visibility icon beside password fields",
+);
 assert(customerPasswordUi.includes('input.removeAttribute("pattern")'), "Customer password UI must allow any character composition");
 assert(customerPasswordUi.includes("letters, numbers and symbols are all allowed"), "Customer signup must explain the relaxed password rule");
 assert.equal((signup.match(/data-social-login="google"/g) || []).length, 0, "Google must stay hidden until OAuth credentials are configured");

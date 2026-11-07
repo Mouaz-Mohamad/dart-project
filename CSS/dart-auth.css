@@ -1,0 +1,362 @@
+/* DART | for you — auth page only. Existing login/registration form hooks are preserved. */
+body.dart-auth-page {
+  --auth-wine: #ab012b;
+  --auth-text: #31232a;
+  --auth-muted: #85757d;
+  --auth-border: #e9dfe1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: clamp(14px, 3vw, 34px);
+  background:
+    radial-gradient(ellipse at 10% 12%, rgba(171, 1, 43, .1), transparent 43%),
+    radial-gradient(ellipse at 90% 85%, rgba(171, 1, 43, .07), transparent 48%),
+    #f9f5f3;
+  color: var(--auth-text);
+  font-family: 'Poppins', sans-serif;
+}
+.dart-auth-page, .dart-auth-page * { box-sizing: border-box; }
+.dart-auth-page .container.dart-auth-shell {
+  position: relative;
+  width: min(980px, 100%);
+  max-width: 980px;
+  height: min(710px, calc(100dvh - 50px));
+  min-height: 605px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid #eee3e4;
+  border-radius: 26px;
+  background: #fffdfb;
+  box-shadow: 0 28px 85px rgba(58, 20, 36, .15);
+}
+.dart-auth-page .form-box {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50%;
+  min-height: 0;
+  padding: 26px clamp(23px, 4.2vw, 54px);
+  background: #fffdfb;
+  color: var(--auth-text);
+  text-align: start;
+  transition: right .65s cubic-bezier(.22, 1, .36, 1);
+}
+.dart-auth-page .container.active .form-box { right: 50%; }
+.dart-auth-page .form-box.login {
+  visibility: visible;
+  transition: right .65s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .35s;
+}
+.dart-auth-page .container.active .form-box.login { visibility: hidden; }
+.dart-auth-page .form-box.register {
+  visibility: hidden;
+  transition: right .65s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .35s;
+}
+.dart-auth-page .container.active .form-box.register {
+  visibility: visible;
+  transition: right .65s cubic-bezier(.22, 1, .36, 1), visibility 0s;
+}
+.dart-auth-page .form-box form {
+  width: 100%;
+  max-width: 385px;
+  max-height: 100%;
+  margin: 0 auto;
+  padding: 8px 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #e3c6cd transparent;
+}
+.dart-auth-page .dart-auth-heading { margin-bottom: 19px; text-align: start; }
+.dart-auth-page .dart-auth-kicker {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #971232;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2em;
+}
+.dart-auth-page .dart-auth-heading h1 {
+  margin: 0 0 7px;
+  color: var(--auth-text);
+  font-size: clamp(25px, 3vw, 34px);
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.22;
+}
+.dart-auth-page .dart-auth-heading p {
+  margin: 0;
+  color: var(--auth-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.dart-auth-page .input-box { position: relative; margin: 10px 0; }
+.dart-auth-page .dart-auth-field-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #59464e;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.dart-auth-page .input-box input {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 11px 43px 11px 14px;
+  border: 1px solid var(--auth-border);
+  border-radius: 12px;
+  outline: none;
+  background: #fff;
+  color: var(--auth-text);
+  font: 500 13px/1.5 'Poppins', sans-serif;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.dart-auth-page .input-box input::placeholder { color: #9a8d92; opacity: 1; }
+.dart-auth-page .input-box .dart-auth-icon {
+  position: absolute;
+  top: auto;
+  right: 16px;
+  bottom: 14px;
+  width: 18px;
+  height: 18px;
+  transform: none;
+  color: #987a83;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.dart-auth-page .input-box input:hover,
+.dart-auth-page .dart-birthday-selects select:hover { border-color: #caadb5; }
+.dart-auth-page .input-box input:focus-visible,
+.dart-auth-page .dart-birthday-selects select:focus-visible {
+  outline: none;
+  border-color: var(--auth-wine);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(171, 1, 43, .12);
+}
+.dart-auth-page .dart-auth-password-field .dart-password-visibility-toggle {
+  border-radius: 10px;
+  color: #967883;
+}
+.dart-auth-page .dart-auth-password-field .dart-password-visibility-toggle:hover,
+.dart-auth-page .dart-auth-password-field .dart-password-visibility-toggle:focus-visible {
+  background: #f9ecef;
+  color: var(--auth-wine);
+}
+.dart-auth-page input::-ms-reveal, .dart-auth-page input::-ms-clear { display: none; }
+.dart-auth-page .forgot-link { margin: 12px 0 19px; text-align: end; }
+.dart-auth-page .forgot-link a {
+  color: #961535;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.dart-auth-page .forgot-link a:hover { text-decoration: underline; }
+.dart-auth-page .btn.enter-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 17px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--auth-wine);
+  box-shadow: 0 10px 22px rgba(171, 1, 43, .18);
+  color: #fff;
+  font: 700 14px/1.4 'Poppins', sans-serif;
+  cursor: pointer;
+  transition: background-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.dart-auth-page .btn.enter-btn:hover {
+  background: #860b2b;
+  color: #fff;
+  box-shadow: 0 13px 24px rgba(171, 1, 43, .22);
+}
+.dart-auth-page .btn.enter-btn:active { transform: translateY(1px); }
+.dart-auth-page .btn.enter-btn:focus-visible,
+.dart-auth-page .toggle-panel .btn:focus-visible,
+.dart-auth-page .forgot-link a:focus-visible { outline: 3px solid #edb5c3; outline-offset: 3px; }
+.dart-auth-page .password-rule {
+  width: 100%;
+  margin: -3px 0 11px;
+  color: #84747b;
+  text-align: start;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.dart-auth-page .dart-birthday-field { margin: 12px 0; }
+.dart-auth-page .dart-birthday-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.dart-auth-page .dart-birthday-selects select {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 9px 24px 9px 10px;
+  border: 1px solid var(--auth-border);
+  border-radius: 12px;
+  background-color: #fff;
+  color: #4a3740;
+  font: 500 12px/1.5 'Poppins', sans-serif;
+  cursor: pointer;
+}
+.dart-auth-page .dart-birthday-selects select:invalid { color: #95878c; }
+.dart-auth-page .dart-birthday-hint {
+  display: block;
+  margin-top: 7px;
+  color: #887b80;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.dart-auth-page .form-status { font-size: 12px; line-height: 1.6; }
+.dart-auth-page .toggle-box { position: absolute; inset: 0; pointer-events: none; }
+.dart-auth-page .toggle-box::before {
+  content: '';
+  position: absolute;
+  left: -250%;
+  z-index: 2;
+  width: 300%;
+  height: 100%;
+  border-radius: 145px;
+  background:
+    radial-gradient(circle at 92% 18%, rgba(255, 255, 255, .11), transparent 17%),
+    linear-gradient(145deg, #ad123a, #870023 72%, #64001d);
+  transition: left .75s cubic-bezier(.22, 1, .36, 1);
+}
+.dart-auth-page .container.active .toggle-box::before { left: 50%; }
+.dart-auth-page .toggle-panel {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 50%;
+  height: 100%;
+  padding: 36px;
+  color: #fff;
+  text-align: center;
+  pointer-events: auto;
+  transition: left .65s cubic-bezier(.22, 1, .36, 1), right .65s cubic-bezier(.22, 1, .36, 1);
+}
+.dart-auth-page .toggle-panel.toggle-left { left: 0; }
+.dart-auth-page .container.active .toggle-panel.toggle-left { left: -50%; }
+.dart-auth-page .toggle-panel.toggle-right { right: -50%; }
+.dart-auth-page .container.active .toggle-panel.toggle-right { right: 0; }
+.dart-auth-page .dart-auth-panel-tag {
+  display: inline-block;
+  margin-bottom: 25px;
+  color: #ffe5eb;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2em;
+}
+.dart-auth-page .toggle-panel h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(29px, 4vw, 42px);
+  font-weight: 700;
+  line-height: 1.17;
+  letter-spacing: -.04em;
+}
+.dart-auth-page .toggle-panel p {
+  max-width: 285px;
+  margin: 14px 0 22px;
+  color: #fae2e8;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.dart-auth-page .toggle-panel .btn {
+  min-width: 140px;
+  min-height: 44px;
+  padding: 10px 22px;
+  border: 1px solid rgba(255, 255, 255, .8);
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  font: 700 13px/1.4 'Poppins', sans-serif;
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease;
+}
+.dart-auth-page .toggle-panel .btn:hover { background: #fff; color: #840126; }
+@media (max-width: 650px) {
+  body.dart-auth-page { display: block; padding: 0; }
+  .dart-auth-page .container.dart-auth-shell {
+    width: 100%;
+    max-width: none;
+    min-height: 640px;
+    height: 100vh;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .dart-auth-page .form-box {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 76%;
+    padding: 15px clamp(22px, 7vw, 42px);
+  }
+  .dart-auth-page .container.active .form-box { right: 0; bottom: 24%; }
+  .dart-auth-page .form-box form { max-width: 400px; padding: 9px 2px 14px; }
+  .dart-auth-page .dart-auth-heading { margin-bottom: 14px; }
+  .dart-auth-page .input-box { margin: 9px 0; }
+  .dart-auth-page .toggle-box::before {
+    top: -276%;
+    left: 0;
+    width: 100%;
+    height: 300%;
+    border-radius: 22vw;
+    transition: top .75s cubic-bezier(.22, 1, .36, 1);
+  }
+  .dart-auth-page .container.active .toggle-box::before { top: 76%; left: 0; }
+  .dart-auth-page .toggle-panel {
+    width: 100%;
+    height: 24%;
+    padding: 11px 24px;
+    transition: top .65s cubic-bezier(.22, 1, .36, 1), bottom .65s cubic-bezier(.22, 1, .36, 1);
+  }
+  .dart-auth-page .toggle-panel.toggle-left { top: 0; left: 0; }
+  .dart-auth-page .container.active .toggle-panel.toggle-left { top: -24%; left: 0; }
+  .dart-auth-page .toggle-panel.toggle-right { bottom: -24%; right: 0; }
+  .dart-auth-page .container.active .toggle-panel.toggle-right { bottom: 0; right: 0; }
+  .dart-auth-page .dart-auth-panel-tag { margin-bottom: 7px; font-size: 10px; }
+  .dart-auth-page .toggle-panel h1 { font-size: clamp(23px, 6vw, 28px); }
+  .dart-auth-page .toggle-panel h1 br { display: none; }
+  .dart-auth-page .toggle-panel p { margin: 6px 0 10px; font-size: 11px; }
+  .dart-auth-page .toggle-panel .btn { min-height: 37px; min-width: 130px; padding: 7px 14px; }
+}
+@media (max-width: 370px) {
+  .dart-auth-page .form-box { padding-inline: 17px; }
+  .dart-auth-page .dart-birthday-selects { gap: 5px; }
+  .dart-auth-page .dart-birthday-selects select { padding: 9px 18px 9px 7px; font-size: 11px; }
+}
+@media (max-height: 690px) and (min-width: 651px) {
+  body.dart-auth-page { align-items: flex-start; }
+  .dart-auth-page .container.dart-auth-shell { min-height: 640px; height: 640px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dart-auth-page .form-box, .dart-auth-page .toggle-box::before,
+  .dart-auth-page .toggle-panel, .dart-auth-page .btn.enter-btn { transition: none; }
+}
