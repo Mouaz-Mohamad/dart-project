@@ -26,7 +26,7 @@
   const DELIVERY_RADIUS_KM = 1;
   const LOCATION_MAX_AGE_MS = 2 * 60 * 1000;
   const LOCATION_SYNC_MS = 1000;
-  const ROAD_ROUTE_REFRESH_MS = 6000;
+  const ROAD_ROUTE_REFRESH_MS = 15000;
   const API_ENABLED = Boolean(window.DartApi?.isConfigured);
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
@@ -1681,18 +1681,27 @@
     } else {
       showAuth("login");
     }
-    setInterval(async () => {
-      if (currentRep() && !document.hidden) {
-        if (API_ENABLED) {
-          try {
-            await refreshApiWork();
-          } catch (error) {
-            setLocationStatus(error.message || "Could not refresh assigned work.", "error");
+    // Run only one network refresh at a time. Idle couriers do not need 5s polling.
+    const pollAssignedWork = async () => {
+      try {
+        if (currentRep() && !document.hidden) {
+          if (API_ENABLED) {
+            try {
+              await refreshApiWork();
+            } catch (error) {
+              setLocationStatus(error.message || "Could not refresh assigned work.", "error");
+            }
           }
+          renderOrders();
         }
-        renderOrders();
+      } finally {
+        const assigned = API_ENABLED
+          ? Boolean(apiWork.orders?.length || apiWork.returns?.length)
+          : Boolean(read(KEYS.orders, []).length || read(KEYS.returns, []).length);
+        setTimeout(pollAssignedWork, assigned ? 5000 : 15000);
       }
-    }, 5000);
+    };
+    setTimeout(pollAssignedWork, 5000);
   });
   window.addEventListener("storage", (event) => {
     if ([KEYS.orders, KEYS.returns, KEYS.reps, KEYS.items].includes(event.key) && currentRep())
