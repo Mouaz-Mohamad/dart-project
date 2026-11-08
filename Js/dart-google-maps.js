@@ -205,6 +205,14 @@
     for (const entry of mounted.values()) disposeRepresentativeMap(entry);
     mounted.clear();
   }
+  function resizeRepresentatives() {
+    for (const entry of mounted.values()) {
+      if (entry.map && entry.container.getBoundingClientRect().height > 0) {
+        google.maps.event?.trigger?.(entry.map, "resize");
+        if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
+      }
+    }
+  }
   async function attachRepresentatives(orders) {
     const generation = mountGeneration;
     const nodes = [...document.querySelectorAll("[data-rep-live-map]")].filter(node => node.closest("dialog")?.open);
@@ -286,7 +294,7 @@
     if (entry && path.every(Boolean)) { entry.path = path; entry.route?.setPath(path); }
   });
   window.DartGoogleMaps = Object.freeze({ loadMaps, attachRepresentatives,
-    updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
+    resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
     get errorMessage() { return errorMessage; },
   });
 })();

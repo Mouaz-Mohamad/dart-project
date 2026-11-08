@@ -2716,9 +2716,9 @@ export class CommerceService {
         // reading is still required above; never invent a destination pin.
         if (hasVerifiedPin) {
           const distance = distanceKm(location.latitude, location.longitude, destinationLat, destinationLng);
-          if (distance > 1) {
+          if (distance > 0.5) {
             throw new AppError(409, "DELIVERY_TOO_FAR",
-              `You must be within 1 km of the delivery address; current distance is ${distance.toFixed(2)} km`);
+              `You must be within 500 m of the delivery address; current distance is ${distance.toFixed(2)} km`);
           }
         }
         nextStatus = "Delivered";

@@ -153,17 +153,23 @@
       </template>
     </section>
   </main>
+  <button id="repNavigationResume" class="rep-btn rep-btn-go dart-rep-resume" type="button" hidden>Resume delivery navigation</button>
   <dialog id="repNavigationDialog" class="dart-rep-navigation" aria-label="Delivery navigation · Google Maps">
     <div id="repNavigationMap" class="dart-rep-navigation-map" aria-label="Google delivery route"></div>
     <footer class="dart-rep-navigation-footer">
+      <div class="dart-rep-navigation-primary"><button id="repNavigationExit" type="button" class="rep-btn rep-btn-call">Exit navigation</button>
+        <button id="repNavigationComplete" type="button" class="rep-btn rep-btn-complete" hidden>Delivered</button></div>
+      <p id="repNavigationInstruction" role="status" dir="auto"></p>
       <p id="repNavigationStatus" role="status"></p>
       <p id="repNavigationMapStatus" role="status"></p>
       <p id="repNavigationProximity" role="status"></p>
+      <p>Keep this page open for live location. Outside the browser on mobile, use Google Maps navigation.</p>
       <p id="repNavigationWarnings" dir="auto"></p>
-      <div><button id="repNavigationExit" type="button" class="rep-btn rep-btn-call">Exit navigation</button>
+      <div>
         <button id="repNavigationFollow" type="button" class="rep-btn rep-btn-go" aria-pressed="true">Following your location</button>
         <button id="repNavigationStandard" type="button" class="rep-btn rep-btn-call">Standard map</button>
-        <button id="repNavigationComplete" type="button" class="rep-btn rep-btn-complete" hidden>Delivered</button>
+        <button id="repNavigationFloat" type="button" class="rep-btn rep-btn-call" hidden>Floating directions</button>
+        <a id="repNavigationGoogle" class="rep-btn rep-btn-call" target="_blank" rel="noopener">Open Google Maps</a>
         <button id="repNavigationRetry" type="button" class="rep-btn rep-btn-go" hidden>Retry Google Maps</button></div>
     </footer>
   </dialog>

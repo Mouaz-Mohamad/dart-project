@@ -211,7 +211,7 @@ const server = http.createServer((req, res) => {
     await page.locator('[data-action="start"]').click();
     await page.waitForFunction(()=>document.getElementById("repNavigationDialog").open && window.__routes===1);
     const sizes=await page.evaluate(()=>({dialog:document.getElementById("repNavigationDialog").getBoundingClientRect().height,map:document.getElementById("repNavigationMap").getBoundingClientRect().height,height:innerHeight}));
-    assert.equal(sizes.dialog,sizes.height);assert(Math.abs(sizes.map/sizes.height-.7)<.005);
+    assert.equal(sizes.dialog,sizes.height);assert(Math.abs(sizes.map/sizes.height-.8)<.005);
     assert.equal(await page.locator("#repOrdersList [data-rep-live-map]").count(),0);
     assert.equal(await page.locator("#repNavigationComplete").isVisible(),false);
     assert.equal(await page.locator(".dart-rep-navigation-banner").count(),0);
@@ -282,20 +282,22 @@ const server = http.createServer((req, res) => {
 
     // Closing the window is UI-only, then reopening still shows the active delivery.
     await page.locator("#repNavigationExit").click();assert.deepEqual(await page.evaluate(()=>window.__actions),["start"]);
-    await page.locator('[data-action="navigate"]').click();
-    await page.waitForFunction(()=>window.__routes===4);
+    const cachedMaps = await page.evaluate(()=>window.__maps);
+    await page.locator('#repNavigationResume').click();
+    assert.equal(await page.evaluate(()=>window.__maps),cachedMaps,"reopening must preserve the loaded map");
+    assert.equal(await page.evaluate(()=>window.__routes),3,"reopening must preserve the route");
     // Visual fixes must not wait for the API or unlock server-backed delivery confirmation.
     await page.waitForTimeout(1100);
-    await page.evaluate(()=>{window.__delayLocation=true;window.__gps.latitude=30.045;window.__watch({coords:window.__gps,timestamp:Date.now()})});
+    await page.evaluate(()=>{window.__delayLocation=true;window.__gps.latitude=30.046;window.__watch({coords:window.__gps,timestamp:Date.now()})});
     await page.waitForFunction(()=>Boolean(window.__finishLocation));
-    await page.waitForFunction(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat===30.045);
+    await page.waitForFunction(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat===30.046);
     assert.equal(await page.locator("#repNavigationComplete").isVisible(),false,"visual GPS cannot unlock completion before server acknowledgement");
     // A newer, throttled GPS fix still updates the visual arrow without an extra server write.
-    await page.evaluate(()=>{window.__gps.latitude=30.0452;window.__watch({coords:window.__gps,timestamp:Date.now()})});
-    await page.waitForFunction(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat===30.0452);
+    await page.evaluate(()=>{window.__gps.latitude=30.0462;window.__watch({coords:window.__gps,timestamp:Date.now()})});
+    await page.waitForFunction(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat===30.0462);
     await page.evaluate(()=>{window.__delayLocation=false;window.__finishLocation()});
     await page.waitForFunction(()=>!document.getElementById("repNavigationComplete").hidden);
-    assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat),30.0452,"older server acknowledgement must not roll back a newer visual fix");
+    assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat),30.0462,"older server acknowledgement must not roll back a newer visual fix");
     assert.equal(await page.locator('[data-action="complete"]').isVisible(),true);
     await page.locator("#repNavigationComplete").click();
     await page.locator("#repNavigationDialog .dart-dialog-layer").waitFor({state:"visible"});

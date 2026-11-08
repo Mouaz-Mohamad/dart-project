@@ -129,6 +129,7 @@ jobs:
           node tests/product-modal-shared-contract.cjs
           node tests/profile-compact-records.cjs
           node tests/sets-runtime-contract.cjs
+          node tests/rep-navigation-session.cjs
           node tests/test-inventory-contract.cjs
 
   browser-smoke:
