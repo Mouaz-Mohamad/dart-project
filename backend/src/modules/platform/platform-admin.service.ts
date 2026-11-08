@@ -49,7 +49,7 @@ export class PlatformAdminService {
       await remove("customerMessages", `DELETE FROM message_records
         WHERE domain IN ('birthday_messages','message_queue')`);
 
-      // Expenses and order COD settlements belong to the reset. Preserve budgets, goals,
+      // Delete order-linked traffic before the orders FK clears its order_code.\n      await remove("orderTrafficEvents", "DELETE FROM traffic_analytics_events WHERE order_code IS NOT NULL");\n\n      // Expenses and order COD settlements belong to the reset. Preserve budgets, goals,
       // unrelated invoices, marketing records and finance audit trails.
       await remove("financeExpensesAndOrderSettlements", `DELETE FROM finance_records
         WHERE domain IN ('finance_expenses','finance_settlements')`);
@@ -109,8 +109,7 @@ export class PlatformAdminService {
       await remove("customerUsers", "DELETE FROM users WHERE account_type='customer'");
 
       // Remove customer/order-specific analytics and request replay markers, not general visitor analytics.
-      await remove("orderTrafficEvents", "DELETE FROM traffic_analytics_events WHERE order_code IS NOT NULL");
-      await remove("idempotencyKeys", "DELETE FROM idempotency_keys");
+      await remove("idempotencyKeys", `DELETE FROM idempotency_keys WHERE scope LIKE 'order.%' OR scope LIKE 'return.%' OR scope LIKE 'cart.%' OR scope LIKE 'waitlist.%'`);
 
       // Reset only the legacy view domains that represent the selected nine areas.
       const viewDomains = [
