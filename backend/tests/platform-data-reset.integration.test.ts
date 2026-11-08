@@ -17,7 +17,7 @@ describe("owner selective reset — executable SQL", () => {
       const ownerId = randomUUID();
       await pool.query("INSERT INTO catalog_models (model_id, name) VALUES ('reset-model','Temporary Product')");
       await pool.query(
-        "INSERT INTO users (id,account_type,email,email_normalized) VALUES ($1,'customer',$2,$2)",
+        "INSERT INTO users (id,account_type,email,email_normalized,password_hash) VALUES ($1,'customer',$2,$2,'isolated-test-hash')",
         [customerId, "reset-test@example.invalid"],
       );
       await pool.query("INSERT INTO customers (user_id,full_name) VALUES ($1,'Temporary Customer')", [customerId]);
