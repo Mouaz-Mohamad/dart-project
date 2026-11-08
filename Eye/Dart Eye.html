@@ -2444,6 +2444,7 @@
                     <button type="button" data-settings-go="settings-dart-card-system"><i class="fa-solid fa-id-card" aria-hidden="true"></i> Dart Card</button>
                     <button type="button" data-settings-go="settings-cod-risk-card"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> COD risk</button>
                     <button type="button" data-settings-go="settings-waiting-card"><i class="fa-regular fa-clock" aria-hidden="true"></i> Waiting</button>
+                    <button type="button" data-settings-go="settings-discount-codes-card"><i class="fa-solid fa-ticket"></i> Discount codes</button>
                     <button type="button" data-settings-go="settings-site-discount-card"><i class="fa-solid fa-percent" aria-hidden="true"></i> Promotions</button>
                     <button type="button" data-settings-go="settings-media-card"><i class="fa-regular fa-images" aria-hidden="true"></i> Images</button>
                     <button type="button" data-settings-go="settings-announcements-card"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> Announcements</button>
@@ -2560,7 +2561,7 @@
                     <div class="dart-settings-card-copy">
                         <span>PROMOTION CAMPAIGNS</span>
                         <h2>Discount campaign manager</h2>
-                        <p>الأولوية لكل قطعة: خصم القطعة، ثم الحملة، ثم عيد الميلاد، ثم Dart Card. لا يتم جمع خصمين على القطعة نفسها.</p>
+                        <p>الأولوية لكل قطعة: خصم القطعة، ثم الحملة، ثم خصم الشخص، ثم كود الخصم، ثم عيد الميلاد، ثم Dart Card. لا يتم جمع خصمين على القطعة نفسها.</p>
                     </div>
                     <form id="settings-promotion-form" class="dart-settings-fields">
                         <input id="settings-promotion-id" type="hidden"><input id="settings-promotion-version" type="hidden">
@@ -2595,6 +2596,40 @@
                     <div id="settings-promotions-list" class="dart-settings-list"></div>
                 </article>
 
+
+                <!-- BEGIN Discount Codes: separate from automatic promotion campaigns. -->
+                <article id="settings-discount-codes-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-ticket"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>DISCOUNT CODES</span>
+                        <h2>Discount code manager</h2>
+                        <p>الكود يُستخدم مرة واحدة في الأوردر. الخصم بالمبلغ يُخصم مرة واحدة من إجمالي القطع المؤهلة، ولا يُستعاد بعد التسليم والمرتجع. لا يجتمع خصمان على قطعة واحدة.</p>
+                    </div>
+                    <form id="dart-code-form" class="dart-settings-fields" autocomplete="off">
+                        <input id="dart-code-id" type="hidden"><input id="dart-code-version" type="hidden">
+                        <label>Code name<input id="dart-code-name" required minlength="2" maxlength="160"></label>
+                        <label>Code<input id="dart-code-code" required minlength="2" maxlength="60" pattern="[A-Za-z0-9_-]+"></label>
+                        <label>Discount type<select id="dart-code-kind"><option value="percent">Percentage</option><option value="amount">Fixed order saving (EGP)</option></select></label>
+                        <label>Discount %<input id="dart-code-percent" type="number" min="0" max="100" step="0.01" value="0"></label>
+                        <label>Fixed saving (EGP)<input id="dart-code-amount" type="number" min="0" step="0.01" value="0"></label>
+                        <label>Maximum saving (EGP, 0 = unlimited)<input id="dart-code-max" type="number" min="0" step="0.01" value="0"></label>
+                        <label>Minimum order (EGP)<input id="dart-code-min" type="number" min="0" step="0.01" value="0"></label>
+                        <label>Status<select id="dart-code-status-select"><option>Draft</option><option>Active</option><option>Paused</option><option>Expired</option></select></label>
+                        <label>Start date<input id="dart-code-start" type="date"></label>
+                        <label>End date<input id="dart-code-end" type="date"></label>
+                        <label>Total uses (0 = unlimited)<input id="dart-code-total" type="number" min="0" step="1" value="0" required></label>
+                        <label>Uses per customer (0 = unlimited)<input id="dart-code-customer-limit" type="number" min="0" step="1" value="1" required></label>
+                        <label class="dart-settings-field-wide">Assigned customer (blank = public)<input id="dart-code-customer" type="text" maxlength="160" placeholder="Customer Client ID, or blank for everyone"></label>
+                        <label>Product scope<select id="dart-code-scope"><option value="all">Whole store</option><option value="categories">Categories</option><option value="models">Models</option><option value="products">Physical item codes</option></select></label>
+                        <label class="dart-settings-field-wide">Scope values (comma separated)<input id="dart-code-scope-values" type="text" maxlength="4000" placeholder="Leave blank for Whole store"></label>
+                        <button id="dart-code-submit" type="submit" class="dart-settings-save">Create code</button>
+                        <button id="dart-code-cancel" type="button" class="dart-settings-secondary" hidden>Cancel edit</button>
+                        <button id="dart-code-refresh" type="button" class="dart-settings-secondary">Refresh codes</button>
+                    </form>
+                    <p id="dart-code-status" class="dart-settings-status" role="status" aria-live="polite"></p>
+                    <div id="dart-codes-list" class="dart-settings-list"></div>
+                </article>
+                <!-- END Discount Codes. -->
                 <article id="settings-media-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-regular fa-images"></i></div>
                     <div class="dart-settings-card-copy">
@@ -2817,6 +2852,7 @@
     <script src="dart-size-chart.js"></script>
     <script src="dart-settings.js"></script>
     <script src="dart-settings-features-loader.js?v=20261107-1"></script>
+    <script src="dart-discount-codes.js?v=20261109-1"></script>
     <script src="dart-staff.js"></script>
     <script src="../Js/dart-news.js?v=20261008-news-v1" defer></script>
 <script src="dart-dashboard-ui.js"></script>

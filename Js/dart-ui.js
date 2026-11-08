@@ -750,6 +750,21 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         const model = window.DartCatalog?.model?.(line.id);
         return Number(model?.discount || 0) <= 0 && Number(line.quantity || 0) > 0;
     });
+    // A manually entered coupon outranks Birthday and Dart Card on eligible pieces.
+    // The exact mixed-line price is always taken from the server quote.
+    if (window.dartAppliedPromotion?.type === 'DiscountCode' && window.dartAppliedPromotion.code) {
+        if (!hasUndiscountedPiece) {
+            window.dartAppliedPromotion = null;
+            appliedDiscountRate = 0;
+        } else {
+            const input = document.getElementById('discountInput');
+            const button = document.getElementById('applyDiscountBtn');
+            if (input) { input.disabled = false; input.value = window.dartAppliedPromotion.code; }
+            if (button) { button.disabled = false; button.textContent = 'Apply'; }
+            appliedDiscountRate = 0;
+            return true;
+        }
+    }
     if (!hasUndiscountedPiece && window.dartAppliedPromotion?.type === 'Promotion') {
         window.dartAppliedPromotion = null;
         appliedDiscountRate = 0;
@@ -767,12 +782,18 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
     if (activeCampaign) {
         appliedDiscountRate = Math.max(0, Math.min(1, Number(activeCampaign.discountPercent ?? activeCampaign.percent ?? 0) / 100));
         if (discountInput) {
-            discountInput.value = activeCampaign.code;
-            discountInput.disabled = Boolean(activeCampaign.automatic);
+            discountInput.disabled = false;
+            if (activeCampaign.automatic) {
+                // Automatic campaigns must not block entering a separate code for other eligible pieces.
+                if (discountInput.value === activeCampaign.code || discountInput.value.startsWith('BIRTHDAY ') || discountInput.value.startsWith('DART CARD ')) discountInput.value = '';
+                discountInput.placeholder = `Campaign ${activeCampaign.code} applied automatically; enter your code`;
+            } else {
+                discountInput.value = activeCampaign.code;
+            }
         }
         if (discountBtn) {
-            discountBtn.disabled = Boolean(activeCampaign.automatic);
-            discountBtn.textContent = activeCampaign.automatic ? 'Applied' : 'Apply';
+            discountBtn.disabled = false;
+            discountBtn.textContent = 'Apply';
         }
         return true;
     }
@@ -780,12 +801,13 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         window.dartAppliedPromotion = { ...birthdayReward, type: 'Birthday' };
         appliedDiscountRate = Math.max(0, Math.min(1, Number(birthdayReward.discountPercent ?? 30) / 100));
         if (discountInput) {
-            discountInput.value = `BIRTHDAY ${Math.round(appliedDiscountRate * 100)}% — AUTO`;
-            discountInput.disabled = true;
+            if (discountInput.value.startsWith('BIRTHDAY ') || discountInput.value.startsWith('DART CARD ')) discountInput.value = '';
+            discountInput.placeholder = `Birthday ${Math.round(appliedDiscountRate * 100)}% automatically; enter your code`;
+            discountInput.disabled = false;
         }
         if (discountBtn) {
-            discountBtn.disabled = true;
-            discountBtn.textContent = 'Applied';
+            discountBtn.disabled = false;
+            discountBtn.textContent = 'Apply';
         }
         if (showNotice) showToast(`تم تطبيق خصم عيد الميلاد ${Math.round(appliedDiscountRate * 100)}% تلقائيًا.`);
         return true;
@@ -795,12 +817,13 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
         window.dartAppliedPromotion = { ...dartCard, type: 'Dart Card', percent: cardPercent };
         appliedDiscountRate = Math.max(0, Math.min(1, cardPercent / 100));
         if (discountInput) {
-            discountInput.value = `DART CARD ${Math.round(cardPercent)}% — AUTO`;
-            discountInput.disabled = true;
+            if (discountInput.value.startsWith('BIRTHDAY ') || discountInput.value.startsWith('DART CARD ')) discountInput.value = '';
+            discountInput.placeholder = `Dart Card ${Math.round(cardPercent)}% automatically; enter your code`;
+            discountInput.disabled = false;
         }
         if (discountBtn) {
-            discountBtn.disabled = true;
-            discountBtn.textContent = 'Applied';
+            discountBtn.disabled = false;
+            discountBtn.textContent = 'Apply';
         }
         if (showNotice) showToast(`تم تطبيق خصم Dart Card بنسبة ${Math.round(cardPercent)}% تلقائيًا.`);
         return true;
@@ -946,7 +969,7 @@ async function persistCartReservation(previousSnapshot = null) {
 }
 async function resolveAutomaticCampaign() {
     if (!cartData.length || !window.DartPlatform?.currentUser?.() || !window.DartPlatform?.apiRequest) return;
-    if (window.dartAppliedPromotion?.type === 'Promotion' && !window.dartAppliedPromotion?.automatic) return;
+    if (window.dartAppliedPromotion?.code && !window.dartAppliedPromotion?.automatic) return;
     try {
         const reservationId = window.DartPlatform.cartReservationId;
         const payload = await window.DartPlatform.apiRequest(
@@ -982,8 +1005,8 @@ function initCartAndCheckoutEvents() {
     if (discountBtn && discountInput) {
         discountBtn.addEventListener('click', async () => {
             const code = discountInput.value.trim().toUpperCase();
-            const manualCampaign = window.dartAppliedPromotion?.type === 'Promotion' && !window.dartAppliedPromotion.automatic;
-            if (!manualCampaign && syncBirthdayCheckoutDiscount(true)) {
+            const manualCampaign = Boolean(window.dartAppliedPromotion?.code && !window.dartAppliedPromotion?.automatic);
+            if (!manualCampaign && !code && syncBirthdayCheckoutDiscount(true)) {
                 updateCartTotals();
                 return;
             }
@@ -992,6 +1015,7 @@ function initCartAndCheckoutEvents() {
                 appliedDiscountRate = 0;
                 showToast(manualCampaign ? "تمت إزالة كود الخصم." : "اكتب كود الخصم أولاً.");
                 updateCartTotals();
+                void resolveAutomaticCampaign();
                 return;
             }
             let promotion = null;
@@ -1005,7 +1029,9 @@ function initCartAndCheckoutEvents() {
                     const payload = await window.DartPlatform.apiRequest(
                         `/api/v1/me/promotions/resolve?reservationId=${encodeURIComponent(reservationId)}&code=${encodeURIComponent(code)}`
                     );
-                    if (payload.campaign) {
+                    if (payload.discountCode) {
+                        promotion = { ...payload.discountCode, type: 'DiscountCode', automatic: false };
+                    } else if (payload.campaign) {
                         promotion = payload.campaign;
                     }
                 } catch (error) {
@@ -1029,14 +1055,30 @@ function initCartAndCheckoutEvents() {
                 } catch {}
             }
             if (promotion) {
-                promotion.type = 'Promotion';
+                promotion.type = promotion.type === 'DiscountCode' ? 'DiscountCode' : 'Promotion';
                 promotion.code = code;
+                const previousPromotion = window.dartAppliedPromotion;
+                const previousDiscountRate = appliedDiscountRate;
                 window.dartAppliedPromotion = promotion;
-                appliedDiscountRate = Math.min(
+                appliedDiscountRate = promotion.type === 'DiscountCode' ? 0 : Math.min(
                     1,
                     Math.max(0, Number(promotion.percent || promotion.discountPercent || promotion.discount) / 100)
                 );
-                showToast(`تم تطبيق خصم ${Math.round(appliedDiscountRate * 100)}% بنجاح!`);
+                // Never show a coupon as applied unless the authoritative quote confirms savings.
+                if (promotion.type === 'DiscountCode' && window.DartPlatform?.quoteCart) {
+                    try {
+                        await window.DartPlatform.quoteCart({ force: true });
+                    } catch (error) {
+                        window.dartAppliedPromotion = previousPromotion;
+                        appliedDiscountRate = previousDiscountRate;
+                        updateCartTotals();
+                        showToast(error?.message || 'الكود لا يمنح خصمًا على القطع الحالية.');
+                        return;
+                    }
+                }
+                showToast(promotion.type === 'DiscountCode' && promotion.kind === 'amount'
+                    ? `تم قبول الكود ${code}؛ خصم المبلغ الثابت يُوزّع على القطع المؤهلة فقط.`
+                    : `تم قبول كود الخصم ${code}؛ راجع السعر النهائي للسلة.`);
             } else {
                 window.dartAppliedPromotion = null;
                 appliedDiscountRate = 0;

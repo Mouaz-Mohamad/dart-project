@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AppError } from "../../http/app-error.js";
 import { customerDetails, type CustomerDetailSection } from "./customer-details.service.js";
 import { saveManualDiscount, type ManualDiscountInput } from "./customer-manual-discount.js";
+import { DiscountCodeService, type DiscountCode, type DiscountCodeInput } from "./discount-code.js";
 
 const conditionField = z.enum([
   "ordersCount",
@@ -213,6 +214,12 @@ function campaignPayload(input: PromotionCampaignInput): Record<string, unknown>
 export class PromotionService {
   public constructor(private readonly pool: Pool) {}
 
+  public listDiscountCodes() { return new DiscountCodeService(this.pool).list(); }
+  public saveDiscountCode(input: DiscountCodeInput, actorId: string, requestId: string,
+    id?: string, expectedVersion?: number) {
+    return new DiscountCodeService(this.pool).save(input,actorId,requestId,id,expectedVersion);
+  }
+
   public saveCustomerDiscount(ref: string, actor: string, requestId: string, id: string,
     input: ManualDiscountInput | null, expectedVersion?: number) {
     return saveManualDiscount(this.pool, ref, actor, requestId, id, input, expectedVersion);
@@ -364,7 +371,7 @@ export class PromotionService {
     return result.rows.map(normalizedCampaign).filter((row): row is PromotionCampaignInput & { id: string; version: number } => Boolean(row));
   }
 
-  public async resolveForCheckout(customerUserId: string, reservationId: string, requestedCode?: string): Promise<{ code: string | null; campaign: Record<string, unknown> | null }> {
+  public async resolveForCheckout(customerUserId: string, reservationId: string, requestedCode?: string): Promise<{ code: string | null; campaign: Record<string, unknown> | null; discountCode: DiscountCode | null }> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -379,13 +386,19 @@ export class PromotionService {
     }
   }
 
-  public async resolveForCheckoutInTransaction(client: PoolClient, customerUserId: string, reservationId: string, requestedCode?: string, reservedItems?: CartFact[]): Promise<{ code: string | null; campaign: Record<string, unknown> | null }> {
+  public async resolveForCheckoutInTransaction(client: PoolClient, customerUserId: string, reservationId: string, requestedCode?: string, reservedItems?: CartFact[]): Promise<{ code: string | null; campaign: Record<string, unknown> | null; discountCode: DiscountCode | null }> {
       const facts = await this.customerFacts(client, customerUserId);
       const cart = reservedItems ?? await this.cartFacts(client, customerUserId, reservationId);
       if (!cart.length) throw new AppError(409, "RESERVATION_EMPTY", "No reserved items remain in this cart");
       const campaigns = await this.loadCampaigns(client);
       const normalizedCode = String(requestedCode || "").trim().toUpperCase();
-      const candidates = normalizedCode
+      const discountCode = normalizedCode ? await new DiscountCodeService(this.pool).resolveInTransaction(
+        client, customerUserId, normalizedCode,
+        cart.map(line => ({ id: line.itemCode, ...line }))
+      ) : null;
+      // Automatic campaigns remain first-priority on their own eligible pieces.
+      // A supplied discount code is not mistaken for a campaign.
+      const candidates = normalizedCode && !discountCode
         ? campaigns.filter((campaign) => campaign.code === normalizedCode)
         : campaigns.filter((campaign) => campaign.automatic).sort((a,b) => b.priority - a.priority || b.discountPercent - a.discountPercent);
       for (const campaign of candidates) {
@@ -397,12 +410,13 @@ export class PromotionService {
         return {
           code: campaign.code,
           campaign: { id: campaign.id, name: campaign.name, code: campaign.code, discountPercent: campaign.discountPercent, automatic: campaign.automatic },
+          discountCode,
         };
       }
-      if (normalizedCode) {
+      if (normalizedCode && !discountCode) {
         throw new AppError(409, "PROMOTION_NOT_ELIGIBLE", "Promotion is invalid, expired, exhausted, or not eligible for this account/cart");
       }
-      return { code: null, campaign: null };
+      return { code: null, campaign: null, discountCode };
   }
 
   public async validateCode(customerUserId: string, code: string): Promise<Record<string, unknown>> {
@@ -460,7 +474,7 @@ export class PromotionService {
     try {
       await client.query("BEGIN");
       await client.query("SELECT pg_advisory_xact_lock(hashtext('dart:promotions'))");
-      const duplicate = await client.query("SELECT 1 FROM promotion_records WHERE code=$1 LIMIT 1", [input.code]);
+      const duplicate = await client.query("SELECT 1 FROM promotion_records WHERE code=$1 OR payload->>'code'=$1 UNION ALL SELECT 1 FROM discount_codes WHERE code=$1 LIMIT 1", [input.code]);
       if (duplicate.rows.length) throw new AppError(409, "PROMOTION_CODE_EXISTS", "Promotion code already exists");
       const positionResult = await client.query<{ position: string }>("SELECT COALESCE(max(position),0)+1::bigint AS position FROM promotion_records");
       const payload = campaignPayload(input);
@@ -496,7 +510,8 @@ export class PromotionService {
       );
       if (!current.rows[0]) throw new AppError(404, "PROMOTION_NOT_FOUND", "Promotion not found");
       if (Number(current.rows[0].version) !== expectedVersion) throw new AppError(409, "PROMOTION_VERSION_CONFLICT", "Promotion changed; reload and retry");
-      const duplicate = await client.query("SELECT 1 FROM promotion_records WHERE code=$1 AND record_id<>$2 LIMIT 1", [input.code, recordId]);
+      const duplicate = await client.query("SELECT 1 FROM promotion_records WHERE (code=$1 OR payload->>'code'=$1) AND record_id<>$2
+          UNION ALL SELECT 1 FROM discount_codes WHERE code=$1 LIMIT 1", [input.code, recordId]);
       if (duplicate.rows.length) throw new AppError(409, "PROMOTION_CODE_EXISTS", "Promotion code already exists");
       const payload = campaignPayload(input);
       await client.query(

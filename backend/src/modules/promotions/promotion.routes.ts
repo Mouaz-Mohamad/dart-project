@@ -14,6 +14,7 @@ import type { IdentityService } from "../identity/identity.service.js";
 import { promotionCampaignInputSchema, type PromotionService } from "./promotion.service.js";
 import { CUSTOMER_DETAIL_PERMISSIONS } from "./customer-details.service.js";
 import { manualDiscountSchema } from "./customer-manual-discount.js";
+import { discountCodeInputSchema } from "./discount-code.js";
 
 const recordId = z.string().trim().min(8).max(160);
 const reservationId = z.string().trim().min(16).max(160).regex(/^[A-Za-z0-9_-]+$/);
@@ -77,11 +78,45 @@ export function createPromotionRouter(
       const targetReservation = reservationId.parse(request.query.reservationId);
       const code = z.string().trim().min(1).max(60).optional().parse(request.query.code);
       response.setHeader("Cache-Control", "no-store");
-      response.status(200).json(
-        await promotions.resolveForCheckout(request.auth!.userId, targetReservation, code),
-      );
+      const resolved = await promotions.resolveForCheckout(request.auth!.userId, targetReservation, code);
+      // Never expose private coupon owner IDs or usage counters through the storefront.
+      response.status(200).json({
+        code: resolved.code,
+        campaign: resolved.campaign,
+        discountCode: resolved.discountCode ? {
+          code: resolved.discountCode.code,
+          name: resolved.discountCode.name,
+          kind: resolved.discountCode.kind,
+          percent: resolved.discountCode.percent,
+          amountMinor: resolved.discountCode.amountMinor,
+        } : null,
+      });
     },
   );
+
+  router.get("/admin/discount-codes", signedIn, requireAccountType("staff"), requireMfa,
+    requirePermission("promotions.read"), async (_request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.json(await promotions.listDiscountCodes());
+    });
+
+  router.post("/admin/discount-codes", signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requirePermission("promotions.manage"), async (request, response) => {
+      const data = discountCodeInputSchema.parse(request.body);
+      response.status(201).json({ discountCode: await promotions.saveDiscountCode(
+        data,request.auth!.userId,String(request.id)) });
+    });
+
+  router.put("/admin/discount-codes/:id", signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requirePermission("promotions.manage"), async (request, response) => {
+      const data = z.object({
+        expectedVersion: z.number().int().positive(),
+        discountCode: discountCodeInputSchema,
+      }).strict().parse(request.body);
+      response.json({ discountCode: await promotions.saveDiscountCode(
+        data.discountCode,request.auth!.userId,String(request.id),
+        z.uuid().parse(request.params.id),data.expectedVersion) });
+    });
 
   router.get(
     "/admin/promotions",
