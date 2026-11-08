@@ -1,9 +1,18 @@
 <!-- DART CODE GUIDE | sections/birthday.html
      الغرض: جزء HTML قابل لإعادة الاستخدام ويتم حقنه داخل صفحات الموقع. -->
-<section class="birthday-conteiner djasb" id="birthday-offer">
-    <img src="/Photos/birthday.webp" alt="Red birthday gift box with a gold ribbon" width="161" height="130" style="width:120px;height:auto" loading="lazy" decoding="async">
-    <div class="paragraph-btn dja-flexdir">
-        <h1>Get a <span>15%</span> Discount on your birthday from <span>Dart</span></h1>
-        <button type="button" data-dart-signup-link>Register your birthday</button>
+<section class="birthday-conteiner djasb" id="birthday-offer" aria-labelledby="birthday-offer-title">
+    <div class="birthday-offer-emblem" aria-hidden="true">
+        <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false">
+            <rect x="16" y="35" width="56" height="38" rx="4" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 25h64v10H12zM44 25v48" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M44 25c-8 0-21-2-21-10 0-4 3-7 7-7 7 0 12 11 14 17Zm0 0c8 0 21-2 21-10 0-4-3-7-7-7-7 0-12 11-14 17Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+    </div>
+    <div class="paragraph-btn dja-flexdir birthday-offer-content">
+        <span class="birthday-offer-eyebrow">DART | FOR YOU</span>
+        <h2 class="birthday-offer-heading" id="birthday-offer-title">YOUR DAY.<br>YOUR GIFT.</h2>
+        <p class="birthday-offer-discount"><strong>15%</strong><span>OFF</span></p>
+        <p class="birthday-offer-message">On your birthday, from Dart.</p>
+        <button class="birthday-offer-cta" type="button" data-dart-signup-link>Register your birthday <span aria-hidden="true">&#8594;</span></button>
     </div>
 </section>
