@@ -49,13 +49,13 @@
     if (entry.map.getRenderingType?.() === "VECTOR") entry.map.moveCamera({ center: location, heading, tilt: 60 });
     else entry.map.setCenter(location);
   }
-  function drawCourier(entry, location, heading) {
+  function drawCourier(entry, location, heading, final = false) {
     if (entry.container.dataset.mapState === "error" || !mapIsVisible(entry)) return;
     entry.drawnLocation = location; entry.drawnHeading = heading;
     // Keep the initial viewport still until streets load. GPS/marker animation must not churn tiles.
     if (entry.follow && entry.tilesReady) {
       const time = performance.now();
-      const changed = entry.cameraAt == null || !entry.cameraLocation || metresBetween(entry.cameraLocation, location) >= 1 ||
+      const changed = final || entry.cameraAt == null || !entry.cameraLocation || metresBetween(entry.cameraLocation, location) >= 1 ||
         Math.abs(angleDifference(entry.cameraHeading ?? heading, heading)) >= 1;
       entry.pendingCamera = { location, heading };
       if (changed) {
@@ -83,13 +83,13 @@
     // Interpolate between real fixes only. Never extrapolate a courier past the latest GPS fix.
     if (!from || metresBetween(from, location) > 250 || document.hidden ||
         window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      drawCourier(entry, location, heading); entry.frame = null; return;
+      drawCourier(entry, location, heading, true); entry.frame = null; return;
     }
     const tick = time => {
       const t = Math.min(1, (time - started) / duration);
       drawCourier(entry, { lat: from.lat + (location.lat - from.lat) * t,
         lng: from.lng + (location.lng - from.lng) * t },
-        (fromHeading + angleDifference(fromHeading, heading) * t + 360) % 360);
+        (fromHeading + angleDifference(fromHeading, heading) * t + 360) % 360, t >= 1);
       entry.frame = t < 1 ? window.requestAnimationFrame(tick) : null;
     };
     entry.frame = window.requestAnimationFrame(tick);
