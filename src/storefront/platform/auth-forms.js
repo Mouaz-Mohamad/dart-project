@@ -15,9 +15,7 @@
         if (
           [
             "registerForm",
-            "customerEmailVerificationForm",
             "loginForm",
-            "customerAccountPasswordForm",
             "checkoutForm",
             "contactForm",
             "reviewForm",
@@ -33,78 +31,38 @@
         if (form.id === "registerForm") {
           event.preventDefault();
           event.stopImmediatePropagation();
+          if (form.dataset.submitting === "1") return;
+          const submit = form.querySelector('[type="submit"]');
+          form.dataset.submitting = "1";
+          if (submit) submit.disabled = true;
+          setStatus(form, "جارٍ إنشاء الحساب…");
           try {
-            const result = await register(Object.fromEntries(new FormData(form)));
-            if (result?.status === "verification_required") {
-              const dialog = document.getElementById("customerEmailVerification");
-              const verificationForm = document.getElementById(
-                "customerEmailVerificationForm",
-              );
-              verificationForm.elements.challengeId.value = result.challengeId;
-              dialog.hidden = false;
-              verificationForm.elements.code.focus();
-              setStatus(form, "تم إرسال كود التأكيد إلى بريدك الإلكتروني.");
-            } else {
-              setStatus(form, "تم إنشاء الحساب بنجاح.");
-              location.assign(requestedAuthDestination());
-            }
+            await register(Object.fromEntries(new FormData(form)));
+            setStatus(form, "تم إنشاء الحساب بنجاح.");
+            location.assign(requestedAuthDestination());
           } catch (error) {
             setStatus(form, error.message, true);
-          }
-        } else if (form.id === "customerEmailVerificationForm") {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          try {
-            await verifyEmail(form.elements.challengeId.value, form.elements.code.value);
-            sessionStorage.removeItem("dart_pending_email_verification");
-            setStatus(form, "تم تأكيد الحساب بنجاح.");
-            setTimeout(() => location.assign(requestedAuthDestination()), 450);
-          } catch (error) {
-            setStatus(form, error.message, true);
+          } finally {
+            delete form.dataset.submitting;
+            if (submit) submit.disabled = false;
           }
         } else if (form.id === "loginForm") {
           event.preventDefault();
           event.stopImmediatePropagation();
+          if (form.dataset.submitting === "1") return;
+          const submit = form.querySelector('[type="submit"]');
+          form.dataset.submitting = "1";
+          if (submit) submit.disabled = true;
+          setStatus(form, "جارٍ تسجيل الدخول…");
           try {
-            const user = await login(
-              form.elements.identifier.value,
-              form.elements.password.value,
-            );
+            await login(form.elements.identifier.value);
             setStatus(form, "تم تسجيل الدخول بنجاح.");
-            if (user.mustChangePassword) {
-              const dialog = document.getElementById("customerPasswordChange");
-              if (dialog) dialog.hidden = false;
-            } else
-              location.assign(requestedAuthDestination());
+            location.assign(requestedAuthDestination());
           } catch (error) {
             setStatus(form, error.message, true);
-          }
-        } else if (form.id === "customerChangePasswordForm") {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          try {
-            await replaceTemporaryPassword(
-              form.elements.password.value,
-              form.elements.confirmPassword.value,
-            );
-            setStatus(form, "Password changed successfully.");
-            setTimeout(() => location.assign(requestedAuthDestination()), 400);
-          } catch (error) {
-            setStatus(form, error.message, true);
-          }
-        } else if (form.id === "customerAccountPasswordForm") {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          try {
-            await changeOwnPassword(
-              form.elements.currentPassword.value,
-              form.elements.password.value,
-              form.elements.confirmPassword.value,
-            );
-            form.reset();
-            setStatus(form, "Password changed successfully. Other active sessions were signed out.");
-          } catch (error) {
-            setStatus(form, error.message, true);
+          } finally {
+            delete form.dataset.submitting;
+            if (submit) submit.disabled = false;
           }
         } else if (form.id === "checkoutForm") {
           // The form handler owns price review; its address-wait capture handler
@@ -473,42 +431,4 @@
       true,
     );
 
-    document.addEventListener("click", (event) => {
-      const passwordToggle = event.target.closest("[data-change-password-toggle]");
-      if (passwordToggle) {
-        event.preventDefault();
-        const form = document.getElementById("customerAccountPasswordForm");
-        if (form) {
-          form.hidden = !form.hidden;
-          if (!form.hidden) form.elements.currentPassword?.focus();
-        }
-        return;
-      }
-      const forgot = event.target.closest("[data-forgot-password]");
-      if (forgot) {
-        event.preventDefault();
-        const hint = document.getElementById("loginForm")?.elements?.identifier?.value || "";
-        openPasswordReset("customer", hint);
-      }
-      const resend = event.target.closest("[data-resend-email-verification]");
-      if (resend) {
-        const form = document.getElementById("customerEmailVerificationForm");
-        const challengeId = form?.elements.challengeId.value;
-        if (!challengeId) return;
-        resend.disabled = true;
-        apiRequest("/api/v1/auth/resend-verification", {
-          method: "POST",
-          body: { challengeId },
-        })
-          .then((result) => {
-            form.elements.challengeId.value = result.challengeId;
-            setStatus(form, "تم إرسال كود جديد إلى بريدك الإلكتروني.");
-          })
-          .catch((error) => setStatus(form, error.message, true))
-          .finally(() => {
-            resend.disabled = false;
-          });
-      }
-    });
   }
-

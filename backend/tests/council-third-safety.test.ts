@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { embeddedStore } from "./embedded-store.js";
 import { IdentityService } from "../src/modules/identity/identity.service.js";
 import type { AuthenticatedAccount } from "../src/modules/identity/identity.types.js";
-import { decryptSecret } from "../src/security/crypto.js";
+import { decryptSecret, digest } from "../src/security/crypto.js";
 import { OutboxService } from "../src/modules/outbox/outbox.service.js";
 import { createOutboxRouter } from "../src/modules/outbox/outbox.routes.js";
 
@@ -27,15 +27,19 @@ describe("third Council account and delivery regressions", () => {
   afterAll(async () => { await store?.db.close(); });
   async function register() {
     const id = randomUUID(), phone = `010${String(randomInt(0, 100000000)).padStart(8, "0")}`;
-    const session = await identity.registerCustomer({ name: "Synthetic Customer", email: `${id}@example.test`, phone1: phone, birthday: "2000-01-02", password: "SyntheticPassword123" }, metadata);
+    const session = await identity.registerCustomer({ name: "Synthetic Customer", email: `${id}@example.test`, phone1: phone, birthday: "2000-01-02" }, metadata);
     return { session, phone };
   }
   async function emailChange() {
     const f = await register();
     const changed = await identity.updateCustomerProfile(f.session.account, { name: "Synthetic Customer", email: `${randomUUID()}@example.test`, phone1: f.phone }, metadata);
-    const challenge = changed.verification!.challengeId;
-    const event = (await store.pool.query("SELECT payload FROM outbox_events WHERE deduplication_key=$1", [`email-change-verification:${challenge}`])).rows[0];
-    const code = decryptSecret(Buffer.from(event.payload.encryptedParameters.otp, "base64"), config.mfaEncryptionKey);
+    expect(changed.verification).toBeUndefined();
+    await store.pool.query("UPDATE users SET status='pending_verification' WHERE id=$1", [f.session.account.userId]);
+    // Legacy challenges may still exist during rollout; suspension/deletion must invalidate them.
+    const challenge = randomUUID(), code = "123456";
+    await store.pool.query(`INSERT INTO email_verification_challenges(id,user_id,purpose,code_hash,expires_at)
+      VALUES($1,$2,'change_email',$3,now()+interval '10 minutes')`,
+      [challenge,f.session.account.userId,digest(`email-otp:${challenge}:${code}`,config.authPepper)]);
     return { ...f, challenge, code };
   }
 

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { digest, randomToken, safeEqual } from "../../security/crypto.js";
-import { normalizeEmail } from "../../security/normalization.js";
+import { normalizeEmail, normalizeEgyptianPhone } from "../../security/normalization.js";
 import type { IssuedSession, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 
@@ -566,7 +566,7 @@ export class SocialAuthService {
       accountExists: Boolean(existing),
       phoneRequired: !existing,
       birthdayAlreadySaved: Boolean(existing?.birthday),
-      passwordRequired: Boolean(existing && !existing.linked),
+      passwordRequired: false,
       birthdayRequired: !existing?.birthday,
       next: row.next_destination,
       expiresAt: row.expires_at.toISOString(),
@@ -614,8 +614,6 @@ export class SocialAuthService {
   public async complete(
     input: {
       token: string;
-      password?: string | undefined;
-      confirmation?: string | undefined;
       birthday?: string | undefined;
       name?: string | undefined;
       phone1?: string | undefined;
@@ -663,20 +661,24 @@ export class SocialAuthService {
       }
 
       let existing = await this.existingCustomerForChallenge(current);
+      if (!existing && input.phone1) {
+        let normalizedPhone: string;
+        try { normalizedPhone = normalizeEgyptianPhone(input.phone1); }
+        catch { throw new AppError(422, "INVALID_PHONE", "Enter a valid Egyptian phone number"); }
+        const phoneMatch = await client.query<{ user_id: string; email: string; birthday: string | null }>(
+          `SELECT u.id::text AS user_id,COALESCE(u.email,'') AS email,c.birthday::text
+             FROM users u JOIN customers c ON c.user_id=u.id
+             JOIN account_phones ap ON ap.user_id=u.id AND ap.account_type='customer'
+            WHERE u.account_type='customer' AND u.deleted_at IS NULL AND ap.phone_normalized=$1`,
+          [normalizedPhone],
+        );
+        const match = phoneMatch.rows[0];
+        if (match) existing = { userId: match.user_id, email: match.email, birthday: match.birthday, linked: false };
+      }
       let session: IssuedSession;
       let newlyRegistered = false;
       if (existing) {
-        if (existing.linked) {
-          session = await this.identity.loginLinkedSocialCustomer(existing.userId, metadata);
-        } else {
-          // Never link an existing Dart account to Google by matching email alone.
-          // The original Dart password must be verified once before linking.
-          if (!input.password || input.password !== input.confirmation) {
-            throw new AppError(422, "PASSWORD_REQUIRED_FOR_LINKING",
-              "Enter your existing Dart account password to link Google");
-          }
-          session = await this.identity.login("customer", existing.email, input.password, metadata);
-        }
+        session = await this.identity.loginLinkedSocialCustomer(existing.userId, metadata);
         if (!existing.birthday) {
           if (!input.birthday) {
             throw new AppError(422, "BIRTHDAY_REQUIRED", "Birthday is required");
@@ -701,10 +703,6 @@ export class SocialAuthService {
         if (!input.birthday) {
           throw new AppError(422, "BIRTHDAY_REQUIRED", "Birthday is required");
         }
-        // Brand-new Google customers do not have to invent a second password.
-        // A random unguessable credential preserves legacy password_hash constraints;
-        // they can set their own password later through verified email recovery.
-        const generatedPassword = randomToken(32);
         session = await this.identity.registerCustomer(
           {
             name,
@@ -714,7 +712,6 @@ export class SocialAuthService {
               ? { phone2: input.phone2.trim() }
               : {}),
             birthday: input.birthday,
-            password: generatedPassword,
           },
           metadata,
         );
@@ -730,9 +727,11 @@ export class SocialAuthService {
       await this.linkIdentity(client, current, existing.userId);
       await client.query(
         `UPDATE users
-            SET email_verified_at=COALESCE(email_verified_at,now()),updated_at=now()
+            SET email=COALESCE(email,$2),email_normalized=COALESCE(email_normalized,$3),
+              email_verified_at=CASE WHEN email_normalized IS NULL OR email_normalized=$3
+                THEN now() ELSE email_verified_at END,updated_at=now()
           WHERE id=$1 AND account_type='customer'`,
-        [existing.userId],
+        [existing.userId, current.provider_email, current.provider_email_normalized],
       );
       await client.query(
         `UPDATE customer_social_auth_challenges

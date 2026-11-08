@@ -18,10 +18,10 @@ import type { AccountType, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 
-const customerPassword = z.string().min(6).max(200);
-const passwordCandidate = z.string().min(6).max(200);
+const passwordCandidate = z.string().min(12).max(200);
 const password = z.string().min(12).max(200);
 const email = z.email().max(254);
+const optionalCustomerEmail = z.union([email, z.literal("")]).optional();
 const egyptianPhone = z.string().min(10).max(25);
 const optionalEgyptianPhone = z
   .union([egyptianPhone, z.literal("")])
@@ -31,11 +31,10 @@ const uuid = z.uuid();
 
 const registerCustomerSchema = z.object({
   name: z.string().trim().min(3).max(120),
-  email,
+  email: optionalCustomerEmail,
   phone1: egyptianPhone,
   phone2: optionalEgyptianPhone,
   birthday: z.iso.date(),
-  password: customerPassword,
 });
 
 const representativeImageDataUrl = z.string().min(100).max(1_500_000).regex(/^data:image\/(?:jpeg|png|webp);base64,/);
@@ -161,27 +160,9 @@ export function createIdentityRouter(
     });
   });
 
-  router.post("/auth/verify-email", authLimiter(config, "identity-2"), async (request, response) => {
-    const body = z.object({ challengeId: uuid, code: z.string().regex(/^\d{6}$/) }).parse(request.body);
-    const session = await service.verifyCustomerEmail(body.challengeId, body.code, metadata(request));
-    setSessionCookies(response, config, session);
-    response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
-  });
-
-  router.post("/auth/resend-verification", authLimiter(config, "identity-3"), async (request, response) => {
-    const body = z.object({ challengeId: uuid }).parse(request.body);
-    const result = await service.resendCustomerVerification(body.challengeId, metadata(request));
-    await dispatchOutbox(outbox, 5);
-    response.status(202).json({
-      status: "verification_required",
-      challengeId: result.challengeId,
-      expiresAt: result.expiresAt.toISOString(),
-    });
-  });
-
   router.post("/auth/login", authLimiter(config, "identity-4"), async (request, response) => {
-    const body = loginSchema.parse(request.body);
-    const session = await service.login("customer", body.identifier, body.password, metadata(request));
+    const body = z.object({ identifier: z.string().trim().min(3).max(254) }).parse(request.body);
+    const session = await service.loginCustomer(body.identifier, metadata(request));
     setSessionCookies(response, config, session);
     response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
   });
@@ -204,7 +185,7 @@ export function createIdentityRouter(
     const body = z
       .object({
         identifier: z.string().trim().min(3).max(254),
-        accountType: z.enum(["customer", "representative"]).default("customer"),
+        accountType: z.literal("representative").default("representative"),
       })
       .parse(request.body);
     const result = await service.requestPasswordReset(
@@ -242,37 +223,6 @@ export function createIdentityRouter(
     response.status(200).json({ message: "Password changed successfully. Sign in with the new password." });
   });
 
-  router.post(
-    "/auth/change-password",
-    signedIn,
-    csrf,
-    requireAccountType("customer"),
-    async (request, response) => {
-      const body = z
-        .object({
-          currentPassword: z.string().min(1).max(200),
-          password: customerPassword,
-          confirmation: customerPassword,
-        })
-        .refine((value) => value.password === value.confirmation, {
-          path: ["confirmation"],
-          message: "Passwords do not match",
-        })
-        .parse(request.body);
-      const session = await service.changeCustomerPassword(
-        request.auth!,
-        body.currentPassword,
-        body.password,
-        metadata(request),
-      );
-      setSessionCookies(response, config, session);
-      response.status(200).json({
-        user: await service.profile(session.account),
-        csrfToken: session.csrfToken,
-      });
-    },
-  );
-
   // Staff sessions are validated independently from the website's customer session.
   router.get("/admin/auth/me", signedIn, requireAccountType("staff"), async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -306,7 +256,7 @@ export function createIdentityRouter(
     const body = z
       .object({
         name: z.string().trim().min(3).max(120),
-        email,
+        email: optionalCustomerEmail,
         phone1: egyptianPhone,
         phone2: optionalEgyptianPhone,
         birthday: z.iso.date().optional(),
@@ -361,7 +311,7 @@ export function createIdentityRouter(
     "/auth/change-temporary-password",
     signedIn,
     csrf,
-    requireAccountType("customer", "representative"),
+    requireAccountType("representative"),
     async (request, response) => {
     const body = z
       .object({ password: passwordCandidate, confirmation: passwordCandidate })
@@ -502,7 +452,7 @@ export function createIdentityRouter(
     async (request, response) => {
       const body = z.object({
         name: z.string().trim().min(3).max(120),
-        email,
+        email: optionalCustomerEmail,
         phone1: egyptianPhone,
         phone2: egyptianPhone.optional(),
         birthday: z.union([z.iso.date(), z.null()]).optional(),
@@ -577,7 +527,7 @@ export function createIdentityRouter(
     requirePermission("staff.sessions_revoke"),
     async (request, response) => {
       const body = z.object({
-        accountType: z.enum(["customer", "representative"]),
+        accountType: z.literal("representative"),
       }).parse(request.body);
       response.status(201).json(
         await service.adminCreatePasswordResetRequest(

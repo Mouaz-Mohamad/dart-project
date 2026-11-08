@@ -587,7 +587,7 @@ paths:
     post:
       tags: [Customer Auth]
       summary: Register a customer and create the customer session immediately
-      description: Customer signup is not gated by Email OTP. Birthday is required for every new customer account. Email OTP remains available for explicit verification/recovery flows.
+      description: Customer signup collects name, primary phone and birthday. No password or contact verification is required. Email is optional. Identifier-only customer access is an explicit owner policy and does not apply to Staff or Representatives.
       operationId: registerCustomer
       requestBody:
         required: true
@@ -599,22 +599,6 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/RateLimited" }
-  /auth/verify-email:
-    post:
-      tags: [Customer Auth]
-      summary: Consume an explicit Email verification challenge and create/replace the customer session
-      operationId: verifyCustomerEmail
-      responses:
-        "200": { $ref: "#/components/responses/Authenticated" }
-        "422": { $ref: "#/components/responses/ValidationError" }
-  /auth/resend-verification:
-    post:
-      tags: [Customer Auth]
-      summary: Replace an existing Email verification challenge
-      operationId: resendCustomerVerification
-      responses:
-        "202": { description: Replacement verification challenge }
-        "422": { $ref: "#/components/responses/ValidationError" }
   /auth/login:
     post:
       tags: [Customer Auth]
@@ -623,7 +607,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/Login" }
+            schema: { $ref: "#/components/schemas/CustomerLogin" }
       responses:
         "200": { $ref: "#/components/responses/Authenticated" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -680,8 +664,8 @@ paths:
   /auth/social/complete:
     post:
       tags: [Customer Auth]
-      summary: Finish Google/Facebook customer authentication with Dart Password + confirmation + Birthday
-      description: Every social completion requires a Dart local Password + confirmation + Birthday. A new social customer also supplies name and primary phone. Existing saved Birthday is preserved; the submitted Birthday only fills a legacy missing value. Provider OAuth access/refresh tokens are never stored.
+      summary: Finish Google/Facebook customer authentication with Dart Name + primary phone + Birthday for new social customers; existing customers do not enter a Dart password
+      description: Every social completion requires a Dart local Name + primary phone + Birthday for new social customers; existing customers do not enter a Dart password. A new social customer also supplies name and primary phone. Existing saved Birthday is preserved; the submitted Birthday only fills a legacy missing value. Provider OAuth access/refresh tokens are never stored.
       operationId: completeCustomerSocialAuth
       requestBody:
         required: true
@@ -727,13 +711,13 @@ paths:
 
   /auth/forgot-password:
     post:
-      tags: [Customer Auth, Representative Auth]
+      tags: [Representative Auth]
       operationId: requestPasswordReset
       responses:
         "202": { description: Non-enumerating reset challenge response. Requests within 60 seconds or after three emails in 15 minutes reuse the latest challenge without resetting attempts. Existing codes expire naturally and all outstanding codes are invalidated after a successful reset. }
   /auth/reset-password:
     post:
-      tags: [Customer Auth, Representative Auth]
+      tags: [Representative Auth]
       summary: Consume reset OTP and replace the account password
       operationId: resetPassword
       requestBody:
@@ -744,17 +728,9 @@ paths:
       responses:
         "200": { description: Password changed }
         "422": { $ref: "#/components/responses/ValidationError" }
-  /auth/change-password:
-    post:
-      tags: [Customer Auth]
-      operationId: changeCustomerPassword
-      security: [{ sessionCookie: [], csrfToken: [] }]
-      responses:
-        "200": { $ref: "#/components/responses/Authenticated" }
-        "409": { $ref: "#/components/responses/Conflict" }
   /auth/change-temporary-password:
     post:
-      tags: [Customer Auth, Representative Auth]
+      tags: [Representative Auth]
       operationId: changeTemporaryPassword
       security: [{ sessionCookie: [], csrfToken: [] }]
       responses:
@@ -1412,17 +1388,11 @@ components:
         size: { type: string, maxLength: 80 }
         quantity: { type: integer, minimum: 1, maximum: 100 }
         reservationId: { type: string, minLength: 1, maxLength: 180, description: Required for add_to_cart and validated against the active reserved cart variant and its signed-in/guest browser owner. }
-    CustomerPassword:
-      type: string
-      minLength: 6
-      maxLength: 200
-      description: Customer password with at least 6 characters and any character composition; letters, digits, symbols, spaces and non-Latin text are allowed.
-      writeOnly: true
     PasswordCandidate:
       type: string
-      minLength: 6
+      minLength: 12
       maxLength: 200
-      description: Reset/temporary-password candidate; the server applies the account-type-specific policy after resolving the account.
+      description: Representative reset/temporary-password candidate; the server enforces the strong representative policy.
       writeOnly: true
     StrongPassword:
       type: string
@@ -1434,32 +1404,28 @@ components:
     CustomerRegistration:
       type: object
       additionalProperties: false
-      required: [name, email, phone1, birthday, password]
+      required: [name, phone1, birthday]
       properties:
         name: { type: string, minLength: 3, maxLength: 120 }
         email: { type: string, format: email, maxLength: 254 }
         phone1: { type: string, minLength: 10, maxLength: 25 }
         phone2: { type: string, minLength: 10, maxLength: 25 }
         birthday: { type: string, format: date }
-        password: { $ref: "#/components/schemas/CustomerPassword" }
     SocialAuthComplete:
       type: object
       additionalProperties: false
-      required: [token, password, confirmation, birthday]
+      required: [token]
       properties:
         token: { type: string, minLength: 40, maxLength: 500, writeOnly: true }
-        password: { $ref: "#/components/schemas/CustomerPassword" }
-        confirmation: { $ref: "#/components/schemas/CustomerPassword" }
         birthday: { type: string, format: date }
         name: { type: string, minLength: 3, maxLength: 120, description: Required by the service when the provider identity does not already map to a Dart customer }
         phone1: { type: string, minLength: 10, maxLength: 25, description: Required by the service for a new social customer }
         phone2: { type: string, minLength: 10, maxLength: 25 }
-    Login:
+    CustomerLogin:
       type: object
-      required: [identifier, password]
+      required: [identifier]
       properties:
-        identifier: { type: string, minLength: 3, maxLength: 254 }
-        password: { type: string, minLength: 1, maxLength: 200, writeOnly: true }
+        identifier: { type: string, minLength: 3, maxLength: 254, description: Registered customer email or Egyptian phone number }
     PasswordReset:
       type: object
       additionalProperties: false
@@ -1477,7 +1443,7 @@ components:
         accountType: { type: string, enum: [customer, staff, representative] }
         code: { type: string }
         name: { type: string }
-        email: { type: string, format: email }
+        email: { oneOf: [{ type: string, format: email }, { type: string, const: "" }] }
         phones: { type: array, items: { type: string } }
         birthday: { type: [string, "null"], format: date }
         status: { type: string }

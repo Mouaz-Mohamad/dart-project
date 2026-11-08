@@ -85,28 +85,6 @@ async function dartLoadPasswordResetRequests(openAfterLoad = false) {
   return dartPasswordResetRequests;
 }
 
-async function dartRequestCustomerPasswordReset(customer) {
-  if (!customer?.serverAuthoritative || !window.DartAdminApi?.request) {
-    return {
-      ok: false,
-      message: "This CRM-only customer does not have a secure login account.",
-    };
-  }
-  try {
-    await window.DartAdminApi.request("/api/v1/auth/forgot-password", {
-      method: "POST",
-      body: {
-        identifier: customer.email || customer.phone1,
-        accountType: "customer",
-      },
-    });
-    await dartLoadPasswordResetRequests(false);
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, message: error.message || "Password reset request failed." };
-  }
-}
-
 async function dartAdminAccountState(sectionKey, record, action) {
   if (!window.DartAdminApi?.request || !record?.serverAuthoritative) {
     return { ok: false, message: "Secure account API is unavailable." };
@@ -327,14 +305,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     if (sectionKey === "customers") {
       const x = customersData.find((v) => String(v.id) === String(id));
       if (e.target.closest("[data-client-profile]")) dartShowClientProfile(x);
-      if (e.target.closest(".dart-reset-password-btn")) {
-        const result = await dartRequestCustomerPasswordReset(x);
-        if (!result.ok) {
-          window.DartDialog.alert(result.message || "Password reset request failed.");
-        } else {
-          window.DartDialog.alert("تم تسجيل طلب Reset Password في قاعدة البيانات.");
-        }
-      }
+
     }
     if (e.target.closest("[data-history-entity]"))
       dartShowAuditFor(sectionKey, id);

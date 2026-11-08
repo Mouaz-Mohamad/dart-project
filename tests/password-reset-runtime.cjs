@@ -35,18 +35,18 @@ function fixture() {
   }
   document.createElement = tag => new Element(tag); document.head = new Element("head"); document.body = new Element("body");
   const trigger = new Element("a"); trigger.focus();
-  const login = new Element("form"); login.elements = { identifier: new Element("input"), password: new Element("input") }; nodes.set("loginForm", login);
+  const login = new Element("form"); login.elements = { identifier: new Element("input"), password: new Element("input") }; nodes.set("repLoginForm", login);
   const c = { document, API_BASE: "https://synthetic.test", requestAnimationFrame: fn => fn(),
     setStatus(form, message, error = false) { form.status = message; form.error = error; },
     apiRequest: async (...args) => { calls.push(args); return handler(...args); } };
-  vm.createContext(c); vm.runInContext(source, c); c.openPasswordReset("customer", "synthetic@example.test");
+  vm.createContext(c); vm.runInContext(source, c); c.openPasswordReset("representative", "synthetic@example.test");
   const dialog = nodes.get("dartPasswordResetDialog"), request = nodes.get("dartPasswordResetRequestForm"), complete = nodes.get("dartPasswordResetCompleteForm");
   const click = selector => dialog.querySelector(selector).fire("click");
   return { c, dialog, request, complete, calls, login, trigger, click, api(fn) { handler = fn; } };
 }
 (async () => {
   assert.match(source, /\.dart-reset-card \[hidden\]\{display:none\}/, "author styles must honor hidden steps");
-  const f = fixture(); assert.equal(f.complete.hidden, true); assert.equal(f.complete.elements.password.minLength, 6);
+  const f = fixture(); assert.equal(f.complete.hidden, true); assert.equal(f.complete.elements.password.minLength, 12);
   const controls = f.dialog.querySelectorAll("button,input").filter(node => !node.closest("[hidden]"));
   controls.at(-1).focus(); await f.dialog.fire("keydown", { key: "Tab" });
   assert.equal(f.c.document.activeElement, controls[0]);
@@ -61,13 +61,13 @@ function fixture() {
   resolve({ challengeId: "first" }); await first;
   assert.equal(f.request.hidden, true); assert.equal(f.complete.hidden, false);
   assert.match(f.complete.status, /If the account exists/); assert.equal(f.dialog.dataset.challengeId, "first");
-  f.complete.elements.code.value = "123456"; f.complete.elements.password.value = "abcdef"; f.complete.elements.confirmation.value = "ghijkl";
+  f.complete.elements.code.value = "123456"; f.complete.elements.password.value = "SyntheticPassword123"; f.complete.elements.confirmation.value = "DifferentPassword123";
   await f.complete.fire("submit"); assert.match(f.complete.status, /do not match/); assert.equal(f.calls.length, 1);
-  f.complete.elements.confirmation.value = "abcdef";
+  f.complete.elements.confirmation.value = "SyntheticPassword123";
   for (const [code, message] of [["OTP_INVALID", /incorrect/], ["OTP_EXPIRED", /expired/], ["PASSWORD_REUSED", /recently/]]) {
     f.api(async () => { throw Object.assign(new Error("private internal diagnostic"), { code }); });
     await f.complete.fire("submit"); assert.match(f.complete.status, message); assert.equal(f.complete.elements.password.disabled, false);
-    assert.equal(f.complete.elements.password.value, "abcdef");
+    assert.equal(f.complete.elements.password.value, "SyntheticPassword123");
   }
   f.api(() => new Promise(yes => resolve = yes)); const changing = f.complete.fire("submit"); await f.complete.fire("submit");
   const count = f.calls.length; resolve({}); await changing; assert.equal(f.calls.length, count);

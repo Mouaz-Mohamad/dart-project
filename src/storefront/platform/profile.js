@@ -267,7 +267,7 @@
       window.DartDialog.alert(conflict);
       return;
     }
-    if (!/^\S+@\S+\.\S+$/.test(email) || !/^\+201[0125]\d{8}$/.test(phone1)) {
+    if ((email && !/^\S+@\S+\.\S+$/.test(email)) || !/^\+201[0125]\d{8}$/.test(phone1)) {
       window.DartDialog.alert("راجع البريد ورقم الهاتف.");
       return;
     }
@@ -285,14 +285,6 @@
         });
         button.dataset.mode = "";
         cacheApiUser(result.user);
-        if (result.verification) {
-          sessionStorage.setItem(
-            "dart_pending_email_verification",
-            JSON.stringify(result.verification),
-          );
-          location.assign("Sign Up modern.html?verify=email&next=profile");
-          return;
-        }
         renderProfile();
       } catch (error) {
         window.DartDialog.alert(error.message);

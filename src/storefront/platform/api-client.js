@@ -1,11 +1,3 @@
-  async function sha256(value) {
-    const bytes = new TextEncoder().encode(String(value));
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return Array.from(new Uint8Array(digest), (b) =>
-      b.toString(16).padStart(2, "0"),
-    ).join("");
-  }
-
   let csrfMemory = "";
 
   async function apiRequest(path, options = {}) {

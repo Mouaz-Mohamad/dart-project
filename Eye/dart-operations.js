@@ -759,7 +759,7 @@ if (typeof dartMoney === 'function') {
     list.innerHTML = pending.map(request => `
       <article class="dart-password-request" data-request-id="${dartEsc(request.id)}">
         <div>
-          <strong>${dartEsc(request.accountType || 'customer')} — ${dartEsc(request.name || request.email || request.phone || '')}</strong>
+          <strong>${dartEsc(request.accountType || 'representative')} — ${dartEsc(request.name || request.email || request.phone || '')}</strong>
           <small>${dartEsc(request.requestedAt ? new Date(request.requestedAt).toLocaleString() : '')}</small>
         </div>
         <input type="password" minlength="12" placeholder="Temporary password (12+ characters)" aria-label="Temporary password">
@@ -778,30 +778,6 @@ if (typeof dartMoney === 'function') {
     });
 
     document.addEventListener('click', async event => {
-      const resetButton = event.target.closest('.dart-reset-password-btn');
-      if (resetButton) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        const customer = customersData.find(
-          row => String(row.id) === String(resetButton.closest('.model-row')?.dataset.id),
-        );
-        if (!customer) return;
-        try {
-          if (!UUID_RE.test(String(customer.id || ''))) {
-            throw new Error('This customer is not yet linked to the secure identity database.');
-          }
-          await requireAdminApi()(
-            `/api/v1/admin/accounts/${encodeURIComponent(customer.id)}/password-reset-request`,
-            { method: 'POST', body: { accountType: 'customer' } },
-          );
-          await hydrateSecurePasswordRequests();
-          openModal(field('password-requests-modal'));
-        } catch (error) {
-          window.DartDialog.alert(error.message || 'Unable to create password reset request.');
-        }
-        return;
-      }
-
       const complete = event.target.closest('.dart-complete-reset');
       if (complete) {
         event.preventDefault();

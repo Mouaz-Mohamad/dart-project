@@ -6,7 +6,7 @@
 - تعديلات الاسم/الملاحظات تحافظ على الحقول المالية والعنوان والقيم الاختيارية المحذوفة من الطلب. طلبات Set والمكافآت والتسليم تحتفظ بصور الأسعار والمستفيد؛ التحقق من COD يعاد فقط عند تغير مؤثر في المخاطر.
 - `COD Cash In` يأتي من إيصالات الاستلام المؤرخة وحدها. `Paid` على الطلب يصف دفع العميل ولا يثبت دخول المال إلى Dart. المستحق من المندوب = مبلغ البيع ناقص تخصيص التوصيل؛ مرتجع دفعته Dart هو Cash Out منفصل ولا ينقص المستحق مرة ثانية. `amountReceived` إجمالي الإيصال قبل COD fee. التدفق الحالي يفترض أن Dart ترد المبلغ؛ مقاصة مرتجع يدفعه المندوب تحتاج تسجيلاً مستقلاً مع بيان الممول، ولا تُفترض تلقائيًا من `amountRefunded`.
 - Migration `0064_set_reward_lifecycle_compatibility.sql` تعيد توافق Birthday مع Set-only legacy وتزامن سجل Set Card، مع الحفاظ على منطق Mixed في 0063. لا تعيد تسعير أو تعديل سجلات العمل التاريخية.
-- Forgot Password يحرك رسالة التحدي المحددة `password-reset-code:<challengeId>` بدلاً من دفعة FIFO عامة. سياسة القنوات وحدود التكلفة مستمرة.
+- Representative Forgot Password يحرك رسالة التحدي المحددة `password-reset-code:<challengeId>` بدلاً من دفعة FIFO عامة. سياسة القنوات وحدود التكلفة مستمرة.
 
 # Dart API Contract — Canonical Notes
 
@@ -44,14 +44,13 @@
 
 ## Customer authentication
 
-`POST /api/v1/auth/register` ينشئ Customer + session مباشرة ويرجع `201`. تسجيل العميل الجديد ليس gated بـEmail OTP. OTP ما زال موجودًا للتدفقات الصريحة مثل password recovery / verification flows.
+`POST /api/v1/auth/register` creates a Customer and a persistent HttpOnly session from `name`, `phone1` and `birthday`; email is optional for API compatibility. No password or email/phone confirmation is used. Phone-only customers store NULL email values, never invented addresses.
 
-قواعد الحساب الحالية:
+`POST /api/v1/auth/login` accepts `{ identifier }`: a registered email or Egyptian phone number. It resolves only the customer realm and preserves the customer ID, orders, rewards and existing sessions. Public account codes and names are not login identifiers. Suspended/deleted accounts remain blocked.
 
-- Birthday مطلوب عند إنشاء أي Customer جديد.
-- Customer password: **6 خانات على الأقل فقط**. لا يوجد شرط Uppercase/Lowercase ولا شرط حرف/رقم؛ الحروف والأرقام والرموز والمسافات والنص غير اللاتيني كلها مسموحة ضمن حد 200 حرف.
-- Representative password يظل أقوى: 12+ chars مع lowercase + uppercase + digit.
-- Staff flow منفصل ويعتمد على allowed Email + one-time email code ولا يستخدم Staff password.
+This is the owner's explicit policy confirmed on 2026-11-08: knowing a customer identifier grants access to that customer's account. It deliberately does not prove ownership. Staff still use allowed Email + one-time email code; Representatives still require their strong 12+ character password. Customer password change/recovery/temporary-password and verification UI are retired; shared recovery endpoints accept Representatives only.
+
+`PATCH /api/v1/me` permits an empty email and updates contact details without verification or logging the customer out. Adding an email enables identifier login with that email. Checkout also accepts no email. Existing hashes are retained for rollback/history but never consulted for customer access.
 
 ### Google / Facebook customer sign-in
 
@@ -62,9 +61,9 @@ Flow:
 1. العميل يبدأ Google أو Facebook من صفحة Login/Register.
 2. الـProvider يثبت الهوية والبريد ويرجع authorization code للـBackend.
 3. Dart ينشئ one-time completion capability قصيرة العمر؛ المخزن في PostgreSQL هو الـhash فقط، والـcapability نفسها ترجع للمتصفح داخل URL fragment وليس query string. بعد إزالة الـfragment من العنوان، الواجهة تقرأ بيانات الـchallenge عبر `POST /api/v1/auth/social/challenge` وتضع الـcapability في JSON body حتى لا تظهر في request URL/logs.
-4. كل Social completion يطلب **Dart Password + Confirm Password + Birthday**.
-5. إذا كان Social account جديدًا في Dart، يطلب أيضًا Full Name + Primary Phone (وPhone 2 اختياري) قبل إنشاء الحساب.
-6. إذا كان العميل موجودًا، يجب أن يؤكد Dart password الحالية. Birthday المحفوظة لا يتم استبدالها من تسجيل الدخول؛ القيمة المدخلة تملأ فقط Legacy account لا يحتوي Birthday.
+4. Social completion لا يطلب كلمة سر Dart. بيانات Google تؤخذ من OAuth الموثق بالخادم.
+5. الحساب الجديد يطلب Full Name + Primary Phone + Birthday فقط.
+6. الحساب الموجود يُربط بنفس customer ID عبر البريد أو الهاتف ضمن سياسة الدخول المباشر. Birthday المحفوظة لا تتغير. الحساب المسجل بهاتف فقط يحصل على بريد Google عند الربط دون إنشاء حساب مكرر.
 7. بعد النجاح تصدر نفس Secure HttpOnly Customer session العادية ويمكن Claim للـguest cart.
 
 Providers لا يصبحوا Active إلا عند ضبط server-side environment credentials. عدم ضبطهم لا يسبب fallback غير آمن؛ الواجهة توضح أن المزود غير مهيأ.

@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:895881374fe4eb7428de635e9093d2c0f7c27a095e757ca85e0a3aba19bfa782 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:0fd3f797be9143542da6fed65ab5b4fda9cc95f472621180b756487ac9df5028 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -2736,28 +2736,6 @@ async function dartLoadPasswordResetRequests(openAfterLoad = false) {
   return dartPasswordResetRequests;
 }
 
-async function dartRequestCustomerPasswordReset(customer) {
-  if (!customer?.serverAuthoritative || !window.DartAdminApi?.request) {
-    return {
-      ok: false,
-      message: "This CRM-only customer does not have a secure login account.",
-    };
-  }
-  try {
-    await window.DartAdminApi.request("/api/v1/auth/forgot-password", {
-      method: "POST",
-      body: {
-        identifier: customer.email || customer.phone1,
-        accountType: "customer",
-      },
-    });
-    await dartLoadPasswordResetRequests(false);
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, message: error.message || "Password reset request failed." };
-  }
-}
-
 async function dartAdminAccountState(sectionKey, record, action) {
   if (!window.DartAdminApi?.request || !record?.serverAuthoritative) {
     return { ok: false, message: "Secure account API is unavailable." };
@@ -2978,14 +2956,7 @@ function setupSectionEvents(containerId, dataArray, renderFn, sectionKey) {
     if (sectionKey === "customers") {
       const x = customersData.find((v) => String(v.id) === String(id));
       if (e.target.closest("[data-client-profile]")) dartShowClientProfile(x);
-      if (e.target.closest(".dart-reset-password-btn")) {
-        const result = await dartRequestCustomerPasswordReset(x);
-        if (!result.ok) {
-          window.DartDialog.alert(result.message || "Password reset request failed.");
-        } else {
-          window.DartDialog.alert("تم تسجيل طلب Reset Password في قاعدة البيانات.");
-        }
-      }
+
     }
     if (e.target.closest("[data-history-entity]"))
       dartShowAuditFor(sectionKey, id);
@@ -3682,7 +3653,7 @@ function renderCustomers(dataArray) {
       monthly = dartCurrentMonthlyOrders(x.clientId);
     c.insertAdjacentHTML(
       "beforeend",
-      `<div class="${getRowClass(x)}" data-id="${dartEsc(x.id)}" data-status="${dartEsc(x.accountStatus || x.status || "Active")}"><input type="checkbox" class="model-checkbox" ${x.isChecked ? "checked" : ""} ${dartIsArchived(x) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(x) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-client-profile="1" title="Client history"><i class="bx bx-history"></i></button><button class="dart-reset-password-btn" title="Reset Password"><i class="bx bx-key"></i></button></div><span class="text-item w150">${dartEsc(x.birthday || "-")}</span><span class="text-item w150">${dartEsc(x.clientName)}</span><span class="text-item w150">${dartEsc(x.clientId)}</span><span class="text-item w150">${dartEsc(x.phone1)}</span><span class="text-item w150">${dartEsc(x.phone2 || "-")}</span><span class="text-item w200">${dartEsc(x.email || "-")}</span><span class="text-item w150">${dartEsc(x.country || "Egypt")}</span><span class="text-item w200">${dartEsc(x.governorate || "-")}</span><span class="text-item w150">${monthly}</span><span class="text-item w150">${st.delivered}</span><span class="text-item w300">${dartMoney(st.spent)}<small class="dart-kpi-inline">${st.purchased} items · last ${dartEsc(st.lastPurchase)}</small></span><span class="text-item w200">${dartEsc(x.dartCard || "no")}</span><span class="text-item w100">${dartEsc(dartClientAge(x.birthday))}</span></div>`,
+      `<div class="${getRowClass(x)}" data-id="${dartEsc(x.id)}" data-status="${dartEsc(x.accountStatus || x.status || "Active")}"><input type="checkbox" class="model-checkbox" ${x.isChecked ? "checked" : ""} ${dartIsArchived(x) ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete"><i class="bx ${dartIsArchived(x) ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-client-profile="1" title="Client history"><i class="bx bx-history"></i></button></div><span class="text-item w150">${dartEsc(x.birthday || "-")}</span><span class="text-item w150">${dartEsc(x.clientName)}</span><span class="text-item w150">${dartEsc(x.clientId)}</span><span class="text-item w150">${dartEsc(x.phone1)}</span><span class="text-item w150">${dartEsc(x.phone2 || "-")}</span><span class="text-item w200">${dartEsc(x.email || "-")}</span><span class="text-item w150">${dartEsc(x.country || "Egypt")}</span><span class="text-item w200">${dartEsc(x.governorate || "-")}</span><span class="text-item w150">${monthly}</span><span class="text-item w150">${st.delivered}</span><span class="text-item w300">${dartMoney(st.spent)}<small class="dart-kpi-inline">${st.purchased} items · last ${dartEsc(st.lastPurchase)}</small></span><span class="text-item w200">${dartEsc(x.dartCard || "no")}</span><span class="text-item w100">${dartEsc(dartClientAge(x.birthday))}</span></div>`,
     );
   });
 }

@@ -118,7 +118,7 @@
       .dart-social-completion-card h2{margin:0 0 6px;font-size:22px}.dart-social-completion-card>p{margin:0 0 14px;color:#666;line-height:1.5}
       .dart-social-completion-card label{display:grid;gap:5px;margin:10px 0;font-size:12px;font-weight:700}.dart-social-completion-card input{width:100%;min-height:42px;border:1px solid #d7d7d7;border-radius:8px;padding:9px 11px;font:inherit;background:#fff;color:#222}
       .dart-social-completion-card input[readonly]{background:#f6f6f6;color:#666}.dart-social-completion-actions{display:flex;gap:8px;margin-top:14px}.dart-social-completion-actions button{min-height:40px;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}.dart-social-completion-submit{flex:1;background:#ab012b;color:white}.dart-social-completion-cancel{background:#eee;color:#222}
-      .dart-social-completion .form-status{min-height:18px;margin:10px 0 0;color:#555}.dart-social-completion .form-status.is-error{color:#a40000}.dart-social-password-rule{font-size:11px!important;color:#666;margin:-3px 0 8px!important}
+      .dart-social-completion .form-status{min-height:18px;margin:10px 0 0;color:#555}.dart-social-completion .form-status.is-error{color:#a40000}
     `;
     document.head.appendChild(style);
   }
@@ -160,9 +160,7 @@
     const intro = document.createElement("p");
     intro.textContent = challenge.phoneRequired
       ? "Google confirmed your email. Add your phone and birthday once to finish your Dart account."
-      : challenge.passwordRequired
-        ? "This email already belongs to a Dart account. Enter your existing Dart password once to link Google securely."
-        : challenge.birthdayRequired
+      : challenge.birthdayRequired
           ? "Welcome back! Add your birthday to finish linking your account."
           : "Your Google account is verified. Continue to Dart.";
     card.append(heading, intro);
@@ -184,20 +182,9 @@
         autocomplete: "tel",
         inputMode: "tel",
       });
-      const phone2 = field("Phone number 2 (optional)", "phone2", "tel", {
-        required: false,
-        inputMode: "tel",
-      });
-      card.append(name.wrapper, phone1.wrapper, phone2.wrapper);
+      card.append(name.wrapper, phone1.wrapper);
     }
 
-    // Only unlinked existing Dart accounts need password proof once.
-    if (challenge.passwordRequired) {
-      const password = field("Existing Dart password", "password", "password", {
-        autocomplete: "current-password",
-      });
-      card.appendChild(password.wrapper);
-    }
     if (challenge.birthdayRequired) {
       const birthday = field("Birthday", "birthday", "date", {
         autocomplete: "bday",
@@ -238,9 +225,6 @@
           method: "POST",
           body: {
             token: socialToken,
-            ...(challenge.passwordRequired
-              ? { password: values.password, confirmation: values.password }
-              : {}),
             ...(challenge.birthdayRequired
               ? { birthday: values.birthday }
               : {}),
@@ -248,9 +232,6 @@
               ? {
                   name: values.name,
                   phone1: values.phone1,
-                  ...(String(values.phone2 || "").trim()
-                    ? { phone2: values.phone2 }
-                    : {}),
                 }
               : {}),
           },

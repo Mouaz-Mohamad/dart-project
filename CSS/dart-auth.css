@@ -148,24 +148,7 @@ body.dart-auth-page {
   background: #fff;
   box-shadow: 0 0 0 3px rgba(171, 1, 43, .12);
 }
-.dart-auth-page .dart-auth-password-field .dart-password-visibility-toggle {
-  border-radius: 10px;
-  color: #967883;
-}
-.dart-auth-page .dart-auth-password-field .dart-password-visibility-toggle:hover,
-.dart-auth-page .dart-auth-password-field .dart-password-visibility-toggle:focus-visible {
-  background: #f9ecef;
-  color: var(--auth-wine);
-}
 .dart-auth-page input::-ms-reveal, .dart-auth-page input::-ms-clear { display: none; }
-.dart-auth-page .forgot-link { margin: 12px 0 19px; text-align: end; }
-.dart-auth-page .forgot-link a {
-  color: #961535;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-}
-.dart-auth-page .forgot-link a:hover { text-decoration: underline; }
 .dart-auth-page .btn.enter-btn {
   display: flex;
   align-items: center;
@@ -191,16 +174,7 @@ body.dart-auth-page {
 }
 .dart-auth-page .btn.enter-btn:active { transform: translateY(1px); }
 .dart-auth-page .btn.enter-btn:focus-visible,
-.dart-auth-page .toggle-panel .btn:focus-visible,
-.dart-auth-page .forgot-link a:focus-visible { outline: 3px solid #edb5c3; outline-offset: 3px; }
-.dart-auth-page .password-rule {
-  width: 100%;
-  margin: -3px 0 11px;
-  color: #84747b;
-  text-align: start;
-  font-size: 11px;
-  line-height: 1.5;
-}
+.dart-auth-page .toggle-panel .btn:focus-visible { outline: 3px solid #edb5c3; outline-offset: 3px; }
 .dart-auth-page .dart-birthday-field { margin: 12px 0; }
 .dart-auth-page .dart-birthday-selects {
   display: grid;

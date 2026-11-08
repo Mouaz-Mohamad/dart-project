@@ -20,14 +20,13 @@ describe("OpenAPI current Dart contracts", () => {
     expect(text).toContain("Full body and staff metadata are omitted");
   });
 
-  it("documents immediate customer signup, required Birthday and the simple customer password policy", async () => {
+  it("documents immediate customer signup, required Birthday and the identifier-only customer access", async () => {
     const text = await spec();
     expect(text).toContain("Register a customer and create the customer session immediately");
     expect(text).toContain('"201": { $ref: "#/components/responses/Authenticated" }');
-    expect(text).toContain("CustomerPassword:");
-    expect(text).toContain("minLength: 6");
-    expect(text).toContain("any character composition");
-    expect(text).toContain("required: [name, email, phone1, birthday, password]");
+    expect(text).not.toContain("CustomerPassword:");
+    expect(text).toContain("No password or contact verification is required");
+    expect(text).toContain("required: [name, phone1, birthday]");
     expect(text).toContain("StrongPassword:");
     expect(text).toContain("minLength: 12");
     expect(text).not.toContain("at least one letter and one number");
@@ -64,6 +63,6 @@ describe("OpenAPI current Dart contracts", () => {
     ]) expect(text).toContain(path);
     expect(text).toContain("Unknown root keys are rejected by the Zod contract");
     expect(text).toContain("up to three exact-tie winners");
-    expect(text).toContain("Password + confirmation + Birthday");
+    expect(text).toContain("Name + primary phone + Birthday");
   });
 });

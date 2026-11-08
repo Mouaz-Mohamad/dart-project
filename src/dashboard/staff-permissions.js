@@ -44,7 +44,7 @@
     [".return-good-btn,.return-bad-btn", ["returns.manage", "returns.inspect"]],
     [".return-rollback-btn", ["returns.manage"]],
     [".dart-repair-btn,.dart-destroy-btn", ["damage.manage", "damage.resolve"]],
-    [".dart-reset-password-btn,.dart-rep-reset,.dart-complete-reset,#openPasswordRequestsBtn,[data-password-reset-action]", ["staff.sessions_revoke"]],
+    [".dart-rep-reset,.dart-complete-reset,#openPasswordRequestsBtn,[data-password-reset-action]", ["staff.sessions_revoke"]],
     [".dart-approve-rep,.dart-reject-rep,.dart-rep-approve,.dart-rep-reject", ["representatives.approve"]],
     [".dart-rep-document,.dart-rep-docs", ["representatives.read_applications"]],
     ["[data-history-entity]", ["dashboard_state.read"]],

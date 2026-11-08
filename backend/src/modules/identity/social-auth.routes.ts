@@ -17,16 +17,10 @@ const destinationSchema = z.enum(["profile", "checkout"]).default("profile");
 const completionSchema = z
   .object({
     token: z.string().min(40).max(500),
-    password: z.string().min(1).max(200).optional(),
-    confirmation: z.string().min(1).max(200).optional(),
     birthday: z.iso.date().optional(),
     name: z.string().trim().min(3).max(120).optional(),
     phone1: z.string().trim().min(10).max(25).optional(),
     phone2: z.string().trim().min(10).max(25).optional(),
-  })
-  .refine((value) => value.password === value.confirmation, {
-    path: ["confirmation"],
-    message: "Passwords do not match",
   });
 
 function metadata(request: Request): RequestMetadata {

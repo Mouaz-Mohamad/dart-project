@@ -6,7 +6,6 @@ import { decryptSecret, encryptSecret } from "../src/security/crypto.js";
 import { normalizeEgyptianPhone } from "../src/security/normalization.js";
 import {
   hashPassword,
-  validateCustomerPasswordPolicy,
   validatePasswordPolicy,
   verifyPassword,
 } from "../src/security/password.js";
@@ -20,13 +19,7 @@ describe("identity security primitives", () => {
     await expect(verifyPassword(hash, "WrongPassword123")).resolves.toBe(false);
   });
 
-  it("keeps customer passwords simple while representative passwords remain strong", () => {
-    expect(validateCustomerPasswordPolicy("abc123")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("123456")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("!!!!!!")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("abc!12")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("دارت12")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("short")).not.toHaveLength(0);
+  it("keeps representative passwords strong", () => {
     expect(validatePasswordPolicy("abc123")).not.toHaveLength(0);
     expect(validatePasswordPolicy("StrongPassword123")).toEqual([]);
   });

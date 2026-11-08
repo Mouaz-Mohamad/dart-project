@@ -1,100 +1,35 @@
   async function register(payload) {
-    const cleanPayload = {
-      ...payload,
-      phone2: String(payload.phone2 || "").trim() || undefined,
-      birthday: String(payload.birthday || "").trim() || undefined,
-    };
-    if (API_BASE) {
-      const result = await apiRequest("/api/v1/auth/register", {
-        method: "POST",
-        body: cleanPayload,
-      });
-      if (result.user) {
-        cacheApiUser(result.user);
-        await claimGuestCartAfterAuth();
-        refreshCustomerCommerceInBackground();
-      }
-      return result;
-    }
-    payload = cleanPayload;
-    if (API_REQUIRED)
-      throw new Error("تعذر إنشاء الحساب لأن خدمة الحسابات غير مهيأة.");
-    const users = read(KEYS.users, []);
-    const email = normalizeEmail(payload.email),
-      phone1 = normalizePhone(payload.phone1),
-      phone2 = normalizePhone(payload.phone2);
-    if (!payload.name || payload.name.trim().length < 3)
-      throw new Error("اكتب الاسم الكامل بصورة صحيحة.");
-    if (!/^\S+@\S+\.\S+$/.test(email))
-      throw new Error("البريد الإلكتروني غير صحيح.");
-    if (!/^\+201[0125]\d{8}$/.test(phone1))
-      throw new Error("رقم الهاتف المصري غير صحيح.");
-    if (phone2 && !/^\+201[0125]\d{8}$/.test(phone2))
-      throw new Error("رقم الهاتف الثاني غير صحيح.");
-    if (String(payload.password || "").length < 8)
-      throw new Error("كلمة المرور يجب ألا تقل عن 8 أحرف.");
-    const conflict = identityConflict({ email, phone1, phone2 });
-    if (conflict) throw new Error(conflict);
-    const customerId = nextCode("DA", read(KEYS.customers, []), "clientId");
-    const user = {
-      id: uid("USR"),
-      customerId,
-      name: payload.name.trim(),
-      email,
-      phone1,
-      phone2,
-      birthday: payload.birthday || "",
-      passwordHash: await sha256(payload.password),
-      createdAt: now(),
-      emailVerified: false,
-      phoneVerified: false,
-      dartCard: "no",
-      role: "Customer",
-      isArchived: false,
-    };
-    users.push(user);
-    write(KEYS.users, users);
-    syncCustomer(user);
-    saveCustomerSession(user);
-    audit("REGISTER", "customers", user.customerId);
-    return user;
-  }
-
-  async function login(identifier, password) {
-    if (API_BASE) {
-      const payload = await apiRequest("/api/v1/auth/login", {
-        method: "POST",
-        body: { identifier, password },
-      });
-      const user = cacheApiUser(payload.user);
+    if (!API_BASE) throw new Error("تعذر إنشاء الحساب لأن خدمة الحسابات غير مهيأة.");
+    const result = await apiRequest("/api/v1/auth/register", {
+      method: "POST",
+      body: {
+        name: String(payload.name || "").trim(),
+        phone1: String(payload.phone1 || "").trim(),
+        birthday: String(payload.birthday || "").trim(),
+      },
+    });
+    if (result.user) {
+      cacheApiUser(result.user);
       await claimGuestCartAfterAuth();
       refreshCustomerCommerceInBackground();
-      return user;
     }
-    if (API_REQUIRED)
-      throw new Error("تعذر تسجيل الدخول لأن خدمة الحسابات غير مهيأة.");
-    const keyEmail = normalizeEmail(identifier),
-      keyPhone = normalizePhone(identifier),
-      keyName = String(identifier || "")
-        .trim()
-        .toLowerCase();
-    const hash = await sha256(password);
-    const user = read(KEYS.users, []).find(
-      (row) =>
-        !row.isArchived &&
-        (normalizeEmail(row.email) === keyEmail ||
-          normalizePhone(row.phone1) === keyPhone ||
-          normalizePhone(row.phone2) === keyPhone ||
-          String(row.name).trim().toLowerCase() === keyName),
-    );
-    if (!user || user.passwordHash !== hash)
-      throw new Error("بيانات الدخول غير صحيحة.");
-    saveCustomerSession(user);
-    audit("LOGIN", "customers", user.customerId);
+    return result;
+  }
+
+  async function login(identifier) {
+    if (!API_BASE) throw new Error("تعذر تسجيل الدخول لأن خدمة الحسابات غير مهيأة.");
+    const payload = await apiRequest("/api/v1/auth/login", {
+      method: "POST",
+      body: { identifier: String(identifier || "").trim() },
+    });
+    const user = cacheApiUser(payload.user);
+    await claimGuestCartAfterAuth();
+    refreshCustomerCommerceInBackground();
     return user;
   }
 
-  async function requestPasswordReset(identifier, accountType = "customer") {
+  async function requestPasswordReset(identifier, accountType = "representative") {
+    if (accountType !== "representative") throw new Error("Customer accounts no longer use passwords.");
     if (!API_BASE) throw new Error("Password recovery requires the secure account API.");
     return apiRequest("/api/v1/auth/forgot-password", {
       method: "POST",
@@ -267,7 +202,7 @@
     dialog.querySelector("[data-reset-login]").addEventListener("click", () => {
       const identifier = dialog.dataset.identifier;
       closePasswordResetDialog(dialog);
-      const loginForm = document.getElementById("loginForm");
+      const loginForm = document.getElementById("repLoginForm");
       if (loginForm) {
         loginForm.elements.identifier.value = identifier;
         loginForm.elements.password.value = "";
@@ -304,17 +239,18 @@
     dialog.returnFocus?.focus();
   }
 
-  function openPasswordReset(accountType = "customer", identifierHint = "") {
+  function openPasswordReset(accountType = "representative", identifierHint = "") {
+    if (accountType !== "representative") return;
     const dialog = ensurePasswordResetDialog();
     const requestForm = dialog.querySelector("#dartPasswordResetRequestForm");
     const completeForm = dialog.querySelector("#dartPasswordResetCompleteForm");
     if (!dialog.hidden) return;
     dialog.returnFocus = document.activeElement;
     dialog.dataset.generation = String(Number(dialog.dataset.generation || 0) + 1);
-    dialog.dataset.accountType = accountType === "representative" ? "representative" : "customer";
+    dialog.dataset.accountType = "representative";
     dialog.dataset.challengeId = "";
     dialog.dataset.identifier = identifierHint || "";
-    const minimumPasswordLength = dialog.dataset.accountType === "representative" ? 12 : 6;
+    const minimumPasswordLength = 12;
     completeForm.elements.password.minLength = minimumPasswordLength;
     completeForm.elements.confirmation.minLength = minimumPasswordLength;
     completeForm.elements.password.placeholder = `At least ${minimumPasswordLength} characters`;
@@ -332,53 +268,6 @@
     requestForm.elements.identifier.value = identifierHint || "";
     dialog.hidden = false;
     requestAnimationFrame(() => requestForm.elements.identifier.focus());
-  }
-
-  async function changeOwnPassword(currentPassword, password, confirmation) {
-    if (password !== confirmation) throw new Error("Passwords do not match.");
-    if (API_BASE) {
-      const payload = await apiRequest("/api/v1/auth/change-password", {
-        method: "POST",
-        body: { currentPassword, password, confirmation },
-      });
-      return cacheApiUser(payload.user);
-    }
-    if (API_REQUIRED) throw new Error("Changing the password requires the secure account API.");
-    const current = currentUser();
-    if (!current) throw new Error("Your login session has expired.");
-    const users = read(KEYS.users, []);
-    const stored = users.find((row) => row.id === current.id);
-    if (!stored || stored.passwordHash !== await sha256(currentPassword))
-      throw new Error("Current password is incorrect.");
-    if (String(password || "").length < 8) throw new Error("Password must be at least 8 characters.");
-    stored.passwordHash = await sha256(password);
-    stored.passwordUpdatedAt = now();
-    write(KEYS.users, users);
-    audit("PASSWORD_CHANGED", "customers", stored.customerId);
-    return stored;
-  }
-
-  async function replaceTemporaryPassword(password, confirmation) {
-    if (API_BASE) {
-      const payload = await apiRequest("/api/v1/auth/change-temporary-password", {
-        method: "POST",
-        body: { password, confirmation },
-      });
-      return cacheApiUser(payload.user);
-    }
-    const user = currentUser();
-    if (!user) throw new Error("Your login session has expired.");
-    if (String(password || "").length < 8)
-      throw new Error("Password must be at least 8 characters.");
-    if (password !== confirmation) throw new Error("Passwords do not match.");
-    const users = read(KEYS.users, []),
-      stored = users.find((row) => row.id === user.id);
-    stored.passwordHash = await sha256(password);
-    stored.mustChangePassword = false;
-    stored.passwordUpdatedAt = now();
-    write(KEYS.users, users);
-    audit("PASSWORD_CHANGED", "customers", stored.customerId);
-    return stored;
   }
 
   function clearCustomerPrivateCache({ preserveCartIdentifier = false, preserveGuestCart = false } = {}) {
@@ -424,17 +313,4 @@
     window.DartState?.remove?.(KEYS.session, { source: "platform" });
     clearCustomerPrivateCache();
   }
-
-  async function verifyEmail(challengeId, code) {
-    if (!API_BASE) throw new Error("Email verification requires the backend API.");
-    const payload = await apiRequest("/api/v1/auth/verify-email", {
-      method: "POST",
-      body: { challengeId, code },
-    });
-    const user = cacheApiUser(payload.user);
-    await claimGuestCartAfterAuth();
-    refreshCustomerCommerceInBackground();
-    return user;
-  }
-
 

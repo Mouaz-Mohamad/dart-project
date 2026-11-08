@@ -96,6 +96,7 @@ function fakeService(auth = account()) {
       status: "pending_approval",
     }),
     login: vi.fn().mockResolvedValue(issued(auth)),
+    loginCustomer: vi.fn().mockResolvedValue(issued(auth)),
     requestPasswordReset: vi.fn().mockResolvedValue({
       challengeId: "123e4567-e89b-12d3-a456-426614174009",
       expiresAt: new Date("2026-09-22T10:10:00.000Z"),
@@ -140,15 +141,15 @@ describe("identity HTTP boundaries", () => {
     } as unknown as OutboxService;
     const response = await request(app(service, outbox))
       .post("/api/v1/auth/forgot-password")
-      .send({ identifier: "customer@example.com", accountType: "customer" });
+      .send({ identifier: "representative@example.com", accountType: "representative" });
 
     expect(response.status).toBe(202);
     expect(response.body).toMatchObject({
       challengeId: "123e4567-e89b-12d3-a456-426614174009",
     });
     expect(service.requestPasswordReset).toHaveBeenCalledWith(
-      "customer",
-      "customer@example.com",
+      "representative",
+      "representative@example.com",
       expect.any(Object),
     );
     expect(outbox.processBatch).toHaveBeenCalledWith(1, "password-reset-code:123e4567-e89b-12d3-a456-426614174009");
@@ -267,15 +268,12 @@ describe("identity HTTP boundaries", () => {
     expect(cookies.some((value) => value.startsWith("dart_staff_csrf=") && !value.includes("HttpOnly"))).toBe(true);
   });
 
-  it("creates a customer session immediately without an email OTP signup gate", async () => {
+  it("creates a customer session from name, phone and birthday only", async () => {
     const service = fakeService();
     const response = await request(app(service)).post("/api/v1/auth/register").send({
       name: "Test Customer",
-      email: "customer@example.com",
       phone1: "01012345678",
-      phone2: "",
       birthday: "2000-01-01",
-      password: "abcd1234",
     });
     expect(response.status).toBe(201);
     expect(response.body.user.accountType).toBe("customer");
@@ -283,15 +281,24 @@ describe("identity HTTP boundaries", () => {
     const cookies = response.headers["set-cookie"] as unknown as string[];
     expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
     expect(service.registerCustomer).toHaveBeenCalledWith(
-      expect.objectContaining({ phone2: undefined, password: "abcd1234" }),
+      expect.objectContaining({ name: "Test Customer", phone1: "01012345678", birthday: "2000-01-01" }),
       expect.any(Object),
     );
+  });
+
+  it("keeps customer password routes retired and representative passwords required", async () => {
+    const service = fakeService(), application = app(service);
+    expect((await request(application).post("/api/v1/representatives/login").send({ identifier: "rep@example.com" })).status).toBe(422);
+    expect(service.login).not.toHaveBeenCalled();
+    expect((await request(application).post("/api/v1/auth/forgot-password").send({identifier:"customer@example.com",accountType:"customer"})).status).toBe(422);
+    expect(service.requestPasswordReset).not.toHaveBeenCalled();
+    expect((await request(application).post("/api/v1/auth/change-password").send({})).status).toBe(404);
+    expect((await request(application).post("/api/v1/auth/verify-email").send({})).status).toBe(404);
   });
 
   it("sets an HttpOnly session cookie and a separate CSRF cookie after login", async () => {
     const response = await request(app(fakeService())).post("/api/v1/auth/login").send({
       identifier: "customer@example.com",
-      password: "StrongPassword123",
     });
     expect(response.status).toBe(200);
     const cookies = response.headers["set-cookie"] as unknown as string[];
@@ -327,7 +334,6 @@ describe("identity HTTP boundaries", () => {
     });
     const response = await request(application).post("/api/v1/auth/login").send({
       identifier: "customer@example.com",
-      password: "StrongPassword123",
     });
     expect(response.status).toBe(200);
     const cookies = response.headers["set-cookie"] as unknown as string[];

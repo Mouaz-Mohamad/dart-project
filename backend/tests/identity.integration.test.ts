@@ -64,7 +64,6 @@ describe.skipIf(!databaseUrl)("identity service", () => {
         email: "Mouaz@Example.com",
         phone1: "01012345678",
         birthday: "2008-09-02",
-        password: "StrongPassword123",
       },
       requestMetadata,
     );
@@ -160,7 +159,6 @@ describe.skipIf(!databaseUrl)("identity service", () => {
           name: "Duplicate Customer",
           email: "mouaz@example.com",
           phone1: "01099999999",
-          password: "StrongPassword123",
         },
         requestMetadata,
       ),

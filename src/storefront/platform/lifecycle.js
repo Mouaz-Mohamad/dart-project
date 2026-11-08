@@ -23,22 +23,6 @@
     initializeAccountNavigation();
     if (!enforceCustomerAccountAccess()) return;
     if (redirectRememberedCustomer()) return;
-    if (document.getElementById("customerEmailVerificationForm")) {
-      try {
-        const pending = JSON.parse(
-          sessionStorage.getItem("dart_pending_email_verification") || "null",
-        );
-        if (pending?.challengeId) {
-          const dialog = document.getElementById("customerEmailVerification");
-          const form = document.getElementById("customerEmailVerificationForm");
-          form.elements.challengeId.value = pending.challengeId;
-          dialog.hidden = false;
-          form.elements.code.focus();
-        }
-      } catch {
-        sessionStorage.removeItem("dart_pending_email_verification");
-      }
-    }
     ensureCatalogInventory();
     cleanupCartReservations();
     updateCartReservationTimer();

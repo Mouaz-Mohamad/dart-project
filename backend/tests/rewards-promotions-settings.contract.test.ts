@@ -1,17 +1,12 @@
 // DART CODE GUIDE | backend/tests/rewards-promotions-settings.contract.test.ts
 // الغرض: Regression contracts للقواعد الجديدة التي لا يجب أن تعود للاعتماد على المتصفح أو validation مرن.
 import { describe, expect, it } from "vitest";
-import { validateCustomerPasswordPolicy, validatePasswordPolicy } from "../src/security/password.js";
+import { validatePasswordPolicy } from "../src/security/password.js";
 import { publicSiteSettings, siteSettingsSchema } from "../src/modules/settings/site-settings.schema.js";
 import { promotionCampaignInputSchema } from "../src/modules/promotions/promotion.service.js";
 
 describe("Dart rewards/promotions/settings contracts", () => {
-  it("keeps the storefront customer password policy separate from representative security", () => {
-    expect(validateCustomerPasswordPolicy("abc123")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("123456")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("!!!!!!")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("دارت12")).toEqual([]);
-    expect(validateCustomerPasswordPolicy("short")).not.toHaveLength(0);
+  it("keeps representative password policy strong", () => {
     expect(validatePasswordPolicy("abc123")).not.toHaveLength(0);
     expect(validatePasswordPolicy("StrongPass123")).toEqual([]);
   });

@@ -5,6 +5,7 @@ const assert = require("node:assert/strict"), { chromium } = require("playwright
 const { openStorefrontFixture } = require("./helpers/storefront-fixture.cjs");
 const root = path.resolve(__dirname, "../public");
 let unavailable = false, meRequests = 0, notificationRequests = 0;
+const authRequests = [];
 const user = { id: "customer-a", accountType: "customer", code: "DR-1", name: "Account Test", email: "fixture@example.test", phones: ["01000000001"], status: "active", birthday: "2000-01-01" };
 function json(res, code, payload) { res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(payload)); }
 const server = http.createServer((req, res) => {
@@ -12,9 +13,15 @@ const server = http.createServer((req, res) => {
   const signedIn = /(?:^|; )dart_test_session=valid(?:;|$)/.test(req.headers.cookie || "");
   if (url.pathname.startsWith("/api/")) {
     if (url.pathname.includes("notifications") || url.pathname.includes("/push/")) notificationRequests++;
-    if (url.pathname === "/api/v1/auth/login") {
-      res.setHeader("Set-Cookie", ["dart_test_session=valid; HttpOnly; Path=/; Max-Age=31536000; SameSite=Lax", "dart_csrf=fixture; Path=/; Max-Age=31536000"]);
-      return json(res, 200, { user, csrfToken: "fixture" });
+    if (["/api/v1/auth/login", "/api/v1/auth/register"].includes(url.pathname)) {
+      let body = "";
+      req.on("data", chunk => { body += chunk; });
+      req.on("end", () => {
+        authRequests.push({ path: url.pathname, body: JSON.parse(body) });
+        res.setHeader("Set-Cookie", ["dart_test_session=valid; HttpOnly; Path=/; Max-Age=31536000; SameSite=Lax", "dart_csrf=fixture; Path=/; Max-Age=31536000"]);
+        json(res, url.pathname.endsWith("register") ? 201 : 200, { user, csrfToken: "fixture" });
+      });
+      return;
     }
     if (url.pathname === "/api/v1/auth/logout") {
       res.setHeader("Set-Cookie", ["dart_test_session=; Path=/; Max-Age=0", "dart_csrf=; Path=/; Max-Age=0"]);
@@ -53,15 +60,29 @@ const server = http.createServer((req, res) => {
     let page = await context.newPage(); page.setDefaultTimeout(10000); const errors = [];
     if (process.env.DART_TEST_TRACE) page.on("framenavigated", frame => { if (frame === page.mainFrame()) console.log("Account test:", frame.url()); });
     page.on("pageerror", error => errors.push(error.message));
+    await page.goto(`${origin}/Sign%20Up%20modern.html`);
+    assert.equal(await page.locator('#loginForm input[type="password"], #registerForm input[type="password"]').count(), 0);
+    await page.locator(".register-btn").click();
+    await page.locator('#registerForm [name="name"]').fill("Phone Only Customer");
+    await page.locator('#registerForm [name="phone1"]').fill("01000000001");
+    await page.locator("#dartBirthYear").selectOption("2000");
+    await page.locator("#dartBirthMonth").selectOption("1");
+    await page.locator("#dartBirthDay").selectOption("2");
+    await page.locator('#registerForm button[type="submit"]').click();
+    await page.waitForURL("**/profile.html");
+    const signup = authRequests.find(request => request.path.endsWith("register"));
+    assert.deepEqual(signup.body, { name: "Phone Only Customer", phone1: "01000000001", birthday: "2000-01-02" });
+    assert.equal(await page.locator("[data-change-password-toggle], #customerAccountPasswordForm").count(), 0);
+    await context.clearCookies();
     for (const [route, next] of [["profile.html?view=orders", "next=profile&view=orders"], ["track.html?order=K-1", "next=track&order=K-1"], ["form-return.html", "next=return"]]) {
       await page.goto(`${origin}/${route}`);
       await page.waitForURL(url => url.pathname.includes("Sign%20Up") && url.search.includes(next));
     }
     await page.goto(`${origin}/Sign%20Up%20modern.html?next=profile&view=orders`);
     await page.locator("#loginForm [name=identifier]").fill(user.email);
-    await page.locator("#loginForm [name=password]").fill("synthetic123");
     await page.locator("#loginForm button[type=submit]").click();
     await page.waitForURL("**/profile.html?view=orders");
+    assert.deepEqual(authRequests.find(request => request.path.endsWith("login")).body, { identifier: user.email });
     await page.locator(".order-info.active").waitFor();
     await page.reload(); await page.locator(".order-info.active").waitFor();
     await page.locator(".order-info [aria-label='Back to account']").click();

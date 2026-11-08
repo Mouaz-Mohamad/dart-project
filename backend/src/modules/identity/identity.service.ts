@@ -8,7 +8,6 @@ import { decryptSecret, digest, encryptSecret, randomToken, safeEqual } from "..
 import { normalizeEmail, normalizeEgyptianPhone, normalizeIdentifier } from "../../security/normalization.js";
 import {
   hashPassword,
-  validateCustomerPasswordPolicy,
   validatePasswordPolicy,
   verifyPassword,
 } from "../../security/password.js";
@@ -66,11 +65,10 @@ interface SessionRow {
 
 export interface RegisterCustomerInput {
   name: string;
-  email: string;
+  email?: string | undefined;
   phone1: string;
   phone2?: string | undefined;
   birthday?: string | undefined;
-  password: string;
 }
 
 export interface RegisterRepresentativeInput {
@@ -110,13 +108,6 @@ function passwordPolicyOrThrow(password: string): void {
   const problems = validatePasswordPolicy(password);
   if (problems.length > 0) {
     throw new AppError(422, "WEAK_PASSWORD", "Password does not meet the security policy", problems);
-  }
-}
-
-function customerPasswordPolicyOrThrow(password: string): void {
-  const problems = validateCustomerPasswordPolicy(password);
-  if (problems.length > 0) {
-    throw new AppError(422, "WEAK_PASSWORD", "Password must contain at least 6 characters", problems);
   }
 }
 
@@ -209,9 +200,8 @@ export class IdentityService {
     input: RegisterCustomerInput,
     metadata: RequestMetadata,
   ): Promise<IssuedSession> {
-    customerPasswordPolicyOrThrow(input.password);
-    const email = input.email.trim();
-    const emailNormalized = normalizeEmail(email);
+    const email = input.email?.trim() || null;
+    const emailNormalized = email ? normalizeEmail(email) : null;
     const phones = [input.phone1, input.phone2].filter(
       (value): value is string => Boolean(value?.trim()),
     );
@@ -223,18 +213,16 @@ export class IdentityService {
         "At least one valid Egyptian phone number is required",
       );
     }
-    const passwordHash = await hashPassword(input.password);
     const userId = randomUUID();
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      // Customers register directly. Email OTP is reserved for Staff access and
-      // explicit email-change verification; it is not a customer signup gate.
+      // Identifier-only access is an explicit owner policy for customers only.
       await client.query(
         `INSERT INTO users (
           id, account_type, email, email_normalized, password_hash, status
-        ) VALUES ($1, 'customer', $2, $3, $4, 'active')`,
-        [userId, email, emailNormalized, passwordHash],
+        ) VALUES ($1, 'customer', $2, $3, NULL, 'active')`,
+        [userId, email, emailNormalized],
       );
       await this.insertPhones(
         client,
@@ -257,7 +245,7 @@ export class IdentityService {
         "users",
         userId,
         metadata,
-        { emailVerificationRequired: false },
+        { emailVerificationRequired: false, method: "customer_identifier" },
       );
       const session = await this.issueSession(client, userId, true, metadata);
       await client.query("COMMIT");
@@ -1643,7 +1631,7 @@ export class IdentityService {
   }
 
   // Issue a customer session only after SocialAuthService has verified a linked provider subject.
-  // Existing email matches without a provider link must still prove ownership using a password.
+  // This method is customer-scoped even when the same email belongs to Staff.
   public async loginLinkedSocialCustomer(
     userId: string,
     metadata: RequestMetadata,
@@ -1678,12 +1666,54 @@ export class IdentityService {
     }
   }
 
+  public async loginCustomer(identifier: string, metadata: RequestMetadata): Promise<IssuedSession> {
+    const normalized = normalizeIdentifier(identifier);
+    let phone: string | null = null;
+    if (!normalized.includes("@")) {
+      try { phone = normalizeEgyptianPhone(identifier); }
+      catch { throw new AppError(401, "INVALID_CREDENTIALS", "Enter a registered email or phone number"); }
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      // Lock the user through session creation: suspension/deletion cannot race login.
+      const found = await client.query<{ id: string; status: string }>(
+        `SELECT u.id,u.status FROM users u
+          WHERE u.account_type='customer' AND u.deleted_at IS NULL
+            AND (u.email_normalized=$1 OR ($2::text IS NOT NULL AND EXISTS (
+              SELECT 1 FROM account_phones ap WHERE ap.user_id=u.id
+                AND ap.account_type='customer' AND ap.phone_normalized=$2
+            ))) FOR UPDATE OF u`,
+        [normalized, phone],
+      );
+      const row = found.rows[0];
+      if (!row) throw new AppError(401, "INVALID_CREDENTIALS", "Enter a registered email or phone number");
+      if (!["active", "pending_verification"].includes(row.status)) {
+        throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
+      }
+      await client.query(
+        `UPDATE users SET status='active',must_change_password=false,
+          failed_login_count=0,locked_until=NULL,last_login_at=now(),updated_at=now()
+          WHERE id=$1 AND account_type='customer'`, [row.id],
+      );
+      const session = await this.issueSession(client, row.id, true, metadata);
+      await this.audit(client, "customer", row.id, "LOGIN_SUCCEEDED", "sessions",
+        session.account.sessionId, metadata, { method: "customer_identifier" });
+      await client.query("COMMIT");
+      return session;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
+  }
+
   public async login(
     accountType: AccountType,
     identifier: string,
     password: string,
     metadata: RequestMetadata,
   ): Promise<IssuedSession> {
+    if (accountType === "customer") return this.loginCustomer(identifier, metadata);
     if (accountType === "staff") {
       throw new AppError(
         403,
@@ -1909,31 +1939,30 @@ export class IdentityService {
       accountType: row.account_type,
       code: row.code,
       name: row.name,
-      email: row.email,
+      email: row.email || "",
       phones: row.phones ?? [],
       status: row.status,
       emailVerified: Boolean(row.email_verified_at),
-      mustChangePassword: row.must_change_password,
+      mustChangePassword: row.account_type === "customer" ? false : row.must_change_password,
       birthday: row.birthday,
     };
   }
 
   public async updateCustomerProfile(
     account: AuthenticatedAccount,
-    input: { name: string; email: string; phone1: string; phone2?: string | undefined; birthday?: string | undefined },
+    input: { name: string; email?: string | undefined; phone1: string; phone2?: string | undefined; birthday?: string | undefined },
     metadata: RequestMetadata,
   ): Promise<{ profile: IdentityPublicProfile; verification?: { challengeId: string; expiresAt: Date } }> {
     if (account.accountType !== "customer") {
       throw new AppError(403, "FORBIDDEN", "Only customer profiles can be changed through this endpoint");
     }
-    const email = input.email.trim();
-    const emailNormalized = normalizeEmail(email);
+    const email = input.email?.trim() || null;
+    const emailNormalized = email ? normalizeEmail(email) : null;
     const displayPhones = [input.phone1, input.phone2].filter(
       (value): value is string => Boolean(value?.trim()),
     );
     const normalizedPhones = normalizePhonesOrThrow(displayPhones);
     const client = await this.pool.connect();
-    let verification: { challengeId: string; expiresAt: Date } | undefined;
     try {
       await client.query("BEGIN");
       const locked = await client.query<{ email_normalized: string; email: string }>(
@@ -1950,58 +1979,12 @@ export class IdentityService {
       );
       await client.query("DELETE FROM account_phones WHERE user_id = $1", [account.userId]);
       await this.insertPhones(client, account.userId, "customer", displayPhones, normalizedPhones);
-      if (emailChanged) {
-        await client.query(
-          `UPDATE users SET email = $2, email_normalized = $3,
-            email_verified_at = NULL, status = 'pending_verification',
-            session_version = session_version + 1, updated_at = now(), version = version + 1
-           WHERE id = $1`,
-          [account.userId, email, emailNormalized],
-        );
-        await client.query(
-          `UPDATE sessions SET revoked_at = now(), revoke_reason = 'email_changed'
-           WHERE user_id = $1 AND revoked_at IS NULL`,
-          [account.userId],
-        );
-        await client.query(
-          `UPDATE email_verification_challenges SET consumed_at = now()
-           WHERE user_id = $1 AND purpose = 'change_email' AND consumed_at IS NULL`,
-          [account.userId],
-        );
-        const challengeId = randomUUID();
-        const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
-        const expiresAt = new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000);
-        await client.query(
-          `INSERT INTO email_verification_challenges
-            (id, user_id, purpose, code_hash, expires_at)
-           VALUES ($1, $2, 'change_email', $3, $4)`,
-          [challengeId, account.userId, digest(`email-otp:${challengeId}:${otp}`, this.config.authPepper), expiresAt],
-        );
-        await client.query(
-          `INSERT INTO outbox_events (
-            aggregate_type, aggregate_id, event_type, payload, deduplication_key
-          ) VALUES ('user', $1, 'EMAIL_CHANGE_VERIFICATION_REQUESTED', $2::jsonb, $3)`,
-          [
-            account.userId,
-            JSON.stringify({
-              channel: "email",
-              to: email,
-              template: "customer_email_change_verification",
-              encryptedParameters: {
-                otp: encryptSecret(otp, this.config.mfaEncryptionKey).toString("base64"),
-              },
-              expiresAt: expiresAt.toISOString(),
-            }),
-            `email-change-verification:${challengeId}`,
-          ],
-        );
-        verification = { challengeId, expiresAt };
-      } else {
-        await client.query(
-          `UPDATE users SET email = $2, updated_at = now(), version = version + 1 WHERE id = $1`,
-          [account.userId, email],
-        );
-      }
+      await client.query(
+        `UPDATE users SET email=$2,email_normalized=$3,
+          email_verified_at=CASE WHEN $4 THEN NULL ELSE email_verified_at END,
+          updated_at=now(),version=version+1 WHERE id=$1`,
+        [account.userId, email, emailNormalized, emailChanged],
+      );
       await this.audit(client, "customer", account.userId, "CUSTOMER_PROFILE_UPDATED", "customers", account.userId, metadata);
       await client.query("COMMIT");
     } catch (error) {
@@ -2010,7 +1993,7 @@ export class IdentityService {
     } finally {
       client.release();
     }
-    return { profile: await this.profile(account), ...(verification ? { verification } : {}) };
+    return { profile: await this.profile(account) };
   }
 
   public async adminSetAccountState(
@@ -2187,7 +2170,7 @@ export class IdentityService {
     customerUserId: string,
     input: {
       name: string;
-      email: string;
+      email?: string | undefined;
       phone1: string;
       phone2?: string | undefined;
       birthday?: string | null | undefined;
@@ -2203,8 +2186,8 @@ export class IdentityService {
       throw new AppError(403, "FORBIDDEN", "You do not have permission to manage customers");
     }
 
-    const email = input.email.trim();
-    const emailNormalized = normalizeEmail(email);
+    const email = input.email?.trim() || null;
+    const emailNormalized = email ? normalizeEmail(email) : null;
     const displayPhones = [input.phone1, input.phone2].filter(
       (value): value is string => Boolean(value?.trim()),
     );
@@ -2261,7 +2244,7 @@ export class IdentityService {
         `UPDATE users
             SET email=$2,
                 email_normalized=$3,
-                email_verified_at=now(),
+                email_verified_at=CASE WHEN email_normalized IS NOT DISTINCT FROM $3 THEN email_verified_at ELSE NULL END,
                 session_version=session_version + CASE WHEN $4 THEN 1 ELSE 0 END,
                 version=version+1,
                 updated_at=now()
@@ -2380,6 +2363,9 @@ export class IdentityService {
     identifier: string,
     metadata: RequestMetadata,
   ): Promise<{ challengeId: string; expiresAt: Date }> {
+    if (accountType === "customer") {
+      throw new AppError(410, "CUSTOMER_PASSWORD_RETIRED", "Customer accounts sign in with email or phone directly");
+    }
     const user = await this.findLogin(accountType, identifier);
     const challengeId = randomUUID();
     const expiresAt = new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000);
@@ -2548,8 +2534,10 @@ export class IdentityService {
         throw new AppError(422, "OTP_INVALID", "The verification code is invalid");
       }
 
-      if (row.account_type === "customer") customerPasswordPolicyOrThrow(newPassword);
-      else passwordPolicyOrThrow(newPassword);
+      if (row.account_type === "customer") {
+        throw new AppError(410, "CUSTOMER_PASSWORD_RETIRED", "Customer accounts no longer use passwords");
+      }
+      passwordPolicyOrThrow(newPassword);
 
       const history = await client.query<{ password_hash: string }>(
         `SELECT password_hash FROM (
@@ -2626,95 +2614,6 @@ export class IdentityService {
     }
   }
 
-  public async changeCustomerPassword(
-    account: AuthenticatedAccount,
-    currentPassword: string,
-    newPassword: string,
-    metadata: RequestMetadata,
-  ): Promise<IssuedSession> {
-    if (account.accountType !== "customer") {
-      throw new AppError(403, "FORBIDDEN", "Only customers can change their password here");
-    }
-    customerPasswordPolicyOrThrow(newPassword);
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-      const current = await client.query<{ password_hash: string | null }>(
-        "SELECT password_hash FROM users WHERE id=$1 AND account_type='customer' FOR UPDATE",
-        [account.userId],
-      );
-      const currentHash = current.rows[0]?.password_hash;
-      if (!currentHash || !(await verifyPassword(currentHash, currentPassword))) {
-        throw new AppError(401, "CURRENT_PASSWORD_INVALID", "Current password is incorrect");
-      }
-
-      const history = await client.query<{ password_hash: string }>(
-        `SELECT password_hash FROM (
-           SELECT password_hash, created_at
-             FROM password_history
-            WHERE user_id=$1
-           UNION ALL
-           SELECT password_hash, now()
-             FROM users
-            WHERE id=$1 AND password_hash IS NOT NULL
-         ) password_versions
-         ORDER BY created_at DESC
-         LIMIT 5`,
-        [account.userId],
-      );
-      for (const previous of history.rows) {
-        if (await verifyPassword(previous.password_hash, newPassword)) {
-          throw new AppError(422, "PASSWORD_REUSED", "Choose a password that was not used recently");
-        }
-      }
-
-      const nextHash = await hashPassword(newPassword);
-      await client.query(
-        `INSERT INTO password_history (user_id, password_hash)
-         SELECT id, password_hash FROM users WHERE id=$1 AND password_hash IS NOT NULL`,
-        [account.userId],
-      );
-      await client.query(
-        `UPDATE users
-            SET password_hash=$2,
-                must_change_password=false,
-                session_version=session_version+1,
-                updated_at=now(),
-                version=version+1
-          WHERE id=$1`,
-        [account.userId, nextHash],
-      );
-      await client.query(
-        `UPDATE sessions
-            SET revoked_at=now(), revoke_reason='password_changed'
-          WHERE user_id=$1 AND revoked_at IS NULL`,
-        [account.userId],
-      );
-      const replacement = await this.issueSession(
-        client,
-        account.userId,
-        account.mfaSatisfied,
-        metadata,
-      );
-      await this.audit(
-        client,
-        "customer",
-        account.userId,
-        "PASSWORD_CHANGED",
-        "users",
-        account.userId,
-        metadata,
-      );
-      await client.query("COMMIT");
-      return replacement;
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
   public async adminCreatePasswordResetRequest(
     account: AuthenticatedAccount,
     targetUserId: string,
@@ -2729,6 +2628,9 @@ export class IdentityService {
       throw new AppError(403, "FORBIDDEN", "You do not have permission to create password reset requests");
     }
 
+    if (targetType === "customer") {
+      throw new AppError(410, "CUSTOMER_PASSWORD_RETIRED", "Customer accounts no longer use passwords");
+    }
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -2842,7 +2744,7 @@ export class IdentityService {
            ON c.user_id=pr.user_id AND pr.account_type='customer'
          LEFT JOIN representatives r
            ON r.user_id=pr.user_id AND pr.account_type='representative'
-        WHERE pr.status='pending'
+        WHERE pr.status='pending' AND pr.account_type='representative'
         ORDER BY pr.requested_at DESC
         LIMIT 500`,
     );
@@ -3111,7 +3013,7 @@ export class IdentityService {
       id: row.user_id,
       repId: row.representative_code,
       name: row.full_name,
-      email: row.email,
+      email: row.email || "",
       phone1:
         row.phones.find((phone) => phone.is_primary)?.phone_display ||
         row.phones[0]?.phone_display ||
@@ -3246,7 +3148,7 @@ export class IdentityService {
         `SELECT password_reset_requests.user_id, password_reset_requests.status, users.email
          FROM password_reset_requests
          LEFT JOIN users ON users.id = password_reset_requests.user_id
-         WHERE password_reset_requests.id = $1 FOR UPDATE`,
+         WHERE password_reset_requests.id = $1 AND password_reset_requests.account_type='representative' FOR UPDATE`,
         [requestId],
       );
       const row = request.rows[0];
@@ -3310,11 +3212,13 @@ export class IdentityService {
     newPassword: string,
     metadata: RequestMetadata,
   ): Promise<IssuedSession> {
+    if (account.accountType !== "representative") {
+      throw new AppError(403, "FORBIDDEN", "Only representative accounts use password replacement");
+    }
     if (!account.mustChangePassword) {
       throw new AppError(409, "TEMPORARY_PASSWORD_NOT_ACTIVE", "This account does not require a password replacement");
     }
-    if (account.accountType === "customer") customerPasswordPolicyOrThrow(newPassword);
-    else passwordPolicyOrThrow(newPassword);
+    passwordPolicyOrThrow(newPassword);
     const history = await this.pool.query<{ password_hash: string }>(
       `SELECT password_hash FROM (
         SELECT password_hash, created_at FROM password_history WHERE user_id = $1
@@ -3488,9 +3392,9 @@ export class IdentityService {
         userId,
         accountType: row.account_type,
         status: row.status,
-        email: row.email,
+        email: row.email || "",
         emailVerified: Boolean(row.email_verified_at),
-        mustChangePassword: row.must_change_password,
+        mustChangePassword: row.account_type === "customer" ? false : row.must_change_password,
         sessionId,
         sessionFamilyId: familyId,
         csrfTokenHash: hashCsrfToken(csrfToken, this.config.authPepper),
@@ -3509,9 +3413,9 @@ export class IdentityService {
       userId: row.id,
       accountType: row.account_type,
       status: row.status,
-      email: row.email,
+      email: row.email || "",
       emailVerified: Boolean(row.email_verified_at),
-      mustChangePassword: row.must_change_password,
+      mustChangePassword: row.account_type === "customer" ? false : row.must_change_password,
       sessionId: row.session_id,
       sessionFamilyId: row.family_id,
       csrfTokenHash: row.csrf_token_hash,

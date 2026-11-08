@@ -23,14 +23,6 @@ export function validatePasswordPolicy(password: string): string[] {
   return problems;
 }
 
-// Customer passwords intentionally optimize for a simple clothing-store signup.
-// The only composition rule is length; letters, digits, spaces and symbols are allowed.
-export function validateCustomerPasswordPolicy(password: string): string[] {
-  return password.length < 6
-    ? ["Password must contain at least 6 characters"]
-    : [];
-}
-
 export async function hashPassword(
   password: string,
   options: PasswordHashOptions = defaultOptions,

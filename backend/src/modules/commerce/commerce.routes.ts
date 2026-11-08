@@ -129,7 +129,7 @@ export const checkoutSchema = z.object({
     name: z.string().trim().min(2).max(160),
     phone1: z.string().trim().min(7).max(40),
     phone2: z.string().trim().max(40).optional(),
-    email: z.string().trim().email().max(320),
+    email: z.union([z.string().trim().email().max(320), z.literal("")]).default(""),
   }),
   address: z.object({
     country: z.string().trim().min(2).max(120),

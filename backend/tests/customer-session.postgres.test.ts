@@ -16,7 +16,7 @@ describe("persistent customer sessions", () => {
     const id = randomUUID();
     return service.registerCustomer({ name: "Session Test", email: `${id}@example.test`,
       phone1: `010${String(Math.floor(Math.random() * 100000000)).padStart(8, "0")}`,
-      birthday: "2000-01-01", password: "test-password" }, metadata);
+      birthday: "2000-01-01" }, metadata);
   }
   it("issues persistent cookies for a year and renews without replacing the session", async () => {
     const session = await customer();

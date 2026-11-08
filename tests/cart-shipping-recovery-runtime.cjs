@@ -131,8 +131,11 @@ function sessionCleanup() {
   assert.equal(storage.get("dart_cart_reservation_id"), "legacy-id"); assert.equal(c.cartData.length, 1);
   c.clearCustomerPrivateCache();
   assert.equal(storage.has("dart_cart_reservation_id"), false); assert.equal(c.cartData.length, 0);
-  const start = source.indexOf("  async function verifyEmail(");
-  assert.match(source.slice(start), /await claimGuestCartAfterAuth\(\)/, "email verification must recover guest ownership before redirect");
+  for (const method of ["register", "login"]) {
+    const start = source.indexOf(`  async function ${method}(`);
+    const end = source.indexOf("\n  async function ", start + 1);
+    assert.match(source.slice(start, end), /await claimGuestCartAfterAuth\(\)/, `${method} must recover guest ownership before redirect`);
+  }
 }
 async function availability(pickup = false) {
   let offline = false;

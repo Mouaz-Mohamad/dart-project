@@ -4,7 +4,6 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 
 const customer = fs.readFileSync("Js/dart-platform.js", "utf8");
-const customerPasswordUi = fs.readFileSync("Js/dart-password-visibility.js", "utf8");
 const social = fs.readFileSync("Js/dart-auth-social.js", "utf8");
 const representative = fs.readFileSync("Js/dart-rep.js", "utf8");
 const admin = fs.readFileSync("Eye/dart-admin-auth.js", "utf8");
@@ -13,7 +12,6 @@ const dashboard = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 
 for (const path of [
   "/api/v1/auth/register",
-  "/api/v1/auth/verify-email",
   "/api/v1/auth/login",
   "/api/v1/auth/logout",
   "/api/v1/me",
@@ -23,7 +21,10 @@ for (const path of [
 assert(customer.includes("profile.accountType !== \"customer\""), "Customer cache must reject Staff/Representative sessions");
 assert(customer.includes("X-CSRF-Token"), "Customer mutations must forward the CSRF token");
 assert(!signup.includes('id="customerEmailVerificationForm"'), "Customer signup must not present an email OTP form");
-assert(signup.includes('minlength="6"'), "Customer signup must expose the 6-character minimum");
+assert(!signup.includes('type="password"'), "Customer signup/login must have no password fields");
+assert(!signup.includes('name="email"') && !signup.includes('name="phone2"'), "Registration must ask only for name, primary phone and birthday");
+assert(!signup.includes("data-forgot-password"), "Password recovery must not appear for customers");
+assert(!social.includes("challenge.passwordRequired"), "Google linking must not ask for the retired customer password");
 assert(
   signup.includes('id="dartBirthdayValue" type="hidden" name="birthday"') &&
     ['dartBirthDay', 'dartBirthMonth', 'dartBirthYear'].every(id =>
@@ -38,8 +39,6 @@ assert(
     !/<input type="password"[^>]*>\\s*<svg class="dart-auth-icon"/.test(signup),
   "Customer authentication must load its dedicated design and keep only the visibility icon beside password fields",
 );
-assert(customerPasswordUi.includes('input.removeAttribute("pattern")'), "Customer password UI must allow any character composition");
-assert(customerPasswordUi.includes("letters, numbers and symbols are all allowed"), "Customer signup must explain the relaxed password rule");
 assert.equal((signup.match(/data-social-login="google"/g) || []).length, 2, "Google sign-in must exist in both forms; availability is checked through the server provider endpoint");
 assert.equal((signup.match(/data-social-login="facebook"/g) || []).length, 0, "Unavailable Facebook login must not be offered");
 for (const path of [
