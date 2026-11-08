@@ -13,11 +13,11 @@ address_components:[{types:['country'],short_name:'EG',long_name:'Egypt'},
 {types:['sublocality'],long_name:'Test district'}, {types:['route'],long_name:'Test street'}],
 geometry:{location:{lat:()=>lat,lng:()=>lng}}});
 window.google={maps:{
-Map:class {constructor(el,options){window.__maps++;window.__mapHistory.push(this);this.options=options;this.events={};this.heading=options.heading||0;this.renderingType=options.renderingType||'RASTER';
+Map:class {constructor(el,options){window.__maps++;window.__mapHistory.push(this);this.options=options;this.events={};this.heading=options.heading||0;this.renderingType=window.__actualRaster?'RASTER':options.renderingType||'RASTER';
 if(window.__throwVector && this.renderingType==='VECTOR')throw Error('Synthetic WebGL initialization failure');
 el.textContent='Synthetic Google Map';window.__map=this;
 if(!(this.renderingType==='VECTOR'?window.__blankVector:window.__blankRaster))setTimeout(()=>this.events.tilesloaded?.(),0);
-} addListener(n,fn){this.events[n]=fn} panTo(location){window.__panCalls.push(location)} setZoom(zoom){this.zoom=zoom} setCenter(location){window.__panCalls.push(location)} fitBounds(){} getRenderingType(){return this.renderingType} getHeading(){return this.heading} moveCamera(options){this.heading=options.heading;this.tilt=options.tilt;window.__panCalls.push(options.center)}},
+} addListener(n,fn){this.events[n]=fn} panTo(location){window.__panCalls.push(location)} setZoom(zoom){this.zoom=zoom} setCenter(location){window.__panCalls.push(location)} fitBounds(){} getRenderingType(){return this.renderingType} getHeading(){return this.heading} getTilt(){return this.tilt??this.options.tilt} moveCamera(options){this.heading=options.heading;this.tilt=options.tilt;window.__panCalls.push(options.center)}},
 Marker:class {constructor(options){this.options=options;this.events={};window.__markers.push(this)}setMap(){}setPosition(position){this.options.position=position}setIcon(icon){this.options.icon=icon}addListener(n,fn){this.events[n]=fn}},
 Point:class{constructor(x,y){this.x=x;this.y=y}},Polyline:class{constructor(options){window.__polyline=options}setMap(){}setPath(path){window.__path=path}},LatLngBounds:class{extend(){}},event:{clearInstanceListeners(map){map.events={}}},
 Geocoder:class{geocode(request,callback){window.__geocodes.push({request,callback});if(!window.__delayGeocode)callback([window.__lookup()], 'OK')}},
@@ -287,9 +287,11 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(()=>window.__routes===2 && document.getElementById("repNavigationStatus").textContent.includes("تعذر"));
     assert.match(await page.locator("#repNavigationStatus").textContent(),/تعذر/);
     await page.evaluate(()=>{window.__routeFailure=false});
+    const beforeRouteRetry=await page.evaluate(()=>window.__maps);
     await page.locator("#repNavigationExit").click();
     await page.locator('[data-action="navigate"]').click();
     await page.waitForFunction(()=>window.__routes===3 && document.getElementById("repNavigationStatus").textContent==="");
+    assert.equal(await page.evaluate(()=>window.__maps),beforeRouteRetry,"Routes failure/retry must preserve the loaded map");
 
     // Closing the window is UI-only, then reopening still shows the active delivery.
     await page.locator("#repNavigationExit").click();assert.deepEqual(await page.evaluate(()=>window.__actions),["start"]);
@@ -328,7 +330,7 @@ const server = http.createServer((req, res) => {
     const mountRecovery=async flags=>{
       await recovery.evaluate(async flags=>{
         window.DartGoogleMaps.destroyRepresentatives();
-        window.__blankVector=Boolean(flags.vector);window.__blankRaster=Boolean(flags.raster);window.__throwVector=Boolean(flags.throwVector);
+        window.__blankVector=Boolean(flags.vector);window.__blankRaster=Boolean(flags.raster);window.__throwVector=Boolean(flags.throwVector);window.__actualRaster=Boolean(flags.actualRaster);
         window.DART_REP_LAST_LOCATION={lat:30.02,lng:31.25,heading:90,speed:2,updatedAt:new Date().toISOString()};
         const dialog=document.getElementById('repNavigationDialog');if(!dialog.open)dialog.showModal();
         const host=document.getElementById('repNavigationMap');host.dataset.repLiveMap='';host.dataset.orderId='recovery';
@@ -341,6 +343,10 @@ const server = http.createServer((req, res) => {
     await recovery.clock.fastForward(20000);
     assert.equal(await recovery.evaluate(()=>window.__maps),healthyCount,"loaded vector maps never downgrade on a timer");
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
+    await mountRecovery({actualRaster:true});await recovery.clock.runFor(10);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER');
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-fallback-reason'),'google-selected-raster');
+    assert.equal(await recovery.evaluate(()=>window.DartGoogleMaps.getRepresentativeDiagnostics()[0].requestedRenderer),'VECTOR');
 
     // A slow first load must not silently remove vector tilt after the former 10-second limit.
     await mountRecovery({vector:true});
@@ -363,18 +369,16 @@ const server = http.createServer((req, res) => {
     assert.equal('orderId' in safeDiagnostic,false);assert.equal('location' in safeDiagnostic,false);
 
     await mountRecovery({vector:true});
-    await recovery.evaluate(()=>{window.__lateVectorTiles=window.__map.events.tilesloaded});
-    await recovery.clock.fastForward(30001);await recovery.clock.runFor(10);
-    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER');
+    const stalledCount=await recovery.evaluate(()=>window.__maps);
+    await recovery.clock.fastForward(21000);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'VECTOR');
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'error');
+    assert.equal(await recovery.evaluate(()=>window.__maps),stalledCount,"a streets timeout never destroys and reloads a map");
+    await recovery.evaluate(()=>window.__map.events.tilesloaded());
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
-    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-fallback-reason'),'visible-tile-timeout');
-    assert.equal(await recovery.evaluate(()=>window.__polyline.path.length),2,"switching renderers retains the road route");
-    assert.deepEqual(await recovery.evaluate(()=>window.__markers.findLast(m=>m.options.title==='Customer destination').options.position),{lat:30.05,lng:31.25});
-    await recovery.evaluate(()=>window.__lateVectorTiles());
-    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER',"late retired vector callbacks cannot replace the recovered map");
-    await recovery.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.0202,lng:31.25,heading:90,speed:2,updatedAt:new Date().toISOString()}));
-    await recovery.clock.runFor(1100);
-    assert.equal(await recovery.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat),30.0202,"GPS tracking continues on the recovered map");
+    assert.equal(await recovery.evaluate(()=>window.__map.tilt),60);
+    assert.equal(await recovery.evaluate(()=>window.__maps),stalledCount,"late streets recover the same vector map");
+    assert.equal(await recovery.evaluate(()=>window.__polyline.path.length),2);
 
     await mountRecovery({});await recovery.clock.runFor(10);
     await recovery.evaluate(()=>document.querySelector('#repNavigationMap .dart-google-map-overlay').dispatchEvent(new Event('webglcontextlost')));
@@ -388,9 +392,9 @@ const server = http.createServer((req, res) => {
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
 
     await mountRecovery({vector:true,raster:true});
-    await recovery.clock.fastForward(30001);await recovery.clock.fastForward(30001);
+    await recovery.clock.fastForward(21000);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'error');
-    assert.match(await recovery.locator('#repNavigationMap').textContent(),/streets could not load.*retry Google Maps/);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'VECTOR');
     const failedCount=await recovery.evaluate(()=>window.__maps);
     await recovery.clock.fastForward(30000);
     assert.equal(await recovery.evaluate(()=>window.__maps),failedCount,"a complete tile outage never loops through new maps");
@@ -402,6 +406,6 @@ const server = http.createServer((req, res) => {
     assert.equal(await recovery.evaluate(()=>window.__maps),closedCount,"closing cancels pending recovery");
     await recovery.close();
     assert.deepEqual(errors,[]);
-    console.log("PASS simulated tile failures: vector stall, constructor failure and context loss recover once; path/pins/GPS preserved; healthy vectors retained; complete outages visible; late/closed callbacks ignored. Google checkout/Places regressions; courier vector 60-degree camera, heading-up arrow, interpolated motion, shortest turns, pause/recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 80% map, retry, cached exit/reopen, 500m gate and cash confirmation");
+    console.log("PASS map lifecycle: delayed streets retain the same vector; actual Google raster selection recorded; explicit constructor/context failures recover once; path/pins/GPS preserved; complete outages bounded; late/closed callbacks safe. Google checkout/Places regressions; courier vector 60-degree camera, heading-up arrow, interpolated motion, shortest turns, pause/recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 80% map, retry, cached exit/reopen, 500m gate and cash confirmation");
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});

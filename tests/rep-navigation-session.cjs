@@ -17,7 +17,8 @@ const document = {addEventListener(){},dispatchEvent(){},getElementById:element,
   body:{classList:{add(){},remove(){}}}};
 const sessionStorage = {getItem:()=>null,removeItem(){}};
 const source = fs.readFileSync('Js/dart-rep.js','utf8').replace('  window.DartRepPortal = {', `
-  window.testNavigation = {openNavigation, closeNavigation, stopNavigation, updateDeliveryControls,
+  window.testNavigation = {openNavigation, closeNavigation, stopNavigation, updateDeliveryControls, refreshApiWork,
+    work(){return apiWork}, logout(){apiRepresentative=null},
     seed(order){apiRepresentative={id:'rep'};apiWork={orders:[order],returns:[]};},
     entry(){return deliveryMaps.get(navigationOrderId)}};
   window.DartRepPortal = {`);
@@ -39,8 +40,26 @@ vm.runInNewContext(source,{window,document,sessionStorage,location:{protocol:'ht
   nav.closeNavigation(); assert.equal(destroys,0); assert.equal(element('repNavigationResume').hidden,false);
   await nav.openNavigation(order); assert.equal(mounts,1); assert.equal(routes,1);assert.equal(nav.entry(),entry);
   assert.match(element('repNavigationInstruction').textContent,/Turn right/);
+  entry.failed=true;await nav.openNavigation(order);await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(mounts,1,'route retry cannot remount a healthy map');assert.equal(routes,2);
   nav.closeNavigation();nav.seed({...order,status:'Delivered'});nav.updateDeliveryControls();
   assert.equal(destroys,1);assert.equal(nav.entry(),undefined);assert.equal(element('repNavigationResume').hidden,true);
   assert.equal(pipClosed,0);
+  const next={...order,id:'parallel'};nav.seed(next);
+  let finishMount;
+  window.DartGoogleMaps.attachRepresentatives=()=>new Promise(resolve=>{mounts++;finishMount=resolve});
+  const opening=nav.openNavigation(next);await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(routes,3,'road request starts before the map mount finishes');
+  finishMount();await opening;nav.stopNavigation();
+  const workReads=[];window.DartApi.request=()=>new Promise(resolve=>workReads.push(resolve));
+  const oldRead=nav.refreshApiWork(),newRead=nav.refreshApiWork();
+  workReads[1]({orders:[{id:'latest'}],returns:[]});await newRead;
+  workReads[0]({orders:[{id:'outdated'}],returns:[]});await oldRead;
+  assert.equal(nav.work().orders[0].id,'latest','slow old work snapshots cannot overwrite a newer response');
+  const privateRead=nav.refreshApiWork();nav.logout();workReads[2]({orders:[{id:'private'}],returns:[]});await privateRead;
+  assert.equal(nav.work().orders[0].id,'latest','logout blocks a late private work response');
+  nav.seed(order);const previousSession=nav.refreshApiWork();nav.logout();nav.seed(order);
+  workReads[3]({orders:[{id:'old-session'}],returns:[]});await previousSession;
+  assert.equal(nav.work().orders[0].id,order.id,'same-account re-login rejects a response from the previous session');
   console.log('PASS courier navigation: 499/501m gate, stale/missing GPS, unchanged pickup radius, retained map/route on exit/reopen and cleanup after completion');
 })().catch(error=>{console.error(error);process.exitCode=1});

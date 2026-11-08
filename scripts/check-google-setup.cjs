@@ -43,7 +43,8 @@ present(maps, 'destroyRepresentatives', 'delivery map disposal');
 present(maps, 'gm_authFailure', 'visible Google Maps key error handling');
 assert.ok(!/leaflet|openstreetmap|nominatim/i.test(maps),
   'Courier Google map must not load old third-party tiles');
-present(courier, 'await window.DartGoogleMaps?.attachRepresentatives?.([order]);', 'Google courier fullscreen map');
+present(courier, 'window.DartGoogleMaps?.attachRepresentatives?.([order])', 'Google courier fullscreen map');
+present(courier, 'await mounting;', 'courier map mount completion guard');
 present(courier, 'addressSource', 'manual destination handling');
 present(csp, 'https://maps.googleapis.com', 'Google Maps CSP');
 present(csp, 'https://maps.gstatic.com', 'Google assets CSP');

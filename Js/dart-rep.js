@@ -46,11 +46,12 @@
   let locationWatch = null;
   let locationPermissionBlocked = false;
   let apiWork = { orders: [], returns: [] };
+  let nextWorkRead = 0, appliedWorkRead = 0;
   let latestApiLocation = null;
   let lastLocationSyncAt = 0;
   const deliveryMaps = new Map();
   let lastOrderRenderSignature = "";
-  let navigationOrderId = "", navigationFocus = null;
+  let navigationOrderId = "", navigationFocus = null, didWarmMaps = false;
 
   const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
@@ -547,7 +548,10 @@
 
   async function refreshApiWork() {
     if (!API_ENABLED || !currentRep()) return apiWork;
+    const owner = currentRep(), version = ++nextWorkRead;
     const payload = await window.DartApi.request("/api/v1/representatives/work");
+    if (currentRep() !== owner || version < appliedWorkRead) return apiWork;
+    appliedWorkRead = version;
     apiWork = {
       orders: Array.isArray(payload.orders) ? payload.orders : [],
       returns: Array.isArray(payload.returns) ? payload.returns : [],
@@ -666,6 +670,7 @@
   const activeNavigationOrder = () => repOrders(currentRep()).find(order => String(order.id) === navigationOrderId);
   function closeNavigation() {
     navigationDialog()?.close();
+    window.DartGoogleMaps?.pauseRepresentatives?.();
     document.body.classList.remove("dart-rep-navigating");
     document.getElementById("repNavigationResume").hidden = !navigationOrderId;
     if (navigationFocus?.isConnected) navigationFocus.focus();
@@ -746,12 +751,15 @@
   }
   async function openNavigation(order) {
     if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) return;
-    if (navigationOrderId === String(order.id) && deliveryMaps.has(navigationOrderId) && !deliveryMaps.get(navigationOrderId).failed && document.getElementById("repNavigationMap").dataset.mapState !== "error") {
+    if (navigationOrderId === String(order.id) && deliveryMaps.has(navigationOrderId) && document.getElementById("repNavigationMap").dataset.mapState !== "error") {
       navigationDialog().showModal();
       window.DartGoogleMaps?.resizeRepresentatives?.();
       document.body.classList.add("dart-rep-navigating");
       document.getElementById("repNavigationResume").hidden = true;
       updateDeliveryControls();
+      const entry = deliveryMaps.get(navigationOrderId);
+      const courier = order.courierLocation || latestApiLocation;
+      if (entry.failed && courier) void refreshDeliveryRoadRoute(entry, courier, true);
       return;
     }
     if (navigationOrderId) stopNavigation();
@@ -773,14 +781,15 @@
       lastRoadRouteAt: 0, roadRouteRequestId: 0, steps: [] };
     deliveryMaps.set(entry.orderId, entry);
     updateDeliveryControls();
-    await window.DartGoogleMaps?.attachRepresentatives?.([order]);
+    const mounting = window.DartGoogleMaps?.attachRepresentatives?.([order]);
+    const courier = order.courierLocation || latestApiLocation;
+    if (entry.destination && courier) void refreshDeliveryRoadRoute(entry, courier, true);
+    await mounting;
     if (deliveryMaps.get(entry.orderId) !== entry) return;
     if (!entry.destination) {
       document.getElementById("repNavigationStatus").textContent = "Manual address — no verified destination pin.";
       return;
     }
-    const courier = order.courierLocation || latestApiLocation;
-    if (courier) void refreshDeliveryRoadRoute(entry, courier, true);
   }
   async function refreshDeliveryRoadRoute(entry, location, force = false) {
     if (!entry?.destination || !location || entry.orderId !== navigationOrderId || entry.pending) return;
@@ -833,6 +842,10 @@
     }
     document.getElementById("repAuthView").hidden = true;
     document.getElementById("repDashboardView").hidden = false;
+    if (!didWarmMaps && repOrders(rep).length) {
+      didWarmMaps = true;
+      void window.DartGoogleMaps?.preloadRepresentativeLibraries?.();
+    }
     document.getElementById("repIdentity").textContent =
       `${rep.name} · ${rep.repId} · ${rep.phone1}`;
     const orders = [...repOrders(rep)].sort((first, second) => {
@@ -1530,15 +1543,15 @@
     document.addEventListener("dart:rep-map-state", event => {
       if (!navigationOrderId || event.detail?.orderId !== navigationOrderId) return;
       document.getElementById("repNavigationMapStatus").textContent =
-        event.detail.state === "error" ? "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة." :
+        ["slow", "error"].includes(event.detail.state) ? event.detail.message || "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة." :
         event.detail.state === "ready" && event.detail.renderer === "RASTER" ?
-          event.detail.fallbackReason === "visible-tile-timeout" ? "الخريطة تعمل بالعرض المسطّح لأن تحميل العرض المائل لم يكتمل." :
-          "الخريطة تعمل بالعرض المسطّح بعد تعذّر تشغيل العرض المائل في المتصفح." : "";
+          "المتصفح يستخدم خريطة مسطّحة؛ الميل والدوران غير متاحين في هذا العرض." : "";
     });
     document.addEventListener("dart:google-maps-error", () => {
       if (!navigationOrderId) return;
       const entry = deliveryMaps.get(navigationOrderId);
       if (entry) entry.failed = true;
+      document.getElementById("repNavigationMap").dataset.mapState = "error";
       document.getElementById("repNavigationStatus").textContent = "تعذر تحميل الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.";
     });
     document.getElementById("repLoginTab").onclick = () => showAuth("login");
