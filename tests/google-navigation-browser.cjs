@@ -342,11 +342,32 @@ const server = http.createServer((req, res) => {
     assert.equal(await recovery.evaluate(()=>window.__maps),healthyCount,"loaded vector maps never downgrade on a timer");
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
 
+    // A slow first load must not silently remove vector tilt after the former 10-second limit.
+    await mountRecovery({vector:true});
+    await recovery.clock.fastForward(10001);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'VECTOR');
+    await recovery.evaluate(()=>window.__map.events.tilesloaded());
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
+    assert.equal(await recovery.evaluate(()=>window.__map.tilt),60);
+    // A cached closed dialog is not a failed GPU, even while its parent tab remains visible.
+    await mountRecovery({vector:true});
+    const hiddenCount=await recovery.evaluate(()=>{document.getElementById('repNavigationDialog').close();return window.__maps});
+    await recovery.clock.fastForward(90000);
+    assert.equal(await recovery.evaluate(()=>window.__maps),hiddenCount);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'VECTOR');
+    await recovery.evaluate(()=>{document.getElementById('repNavigationDialog').showModal();window.DartGoogleMaps.resizeRepresentatives();window.__map.events.tilesloaded()});
+    assert.equal(await recovery.evaluate(()=>window.__maps),hiddenCount);
+    assert.equal(await recovery.evaluate(()=>window.__map.tilt),60);
+    const safeDiagnostic=await recovery.evaluate(()=>window.DartGoogleMaps.getRepresentativeDiagnostics()[0]);
+    assert.equal(safeDiagnostic.actualRenderer,'VECTOR');
+    assert.equal('orderId' in safeDiagnostic,false);assert.equal('location' in safeDiagnostic,false);
+
     await mountRecovery({vector:true});
     await recovery.evaluate(()=>{window.__lateVectorTiles=window.__map.events.tilesloaded});
-    await recovery.clock.fastForward(10001);await recovery.clock.runFor(10);
+    await recovery.clock.fastForward(30001);await recovery.clock.runFor(10);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER');
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-fallback-reason'),'visible-tile-timeout');
     assert.equal(await recovery.evaluate(()=>window.__polyline.path.length),2,"switching renderers retains the road route");
     assert.deepEqual(await recovery.evaluate(()=>window.__markers.findLast(m=>m.options.title==='Customer destination').options.position),{lat:30.05,lng:31.25});
     await recovery.evaluate(()=>window.__lateVectorTiles());
@@ -359,13 +380,15 @@ const server = http.createServer((req, res) => {
     await recovery.evaluate(()=>document.querySelector('#repNavigationMap .dart-google-map-overlay').dispatchEvent(new Event('webglcontextlost')));
     await recovery.clock.runFor(10);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER',"WebGL context loss immediately recovers to a standard map");
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-fallback-reason'),'webgl-context-lost');
 
     await mountRecovery({throwVector:true});await recovery.clock.runFor(10);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER',"vector constructor failure has a bounded fallback");
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-fallback-reason'),'map-startup-error');
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
 
     await mountRecovery({vector:true,raster:true});
-    await recovery.clock.fastForward(10001);await recovery.clock.fastForward(10001);
+    await recovery.clock.fastForward(30001);await recovery.clock.fastForward(30001);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'error');
     assert.match(await recovery.locator('#repNavigationMap').textContent(),/streets could not load.*retry Google Maps/);
     const failedCount=await recovery.evaluate(()=>window.__maps);

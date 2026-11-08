@@ -45,6 +45,7 @@
     entry.drawnLocation = location; entry.drawnHeading = heading;
     if (entry.follow) {
       if (entry.tilesReady && entry.map.getRenderingType?.() === "VECTOR") {
+        entry.cameraHeading = heading;
         entry.map.moveCamera({ center: location, heading, tilt: 60 });
       } else entry.map.setCenter(location);
     }
@@ -146,7 +147,23 @@
   }
   function mapState(entry, state, message = "") {
     entry.container.dataset.mapState = state;
-    document.dispatchEvent(new CustomEvent("dart:rep-map-state", { detail: { orderId: entry.id, state, message } }));
+    entry.state = state;
+    document.dispatchEvent(new CustomEvent("dart:rep-map-state", { detail: {
+      orderId: entry.id, state, message, renderer: entry.container.dataset.mapRenderer,
+      fallbackReason: entry.fallbackReason || "",
+    } }));
+  }
+  function mapIsVisible(entry) {
+    const rect = entry.container.getBoundingClientRect();
+    return !document.hidden && Boolean(entry.container.closest("dialog")?.open) && rect.width > 0 && rect.height > 0;
+  }
+  function getRepresentativeDiagnostics() {
+    return [...mounted.values()].map(entry => ({
+      requestedRenderer: entry.requestedRenderer, actualRenderer: entry.map?.getRenderingType?.() || "UNINITIALIZED",
+      state: entry.state || "loading", fallbackReason: entry.fallbackReason || "",
+      visible: mapIsVisible(entry), heading: entry.map?.getHeading?.() ?? null,
+      tilt: entry.map?.getTilt?.() ?? null, startupFailure: entry.startupFailure || "",
+    }));
   }
   function createRepresentativeMap(entry, renderer = "VECTOR") {
     const center = (!entry.follow && point(entry.map?.getCenter?.())) || entry.location || entry.target || { lat: 30.0444, lng: 31.2357 };
@@ -156,9 +173,13 @@
     canvas.className = "dart-google-map-overlay";
     entry.container.appendChild(canvas);
     entry.container.dataset.mapRenderer = renderer;
+    entry.requestedRenderer ??= renderer;
+    entry.container.dataset.mapFallbackReason = entry.fallbackReason || "";
     let map = null;
-    const recover = () => {
+    const recover = reason => {
       if (mounted.get(entry.id) !== entry || authFailed || (map && entry.map !== map)) return;
+      entry.fallbackReason = reason;
+      entry.container.dataset.mapFallbackReason = reason;
       if (renderer === "VECTOR") createRepresentativeMap(entry, "RASTER");
       else {
         disposeRepresentativeMap(entry);
@@ -168,7 +189,8 @@
     };
     try {
       map = new google.maps.Map(canvas, { center, zoom: 17, renderingType: renderer,
-        tilt: renderer === "VECTOR" ? 60 : 0, heading: renderer === "VECTOR" ? entry.heading ?? 0 : 0,
+        // Start top-down while Google's vector tiles initialize, then tilt/rotate after tilesloaded.
+        tilt: 0, heading: 0,
         tiltInteractionEnabled: true, headingInteractionEnabled: true, isFractionalZoomEnabled: true,
         disableDefaultUI: true, colorScheme: "LIGHT", clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
       entry.map = map;
@@ -180,6 +202,13 @@
         entry.followTimer = setTimeout(() => { if (mounted.get(entry.id) === entry && entry.map === map) setFollow(entry, true); }, 8000);
       });
       map.addListener("heading_changed", () => {
+        // User rotation must not be immediately overwritten by the next GPS camera update.
+        if (entry.tilesReady && entry.follow && entry.cameraHeading != null &&
+            Math.abs(angleDifference(entry.cameraHeading, map.getHeading() || 0)) > 0.5) {
+          setFollow(entry, false);
+          clearTimeout(entry.followTimer);
+          entry.followTimer = setTimeout(() => { if (mounted.get(entry.id) === entry && entry.map === map) setFollow(entry, true); }, 8000);
+        }
         entry.courier?.setIcon(courierIcon(((entry.drawnHeading - (map.getHeading() || 0)) % 360 + 360) % 360));
       });
       map.addListener("renderingtype_changed", () => {
@@ -190,19 +219,32 @@
         entry.tilesReady = true; clearTimeout(entry.tileTimer);
         window.cancelAnimationFrame(entry.frame); entry.frame = null;
         entry.container.dataset.mapRenderer = map.getRenderingType?.() || renderer;
-        mapState(entry, "ready", entry.container.dataset.mapRenderer === "RASTER" ? "Showing the standard Google Maps view." : "");
+        if (renderer === "VECTOR" && entry.container.dataset.mapRenderer === "RASTER") {
+          entry.fallbackReason = "google-selected-raster";
+          entry.container.dataset.mapFallbackReason = entry.fallbackReason;
+        }
+        mapState(entry, "ready", "");
         if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
       });
-      canvas.addEventListener("webglcontextlost", recover, { once: true, capture: true });
+      canvas.addEventListener("webglcontextlost", () => recover("webgl-context-lost"), { once: true, capture: true });
       mapState(entry, "loading", renderer === "RASTER" ? "Switching to the standard Google Maps view..." : "Loading Google road map...");
+      // Only visible, nonzero map time counts. Closing the cached dialog is not GPU failure.
+      entry.visibleSince = mapIsVisible(entry) ? Date.now() : null;
       const checkTiles = () => {
         if (entry.map !== map || mounted.get(entry.id) !== entry || entry.tilesReady) return;
-        if (document.hidden) entry.tileTimer = setTimeout(checkTiles, 10000);
-        else recover();
+        if (!mapIsVisible(entry)) entry.visibleSince = null;
+        else {
+          entry.visibleSince ??= Date.now();
+          if (Date.now() - entry.visibleSince >= 30000) { recover("visible-tile-timeout"); return; }
+        }
+        entry.tileTimer = setTimeout(checkTiles, 10000);
       };
       entry.tileTimer = setTimeout(checkTiles, 10000);
       setFollow(entry, entry.follow);
-    } catch { recover(); }
+    } catch (error) {
+      entry.startupFailure = error instanceof Error ? error.name : "Error";
+      recover("map-startup-error");
+    }
   }
   function destroyRepresentatives() {
     mountGeneration += 1;
@@ -212,6 +254,7 @@
   function resizeRepresentatives() {
     for (const entry of mounted.values()) {
       if (entry.map && entry.container.getBoundingClientRect().height > 0) {
+        if (!entry.tilesReady) entry.visibleSince = Date.now();
         google.maps.event?.trigger?.(entry.map, "resize");
         if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
       }
@@ -269,6 +312,7 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) return;
     for (const entry of mounted.values()) {
+      entry.visibleSince = null;
       window.cancelAnimationFrame(entry.frame); entry.frame = null;
       if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
     }
@@ -298,7 +342,7 @@
     if (entry && path.every(Boolean)) { entry.path = path; entry.route?.setPath(path); }
   });
   window.DartGoogleMaps = Object.freeze({ loadMaps, attachRepresentatives,
-    resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
+    getRepresentativeDiagnostics, resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
     get errorMessage() { return errorMessage; },
   });
 })();

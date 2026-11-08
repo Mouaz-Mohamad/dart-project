@@ -6171,6 +6171,8 @@ body.dart-rep-navigating { overflow: hidden; }
 
 .dart-rep-resume:not([hidden]) { position: fixed; bottom: 20px; inset-inline-end: 16px; z-index: 1000; width: auto; }
 
+.dart-rep-resume[hidden] { display: none; }
+
 /* === CSS/base.css === */
 /* DART CODE GUIDE | CSS/base.css
    الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */

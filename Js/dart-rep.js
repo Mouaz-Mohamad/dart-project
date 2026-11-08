@@ -1530,7 +1530,10 @@
     document.addEventListener("dart:rep-map-state", event => {
       if (!navigationOrderId || event.detail?.orderId !== navigationOrderId) return;
       document.getElementById("repNavigationMapStatus").textContent =
-        event.detail.state === "error" ? "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة." : "";
+        event.detail.state === "error" ? "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة." :
+        event.detail.state === "ready" && event.detail.renderer === "RASTER" ?
+          event.detail.fallbackReason === "visible-tile-timeout" ? "الخريطة تعمل بالعرض المسطّح لأن تحميل العرض المائل لم يكتمل." :
+          "الخريطة تعمل بالعرض المسطّح بعد تعذّر تشغيل العرض المائل في المتصفح." : "";
     });
     document.addEventListener("dart:google-maps-error", () => {
       if (!navigationOrderId) return;

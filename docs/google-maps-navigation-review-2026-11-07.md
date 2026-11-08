@@ -199,3 +199,28 @@ Files: Js/dart-google-maps.js, Js/dart-rep.js, rep.html, tests/google-navigation
 | 10. Secrets | No key, credential, customer data or durable location storage added. |
 
 Manual acceptance on the affected device: refresh rep.html and reopen navigation. Allow up to ten seconds for initial streets; if vector fails, verify standard Google streets appear with the same blue path and moving arrow. The standard-view status explains the recovery. If both renderers cannot fetch streets, the explicit error and Retry Google Maps replace the silent grey viewport. Physical driving and the actual affected device remain the final visual acceptance check.
+
+## Direction/tilt diagnosis and repair — 8 November 2026
+
+Confirmed source defect and synthetic reproduction: the ten-second streets timer treated a cached closed dialog as visible because it checked document.hidden only. A closed dialog in a visible tab could therefore silently replace VECTOR with RASTER, which cannot provide the requested roadmap camera rotation and tilt. A slow initial vector load also lost its renderer unnecessarily at ten seconds. This is a confirmed application defect, not proof of the exact GPU failure on the owner's phone.
+
+The new renderer waits thirty seconds of visible startup, checks the dialog and its dimensions, resets the wait when reopening, and suspends counting for hidden tabs/maps. It initializes camera tilt/heading at zero and applies the existing 60-degree/heading-up camera only after streets are ready. A real constructor failure or WebGL context loss still recovers once to raster. No endless retry is introduced. getRenderingType records Google's actual selection; location-free in-memory diagnostics distinguish visible-tile-timeout, map-startup-error, webgl-context-lost and google-selected-raster. No customer identifiers, coordinates, provider keys or durable business state are included. A concise Arabic message explains actual raster recovery, with no extra buttons. Public source metadata can be inspected using DartGoogleMaps.getRepresentativeDiagnostics() while a map is mounted; no remote telemetry endpoint is added.
+
+A separate confirmed interaction problem was GPS updates immediately overwriting manual camera rotation. User heading changes now pause follow for eight seconds; programmatic heading updates do not. Follow then resumes automatically without another control. The hidden Resume button also now stays hidden on signed-out pages despite the generic button display rule.
+
+Validation: local build/source/51 static checks/storage plus a deterministic fake-clock map lifecycle test. Scenarios: delayed vector tiles after ten seconds, 60-degree readiness, healthy retention, ninety seconds with the cached dialog closed, retained map on reopen, manual rotation surviving GPS, automatic follow resumption, thirty-second visible failure with one bounded raster fallback, safe diagnostics and timer cleanup. Chromium recovery tests extend these cases, preserve context-loss/constructor/outage coverage, and continue testing two footer buttons and delivery confirmation. No backend changes, new endpoint or migration.
+
+| Quality section | Result |
+| --- | --- |
+| 1 States | Loading/slow/closed/visible/ready/fallback/error explicitly covered. |
+| 2 Authority | Existing delivery/status/payment/server checks unchanged. |
+| 3 Concurrency | Map identity guards, bounded timers and disposed listener/frame checks preserved. |
+| 4 Validation/auth | No endpoint or authorization changes; coordinate/timestamp guards preserved. |
+| 5 Idempotency | Bounded recovery and cleanup tested; no sensitive transition changed. |
+| 6 Audit | No sensitive action introduced. |
+| 7 Cost | Fewer unnecessary map recreations; no new Maps/Routes request loop or telemetry service. |
+| 8 Regression | Existing static tests and cached-session tests pass. |
+| 9 Tests | Source-executing fake-clock lifecycle and updated Chromium scenarios. |
+| 10 Secrets | Diagnostic output excludes identifiers, coordinates, keys and raw provider exceptions. |
+
+Live limitation: the representative portal in the available browser requires sign-in. The affected Android GPU/console is not available remotely. The fix removes reproduced application causes; it cannot certify that the actual phone's WebGL renderer is healthy. Google documents additional automatic raster fallback when vector rendering is unavailable: https://developers.google.com/maps/documentation/javascript/webgl/support .

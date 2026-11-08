@@ -6166,3 +6166,5 @@ body.dart-rep-navigating { overflow: hidden; }
 .dart-checkout-extra-fields { padding: 4px 14px 2px; }
 
 .dart-rep-resume:not([hidden]) { position: fixed; bottom: 20px; inset-inline-end: 16px; z-index: 1000; width: auto; }
+
+.dart-rep-resume[hidden] { display: none; }
