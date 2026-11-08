@@ -510,8 +510,8 @@ export class PromotionService {
       );
       if (!current.rows[0]) throw new AppError(404, "PROMOTION_NOT_FOUND", "Promotion not found");
       if (Number(current.rows[0].version) !== expectedVersion) throw new AppError(409, "PROMOTION_VERSION_CONFLICT", "Promotion changed; reload and retry");
-      const duplicate = await client.query("SELECT 1 FROM promotion_records WHERE (code=$1 OR payload->>'code'=$1) AND record_id<>$2
-          UNION ALL SELECT 1 FROM discount_codes WHERE code=$1 LIMIT 1", [input.code, recordId]);
+      const duplicate = await client.query(`SELECT 1 FROM promotion_records WHERE (code=$1 OR payload->>'code'=$1) AND record_id<>$2
+          UNION ALL SELECT 1 FROM discount_codes WHERE code=$1 LIMIT 1`, [input.code, recordId]);
       if (duplicate.rows.length) throw new AppError(409, "PROMOTION_CODE_EXISTS", "Promotion code already exists");
       const payload = campaignPayload(input);
       await client.query(
