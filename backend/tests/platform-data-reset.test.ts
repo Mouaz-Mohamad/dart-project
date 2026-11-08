@@ -1,10 +1,13 @@
 // DART CODE GUIDE | backend/tests/platform-data-reset.test.ts
 // Owner-only selective data reset: preserve staff, representatives, settings and unrelated finance.
 import type { Pool } from "pg";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlatformAdminService } from "../src/modules/platform/platform-admin.service.js";
 
+afterEach(() => vi.unstubAllEnvs());
+
 function setup(options: { owner?: boolean; failAt?: string; lock?: boolean } = {}) {
+  vi.stubEnv("DART_RESET_AFTER_BACKUP_ENABLED", "true");
   const queries: string[] = [];
   const client = {
     query: vi.fn(async (sql: string) => {
@@ -25,6 +28,13 @@ function setup(options: { owner?: boolean; failAt?: string; lock?: boolean } = {
 }
 
 describe("owner selective platform data reset", () => {
+  it("blocks all database access until a current verified backup is authorized", async () => {
+    const { service, queries } = setup();
+    vi.stubEnv("DART_RESET_AFTER_BACKUP_ENABLED", "false");
+    await expect(service.resetBusinessData("staff-owner", "request-no-backup"))
+      .rejects.toThrow("A current verified backup is required");
+    expect(queries).toEqual([]);
+  });
   it("deletes exactly the requested business areas and their FK dependents, preserving configuration", async () => {
     const { service, queries, client } = setup();
     const result = await service.resetBusinessData("staff-owner", "request-one");
