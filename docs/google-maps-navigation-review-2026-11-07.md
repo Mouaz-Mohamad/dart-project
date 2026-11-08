@@ -224,3 +224,28 @@ Validation: local build/source/51 static checks/storage plus a deterministic fak
 | 10 Secrets | Diagnostic output excludes identifiers, coordinates, keys and raw provider exceptions. |
 
 Live limitation: the representative portal in the available browser requires sign-in. The affected Android GPU/console is not available remotely. The fix removes reproduced application causes; it cannot certify that the actual phone's WebGL renderer is healthy. Google documents additional automatic raster fallback when vector rendering is unavailable: https://developers.google.com/maps/documentation/javascript/webgl/support .
+
+## Courier page audit: startup, camera and session separation — 8 November 2026
+
+The owner's next photo still showed the timeout-generated raster message and prolonged loading. The earlier timer extension did not resolve that observation. The confirmed defects are (a) GPS/interpolation moving the viewport before visible streets finish, (b) a timeout destroying a potentially viable Vector map and starting a second load, (c) route-only failure invalidating the healthy cached map on reopen, (d) sequential late Maps/Routes loading, and (e) site-wide media max-width leaking into Google's internal canvases/images. Their individual contribution to the owner's GPU/network behavior remains unmeasured. tilesloaded means all visible tiles have finished loading; it is not a direct capability test.
+
+This revision freezes the startup viewport while marker/GPS state updates. After streets are ready it coalesces camera updates at 200ms, with one trailing latest-target update; marker interpolation remains separate. Closed/hidden maps cancel rendering and apply the latest GPS when visible again, even if the next location reading is identical. Manual rotation and automatic follow resumption remain. A slow-load message appears after eight visible seconds; after twenty seconds, error/reopen offers an explicit retry without destroying or downgrading the current map automatically. Late tiles still recover that same instance. Raster recovery is reserved for explicit construction/context failures or Google's actual renderer selection, read before tile readiness. A real failure on the owner's phone still needs device verification; a passing mock is not proof of hardware support.
+
+Authenticated representatives with assigned work preload Maps/Routes libraries once (no route lookup, customer coordinates or GPS permission in this preload). Starting delivery still requires the existing successful server mutation; map mounting and route lookup then run concurrently. A bounded in-memory pending geometry slot retains a road result that arrives before mounting. A route-only retry preserves the healthy map. Late work responses cannot overwrite newer work, or apply across logout/re-login even for the same account. Google media internals are scoped out of the generic image/canvas max-width rule. No extra footer buttons, backend endpoint, migration, delivery eligibility, discount or WhatsApp change.
+
+Source-code budget for these page-specific Maps integrations moves from 120 to 124 KiB for early loading/coalescing/diagnostics; Home/core limits are unchanged. Preconnect uses the existing permitted Google origins. The build guard now recognizes awaited parallel mounting rather than requiring the obsolete sequential source statement.
+
+Local validation: build, source checks, 51 static checks, storage contract; source-executing scenarios for continuous GPS during delayed first tiles (zero camera writes), burst coalescing/final target, hidden/resume, actual Google-selected Raster without remount, timeout without downgrade, late recovery, route-before-mount geometry, route retry without remount, out-of-order work responses and session isolation. Chromium tests retain the 80%/two-button/geofence/confirmation paths and test delayed/failed/actual-renderer cases. Live owner-device load time and GPU capability are not certified by these tests. No production delivery was created or completed.
+
+| Quality section | Result |
+| --- | --- |
+| 1 States | Loading, slow, timeout, late recovery, explicit retry, provider failure, hidden and ready covered. |
+| 2 Server authority | Existing 500m known-pin gate, explicit manual-no-pin exception, status/payment authority unchanged. |
+| 3 Concurrency | Separate map/route identities, bounded geometry/timers, coalesced camera and work-response/session guards tested. |
+| 4 Validation/auth | No new data endpoint; preload only after authenticated assigned work; existing permissions retained. |
+| 5 Idempotency | No new mutation; existing guarded delivery actions preserved. |
+| 6 Audit | Existing server transition audit preserved; no new sensitive action. |
+| 7 Cost | No extra Routes polling, no location telemetry; library preload makes no route/map instance. |
+| 8 Regression | Maintained static suite, storage, session and rendering lifecycle checks; device rendering remains a limitation. |
+| 9 Tests | Synthetic behavioral coverage strengthened; no claim of measured real-device speed. |
+| 10 Secrets | Timings/renderer diagnostics exclude customer identifiers, coordinates and provider keys. |
