@@ -45,6 +45,7 @@ describe("owner selective reset — executable SQL", () => {
       expect(result.deleted.customers).toBe(1);
       const model = await pool.query("SELECT count(*)::int AS n FROM catalog_models");
       const customers = await pool.query("SELECT count(*)::int AS n FROM customers");
+      const owners = await pool.query("SELECT count(*)::int AS n FROM staff_users WHERE is_owner");
       const finance = await pool.query("SELECT domain FROM finance_records ORDER BY domain");
       const settings = await pool.query("SELECT data FROM site_settings WHERE id='main'");
       const domains = await pool.query("SELECT domain,data FROM dashboard_domain_state ORDER BY domain");
