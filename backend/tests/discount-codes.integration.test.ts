@@ -80,7 +80,9 @@ describe("Discount Code: line-level priority, single order amount, lifecycle", (
     // Retrying a committed checkout must not redeem another usage.
     await commerce.checkout(f.user,f.input,"coupon-retry",undefined,`checkout-${f.reservationId}`);
     expect((await store.pool.query("SELECT count(*)::int AS c FROM discount_code_usages WHERE discount_code_id=$1",[f.offer.id])).rows[0]?.c).toBe(1);
-    await store.pool.query("UPDATE orders SET status='Delivered' WHERE id=$1",[order.id]);
+    await store.pool.query("UPDATE orders SET status='Representative On The Way' WHERE id=$1",[order.id]);
+    await commerce.adminOrderWorkflowAction(owner,String(order.orderId),
+      {expectedStatus:"Representative On The Way",target:"Delivered"},"coupon-delivered",false);
     expect((await store.pool.query("SELECT status FROM discount_code_usages WHERE order_id=$1",[order.id])).rows[0].status).toBe("Used");
     await commerce.adminManualReturn(owner,{itemCode:f.pieces[3]!,reason:"Coupon return",condition:"Good",refundAmount:850},"coupon-return");
     expect((await store.pool.query("SELECT status FROM discount_code_usages WHERE order_id=$1",[order.id])).rows[0].status).toBe("Used");
@@ -91,7 +93,7 @@ describe("Discount Code: line-level priority, single order amount, lifecycle", (
     const alternate = randomUUID(), email=`${alternate}@example.test`;
     await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
       VALUES($1,'customer',$2,$2,'test-only','active',now())`,[alternate,email]);
-    await store.pool.query("INSERT INTO customers(user_id,full_name) VALUES($1,'Other customer')",[alternate]);
+    await store.pool.query("INSERT INTO customers(user_id,full_name,birthday) VALUES($1,'Other customer','2000-01-01')",[alternate]);
     const client=await store.pool.connect();
     try{
       await client.query("BEGIN");
