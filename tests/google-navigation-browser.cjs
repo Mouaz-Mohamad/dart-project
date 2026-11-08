@@ -68,7 +68,7 @@ const server = http.createServer((req, res) => {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const browser = await chromium.launch({headless:true, executablePath:process.env.CHROMIUM_EXECUTABLE || chromium.executablePath(),args:["--no-sandbox","--disable-dev-shm-usage"]});
   try {
-    const page = await browser.newPage({viewport:{width:390,height:844}}), errors=[];
+    const page = await browser.newPage({viewport:{width:390,height:844},hasTouch:true,colorScheme:"dark"}), errors=[];
     page.on("pageerror", error=>errors.push(error.message));
     await page.route(/https:\/\//, route=>route.abort());
     const origin=`http://127.0.0.1:${server.address().port}`;
@@ -93,6 +93,10 @@ const server = http.createServer((req, res) => {
     await page.addScriptTag({path:"Js/dart-checkout-google.js"});
     await page.addScriptTag({path:"Js/dart-checkout-places.js"});
     await page.waitForFunction(()=>window.dartCheckoutAddress && window.__maps===1);
+    assert.equal(await page.evaluate(()=>window.__map.options.colorScheme),"LIGHT","checkout map must stay light on a dark-mode device");
+    assert.equal(await page.evaluate(()=>window.__map.options.mapTypeId),"roadmap");
+    assert.equal(await page.evaluate(()=>window.__map.options.gestureHandling),"cooperative","the map must not trap checkout page scrolling");
+    assert.equal(await page.locator(".dart-checkout-map-card").evaluate(el=>getComputedStyle(el).colorScheme),"light");
     await page.evaluate(()=>{document.getElementById("checkout-building").value="10";document.getElementById("checkout-floor").value="2"});
     await page.locator("#address-input").fill("Test address"); await page.locator("#dart-google-search").click();
     await page.waitForFunction(()=>document.getElementById("checkoutForm").dataset.dartAddressSource==="map");
@@ -119,10 +123,28 @@ const server = http.createServer((req, res) => {
     await page.locator("#address-input").fill("Panorama");
     await page.locator(".dart-address-prediction").waitFor({state:"visible"});
     assert.match(await page.locator(".dart-address-prediction").textContent(),/Panorama building/);
+    for(const width of [320,390,768,1440]) {
+      await page.setViewportSize({width,height:844});
+      await page.locator(".dart-address-prediction").scrollIntoViewIfNeeded();
+      const boxes=await page.evaluate(()=>{
+        const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height}};
+        const map=box("#dart-checkout-google-map"),search=box(".dart-map-search-bar"),suggestions=box(".dart-address-predictions"),locate=box("#dart-google-current-location");
+        const option=document.querySelector(".dart-address-prediction").getBoundingClientRect();
+        return {map,search,suggestions,locate,hit:Boolean(document.elementFromPoint(option.left+option.width/2,option.top+option.height/2)?.closest(".dart-address-prediction"))};
+      });
+      assert(boxes.map.height>=400,`checkout map remains usable at ${width}px`);
+      assert(boxes.search.top>=boxes.map.top && boxes.search.bottom<boxes.map.bottom,"search floats at the top of the map");
+      assert(boxes.search.left>=boxes.map.left && boxes.search.right<=boxes.map.right,"search fits inside the map");
+      assert(boxes.suggestions.top>=boxes.search.bottom && boxes.suggestions.bottom<=boxes.map.bottom,"suggestions open beneath search and stay within the map");
+      assert(boxes.locate.bottom<=boxes.map.bottom-24,"location button leaves Google attribution visible");
+      assert(boxes.hit,`suggestions must receive pointer events above the map at ${width}px`);
+    }
+    await page.setViewportSize({width:390,height:844});
+    if(process.env.DART_CHECKOUT_SCREENSHOT)await page.locator(".dart-checkout-map-card").screenshot({path:process.env.DART_CHECKOUT_SCREENSHOT});
     assert.equal(await page.evaluate(()=>window.__autocompleteRequests.at(-1).includedRegionCodes[0]),"eg");
     await page.evaluate(()=>{window.__firstToken=window.__autocompleteRequests.at(-1).sessionToken});
     await page.evaluate(()=>{window.__delayDetails=true});
-    await page.locator(".dart-address-prediction").click();
+    await page.locator(".dart-address-prediction").tap();
     await page.waitForFunction(()=>Boolean(window.__finishDetails));
     assert.equal(await page.evaluate(()=>window.dartCheckoutAddress.validate().ok),false,"checkout must wait for the selected Place details and verified pin");
     await page.evaluate(()=>{window.__delayDetails=false;window.__finishDetails()});
@@ -145,6 +167,11 @@ const server = http.createServer((req, res) => {
     await page.evaluate(()=>{window.__pendingSuggestions[1].resolve(window.__suggestions('Newer query'));window.__pendingSuggestions[0].resolve(window.__suggestions('Older query'));window.__deferSuggestions=false});
     await page.locator(".dart-address-prediction").waitFor({state:"visible"});
     assert.match(await page.locator(".dart-address-prediction").textContent(),/Newer query/);
+    await page.locator("#address-input").press("Escape");
+    assert.equal(await page.locator(".dart-address-predictions").isVisible(),false);
+    await page.evaluate(()=>{window.__suggestions=()=>({suggestions:[]})});
+    await page.locator("#address-input").fill("No matching place");
+    await page.getByText("No matching suggestions. Add a street or district, or use Search.",{exact:true}).waitFor({state:"visible"});
     await page.locator("#address-input").press("Escape");
     assert.equal(await page.locator(".dart-address-predictions").isVisible(),false);
     await page.evaluate(()=>{window.__autocompleteFailure=true});

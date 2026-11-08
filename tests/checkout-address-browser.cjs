@@ -26,6 +26,12 @@ window.DartState={read:()=>null};
 await page.addScriptTag({content:fs.readFileSync(path.join(root,"Js/dart-checkout-google.js"),"utf8")});
 await page.evaluate(()=>{document.getElementById("checkoutView").style.display="block";document.getElementById("cartView").style.display="none";});
 assert.equal(await page.locator("#dart-checkout-google-map").count(),1);
+await page.locator("#dart-checkout-google-map > p").filter({hasText:"Google Maps is unavailable"}).waitFor();
+assert.equal(await page.evaluate(()=>{
+const message=document.querySelector("#dart-checkout-google-map > p"),range=document.createRange();
+range.selectNodeContents(message);
+return range.getBoundingClientRect().top>document.querySelector(".dart-map-search-bar").getBoundingClientRect().bottom;
+}),true,"map error text must remain visible below the floating search bar");
 for(const [id,value] of [["area-input","Nasr City"],["street-input","Example St"],["checkout-building","21"],["checkout-floor","3"]])
 await page.locator("#"+id).fill(value);
 assert.equal(await page.evaluate(()=>dartCheckoutAddress.validate().ok),true,"manual delivery fallback works without Google");

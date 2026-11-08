@@ -90,6 +90,8 @@
           name.textContent = String(prediction.mainText || prediction.text || "Address");
           detail.textContent = String(prediction.secondaryText || "");
           option.append(name, detail);
+          // Keep focus until click selects the row, including touch/pen input on mobile.
+          option.addEventListener("pointerdown", event => event.preventDefault());
           option.addEventListener("mousedown", event => event.preventDefault());
           option.addEventListener("click", () => void choose(prediction)); list.appendChild(option);
         }

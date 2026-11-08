@@ -145,10 +145,10 @@ async function initialize(page, origin, file, phase) {
   await page.goto(`${origin}/${encodeURI(file)}?cssPhase=${phase}`, {
     waitUntil: 'networkidle',
   });
-  // Cash-only payment was intentionally redesigned. Its responsive presentation
-  // is checked by checkout-address-browser; compare the rest of checkout here.
+  // Approved checkout payment/map redesigns have dedicated browser coverage.
+  // Compare all other checkout surfaces against the reviewed styles here.
   if (file === 'cart-checkout.html') {
-    await page.locator('.dart-cash-payment').evaluateAll(nodes => nodes.forEach(node => node.remove()));
+    await page.locator('.dart-cash-payment, .dart-checkout-map-card').evaluateAll(nodes => nodes.forEach(node => node.remove()));
   }
   if (file.startsWith('__css-probes-'))
     await page.evaluate(

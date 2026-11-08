@@ -177,17 +177,18 @@
       errorMessage = window.DartGoogleMaps?.errorMessage || "Google Maps could not load.";
       return Boolean(ok);
     }
+    function mapMessage(message) {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = message;
+      panel.replaceChildren(paragraph);
+    }
     async function showMap() {
       if (map) return;
       if (loading) return loading;
       loading = (async () => {
-        panel.replaceChildren();
-        const busy = document.createElement("p");
-        busy.textContent = "Loading Google Maps...";
-        busy.style.padding = "14px";
-        panel.appendChild(busy);
+        mapMessage("Loading Google Maps...");
         if (!await googleLoader()) {
-          panel.textContent = "Google Maps is unavailable. You can still enter a complete delivery address below.";
+          mapMessage("Google Maps is unavailable. You can still enter a complete delivery address below.");
           setStatus(errorMessage || "Google Maps unavailable. Manual address entry is available.", "error");
           return;
         }
@@ -196,11 +197,13 @@
         try { map = new google.maps.Map(panel, {
           center: pendingSavedPin || { lat: 30.0444, lng: 31.2357 },
           zoom: pendingSavedPin ? 15 : 11,
+          colorScheme: "LIGHT", mapTypeId: "roadmap", backgroundColor: "#f7f8f8",
           clickableIcons: false, mapTypeControl: false,
           streetViewControl: false, fullscreenControl: false,
+          cameraControl: false, zoomControl: true, gestureHandling: "cooperative",
         }); } catch {
           map = null;
-          panel.textContent = "Google Maps cannot be displayed right now. Enter your address manually.";
+          mapMessage("Google Maps cannot be displayed right now. Enter your address manually.");
           setStatus("Google Maps error. Manual checkout is still available.", "error");
           return;
         }
@@ -268,7 +271,7 @@
     });
     document.addEventListener("dart:google-maps-error", event => {
       clearPin(); map = null; geocoder = null;
-      panel.textContent = event.detail?.message || "Google Maps could not load.";
+      mapMessage(event.detail?.message || "Google Maps could not load.");
       setStatus(panel.textContent, "error");
     });
     form.addEventListener("input", (event) => {
