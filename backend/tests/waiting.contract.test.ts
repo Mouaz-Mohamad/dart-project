@@ -25,7 +25,7 @@ describe("Waiting restock reservation contract", () => {
     expect(restock).toContain("v_due >= v_expires_at");
     expect(immediateRestock).toContain("v_due := now()");
     expect(immediateRestock).toContain("v_due >= v_expires_at");
-    expect(sender).toContain('const bypassWindow = immediate || row.event_type === "WAITLIST_WHATSAPP_RESTOCK"');
+    expect(sender).toContain('const bypassWindow = row.event_type !== "CUSTOMER_BIRTHDAY_MESSAGE"');
     expect(restock).toContain("'waitlist.whatsapp.restock:'||v_allocation_id::text");
     expect(restock).toContain("'category','marketing'");
     expect(sender).toContain("wa.expires_at=$4::timestamptz");
