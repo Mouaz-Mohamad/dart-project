@@ -394,7 +394,7 @@ export class PromotionService {
       const normalizedCode = String(requestedCode || "").trim().toUpperCase();
       const discountCode = normalizedCode ? await new DiscountCodeService(this.pool).resolveInTransaction(
         client, customerUserId, normalizedCode,
-        cart.map(line => ({ id: line.itemCode, ...line }))
+        cart.map(line => ({ id: line.itemCode, ...line, isSet: Boolean(line.isSet) }))
       ) : null;
       // Automatic campaigns remain first-priority on their own eligible pieces.
       // A supplied discount code is not mistaken for a campaign.
