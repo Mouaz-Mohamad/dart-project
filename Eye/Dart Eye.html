@@ -2692,11 +2692,11 @@
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>Danger Zone</span>
-                        <h2>Reset All Dart Data</h2>
-                        <p>يمسح كل بيانات المنتجات والقطع والعملاء والطلبات والمرتجعات والمندوبين والكروت والتمويل والصور المحفوظة، ثم يبدأ النظام من الصفر.</p>
+                        <h2>Reset Selected Dart Data</h2>
+                        <p>يمسح فقط الموديلات والقطع والأوردرات والمرتجعات والمصاريف والانتظار وDart Card والأخبار والعملاء، مع السجلات التابعة لها. حسابات الإدارة والمندوبين وإعدادات الموقع محفوظة.</p>
                         <strong>هذه العملية نهائية ولا يمكن التراجع عنها.</strong>
                     </div>
-                    <button id="open-reset-data-modal" type="button" class="dart-settings-danger-button"><i class="fa-solid fa-trash-can"></i> Delete All Data</button>
+                    <button id="open-reset-data-modal" type="button" class="dart-settings-danger-button"><i class="fa-solid fa-trash-can"></i> Delete Selected Data</button>
                 </article>
             </div>
             <p id="settings-reset-status" class="dart-settings-status" role="status" aria-live="polite" hidden></p>
@@ -2708,13 +2708,13 @@
             <button id="close-reset-data-modal" type="button" class="dart-reset-modal-close" aria-label="Close">&times;</button>
             <div class="dart-reset-warning-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
             <p class="dart-reset-kicker">DANGER — PERMANENT ACTION</p>
-            <h2 id="reset-data-modal-title">تحذير شديد: سيتم مسح كل بيانات Dart</h2>
-            <p id="reset-data-modal-description">بعد التأكيد سيتم حذف بيانات النشاط من PostgreSQL: العملاء والمندوبون والمنتجات والقطع والطلبات والمرتجعات والسجلات المالية والصور. سيتم الاحتفاظ بحسابات Owner/Staff والصلاحيات وسجل Audit.</p>
+            <h2 id="reset-data-modal-title">تحذير شديد: سيتم حذف البيانات المحددة فقط</h2>
+            <p id="reset-data-modal-description">سيتم حذف البيانات المحددة من PostgreSQL: الموديلات والقطع والأوردرات والمرتجعات والمصاريف وتسويات الأوردرات وقوائم الانتظار وDart Card والأخبار والعملاء. لن تُمسح بيانات المندوبين أو حسابات الإدارة أو إعدادات الموقع والصور العامة. لا يمكن التراجع دون نسخة احتياطية.</p>
             <ul class="dart-reset-data-list">
-              <li><i class="fa-solid fa-xmark"></i> Models, Items and saved product images</li>
-              <li><i class="fa-solid fa-xmark"></i> Customer/representative accounts, orders, returns and delivery state</li>
-              <li><i class="fa-solid fa-xmark"></i> Dart Cards, reviews and notifications — Audit history is preserved</li>
-              <li><i class="fa-solid fa-xmark"></i> Finance, goals, budgets, invoices and marketing records</li>
+              <li><i class="fa-solid fa-xmark"></i> Models, Items, Sets and their orders/returns</li>
+              <li><i class="fa-solid fa-xmark"></i> Customers, Waiting, Dart Card and News</li>
+              <li><i class="fa-solid fa-xmark"></i> Expenses, order settlements and related notifications</li>
+              <li><i class="fa-solid fa-check"></i> Preserved: staff, representatives, website settings, branding, budgets, goals, independent invoices, audit</li>
             </ul>
             <label class="dart-reset-confirm-label" for="reset-confirmation-input">للتأكيد اكتب <code>DELETE DART</code> كما هي:</label>
             <input id="reset-confirmation-input" class="dart-reset-confirm-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE DART">
@@ -2725,7 +2725,7 @@
             <p id="reset-data-error" class="dart-reset-error" role="alert" aria-live="assertive" hidden></p>
             <div class="dart-reset-actions">
               <button id="cancel-reset-data" type="button" class="dart-reset-cancel-button">Cancel</button>
-                  <button id="confirm-reset-data" type="button" class="dart-reset-confirm-button" disabled><i class="fa-solid fa-skull-crossbones"></i><span id="reset-delete-button-label">Permanently Delete Everything</span></button>
+                  <button id="confirm-reset-data" type="button" class="dart-reset-confirm-button" disabled><i class="fa-solid fa-skull-crossbones"></i><span id="reset-delete-button-label">Permanently Delete Selected Data</span></button>
             </div>
           </div>
         </div>
