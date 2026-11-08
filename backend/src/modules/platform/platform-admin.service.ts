@@ -58,7 +58,10 @@ export class PlatformAdminService {
       await remove("customerMessages", `DELETE FROM message_records
         WHERE domain IN ('birthday_messages','message_queue')`);
 
-      // Delete order-linked traffic before the orders FK clears its order_code.\n      await remove("orderTrafficEvents", "DELETE FROM traffic_analytics_events WHERE order_code IS NOT NULL");\n\n      // Expenses and order COD settlements belong to the reset. Preserve budgets, goals,
+      // Delete order-linked traffic before the orders FK clears its order_code.
+      await remove("orderTrafficEvents", "DELETE FROM traffic_analytics_events WHERE order_code IS NOT NULL");
+
+      // Expenses and order COD settlements belong to the reset. Preserve budgets, goals,
       // unrelated invoices, marketing records and finance audit trails.
       await remove("financeExpensesAndOrderSettlements", `DELETE FROM finance_records
         WHERE domain IN ('finance_expenses','finance_settlements')`);
