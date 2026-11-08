@@ -48,8 +48,8 @@
     <link rel="stylesheet" href="CSS/home.min.css?v=cef66de35079c49e">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link id="dart-brand-fonts" href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet" media="print">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet"></noscript>
+    <link id="dart-brand-fonts" href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet" media="print">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet"></noscript>
 
     <!-- DART COMING SOON: temporary landing cover, scoped to index.html only. -->
     <style id="dart-coming-soon-style">
@@ -145,39 +145,6 @@
         .icon-menu:focus-visible,.btn-go-product:focus-visible,.cart-btn:focus-visible{outline:3px solid #111;outline-offset:3px}
         #birthday,.reviews-section,#why,#feedback-form,footer{content-visibility:auto;contain-intrinsic-size:auto 600px}
         @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}.dart-cursor{animation:none!important}.product-card,.side-menu,.menu-facke{transition:none!important}}
-
-
-        .dart-stage{height:260vh;position:relative}
-.dart-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:#1a0306}
-.dart-sticky img{position:absolute;right:0;top:0;height:100%;width:62%;
-  object-fit:cover;object-position:center 30%;transform:scale(1.08)}
-.dart-sticky::after{content:"";position:absolute;inset:0;
-  background:linear-gradient(90deg,#1a0306 0%,#1a0306 34%,rgba(26,3,6,0) 68%)}
-
-.dart-copy{position:absolute;z-index:2;left:6vw;top:50%;transform:translateY(-50%);
-  max-width:34vw;color:#f6ece8}
-.dart-copy h2{font-family:Georgia,serif;font-weight:400;line-height:1.05;
-  font-size:clamp(30px,5.2vw,64px)}
-.dart-copy p{margin-top:18px;font-family:system-ui,sans-serif;line-height:1.6;
-  font-size:clamp(13px,1.5vw,17px);opacity:.8;max-width:30ch}
-.dart-copy a{display:inline-block;margin-top:26px;padding:13px 26px;
-  border:1px solid #f6ece8;color:#f6ece8;text-decoration:none;
-  font-family:system-ui,sans-serif;font-size:14px;transition:background .2s,color .2s}
-.dart-copy a:hover{background:#f6ece8;color:#1a0306}
-.dart-copy a:focus-visible{outline:2px solid #fff;outline-offset:3px}
-
-.dart-line{opacity:0;transform:translateY(18px);transition:opacity .7s,transform .7s}
-.dart-line.on{opacity:1;transform:none}
-
-@media (max-width:700px){
-  .dart-sticky img{width:100%}
-  .dart-sticky::after{background:linear-gradient(180deg,rgba(26,3,6,.1) 30%,#1a0306 92%)}
-  .dart-copy{left:6vw;right:6vw;top:auto;bottom:6vh;transform:none;max-width:none}
-  .dart-copy p{max-width:none}
-}
-@media (prefers-reduced-motion:reduce){
-  .dart-line{transition:none;opacity:1;transform:none}
-}
     </style>
 
     <script type="application/ld+json">
@@ -206,30 +173,9 @@
     }
     </script>
 
-    <script>const stage = document.getElementById('dartStage');
-const pic = document.getElementById('dartPic');
-const lines = document.querySelectorAll('.dart-line');
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-let ticking = false;
-
-function update() {
-  const r = stage.getBoundingClientRect();
-  const p = Math.min(1, Math.max(0, -r.top / (r.height - innerHeight)));
-  pic.style.transform = `scale(${1.08 - 0.08 * p})`;
-  lines.forEach((el, i) => el.classList.toggle('on', reduce || p > 0.08 + i * 0.2));
-  ticking = false;
-}
-
-addEventListener('scroll', () => {
-  if (!ticking) { requestAnimationFrame(update); ticking = true; }
-}, { passive: true });
-
-update();</script>
-
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="/CSS/dart-card-visibility.css">
-    <link rel="stylesheet" href="CSS/dart-headings.css">
 </head>
 <body class='dja-flexdir'>
     <!-- DART COMING SOON: remove this cover and its matching style to reopen the homepage. -->
@@ -264,19 +210,6 @@ update();</script>
                 </section>
 
                 <section id="leaderboard-card" aria-label="Dart Gift Card Leaderboard"></section>
-
-                <section class="dart-stage" id="dartStage">
-                  <div class="dart-sticky">
-                    <img id="dartPic" src="Photos/model1.jpg" loading="lazy"
-                        alt="Model wearing the Dart white zip hoodie next to the Dart box">
-                    <div class="dart-copy">
-                      <h2 class="dart-line">Not for everyone. For you.</h2>
-                      <p class="dart-line">Heavy fabric. Plaid-lined hood. Cut oversized, worn your way.</p>
-                      <a class="dart-line" href="products.html">Shop the hoodie</a>
-                    </div>
-                  </div>
-                </section>
-
 
                 <section id="dartSetRouteState" class="set-route-state" hidden>
                     <p data-set-route-message role="status"></p>
