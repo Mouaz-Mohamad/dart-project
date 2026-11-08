@@ -29,6 +29,9 @@ return {routes:[{path:[{lat:30.02,lng:31.25},{lat:30.05,lng:31.25}],warnings:[],
 legs:[{steps:[{instructions:'Continue on Test road',maneuver:'STRAIGHT',startLocation:{lat:30.02,lng:31.25},endLocation:{lat:30.04,lng:31.25},path:[{lat:30.02,lng:31.25},{lat:30.04,lng:31.25}]},
 {instructions:'Turn right onto Test street',maneuver:'TURN_RIGHT',startLocation:{lat:30.04,lng:31.25},endLocation:{lat:30.05,lng:31.25},path:[{lat:30.04,lng:31.25},{lat:30.05,lng:31.25}]}]}],distanceMeters:3500,durationMillis:300000}]};}}})}};
 `;
+const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+const operations = fs.readFileSync("Eye/dart-operations.js", "utf8");
+const orderLayout = operations.slice(operations.indexOf("  function organizeOrderForm()"), operations.indexOf("  function bindOrderModal()"));
 const repHtml = fs.readFileSync("rep.html", "utf8").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
 const checkoutHtml = fs.readFileSync("cart-checkout.html", "utf8").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
 const productionCsp = JSON.parse(fs.readFileSync("vercel.json", "utf8")).headers
@@ -43,6 +46,7 @@ try {
   worker.onerror=()=>{document.body.dataset.worker='blocked';worker.terminate();URL.revokeObjectURL(source)};
 } catch { document.body.dataset.worker='blocked';URL.revokeObjectURL(source); }
 `;
+let pointValidationAllowed = true;
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, "http://fixture").pathname;
   if (pathname==="/Js/__maps-csp-probe.js") {
@@ -53,7 +57,8 @@ const server = http.createServer((req, res) => {
     res.setHeader("Content-Security-Policy",pathname.includes("before") ? productionCsp.replace(/worker-src[^;]*/,"worker-src 'self'") : productionCsp);
     return res.end('<!doctype html><html><body><script>document.body.dataset.inline="allowed"</script><script src="/Js/__maps-csp-probe.js"></script></body></html>');
   }
-  if (pathname.startsWith("/Js/") || pathname.startsWith("/CSS/")) {
+  if (pathname === "/Eye/dashboard.html") { res.setHeader("Content-Type", "text/html"); return res.end(dashboardHtml); }
+  if (pathname.startsWith("/Js/") || pathname.startsWith("/CSS/") || pathname.startsWith("/Eye/")) {
     res.setHeader("Content-Type", pathname.endsWith(".js") ? "text/javascript" : "text/css");
     return res.end(fs.readFileSync(pathname.slice(1)));
   }
@@ -61,7 +66,7 @@ const server = http.createServer((req, res) => {
     res.setHeader("Content-Type", "application/json");
     return res.end(JSON.stringify({governorates:Array.from({length:27},(_,i)=>({id:i===0?"Cairo":i===1?"Giza":`Synthetic-${i}`,en:i===0?"Cairo":"Other",ar:i===0?"القاهرة":"أخرى",available:true,carriers:["dart"],cities:[]})),companies:[]}));
   }
-  if (pathname === "/api/v1/shipping/validate-point") {res.setHeader("Content-Type", "application/json");return res.end('{"valid":true}');}
+  if (pathname === "/api/v1/shipping/validate-point") {res.setHeader("Content-Type", "application/json");return res.end(JSON.stringify({valid:pointValidationAllowed}));}
   res.setHeader("Content-Type", "text/html");res.end(pathname === "/rep.html" ? repHtml : checkoutHtml);
 });
 (async () => {
@@ -187,6 +192,80 @@ const server = http.createServer((req, res) => {
     // Late Google authentication failures replace the broken viewport and clear its pin.
     await page.evaluate(()=>{document.dispatchEvent(new CustomEvent("dart:google-maps-error",{detail:{message:"Synthetic authorization failure"}}))});
     assert.match(await page.locator("#dart-checkout-google-map").textContent(),/authorization failure/);
+    // The real manual order form uses the same Places component and a Google viewport.
+    await page.goto(origin+"/Eye/dashboard.html");
+    await page.addScriptTag({content:mockGoogle});
+    await page.addScriptTag({path:"Js/dart-google-maps.js"});
+    await page.addScriptTag({path:"Js/dart-checkout-regions.js"});
+    await page.addScriptTag({path:"Js/dart-checkout-places.js"});
+    await page.addScriptTag({path:"Eye/dart-order-address.js"});
+    await page.addScriptTag({content:`const orderForm=document.getElementById('orderForm');const field=id=>document.getElementById(id);const value=id=>field(id)?.value||'';${orderLayout} organizeOrderForm();window.__orderAddress=DartOrderAddress.create();`});
+    assert.equal(await page.evaluate(()=>window.__maps),0,"hidden manual orders must not load a paid Google map");
+    await page.evaluate(()=>{document.getElementById("orderModal").style.display="flex";window.__orderAddress.resize()});
+    await page.waitForFunction(()=>window.__maps===1 && window.DartShippingAvailability.ready);
+    await page.locator("#orderBuildingNumber").fill("12");
+    await page.locator("#orderFloor").fill("3");
+    await page.locator("#orderAddress").fill("عمارات بانوراما");
+    assert.equal(await page.evaluate(()=>__orderAddress.validate().ok),false,"an unselected search cannot silently save the previous address");
+    await page.locator("#orderModal .dart-address-prediction").waitFor({state:"visible"});
+    assert.equal(await page.locator("#orderAddress").getAttribute("aria-controls"),"dashboard-address-results");
+    assert.deepEqual(await page.evaluate(()=>__autocompleteRequests.at(-1).includedRegionCodes),["eg"]);
+    for (const width of [320,390,768,1440]) {
+      await page.setViewportSize({width,height:844});
+      await page.locator("#orderModal .dart-address-prediction").scrollIntoViewIfNeeded();
+      const fit=await page.locator("#orderModal .dart-address-predictions").evaluate(el=>{
+        const r=el.getBoundingClientRect(),p=el.closest('.modal-content').getBoundingClientRect();
+        return r.left>=p.left && r.right<=p.right && r.width>100;
+      });
+      assert(fit,`manual order suggestions fit at ${width}px`);
+    }
+    await page.locator("#orderAddress").press("ArrowDown");
+    await page.locator("#orderAddress").press("Enter");
+    await page.waitForFunction(()=>document.getElementById("orderLatitude").value==="30.0500000");
+    assert.equal(await page.locator("#orderStreetName").inputValue(),"Test street");
+    assert.equal(await page.locator("#orderArea").inputValue(),"Test district");
+    assert.equal(await page.locator("#governorate").inputValue(),"Cairo");
+    assert.equal(await page.locator("#orderBuildingNumber").inputValue(),"12");
+    assert.equal(await page.locator("#orderFloor").inputValue(),"3");
+    assert.equal(await page.evaluate(()=>__orderAddress.validate().source),"map");
+    await page.locator("#orderFloor").fill("4");
+    assert.equal(await page.locator("#orderLatitude").inputValue(),"30.0500000","unit details keep the verified location");
+    await page.evaluate(()=>{const marker=__markers.at(-1);marker.events.dragstart();window.__draggedMarker=marker});
+    assert.equal(await page.locator("#orderLatitude").inputValue(),"","dragging invalidates the previous pin immediately");
+    await page.evaluate(()=>__draggedMarker.events.dragend({latLng:{lat:()=>30.06,lng:()=>31.26}}));
+    await page.waitForFunction(()=>document.getElementById("orderLatitude").value==="30.0600000");
+    pointValidationAllowed=false;
+    await page.evaluate(()=>__map.events.click({latLng:{lat:()=>30.07,lng:()=>31.27}}));
+    await page.waitForFunction(()=>document.getElementById("orderForm").dataset.dartAddressState==="error");
+    assert.equal(await page.locator("#orderLatitude").inputValue(),"","a rejected server point must not keep a verified pin");
+    pointValidationAllowed=true;
+    // An in-flight Google selection cannot overwrite the next order after closing/resetting.
+    await page.evaluate(()=>{window.__delayDetails=true});
+    await page.locator("#orderAddress").fill("Delayed destination");
+    await page.locator("#orderModal .dart-address-prediction").click();
+    await page.waitForFunction(()=>Boolean(window.__finishDetails));
+    await page.evaluate(()=>{document.getElementById("orderModal").style.display="none";document.getElementById("orderForm").reset();window.__finishDetails()});
+    await page.waitForTimeout(80);
+    assert.equal(await page.locator("#orderLatitude").inputValue(),"");
+    const reads=await page.evaluate(()=>__autocompleteRequests.length);
+    await page.evaluate(()=>{const f=document.getElementById('orderAddress');f.value='Hidden query';f.dispatchEvent(new Event('input',{bubbles:true}))});
+    await page.waitForTimeout(350);
+    assert.equal(await page.evaluate(()=>__autocompleteRequests.length),reads,"closed dialogs do not request predictions");
+    await page.evaluate(()=>{window.__delayDetails=false;document.getElementById("orderModal").style.display="flex"});
+    await page.locator("#orderAddress").fill("Retry destination");
+    await page.locator("#orderModal .dart-address-prediction").click();
+    await page.waitForFunction(()=>document.getElementById("orderLatitude").value==="30.0500000");
+    assert.equal(await page.evaluate(()=>window.__maps),1,"reopening reuses the Google viewport");
+    // Late provider failures leave an explicit complete-manual-address route.
+    await page.evaluate(()=>{document.dispatchEvent(new CustomEvent('dart:google-maps-error'));window.DartGoogleMaps={loadMaps:async()=>false}});
+    await page.locator("#orderArea").fill("Manual district");
+    await page.locator("#orderStreetName").fill("Manual street");
+    await page.locator("#orderBuildingNumber").fill("10");
+    await page.locator("#orderFloor").fill("2");
+    assert.equal(await page.evaluate(()=>__orderAddress.validate().source),"manual");
+    assert.equal(await page.locator("#orderLatitude").inputValue(),"");
+    assert.match(await page.locator("#dashboard-address-status").textContent(),/manual/i);
+    console.log("PASS manual order Google Places: Egypt suggestions, four widths, keyboard selection, structured address/pin, preserved unit details, closed/reset stale replies, lazy/reused map and manual fallback");
     await page.goto(origin+"/rep.html");
     await page.addScriptTag({content:mockGoogle});
     await page.addScriptTag({path:"Js/dart-google-maps.js"});

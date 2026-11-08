@@ -1,17 +1,14 @@
-// Google Places suggestions for checkout only. Predictions and session tokens stay in memory.
+// Shared Google Places suggestions for checkout and manual dashboard orders. Predictions and session tokens stay in memory.
 (() => {
   "use strict";
-  function init() {
-    const input = document.getElementById("address-input"), form = document.getElementById("checkoutForm");
-    const address = window.dartCheckoutAddress;
+  function create({ input, form, address, host, listId = "dart-address-predictions", cancelTargets = [], isActive = () => true }) {
     if (!input || !form || !address || input.dataset.dartPlacesReady) return;
     input.dataset.dartPlacesReady = "1";
-    const host = input.closest(".dart-checkout-location-search");
     if (!host) return;
     const dropdown = document.createElement("div");
     dropdown.className = "dart-address-predictions"; dropdown.hidden = true;
     const list = document.createElement("div");
-    list.id = "dart-address-predictions"; list.setAttribute("role", "listbox");
+    list.id = listId; list.setAttribute("role", "listbox");
     list.setAttribute("aria-label", "Google address suggestions");
     const notice = document.createElement("p"); notice.className = "dart-address-predictions-status";
     notice.setAttribute("role", "status"); notice.setAttribute("aria-live", "polite");
@@ -59,7 +56,7 @@
         // The token is attached by Google to the prediction; fetchFields concludes that session.
         token = null;
         await place.fetchFields({ fields: ["location"] });
-        if (request !== sequence || query !== value() || snapshot !== address.snapshot()) return;
+        if (!isActive() || request !== sequence || query !== value() || snapshot !== address.snapshot()) return;
         const location = place.location;
         if (!location) throw new Error("Place has no location");
         selecting = false; close();
@@ -72,14 +69,14 @@
     async function suggest(request, query) {
       try {
         const { AutocompleteSuggestion, AutocompleteSessionToken } = await places();
-        if (request !== sequence || query !== value()) return;
+        if (!isActive() || request !== sequence || query !== value()) return;
         if (!token || Date.now() - tokenAt > 180000) { token = new AutocompleteSessionToken(); tokenAt = Date.now(); }
         const bounds = address.mapBounds?.();
         const result = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
           input: query, includedRegionCodes: ["eg"], language: "ar", region: "eg", sessionToken: token,
           locationBias: bounds || { south: 21.5, north: 32.1, west: 24.5, east: 36.2 },
         });
-        if (request !== sequence || query !== value()) return;
+        if (!isActive() || request !== sequence || query !== value()) return;
         rows = (result.suggestions || []).map(row => row.placePrediction).filter(Boolean).slice(0, 5);
         list.replaceChildren(); active = -1;
         for (const [index, prediction] of rows.entries()) {
@@ -97,7 +94,7 @@
         }
         message(rows.length ? "" : "No matching suggestions. Add a street or district, or use Search.");
       } catch {
-        if (request === sequence && query === value()) {
+        if (isActive() && request === sequence && query === value()) {
           rows = []; list.replaceChildren(); token = null;
           message("Google suggestions are temporarily unavailable. Use Search or choose a point on the map.");
         }
@@ -106,7 +103,7 @@
     function schedule() {
       cancel();
       const query = value(), request = sequence;
-      if (composing || query.length < 3) { if (!query) token = null; return; }
+      if (!isActive() || composing || query.length < 3) { if (!query) token = null; return; }
       message("Searching Google addresses...");
       timer = setTimeout(() => void suggest(request, query), 300);
     }
@@ -127,11 +124,19 @@
     document.addEventListener("click", event => { if (!event.composedPath().includes(host)) cancel(); });
     form.addEventListener("input", event => { if (event.target !== input) cancel(); });
     form.addEventListener("change", event => { if (event.target !== input) cancel(); });
-    for (const id of ["dart-google-search", "dart-google-current-location", "dart-checkout-google-map"]) {
-      document.getElementById(id)?.addEventListener("click", cancel, true);
-    }
+    for (const target of cancelTargets) target?.addEventListener("click", cancel, true);
     document.addEventListener("dart:google-maps-error", cancel);
     window.addEventListener("pagehide", () => { cancel(); token = null; });
+    form.addEventListener("reset", () => { cancel(); token = null; });
+    return Object.freeze({ cancel: () => { cancel(); token = null; } });
+  }
+  window.DartGooglePlaces = Object.freeze({ create });
+  function init() {
+    const input = document.getElementById("address-input");
+    create({ input, form: document.getElementById("checkoutForm"), address: window.dartCheckoutAddress,
+      host: input?.closest(".dart-checkout-location-search"),
+      cancelTargets: ["dart-google-search", "dart-google-current-location", "dart-checkout-google-map"].map(id => document.getElementById(id)),
+    });
   }
   document.addEventListener("dart:checkout-address-ready", init);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });

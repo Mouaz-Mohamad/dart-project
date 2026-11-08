@@ -72,14 +72,7 @@ if (typeof dartMoney === 'function') {
   }
 
   function initDashboardAddress() {
-    if (dashboardAddress || !window.DartAddress) return dashboardAddress;
-    dashboardAddress = window.DartAddress.create({
-      form:'#orderForm', map:'#dashboard-order-map', search:'#orderAddress', results:'#dashboard-address-results',
-      latitude:'#orderLatitude', longitude:'#orderLongitude', fullAddress:'#orderFullAddress',
-      country:'#orderCountry', governorate:'#governorate', area:'#orderArea', street:'#orderStreetName',
-      building:'#orderBuildingNumber', floor:'#orderFloor', status:'#dashboard-address-status',
-      manualButton:'#dashboard-locate-manual-address', overwriteFromMap:true
-    });
+    if (!dashboardAddress) dashboardAddress = window.DartOrderAddress?.create() || null;
     return dashboardAddress;
   }
 
@@ -232,7 +225,7 @@ if (typeof dartMoney === 'function') {
       orderForm.reset(); selected = []; resetOrderAddress(); populateLists(); renderSelected();
       if (field('modal-order-edit-id')) field('modal-order-edit-id').value = '';
       if (typeof openModal === 'function') openModal(field('orderModal'));
-      initDashboardAddress()?.invalidate();
+      initDashboardAddress()?.resize();
     });
 
     field('addProductBtn')?.addEventListener('click', () => {
@@ -921,7 +914,7 @@ if (typeof dartMoney === 'function') {
         field('orderLongitude').value = order.longitude || '';
         field('orderFullAddress').value = order.fullAddress || '';
         orderForm.dataset.dartAddressSource = order.addressSource || (order.latitude && order.longitude ? 'map' : 'manual');
-        initDashboardAddress()?.invalidate();
+        initDashboardAddress()?.resize();
         if (order.latitude && order.longitude) initDashboardAddress()?.selectLocation(Number(order.latitude), Number(order.longitude));
       }
       if (sectionKey === 'representative') {

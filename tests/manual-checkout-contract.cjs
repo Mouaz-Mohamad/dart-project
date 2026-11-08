@@ -29,3 +29,15 @@ for (const label of ["Cairo", "Cairo Governorate", "محافظة القاهرة"
 assert.equal(canonical("\u061cمحافظة الجيزة\u200f"),"Giza");
 assert.equal(canonical("Unrecognized region"),"");
 console.log("PASS real Google governorate labels, bidi controls, English suffix/prefix and unknown rejection");
+
+// Dashboard manual orders share Google Places instead of the retired address provider.
+const dashboard = fs.readFileSync("Eye/Dart Eye.html", "utf8");
+const picker = fs.readFileSync("src/dashboard/order-address.js", "utf8");
+assert.match(dashboard, /Search Google Maps/);
+assert.match(dashboard, /dart-order-address\.js/);
+assert.doesNotMatch(dashboard, /src="[^"]*dart-address\.js/);
+assert.match(picker, /DartGooglePlaces\.create/);
+assert.match(picker, /shipping\/validate-point/);
+assert.doesNotMatch(picker, /nominatim|openstreetmap|leaflet/i);
+assert.match(picker, /pendingValidation\?\.abort/);
+console.log("PASS manual order Google Places wiring, authoritative point validation and stale-write cancellation");
