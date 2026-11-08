@@ -49,7 +49,7 @@ export class PlatformAdminService {
       // Cancel queued deliveries for deleted orders, waitlist reservations and customer logins.
       // Keep staff access, invitation and representative messages intact.
       await remove("outboxBusiness", `DELETE FROM outbox_events
-         WHERE aggregate_type IN ('order', 'waitlist')
+         WHERE aggregate_type IN ('order', 'waitlist', 'customer')
             OR (aggregate_type='user' AND aggregate_id IN
                 (SELECT id::text FROM users WHERE account_type='customer'))`);
       await remove("businessNotifications", `DELETE FROM notification_records
@@ -150,7 +150,7 @@ export class PlatformAdminService {
       // Force active clients to refresh the catalog and order caches.
       await client.query(
         `UPDATE domain_state_versions SET version=version+1, updated_at=now()
-         WHERE domain IN ('catalog_inventory','orders')`,
+         WHERE domain IN ('catalog_inventory','orders','waiting','sets','set_waiting')`,
       );
 
       // Keep stored image assets: some are used by the preserved site's branding.
