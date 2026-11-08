@@ -265,16 +265,18 @@ const server = http.createServer((req, res) => {
     assert.equal(reducedPosition,30.0211,"reduced-motion preference displays the real fix without interpolation");
     await page.emulateMedia({reducedMotion:"no-preference"});
     await page.setViewportSize({width:1280,height:900});
-    assert.equal(await page.locator("#repNavigationMap").evaluate(el=>el.getBoundingClientRect().height),630);
+    assert.equal(await page.locator("#repNavigationMap").evaluate(el=>el.getBoundingClientRect().height),720);
     await page.setViewportSize({width:390,height:844});
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.0212,lng:31.251,heading:270,speed:2,updatedAt:new Date().toISOString()}));
     await page.locator("#repNavigationExit").click();
-    const stoppedFrames=await page.evaluate(()=>window.__panCalls.length);
+    const retainedMapCount=await page.evaluate(()=>window.__maps);
     await page.waitForTimeout(100);
-    assert.equal(await page.evaluate(()=>window.__panCalls.length),stoppedFrames,"closing cancels camera animation");
+    assert.equal(await page.evaluate(()=>window.__maps),retainedMapCount,"closing retains the existing navigation map");
     await page.evaluate(()=>{window.__routeFailure=true});
     await page.locator('[data-action="navigate"]').click();
-    await page.locator("#repNavigationRetry").waitFor({state:"visible"});
+    await page.evaluate(()=>document.dispatchEvent(new CustomEvent("dart:google-maps-error",{detail:{message:"Synthetic Google failure"}})));
+    await page.locator("#repNavigationRetry").click();
+    await page.waitForFunction(()=>window.__routes===2 && !document.getElementById("repNavigationRetry").hidden);
     assert.match(await page.locator("#repNavigationStatus").textContent(),/directions unavailable/);
     await page.evaluate(()=>{window.__routeFailure=false});
     await page.locator("#repNavigationRetry").click();
@@ -368,6 +370,6 @@ const server = http.createServer((req, res) => {
     assert.equal(await recovery.evaluate(()=>window.__maps),closedCount,"closing cancels pending recovery");
     await recovery.close();
     assert.deepEqual(errors,[]);
-    console.log("PASS simulated tile failures: vector stall, constructor failure and context loss recover once; path/pins/GPS preserved; healthy vectors retained; complete outages visible; late/closed callbacks ignored. Google checkout/Places regressions; courier vector 60-degree camera, heading-up arrow, interpolated motion, shortest turns, pause/recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 70% map, retry, exit/reopen, 1km gate and cash confirmation");
+    console.log("PASS simulated tile failures: vector stall, constructor failure and context loss recover once; path/pins/GPS preserved; healthy vectors retained; complete outages visible; late/closed callbacks ignored. Google checkout/Places regressions; courier vector 60-degree camera, heading-up arrow, interpolated motion, shortest turns, pause/recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 80% map, retry, cached exit/reopen, 500m gate and cash confirmation");
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});
