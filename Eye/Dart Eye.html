@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="dart-damage-review-rep.css?v=20261105-drr-1">
     <link rel="stylesheet" href="dart-live-card-refresh.css?v=20261105-live-card-1">
     <link rel="stylesheet" href="dart-news-finance-settings.css?v=20261105-summary-collapsed-3">
+    <link rel="stylesheet" href="dart-sidebar.css?v=20261108-sidebar-v1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,32 +68,49 @@
       </div>
     </section>
 
-    <!-- القائمة الجانبية (الثابتة) -->
-    <nav class="cont-menu">
-        <picture class="dart-picture"><source srcset="../Photos/Logos/02_Dart_white_red_transparent 2.png" type="image/webp"><img src="../Photos/dart-logo-white.png" alt="Dart Logo"></picture>
-        <ul class="menu">
-            <li><a href="#" data-target="brand">Brand</a></li>
-            <li><a href="#" data-target="models" class="active">Models</a></li>
-            <li><a href="#" data-target="items">Items</a></li>
-            <li><a href="#" data-target="customers">Clients</a></li>
-            <li><a href="#" data-target="orders">Orders</a></li>
-            <li><a href="#" data-target="shipping">Shipping Companies</a></li>
-            <li><a href="#" data-target="waiting">Waiting</a></li>
-            <li><a href="#" data-target="returns">Returns</a></li>
-            <li><a href="#" data-target="damage">Damage</a></li>
-            <li><a href="#" data-target="review">Review</a></li>
-            <li><a href="#" data-target="representative">Rep</a></li>
-            <li><a href="#" data-target="live-operations">Live Map</a></li>
-            <li><a href="#" data-target="card">Dart Card</a></li>
-            <li hidden><a href="#" data-target="news">News</a></li>
-            <li><a href="#" data-target="finance"> Finance</a></li>
-            <li><a href="#" data-target="settings"> Settings</a></li>
-        </ul>
-        <button id="dart-admin-logout" class="dart-admin-logout" type="button" hidden>Log Out</button>
+    <!-- BEGIN Dart Eye Sidebar V1 — navigation targets remain unchanged. -->
+    <nav class="cont-menu" id="dart-sidebar-navigation" aria-label="Dashboard sections">
+      <div class="dart-sidebar-brand">
+        <picture class="dart-picture">
+          <img src="../Photos/dart-logo-white.png" alt="Dart logo">
+        </picture>
+        <span class="dart-sidebar-brand-copy"><strong>DART EYE</strong><small>CONTROL CENTER</small></span>
+        <button id="dart-sidebar-toggle" class="dart-sidebar-toggle" type="button" aria-controls="dart-sidebar-navigation" aria-label="Collapse sidebar" aria-expanded="true" title="Collapse sidebar"><i class="fa-solid fa-angles-left" aria-hidden="true"></i></button>
+        <button id="dart-sidebar-close" class="dart-sidebar-close" type="button" aria-label="Close navigation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      </div>
+      <ul class="menu">
+        <li class="dart-sidebar-heading" role="presentation">Overview</li>
+        <li><a href="#" data-target="brand"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i><span class="dart-sidebar-label">Brand</span></a></li>
+        <li class="dart-sidebar-heading" role="presentation">Products</li>
+        <li><a href="#" data-target="models" class="active"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span class="dart-sidebar-label">Models</span></a></li>
+        <li><a href="#" data-target="items"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i><span class="dart-sidebar-label">Items</span></a></li>
+        <li><a href="#" data-target="waiting"><i class="fa-solid fa-clock" aria-hidden="true"></i><span class="dart-sidebar-label">Waiting</span></a></li>
+        <li class="dart-sidebar-heading" role="presentation">Sales</li>
+        <li><a href="#" data-target="orders"><i class="fa-solid fa-bag-shopping" aria-hidden="true"></i><span class="dart-sidebar-label">Orders</span></a></li>
+        <li><a href="#" data-target="customers"><i class="fa-solid fa-users" aria-hidden="true"></i><span class="dart-sidebar-label">Clients</span></a></li>
+        <li><a href="#" data-target="shipping"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i><span class="dart-sidebar-label">Shipping Companies</span></a></li>
+        <li class="dart-sidebar-heading" role="presentation">Operations</li>
+        <li><a href="#" data-target="returns"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="dart-sidebar-label">Returns</span></a></li>
+        <li><a href="#" data-target="damage"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span class="dart-sidebar-label">Damage</span></a></li>
+        <li><a href="#" data-target="representative"><i class="fa-solid fa-motorcycle" aria-hidden="true"></i><span class="dart-sidebar-label">Rep</span></a></li>
+        <li><a href="#" data-target="live-operations"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span class="dart-sidebar-label">Live Map</span></a></li>
+        <li class="dart-sidebar-heading" role="presentation">Marketing</li>
+        <li><a href="#" data-target="review"><i class="fa-solid fa-star" aria-hidden="true"></i><span class="dart-sidebar-label">Review</span></a></li>
+        <li><a href="#" data-target="card"><i class="fa-solid fa-id-card" aria-hidden="true"></i><span class="dart-sidebar-label">Dart Card</span></a></li>
+        <li hidden><a href="#" data-target="news"><i class="fa-solid fa-newspaper" aria-hidden="true"></i><span class="dart-sidebar-label">News</span></a></li>
+        <li class="dart-sidebar-heading" role="presentation">Management</li>
+        <li><a href="#" data-target="finance"><i class="fa-solid fa-wallet" aria-hidden="true"></i><span class="dart-sidebar-label">Finance</span></a></li>
+        <li><a href="#" data-target="settings"><i class="fa-solid fa-gear" aria-hidden="true"></i><span class="dart-sidebar-label">Settings</span></a></li>
+      </ul>
+      <button id="dart-admin-logout" class="dart-admin-logout" type="button" hidden><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i><span class="dart-sidebar-logout-label">Log Out</span></button>
+      <small class="dart-sidebar-footer">Dart | for you</small>
     </nav>
+    <div id="dart-sidebar-overlay" class="dart-sidebar-overlay" hidden></div>
+    <!-- END Dart Eye Sidebar V1. -->
 
     <!-- الشريط السفلي الخاص بالموبايل فقط -->
-<nav class="nav-tow">
+<nav class="nav-tow" aria-label="Quick dashboard navigation">
+    <button id="dart-mobile-menu-toggle" class="dart-mobile-menu-toggle" type="button" aria-controls="dart-sidebar-navigation" aria-expanded="false" aria-label="Open all dashboard sections"><i class="fa-solid fa-bars" aria-hidden="true"></i><span>All</span></button>
     <ul class="menu-tow">
         <li><a href="#" data-target="brand"><i class='bx bx-store-alt'></i><span>Brand</span></a></li>
         <li><a href="#" data-target="models" class="active"><i class='bx bx-layer'></i><span>Models</span></a></li>
@@ -2804,5 +2822,6 @@
 <script src="dart-dashboard-ui.js"></script>
 <script src="dart-orders-ui.js?v=20261105-orders-ui-v1"></script>
 <script src="dart-display-preferences.js"></script>
+<script src="dart-sidebar.js?v=20261108-sidebar-v1"></script>
 </body>
 </html>
