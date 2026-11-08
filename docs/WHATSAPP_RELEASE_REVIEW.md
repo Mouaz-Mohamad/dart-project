@@ -48,3 +48,11 @@ GET /api/v1/admin/messaging/delivery-health يعرض حالة الإرسال و�
 
 لم تُجهز قيم Meta ولا قالبا الإرسال في هذه الدفعة. تتطلب التجربة الحقيقية القيم الأربع، واسمي القالبين الموافق عليهما، وتسجيل callback والاشتراك في messages.
 بعدها يمكن تفعيل WHATSAPP_SEND_ENABLED لإرسال الرسالتين المصرح بهما. تفاصيل الإعداد ونصا القالبين المقترحان في WHATSAPP_WEBHOOK_SETUP.md.
+
+## تفعيل قوالب الإنتاج — 7 نوفمبر 2026
+
+- أسماء القوالب الفعلية المعتمدة في Meta WABA: `birthday` (Marketing، Arabic، صورة رأس ثابت النص)، و`share_your_experience_2` (Utility، Arabic، نص ثابت دون متغيرات).
+- تمت إضافة `WHATSAPP_BIRTHDAY_TEMPLATE` و`WHATSAPP_POST_DELIVERY_TEMPLATE` إلى بيئة Vercel Production وضبط `WHATSAPP_SEND_ENABLED=true`.
+- تحديث المرسل ليحذف متغيرات النص التي لم تعتمدها Meta ويرسل صورة JPEG عامة مع قالب الميلاد.
+- يستمر منع التكرار والتحقق من موافقة العميل وحالة الأوردر ونطاق 13:00–22:00؛ لم يتم ترحيل الرسائل القديمة.
+- يجب التحقق من نجاح إرسال حي وحالة Delivered عبر Meta قبل اعتبار تكامل الإنتاج معتمدًا بالكامل.

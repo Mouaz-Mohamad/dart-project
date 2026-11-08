@@ -620,6 +620,13 @@
     const form = $("item-add-form");
     if (!form || form.dataset.catalogReady) return;
     form.dataset.catalogReady = "1";
+    const saveButton = form.querySelector('button[type="submit"]');
+    const saveStatus = document.createElement("p");
+    saveStatus.id = "dart-item-save-status";
+    saveStatus.setAttribute("role", "status");
+    saveStatus.setAttribute("aria-live", "polite");
+    saveStatus.dir = "rtl";
+    form.append(saveStatus);
     const file = $("modal-item-file");
     file?.closest(".form-group").remove();
     for (const id of ["modal-item-color", "modal-item-size"]) {
@@ -634,8 +641,14 @@
     document
       .querySelector("#items .add-btn")
       .addEventListener("click", () => openEditor(null, "items"));
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (form.dataset.saving === "true") return;
+      saveStatus.textContent = "";
+      if (!C.isServerAuthoritative?.() || typeof C.savePhysicalItem !== "function") {
+        saveStatus.textContent = "تعذر الاتصال بالمخزون. حدّث لوحة التحكم ثم حاول مرة أخرى.";
+        return;
+      }
       const id = $("modal-item-add-edit-id").value,
         old = itemsData.find((i) => i.id === id),
         m = modelsData.find((m) => m.modelId === code.value.trim());
@@ -672,14 +685,20 @@
         size,
         updatedAt: stamp(),
       };
-      if (old) {
-        const before = { ...old };
-        Object.assign(old, payload);
-        dartAudit("EDIT", "items", old.id, before, payload);
-      } else {
-        const it = {
-          id: C.uid(),
+      const newItemId = old?.id || C.uid();
+      const before = old ? { ...old } : null;
+      form.dataset.saving = "true";
+      form.setAttribute("aria-busy", "true");
+      if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving…";
+      }
+      saveStatus.textContent = "جاري حفظ القطعة في المخزون…";
+      try {
+        const candidate = old ? { ...old, ...payload } : {
+          id: newItemId,
           status: "In stock",
+          active: true,
           costSnapshot: Number(m.cost) || 0,
           createdAt: stamp(),
           regDate: new Date().toLocaleDateString("en-GB"),
@@ -688,16 +707,47 @@
           isChecked: false,
           ...payload,
         };
-        itemsData.push(it);
-        dartAudit("CREATE", "items", it.id, {}, payload);
+        await C.savePhysicalItem(candidate);
+        itemsData = C.items();
+        const saved = itemsData.find((row) => row.id === newItemId);
+        if (!saved || saved.itemCode !== itemCode || saved.modelId !== m.modelId ||
+            saved.color !== color || saved.size !== size) {
+          throw new Error("لم يتم تأكيد إضافة القطعة على السيرفر. راجع المخزون قبل المحاولة من جديد.");
+        }
+        dartAudit(old ? "EDIT" : "CREATE", "items", newItemId, before || {}, payload);
+        dartRefreshAll();
+        refreshFilters();
+        closeModal($("item-add-modal"));
+        window.dispatchEvent(new CustomEvent("dart:data-changed", {
+          detail: { key: "dart_items" },
+        }));
+      } catch (error) {
+        // Never show success for a local-only item. Rehydrate rather than replay
+        // a failed PATCH, which could already have committed before a disconnect.
+        try {
+          await C.hydrate(true);
+          itemsData = C.items();
+          dartRefreshAll();
+          refreshFilters();
+        } catch {
+          // Do not display an unconfirmed local save as successful.
+          // Never auto-retry an uncertain write: the backend may have committed.
+        }
+        console.warn("Inventory save was not confirmed", error?.code || "SAVE_FAILED");
+        saveStatus.textContent = error?.status === 409
+          ? "تم تعديل المخزون في جلسة أخرى. راجع البيانات وحاول الحفظ مجددًا."
+          : (error?.message && ["ITEM_FIELDS_REQUIRED","CATALOG_PENDING_CHANGES","ITEM_SAVE_UNCONFIRMED","CATALOG_NOT_READY"].includes(error.code))
+            ? error.message
+            : "لم يتم تأكيد حفظ القطعة في قاعدة البيانات. تحقق من المخزون ثم حاول مرة أخرى.";
+        window.DartDialog?.alert?.(saveStatus.textContent);
+      } finally {
+        delete form.dataset.saving;
+        form.removeAttribute("aria-busy");
+        if (saveButton) {
+          saveButton.disabled = false;
+          saveButton.textContent = "Save";
+        }
       }
-      dartSaveAll();
-      dartRefreshAll();
-      refreshFilters();
-      closeModal($("item-add-modal"));
-      window.dispatchEvent(
-        new CustomEvent("dart:data-changed", { detail: { key: "dart_items" } }),
-      );
     });
   }
   function populateItemOptions(color = "", size = "") {
@@ -763,6 +813,8 @@
     } else {
       const i = itemsData.find((i) => i.id === id);
       $("item-add-form").reset();
+      const saveStatus = $("dart-item-save-status");
+      if (saveStatus) saveStatus.textContent = "";
       $("modal-item-add-edit-id").value = id || "";
       populateModelsDatalist();
       $("modal-item-model-id").value = i?.modelId || "";

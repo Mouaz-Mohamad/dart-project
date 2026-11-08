@@ -1642,6 +1642,42 @@ export class IdentityService {
     }
   }
 
+  // Issue a customer session only after SocialAuthService has verified a linked provider subject.
+  // Existing email matches without a provider link must still prove ownership using a password.
+  public async loginLinkedSocialCustomer(
+    userId: string,
+    metadata: RequestMetadata,
+  ): Promise<IssuedSession> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const account = await client.query<{ id: string }>(
+        `SELECT id::text FROM users
+          WHERE id=$1 AND account_type='customer' AND status='active'
+            AND deleted_at IS NULL FOR UPDATE`,
+        [userId],
+      );
+      if (!account.rows[0]) {
+        throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
+      }
+      await client.query(
+        `UPDATE users SET failed_login_count=0,locked_until=NULL,
+          last_login_at=now(),updated_at=now() WHERE id=$1`,
+        [userId],
+      );
+      const session = await this.issueSession(client, userId, true, metadata);
+      await this.audit(client, "customer", userId, "LOGIN_SUCCEEDED", "sessions",
+        session.account.sessionId, metadata, { method: "linked_social_identity" });
+      await client.query("COMMIT");
+      return session;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async login(
     accountType: AccountType,
     identifier: string,

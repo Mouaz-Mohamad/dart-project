@@ -158,9 +158,13 @@
     const heading = document.createElement("h2");
     heading.textContent = `Continue with ${providerLabel(challenge.provider)}`;
     const intro = document.createElement("p");
-    intro.textContent = challenge.accountExists
-      ? "Confirm your Dart password and birthday to finish this social sign-in. Your saved birthday will not be overwritten here."
-      : "Finish your Dart account once. Google/Facebook verifies your email; Dart still needs your phone, birthday and a local password.";
+    intro.textContent = challenge.phoneRequired
+      ? "Google confirmed your email. Add your phone and birthday once to finish your Dart account."
+      : challenge.passwordRequired
+        ? "This email already belongs to a Dart account. Enter your existing Dart password once to link Google securely."
+        : challenge.birthdayRequired
+          ? "Welcome back! Add your birthday to finish linking your account."
+          : "Your Google account is verified. Continue to Dart.";
     card.append(heading, intro);
 
     const email = field("Verified email", "socialEmail", "email", {
@@ -187,21 +191,19 @@
       card.append(name.wrapper, phone1.wrapper, phone2.wrapper);
     }
 
-    const password = field("Dart password", "password", "password", {
-      autocomplete: challenge.accountExists ? "current-password" : "new-password",
-      minLength: 6,
-    });
-    const confirmation = field("Confirm password", "confirmation", "password", {
-      autocomplete: challenge.accountExists ? "current-password" : "new-password",
-      minLength: 6,
-    });
-    const rule = document.createElement("p");
-    rule.className = "dart-social-password-rule";
-    rule.textContent = "Minimum 6 characters. Letters, numbers and symbols are all allowed.";
-    const birthday = field("Birthday", "birthday", "date", {
-      autocomplete: "bday",
-    });
-    card.append(password.wrapper, confirmation.wrapper, rule, birthday.wrapper);
+    // Only unlinked existing Dart accounts need password proof once.
+    if (challenge.passwordRequired) {
+      const password = field("Existing Dart password", "password", "password", {
+        autocomplete: "current-password",
+      });
+      card.appendChild(password.wrapper);
+    }
+    if (challenge.birthdayRequired) {
+      const birthday = field("Birthday", "birthday", "date", {
+        autocomplete: "bday",
+      });
+      card.appendChild(birthday.wrapper);
+    }
 
     const actions = document.createElement("div");
     actions.className = "dart-social-completion-actions";
@@ -226,12 +228,6 @@
     card.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!card.checkValidity()) return card.reportValidity();
-      if (password.input.value !== confirmation.input.value) {
-        status.textContent = "Passwords do not match.";
-        status.classList.add("is-error");
-        confirmation.input.focus();
-        return;
-      }
       submit.disabled = true;
       cancel.disabled = true;
       status.textContent = "Finishing your Dart sign-in…";
@@ -242,9 +238,12 @@
           method: "POST",
           body: {
             token: socialToken,
-            password: values.password,
-            confirmation: values.confirmation,
-            birthday: values.birthday,
+            ...(challenge.passwordRequired
+              ? { password: values.password, confirmation: values.password }
+              : {}),
+            ...(challenge.birthdayRequired
+              ? { birthday: values.birthday }
+              : {}),
             ...(challenge.phoneRequired
               ? {
                   name: values.name,
@@ -266,7 +265,7 @@
         cancel.disabled = false;
       }
     });
-    password.input.focus();
+    card.querySelector('input:not([readonly])')?.focus();
   }
 
   async function resumeFromFragment() {

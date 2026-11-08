@@ -11,6 +11,7 @@
     "cart-shipping-recovery-runtime.cjs",
     "catalog-category-contract.js",
     "checkout-address-runtime.cjs",
+    "manual-checkout-contract.cjs",
     "council-browser-runtime.cjs",
     "council-fourth-runtime.cjs",
     "council-third-runtime.cjs",
@@ -49,7 +50,9 @@
     "settings-and-groups-unit.js",
     "settings-reset-unit.js",
     "source-layout-contract.cjs",
-    "test-inventory-contract.cjs"
+    "test-inventory-contract.cjs",
+    "rep-google-contract.cjs",
+    "rep-navigation-session.cjs"
   ],
   "ciBrowser": [
     "brand-details-browser.cjs",
@@ -70,7 +73,8 @@
     "sets-admin-browser.js",
     "sets-home-browser.js",
     "sets-storefront-browser.js",
-    "storefront-settings-regression.js"
+    "storefront-settings-regression.js",
+    "google-navigation-browser.cjs"
   ],
   "legacyRewrite": {
     "catalog-browser.js": "V7 browser-authoritative acceptance flow; rewrite useful scenarios around API fixtures and server-authoritative state before enabling.",

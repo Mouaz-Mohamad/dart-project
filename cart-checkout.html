@@ -46,11 +46,10 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="CSS/dart-checkout-regions.css">
     <link rel="stylesheet" href="/CSS/dart-card-visibility.css">
+    <link rel="stylesheet" href="CSS/dart-headings.css">
 </head>
 <body class='dja-flexdir'>
     <div class="mother">
@@ -116,20 +115,28 @@
 <!-- نموذج تفاصيل العنوان -->
 <form id="checkoutForm" class="address-form">
     
-    <!-- خانة البحث والاقتراحات من جوجل -->
-<div class="form-group" style="position: relative;">
-    <label for="address-input">Search for your address</label>
-    <input type="text" id="address-input" name="address_search" class="inp" placeholder="Enter an area or street in Cairo or Giza" autocomplete="street-address">
-    <ul id="results-list" class="results-list" style="display:none;"></ul>
+    <!-- Google Maps: maps are optional for checkout, never a substitute for courier coverage checks. -->
+<div class="dart-checkout-map-card">
+  <div class="dart-checkout-location-search" dir="rtl">
+    <label for="address-input" class="dart-map-search-label">Search for your address on Google Maps</label>
+    <div class="dart-map-search-bar">
+      <svg class="dart-map-search-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+      <input type="search" id="address-input" class="inp" placeholder="ابحث عن شارع، منطقة أو مكان" autocomplete="off" enterkeyhint="search" dir="auto">
+      <button type="button" id="dart-google-search" class="dart-map-search-submit" aria-label="Search Google Maps" title="Search Google Maps">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
+      </button>
+    </div>
+  </div>
+  <div id="dart-checkout-google-map" role="region" aria-label="Google delivery location map">
+    <p>Google Maps will load when you open checkout.</p>
+  </div>
+  <button id="dart-google-current-location" class="dart-checkout-map-locate" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2.5"></circle><path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path></svg>
+    <span>Use my location</span>
+  </button>
 </div>
-
-<!-- حاوية الخريطة -->
-<div id="map" style="height: 250px; width: 100%; border-radius: 8px; margin: 10px 0; border: 1px solid #ccc; z-index: 1;"></div>
-
-<p class="dart-delivery-zone-note"><i class="fa-solid fa-clock" aria-hidden="true"></i> Delivery is currently available across Cairo and Giza, within 12 hours.</p>
-<p id="checkout-address-status" class="dart-address-status" role="status" aria-live="polite">Select a pin in an available Egypt governorate, or enter the complete address manually.</p>
-<button type="button" id="confirm-manual-pin" class="dart-locate-address-btn" hidden style="display:none">Confirm pin and typed address</button>
-
+<p class="dart-delivery-zone-note"><i class="fa-solid fa-truck" aria-hidden="true"></i> Delivery depends on the available shipping coverage.</p>
+<p id="checkout-address-status" class="dart-address-status" role="status" aria-live="polite">Choose your location on Google Maps or complete the address manually below.</p>
 <input type="hidden" id="lat-input" name="latitude">
 <input type="hidden" id="lng-input" name="longitude">
 <input type="hidden" id="formatted-address-input" name="full_address">
@@ -137,43 +144,44 @@
     <div class="form-group"><label for="checkout-name">Name</label><input id="checkout-name" name="customer_name" class="inp" type="text" placeholder="Value" autocomplete="name" required></div>
     <div class="form-group"><label for="checkout-phone1">Phone number</label><input id="checkout-phone1" name="phone1" class="inp" type="tel" placeholder="Value" autocomplete="tel" inputmode="tel" required></div>
     <div class="form-group"><label for="checkout-phone2">Phone number 2</label><input id="checkout-phone2" name="phone2" class="inp" type="tel" placeholder="Optional" inputmode="tel"></div>
-    <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Value" autocomplete="email"></div>
     <div class="form-group"><label for="checkout-building">Building Number/Name</label><input id="checkout-building" name="building" class="inp" type="text" placeholder="Value" required></div>
     <div class="form-group"><label for="checkout-floor">Floor</label><input id="checkout-floor" name="floor" class="inp" type="text" placeholder="Value" required></div>
-    <div class="form-group"><label for="checkout-notes">Delivery Notes</label><textarea id="checkout-notes" name="delivery_notes" class="inp" placeholder="Value"></textarea></div>
-    <div class="arrwo-for-other-adrees" role="button" tabindex="0" aria-expanded="false">=== &#9662; Alternative address entry &#9662; ===</div>
+    <details id="checkout-extra-details" class="dart-checkout-extra-details">
+      <summary>
+        <span>Additional details</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </summary>
+      <div class="dart-checkout-extra-fields">
+        <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Value" autocomplete="email"></div>
+        <div class="form-group"><label for="checkout-notes">Delivery Notes</label><textarea id="checkout-notes" name="delivery_notes" class="inp" placeholder="Value"></textarea></div>
+        <div class="other-addres" style="display: block;">
+            <div class="form-group">
+                <label>Country</label>
+                <select required class="select-cart" id="checkout-country" name="country">
+                    <option value="Egypt" selected>Egypt</option>
+                </select>
+            </div>
 
+            <div class="form-group">
+                <label>Governorate</label>
+                <select required class="select-cart" id="governorate-select" name="governorate">
+                    <option value="Cairo" selected>Cairo</option>
+                    <option value="Giza">Giza</option>
+                </select>
+            </div>
 
-    <div class="other-addres">
-        <div class="form-group">
-            <label>Country</label>
-            <select required class="select-cart" id="checkout-country" name="country">
-                <option value="Egypt" selected>Egypt</option>
-            </select>                  
+            <div class="form-group">
+                <label>Area</label>
+                <input class="inp" type="text" id="area-input" name="area" placeholder="Area / district" required>
+            </div>
+
+            <div class="form-group">
+                <label>Street Name</label>
+                <input class="inp" type="text" id="street-input" name="street" placeholder="Street name" required>
+            </div>
         </div>
-
-        <div class="form-group">
-            <label>Governorate</label>
-            <select required class="select-cart" id="governorate-select" name="governorate">
-                <option value="Cairo" selected>Cairo</option>
-                <option value="Giza">Giza</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Area</label>
-            <input class="inp" type="text" id="area-input" name="area" placeholder="Area / district" required>
-        </div>
-
-        <div class="form-group">
-            <label>Street Name</label>
-            <input class="inp" type="text" id="street-input" name="street" placeholder="Street name" required>
-        </div>
-        <button type="button" id="locate-manual-address" class="dart-locate-address-btn"><i class="fa-solid fa-location-crosshairs"></i> Locate this address on the map</button>
-    </div>
-
-
-
+      </div>
+    </details>
     <section class="dart-cash-payment" aria-labelledby="checkout-payment-title">
         <span class="dart-cash-payment-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -244,7 +252,10 @@
         <footer id="footer" aria-label="footer."></footer>
     
     </div>
-    <script  src="Js/dart-address.js" defer></script>
+    <script src="Js/dart-google-maps-config.js" defer></script>
+    <script src="Js/dart-google-maps.js" defer></script>
+    <script src="Js/dart-checkout-google.js" defer></script>
+    <script src="Js/dart-checkout-places.js" defer></script>
     <script  src="Js/dart-state.js" defer></script>
     <script  src="Js/dart-site-settings.js" defer></script>
     <script  src="Js/dart-catalog.js" defer></script>

@@ -13,13 +13,13 @@
   <link rel="stylesheet" href="CSS/base.css">
   <link rel="stylesheet" href="CSS/responsive.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/boxicons/2.1.4/css/boxicons.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@400;500;600&family=Poppins:wght@500;600;700&family=Readex+Pro:wght@200;300;500;600;700&display=swap" rel="stylesheet">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#ab012b">
+    <link rel="stylesheet" href="CSS/dart-headings.css">
 </head>
 <body class="dart-rep-page">
   <main class="dart-rep-main">
@@ -153,6 +153,26 @@
       </template>
     </section>
   </main>
+  <button id="repNavigationResume" class="rep-btn rep-btn-go dart-rep-resume" type="button" hidden>الرجوع للتوصيل</button>
+  <dialog id="repNavigationDialog" class="dart-rep-navigation" aria-label="Delivery navigation · Google Maps">
+    <div class="dart-rep-navigation-viewport">
+      <div id="repNavigationMap" class="dart-rep-navigation-map" aria-label="Google delivery route"></div>
+      <div class="dart-rep-direction" dir="rtl" role="status">
+        <span id="repNavigationManeuver" aria-hidden="true">↑</span>
+        <p id="repNavigationInstruction" dir="auto"></p>
+      </div>
+      <div class="dart-rep-navigation-messages" dir="rtl">
+        <p id="repNavigationStatus" role="status"></p>
+        <p id="repNavigationMapStatus" role="status"></p>
+        <p id="repNavigationWarnings" dir="auto"></p>
+      </div>
+      <p id="repNavigationProximity" class="dart-visually-hidden" role="status"></p>
+    </div>
+    <footer class="dart-rep-navigation-footer" dir="rtl">
+      <button id="repNavigationExit" type="button" class="rep-btn rep-btn-call">خروج</button>
+      <button id="repNavigationComplete" type="button" class="rep-btn rep-btn-complete" hidden>وصلت</button>
+    </footer>
+  </dialog>
 
   <footer id="footer" aria-label="Footer"></footer>
   <script  src="Js/dart-state.js" defer></script>
@@ -167,7 +187,8 @@
   <script  src="Js/dart-password-visibility.js" defer></script>
     <script src="Js/dart-dialog.js"></script>
     <script  src="Js/dart-platform.js" defer></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="Js/dart-google-maps-config.js" defer></script>
+  <script src="Js/dart-google-maps.js" defer></script>
   <script  src="Js/dart-rep.js" defer></script>
 </body>
 </html>

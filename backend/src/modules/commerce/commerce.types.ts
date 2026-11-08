@@ -58,8 +58,8 @@ export interface CheckoutInput {
     street: string;
     building: string;
     floor: string;
-    latitude: string;
-    longitude: string;
+    latitude?: string | undefined;
+    longitude?: string | undefined;
     fullAddress?: string | undefined;
     addressSource?: string | undefined;
   };

@@ -92,9 +92,12 @@ export function createWaitingRouter(
     requireAccountType("customer"),
     async (request, response) => {
       const body = joinSchema.parse(request.body);
+      // Clicking Notify me when available is the customer's explicit request
+      // for a one-time Dart WhatsApp availability alert (see storefront disclosure).
+      // Never depend on a hidden optional checkbox or client-supplied flag.
       const entry = await waiting.join(
         request.auth!.userId,
-        body,
+        { ...body, whatsappRestockOptIn: true },
         String(request.id),
       );
       await dispatchOutbox(outbox, 10);

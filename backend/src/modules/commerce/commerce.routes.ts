@@ -109,17 +109,21 @@ const liveRoadRouteSchema = z.object({
 
 const savedAddressSchema = z.object({
   address: z.string().trim().min(1).max(600),
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
   governorate: z.string().trim().min(2).max(100),
   country: z.string().trim().max(120).optional(),
   area: z.string().trim().max(160).optional(),
   street: z.string().trim().max(200).optional(),
   building: z.string().trim().max(120).optional(),
   floor: z.string().trim().max(80).optional(),
+}).superRefine((address, ctx) => {
+  if ((address.lat === undefined) !== (address.lng === undefined)) {
+    ctx.addIssue({ code: "custom", path: ["lat"], message: "Provide both address coordinates or neither" });
+  }
 });
 
-const checkoutSchema = z.object({
+export const checkoutSchema = z.object({
   reservationId,
   contact: z.object({
     name: z.string().trim().min(2).max(160),
@@ -136,10 +140,19 @@ const checkoutSchema = z.object({
     street: z.string().trim().min(1).max(200),
     building: z.string().trim().min(1).max(120),
     floor: z.string().trim().min(1).max(80),
-    latitude: z.coerce.number().finite().min(-90).max(90).transform(String),
-    longitude: z.coerce.number().finite().min(-180).max(180).transform(String),
+    latitude: z.coerce.number().finite().min(-90).max(90).transform(String).optional(),
+    longitude: z.coerce.number().finite().min(-180).max(180).transform(String).optional(),
     fullAddress: z.string().trim().max(600).optional(),
     addressSource: z.enum(["map", "manual"]),
+  }).superRefine((address, ctx) => {
+    const hasLat = address.latitude !== undefined;
+    const hasLng = address.longitude !== undefined;
+    if (hasLat !== hasLng) {
+      ctx.addIssue({ code: "custom", path: ["latitude"], message: "Coordinates must be provided together" });
+    }
+    if (address.addressSource === "map" && (!hasLat || !hasLng)) {
+      ctx.addIssue({ code: "custom", path: ["latitude"], message: "Map address requires coordinates" });
+    }
   }),
   deliveryNotes: z.string().trim().max(1000).optional(),
   promotionCode: z.string().trim().min(1).max(120).optional(),

@@ -55,6 +55,26 @@ describe("live operations contracts", () => {
     expect(routes).toContain('"/admin/live-operations/representatives/:representativeId/reorder"');
   });
 
+  it("serializes courier starts and heals stale current route stops before new current upsert", () => {
+    const rep = service.slice(
+      service.indexOf("public async representativeOrderAction("),
+      service.indexOf("public async recordAdminReturn("),
+    );
+    expect(rep).toContain("pg_advisory_xact_lock(hashtext($1))");
+    expect(rep).toContain("dart:representative-route:");
+    expect(rep).toContain("route_state='current'");
+    expect(rep).toContain("AND order_id<>$2::uuid");
+    expect(rep.indexOf("SET route_state='upcoming'")).toBeLessThan(rep.indexOf("INSERT INTO delivery_route_stops"));
+    const admin = service.slice(
+      service.indexOf("public async adminLiveRouteState("),
+      service.indexOf("public async reorderLiveRoute("),
+    );
+    expect(admin).toContain("pg_advisory_xact_lock(hashtext($1))");
+    expect(admin).toContain("LIVE_ROUTE_ASSIGNMENT_CHANGED");
+    expect(admin).toContain("route_state='current'");
+    expect(admin).toContain("AND order_id<>$2::uuid");
+  });
+
   it("supports representative waiting and problem actions", () => {
     expect(routes).toContain('z.enum(["start", "cancel", "delivered", "waiting", "problem"])');
     expect(service).toContain('"start" | "cancel" | "delivered" | "waiting" | "problem"');

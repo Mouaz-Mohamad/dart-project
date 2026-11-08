@@ -114,11 +114,11 @@
   }
 
   async function saveCustomerAddress(address) {
+    const hasCoordinates = address?.lat != null && address?.lng != null;
     const normalized = address && typeof address === "object"
       ? {
           address: String(address.address || "").trim(),
-          lat: Number(address.lat),
-          lng: Number(address.lng),
+          ...(hasCoordinates ? { lat: Number(address.lat), lng: Number(address.lng) } : {}),
           governorate: deliveryGovernorate(address.governorate),
           ...(address.country ? { country: String(address.country) } : {}),
           ...(address.area ? { area: String(address.area) } : {}),
@@ -130,9 +130,8 @@
     if (
       !normalized ||
       !normalized.address ||
-      !Number.isFinite(normalized.lat) ||
-      !Number.isFinite(normalized.lng) ||
-      !normalized.governorate
+      !normalized.governorate ||
+      (hasCoordinates && (!Number.isFinite(normalized.lat) || !Number.isFinite(normalized.lng)))
     ) {
       throw new Error("Saved address is incomplete.");
     }

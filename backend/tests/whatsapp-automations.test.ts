@@ -6,6 +6,8 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { embeddedStore } from "./embedded-store.js";
 import { BirthdayMessagingService } from "../src/modules/outbox/birthday-messaging.service.js";
+import { WaitingService } from "../src/modules/waiting/waiting.service.js";
+import { CatalogService } from "../src/modules/catalog/catalog.service.js";
 import { OutboxService } from "../src/modules/outbox/outbox.service.js";
 import { createWhatsAppWebhookRouter } from "../src/modules/outbox/whatsapp-webhook.routes.js";
 import { whatsappSendWindow } from "../src/modules/outbox/whatsapp-schedule.js";
@@ -64,6 +66,34 @@ describe("durable WhatsApp automations and receipts", () => {
       AT TIME ZONE 'Africa/Cairo','YYYY-MM-DD HH24:MI') AS scheduled`,[input])).rows[0]!;
     expect(row.scheduled).toBe(expected);
   });
+  it.each([
+    "2026-10-28T05:00:00+03:00",
+    "2026-10-28T18:00:00+03:00",
+    "2026-12-01T06:00:00+02:00",
+  ])("queues post-delivery feedback at seven elapsed hours with no quiet-hour shift: %s",async(deliveredAt)=>{
+    const buyer=await delivered(true,false);
+    // Consent must precede the synthetic historic delivery for the trigger to queue.
+    await store.pool.query("UPDATE customer_whatsapp_preferences SET review_consented_at=$2::timestamptz-interval '1 day' WHERE customer_user_id=$1",[buyer.id,deliveredAt]);
+    await store.pool.query("UPDATE orders SET status='Delivered', delivered_at=$2::timestamptz WHERE id=$1",[buyer.order,deliveredAt]);
+    const result=(await store.pool.query("SELECT available_at,payload->>'expiresAt' AS expiry FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
+    const expected=new Date(new Date(deliveredAt).getTime()+7*3600000);
+    expect(new Date(result.available_at).toISOString()).toBe(expected.toISOString());
+    expect(new Date(result.expiry).toISOString()).toBe(new Date(expected.getTime()+24*3600000).toISOString());
+  });
+  it("keeps birthday greetings queued outside 13:00–22:00 Cairo",async()=>{
+    const today=(await store.pool.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today")).rows[0]!.today as string;
+    const buyer=await customer(`2000-${today.slice(5)}`);
+    const birthday=new BirthdayMessagingService(store.pool,"birthday");
+    await birthday.setPreference(buyer.id,true,"birthday-quiet-test");
+    await birthday.queueToday();
+    const key=`birthday:${buyer.id}:${today}`;await makeDue(key);
+    const fetch=fakeProvider();
+    expect(whatsappSendWindow(quietClock())).toBe(false);
+    expect((await sender(true,quietClock).processBatch(1,key)).claimed).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[key])).rows[0]!;
+    expect(event).toMatchObject({status:"pending",attempts:0});
+  });
   it("requires independent review consent and queues only a new delivery, once",async()=>{
     const no=await delivered(false);
     expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[no.key])).rows).toHaveLength(0);
@@ -75,14 +105,15 @@ describe("durable WhatsApp automations and receipts", () => {
     expect((await yes.preferences.preference(yes.id)).postDeliveryReview).toBe(true);
     expect((await yes.preferences.preference(yes.id)).birthdayMarketing).toBe(false);
   });
-  it("keeps WhatsApp pending without using retries when disabled or outside the window",async()=>{
+  it("keeps reviews pending if disabled, but sends outside birthday hours",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();
     expect((await sender(false).processBatch(5,buyer.key)).claimed).toBe(0);
-    expect((await sender(true,quietClock).processBatch(5,buyer.key)).claimed).toBe(0);
-    const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
-    expect(event).toMatchObject({status:"pending",attempts:0});expect(fetch).not.toHaveBeenCalled();
     expect((await sender(false).health()).duePending).toBe(0);
-    expect((await sender(true,quietClock).health()).duePending).toBe(0);
+    expect((await sender(true,quietClock).health()).duePending).toBeGreaterThan(0);
+    expect((await sender(true,quietClock).processBatch(5,buyer.key)).published).toBe(1);
+    const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
+    expect(event).toMatchObject({status:"published",attempts:1});
+    expect(fetch).toHaveBeenCalledOnce();
   });
   it("keeps Email working when WhatsApp is disabled",async()=>{
     const key=`synthetic-email:${randomUUID()}`;
@@ -110,14 +141,185 @@ describe("durable WhatsApp automations and receipts", () => {
     expect(payload.template.name).toBe("synthetic_review");
     expect(payload.template.components[0].parameters).toHaveLength(2);
   });
-  it("defers without an external call or lost retry when a batch crosses 22:00",async()=>{
+  it("matches approved fixed-text review template without sending obsolete body variables",async()=>{
+    const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();
+    const approved=new OutboxService(store.pool,{...config,whatsappPostDeliveryTemplate:"share_your_experience_2"},null,null,activeClock);
+    expect((await approved.processBatch(1,buyer.key)).published).toBe(1);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("share_your_experience_2");
+    expect(sent.template.components).toBeUndefined();
+  });
+  it("matches approved birthday template with a required JPEG image header and no body variables",async()=>{
+    const today=(await store.pool.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today")).rows[0]!.today as string;
+    const buyer=await customer(`2000-${today.slice(5)}`);
+    const birthday=new BirthdayMessagingService(store.pool,"birthday");
+    await birthday.setPreference(buyer.id,true,"birthday-test");
+    await birthday.queueToday();
+    const key=`birthday:${buyer.id}:${today}`;await makeDue(key);
+    const fetch=fakeProvider();
+    expect((await sender().processBatch(1,key)).published).toBe(1);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("birthday");
+    expect(sent.template.components).toEqual([{
+      type:"header",parameters:[{type:"image",image:{link:"https://www.dartofficial.com/Photos/dart-birthday-reward.jpg"}}],
+    }]);
+  });
+  async function restockFixture(optIn: boolean) {
+    const buyer=await customer();
+    const modelId="restock-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Restock Test Shirt','[{"name":"M","active":true}]','[{"name":"Burgundy","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{modelId,size:"M",color:"Burgundy",whatsappRestockOptIn:optIn},randomUUID());
+    const itemId="restock-item-"+randomUUID();
+    // Restock holds remain the normal four hours, even outside WhatsApp quiet hours.
+    await store.pool.query(
+      `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
+       VALUES($1,$1,$2,'Burgundy','M',10000)`,[itemId,modelId]);
+    const rows=await store.pool.query<{deduplication_key:string,payload:Record<string,unknown>}>(
+      `SELECT deduplication_key,payload FROM outbox_events
+       WHERE aggregate_type='waitlist' AND event_type='WAITLIST_WHATSAPP_RESTOCK' AND aggregate_id=$1`,[entry.id]);
+    return {...buyer,entry,itemId,event:rows.rows[0]||null};
+  }
+  it("atomically reserves stock for Waiting when an admin adds the physical piece via CatalogService",async()=>{
+    const buyer=await customer();
+    const modelId="restock-admin-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Dashboard restock','[{"name":"M","active":true}]','[{"name":"Red","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{
+      modelId,size:"M",color:"Red",whatsappRestockOptIn:true,
+    },randomUUID());
+    const catalog=new CatalogService(store.pool);
+    const prior=await catalog.adminState();
+    const id=randomUUID();
+    await catalog.replaceState(prior.version,[],[{
+      id,itemCode:"test-"+id,modelId,color:"Red",size:"M",
+      status:"In stock",active:true,isArchived:false,isDeleted:false,
+    }],randomUUID(),"restock-admin-save",{models:{},items:{[id]:0}});
+    const allocation=(await store.pool.query(
+      `SELECT w.status,wa.status AS allocation_status,wa.match_type,i.status AS item_status,
+              e.event_type,e.available_at,e.created_at
+         FROM waitlist_entries w JOIN waitlist_allocations wa ON wa.waitlist_entry_id=w.id
+         JOIN inventory_items i ON i.id=wa.inventory_item_id
+         LEFT JOIN outbox_events e ON e.aggregate_id=w.id::text AND e.event_type='WAITLIST_WHATSAPP_RESTOCK'
+        WHERE w.id=$1`,[entry.id])).rows[0];
+    expect(allocation).toMatchObject({
+      status:"reserved",allocation_status:"active",match_type:"exact",
+      item_status:"Cart Reserved",event_type:"WAITLIST_WHATSAPP_RESTOCK",
+    });
+    expect(Math.abs(new Date(allocation.available_at).getTime()-new Date(allocation.created_at).getTime()))
+      .toBeLessThan(30000);
+  });
+  it("keeps Waiting available when WhatsApp is requested but the account has no primary phone",async()=>{
+    const buyer=await customer();
+    await store.pool.query("DELETE FROM account_phones WHERE user_id=$1",[buyer.id]);
+    const modelId="restock-no-phone-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Unstocked model','[{"name":"M","active":true}]','[{"name":"Burgundy","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{
+      modelId,size:"M",color:"Burgundy",whatsappRestockOptIn:true,
+    },randomUUID());
+    expect(entry.status).toBe("waiting");
+    const saved=(await store.pool.query(
+      "SELECT whatsapp_restock_opt_in_at,whatsapp_restock_phone_normalized FROM waitlist_entries WHERE id=$1",
+      [entry.id])).rows[0];
+    expect(saved).toMatchObject({
+      whatsapp_restock_opt_in_at:null,whatsapp_restock_phone_normalized:null,
+    });
+  });
+  it("reserves a different available color without queueing any WhatsApp message",async()=>{
+    const buyer=await customer();
+    const modelId="restock-alternative-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO catalog_models(model_id,name,size_options,color_options)
+       VALUES($1,'Alternative Restock Test','[{"name":"M","active":true}]','[{"name":"Black","active":true},{"name":"Begi","active":true}]')`,[modelId]);
+    const waiting=new WaitingService(store.pool);
+    const entry=await waiting.join(buyer.id,{modelId,size:"M",color:"Black",whatsappRestockOptIn:true},randomUUID());
+    const id="alt-test-item-"+randomUUID();
+    await store.pool.query(
+      `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
+       VALUES($1,$1,$2,'Begi','M',10000)`,[id,modelId]);
+    const r=(await store.pool.query(
+      `SELECT w.status,wa.match_type,wa.offered_color FROM waitlist_entries w
+       JOIN waitlist_allocations wa ON wa.waitlist_entry_id=w.id WHERE w.id=$1`,[entry.id])).rows[0];
+    expect(r).toMatchObject({status:"reserved",match_type:"alternative_color",offered_color:"Begi"});
+    const queued=await store.pool.query(
+      `SELECT event_type FROM outbox_events WHERE aggregate_type='waitlist'
+       AND aggregate_id=$1 AND payload->>'channel'='whatsapp'`,[entry.id]);
+    expect(queued.rows).toHaveLength(0);
+    const email=await store.pool.query(
+      `SELECT event_type FROM outbox_events WHERE aggregate_type='waitlist'
+       AND aggregate_id=$1 AND event_type='WAITLIST_ALTERNATIVE_RESERVED'`,[entry.id]);
+    expect(email.rows).toHaveLength(1);
+  });
+  it("queues a single Marketing restock only after explicit consent for the exact item",async()=>{
+    const without=await restockFixture(false);
+    expect(without.event).toBeNull();
+    const withConsent=await restockFixture(true);
+    expect(withConsent.event?.payload).toMatchObject({
+      channel:"whatsapp",category:"marketing",to:withConsent.phone,
+      parameters:["Restock Test Shirt","Burgundy","M"],
+    });
+    const count=(await store.pool.query(
+      "SELECT count(*)::int AS total FROM outbox_events WHERE deduplication_key=$1",
+      [withConsent.event!.deduplication_key])).rows[0]!.total;
+    expect(Number(count)).toBe(1);
+  });
+  it("sends opted-in restock promptly even outside birthday/review WhatsApp hours",async()=>{
+    const fresh=await restockFixture(true);
+    expect(fresh.event).not.toBeNull();
+    const fetch=fakeProvider();
+    const send=new OutboxService(store.pool,{...config,whatsappRestockTemplate:"dart_restock_available"},null,null,quietClock);
+    expect(whatsappSendWindow(quietClock())).toBe(false);
+    expect((await send.health()).duePending).toBeGreaterThan(0);
+    expect((await send.processBatch(1,fresh.event!.deduplication_key)).published).toBe(1);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect((await send.processBatch(1,fresh.event!.deduplication_key)).claimed).toBe(0);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("dart_restock_available");
+    const queued=(await store.pool.query(
+      "SELECT available_at, created_at FROM outbox_events WHERE deduplication_key=$1",
+      [fresh.event!.deduplication_key])).rows[0];
+    expect(Math.abs(new Date(queued.available_at).getTime()-new Date(queued.created_at).getTime())).toBeLessThan(30000);
+  });
+  it("sends approved restock variables once; suppresses stale phone after consent",async()=>{
+    const fresh=await restockFixture(true);
+    expect(fresh.event).not.toBeNull();
+    await makeDue(fresh.event!.deduplication_key);
+    const fetch=fakeProvider();
+    const restockSender=new OutboxService(store.pool,{...config,whatsappRestockTemplate:"dart_restock_available"},null,null,activeClock);
+    expect((await restockSender.processBatch(1,fresh.event!.deduplication_key)).published).toBe(1);
+    expect((await restockSender.processBatch(1,fresh.event!.deduplication_key)).claimed).toBe(0);
+    const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(sent.template.name).toBe("dart_restock_available");
+    expect(sent.template.components[0].parameters.map((p:{text:string})=>p.text))
+      .toEqual(["Restock Test Shirt","Burgundy","M"]);
+    expect(fetch).toHaveBeenCalledOnce();
+
+    const changed=await restockFixture(true);
+    await makeDue(changed.event!.deduplication_key);
+    await store.pool.query("UPDATE account_phones SET phone_normalized=$2 WHERE user_id=$1 AND is_primary",
+      [changed.id,"2011"+String(Math.floor(Math.random()*100000000)).padStart(8,"0")]);
+    expect((await restockSender.processBatch(1,changed.event!.deduplication_key)).published).toBe(1);
+    expect(fetch).toHaveBeenCalledOnce();
+    const suppressed=(await store.pool.query(
+      `SELECT a.state FROM outbox_delivery_attempts a JOIN outbox_events e ON e.id=a.event_id
+       WHERE e.deduplication_key=$1`,[changed.event!.deduplication_key])).rows[0];
+    expect(suppressed.state).toBe("suppressed");
+  });
+  it("sends reviews when a batch crosses 22:00 rather than deferring them",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);const fetch=fakeProvider();let calls=0;
     const clock=()=>++calls<3?activeClock():quietClock();
-    expect(await sender(true,clock).processBatch(1,buyer.key)).toMatchObject({claimed:1,published:0,failed:0,uncertain:0});
-    expect(fetch).not.toHaveBeenCalled();
+    expect(await sender(true,clock).processBatch(1,buyer.key)).toMatchObject({claimed:1,published:1,failed:0,uncertain:0});
+    expect(fetch).toHaveBeenCalledOnce();
     const row=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
-    expect(row).toMatchObject({status:"pending",attempts:0});
-    await makeDue(buyer.key);expect((await sender().processBatch(1,buyer.key)).published).toBe(1);expect(fetch).toHaveBeenCalledOnce();
+    expect(row).toMatchObject({status:"published",attempts:1});
+    expect((await sender().processBatch(1,buyer.key)).claimed).toBe(0);
   });
   it("preserves and audits a callback that arrives before provider acknowledgement",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);

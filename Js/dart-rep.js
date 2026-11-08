@@ -23,10 +23,10 @@
   const ALLOWED_IMAGES = new Set(["image/jpeg", "image/png", "image/webp"]);
   const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
   const MAX_SAVED_BYTES = 650 * 1024;
-  const DELIVERY_RADIUS_KM = 1;
+  const DELIVERY_RADIUS_KM = 0.5;
   const LOCATION_MAX_AGE_MS = 2 * 60 * 1000;
   const LOCATION_SYNC_MS = 1000;
-  const ROAD_ROUTE_REFRESH_MS = 6000;
+  const ROAD_ROUTE_REFRESH_MS = 15000;
   const API_ENABLED = Boolean(window.DartApi?.isConfigured);
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
@@ -50,6 +50,7 @@
   let lastLocationSyncAt = 0;
   const deliveryMaps = new Map();
   let lastOrderRenderSignature = "";
+  let navigationOrderId = "", navigationFocus = null;
 
   const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
@@ -125,17 +126,14 @@
     const destinationLng = Number(order?.longitude);
     const courierLat = Number(order?.courierLocation?.lat);
     const courierLng = Number(order?.courierLocation?.lng);
-    if (
-      ![destinationLat, destinationLng, courierLat, courierLng].every(
-        Number.isFinite,
-      ) ||
-      !destinationLat ||
-      !destinationLng
-    ) {
-      return {
-        ok: false,
-        reason: "Waiting for a precise representative location.",
-      };
+    if (!Number.isFinite(courierLat) || !Number.isFinite(courierLng) ||
+        !courierLat || !courierLng) {
+      return { ok: false, reason: "Waiting for a precise representative location." };
+    }
+    const hasDestination = Number.isFinite(destinationLat) && Number.isFinite(destinationLng) &&
+      destinationLat !== 0 && destinationLng !== 0;
+    if (!hasDestination && order?.addressSource !== "manual") {
+      return { ok: false, reason: "Customer destination coordinates are missing." };
     }
     const updatedAt = Date.parse(order?.courierLocation?.updatedAt || 0);
     if (!updatedAt || Date.now() - updatedAt > LOCATION_MAX_AGE_MS) {
@@ -145,18 +143,23 @@
           "Your location must be refreshed before delivery can be confirmed.",
       };
     }
+    if (!hasDestination) {
+      return { ok: true, manual: true,
+        reason: "Manual address: no verified customer pin. Confirm delivery in person before marking Delivered." };
+    }
     const distance = distanceKm(
       courierLat,
       courierLng,
       destinationLat,
       destinationLng,
     );
+    const radius = order.requestType ? 1 : DELIVERY_RADIUS_KM;
     return {
-      ok: distance <= DELIVERY_RADIUS_KM,
+      ok: distance <= radius,
       distance,
       reason:
-        distance <= DELIVERY_RADIUS_KM
-          ? "You are within 1 km of the delivery address."
+        distance <= radius
+          ? `You are within ${radius * 1000} m of the delivery address.`
           : `${distance.toFixed(1)} km remaining before the Delivered button is enabled.`,
     };
   }
@@ -501,6 +504,7 @@
   }
 
   function showAuth(name = "login") {
+    if (navigationOrderId) stopNavigation();
     document.getElementById("repAuthView").hidden = false;
     document.getElementById("repDashboardView").hidden = true;
     const login = document.getElementById("repLoginForm"),
@@ -652,137 +656,169 @@
   }
 
 
+  // Google Maps is the only embedded map provider. Do not load Leaflet.
   function clearDeliveryMaps() {
-    for (const entry of deliveryMaps.values()) {
-      try { entry.map.remove(); } catch {}
-    }
+    window.DartGoogleMaps?.destroyRepresentatives?.();
     deliveryMaps.clear();
   }
 
-  function renderDeliveryMaps(orders) {
-    if (typeof window.L === "undefined") return;
-    document.querySelectorAll("[data-rep-live-map]").forEach((element) => {
-      const order = orders.find(
-        (row) => String(row.id) === String(element.dataset.orderId),
-      );
-      if (!order) return;
-      const destinationLat = Number(order.latitude);
-      const destinationLng = Number(order.longitude);
-      if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) {
-        element.replaceChildren();
-        element.textContent = "Customer map location is unavailable.";
-        return;
-      }
-      const courier = order.courierLocation || latestApiLocation;
-      const courierLat = Number(courier?.lat);
-      const courierLng = Number(courier?.lng);
-      const map = window.L.map(element, {
-        attributionControl: true,
-        zoomControl: false,
-      }).setView([destinationLat, destinationLng], 15);
-      map.attributionControl?.setPrefix(false);
-      window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4571_1_f3f5f58e8a8808e98e8b6df9", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-      }).addTo(map);
-      const destinationMarker = window.L.marker([destinationLat, destinationLng])
-        .addTo(map)
-        .bindPopup("Customer");
-      let courierMarker = null;
-      let route = null;
-      if (Number.isFinite(courierLat) && Number.isFinite(courierLng)) {
-        courierMarker = window.L.marker([courierLat, courierLng])
-          .addTo(map)
-          .bindPopup("You");
-        route = window.L.polyline([], {
-          color: "#8c1d2c",
-          weight: 4,
-          opacity: 0.82,
-        }).addTo(map);
-        map.fitBounds(
-          [[courierLat, courierLng], [destinationLat, destinationLng]],
-          { padding: [28, 28], maxZoom: 16 },
-        );
-      } else {
-        destinationMarker.openPopup();
-      }
-      deliveryMaps.set(String(order.id), {
-        map,
-        destinationMarker,
-        courierMarker,
-        route,
-        lastRoadRouteAt: 0,
-        roadRouteRequestId: 0,
-      });
-      if (courierMarker) {
-        void refreshDeliveryRoadRoute(
-          deliveryMaps.get(String(order.id)),
-          { lat: courierLat, lng: courierLng },
-          true,
-        );
-      }
-      window.setTimeout(() => map.invalidateSize(), 80);
-    });
+  const navigationDialog = () => document.getElementById("repNavigationDialog");
+  const activeNavigationOrder = () => repOrders(currentRep()).find(order => String(order.id) === navigationOrderId);
+  function closeNavigation() {
+    navigationDialog()?.close();
+    document.body.classList.remove("dart-rep-navigating");
+    document.getElementById("repNavigationResume").hidden = !navigationOrderId;
+    if (navigationFocus?.isConnected) navigationFocus.focus();
   }
-
+  function stopNavigation() {
+    closeNavigation();
+    navigationOrderId = "";
+    clearDeliveryMaps();
+    document.getElementById("repNavigationResume").hidden = true;
+  }
+  function showInstruction(text, maneuver = "STRAIGHT") {
+    document.getElementById("repNavigationInstruction").textContent = text;
+    document.getElementById("repNavigationManeuver").textContent =
+      maneuver.includes("U_TURN") ? "↶" : maneuver.includes("LEFT") ? "↰" : maneuver.includes("RIGHT") ? "↱" : maneuver.includes("ROUNDABOUT") ? "⟳" : "↑";
+  }
+  function distanceToRoadPath(location, path) {
+    if (!path?.length) return Infinity;
+    if (path.length === 1) return distanceKm(location.lat, location.lng, path[0].lat, path[0].lng);
+    const scale = Math.cos(Number(location.lat) * Math.PI / 180);
+    let nearest = Infinity;
+    for (let i = 1; i < path.length; i++) {
+      const a = { x: (path[i - 1].lng - location.lng) * scale, y: path[i - 1].lat - location.lat };
+      const b = { x: (path[i].lng - location.lng) * scale, y: path[i].lat - location.lat };
+      const dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
+      const t = length ? Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / length)) : 0;
+      nearest = Math.min(nearest, Math.hypot(a.x + t * dx, a.y + t * dy) * 111.195);
+    }
+    return nearest;
+  }
+  function updateRouteProgress(entry, location) {
+    if (!navigationOrderId || entry.orderId !== navigationOrderId || !entry.steps?.length) return;
+    let nearest = entry.stepIndex || 0, nearestDistance = Infinity;
+    // Examine nearby steps only: crossing roads later in the route must not skip turns.
+    for (let i = Math.max(0, nearest - 1); i < Math.min(entry.steps.length, nearest + 5); i++) {
+      const step = entry.steps[i];
+      const distance = distanceToRoadPath(location, [step.start, ...(step.path || []), step.end].filter(Boolean));
+      if (distance < nearestDistance) { nearestDistance = distance; nearest = i; }
+    }
+    entry.offRoute = nearestDistance > 0.15;
+    entry.stepIndex = Math.max(entry.stepIndex || 0, nearest);
+    const step = entry.steps[entry.stepIndex];
+    const remaining = step.end ? Math.round(distanceKm(location.lat, location.lng, step.end.lat, step.end.lng) * 1000) : null;
+    showInstruction(entry.offRoute ? "جارٍ تحديث الاتجاهات بعد تغيير المسار..." : `${step.instruction}${remaining == null ? "" : ` · ${remaining} متر تقريبًا`}`, step.maneuver);
+  }
+  function updateDeliveryControls() {
+    const rep = currentRep();
+    if (!rep) { if (navigationOrderId) stopNavigation(); return; }
+    const orders = repOrders(rep);
+    for (const card of document.querySelectorAll("#repOrdersList [data-order-id]")) {
+      const order = orders.find(row => String(row.id) === card.dataset.orderId);
+      if (!order) continue;
+      const proximity = deliveryProximity(order);
+      const started = activeOrderIds.has(order.id) && Boolean(order.deliveryStartedAt);
+      const complete = card.querySelector('[data-action="complete"]');
+      if (complete) complete.hidden = !started || !proximity.ok;
+      const label = card.querySelector(".dart-rep-proximity");
+      if (label && started) { label.textContent = proximity.reason; label.classList.toggle("is-ready", proximity.ok); }
+    }
+    if (!navigationOrderId) return;
+    const order = activeNavigationOrder();
+    if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) { stopNavigation(); return; }
+    const proximity = deliveryProximity(order);
+    document.getElementById("repNavigationProximity").textContent = proximity.reason;
+    // An unknown destination cannot satisfy the 500 m rule. Existing manual-order actions stay on the order card.
+    document.getElementById("repNavigationComplete").hidden = !proximity.ok || Boolean(proximity.manual);
+    const entry = deliveryMaps.get(navigationOrderId);
+    if (entry && order.courierLocation) {
+      const updatedAt = Date.parse(order.courierLocation.updatedAt || "");
+      if (Date.now() - updatedAt <= LOCATION_MAX_AGE_MS) {
+        updateRouteProgress(entry, order.courierLocation);
+        if (entry.steps.length && !entry.pending && !entry.failed) document.getElementById("repNavigationStatus").textContent = "";
+      }
+      else {
+        document.getElementById("repNavigationStatus").textContent = "بانتظار إشارة موقع حديثة...";
+        showInstruction("إشارة الموقع قديمة. انتظر تحديث GPS قبل متابعة الاتجاهات.");
+      }
+    }
+  }
+  async function openNavigation(order) {
+    if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) return;
+    if (navigationOrderId === String(order.id) && deliveryMaps.has(navigationOrderId) && !deliveryMaps.get(navigationOrderId).failed && document.getElementById("repNavigationMap").dataset.mapState !== "error") {
+      navigationDialog().showModal();
+      window.DartGoogleMaps?.resizeRepresentatives?.();
+      document.body.classList.add("dart-rep-navigating");
+      document.getElementById("repNavigationResume").hidden = true;
+      updateDeliveryControls();
+      return;
+    }
+    if (navigationOrderId) stopNavigation();
+    navigationFocus = document.activeElement;
+    navigationOrderId = String(order.id);
+    const container = document.getElementById("repNavigationMap");
+    container.dataset.repLiveMap = ""; container.dataset.orderId = navigationOrderId;
+    container.textContent = "Loading Google Maps...";
+    showInstruction("جارٍ تحديد موقعك وحساب المسار...");
+    document.getElementById("repNavigationResume").hidden = true;
+    document.getElementById("repNavigationStatus").textContent = "جارٍ تحديد موقعك...";
+    document.getElementById("repNavigationMapStatus").textContent = "";
+    document.getElementById("repNavigationWarnings").textContent = "";
+    navigationDialog().showModal();
+    document.body.classList.add("dart-rep-navigating");
+    const lat = Number(order.latitude), lng = Number(order.longitude);
+    const entry = { orderId: navigationOrderId,
+      destination: lat && lng && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null,
+      lastRoadRouteAt: 0, roadRouteRequestId: 0, steps: [] };
+    deliveryMaps.set(entry.orderId, entry);
+    updateDeliveryControls();
+    await window.DartGoogleMaps?.attachRepresentatives?.([order]);
+    if (deliveryMaps.get(entry.orderId) !== entry) return;
+    if (!entry.destination) {
+      document.getElementById("repNavigationStatus").textContent = "Manual address — no verified destination pin.";
+      return;
+    }
+    const courier = order.courierLocation || latestApiLocation;
+    if (courier) void refreshDeliveryRoadRoute(entry, courier, true);
+  }
   async function refreshDeliveryRoadRoute(entry, location, force = false) {
-    if (!entry?.route || !entry.destinationMarker || !location) return;
-    const destination = entry.destinationMarker.getLatLng?.();
-    if (!destination) return;
-    const now = Date.now();
-    if (!force && now - Number(entry.lastRoadRouteAt || 0) < ROAD_ROUTE_REFRESH_MS) return;
-    entry.lastRoadRouteAt = now;
-    const requestId = Number(entry.roadRouteRequestId || 0) + 1;
-    entry.roadRouteRequestId = requestId;
-    const points = `${Number(location.lng)},${Number(location.lat)};${Number(destination.lng)},${Number(destination.lat)}`;
-    let timeout = null;
+    if (!entry?.destination || !location || entry.orderId !== navigationOrderId || entry.pending) return;
+    const currentTime = Date.now();
+    if (!force && currentTime - entry.lastRoadRouteAt < ROAD_ROUTE_REFRESH_MS) return;
+    const moved = entry.lastRouteOrigin ? distanceKm(location.lat, location.lng, entry.lastRouteOrigin.lat, entry.lastRouteOrigin.lng) : Infinity;
+    if (!force && entry.steps.length && !entry.offRoute && (moved < 0.12 || currentTime - entry.lastRoadRouteAt < 60000)) return;
+    if (!force && entry.failed && currentTime - entry.lastRoadRouteAt < 60000) return;
+    if (Date.now() - Date.parse(location.updatedAt || "") > LOCATION_MAX_AGE_MS) return;
+    entry.lastRoadRouteAt = currentTime; entry.pending = true;
+    document.getElementById("repNavigationStatus").textContent = "جارٍ تحديث المسار...";
+    const requestId = ++entry.roadRouteRequestId;
+    let timeout;
     try {
-      const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), 4500);
-      const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false`,
-        { signal: controller.signal },
-      );
-      if (!response.ok) throw new Error("Routing provider unavailable");
-      const payload = await response.json();
-      const raw = payload.routes?.[0]?.geometry?.coordinates;
-      if (!Array.isArray(raw) || raw.length < 2 || entry.roadRouteRequestId !== requestId) return;
-      const geometry = raw.map(([lng, lat]) => [Number(lat), Number(lng)]);
-      if (geometry.some(([lat, lng]) => !Number.isFinite(lat) || !Number.isFinite(lng))) return;
-      entry.route.setLatLngs(geometry);
+      const route = await Promise.race([
+        window.DartGoogleMaps.computeRoute({ lat: Number(location.lat), lng: Number(location.lng) }, entry.destination),
+        new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("Route timeout")), 12000); }),
+      ]);
+      if (deliveryMaps.get(entry.orderId) !== entry || requestId !== entry.roadRouteRequestId) return;
+      entry.steps = route.steps; entry.stepIndex = 0; entry.failed = false;
+      entry.lastRouteOrigin = { lat: Number(location.lat), lng: Number(location.lng) };
+      document.dispatchEvent(new CustomEvent("dart:rep-road-route", { detail: { orderId: entry.orderId, geometry: route.geometry } }));
+      document.getElementById("repNavigationStatus").textContent = "";
+      document.getElementById("repNavigationWarnings").textContent = route.warnings.join(" · ");
+      updateDeliveryControls();
     } catch {
-      if (entry.roadRouteRequestId !== requestId) return;
-      // Keep the last valid road geometry visible while the routing provider recovers.
-      // Pins remain authoritative and no fake straight fallback is drawn.
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
+      if (deliveryMaps.get(entry.orderId) !== entry) return;
+      entry.failed = true; entry.steps = [];
+      showInstruction("تعذر حساب الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.");
+      document.getElementById("repNavigationStatus").textContent = "تعذر تحميل الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.";
+    } finally { clearTimeout(timeout); entry.pending = false; }
   }
-
   function updateDeliveryMapsLocation(location) {
-    const courierLat = Number(location?.lat);
-    const courierLng = Number(location?.lng);
-    if (!Number.isFinite(courierLat) || !Number.isFinite(courierLng)) return;
-
-    for (const entry of deliveryMaps.values()) {
-      const destination = entry.destinationMarker?.getLatLng?.();
-      if (!destination) continue;
-      if (!entry.courierMarker) {
-        entry.courierMarker = window.L.marker([courierLat, courierLng])
-          .addTo(entry.map)
-          .bindPopup("You");
-      } else {
-        entry.courierMarker.setLatLng([courierLat, courierLng]);
-      }
-      if (!entry.route) {
-        entry.route = window.L.polyline([], {
-          color: "#8c1d2c",
-          weight: 4,
-          opacity: 0.82,
-        }).addTo(entry.map);
-      }
-      void refreshDeliveryRoadRoute(entry, { lat: courierLat, lng: courierLng });
+    if (location && Number.isFinite(Number(location.lat)) && Number.isFinite(Number(location.lng))) {
+      window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
+      for (const entry of deliveryMaps.values()) void refreshDeliveryRoadRoute(entry, location);
     }
+    updateDeliveryControls();
   }
 
   function renderOrders() {
@@ -821,6 +857,7 @@
       Number(order.suggestedSequence || 0),
       String(order.latitude || ""),
       String(order.longitude || ""),
+      String(order.addressSource || ""),
     ]));
     activeOrderIds.clear();
     orders
@@ -837,7 +874,6 @@
       ensureLocationWatch();
       return;
     }
-    clearDeliveryMaps();
     lastOrderRenderSignature = renderSignature;
     list.innerHTML =
       orders
@@ -876,22 +912,21 @@
         <div class="rep-info-box"><div class="rep-info-title">Customer &amp; address</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "Address missing")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
         <div class="rep-info-box"><div class="rep-info-title">Items &amp; cash collection</div>${items}<div class="dart-rep-total"><span>Collect cash</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>
         <p class="dart-rep-proximity ${proximity.ok ? "is-ready" : ""}" role="status">${esc(proximity.reason)}</p>
-        ${started ? `<div class="dart-rep-live-map" data-rep-live-map data-order-id="${esc(order.id)}" aria-label="Live delivery route"></div>` : ""}
         <div class="dart-rep-order-actions">
           <a href="tel:${esc(order.phone1)}" class="rep-btn rep-btn-call"><i class="fa-solid fa-phone"></i> Call customer</a>
           ${!started ? '<button type="button" class="rep-btn rep-btn-go" data-action="start"><i class="fa-solid fa-diamond-turn-right"></i> Start delivery</button>' : ""}
-          ${started ? `<a class="rep-btn rep-btn-go" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Open navigation</a>` : ""}
+          ${started ? `<button type="button" class="rep-btn rep-btn-go" data-action="navigate"><i class="fa-solid fa-map-location-dot"></i> Open navigation</button><a class="rep-btn rep-btn-call" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener">Open Google Maps app</a>` : ""}
           ${started ? '<button type="button" class="rep-btn rep-btn-wait" data-action="waiting"><i class="fa-solid fa-clock"></i> Waiting</button>' : ""}
           ${started ? '<button type="button" class="rep-btn rep-btn-problem" data-action="problem"><i class="fa-solid fa-triangle-exclamation"></i> Report problem</button>' : ""}
           ${started ? '<button type="button" class="rep-btn rep-btn-cancel" data-action="cancel"><i class="fa-solid fa-arrow-rotate-left"></i> Stop current delivery</button>' : ""}
-          ${started && proximity.ok ? '<button type="button" class="rep-btn rep-btn-complete" data-action="complete"><i class="fa-solid fa-circle-check"></i> Delivered</button>' : ""}
+          ${started ? `<button type="button" class="rep-btn rep-btn-complete" data-action="complete" ${proximity.ok ? "" : "hidden"}><i class="fa-solid fa-circle-check"></i> Delivered</button>` : ""}
         </div>
       </article>`;
         })
         .join("") ||
       '<div class="empty-state">No active orders are assigned to you.</div>';
     wrapOperationalGroups(list, orders, "order");
-    renderDeliveryMaps(orders);
+    updateDeliveryMapsLocation(latestApiLocation);
     renderReturns(rep);
     ensureLocationWatch();
   }
@@ -907,6 +942,15 @@
     );
   }
 
+  function previewRepresentativePosition(position) {
+    const sampledAt = new Date(Number.isFinite(position.timestamp) ? position.timestamp : Date.now()).toISOString();
+    const location = { lat: position.coords.latitude, lng: position.coords.longitude,
+      accuracy: position.coords.accuracy, heading: position.coords.heading, speed: position.coords.speed,
+      sampledAt, updatedAt: sampledAt };
+    // Immediate visual feedback only: delivery eligibility still uses server-acknowledged locations.
+    window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
+    return location;
+  }
   async function syncFreshRepresentativeLocation() {
     if (!API_ENABLED || !navigator.geolocation) return false;
     try {
@@ -917,6 +961,7 @@
           timeout: 12000,
         });
       });
+      const preview = previewRepresentativePosition(position);
       const payload = await window.DartApi.request("/api/v1/representatives/location", {
         method: "PUT",
         body: {
@@ -927,15 +972,9 @@
             : null,
         },
       });
+      if (Date.parse(preview.sampledAt) < Date.parse(latestApiLocation?.sampledAt || "")) return true;
       lastLocationSyncAt = Date.now();
-      latestApiLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        heading: position.coords.heading,
-        speed: position.coords.speed,
-        updatedAt: payload.updatedAt || now(),
-      };
+      latestApiLocation = { ...preview, updatedAt: payload.updatedAt || now() };
       [...apiWork.orders, ...apiWork.returns].forEach((record) => {
         if (record.status === "Representative On The Way" || record.status === "Pickup On The Way") {
           record.courierLocation = latestApiLocation;
@@ -981,7 +1020,7 @@
         saveActiveIds();
         // Publish one fresh position immediately after Start. watchPosition can
         // otherwise wait for device movement before emitting another sample.
-        await syncFreshRepresentativeLocation();
+        void syncFreshRepresentativeLocation();
       }
       await refreshApiWork();
       if (status === "Delivered") activeOrderIds.delete(order.id);
@@ -1380,6 +1419,7 @@
     locationWatch = navigator.geolocation.watchPosition(
       async (position) => {
         const rep = currentRep();
+        const preview = previewRepresentativePosition(position);
         if (API_ENABLED) {
           const currentTime = Date.now();
           if (currentTime - lastLocationSyncAt < LOCATION_SYNC_MS) return;
@@ -1395,14 +1435,8 @@
                   : null,
               },
             });
-            latestApiLocation = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              heading: position.coords.heading,
-              speed: position.coords.speed,
-              updatedAt: payload.updatedAt || now(),
-            };
+            if (Date.parse(preview.sampledAt) < Date.parse(latestApiLocation?.sampledAt || "")) return;
+            latestApiLocation = { ...preview, updatedAt: payload.updatedAt || now() };
             [...apiWork.orders, ...apiWork.returns].forEach((record) => {
               if (
                 activeOrderIds.has(record.id) ||
@@ -1486,6 +1520,27 @@
       registerForm = document.getElementById("repRegisterForm"),
       changeForm = document.getElementById("repChangePasswordForm");
     bindImagePreviews(registerForm);
+    document.getElementById("repNavigationResume").addEventListener("click", () => openNavigation(activeNavigationOrder()));
+    document.getElementById("repNavigationExit").addEventListener("click", closeNavigation);
+    navigationDialog().addEventListener("cancel", event => { event.preventDefault(); closeNavigation(); });
+    document.getElementById("repNavigationComplete").addEventListener("click", () => {
+      const card = [...document.querySelectorAll("#repOrdersList [data-order-id]")].find(el => el.dataset.orderId === navigationOrderId);
+      card?.querySelector('[data-action="complete"]')?.click();
+    });
+    document.addEventListener("dart:rep-map-state", event => {
+      if (!navigationOrderId || event.detail?.orderId !== navigationOrderId) return;
+      document.getElementById("repNavigationMapStatus").textContent =
+        event.detail.state === "error" ? "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة." :
+        event.detail.state === "ready" && event.detail.renderer === "RASTER" ?
+          event.detail.fallbackReason === "visible-tile-timeout" ? "الخريطة تعمل بالعرض المسطّح لأن تحميل العرض المائل لم يكتمل." :
+          "الخريطة تعمل بالعرض المسطّح بعد تعذّر تشغيل العرض المائل في المتصفح." : "";
+    });
+    document.addEventListener("dart:google-maps-error", () => {
+      if (!navigationOrderId) return;
+      const entry = deliveryMaps.get(navigationOrderId);
+      if (entry) entry.failed = true;
+      document.getElementById("repNavigationStatus").textContent = "تعذر تحميل الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.";
+    });
     document.getElementById("repLoginTab").onclick = () => showAuth("login");
     document.getElementById("repRegisterTab").onclick = () =>
       showAuth("register");
@@ -1590,13 +1645,17 @@
       .getElementById("repOrdersList")
       .addEventListener("click", async (event) => {
         const button = event.target.closest("[data-action]");
-        if (!button) return;
+        if (!button || button.disabled) return;
+        button.disabled = true;
+        const modalComplete = document.getElementById("repNavigationComplete");
+        modalComplete.disabled = true;
         const card = button.closest("[data-order-id]"),
           orderId = card?.dataset.orderId,
           orders = API_ENABLED ? apiWork.orders : read(KEYS.orders, []),
           order = orders.find((row) => String(row.id) === String(orderId));
         try {
           if (!order) throw new Error("The assigned order could not be found.");
+          if (button.dataset.action === "navigate") await openNavigation(order);
           if (button.dataset.action === "start") {
             if (
               ![
@@ -1609,9 +1668,10 @@
               );
             locationPermissionBlocked = false;
             activeOrderIds.add(order.id);
-            await updateOrderStatus(order.id, "Representative On The Way");
+            const startedOrder = await updateOrderStatus(order.id, "Representative On The Way");
             ensureLocationWatch();
             renderOrders();
+            await openNavigation(startedOrder);
           }
           if (button.dataset.action === "complete") {
             const freshOrder = (API_ENABLED ? apiWork.orders : read(KEYS.orders, [])).find(
@@ -1624,7 +1684,10 @@
             )
               throw new Error("Start delivery before confirming it.");
             if (!proximity.ok) throw new Error(proximity.reason);
-            if (!await window.DartDialog.confirm(`Mark ${freshOrder.orderId} as delivered and paid?`))
+            const confirmation = proximity.manual
+              ? `Manual address has no verified customer pin. Have you physically delivered ${freshOrder.orderId} and collected the payment?`
+              : `Confirm the customer received Order ${freshOrder.orderId} and you collected ${money(orderTotal(freshOrder))}?`;
+            if (!await window.DartDialog.confirm(confirmation))
               return;
             await updateOrderStatus(freshOrder.id, "Delivered");
             renderOrders();
@@ -1650,6 +1713,10 @@
           }
         } catch (error) {
           window.DartDialog.alert(error.message);
+        } finally {
+          button.disabled = false;
+          modalComplete.disabled = false;
+          updateDeliveryControls();
         }
       });
     document
@@ -1707,6 +1774,8 @@
     distanceKm,
     deliveryProximity,
     googleMapsRoute,
+    // Re-render assigned work without replacing an open navigation map.
+    renderOrders: () => { lastOrderRenderSignature = ""; renderOrders(); },
     startReturnPickup,
     cancelReturnPickup,
     completeReturnPickup,
@@ -1714,6 +1783,7 @@
 
   document.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
+    setInterval(updateDeliveryControls, 10000);
     if (API_ENABLED) {
       try {
         const payload = await window.DartApi.request("/api/v1/representatives/me");
@@ -1738,18 +1808,27 @@
     } else {
       showAuth("login");
     }
-    setInterval(async () => {
-      if (currentRep() && !document.hidden) {
-        if (API_ENABLED) {
-          try {
-            await refreshApiWork();
-          } catch (error) {
-            setLocationStatus(error.message || "Could not refresh assigned work.", "error");
+    // Run only one network refresh at a time. Idle couriers do not need 5s polling.
+    const pollAssignedWork = async () => {
+      try {
+        if (currentRep() && !document.hidden) {
+          if (API_ENABLED) {
+            try {
+              await refreshApiWork();
+            } catch (error) {
+              setLocationStatus(error.message || "Could not refresh assigned work.", "error");
+            }
           }
+          renderOrders();
         }
-        renderOrders();
+      } finally {
+        const assigned = API_ENABLED
+          ? Boolean(apiWork.orders?.length || apiWork.returns?.length)
+          : Boolean(read(KEYS.orders, []).length || read(KEYS.returns, []).length);
+        setTimeout(pollAssignedWork, assigned ? 5000 : 15000);
       }
-    }, 5000);
+    };
+    setTimeout(pollAssignedWork, 5000);
   });
   window.addEventListener("storage", (event) => {
     if ([KEYS.orders, KEYS.returns, KEYS.reps, KEYS.items].includes(event.key) && currentRep())

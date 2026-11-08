@@ -1,3 +1,5 @@
-purpose=smtp-credential-refresh
-triggered_at=2026-09-27T21:30:00Z
-source=manual-vercel-env-update
+purpose=approved-restock-whatsapp-template-activation
+triggered_at=2026-11-07
+source=production-template-environment-update
+template=dart_restock_available
+migration=0075_waitlist_whatsapp_restock.sql

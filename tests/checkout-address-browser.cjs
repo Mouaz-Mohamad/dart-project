@@ -1,117 +1,91 @@
 "use strict";
-const fs = require("node:fs");
-const path = require("node:path");
-const assert = require("node:assert/strict");
-const { chromium } = require("playwright");
-const root = path.resolve(__dirname, "..");
-const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-
-(async () => {
-  const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE || chromium.executablePath(), args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-  try {
-    const page = await browser.newPage(); const errors = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    await page.route("**/*", (route) => {
-      const url = new URL(route.request().url());
-      if (url.hostname !== "localhost") return route.abort();
-      const file = decodeURIComponent(url.pathname).slice(1) || "cart-checkout.html";
-      if (file.includes("..") || !fs.existsSync(path.join(root, file))) return route.fulfill({ status: 404, body: "" });
-      const contentType = file.endsWith(".css") ? "text/css" : file.endsWith(".html") ? "text/html" : "application/octet-stream";
-      let body = fs.readFileSync(path.join(root, file));
-      if (file.endsWith(".html")) body = body.toString().replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
-      return route.fulfill({ contentType, body });
-    });
-    await page.goto("http://localhost/cart-checkout.html");
-    await page.clock.install();
-    // The real form and production modules run against a controllable map/GPS
-    // and geocoder. No order or lookup is sent to a production service.
-    await page.evaluate(() => {
-      document.getElementById("checkoutView").style.display = "block";
-      document.getElementById("cartView").style.display = "none";
-      const values = { "checkout-name": "Synthetic", "checkout-phone1": "01000000001", "checkout-email": "synthetic@example.test", "checkout-building": "10", "checkout-floor": "2" };
-      for (const [id, value] of Object.entries(values)) document.getElementById(id).value = value;
-      window.DartState = { read: () => ({ lat: 30.04, lng: 31.23, country: "Egypt", governorate: "Cairo", area: "Old area", street: "Old street", building: "10", floor: "2", address: "Old destination" }) };
-      const map = { attributionControl: { setPrefix() {} }, setView() { return this; }, on() {}, removeLayer() {}, invalidateSize() {} };
-      window.L = {
-        map: () => map, tileLayer: () => ({ addTo() {} }), divIcon: () => ({}),
-        marker: () => ({ addTo() { return this; }, setLatLng() {}, on() {}, bindPopup() { return this; }, openPopup() { return this; } }),
-        control: () => ({ addTo() { this.onAdd(); } }), DomUtil: { create: (tag) => document.createElement(tag) }, DomEvent: { disableClickPropagation() {}, on(el, type, fn) { el.addEventListener(type, fn); } },
-      };
-      window.lookups = [];
-      window.fetch = (_url, { signal, ...options }) => new Promise((resolve, reject) => {
-        window.lookups.push({ url: _url, options, resolve: (result) => resolve({ ok: true, json: async () => result }), reject });
-        signal.addEventListener("abort", () => reject(new Error("Synthetic timeout")), { once: true });
-      });
-      window.syntheticResult = (name, lat, lon) => ({ lat, lon, display_name: name, address: { country: "Egypt", state: "Cairo", suburb: `${name} area`, road: `${name} street` } });
-    });
-    await page.addScriptTag({ content: read("Js/dart-address.js") });
-    await page.evaluate(() => DartAddress.initCheckout());
-    await page.addScriptTag({ content: read("Js/dart-checkout-stability.js") });
-    await page.evaluate(() => {
-      window.submits = 0;
-      document.getElementById("checkoutForm").addEventListener("submit", (event) => { event.preventDefault(); window.submits++; });
-    });
-    const submit = page.locator('#checkoutForm [type="submit"]');
-    const payment = page.getByRole('region', { name: 'Cash on delivery' });
-    assert.equal(await payment.count(), 1);
-    assert.equal(await payment.locator('input, select, button').count(), 0, 'cash-only payment is information, not a choice');
-    assert.equal(await payment.getByText('Pay when your order arrives.', { exact: true }).count(), 1);
-    assert.equal(await submit.isDisabled(), false);
-    await page.evaluate(() => { void dartCheckoutAddress.selectLocation(30.05, 31.35); });
-    assert.equal(await submit.isDisabled(), true);
-    assert.equal(await submit.textContent(), "Checking location…");
-    await page.evaluate(() => document.getElementById("checkoutForm").requestSubmit());
-    assert.equal(await page.evaluate(() => submits), 0);
-    await page.clock.fastForward(8001);
-    assert.equal(await submit.isDisabled(), true, "no eight-second fallback to the old pin");
-    await page.evaluate(() => lookups[0].resolve(syntheticResult("New destination", 30.05, 31.35)));
-    await page.waitForFunction(() => document.getElementById("checkoutForm").dataset.dartAddressState === "success");
-    assert.equal(await submit.isDisabled(), false);
-    assert.equal(await page.locator("#street-input").inputValue(), "New destination street");
-    assert.equal(await page.locator("#lat-input").inputValue(), "30.0500000");
-    await page.locator("#checkout-floor").fill("4");
-    assert.equal(await page.evaluate(() => dartCheckoutAddress.validate().ok), true);
-    await page.evaluate(() => {
-      document.getElementById("checkoutForm").setAttribute("aria-busy", "true");
-    });
-    await page.waitForFunction(() => document.querySelector('#checkoutForm [type="submit"]').disabled);
-    assert.equal(await submit.textContent(), "Adding…");
-    await page.evaluate(() => document.getElementById("checkoutForm").setAttribute("aria-busy", "false"));
-    await page.waitForFunction(() => !document.querySelector('#checkoutForm [type="submit"]').disabled);
-    await submit.click(); assert.equal(await page.evaluate(() => submits), 1);
-    // A verification timeout releases the UI for retry, but cannot submit an
-    // earlier location or queue a delayed automatic order.
-    await page.evaluate(() => { void dartCheckoutAddress.selectLocation(30.06, 31.36); });
-    await page.clock.fastForward(13000);
-    await page.waitForFunction(() => document.getElementById("checkoutForm").dataset.dartAddressState === "error");
-    assert.equal(await page.evaluate(() => dartCheckoutAddress.validate().ok), false);
-    assert.equal(await page.locator("#lat-input").inputValue(), "");
-    assert.equal(await page.evaluate(() => submits), 1);
-    await page.locator('#confirm-manual-pin').click();
-    assert.equal(await page.evaluate(() => lookups.at(-1).url.endsWith('/shipping/validate-point')), true);
-    assert.equal(await page.evaluate(() => JSON.parse(lookups.at(-1).options.body).governorate), 'Cairo');
-    assert.equal(await submit.isDisabled(), true, 'server geometry must finish before ordering');
-    await page.evaluate(() => lookups.at(-1).resolve({ valid: true }));
-    await page.waitForFunction(() => dartCheckoutAddress.validate().ok);
-    assert.equal(await page.locator('#lat-input').inputValue(), '30.0600000');
-    assert.equal(await page.evaluate(() => document.getElementById('checkoutForm').dataset.dartAddressSource), 'manual-pin');
-    await page.locator('#checkout-floor').fill('5');
-    assert.equal(await page.evaluate(() => dartCheckoutAddress.validate().ok), false, 'edited manual details need reconfirmation');
-    await page.locator('#confirm-manual-pin').click();
-    await page.evaluate(() => lookups.at(-1).resolve({ valid: false }));
-    await page.waitForFunction(() => document.getElementById('checkoutForm').dataset.dartAddressState === 'error');
-    assert.equal(await page.locator('#lat-input').inputValue(), '', 'a mismatched governorate cannot leave usable coordinates');
-    await page.locator('#confirm-manual-pin').click();
-    await page.evaluate(() => lookups.at(-1).resolve({ valid: true }));
-    await page.waitForFunction(() => dartCheckoutAddress.validate().ok);
-    assert.equal(await page.evaluate(() => submits), 1, 'confirmation never creates an order');
-    for (const width of [370, 480, 767, 768, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      const bounds = await submit.boundingBox(); assert.ok(bounds && bounds.width <= width, `button fits ${width}`);
-      const paymentBounds = await payment.boundingBox();
-      assert.ok(paymentBounds && paymentBounds.x >= 0 && paymentBounds.x + paymentBounds.width <= width, `cash payment fits ${width}`);
-    }
-    assert.deepEqual(errors, []);
-    console.log("PASS checkout Chromium: actual form, disabled button/Enter, 8s delay, new address fields, unit edits, busy guard, timeout/retry and mobile/desktop button");
-  } finally { await browser.close(); }
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+const fs=require("node:fs"),path=require("node:path"),assert=require("node:assert/strict");
+const {chromium}=require("playwright");
+const root=path.resolve(__dirname,"..");
+(async()=>{
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||chromium.executablePath(),args:["--no-sandbox","--disable-dev-shm-usage"]});
+try{
+const page=await browser.newPage(),errors=[];
+page.on("pageerror",e=>errors.push(e.message));
+await page.route("**/*",route=>{
+const url=new URL(route.request().url());
+if(url.hostname!=="localhost")return route.abort();
+const file=decodeURIComponent(url.pathname).slice(1)||"cart-checkout.html";
+if(file.includes("..")||!fs.existsSync(path.join(root,file)))return route.fulfill({status:404,body:""});
+const type=file.endsWith(".css")?"text/css":file.endsWith(".html")?"text/html":"application/octet-stream";
+let body=fs.readFileSync(path.join(root,file));
+if(file.endsWith(".html"))body=body.toString().replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,"");
+return route.fulfill({contentType:type,body});
+});
+await page.goto("http://localhost/cart-checkout.html");
+await page.evaluate(()=>{
+window.DART_GOOGLE_MAPS_BROWSER_KEY="";
+window.DartShippingAvailability={ready:true,isAddressCovered:addr=>addr.governorate==="Cairo"};
+window.DartState={read:()=>null};
+});
+await page.addScriptTag({content:fs.readFileSync(path.join(root,"Js/dart-checkout-google.js"),"utf8")});
+await page.addScriptTag({content:fs.readFileSync(path.join(root,"Js/dart-checkout-stability.js"),"utf8")});
+await page.evaluate(()=>{document.getElementById("checkoutView").style.display="block";document.getElementById("cartView").style.display="none";});
+const details=page.locator("#checkout-extra-details"),summary=details.locator("summary");
+for(const width of [320,390,768,1440]){
+await page.setViewportSize({width,height:844});
+assert.equal(await details.evaluate(el=>el.open),false,"extra details start collapsed");
+assert.deepEqual(await page.locator("#checkoutForm > .form-group input:visible").evaluateAll(nodes=>nodes.map(el=>el.id)),
+["checkout-name","checkout-phone1","checkout-phone2","checkout-building","checkout-floor"]);
+assert.equal(await page.locator("#checkout-email").isVisible(),false);
+assert.equal(await page.locator("#checkout-notes").isVisible(),false);
+assert.equal(await page.locator("#area-input").isVisible(),false);
+const map=await page.locator("#dart-checkout-google-map").boundingBox();
+assert(Math.abs(map.height-844*.65)<2,"map uses 65% of the stable screen height on mobile and desktop");
+assert(map.x>=0&&map.x+map.width<=width,"map fits the viewport");
+}
+await page.setViewportSize({width:390,height:844});
+await summary.focus();await summary.press("Enter");
+assert.equal(await details.evaluate(el=>el.open),true,"keyboard opens native disclosure");
+await summary.press("Space");
+assert.equal(await details.evaluate(el=>el.open),false,"keyboard closes native disclosure");
+await page.evaluate(()=>document.getElementById("checkoutForm").addEventListener("submit",event=>event.preventDefault()));
+for(const [id,value] of [["checkout-name","Synthetic customer"],["checkout-phone1","01000000000"],["checkout-building","21"],["checkout-floor","3"]])
+await page.locator("#"+id).fill(value);
+if(process.env.DART_CHECKOUT_SCREENSHOT)await page.locator("#checkoutForm").screenshot({path:process.env.DART_CHECKOUT_SCREENSHOT});
+await page.locator("#checkoutForm button[type=submit]").click();
+assert.equal(await details.evaluate(el=>el.open),true,"missing required address fields reveal details before native focus");
+assert.equal(await page.evaluate(()=>document.activeElement.id),"area-input");
+assert.equal(await page.locator("#dart-checkout-google-map").count(),1);
+await page.locator("#dart-checkout-google-map > p").filter({hasText:"Google Maps is unavailable"}).waitFor();
+assert.equal(await page.evaluate(()=>{
+const message=document.querySelector("#dart-checkout-google-map > p"),range=document.createRange();
+range.selectNodeContents(message);
+return range.getBoundingClientRect().top>document.querySelector(".dart-map-search-bar").getBoundingClientRect().bottom;
+}),true,"map error text must remain visible below the floating search bar");
+for(const [id,value] of [["area-input","Nasr City"],["street-input","Example St"],["checkout-building","21"],["checkout-floor","3"]])
+await page.locator("#"+id).fill(value);
+assert.equal(await page.evaluate(()=>dartCheckoutAddress.validate().ok),true,"manual delivery fallback works without Google");
+await page.locator("#checkout-email").fill("not-an-email");await summary.click();
+await page.evaluate(()=>document.getElementById("checkoutForm").requestSubmit());
+assert.equal(await details.evaluate(el=>el.open),true,"requestSubmit reveals an invalid collapsed email");
+assert.equal(await page.evaluate(()=>document.activeElement.id),"checkout-email");
+await page.locator("#checkout-email").fill("synthetic@example.test");
+await page.locator("#checkout-notes").fill("Synthetic delivery note");await summary.click();
+assert.equal(await page.evaluate(()=>new FormData(document.getElementById("checkoutForm")).get("street")),"Example St","collapsed fields are still submitted");
+assert.equal(await page.evaluate(()=>new FormData(document.getElementById("checkoutForm")).get("delivery_notes")),"Synthetic delivery note","closing details preserves optional values");
+await page.evaluate(()=>document.getElementById("checkoutForm").requestSubmit());
+assert.equal(await details.evaluate(el=>el.open),false,"valid collapsed fields do not force extra details open on submit");
+await summary.click();
+const snapshot=await page.evaluate(()=>dartCheckoutAddress.snapshot());
+await page.locator("#street-input").fill("Other road");
+assert.equal(await page.evaluate(old=>dartCheckoutAddress.isCurrentSnapshot(old),snapshot),false);
+await page.locator("#governorate-select").selectOption("Giza");
+assert.equal(await page.evaluate(()=>dartCheckoutAddress.validate().ok),false);
+await summary.click();
+await page.evaluate(()=>document.getElementById("checkoutForm").requestSubmit());
+assert.equal(await details.evaluate(el=>el.open),true,"custom shipping failure reveals the coverage controls");
+assert.deepEqual(errors,[]);
+// The disclosure also works if scripts fail to load.
+await page.reload();
+await page.evaluate(()=>document.getElementById("checkoutView").style.display="block");
+await summary.click();assert.equal(await details.evaluate(el=>el.open),true);
+await summary.click();assert.equal(await details.evaluate(el=>el.open),false);
+console.log("PASS taller responsive map, five primary fields, native keyboard/no-JS disclosure, hidden-field validation/focus, preserved form data, offline manual fallback and coverage guards");
+}finally{await browser.close()}
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -69,6 +69,10 @@
     });
     const buy = $("modalBuyBtn");
     const waiting = $("modalWaitBtn");
+    // A Waiting request explicitly asks Dart for an availability message.
+    // The adjacent product-modal disclosure names the brand and WhatsApp channel.
+    const whatsappDisclosure = $("dartRestockWhatsAppDisclosure");
+    if (whatsappDisclosure) whatsappDisclosure.hidden = !state.showWaiting;
     const reserved =
       state.showWaiting &&
       key(item, selectedSizeValue, selectedColorValue) === reservedKey;
@@ -278,10 +282,10 @@
     waitingBusy = true;
     sync();
     try {
+      if (typeof root.DartPlatform?.joinWaiting !== "function") throw new Error("Waiting service is unavailable");
+      // All Waiting buttons use one canonical customer-requested notification path.
       await root.DartPlatform.joinWaiting(
-        String(item.id),
-        String(selectedSizeValue),
-        String(selectedColorValue),
+        String(item.id), String(selectedSizeValue), String(selectedColorValue),
       );
       reservedKey = key(item, selectedSizeValue, selectedColorValue);
       const message = `تم تسجيل حجز القطعة في Waiting: ${item.title} — المقاس: ${selectedSizeValue} — اللون: ${selectedColorValue}.`;

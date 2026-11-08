@@ -5,6 +5,7 @@
 const $=id=>document.getElementById(id);
 const pickup=Boolean($("returnRequestForm"));
 const norm=value=>String(value||"").trim().toLowerCase()
+.replace(/[\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f]/g,"")
 .replace(/[\u064b-\u065f\u0670\u0640]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه")
 .replace(/[\s_-]+/g,"");
 
@@ -14,8 +15,8 @@ let regions=[
 ], companies=[],ready=false;
 let activePromise=null;
 const canonical=value=>{
-const v=norm(value);
-const known=regions.find(x=>[x.id,x.en,x.ar,"محافظة "+x.ar,x.id+" governorate"]
+const v=norm(value).replace(/^(?:محافظه|governorateof|governorate)/,"").replace(/(?:محافظه|governorate)$/,"");
+const known=regions.find(x=>[x.id,x.en,x.ar]
 .some(label=>norm(label)===v));
 if(known)return known.id;
 if(["cairo","cairogovernorate","alqahirah","القاهرة","محافظهالقاهرة"].includes(v))return "Cairo";
@@ -99,7 +100,7 @@ const helper=document.createElement("div");helper.className="dart-checkout-regio
 const caption=document.createElement("p");
 caption.textContent="المحافظة ← المدينة ← المنطقة / Delivery coverage";
 const intro=document.createElement("small");
-intro.textContent="التوصيل متاح فقط في الأماكن المغطاة. اختار المدينة والمنطقة إن لزم، ثم أكد موقعك على الخريطة.";
+intro.textContent="التوصيل متاح فقط في الأماكن المغطاة. اختار المدينة والمنطقة إن لزم، ثم أكمل عنوان التوصيل.";
 const search=document.createElement("input");search.type="search";
 search.placeholder="ابحث عن مدينة أو منطقة · Search";search.setAttribute("aria-label","Search delivery districts");
 const city=document.createElement("select");city.name="city";city.id="checkout-city";
@@ -158,9 +159,12 @@ if(!selected)return;
 const zone=selected.areas.find(x=>x.id===district.value);
 const next=selected.en+(zone?", "+zone.en:"");
 area.value=next;
-// A new manual address never inherits coordinates from an old verified pin.
+// Coverage labels supplement a pin; they do not move the physical location.
+area.dataset.dartCoverageUpdate="1";
+try{
 area.dispatchEvent(new Event("input",{bubbles:true}));
 area.dispatchEvent(new Event("change",{bubbles:true}));
+}finally{delete area.dataset.dartCoverageUpdate;}
 }
 governorate.addEventListener("change",()=>{city.value="";district.value="";search.value="";renderCities()});
 search.addEventListener("input",renderCities);

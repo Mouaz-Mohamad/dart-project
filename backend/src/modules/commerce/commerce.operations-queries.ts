@@ -426,6 +426,7 @@ export async function readRepresentativeWork(pool: Pool, representativeUserId: s
           floor: address.floor || "",
           latitude: address.latitude || "",
           longitude: address.longitude || "",
+          addressSource: address.addressSource || "",
           fullAddress: address.fullAddress || "",
           deliveryNotes: row.delivery_notes,
           createdAt: row.created_at.toISOString(),

@@ -1935,8 +1935,9 @@ export class CommerceService {
       );
       const settings = settingsResult.rows[0]?.data || {};
       const shippingPartners=(Array.isArray(settings.shippingCompanies)?settings.shippingCompanies:[]) as CheckoutShippingCompany[];
+      const hasDeliveryCoordinates = input.address.latitude !== undefined && input.address.longitude !== undefined;
       if(String(input.address.country).trim().toLowerCase()!=="egypt" ||
-         !isInsideEgyptEnvelope(input.address.latitude,input.address.longitude)) {
+         (hasDeliveryCoordinates && !isInsideEgyptEnvelope(input.address.latitude,input.address.longitude))) {
         throw new AppError(422,"DELIVERY_LOCATION_OUTSIDE_EGYPT",
           "Delivery coordinates and country must be inside Egypt.");
       }
@@ -1949,7 +1950,7 @@ export class CommerceService {
         throw new AppError(422,"DELIVERY_REGION_UNAVAILABLE",
           "No active shipping company currently covers the selected delivery location.");
       }
-      if (!matchesDeliveryGovernorate(input.address.governorate, input.address.latitude, input.address.longitude)) {
+      if (hasDeliveryCoordinates && !matchesDeliveryGovernorate(input.address.governorate, input.address.latitude, input.address.longitude)) {
         throw new AppError(422, "DELIVERY_GOVERNORATE_MISMATCH",
           "The map pin must be inside the selected governorate. Verify the delivery location again.");
       }
@@ -2306,6 +2307,19 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // Acquire the same per-representative route lock before locking an order row
+      // to avoid deadlocking a concurrent courier Start request.
+      const assignment = await client.query<{ representative_user_id: string | null }>(
+        `SELECT representative_user_id::text
+           FROM orders
+          WHERE (id::text=$1 OR order_code=$1)
+            AND NOT is_deleted AND NOT is_archived
+          LIMIT 1`, [orderRef],
+      );
+      if (assignment.rows[0]?.representative_user_id) {
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",
+          [`dart:representative-route:${assignment.rows[0].representative_user_id}`]);
+      }
       const orderResult = await client.query<{
         id: string;
         order_code: string;
@@ -2324,6 +2338,9 @@ export class CommerceService {
       const order = orderResult.rows[0];
       if (!order || !order.representative_user_id) {
         throw new AppError(404, "LIVE_ORDER_NOT_FOUND", "Assigned live order not found");
+      }
+      if (assignment.rows[0]?.representative_user_id !== order.representative_user_id) {
+        throw new AppError(409, "LIVE_ROUTE_ASSIGNMENT_CHANGED", "Order assignment changed. Refresh and retry.");
       }
       if (!["Out With Representative", "Representative On The Way"].includes(order.status)) {
         throw new AppError(409, "LIVE_ORDER_STATE_INVALID", "Only active assigned orders can change live route state");
@@ -2380,6 +2397,16 @@ export class CommerceService {
         );
       }
 
+      if (state === "current") {
+        await client.query(
+          `UPDATE delivery_route_stops
+              SET route_state='upcoming', updated_at=now()
+            WHERE representative_user_id=$1
+              AND route_state='current'
+              AND order_id<>$2::uuid`,
+          [order.representative_user_id, order.id],
+        );
+      }
       await client.query(
         `INSERT INTO delivery_route_stops (
            representative_user_id,order_id,sequence_number,route_state,note,
@@ -2554,6 +2581,9 @@ export class CommerceService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // Serialize every route mutation by this courier, including two rapid Start clicks.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",
+        [`dart:representative-route:${representativeUserId}`]);
       const orderResult = await client.query<{
         id: string;
         status: string;
@@ -2578,6 +2608,16 @@ export class CommerceService {
       }
 
       if (action === "start") {
+        // Old workflow changes can leave a current route stop although its order
+        // is no longer On The Way. Heal it before the unique current-stop insert.
+        await client.query(
+          `UPDATE delivery_route_stops
+              SET route_state='upcoming', updated_at=now()
+            WHERE representative_user_id=$1
+              AND route_state='current'
+              AND order_id<>$2::uuid`,
+          [representativeUserId, order.id],
+        );
         const previousCurrent = await client.query<{ id: string; order_code: string }>(
           `SELECT id::text, order_code
              FROM orders
@@ -2665,26 +2705,21 @@ export class CommerceService {
         }
         const destinationLat = Number(order.delivery_address?.latitude);
         const destinationLng = Number(order.delivery_address?.longitude);
-        if (
-          !Number.isFinite(destinationLat) ||
-          !Number.isFinite(destinationLng) ||
-          !destinationLat ||
-          !destinationLng
-        ) {
+        const hasVerifiedPin = Number.isFinite(destinationLat) && Number.isFinite(destinationLng) &&
+          destinationLat !== 0 && destinationLng !== 0;
+        const manualWithoutPin = order.delivery_address?.addressSource === "manual" &&
+          !order.delivery_address?.latitude && !order.delivery_address?.longitude;
+        if (!hasVerifiedPin && !manualWithoutPin) {
           throw new AppError(409, "DELIVERY_COORDINATES_MISSING", "Customer delivery coordinates are missing");
         }
-        const distance = distanceKm(
-          location.latitude,
-          location.longitude,
-          destinationLat,
-          destinationLng,
-        );
-        if (distance > 1) {
-          throw new AppError(
-            409,
-            "DELIVERY_TOO_FAR",
-            `You must be within 1 km of the delivery address; current distance is ${distance.toFixed(2)} km`,
-          );
+        // A manual address has no geofence. A fresh authenticated courier GPS
+        // reading is still required above; never invent a destination pin.
+        if (hasVerifiedPin) {
+          const distance = distanceKm(location.latitude, location.longitude, destinationLat, destinationLng);
+          if (distance > 0.5) {
+            throw new AppError(409, "DELIVERY_TOO_FAR",
+              `You must be within 500 m of the delivery address; current distance is ${distance.toFixed(2)} km`);
+          }
         }
         nextStatus = "Delivered";
       }

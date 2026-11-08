@@ -85,14 +85,14 @@
   async function api(path, options = {}) {
     if (!API_BASE) throw new Error("Catalogue API is not configured.");
     const method = String(options.method || "GET").toUpperCase();
-    const csrf =
-      csrfMemory ||
-      document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("dart_csrf="))
-        ?.split("=")
-        .slice(1)
-        .join("=");
+    // Staff and customer sessions have separate CSRF tokens. Never take a
+    // customer's token when writing staff-owned catalogue / inventory data.
+    const csrfCookieName = IS_ADMIN ? "dart_staff_csrf" : "dart_csrf";
+    const cookieCsrf = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(csrfCookieName + "="))
+      ?.slice(csrfCookieName.length + 1);
+    const csrf = cookieCsrf || (!IS_ADMIN ? csrfMemory : "");
     const response = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
       method,
@@ -117,6 +117,40 @@
 
   async function syncAdminState() {
     return (await adminAdapter()).flush(persistAdminState, () => catalogDirty && serverVersion > 0);
+  }
+
+  // Save exactly one physical unit through the existing authorized, versioned API.
+  // Do not optimistically edit the in-memory catalogue or rely on its debounce timer.
+  async function savePhysicalItem(item) {
+    if (!IS_ADMIN || !canReadAdmin() || !serverVersion) {
+      throw Object.assign(new Error("Inventory is not connected to the server."), { code: "CATALOG_NOT_READY" });
+    }
+    if (!item || !item.id || !item.modelId || !item.itemCode || !item.size || !item.color) {
+      throw Object.assign(new Error("Complete the physical item's fields."), { code: "ITEM_FIELDS_REQUIRED" });
+    }
+    // Outstanding edits must be resolved before a forced refresh can safely occur.
+    if (catalogDirty) {
+      await syncAdminState();
+      if (catalogDirty) throw Object.assign(new Error("Save pending catalogue changes first."), { code: "CATALOG_PENDING_CHANGES" });
+    }
+    const existing = items().find((row) => row.id === item.id);
+    const row = existing ? { ...existing, ...item } : { ...item };
+    const result = await api("/api/v1/admin/catalog-state", {
+      method: "PATCH",
+      body: {
+        expectedVersion: serverVersion,
+        models: [],
+        items: [row],
+        recordVersions: { models: {}, items: { [item.id]: Number(existing?.version || 0) } },
+      },
+    });
+    // The API has committed the transaction, including any Waiting allocation.
+    const confirmed = result.items?.find((record) =>
+      record.id === item.id && record.modelId === item.modelId &&
+      record.itemCode === item.itemCode && record.color === item.color && record.size === item.size);
+    if (!confirmed) throw Object.assign(new Error("Inventory save was not confirmed by the server."), { code: "ITEM_SAVE_UNCONFIRMED" });
+    await hydrateCatalog(true);
+    return confirmed;
   }
   async function persistAdminState() {
     if (!IS_ADMIN || !API_BASE || !serverVersion) return;
@@ -611,6 +645,7 @@
     hydrate: hydrateCatalog,
     refreshChanged,
     syncAdminState,
+    savePhysicalItem,
     serverVersion: () => serverVersion,
     isServerAuthoritative: () => Boolean(API_BASE && serverVersion),
     checkForServerChanges,

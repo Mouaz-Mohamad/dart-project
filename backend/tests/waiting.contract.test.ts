@@ -4,6 +4,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(new URL("../migrations/0036_waitlist_reservations.sql", import.meta.url), "utf8");
+const restock = readFileSync(new URL("../migrations/0075_waitlist_whatsapp_restock.sql", import.meta.url), "utf8");
+const immediateRestock = readFileSync(new URL("../migrations/0076_waitlist_immediate_restock_whatsapp.sql", import.meta.url), "utf8");
+const sender = readFileSync(new URL("../src/modules/outbox/outbox.service.ts", import.meta.url), "utf8");
 const service = readFileSync(new URL("../src/modules/waiting/waiting.service.ts", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../src/modules/waiting/waiting.routes.ts", import.meta.url), "utf8");
 const commerce = readFileSync(new URL("../src/modules/commerce/commerce.service.ts", import.meta.url), "utf8");
@@ -11,10 +14,38 @@ const storefront = readFileSync(new URL("../../src/storefront/storefront.js", im
 const productActions = readFileSync(new URL("../../Js/dart-product-button-state.js", import.meta.url), "utf8");
 const productModal = readFileSync(new URL("../../sections/product-modal.html", import.meta.url), "utf8");
 const platform = readFileSync(new URL("../../Js/dart-platform.js", import.meta.url), "utf8");
+const waitingSource = readFileSync(new URL("../../src/storefront/platform/waiting.js", import.meta.url), "utf8");
 const profile = readFileSync(new URL("../../profile.html", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../../Eye/Dart Eye.html", import.meta.url), "utf8");
 
 describe("Waiting restock reservation contract", () => {
+  it("queues exact-variant restocks only with bound WhatsApp consent and a live hold", () => {
+    expect(restock).toContain("NEW.whatsapp_restock_opt_in_at IS NULL");
+    expect(restock).toContain("wa.match_type='exact'");
+    expect(restock).toContain("v_due >= v_expires_at");
+    expect(immediateRestock).toContain("v_due := now()");
+    expect(immediateRestock).toContain("v_due >= v_expires_at");
+    expect(sender).toContain('const bypassWindow = immediate || row.event_type === "WAITLIST_WHATSAPP_RESTOCK"');
+    expect(restock).toContain("'waitlist.whatsapp.restock:'||v_allocation_id::text");
+    expect(restock).toContain("'category','marketing'");
+    expect(sender).toContain("wa.expires_at=$4::timestamptz");
+    expect(sender).toContain("w.whatsapp_restock_phone_normalized=$3");
+    expect(sender).toContain("w.status='reserved'");
+    expect(routes).toContain("{ ...body, whatsappRestockOptIn: true }");
+    expect(routes).not.toContain("z.boolean().optional().default(false)");
+    expect(productActions).toContain("DartPlatform.joinWaiting");
+    expect(waitingSource).toContain("whatsappRestockOptIn: true");
+    expect(sender).toContain('wa.match_type=\'exact\'');
+    expect(sender).not.toContain('whatsappWaitingAlternativeTemplate');
+    expect(restock).not.toContain("WAITLIST_WHATSAPP_ALTERNATIVE");
+    expect(productActions).not.toContain("dartRestockWhatsappOptIn");
+    expect(productModal).toContain("dartRestockWhatsAppDisclosure");
+    expect(productModal).toContain("Dart | for you");
+    expect(productModal).toContain("واتساب");
+    expect(productModal).toContain("الإيميل");
+    expect(service).not.toContain("WAITING_WHATSAPP_PHONE_REQUIRED");
+  });
+
   it("keeps Waiting separate from the normal 15-minute cart until customer confirmation", () => {
     expect(migration).toContain("source IN ('cart','waitlist')");
     expect(commerce).toContain("source='cart'");
@@ -54,7 +85,7 @@ describe("Waiting restock reservation contract", () => {
   it("lets customers select unavailable variants and manage My Waiting", () => {
     expect(storefront).toContain("is-unavailable");
     expect(productModal).toContain("Notify me when available");
-    expect(productActions).toContain("DartPlatform.joinWaiting");
+    expect(productActions).toContain('root.DartPlatform.joinWaiting(');
     expect(platform).toContain("joinWaiting");
     expect(platform).toContain("cancelWaiting");
     expect(platform).toContain("confirmWaiting");

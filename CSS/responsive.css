@@ -214,6 +214,9 @@
   .address-form {
     width: 100%;
   }
+  .dart-checkout-location-search { inset-inline: 10px; top: 10px; }
+  .dart-map-search-bar { gap: 6px; padding-inline: 8px; }
+  .dart-checkout-map-locate { inset-inline-end: 10px; }
   .account .djasb {
     gap: 10px;
   }
@@ -436,4 +439,8 @@
   .dart-related-card { flex-basis: 116px; }
   .dart-related-card img { height: 122px; }
   .dart-quantity-offer { padding: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-filter-panel, .product-filter-toggle, .product-filter-toggle-arrow { transition: none; }
 }

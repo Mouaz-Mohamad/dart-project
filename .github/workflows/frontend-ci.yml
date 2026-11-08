@@ -92,6 +92,8 @@ jobs:
           node tests/order-dispatch-runtime.cjs
           node tests/auth-contract.js
           node tests/tracking-shipment-runtime.cjs
+          node tests/manual-checkout-contract.cjs
+          node tests/rep-google-contract.cjs
           node tests/direct-changes-runtime.cjs
           node tests/catalog-pagination-runtime.cjs
           node tests/password-reset-runtime.cjs
@@ -127,6 +129,7 @@ jobs:
           node tests/product-modal-shared-contract.cjs
           node tests/profile-compact-records.cjs
           node tests/sets-runtime-contract.cjs
+          node tests/rep-navigation-session.cjs
           node tests/test-inventory-contract.cjs
 
   browser-smoke:
@@ -160,6 +163,7 @@ jobs:
       - name: Full storefront and dashboard Chromium smoke
         run: |
           node tests/checkout-address-browser.cjs
+          node tests/google-navigation-browser.cjs
           node tests/direct-changes-browser.cjs
           node tests/dashboard-groups-browser.cjs
           node tests/brand-details-browser.cjs
