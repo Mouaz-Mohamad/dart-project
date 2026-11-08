@@ -10,6 +10,15 @@ export class PlatformAdminService {
     actorId: string,
     requestId: string,
   ): Promise<{ resetAt: string; deleted: Record<string, number> }> {
+    // Fail closed while Neon has no fresh verified recovery point.
+    // Enable only after a successful backup/restore verification and Owner approval.
+    if (process.env.DART_RESET_AFTER_BACKUP_ENABLED !== "true") {
+      throw new AppError(
+        423,
+        "RESET_BACKUP_REQUIRED",
+        "A current verified backup is required before permanent deletion",
+      );
+    }
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
