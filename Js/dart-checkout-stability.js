@@ -11,6 +11,12 @@
     const submit = form.querySelector('button[type="submit"], input[type="submit"]');
     if (!submit) return;
     const originalLabel = (submit.tagName === "INPUT" ? submit.value : submit.textContent) || "Order";
+    const extraDetails = document.getElementById("checkout-extra-details");
+    // Native validation happens before submit. Reveal invalid collapsed fields
+    // synchronously so the browser can focus them and explain what is missing.
+    form.addEventListener("invalid", (event) => {
+      if (extraDetails?.contains(event.target)) extraDetails.open = true;
+    }, true);
 
     function sync() {
       const verifying = form.dataset.dartAddressState === "loading";
@@ -28,7 +34,12 @@
     new MutationObserver(sync).observe(submit, { attributes: true, attributeFilter: ["disabled"] });
     // Covers Enter and programmatic requestSubmit, as well as ordinary clicks.
     form.addEventListener("submit", (event) => {
-      if (form.dataset.dartAddressState !== "loading" && form.getAttribute("aria-busy") !== "true") return;
+      if (form.dataset.dartAddressState !== "loading" && form.getAttribute("aria-busy") !== "true") {
+        // Coverage checks can also require a city/area without a native invalid field.
+        const address = window.dartCheckoutAddress?.validate?.();
+        if (extraDetails && address && !address.ok) extraDetails.open = true;
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
       sync();

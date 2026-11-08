@@ -97,12 +97,14 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(()=>window.__map.options.mapTypeId),"roadmap");
     assert.equal(await page.evaluate(()=>window.__map.options.gestureHandling),"cooperative","the map must not trap checkout page scrolling");
     assert.equal(await page.locator(".dart-checkout-map-card").evaluate(el=>getComputedStyle(el).colorScheme),"light");
+    assert.equal(await page.locator("#checkout-extra-details").evaluate(el=>el.open),false);
     await page.evaluate(()=>{document.getElementById("checkout-building").value="10";document.getElementById("checkout-floor").value="2"});
     await page.locator("#address-input").fill("Test address"); await page.locator("#dart-google-search").click();
     await page.waitForFunction(()=>document.getElementById("checkoutForm").dataset.dartAddressSource==="map");
     assert.equal(await page.locator("#street-input").inputValue(),"Test street");
     assert.equal(await page.locator("#area-input").inputValue(),"Test district");
     assert.equal(await page.locator("#lat-input").inputValue(),"30.0500000");
+    assert.equal(await page.locator("#checkout-extra-details").evaluate(el=>el.open),false,"Google populates address fields while extra details stay collapsed");
     await page.locator("#checkout-building").fill("12");
     await page.locator("#checkout-floor").fill("3");
     assert.equal(await page.locator("#lat-input").inputValue(),"30.0500000","building/floor edits must preserve the chosen pin");
@@ -116,7 +118,9 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(()=>document.getElementById("lat-input").value==="30.0600000");
     await page.evaluate(()=>window.__geocodes[1].callback([window.__lookup(31,32)],"OK"));
     assert.equal(await page.locator("#lat-input").inputValue(),"30.0600000");
+    await page.locator("#checkout-extra-details summary").click();
     await page.locator("#street-input").fill("Manual correction");
+    await page.locator("#checkout-extra-details summary").click();
     assert.equal(await page.locator("#lat-input").inputValue(),"");
     assert.equal(await page.evaluate(()=>window.dartCheckoutAddress.validate().source),"manual");
     // Type-ahead uses Places, then reuses reverse lookup and server pin verification.
@@ -215,6 +219,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(()=>window.__polyline.strokeColor),"#1a73e8");
     assert.equal(await page.evaluate(()=>window.__path.length),2);
     assert.equal(await page.evaluate(()=>window.__map.options.renderingType),"VECTOR");
+    await page.waitForFunction(()=>window.__map.tilt===60);
     assert.equal(await page.evaluate(()=>window.__map.tilt),60);
     assert.equal(await page.evaluate(()=>window.__map.heading),90);
     assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation),0,"the navigation arrow faces ahead while the vector camera rotates with travel");

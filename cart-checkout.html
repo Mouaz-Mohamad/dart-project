@@ -144,39 +144,44 @@
     <div class="form-group"><label for="checkout-name">Name</label><input id="checkout-name" name="customer_name" class="inp" type="text" placeholder="Value" autocomplete="name" required></div>
     <div class="form-group"><label for="checkout-phone1">Phone number</label><input id="checkout-phone1" name="phone1" class="inp" type="tel" placeholder="Value" autocomplete="tel" inputmode="tel" required></div>
     <div class="form-group"><label for="checkout-phone2">Phone number 2</label><input id="checkout-phone2" name="phone2" class="inp" type="tel" placeholder="Optional" inputmode="tel"></div>
-    <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Value" autocomplete="email"></div>
     <div class="form-group"><label for="checkout-building">Building Number/Name</label><input id="checkout-building" name="building" class="inp" type="text" placeholder="Value" required></div>
     <div class="form-group"><label for="checkout-floor">Floor</label><input id="checkout-floor" name="floor" class="inp" type="text" placeholder="Value" required></div>
-    <div class="form-group"><label for="checkout-notes">Delivery Notes</label><textarea id="checkout-notes" name="delivery_notes" class="inp" placeholder="Value"></textarea></div>
-    <div class="other-addres" style="display: block;">
-        <div class="form-group">
-            <label>Country</label>
-            <select required class="select-cart" id="checkout-country" name="country">
-                <option value="Egypt" selected>Egypt</option>
-            </select>                  
+    <details id="checkout-extra-details" class="dart-checkout-extra-details">
+      <summary>
+        <span>Additional details</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </summary>
+      <div class="dart-checkout-extra-fields">
+        <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Value" autocomplete="email"></div>
+        <div class="form-group"><label for="checkout-notes">Delivery Notes</label><textarea id="checkout-notes" name="delivery_notes" class="inp" placeholder="Value"></textarea></div>
+        <div class="other-addres" style="display: block;">
+            <div class="form-group">
+                <label>Country</label>
+                <select required class="select-cart" id="checkout-country" name="country">
+                    <option value="Egypt" selected>Egypt</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Governorate</label>
+                <select required class="select-cart" id="governorate-select" name="governorate">
+                    <option value="Cairo" selected>Cairo</option>
+                    <option value="Giza">Giza</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Area</label>
+                <input class="inp" type="text" id="area-input" name="area" placeholder="Area / district" required>
+            </div>
+
+            <div class="form-group">
+                <label>Street Name</label>
+                <input class="inp" type="text" id="street-input" name="street" placeholder="Street name" required>
+            </div>
         </div>
-
-        <div class="form-group">
-            <label>Governorate</label>
-            <select required class="select-cart" id="governorate-select" name="governorate">
-                <option value="Cairo" selected>Cairo</option>
-                <option value="Giza">Giza</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Area</label>
-            <input class="inp" type="text" id="area-input" name="area" placeholder="Area / district" required>
-        </div>
-
-        <div class="form-group">
-            <label>Street Name</label>
-            <input class="inp" type="text" id="street-input" name="street" placeholder="Street name" required>
-        </div>
-    </div>
-
-
-
+      </div>
+    </details>
     <section class="dart-cash-payment" aria-labelledby="checkout-payment-title">
         <span class="dart-cash-payment-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

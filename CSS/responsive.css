@@ -214,7 +214,6 @@
   .address-form {
     width: 100%;
   }
-  #dart-checkout-google-map { height: 420px; }
   .dart-checkout-location-search { inset-inline: 10px; top: 10px; }
   .dart-map-search-bar { gap: 6px; padding-inline: 8px; }
   .dart-checkout-map-locate { inset-inline-end: 10px; }

@@ -6089,7 +6089,8 @@ body.dart-rep-navigating { overflow: hidden; }
   color: #252525; color-scheme: light; box-shadow: 0 6px 24px #3512200a;
 }
 #dart-checkout-google-map {
-  width: 100%; height: 460px; overflow: hidden; border-radius: inherit; background: #f7f8f8;
+  width: 100%; height: clamp(480px, 65vh, 720px); height: clamp(480px, 65svh, 720px);
+  overflow: hidden; border-radius: inherit; background: #f7f8f8;
 }
 #dart-checkout-google-map > p { margin: 0; padding: 100px 20px 20px; line-height: 1.7; }
 .dart-checkout-location-search { position: absolute; inset-inline: 14px; top: 14px; z-index: 2; }
@@ -6142,6 +6143,25 @@ body.dart-rep-navigating { overflow: hidden; }
 .dart-address-predictions-status { margin: 0; padding: 12px 14px; font-size: 12px; }
 .dart-address-predictions-status[hidden] { display: none; }
 .dart-address-predictions > small { display: block; padding: 7px 14px; text-align: end; font-size: 11px; color: #665e63; }
+
+/* Keep optional checkout fields and address controls behind a native disclosure. */
+.dart-checkout-extra-details {
+  margin: 16px 0; border: 1px solid #e4dce0; border-radius: 12px; background: #fff; color: #252525;
+}
+.dart-checkout-extra-details > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 50px; padding: 12px 14px; border-radius: 12px;
+  font-size: 14px; font-weight: 600; list-style: none; cursor: pointer;
+}
+.dart-checkout-extra-details > summary::-webkit-details-marker { display: none; }
+.dart-checkout-extra-details > summary:focus-visible {
+  outline: 2px solid var(--bragnte, #ab012b); outline-offset: 3px;
+}
+.dart-checkout-extra-details > summary svg {
+  width: 20px; height: 20px; flex-shrink: 0; color: var(--bragnte, #ab012b);
+}
+.dart-checkout-extra-details[open] > summary svg { transform: rotate(180deg); }
+.dart-checkout-extra-fields { padding: 4px 14px 2px; }
 
 /* === CSS/base.css === */
 /* DART CODE GUIDE | CSS/base.css
@@ -6653,7 +6673,6 @@ picture.dart-picture {
   .address-form {
     width: 100%;
   }
-  #dart-checkout-google-map { height: 420px; }
   .dart-checkout-location-search { inset-inline: 10px; top: 10px; }
   .dart-map-search-bar { gap: 6px; padding-inline: 8px; }
   .dart-checkout-map-locate { inset-inline-end: 10px; }
