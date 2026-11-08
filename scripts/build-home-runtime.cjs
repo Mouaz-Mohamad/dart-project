@@ -20,6 +20,7 @@ module.exports = { sourceText };
 if (require.main === module) buildSourceRuntimes();
 if (require.main === module) for (const [source, output] of [
   ['src/dashboard/inventory.js', 'Eye/dart-inventory.js'],
+  ['src/dashboard/order-address.js', 'Eye/dart-order-address.js'],
   ['src/dashboard/shipping-ui.js', 'Eye/dart-shipping-ui.js'],
   ['src/dashboard/settings.js', 'Eye/dart-settings.js'],
   ['src/storefront/checkout-regions.js', 'Js/dart-checkout-regions.js'],

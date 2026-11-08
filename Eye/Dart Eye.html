@@ -1166,14 +1166,16 @@
                                 <label for="deliveryNotes">Delivery Notes</label>
                                 <textarea id="deliveryNotes" placeholder="Value" rows="2"></textarea>
                             </div>
-                            <div class="form-group">
-                                <label for="orderAddress">Address (OpenStreetMap)</label>
-                                <textarea id="orderAddress" placeholder="Search for the delivery address"></textarea>
-                                <ul id="dashboard-address-results" class="dart-address-results" hidden></ul>
+                            <div class="form-group dart-order-address-search" id="dashboard-order-location-search">
+                                <label for="orderAddress">Search Google Maps</label>
+                                <div class="dart-order-address-search-bar">
+                                    <input type="search" id="orderAddress" placeholder="Search for a place, street or building" autocomplete="off">
+                                    <button type="button" id="dashboard-google-search">Search</button>
+                                </div>
                             </div>
                             <div id="dashboard-order-map" class="dart-dashboard-order-map" aria-label="Order delivery location map"></div>
                             <p class="dart-delivery-zone-note"><i class="fa-solid fa-clock" aria-hidden="true"></i> Cairo and Giza delivery only — promised within 12 hours.</p>
-                            <p id="dashboard-address-status" class="dart-address-status" role="status" aria-live="polite">Select a Cairo/Giza pin or enter the complete address manually.</p>
+                            <p id="dashboard-address-status" class="dart-address-status" role="status" aria-live="polite">Choose a Google Maps suggestion or enter the complete delivery address manually.</p>
                             <input type="hidden" id="orderLatitude">
                             <input type="hidden" id="orderLongitude">
                             <input type="hidden" id="orderFullAddress">
@@ -2776,7 +2778,11 @@
     <script  src="../Js/dart-password-visibility.js" defer></script>
     <script  src="../Js/dart-site-settings.js" defer></script>
     <script  src="../Js/dart-groups.js" defer></script>
-    <script  src="../Js/dart-address.js" defer></script>
+    <script src="../Js/dart-google-maps-config.js" defer></script>
+    <script src="../Js/dart-google-maps.js" defer></script>
+    <script src="../Js/dart-checkout-regions.js" defer></script>
+    <script src="../Js/dart-checkout-places.js" defer></script>
+    <script src="dart-order-address.js" defer></script>
     <script  src="../Js/dart-catalog.js" defer></script>
     <script  src="../Js/dart-returns.js" defer></script>
     <script src="dart-permissions.js"></script>

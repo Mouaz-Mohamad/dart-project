@@ -557,3 +557,18 @@
 @media(max-width:390px){
   #orders .cont-card-info .card-inf .numebr{font-size:16px !important}
 }
+
+/* Google place suggestions inside the manual order dialog. */
+#orderModal .dart-order-address-search { grid-column: 1/-1; min-width: 0; }
+#orderModal .dart-order-address-search-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#orderModal .dart-order-address-search-bar input { flex: 1; min-width: 0; }
+#orderModal .dart-order-address-search-bar button { flex: 0 0 auto; border: 0; border-radius: 8px; padding: 10px 14px; background: #ab012b; color: #fff; cursor: pointer; }
+#orderModal .dart-address-predictions { max-height: 280px; overflow: auto; border: 1px solid #ded6de; border-radius: 8px; background: #fff; color: #2d2530; }
+#orderModal .dart-address-predictions[hidden], #orderModal .dart-address-predictions-status[hidden] { display: none; }
+#orderModal .dart-address-prediction { display: grid; gap: 4px; min-height: 52px; padding: 10px 12px; border-bottom: 1px solid #f0e8ea; cursor: pointer; text-align: start; overflow-wrap: anywhere; }
+#orderModal .dart-address-prediction:hover, #orderModal .dart-address-prediction[aria-selected="true"] { background: #fbf0f3; }
+#orderModal .dart-address-prediction strong { font-size: 14px; line-height: 1.5; }
+#orderModal .dart-address-prediction span { font-size: 12px; line-height: 1.5; color: #655860; }
+#orderModal .dart-address-predictions-status { padding: 10px 12px; margin: 0; font-size: 12px; }
+#orderModal .dart-address-predictions > small { display: block; padding: 7px 12px; text-align: end; color: #655860; }
+#orderModal #dashboard-google-search:focus-visible { outline: 3px solid #d395a6; outline-offset: 2px; }
