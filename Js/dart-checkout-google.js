@@ -287,6 +287,8 @@
     window.addEventListener("dart:shipping-coverage-loaded", maybeLoad);
     window.dartCheckoutAddress = Object.freeze({
       fields, validate, snapshot, selectLocation, showMap,
+      mapBounds: () => map?.getBounds?.()?.toJSON?.() || null,
+      beginSelection: () => setStatus("Checking selected Google address...", "loading"),
       isCurrentSnapshot: old => old === snapshot() && validate().ok,
       invalidate: clearPin,
     });

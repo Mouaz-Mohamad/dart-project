@@ -80,3 +80,22 @@ The browser regression now loads the real checkout coverage controller rather th
 | Regression | Pass: build, source freshness and 50 static checks. |
 | Tests | Pass: real coverage mapping plus isolated Chromium flows. |
 | Secrets | Pass: no actual API key or sign-in value in changes/logs. |
+
+## Checkout type-ahead — 8 November 2026
+
+The owner clarified that address search must suggest matching buildings/places while typing. A live Places API (New) request for the owner-provided public complex name returned two matching Panorama Gardens buildings. The new checkout-only Places controller uses Google's AutocompleteSuggestion API, Egypt filtering, Arabic results and the visible map as a ranking bias. Predictions appear after three characters and a 300 ms typing pause. They remain in memory, use a fresh Google session token after each selected place, and never change a delivery destination until the customer selects one. Selection fetches only location, then reuses the existing reverse lookup and server polygon/coverage checks. Arrow keys, Enter, Escape, pointer/touch selection, stale responses, composition input, service errors and the original Search fallback are handled. Checkout stays pending during selected-place lookup; editing or cancelling the lookup releases that pending state safely.
+
+Files: new Js/dart-checkout-places.js, checkout HTML wiring, two small read/pending hooks in the existing checkout controller, CSS and generated CSS, build contracts, browser regressions and the independent checkout/courier size cap (112 KiB, allowing the new page-only module). No database migration or endpoint is added. Existing money, inventory, order, representative and discount rules are unchanged.
+
+| Quality area | Result |
+| --- | --- |
+| 1. States | Loading, no results, service error, selection error and Search fallback covered. |
+| 2. Authority | Existing server point/coverage validation reused; pending selection blocks checkout. |
+| 3. Concurrency | Debounce and sequence/snapshot checks reject stale predictions/details. |
+| 4. Validation/auth | Public place lookup, Egypt restriction and existing checkout authorization retained. |
+| 5. Idempotency | No new persistent mutation; selecting a prediction only verifies a draft location. |
+| 6. Audit | No new sensitive server operation; existing order audit unaffected. |
+| 7. External cost | Three-character threshold, debounce, session-token rotation and minimal Place Details fields; cost reporting stays in Google Cloud. |
+| 8. Regression | Original Search, map clicks, manual address, GPS and courier behavior retained. |
+| 9. Tests | Browser coverage includes live-list behavior with a mocked Google service, keyboard selection, token rotation, delayed details/checkout guard, out-of-order suggestions, Escape and error/Search fallback. |
+| 10. Secrets | No actual key or credential added; no prediction persistence or query logging. |

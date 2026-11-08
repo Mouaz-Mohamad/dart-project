@@ -5,6 +5,8 @@ const { chromium } = require("playwright");
 const mockGoogle = `
 window.DART_GOOGLE_MAPS_BROWSER_KEY = 'synthetic-browser-key';
 window.__geocodes = []; window.__routes = 0; window.__maps = 0; window.__markers = [];
+window.__autocompleteRequests=[];window.__pendingSuggestions=[];window.__placeDetails=[];
+window.__suggestions = text => ({suggestions:[{placePrediction:{mainText:text+' building',secondaryText:'Test district, Cairo',text:text+' building, Cairo',toPlace:()=>({location:{lat:()=>30.05,lng:()=>31.25},fetchFields:async request=>{window.__placeDetails.push(request);if(window.__delayDetails)await new Promise(resolve=>{window.__finishDetails=resolve})}})}}]});
 window.__lookup = (lat=30.05,lng=31.25) => ({formatted_address:'Test street, Cairo, Egypt',
 address_components:[{types:['country'],short_name:'EG',long_name:'Egypt'},
 {types:['administrative_area_level_1'],long_name:'\u202bمحافظة القاهرة\u202c',short_name:'القاهرة'},
@@ -15,7 +17,10 @@ Map:class {constructor(el){window.__maps++; el.textContent='Synthetic Google Map
 Marker:class {constructor(options){this.options=options;this.events={};window.__markers.push(this)}setMap(){}setPosition(){}addListener(n,fn){this.events[n]=fn}},
 Polyline:class{setMap(){}setPath(path){window.__path=path}},LatLngBounds:class{extend(){}},event:{clearInstanceListeners(){}},
 Geocoder:class{geocode(request,callback){window.__geocodes.push({request,callback});if(!window.__delayGeocode)callback([window.__lookup()], 'OK')}},
-importLibrary:async()=>({Route:{computeRoutes:async request=>{window.__routes++; window.__routeRequest=request; if(window.__routeFailure) throw Error('unavailable');
+importLibrary:async name=>name==='places'?{AutocompleteSessionToken:class{},AutocompleteSuggestion:{fetchAutocompleteSuggestions:async request=>{
+window.__autocompleteRequests.push(request);if(window.__autocompleteFailure)throw Error('Unavailable');
+if(window.__deferSuggestions)return new Promise(resolve=>window.__pendingSuggestions.push({input:request.input,resolve}));return window.__suggestions(request.input);
+}}}:({Route:{computeRoutes:async request=>{window.__routes++; window.__routeRequest=request; if(window.__routeFailure) throw Error('unavailable');
 return {routes:[{path:[{lat:30.02,lng:31.25},{lat:30.05,lng:31.25}],warnings:[],
 legs:[{steps:[{instructions:'Continue on Test road',maneuver:'STRAIGHT',startLocation:{lat:30.02,lng:31.25},endLocation:{lat:30.04,lng:31.25},path:[{lat:30.02,lng:31.25},{lat:30.04,lng:31.25}]},
 {instructions:'Turn right onto Test street',maneuver:'TURN_RIGHT',startLocation:{lat:30.04,lng:31.25},endLocation:{lat:30.05,lng:31.25},path:[{lat:30.04,lng:31.25},{lat:30.05,lng:31.25}]}]}],distanceMeters:3500,durationMillis:300000}]};}}})}};
@@ -52,6 +57,7 @@ const server = http.createServer((req, res) => {
     await page.addScriptTag({path:"Js/dart-checkout-regions.js"});
     await page.waitForFunction(()=>window.DartShippingAvailability?.ready);
     await page.addScriptTag({path:"Js/dart-checkout-google.js"});
+    await page.addScriptTag({path:"Js/dart-checkout-places.js"});
     await page.waitForFunction(()=>window.dartCheckoutAddress && window.__maps===1);
     await page.evaluate(()=>{document.getElementById("checkout-building").value="10";document.getElementById("checkout-floor").value="2"});
     await page.locator("#address-input").fill("Test address"); await page.locator("#dart-google-search").click();
@@ -75,6 +81,44 @@ const server = http.createServer((req, res) => {
     await page.locator("#street-input").fill("Manual correction");
     assert.equal(await page.locator("#lat-input").inputValue(),"");
     assert.equal(await page.evaluate(()=>window.dartCheckoutAddress.validate().source),"manual");
+    // Type-ahead uses Places, then reuses reverse lookup and server pin verification.
+    await page.locator("#address-input").fill("Panorama");
+    await page.locator(".dart-address-prediction").waitFor({state:"visible"});
+    assert.match(await page.locator(".dart-address-prediction").textContent(),/Panorama building/);
+    assert.equal(await page.evaluate(()=>window.__autocompleteRequests.at(-1).includedRegionCodes[0]),"eg");
+    await page.evaluate(()=>{window.__firstToken=window.__autocompleteRequests.at(-1).sessionToken});
+    await page.evaluate(()=>{window.__delayDetails=true});
+    await page.locator(".dart-address-prediction").click();
+    await page.waitForFunction(()=>Boolean(window.__finishDetails));
+    assert.equal(await page.evaluate(()=>window.dartCheckoutAddress.validate().ok),false,"checkout must wait for the selected Place details and verified pin");
+    await page.evaluate(()=>{window.__delayDetails=false;window.__finishDetails()});
+    await page.waitForFunction(()=>document.getElementById("checkoutForm").dataset.dartAddressSource==="map");
+    assert.equal(await page.locator("#street-input").inputValue(),"Test street");
+    assert.deepEqual(await page.evaluate(()=>window.__placeDetails[0].fields),["location"]);
+    await page.locator("#address-input").fill("Panorama B");
+    await page.locator(".dart-address-prediction").waitFor({state:"visible"});
+    assert.equal(await page.evaluate(()=>window.__firstToken!==window.__autocompleteRequests.at(-1).sessionToken),true,"selection must end the billing session");
+    const beforeKeyboard=await page.evaluate(()=>window.__geocodes.filter(r=>r.request.address).length);
+    await page.locator("#address-input").press("ArrowDown");
+    await page.locator("#address-input").press("Enter");
+    await page.waitForFunction(()=>document.getElementById("checkoutForm").dataset.dartAddressSource==="map");
+    assert.equal(await page.evaluate(()=>window.__geocodes.filter(r=>r.request.address).length),beforeKeyboard,"Enter selects a suggestion without starting the old Search handler");
+    await page.evaluate(()=>{window.__deferSuggestions=true});
+    await page.locator("#address-input").fill("Older query");
+    await page.waitForFunction(()=>window.__pendingSuggestions.length===1);
+    await page.locator("#address-input").fill("Newer query");
+    await page.waitForFunction(()=>window.__pendingSuggestions.length===2);
+    await page.evaluate(()=>{window.__pendingSuggestions[1].resolve(window.__suggestions('Newer query'));window.__pendingSuggestions[0].resolve(window.__suggestions('Older query'));window.__deferSuggestions=false});
+    await page.locator(".dart-address-prediction").waitFor({state:"visible"});
+    assert.match(await page.locator(".dart-address-prediction").textContent(),/Newer query/);
+    await page.locator("#address-input").press("Escape");
+    assert.equal(await page.locator(".dart-address-predictions").isVisible(),false);
+    await page.evaluate(()=>{window.__autocompleteFailure=true});
+    await page.locator("#address-input").fill("Unavailable query");
+    await page.getByText("Google suggestions are temporarily unavailable. Use Search or choose a point on the map.",{exact:true}).waitFor({state:"visible"});
+    await page.locator("#dart-google-search").click();
+    await page.waitForFunction(()=>document.getElementById("checkoutForm").dataset.dartAddressSource==="map");
+    assert.equal(await page.locator(".dart-address-predictions").isVisible(),false);
     // Late Google authentication failures replace the broken viewport and clear its pin.
     await page.evaluate(()=>{document.dispatchEvent(new CustomEvent("dart:google-maps-error",{detail:{message:"Synthetic authorization failure"}}))});
     assert.match(await page.locator("#dart-checkout-google-map").textContent(),/authorization failure/);
@@ -134,6 +178,6 @@ const server = http.createServer((req, res) => {
     await page.locator(".dart-dialog-button.is-primary").click();
     await page.waitForFunction(()=>window.__actions.includes("delivered") && !document.getElementById("repNavigationDialog").open);
     assert.deepEqual(errors,[]);
-    console.log("PASS Google checkout forward/reverse lookup, stale search, manual invalidation, auth error; courier 70% map, exit/reopen, live 1km button, cash confirmation and completion");
+    console.log("PASS Google Places suggestions, keyboard choice, session rotation, stale responses and error/Search fallback; checkout forward/reverse lookup, manual invalidation, auth error; courier 70% map, exit/reopen, live 1km button, cash confirmation and completion");
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});

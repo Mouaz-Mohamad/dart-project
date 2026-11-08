@@ -12,6 +12,7 @@ const maps = read('public/Js/dart-google-maps.js');
 const social = read('public/Js/dart-auth-social.js');
 const address = read('public/Js/dart-address.js');
 const googleCheckout = read('public/Js/dart-checkout-google.js');
+const googlePlaces = read('public/Js/dart-checkout-places.js');
 const courier = read('public/Js/dart-rep.js');
 const csp = JSON.parse(read('vercel.json')).headers
   .flatMap((row) => row.headers || [])
@@ -24,6 +25,8 @@ present(rep, 'Js/dart-google-maps-config.js', 'representative browser key');
 present(rep, 'Js/dart-google-maps.js', 'representative Maps renderer');
 present(checkout, 'Js/dart-google-maps-config.js', 'checkout browser key');
 present(checkout, 'Js/dart-checkout-google.js', 'Google-only checkout controller');
+present(checkout, 'Js/dart-checkout-places.js', 'Google Places type-ahead');
+present(googlePlaces, 'fetchAutocompleteSuggestions', 'Google address suggestions');
 present(checkout, 'id="dart-checkout-google-map"', 'Google location viewport');
 assert.ok(!/leaflet|openstreetmap|dart-checkout-manual-address/i.test(checkout),
   'Checkout must not load legacy map or manual-only controller');
@@ -46,7 +49,7 @@ present(csp, 'https://maps.googleapis.com', 'Google Maps CSP');
 present(csp, 'https://maps.gstatic.com', 'Google assets CSP');
 assert.match(config, /^window\.DART_GOOGLE_MAPS_BROWSER_KEY = "(?:AIza[0-9A-Za-z_-]{30,})?";\n$/,
   'Generated browser config must contain only an empty or restricted browser API key');
-for (const [file, source] of [['Maps JS', maps], ['Social JS', social], ['Address JS', address], ['Google Checkout JS', googleCheckout], ['Rep JS', courier]]) {
+for (const [file, source] of [['Maps JS', maps], ['Social JS', social], ['Address JS', address], ['Google Checkout JS', googleCheckout], ['Google Places JS', googlePlaces], ['Rep JS', courier]]) {
   try { new Function(source); } catch (error) { throw new Error(file + ' invalid JavaScript: ' + error.message); }
 }
 console.log('Dart Google-only checkout, manual fallback and courier-map build contracts passed.');

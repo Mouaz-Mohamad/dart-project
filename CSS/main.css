@@ -6086,3 +6086,19 @@ body.dart-rep-navigating { overflow: hidden; }
 .dart-rep-navigation-footer .rep-btn:not([hidden]) { display: flex; }
 .dart-rep-navigation [hidden], .dart-rep-order-actions .rep-btn[hidden] { display: none; }
 /* END courier fullscreen Google navigation */
+
+/* Google checkout address predictions */
+.dart-checkout-location-search { position: relative; }
+.dart-address-predictions {
+  position: absolute; inset-inline: 0; top: 100%; z-index: 40;
+  max-height: 320px; overflow-y: auto; border: 1px solid #e3d7da; border-radius: 10px;
+  background: #fff; box-shadow: 0 8px 22px #35122024; color: #252525;
+}
+.dart-address-predictions[hidden] { display: none; }
+.dart-address-prediction { display: grid; gap: 3px; padding: 12px 14px; border-bottom: 1px solid #f0e8ea; cursor: pointer; text-align: start; }
+.dart-address-prediction:hover, .dart-address-prediction[aria-selected="true"] { background: #fbf0f3; }
+.dart-address-prediction strong { font-size: 14px; line-height: 1.5; }
+.dart-address-prediction span { font-size: 12px; color: #655860; line-height: 1.5; }
+.dart-address-predictions-status { margin: 0; padding: 12px 14px; font-size: 12px; }
+.dart-address-predictions-status[hidden] { display: none; }
+.dart-address-predictions > small { display: block; padding: 7px 14px; text-align: end; font-size: 11px; color: #665e63; }

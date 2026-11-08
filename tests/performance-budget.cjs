@@ -144,7 +144,7 @@ let customerDetailsBytes = 0;
 let merchandisingBytes = 0;
 // Google checkout and courier navigation never load on Home. Account for their
 // complete payload independently instead of misclassifying address code as core.
-const googleNavigationFiles = new Set(["Js/dart-rep.js", "Js/dart-google-maps.js", "Js/dart-checkout-google.js"]);
+const googleNavigationFiles = new Set(["Js/dart-rep.js", "Js/dart-google-maps.js", "Js/dart-checkout-google.js", "Js/dart-checkout-places.js"]);
 let googleNavigationBytes = 0;
 for (const file of jsFiles) {
   const size = fs.statSync(file).size;
@@ -162,9 +162,9 @@ for (const file of jsFiles) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
 }
-if (googleNavigationBytes > 100 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 100 KiB cap");
+if (googleNavigationBytes > 112 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 112 KiB cap");
 for (const file of rootHtml.filter(file => !["cart-checkout.html", "rep.html"].includes(file))) {
-  if (/<script[^>]+src=["'][^"']*dart-(?:rep|google-maps|checkout-google)\.js/.test(fs.readFileSync(file, "utf8")))
+  if (/<script[^>]+src=["'][^"']*dart-(?:rep|google-maps|checkout-google|checkout-places)\.js/.test(fs.readFileSync(file, "utf8")))
     failures.push(`${file}: Google checkout/courier code must stay page-scoped`);
 }
 // Settings subfeatures are downloaded only when opening the Settings workspace.
