@@ -5,7 +5,6 @@ import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { digest, randomToken, safeEqual } from "../../security/crypto.js";
 import { normalizeEmail } from "../../security/normalization.js";
-import { validateCustomerPasswordPolicy } from "../../security/password.js";
 import type { IssuedSession, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 
@@ -142,18 +141,6 @@ function parseCapabilityToken(
       /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([A-Za-z0-9_-]{32,})$/i,
     );
   return match ? { id: match[1]!, secret: match[2]! } : null;
-}
-
-function customerPasswordOrThrow(password: string): void {
-  const problems = validateCustomerPasswordPolicy(password);
-  if (problems.length) {
-    throw new AppError(
-      422,
-      "WEAK_PASSWORD",
-      "Password must contain at least 6 characters",
-      problems,
-    );
-  }
 }
 
 async function fetchJson(
