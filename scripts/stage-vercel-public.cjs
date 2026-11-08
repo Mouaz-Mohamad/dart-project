@@ -120,13 +120,15 @@ function inlineSharedShell() {
     for (const [id, partial] of [
       ['header-container', 'Nav-Bar.html'],
       ['footer', 'footer.html'],
+      // Serve the existing story in initial HTML; loadSection recognizes dartStatic.
+      ['story', 'story.html'],
     ]) {
       const markup = fs.readFileSync(
         path.join(OUTPUT_DIR, 'sections', partial),
         'utf8',
       );
       const pattern = new RegExp(
-        `(<(?:header|footer|div)\\b[^>]*\\bid=["']${id}["'][^>]*)(>\\s*</(?:header|footer|div)>)`,
+        `(<(?:header|footer|section|div)\\b[^>]*\\bid=["']${id}["'][^>]*)(>\\s*</(?:header|footer|section|div)>)`,
         'i',
       );
       html = html.replace(pattern, (_match, opening, ending) => {

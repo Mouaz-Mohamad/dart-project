@@ -134,8 +134,8 @@ function buildProductGraph(catalog, model) {
       {
         "@type": "Organization",
         "@id": `${PUBLIC_ORIGIN}/#organization`,
-        name: "Dart | for you",
-        alternateName: ["Dart for you", "Dart Wear", "دارت"],
+        name: "Dart",
+        alternateName: ["دارت", "Dart for you", "Dart | for you", "Dart Egypt"],
         url: `${PUBLIC_ORIGIN}/`,
         logo: `${PUBLIC_ORIGIN}/Photos/1080px.png`,
         sameAs: SOCIAL_URLS,
@@ -143,8 +143,8 @@ function buildProductGraph(catalog, model) {
       {
         "@type": "Brand",
         "@id": `${PUBLIC_ORIGIN}/#brand`,
-        name: "Dart | for you",
-        alternateName: ["Dart for you", "Dart Wear", "دارت"],
+        name: "Dart",
+        alternateName: ["دارت", "Dart for you", "Dart | for you", "Dart Egypt"],
         sameAs: SOCIAL_URLS,
       },
       {

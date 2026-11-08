@@ -19,7 +19,7 @@ function render(article, status = 200) {
     description, image: [image], articleBody: article.body,
     ...(published ? { datePublished: published } : {}),
     author: { "@type": "Organization", name: "Dart", url: `${PUBLIC_ORIGIN}/about.html` },
-    publisher: { "@type": "Organization", name: "Dart | for you", url: `${PUBLIC_ORIGIN}/`,
+    publisher: { "@type": "Organization", "@id": `${PUBLIC_ORIGIN}/#organization`, name: "Dart", url: `${PUBLIC_ORIGIN}/`,
       logo: { "@type": "ImageObject", url: `${PUBLIC_ORIGIN}/Photos/1080px.png` } } } : {};
   const data = safeJson(schema);
   const articleHtml = available ? `<nav class="news-page-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/#dart-news">Dart News</a><span aria-hidden="true">/</span><span dir="auto">${escape(title)}</span></nav>

@@ -198,6 +198,25 @@ if (!website[0]?.alternateName?.includes("دارت"))
   errors.push("index.html: site name must include the recognized Arabic alternate");
 if (!home.includes('property="og:site_name" content="Dart"'))
   errors.push("index.html: Open Graph must agree with the preferred site name");
+const organization = homeGraph.find(node => node["@type"] === "Organization");
+const productOrganization = require("../api/product-page.js")._test
+  .buildProductGraph({}, { modelId: "seo-fixture", name: "Test", selling: 0 })
+  ["@graph"].find(node => node["@type"] === "Organization");
+for (const field of ["@id", "name", "url", "logo"])
+  if (organization[field] !== productOrganization[field])
+    errors.push(`Brand identity: home and product disagree on ${field}`);
+for (const url of productOrganization.sameAs)
+  if (!organization.sameAs.includes(url))
+    errors.push(`Brand identity: homepage missing social profile ${url}`);
+const footer = read("sections/footer.html");
+if (!footer.includes('lang="ar" dir="rtl"') || !footer.includes("دارت (Dart for you)"))
+  errors.push("Brand identity: footer must have a visible Arabic brand introduction");
+for (const fragment of [footer, read("sections/Nav-Bar.html")])
+  if (/href="\/(?:index|products)\.html"/.test(fragment))
+    errors.push("Navigation: shared links must use canonical home and products URLs");
+const homeRedirect = (vercelConfig.redirects || []).find(entry => entry.source === "/index.html");
+if (homeRedirect?.destination !== "/" || homeRedirect.permanent !== true)
+  errors.push("Canonical home: index.html must permanently redirect to the root");
 const oldDomainRedirect = (vercelConfig.redirects || []).find(entry =>
   entry.has?.some(condition => condition.type === "host" && condition.value === "dart-project-psi.vercel.app"));
 if (oldDomainRedirect?.destination !== "https://www.dartofficial.com/:path*" || oldDomainRedirect.permanent !== true)
@@ -211,6 +230,19 @@ for (const term of ["Dart for you", "دارت", "لبس رجالي", "لبس ش�
     errors.push(`SEO discovery: missing natural brand/query term ${term}`);
 if (!products.includes('rel="canonical" href="https://www.dartofficial.com/products"'))
   errors.push("products.html: canonical must use clean /products URL");
+
+// Run against the actual build output when staging has completed, not only source metadata.
+if (fs.existsSync(path.join(root, "public/about.html"))) {
+  const stagedAbout = read("public/about.html");
+  if (!stagedAbout.includes(read("sections/story.html")) ||
+      !/<section\b[^>]*id="story"[^>]*data-dart-static=/.test(stagedAbout))
+    errors.push("About: original story must be present in initial HTML without a duplicate JS load");
+  if (count(stagedAbout, /id="dart-founder-image"/g) !== 1)
+    errors.push("About: static story must preserve one settings-controlled founder image");
+  for (const page of publicPages)
+    if (!read(`public/${page}`).includes("دارت (Dart for you)"))
+      errors.push(`${page}: staged HTML must include the visible Arabic brand introduction`);
+}
 
 if (errors.length) {
   console.error(errors.map((error) => `FAIL ${error}`).join("\n"));
