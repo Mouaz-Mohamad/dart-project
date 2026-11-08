@@ -173,3 +173,29 @@ A Chromium probe serves the actual vercel.json policy, with a minimal local blob
 After deployment, verify the live rep.html CSP includes worker-src self plus blob, and both website/API health and production aliases. Refresh the courier page and reopen navigation on the affected device to confirm its actual vector renderer draws the road map.
 
 Reference: https://developers.google.com/maps/documentation/javascript/content-security-policy (worker-src blob:).
+
+
+## Persistent grey streets: bounded renderer recovery — 8 November 2026
+
+The owner confirmed that pins/arrows remain visible over grey, so successful Map/Marker construction is not evidence that the basemap rendered. The prior CSP correction addressed a real blocked dependency but did not resolve the owner's observed rendering failure. The live courier portal in the available browser is behind representative sign-in, so no claim is made that the affected device's GPU error was observed or that the exact remaining cause is confirmed.
+
+The courier renderer now waits for Google's tilesloaded event. It starts with the requested VECTOR/60-degree view. A vector constructor failure, WebGL context loss, or ten visible seconds without tiles recreates the map once as an explicitly RASTER Google map. The same destination, courier fix/course, follow state and route geometry remain; no extra Route lookup is needed. A healthy vector map is retained. A visible Standard map control also lets the representative request this recovery immediately if the GPU displays grey despite reporting tiles loaded. Duplicate clicks do not remount a ready standard map. If the raster attempt also cannot load tiles, the viewport shows a clear retry message and the existing retry control remains available even when route computation succeeds. Separate map status below the map prevents routine GPS/route updates from erasing this information. Standard-view recovery is identified to the representative; oblique/heading-up camera capability is not promised for raster rendering.
+
+Closing cleans up timers, animation, overlays and listeners. Late events from retired maps cannot overwrite the active renderer. Hidden-tab rendering is not timed out while hidden. Initial camera follow waits for tiles before repeated vector camera moves. First tile readiness is handled once to avoid an event/camera feedback loop. Retries remain an explicit existing user action, with no endless map creation. The independent page-only Google source budget increases from 112 to 116 KiB for renderer lifecycle/error handling; shared storefront budgets and download scope remain unchanged. No endpoint, database migration or order eligibility change.
+
+Files: Js/dart-google-maps.js, Js/dart-rep.js, rep.html, tests/google-navigation-browser.cjs, tests/performance-budget.cjs and this report.
+
+| Review area | Result |
+| --- | --- |
+| 1. States | Pass: loading streets, healthy vector, stalled vector, failed constructor, context loss, standard recovery, complete tile outage and retry have explicit behavior. |
+| 2. Authority | No delivery gate, money, stock or status endpoint changed; preview versus acknowledged-location separation retained. |
+| 3. Concurrency | Map identity guards, bounded recovery, first-readiness guard and timer/frame cleanup prevent stale events or closed-window remounts. |
+| 4. Validation/auth | No permission or endpoint added; existing coordinate/timestamp checks and Google auth failure handling remain. |
+| 5. Idempotency | Recovery happens at most once automatically per open map; complete outages cannot create a retry loop. |
+| 6. Audit | No new sensitive server operation; existing delivery action audit unchanged. |
+| 7. External cost | Only an unsuccessful vector instance may create one additional raster map; no new automatic Routes/Places queries. Existing Google Cloud reporting remains the billing source. |
+| 8. Regression | Pass: build, source checks, all 50 frontend static checks, storage contract and existing checkout/Places/courier browser flows. |
+| 9. Tests | Synthetic Chromium scenarios cover no tiles despite markers, healthy vector retention, the actual Standard map button, duplicate-click disabling, constructor failure, context loss, destination/path/GPS preservation, complete outage, stale old tiles event and close before recovery. The existing full courier flow still tests the 1 km gate and receipt/cash confirmation. No real delivery or physical GPU validation is claimed. |
+| 10. Secrets | No key, credential, customer data or durable location storage added. |
+
+Manual acceptance on the affected device: refresh rep.html and reopen navigation. Allow up to ten seconds for initial streets; if vector fails, verify standard Google streets appear with the same blue path and moving arrow. The standard-view status explains the recovery. If both renderers cannot fetch streets, the explicit error and Retry Google Maps replace the silent grey viewport. Physical driving and the actual affected device remain the final visual acceptance check.

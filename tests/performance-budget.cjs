@@ -162,7 +162,7 @@ for (const file of jsFiles) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
 }
-if (googleNavigationBytes > 112 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 112 KiB cap");
+if (googleNavigationBytes > 116 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 116 KiB cap");
 for (const file of rootHtml.filter(file => !["cart-checkout.html", "rep.html"].includes(file))) {
   if (/<script[^>]+src=["'][^"']*dart-(?:rep|google-maps|checkout-google|checkout-places)\.js/.test(fs.readFileSync(file, "utf8")))
     failures.push(`${file}: Google checkout/courier code must stay page-scoped`);

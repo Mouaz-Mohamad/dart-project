@@ -734,6 +734,7 @@
     container.dataset.repLiveMap = ""; container.dataset.orderId = navigationOrderId;
     container.textContent = "Loading Google Maps...";
     document.getElementById("repNavigationStatus").textContent = "Waiting for your location...";
+    document.getElementById("repNavigationMapStatus").textContent = "";
     const follow = document.getElementById("repNavigationFollow");
     follow.setAttribute("aria-pressed", "true");
     follow.textContent = "Following your location";
@@ -779,7 +780,7 @@
       document.dispatchEvent(new CustomEvent("dart:rep-road-route", { detail: { orderId: entry.orderId, geometry: route.geometry } }));
       document.getElementById("repNavigationStatus").textContent = "";
       document.getElementById("repNavigationWarnings").textContent = route.warnings.join(" · ");
-      document.getElementById("repNavigationRetry").hidden = true;
+      document.getElementById("repNavigationRetry").hidden = document.getElementById("repNavigationMap").dataset.mapState !== "error";
       updateDeliveryControls();
     } catch {
       if (deliveryMaps.get(entry.orderId) !== entry) return;
@@ -1500,6 +1501,7 @@
     document.getElementById("repNavigationFollow").addEventListener("click", event => {
       window.DartGoogleMaps?.setRepresentativeFollow?.(event.currentTarget.getAttribute("aria-pressed") !== "true");
     });
+    document.getElementById("repNavigationStandard").addEventListener("click", () => window.DartGoogleMaps?.useStandardRepresentativeMap?.());
     document.addEventListener("dart:rep-map-follow", event => {
       const follow = document.getElementById("repNavigationFollow");
       follow.setAttribute("aria-pressed", String(Boolean(event.detail?.following)));
@@ -1512,6 +1514,12 @@
     document.getElementById("repNavigationRetry").addEventListener("click", async () => {
       const order = activeNavigationOrder();
       if (order) await openNavigation(order);
+    });
+    document.addEventListener("dart:rep-map-state", event => {
+      if (!navigationDialog()?.open || event.detail?.orderId !== navigationOrderId) return;
+      document.getElementById("repNavigationMapStatus").textContent = event.detail.message;
+      document.getElementById("repNavigationStandard").disabled = document.getElementById("repNavigationMap").dataset.mapRenderer === "RASTER" && event.detail.state !== "error";
+      if (event.detail.state === "error") document.getElementById("repNavigationRetry").hidden = false;
     });
     document.addEventListener("dart:google-maps-error", event => {
       if (!navigationDialog()?.open) return;

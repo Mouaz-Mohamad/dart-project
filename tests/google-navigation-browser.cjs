@@ -4,7 +4,7 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), http = re
 const { chromium } = require("playwright");
 const mockGoogle = `
 window.DART_GOOGLE_MAPS_BROWSER_KEY = 'synthetic-browser-key';
-window.__geocodes = []; window.__routes = 0; window.__maps = 0; window.__markers = [];window.__panCalls=[];
+window.__geocodes = []; window.__routes = 0; window.__maps = 0; window.__markers = [];window.__panCalls=[];window.__mapHistory=[];
 window.__autocompleteRequests=[];window.__pendingSuggestions=[];window.__placeDetails=[];
 window.__suggestions = text => ({suggestions:[{placePrediction:{mainText:text+' building',secondaryText:'Test district, Cairo',text:text+' building, Cairo',toPlace:()=>({location:{lat:()=>30.05,lng:()=>31.25},fetchFields:async request=>{window.__placeDetails.push(request);if(window.__delayDetails)await new Promise(resolve=>{window.__finishDetails=resolve})}})}}]});
 window.__lookup = (lat=30.05,lng=31.25) => ({formatted_address:'Test street, Cairo, Egypt',
@@ -13,9 +13,13 @@ address_components:[{types:['country'],short_name:'EG',long_name:'Egypt'},
 {types:['sublocality'],long_name:'Test district'}, {types:['route'],long_name:'Test street'}],
 geometry:{location:{lat:()=>lat,lng:()=>lng}}});
 window.google={maps:{
-Map:class {constructor(el,options){window.__maps++;el.textContent='Synthetic Google Map';this.options=options;this.events={};this.heading=0;this.renderingType=options.renderingType||'RASTER';window.__map=this;} addListener(n,fn){this.events[n]=fn} panTo(location){window.__panCalls.push(location)} setZoom(zoom){this.zoom=zoom} setCenter(location){window.__panCalls.push(location)} fitBounds(){} getRenderingType(){return this.renderingType} getHeading(){return this.heading} moveCamera(options){this.heading=options.heading;this.tilt=options.tilt;window.__panCalls.push(options.center)}},
+Map:class {constructor(el,options){window.__maps++;window.__mapHistory.push(this);this.options=options;this.events={};this.heading=options.heading||0;this.renderingType=options.renderingType||'RASTER';
+if(window.__throwVector && this.renderingType==='VECTOR')throw Error('Synthetic WebGL initialization failure');
+el.textContent='Synthetic Google Map';window.__map=this;
+if(!(this.renderingType==='VECTOR'?window.__blankVector:window.__blankRaster))setTimeout(()=>this.events.tilesloaded?.(),0);
+} addListener(n,fn){this.events[n]=fn} panTo(location){window.__panCalls.push(location)} setZoom(zoom){this.zoom=zoom} setCenter(location){window.__panCalls.push(location)} fitBounds(){} getRenderingType(){return this.renderingType} getHeading(){return this.heading} moveCamera(options){this.heading=options.heading;this.tilt=options.tilt;window.__panCalls.push(options.center)}},
 Marker:class {constructor(options){this.options=options;this.events={};window.__markers.push(this)}setMap(){}setPosition(position){this.options.position=position}setIcon(icon){this.options.icon=icon}addListener(n,fn){this.events[n]=fn}},
-Point:class{constructor(x,y){this.x=x;this.y=y}},Polyline:class{constructor(options){window.__polyline=options}setMap(){}setPath(path){window.__path=path}},LatLngBounds:class{extend(){}},event:{clearInstanceListeners(){}},
+Point:class{constructor(x,y){this.x=x;this.y=y}},Polyline:class{constructor(options){window.__polyline=options}setMap(){}setPath(path){window.__path=path}},LatLngBounds:class{extend(){}},event:{clearInstanceListeners(map){map.events={}}},
 Geocoder:class{geocode(request,callback){window.__geocodes.push({request,callback});if(!window.__delayGeocode)callback([window.__lookup()], 'OK')}},
 importLibrary:async name=>name==='places'?{AutocompleteSessionToken:class{},AutocompleteSuggestion:{fetchAutocompleteSuggestions:async request=>{
 window.__autocompleteRequests.push(request);if(window.__autocompleteFailure)throw Error('Unavailable');
@@ -217,7 +221,9 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(()=>window.__map.heading>350 || window.__map.heading<10),true,"camera crosses north by the shortest turn");
     await page.waitForFunction(()=>window.__map.heading===10);
     // Devices without a vector renderer retain a working flat map and correctly oriented marker.
-    await page.evaluate(()=>{window.__map.renderingType='RASTER';window.__map.heading=0;window.__map.events.renderingtype_changed()});
+    await page.locator('#repNavigationStandard').click();
+    await page.waitForFunction(()=>document.getElementById('repNavigationMap').dataset.mapRenderer==='RASTER' && document.getElementById('repNavigationMap').dataset.mapState==='ready');
+    assert.equal(await page.locator('#repNavigationStandard').isDisabled(),true,"a ready standard map cannot be remounted by duplicate clicks");
     assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation),10);
     await page.emulateMedia({reducedMotion:"reduce"});
     const reducedPosition=await page.evaluate(()=>{
@@ -267,7 +273,67 @@ const server = http.createServer((req, res) => {
     await page.locator("#repNavigationComplete").click();
     await page.locator(".dart-dialog-button.is-primary").click();
     await page.waitForFunction(()=>window.__actions.includes("delivered") && !document.getElementById("repNavigationDialog").open);
+    // Isolated tile lifecycle: marker creation is not proof that the base map rendered.
+    const recovery = await browser.newPage({viewport:{width:390,height:844}});
+    await recovery.route(/https:\/\//, route=>route.abort());
+    await recovery.goto(origin+"/rep.html");
+    await recovery.addScriptTag({content:mockGoogle});
+    await recovery.addScriptTag({path:"Js/dart-google-maps.js"});
+    await recovery.clock.install();
+    const mountRecovery=async flags=>{
+      await recovery.evaluate(async flags=>{
+        window.DartGoogleMaps.destroyRepresentatives();
+        window.__blankVector=Boolean(flags.vector);window.__blankRaster=Boolean(flags.raster);window.__throwVector=Boolean(flags.throwVector);
+        window.DART_REP_LAST_LOCATION={lat:30.02,lng:31.25,heading:90,speed:2,updatedAt:new Date().toISOString()};
+        const dialog=document.getElementById('repNavigationDialog');if(!dialog.open)dialog.showModal();
+        const host=document.getElementById('repNavigationMap');host.dataset.repLiveMap='';host.dataset.orderId='recovery';
+        await window.DartGoogleMaps.attachRepresentatives([{id:'recovery',latitude:30.05,longitude:31.25}]);
+        document.dispatchEvent(new CustomEvent('dart:rep-road-route',{detail:{orderId:'recovery',geometry:[[30.02,31.25],[30.05,31.25]]}}));
+      },flags);
+    };
+    await mountRecovery({});await recovery.clock.runFor(10);
+    const healthyCount=await recovery.evaluate(()=>window.__maps);
+    await recovery.clock.fastForward(20000);
+    assert.equal(await recovery.evaluate(()=>window.__maps),healthyCount,"loaded vector maps never downgrade on a timer");
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
+
+    await mountRecovery({vector:true});
+    await recovery.evaluate(()=>{window.__lateVectorTiles=window.__map.events.tilesloaded});
+    await recovery.clock.fastForward(10001);await recovery.clock.runFor(10);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER');
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
+    assert.equal(await recovery.evaluate(()=>window.__polyline.path.length),2,"switching renderers retains the road route");
+    assert.deepEqual(await recovery.evaluate(()=>window.__markers.findLast(m=>m.options.title==='Customer destination').options.position),{lat:30.05,lng:31.25});
+    await recovery.evaluate(()=>window.__lateVectorTiles());
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER',"late retired vector callbacks cannot replace the recovered map");
+    await recovery.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.0202,lng:31.25,heading:90,speed:2,updatedAt:new Date().toISOString()}));
+    await recovery.clock.runFor(1100);
+    assert.equal(await recovery.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat),30.0202,"GPS tracking continues on the recovered map");
+
+    await mountRecovery({});await recovery.clock.runFor(10);
+    await recovery.evaluate(()=>document.querySelector('#repNavigationMap .dart-google-map-overlay').dispatchEvent(new Event('webglcontextlost')));
+    await recovery.clock.runFor(10);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER',"WebGL context loss immediately recovers to a standard map");
+
+    await mountRecovery({throwVector:true});await recovery.clock.runFor(10);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER',"vector constructor failure has a bounded fallback");
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
+
+    await mountRecovery({vector:true,raster:true});
+    await recovery.clock.fastForward(10001);await recovery.clock.fastForward(10001);
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'error');
+    assert.match(await recovery.locator('#repNavigationMap').textContent(),/streets could not load.*retry Google Maps/);
+    const failedCount=await recovery.evaluate(()=>window.__maps);
+    await recovery.clock.fastForward(30000);
+    assert.equal(await recovery.evaluate(()=>window.__maps),failedCount,"a complete tile outage never loops through new maps");
+
+    await mountRecovery({vector:true});
+    await recovery.evaluate(()=>{document.getElementById('repNavigationDialog').close();window.DartGoogleMaps.destroyRepresentatives()});
+    const closedCount=await recovery.evaluate(()=>window.__maps);
+    await recovery.clock.fastForward(20000);
+    assert.equal(await recovery.evaluate(()=>window.__maps),closedCount,"closing cancels pending recovery");
+    await recovery.close();
     assert.deepEqual(errors,[]);
-    console.log("PASS Google checkout/Places regressions; courier vector 60-degree camera, heading-up arrow, interpolated motion, shortest turns, pause/recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 70% map, retry, exit/reopen, 1km gate and cash confirmation");
+    console.log("PASS simulated tile failures: vector stall, constructor failure and context loss recover once; path/pins/GPS preserved; healthy vectors retained; complete outages visible; late/closed callbacks ignored. Google checkout/Places regressions; courier vector 60-degree camera, heading-up arrow, interpolated motion, shortest turns, pause/recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 70% map, retry, exit/reopen, 1km gate and cash confirmation");
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});
