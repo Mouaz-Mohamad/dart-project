@@ -47,6 +47,7 @@ present(courier, 'await window.DartGoogleMaps?.attachRepresentatives?.([order]);
 present(courier, 'addressSource', 'manual destination handling');
 present(csp, 'https://maps.googleapis.com', 'Google Maps CSP');
 present(csp, 'https://maps.gstatic.com', 'Google assets CSP');
+assert.match(csp, /(?:^|;)\s*worker-src[^;]*\bblob:/, 'Google vector Maps need blob workers permitted by CSP');
 assert.match(config, /^window\.DART_GOOGLE_MAPS_BROWSER_KEY = "(?:AIza[0-9A-Za-z_-]{30,})?";\n$/,
   'Generated browser config must contain only an empty or restricted browser API key');
 for (const [file, source] of [['Maps JS', maps], ['Social JS', social], ['Address JS', address], ['Google Checkout JS', googleCheckout], ['Google Places JS', googlePlaces], ['Rep JS', courier]]) {

@@ -27,8 +27,28 @@ legs:[{steps:[{instructions:'Continue on Test road',maneuver:'STRAIGHT',startLoc
 `;
 const repHtml = fs.readFileSync("rep.html", "utf8").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
 const checkoutHtml = fs.readFileSync("cart-checkout.html", "utf8").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+const productionCsp = JSON.parse(fs.readFileSync("vercel.json", "utf8")).headers
+  .find(row=>row.source==="/(.*)").headers.find(row=>row.key==="Content-Security-Policy").value;
+const cspWorkerProbe = `
+try { new Function('return 1')(); document.body.dataset.dynamicCode='allowed'; }
+catch { document.body.dataset.dynamicCode='blocked'; }
+const source=URL.createObjectURL(new Blob(['self.postMessage("worker-ready")'],{type:'text/javascript'}));
+try {
+  const worker=new Worker(source);
+  worker.onmessage=event=>{document.body.dataset.worker=event.data;worker.terminate();URL.revokeObjectURL(source)};
+  worker.onerror=()=>{document.body.dataset.worker='blocked';worker.terminate();URL.revokeObjectURL(source)};
+} catch { document.body.dataset.worker='blocked';URL.revokeObjectURL(source); }
+`;
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, "http://fixture").pathname;
+  if (pathname==="/Js/__maps-csp-probe.js") {
+    res.setHeader("Content-Type","text/javascript"); return res.end(cspWorkerProbe);
+  }
+  if (pathname==="/__maps-csp-before.html" || pathname==="/__maps-csp-after.html") {
+    res.setHeader("Content-Type","text/html");
+    res.setHeader("Content-Security-Policy",pathname.includes("before") ? productionCsp.replace(/worker-src[^;]*/,"worker-src 'self'") : productionCsp);
+    return res.end('<!doctype html><html><body><script>document.body.dataset.inline="allowed"</script><script src="/Js/__maps-csp-probe.js"></script></body></html>');
+  }
   if (pathname.startsWith("/Js/") || pathname.startsWith("/CSS/")) {
     res.setHeader("Content-Type", pathname.endsWith(".js") ? "text/javascript" : "text/css");
     return res.end(fs.readFileSync(pathname.slice(1)));
@@ -48,6 +68,16 @@ const server = http.createServer((req, res) => {
     page.on("pageerror", error=>errors.push(error.message));
     await page.route(/https:\/\//, route=>route.abort());
     const origin=`http://127.0.0.1:${server.address().port}`;
+    // Use the real deployment CSP: the former worker policy reproduces the vector bootstrap failure.
+    await page.goto(origin+"/__maps-csp-before.html");
+    await page.waitForFunction(()=>Boolean(document.body.dataset.worker));
+    assert.equal(await page.locator("body").getAttribute("data-worker"),"blocked");
+    await page.goto(origin+"/__maps-csp-after.html");
+    await page.waitForFunction(()=>Boolean(document.body.dataset.worker));
+    assert.equal(await page.locator("body").getAttribute("data-worker"),"worker-ready","production CSP must permit the blob workers needed by vector Maps");
+    assert.equal(await page.locator("body").getAttribute("data-dynamic-code"),"blocked","dynamic code execution stays disabled");
+    assert.equal(await page.locator("body").getAttribute("data-inline"),null,"unapproved inline scripts stay disabled");
+    console.log("PASS real production CSP: old policy blocks vector-map blob workers; corrected policy starts them while inline/dynamic scripts remain blocked");
     await page.goto(origin+"/cart-checkout.html");
     await page.addScriptTag({content:mockGoogle});
     await page.evaluate(()=>{

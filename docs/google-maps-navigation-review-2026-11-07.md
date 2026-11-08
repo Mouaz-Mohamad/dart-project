@@ -149,3 +149,27 @@ Marker position and heading interpolate between actual fixes using requestAnimat
 Manual acceptance: refresh rep.html, start an actual assigned delivery and allow precise location. With the page open and the device moving, verify the road ahead stays up, the camera is oblique on supported vector devices and the arrow moves smoothly. Drag to inspect and use Follow to resume. Confirm receipt/collection only after real delivery.
 
 Google references: https://developers.google.com/maps/documentation/javascript/map-rendering-type and https://developers.google.com/maps/documentation/javascript/vector-map (VECTOR can be requested without a map ID; zoom 17 supports a 60-degree tilt, subject to renderer capability).
+
+
+## Grey courier viewport: production CSP correction — 8 November 2026
+
+After the vector-camera release, the owner reported a grey courier map. Inspection of the actual www.dartofficial.com/rep.html response confirmed `worker-src 'self'`. Google Maps vector rendering requires blob workers, as documented in Google's CSP guide. The prior synthetic Maps test did not apply production CSP and therefore missed this integration blocker. The CSP now adds only `blob:` to the existing worker-src; script-src stays unchanged, with unapproved inline and dynamic code execution still blocked. No new frame, external script host, unsafe-eval or general unsafe-inline permission is added.
+
+A Chromium probe serves the actual vercel.json policy, with a minimal local blob worker. Under the former worker-src it is blocked; with the corrected production policy it posts its ready message. The same probe verifies that unapproved inline scripts and dynamic Function execution remain blocked. This regression is part of tests/google-navigation-browser.cjs, before its checkout/courier scenarios. The staging contract in scripts/check-google-setup.cjs also refuses a release without blob-worker permission. vercel.json and these two checks are the only runtime/configuration changes; no business logic, endpoint or database migration is changed.
+
+| Review area | Result |
+| --- | --- |
+| 1. States | Existing map loading/GPS/error/manual/retry/closed states retained; vector-worker bootstrap blocker corrected. |
+| 2. Authority | No business calculation or delivery gate changed. |
+| 3. Concurrency | No request or animation code changed; existing lifecycle guards retained. |
+| 4. Validation/auth | Only the blob-worker source permission changes; no new external worker host, script-eval or inline-script permission. |
+| 5. Idempotency | No durable action added. |
+| 6. Audit | No sensitive server action changed. |
+| 7. External cost | No extra Maps/Routes/Places queries or polling; existing Google usage reporting remains. |
+| 8. Regression | Build, source checks, all 50 static checks, storage contract and existing checkout/courier browser scenarios required before publication. |
+| 9. Tests | Chromium reproduces worker blocking with the former actual policy and readiness with the corrected policy; inline/dynamic execution remain blocked. This proves the CSP dependency correction, not a physical courier/GPU driving test. |
+| 10. Secrets | No actual key, credentials or customer/order data introduced. |
+
+After deployment, verify the live rep.html CSP includes worker-src self plus blob, and both website/API health and production aliases. Refresh the courier page and reopen navigation on the affected device to confirm its actual vector renderer draws the road map.
+
+Reference: https://developers.google.com/maps/documentation/javascript/content-security-policy (worker-src blob:).
