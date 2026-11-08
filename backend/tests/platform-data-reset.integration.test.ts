@@ -20,7 +20,7 @@ describe("owner selective reset — executable SQL", () => {
         "INSERT INTO users (id,account_type,email,email_normalized,password_hash) VALUES ($1,'customer',$2,$2,'isolated-test-hash')",
         [customerId, "reset-test@example.invalid"],
       );
-      await pool.query("INSERT INTO customers (user_id,full_name) VALUES ($1,'Temporary Customer')", [customerId]);
+      await pool.query("INSERT INTO customers (user_id,full_name,birthday) VALUES ($1,'Temporary Customer','2000-09-02'::date)", [customerId]);
       await pool.query(
         "INSERT INTO finance_records(domain,record_id,payload) VALUES ('finance_expenses','test-expense','{}'::jsonb), ('finance_budgets','test-budget','{}'::jsonb)",
       );
