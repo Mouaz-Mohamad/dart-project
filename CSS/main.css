@@ -1823,20 +1823,151 @@ body.dart-set-image-open {
 /* Home birthday, shared footer and contact form blocks follow. */
 /* ========================================== */
 
-.birthday-conteiner {
-  color: var(--bg-dark);
-  text-align: center;
+/* BEGIN DART Birthday Offer | homepage-only premium campaign card */
+#birthday-offer.birthday-conteiner {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  min-height: 345px;
+  padding: 26px 24px 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 230, 216, 0.14);
+  border-radius: 24px;
+  color: #fff9f5;
+  text-align: left;
+  background:
+    radial-gradient(circle at 96% 3%, rgba(218, 115, 139, 0.22), transparent 39%),
+    radial-gradient(circle at 5% 100%, rgba(149, 28, 62, 0.25), transparent 51%),
+    linear-gradient(130deg, #1d1217 0%, #3d1224 53%, #680f2d 100%);
+  box-shadow: 0 14px 30px rgba(41, 12, 24, 0.13);
 }
 
-.birthday-conteiner span {
-  font-size: clamp(18px, 3vw, 30px);
-  color: var(--bragnte);
+#birthday-offer::before,
+#birthday-offer::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  border: 1px solid rgba(247, 213, 197, 0.13);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
-.birthday-conteiner img {
-  width: 120px;
-  height: auto;
+#birthday-offer::before {
+  top: -125px;
+  right: -115px;
+  width: 270px;
+  height: 270px;
 }
+
+#birthday-offer::after {
+  bottom: -145px;
+  left: -110px;
+  width: 240px;
+  height: 240px;
+}
+
+#birthday-offer .birthday-offer-emblem {
+  position: absolute;
+  z-index: 1;
+  top: 21px;
+  right: 20px;
+  width: 71px;
+  height: 71px;
+  color: #ebc9b2;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+#birthday-offer .birthday-offer-emblem svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#birthday-offer .birthday-offer-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 0;
+}
+
+#birthday-offer .birthday-offer-eyebrow {
+  margin-bottom: 29px;
+  color: #e8c6b7;
+  font: 600 11px/1.3 var(--font-main);
+  letter-spacing: 0.18em;
+}
+
+#birthday-offer .birthday-offer-heading {
+  margin: 0;
+  color: #fff9f5;
+  font: 700 clamp(30px, 8vw, 37px)/0.98 var(--font-irish);
+  letter-spacing: 0.025em;
+}
+
+#birthday-offer .birthday-offer-discount {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 11px 0 0;
+  color: #f6dbc9;
+}
+
+#birthday-offer .birthday-offer-discount strong {
+  font: 700 clamp(54px, 14vw, 72px)/0.95 var(--font-irish);
+  letter-spacing: -0.035em;
+}
+
+#birthday-offer .birthday-offer-discount span {
+  color: #fff9f5;
+  font: 700 23px/1 var(--font-irish);
+  letter-spacing: 0.065em;
+}
+
+#birthday-offer .birthday-offer-message {
+  margin: 10px 0 0;
+  color: rgba(255, 249, 245, 0.87);
+  font: 400 14px/1.45 var(--font-main);
+}
+
+#birthday-offer .birthday-offer-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+  min-height: 49px;
+  margin-top: 24px;
+  padding: 11px 16px;
+  border: 1px solid #fff9f5;
+  border-radius: 10px;
+  background: #fff9f5;
+  color: #46192b;
+  font: 600 14px/1.35 var(--font-main);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#birthday-offer .birthday-offer-cta span {
+  color: #8c1c41;
+  font: 700 22px/1 var(--font-irish);
+}
+
+#birthday-offer .birthday-offer-cta:hover {
+  border-color: #f1dfd5;
+  background: #f1dfd5;
+}
+
+#birthday-offer .birthday-offer-cta:focus-visible {
+  outline: 3px solid #f4c7a1;
+  outline-offset: 4px;
+}
+/* END DART Birthday Offer */
 
 .paragraph-btn {
   gap: 15px;
