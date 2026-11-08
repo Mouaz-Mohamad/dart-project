@@ -58,6 +58,11 @@
         .fa-solid,.fa-regular{display:inline-block;min-width:1em;min-height:1em}
         .icon-menu:focus-visible,.btn-go-product:focus-visible,.cart-btn:focus-visible{outline:3px solid #111;outline-offset:3px}
         #birthday,.reviews-section,#why,#feedback-form,footer{content-visibility:auto;contain-intrinsic-size:auto 600px}
+        /* Compact feedback empty state: only the order-first notice should occupy space. */
+        #feedback-form{content-visibility:visible;contain-intrinsic-size:none}
+        #feedback-form .dart-feedback-embed{width:100%}
+        #feedback-form .feedback-section:has(.feedback-access-message)>.section-title{display:none}
+        #feedback-form .feedback-section:has(.feedback-access-message) .feedback-access-message{margin:12px auto 16px}
         @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}.dart-cursor{animation:none!important}.product-card,.side-menu,.menu-facke{transition:none!important}}
     </style>
     <style>
