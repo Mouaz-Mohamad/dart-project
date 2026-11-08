@@ -15,7 +15,7 @@ describe("owner selective reset — executable SQL", () => {
       const customerId = randomUUID();
       const ownerId = randomUUID();
       await pool.query(
-        "INSERT INTO users (id,account_type,email,email_normalized,status) VALUES ($1,'staff','reset-owner@example.invalid','reset-owner@example.invalid','active')",
+        "INSERT INTO users (id,account_type,email,email_normalized,status,email_verified_at) VALUES ($1,'staff','reset-owner@example.invalid','reset-owner@example.invalid','active',now())",
         [ownerId],
       );
       await pool.query(
