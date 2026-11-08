@@ -21,7 +21,11 @@ assert.equal(settings.CONFIRMATION_PHRASE, "DELETE DART");
 assert.equal(settings.isDartStorageKey("dart_orders"), true);
 assert.equal(settings.isDartStorageKey("dart_finance_expenses"), true);
 assert.equal(settings.isDartStorageKey("user_last_address"), true);
-assert.equal(settings.isDartStorageKey("order_45_state"), true);
+assert.equal(settings.isDartStorageKey("order_45_state"), false);
+assert.equal(settings.isDartStorageKey("dart_session"), false);
+assert.equal(settings.isDartStorageKey("dart_site_settings"), false);
+assert.equal(settings.isDartStorageKey("dart_representatives"), false);
+assert.equal(settings.isDartStorageKey("dart_finance_budgets"), false);
 assert.equal(settings.isDartStorageKey("unrelated_preference"), false);
 
 const storage = new StorageMock({
@@ -33,8 +37,10 @@ const storage = new StorageMock({
   unrelated_preference: "keep-me",
 });
 const removed = settings.clearDartStorage(storage);
-assert.deepEqual(new Set(removed), new Set(["dart_orders", "dart_finance_expenses", "dart_session", "user_last_address", "order_45_state"]));
+assert.deepEqual(new Set(removed), new Set(["dart_orders", "dart_finance_expenses", "user_last_address"]));
 assert.equal(storage.getItem("unrelated_preference"), "keep-me", "Reset must preserve unrelated origin storage.");
+assert.equal(storage.getItem("dart_session"), "{}", "Owner session must survive the selective reset.");
+assert.equal(storage.getItem("order_45_state"), "delivered", "Unrelated browser state remains intact.");
 
 const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "Eye", "Dart Eye.html"), "utf8");
@@ -45,7 +51,8 @@ for (const id of ["settings", "open-reset-data-modal", "reset-data-modal", "rese
 assert.equal((html.match(/data-target="settings"/g) || []).length, 2, "Settings must exist in desktop and mobile navigation.");
 assert(html.includes('href="dart-settings.css"'));
 assert(html.includes('src="dart-settings.js"'));
-assert(script.includes("clearCatalogMedia"), "Reset must clear IndexedDB product images.");
+assert(script.includes("clearCatalogMedia"), "The reset module keeps the media API without erasing brand assets.");
+assert(html.includes("Reset Selected Dart Data"), "Reset UI must reflect selected scope.");
 assert(!script.includes("localStorage.clear("), "Reset must never clear unrelated origin storage.");
 
 console.log("PASS guarded Settings reset and Dart-only storage scope");
