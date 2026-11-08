@@ -13,7 +13,7 @@ address_components:[{types:['country'],short_name:'EG',long_name:'Egypt'},
 {types:['sublocality'],long_name:'Test district'}, {types:['route'],long_name:'Test street'}],
 geometry:{location:{lat:()=>lat,lng:()=>lng}}});
 window.google={maps:{
-Map:class {constructor(el,options){window.__maps++;window.__mapHistory.push(this);this.options=options;this.events={};this.heading=options.heading||0;this.renderingType=window.__actualRaster?'RASTER':options.renderingType||'RASTER';
+Map:class {constructor(el,options){window.__maps++;window.__mapHistory.push(this);this.options=options;this.zoom=options.zoom;this.events={};this.heading=options.heading||0;this.renderingType=window.__actualRaster?'RASTER':options.renderingType||'RASTER';
 if(window.__throwVector && this.renderingType==='VECTOR')throw Error('Synthetic WebGL initialization failure');
 el.textContent='Synthetic Google Map';window.__map=this;
 if(!(this.renderingType==='VECTOR'?window.__blankVector:window.__blankRaster))setTimeout(()=>this.events.tilesloaded?.(),0);
