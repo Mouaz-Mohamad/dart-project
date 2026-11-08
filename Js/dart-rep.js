@@ -917,6 +917,15 @@
     );
   }
 
+  function previewRepresentativePosition(position) {
+    const sampledAt = new Date(Number.isFinite(position.timestamp) ? position.timestamp : Date.now()).toISOString();
+    const location = { lat: position.coords.latitude, lng: position.coords.longitude,
+      accuracy: position.coords.accuracy, heading: position.coords.heading, speed: position.coords.speed,
+      sampledAt, updatedAt: sampledAt };
+    // Immediate visual feedback only: delivery eligibility still uses server-acknowledged locations.
+    window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
+    return location;
+  }
   async function syncFreshRepresentativeLocation() {
     if (!API_ENABLED || !navigator.geolocation) return false;
     try {
@@ -927,6 +936,7 @@
           timeout: 12000,
         });
       });
+      const preview = previewRepresentativePosition(position);
       const payload = await window.DartApi.request("/api/v1/representatives/location", {
         method: "PUT",
         body: {
@@ -937,15 +947,9 @@
             : null,
         },
       });
+      if (Date.parse(preview.sampledAt) < Date.parse(latestApiLocation?.sampledAt || "")) return true;
       lastLocationSyncAt = Date.now();
-      latestApiLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        heading: position.coords.heading,
-        speed: position.coords.speed,
-        updatedAt: payload.updatedAt || now(),
-      };
+      latestApiLocation = { ...preview, updatedAt: payload.updatedAt || now() };
       [...apiWork.orders, ...apiWork.returns].forEach((record) => {
         if (record.status === "Representative On The Way" || record.status === "Pickup On The Way") {
           record.courierLocation = latestApiLocation;
@@ -1390,6 +1394,7 @@
     locationWatch = navigator.geolocation.watchPosition(
       async (position) => {
         const rep = currentRep();
+        const preview = previewRepresentativePosition(position);
         if (API_ENABLED) {
           const currentTime = Date.now();
           if (currentTime - lastLocationSyncAt < LOCATION_SYNC_MS) return;
@@ -1405,14 +1410,8 @@
                   : null,
               },
             });
-            latestApiLocation = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              heading: position.coords.heading,
-              speed: position.coords.speed,
-              updatedAt: payload.updatedAt || now(),
-            };
+            if (Date.parse(preview.sampledAt) < Date.parse(latestApiLocation?.sampledAt || "")) return;
+            latestApiLocation = { ...preview, updatedAt: payload.updatedAt || now() };
             [...apiWork.orders, ...apiWork.returns].forEach((record) => {
               if (
                 activeOrderIds.has(record.id) ||

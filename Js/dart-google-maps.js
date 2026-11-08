@@ -35,9 +35,49 @@
       anchor: new google.maps.Point(0, 0), fillColor: "#1a73e8", fillOpacity: 1,
       strokeColor: "#ffffff", strokeWeight: 2 };
   }
+  const angleDifference = (from, to) => ((to - from + 540) % 360) - 180;
+  function metresBetween(a, b) {
+    return a && b ? Math.hypot((b.lat - a.lat) * 111195,
+      (b.lng - a.lng) * 111195 * Math.cos(b.lat * Math.PI / 180)) : Infinity;
+  }
+  function drawCourier(entry, location, heading) {
+    entry.drawnLocation = location; entry.drawnHeading = heading;
+    if (entry.follow) {
+      if (entry.map.getRenderingType?.() === "VECTOR") {
+        entry.map.moveCamera({ center: location, heading, tilt: 60 });
+      } else entry.map.setCenter(location);
+    }
+    const rotation = ((heading - (entry.map.getHeading?.() || 0)) % 360 + 360) % 360;
+    if (!entry.courier) entry.courier = new google.maps.Marker({ map: entry.map,
+      position: location, title: "You", icon: courierIcon(rotation), zIndex: 10 });
+    else { entry.courier.setPosition(location); entry.courier.setIcon(courierIcon(rotation)); }
+  }
+  function animateCourier(entry, location, heading) {
+    window.cancelAnimationFrame(entry.frame);
+    const from = entry.drawnLocation, fromHeading = entry.drawnHeading ?? heading;
+    const started = performance.now();
+    const duration = Math.max(300, Math.min(1000, started - (entry.lastAnimationAt ?? started - 800)));
+    entry.lastAnimationAt = started;
+    // Interpolate between real fixes only. Never extrapolate a courier past the latest GPS fix.
+    if (!from || metresBetween(from, location) > 250 || document.hidden ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      drawCourier(entry, location, heading); entry.frame = null; return;
+    }
+    const tick = time => {
+      const t = Math.min(1, (time - started) / duration);
+      drawCourier(entry, { lat: from.lat + (location.lat - from.lat) * t,
+        lng: from.lng + (location.lng - from.lng) * t },
+        (fromHeading + angleDifference(fromHeading, heading) * t + 360) % 360);
+      entry.frame = t < 1 ? window.requestAnimationFrame(tick) : null;
+    };
+    entry.frame = window.requestAnimationFrame(tick);
+  }
   function setFollow(entry, enabled) {
     entry.follow = Boolean(enabled);
-    if (entry.follow && entry.location) { entry.map.panTo(entry.location); entry.map.setZoom(17); }
+    if (entry.follow && entry.location) {
+      entry.map.setZoom(17);
+      drawCourier(entry, entry.drawnLocation || entry.location, entry.drawnHeading ?? entry.heading ?? 0);
+    }
     document.dispatchEvent(new CustomEvent("dart:rep-map-follow", { detail: { following: entry.follow } }));
   }
   function setRepresentativeFollow(enabled) {
@@ -91,6 +131,7 @@
   function destroyRepresentatives() {
     mountGeneration += 1;
     for (const entry of mounted.values()) {
+      window.cancelAnimationFrame(entry.frame);
       entry.destination?.setMap(null);
       entry.courier?.setMap(null);
       entry.route?.setMap(null);
@@ -122,14 +163,23 @@
       container.appendChild(canvas);
       try {
         const map = new google.maps.Map(canvas, { center: courier || destination || { lat: 30.0444, lng: 31.2357 },
-          zoom: 17, clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
+          zoom: 17, renderingType: "VECTOR", tilt: 60, tiltInteractionEnabled: true,
+          headingInteractionEnabled: true, isFractionalZoomEnabled: true,
+          clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
         const heading = gpsHeading(position);
         const entry = { map, container, location: courier, heading, courseOrigin: courier, follow: true,
+          drawnLocation: courier, drawnHeading: heading ?? 0, frame: null,
           destination: destination ? new google.maps.Marker({ map, position: destination, title: "Customer destination" }) : null,
           courier: courier ? new google.maps.Marker({ map, position: courier, title: "You", icon: courierIcon(heading), zIndex: 10 }) : null,
           route: new google.maps.Polyline({ map, path: [], strokeColor: "#1a73e8", strokeOpacity: 1, strokeWeight: 6 }),
         };
         map.addListener("dragstart", () => setFollow(entry, false));
+        map.addListener("heading_changed", () => {
+          entry.courier?.setIcon(courierIcon(((entry.drawnHeading - (map.getHeading() || 0)) % 360 + 360) % 360));
+        });
+        map.addListener("renderingtype_changed", () => {
+          if (entry.follow && entry.location) drawCourier(entry, entry.drawnLocation || entry.location, entry.drawnHeading);
+        });
         mounted.set(id, entry);
         setFollow(entry, true);
       } catch { container.textContent = "Google Maps could not display. Use Google Maps navigation or retry."; }
@@ -138,28 +188,36 @@
   function updateRepresentativeLocation(position) {
     const location = point(position);
     const updatedAt = Date.parse(position?.updatedAt || "");
+    const sampledAt = Date.parse(position?.sampledAt || position?.updatedAt || "");
     if (!location || !Number.isFinite(updatedAt) || Math.abs(Date.now() - updatedAt) > 120000) return;
-    if (updatedAt < Date.parse(window.DART_REP_LAST_LOCATION?.updatedAt || "")) return;
+    if (!Number.isFinite(sampledAt) || Math.abs(Date.now() - sampledAt) > 120000) return;
+    const previous = window.DART_REP_LAST_LOCATION;
+    if (sampledAt < Date.parse(previous?.sampledAt || previous?.updatedAt || "")) return;
     window.DART_REP_LAST_LOCATION = { ...location, heading: position.heading, speed: position.speed,
-      accuracy: position.accuracy, updatedAt: position.updatedAt };
+      accuracy: position.accuracy, sampledAt: new Date(sampledAt).toISOString(), updatedAt: position.updatedAt };
     for (const entry of mounted.values()) {
       let heading = gpsHeading(position);
       const origin = entry.courseOrigin;
       // Devices often omit GPS heading. Derive a course only after moving beyond GPS jitter.
-      const metres = origin ? Math.hypot((location.lat - origin.lat) * 111195,
-        (location.lng - origin.lng) * 111195 * Math.cos(location.lat * Math.PI / 180)) : 0;
+      const metres = metresBetween(origin, location);
       if (origin && metres >= Math.max(8, Number(position.accuracy) || 0)) {
-        if (heading == null) heading = bearing(origin, location);
+        if (heading == null && (position.speed == null || position.speed >= 0.8)) heading = bearing(origin, location);
         entry.courseOrigin = location;
       } else if (!origin) entry.courseOrigin = location;
-      if (heading != null) entry.heading = heading;
+      const nextHeading = heading ?? entry.heading ?? 0;
+      if (metresBetween(entry.location, location) < 0.01 && Math.abs(angleDifference(entry.heading ?? 0, nextHeading)) < 0.01) continue;
+      entry.heading = nextHeading;
       entry.location = location;
-      if (!entry.courier) entry.courier = new google.maps.Marker({ map: entry.map, position: location,
-        title: "You", icon: courierIcon(entry.heading), zIndex: 10 });
-      else { entry.courier.setPosition(location); entry.courier.setIcon(courierIcon(entry.heading)); }
-      if (entry.follow) entry.map.panTo(location);
+      animateCourier(entry, location, nextHeading);
     }
   }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) return;
+    for (const entry of mounted.values()) {
+      window.cancelAnimationFrame(entry.frame); entry.frame = null;
+      if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
+    }
+  });
   async function computeRoute(origin, destination) {
     if (!await loadMaps()) throw new Error(errorMessage);
     const { Route } = await google.maps.importLibrary("routes");

@@ -123,3 +123,29 @@ Changed files: rep.html, Js/dart-google-maps.js, Js/dart-rep.js, CSS/main.css an
 | 10. Secrets | Pass: no actual key, credential, customer data or persistent location cache introduced. |
 
 Manual check after publishing: sign in as the assigned representative, start the actual delivery, allow accurate location and keep the page open. Check the blue route and arrow while moving. Drag the map then press Follow my location. Exit/reopen without changing delivery status. Mark Delivered only after physical receipt and actual cash collection inside the allowed radius.
+
+
+## Smooth vector navigation camera — 8 November 2026
+
+The owner requested navigation-style smoothness and a 45–60 degree oblique camera, then clarified the courier map must be a directional vector map. The courier-only Map now requests VECTOR rendering, 60-degree tilt and fractional zoom. During follow, moveCamera keeps the road ahead at the top using the moving GPS course. The arrow's screen angle compensates for the camera heading; free exploration keeps its correct orientation. Google automatically constrains tilt by renderer/zoom/device capability; the existing working flat map remains available if the device falls back to raster. No CSS perspective imitation or production demonstration map ID is used.
+
+Fresh device GPS now previews the arrow before the API throttle and response. The preview never updates an order or enables Delivered. The existing server-acknowledged location still controls delivery proximity, route queries and completion. GPS sample timestamps prevent a delayed acknowledgement from reversing a newer visual position; older responses also cannot replace a newer acknowledged in-memory position. Server location-write frequency and route-query limits are unchanged.
+
+Marker position and heading interpolate between actual fixes using requestAnimationFrame for 300–1000 ms, taking the shortest angular turn across north. Camera center and heading use the same frame, avoiding competing pan animations. No movement is extrapolated beyond a real fix. Stationary headings are retained; missing course uses movement outside the GPS uncertainty threshold. Large discontinuities snap to the real position. Closing cancels animation; hidden tabs and reduced-motion preferences skip interpolation. These changes are limited to Js/dart-google-maps.js, Js/dart-rep.js, the existing synthetic browser regression and this report. No endpoint or database migration.
+
+| Review area | Result |
+| --- | --- |
+| 1. States | Pass: vector initialization/raster fallback, no course, stopped GPS, reduced motion, hidden/closed map and existing loading/error/retry handled. |
+| 2. Authority | Pass: preview is visual-only; eligibility still waits for the acknowledged server location and the existing delivery endpoint. |
+| 3. Concurrency | Pass: GPS sample ordering, stale response rejection, retargeting from the drawn position and cancellation prevent rollbacks/orphan animation. |
+| 4. Validation/auth | Pass: validated coordinates and fresh timestamps required; no new permission or endpoint. |
+| 5. Idempotency | No new durable operation; duplicate visual targets do not restart animation. Existing action locks retained. |
+| 6. Audit | No new sensitive operation; existing status/location server flows remain authoritative. |
+| 7. External cost | Local animation only; existing location throttle and Routes refresh limits retained. Billing visibility remains in Google Cloud. |
+| 8. Regression | Pass: source checks, all 50 static checks and database-only storage contract; checkout/Places behavior also covered by the browser regression. |
+| 9. Tests | Pass: vector/60-degree camera request, forward-facing arrow, intermediate position frames, shortest 350→10 degree turn, paused follow/recenter, raster/reduced-motion fallback, close during animation, delayed API and newer throttled GPS without early Delivered or visual rollback; existing route retry/1km/cash confirmation preserved. GPS, Google and API responses are synthetic; physical driving smoothness and each device GPU are not certified by these tests. |
+| 10. Secrets | Pass: no key, credential, customer data or persistent location storage added. |
+
+Manual acceptance: refresh rep.html, start an actual assigned delivery and allow precise location. With the page open and the device moving, verify the road ahead stays up, the camera is oblique on supported vector devices and the arrow moves smoothly. Drag to inspect and use Follow to resume. Confirm receipt/collection only after real delivery.
+
+Google references: https://developers.google.com/maps/documentation/javascript/map-rendering-type and https://developers.google.com/maps/documentation/javascript/vector-map (VECTOR can be requested without a map ID; zoom 17 supports a 60-degree tilt, subject to renderer capability).
