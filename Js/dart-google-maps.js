@@ -18,6 +18,31 @@
     return coords(typeof value?.lat === "function" ? value.lat() : value?.lat,
       typeof value?.lng === "function" ? value.lng() : value?.lng);
   }
+  function bearing(a, b) {
+    const radians = Math.PI / 180, delta = (b.lng - a.lng) * radians;
+    const y = Math.sin(delta) * Math.cos(b.lat * radians);
+    const x = Math.cos(a.lat * radians) * Math.sin(b.lat * radians) -
+      Math.sin(a.lat * radians) * Math.cos(b.lat * radians) * Math.cos(delta);
+    return (Math.atan2(y, x) / radians + 360) % 360;
+  }
+  function gpsHeading(position) {
+    const heading = position?.heading, speed = position?.speed;
+    return typeof heading === "number" && Number.isFinite(heading) && heading >= 0 && heading < 360 &&
+      (speed == null || (Number.isFinite(speed) && speed >= 0.8)) ? heading : null;
+  }
+  function courierIcon(heading) {
+    return { path: "M 0,-12 9,10 0,6 -9,10 Z", scale: 1.5, rotation: heading ?? 0,
+      anchor: new google.maps.Point(0, 0), fillColor: "#1a73e8", fillOpacity: 1,
+      strokeColor: "#ffffff", strokeWeight: 2 };
+  }
+  function setFollow(entry, enabled) {
+    entry.follow = Boolean(enabled);
+    if (entry.follow && entry.location) { entry.map.panTo(entry.location); entry.map.setZoom(17); }
+    document.dispatchEvent(new CustomEvent("dart:rep-map-follow", { detail: { following: entry.follow } }));
+  }
+  function setRepresentativeFollow(enabled) {
+    for (const entry of mounted.values()) setFollow(entry, enabled);
+  }
   function loadMaps() {
     const key = String(window.DART_GOOGLE_MAPS_BROWSER_KEY || "").trim();
     if (authFailed || !key) {
@@ -88,34 +113,51 @@
       const container = nodes.find(node => node.isConnected && node.dataset.orderId === id);
       if (!container || mounted.has(id)) continue;
       const destination = coords(order.latitude, order.longitude);
-      const courier = point(order.courierLocation) || point(window.DART_REP_LAST_LOCATION);
+      const saved = order.courierLocation, live = window.DART_REP_LAST_LOCATION;
+      const position = (Date.parse(live?.updatedAt || "") || 0) > (Date.parse(saved?.updatedAt || "") || 0) ? live : saved || live;
+      const courier = point(position);
       container.replaceChildren();
       const canvas = document.createElement("div");
       canvas.className = "dart-google-map-overlay";
       container.appendChild(canvas);
       try {
-        const map = new google.maps.Map(canvas, { center: destination || courier || { lat: 30.0444, lng: 31.2357 },
-          zoom: 16, clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
-        const entry = { map, container,
+        const map = new google.maps.Map(canvas, { center: courier || destination || { lat: 30.0444, lng: 31.2357 },
+          zoom: 17, clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
+        const heading = gpsHeading(position);
+        const entry = { map, container, location: courier, heading, courseOrigin: courier, follow: true,
           destination: destination ? new google.maps.Marker({ map, position: destination, title: "Customer destination" }) : null,
-          courier: courier ? new google.maps.Marker({ map, position: courier, title: "You" }) : null,
-          route: new google.maps.Polyline({ map, path: [], strokeColor: "#ab012b", strokeWeight: 5 }),
+          courier: courier ? new google.maps.Marker({ map, position: courier, title: "You", icon: courierIcon(heading), zIndex: 10 }) : null,
+          route: new google.maps.Polyline({ map, path: [], strokeColor: "#1a73e8", strokeOpacity: 1, strokeWeight: 6 }),
         };
-        if (destination && courier) {
-          const bounds = new google.maps.LatLngBounds();
-          bounds.extend(destination); bounds.extend(courier); map.fitBounds(bounds, 40);
-        }
+        map.addListener("dragstart", () => setFollow(entry, false));
         mounted.set(id, entry);
+        setFollow(entry, true);
       } catch { container.textContent = "Google Maps could not display. Use Google Maps navigation or retry."; }
     }
   }
   function updateRepresentativeLocation(position) {
     const location = point(position);
-    if (!location) return;
-    window.DART_REP_LAST_LOCATION = location;
+    const updatedAt = Date.parse(position?.updatedAt || "");
+    if (!location || !Number.isFinite(updatedAt) || Math.abs(Date.now() - updatedAt) > 120000) return;
+    if (updatedAt < Date.parse(window.DART_REP_LAST_LOCATION?.updatedAt || "")) return;
+    window.DART_REP_LAST_LOCATION = { ...location, heading: position.heading, speed: position.speed,
+      accuracy: position.accuracy, updatedAt: position.updatedAt };
     for (const entry of mounted.values()) {
-      if (!entry.courier) entry.courier = new google.maps.Marker({ map: entry.map, position: location, title: "You" });
-      else entry.courier.setPosition(location);
+      let heading = gpsHeading(position);
+      const origin = entry.courseOrigin;
+      // Devices often omit GPS heading. Derive a course only after moving beyond GPS jitter.
+      const metres = origin ? Math.hypot((location.lat - origin.lat) * 111195,
+        (location.lng - origin.lng) * 111195 * Math.cos(location.lat * Math.PI / 180)) : 0;
+      if (origin && metres >= Math.max(8, Number(position.accuracy) || 0)) {
+        if (heading == null) heading = bearing(origin, location);
+        entry.courseOrigin = location;
+      } else if (!origin) entry.courseOrigin = location;
+      if (heading != null) entry.heading = heading;
+      entry.location = location;
+      if (!entry.courier) entry.courier = new google.maps.Marker({ map: entry.map, position: location,
+        title: "You", icon: courierIcon(entry.heading), zIndex: 10 });
+      else { entry.courier.setPosition(location); entry.courier.setIcon(courierIcon(entry.heading)); }
+      if (entry.follow) entry.map.panTo(location);
     }
   }
   async function computeRoute(origin, destination) {
@@ -142,7 +184,7 @@
     if (path.every(Boolean)) mounted.get(String(orderId))?.route?.setPath(path);
   });
   window.DartGoogleMaps = Object.freeze({ loadMaps, attachRepresentatives,
-    updateRepresentativeLocation, destroyRepresentatives, computeRoute,
+    updateRepresentativeLocation, setRepresentativeFollow, destroyRepresentatives, computeRoute,
     get errorMessage() { return errorMessage; },
   });
 })();

@@ -99,3 +99,27 @@ Files: new Js/dart-checkout-places.js, checkout HTML wiring, two small read/pend
 | 8. Regression | Original Search, map clicks, manual address, GPS and courier behavior retained. |
 | 9. Tests | Browser coverage includes live-list behavior with a mocked Google service, keyboard selection, token rotation, delayed details/checkout guard, out-of-order suggestions, Escape and error/Search fallback. |
 | 10. Secrets | No actual key or credential added; no prediction persistence or query logging. |
+
+
+## Courier arrow and blue route — 8 November 2026
+
+The owner requested a moving navigation arrow and a blue road route, and explicitly removed the directions banner. The full-screen dialog now starts with the Google map occupying 70% of the viewport; the lower 30% contains Exit, Follow my location, proximity, recoverable route errors and Delivered when eligible. The turn banner and its optional speech control are removed. The customer destination remains a pin; the courier uses a white-outlined blue arrow above the blue route. The map starts at the courier with zoom 17 and follows accepted fresh GPS updates. Dragging pauses camera follow while the arrow keeps updating; the Follow button recenters and resumes it.
+
+Heading comes from moving-device GPS when available, otherwise from movement beyond the reported accuracy / eight-metre jitter threshold. Unknown or stationary GPS heading does not reset a known course to north. Stale or older location updates cannot move the live arrow/camera. Off-route detection, bounded route refresh, retries, route warnings, exit/reopen, server delivery authorization and the one-kilometre completion gate remain. This is the website's Google road-route display with a custom heading marker; native Google Maps app navigation is still available through the existing external link.
+
+Changed files: rep.html, Js/dart-google-maps.js, Js/dart-rep.js, CSS/main.css and generated CSS/home.css / CSS/home.min.css, tests/google-navigation-browser.cjs, and this report. No database migration or endpoint change.
+
+| Review area | Result |
+| --- | --- |
+| 1. States | Pass: waiting/stale GPS, manual destination, route loading/error/retry and empty/closed dialog retained; route status is below the map. |
+| 2. Authority | Pass: delivery completion continues through the existing server action; no pricing, stock or eligibility change. |
+| 3. Concurrency | Pass: existing map-generation and route-request identity guards retained; older live marker updates ignored. |
+| 4. Validation/auth | No new endpoint; coordinate/timestamp/heading validation and existing representative ownership retained. |
+| 5. Idempotency | No new persistent operation; existing action locks and receipt/collection confirmation retained. |
+| 6. Audit | No new sensitive operation; existing server delivery audit remains authoritative. |
+| 7. External cost | Arrow movement/follow/recenter use local map methods; no added route queries or cadence changes. Existing Google Cloud usage reporting remains the cost source. |
+| 8. Regression | Pass: source checks, 50 frontend static checks, database browser-storage contract and isolated browser checkout/courier flow. |
+| 9. Tests | Pass: blue route, heading and movement fallback, stationary course preservation, camera follow/pause/recenter, stale GPS rejection, no banner, 70% mobile/desktop map, route error/retry, exit/reopen, 1 km gate and cash confirmation. Google/GPS are synthetic; no real order changed and no physical driving test claimed. |
+| 10. Secrets | Pass: no actual key, credential, customer data or persistent location cache introduced. |
+
+Manual check after publishing: sign in as the assigned representative, start the actual delivery, allow accurate location and keep the page open. Check the blue route and arrow while moving. Drag the map then press Follow my location. Exit/reopen without changing delivery status. Mark Delivered only after physical receipt and actual cash collection inside the allowed radius.

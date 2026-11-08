@@ -4,7 +4,7 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), http = re
 const { chromium } = require("playwright");
 const mockGoogle = `
 window.DART_GOOGLE_MAPS_BROWSER_KEY = 'synthetic-browser-key';
-window.__geocodes = []; window.__routes = 0; window.__maps = 0; window.__markers = [];
+window.__geocodes = []; window.__routes = 0; window.__maps = 0; window.__markers = [];window.__panCalls=[];
 window.__autocompleteRequests=[];window.__pendingSuggestions=[];window.__placeDetails=[];
 window.__suggestions = text => ({suggestions:[{placePrediction:{mainText:text+' building',secondaryText:'Test district, Cairo',text:text+' building, Cairo',toPlace:()=>({location:{lat:()=>30.05,lng:()=>31.25},fetchFields:async request=>{window.__placeDetails.push(request);if(window.__delayDetails)await new Promise(resolve=>{window.__finishDetails=resolve})}})}}]});
 window.__lookup = (lat=30.05,lng=31.25) => ({formatted_address:'Test street, Cairo, Egypt',
@@ -13,9 +13,9 @@ address_components:[{types:['country'],short_name:'EG',long_name:'Egypt'},
 {types:['sublocality'],long_name:'Test district'}, {types:['route'],long_name:'Test street'}],
 geometry:{location:{lat:()=>lat,lng:()=>lng}}});
 window.google={maps:{
-Map:class {constructor(el){window.__maps++; el.textContent='Synthetic Google Map';this.events={};window.__map=this;} addListener(n,fn){this.events[n]=fn} panTo(){} setZoom(){} setCenter(){} fitBounds(){}},
-Marker:class {constructor(options){this.options=options;this.events={};window.__markers.push(this)}setMap(){}setPosition(){}addListener(n,fn){this.events[n]=fn}},
-Polyline:class{setMap(){}setPath(path){window.__path=path}},LatLngBounds:class{extend(){}},event:{clearInstanceListeners(){}},
+Map:class {constructor(el,options){window.__maps++;el.textContent='Synthetic Google Map';this.options=options;this.events={};window.__map=this;} addListener(n,fn){this.events[n]=fn} panTo(location){window.__panCalls.push(location)} setZoom(zoom){this.zoom=zoom} setCenter(){} fitBounds(){}},
+Marker:class {constructor(options){this.options=options;this.events={};window.__markers.push(this)}setMap(){}setPosition(position){this.options.position=position}setIcon(icon){this.options.icon=icon}addListener(n,fn){this.events[n]=fn}},
+Point:class{constructor(x,y){this.x=x;this.y=y}},Polyline:class{constructor(options){window.__polyline=options}setMap(){}setPath(path){window.__path=path}},LatLngBounds:class{extend(){}},event:{clearInstanceListeners(){}},
 Geocoder:class{geocode(request,callback){window.__geocodes.push({request,callback});if(!window.__delayGeocode)callback([window.__lookup()], 'OK')}},
 importLibrary:async name=>name==='places'?{AutocompleteSessionToken:class{},AutocompleteSuggestion:{fetchAutocompleteSuggestions:async request=>{
 window.__autocompleteRequests.push(request);if(window.__autocompleteFailure)throw Error('Unavailable');
@@ -127,7 +127,7 @@ const server = http.createServer((req, res) => {
     await page.addScriptTag({path:"Js/dart-google-maps.js"});
     await page.evaluate(()=>{
       window.__order={id:"synthetic-1",orderId:"TEST-1",status:"Out With Representative",clientName:"Synthetic customer",phone1:"",latitude:30.05,longitude:31.25,addressSource:"map",priceSnapshot:[],finalAmount:640};
-      window.__gps={latitude:30.02,longitude:31.25,accuracy:5};
+      window.__gps={latitude:30.02,longitude:31.25,accuracy:5,heading:90,speed:2};
       Object.defineProperty(navigator,"geolocation",{configurable:true,value:{getCurrentPosition(ok){ok({coords:window.__gps})},watchPosition(ok){window.__watch=ok;return 1},clearWatch(){}}});
       window.__actions=[];window.__confirm=true;window.__prompts=[];
 
@@ -149,12 +149,37 @@ const server = http.createServer((req, res) => {
     assert.equal(sizes.dialog,sizes.height);assert(Math.abs(sizes.map/sizes.height-.7)<.005);
     assert.equal(await page.locator("#repOrdersList [data-rep-live-map]").count(),0);
     assert.equal(await page.locator("#repNavigationComplete").isVisible(),false);
-    assert.match(await page.locator("#repNavigationInstruction").textContent(),/Test road|Test street/);
+    assert.equal(await page.locator(".dart-rep-navigation-banner").count(),0);
+    assert.equal(await page.locator("#repNavigationStatus").textContent(),"");
+    assert.equal(await page.evaluate(()=>window.__polyline.strokeColor),"#1a73e8");
+    assert.equal(await page.evaluate(()=>window.__path.length),2);
+    assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation),90);
+    assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.fillColor),"#1a73e8");
+    assert.equal(await page.evaluate(()=>window.__map.zoom),17);
+    // Unknown headings must not coerce null to north; stationary noise must not rotate the arrow.
+    await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.02,lng:31.25,accuracy:5,heading:270,speed:0,updatedAt:new Date().toISOString()}));
+    assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation),90);
+    await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.25,accuracy:5,heading:null,speed:null,updatedAt:new Date().toISOString()}));
+    assert(Math.abs(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation))<.01,"missing heading uses actual northbound movement");
+    assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lat),30.021);
+    await page.evaluate(()=>{window.__panBefore=window.__panCalls.length;window.__map.events.dragstart()});
+    await page.getByRole("button",{name:"Follow my location",exact:true}).waitFor();
+    await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.251,accuracy:5,heading:null,updatedAt:new Date().toISOString()}));
+    assert.equal(await page.evaluate(()=>window.__panCalls.length===window.__panBefore),true,"dragging pauses follow while the marker keeps moving");
+    assert(Math.abs(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation)-90)<.01);
+    await page.getByRole("button",{name:"Follow my location",exact:true}).click();
+    assert.equal(await page.locator("#repNavigationFollow").getAttribute("aria-pressed"),"true");
+    assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lng),31.251);
+    await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:31,lng:32,heading:180,updatedAt:new Date(Date.now()-180000).toISOString()}));
+    assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lng),31.251,"stale GPS does not move the live arrow or camera");
+    await page.setViewportSize({width:1280,height:900});
+    assert.equal(await page.locator("#repNavigationMap").evaluate(el=>el.getBoundingClientRect().height),630);
+    await page.setViewportSize({width:390,height:844});
     await page.locator("#repNavigationExit").click();
     await page.evaluate(()=>{window.__routeFailure=true});
     await page.locator('[data-action="navigate"]').click();
     await page.locator("#repNavigationRetry").waitFor({state:"visible"});
-    assert.match(await page.locator("#repNavigationInstruction").textContent(),/directions unavailable/);
+    assert.match(await page.locator("#repNavigationStatus").textContent(),/directions unavailable/);
     await page.evaluate(()=>{window.__routeFailure=false});
     await page.locator("#repNavigationRetry").click();
     await page.waitForFunction(()=>document.getElementById("repNavigationRetry").hidden && window.__routes===3);
@@ -178,6 +203,6 @@ const server = http.createServer((req, res) => {
     await page.locator(".dart-dialog-button.is-primary").click();
     await page.waitForFunction(()=>window.__actions.includes("delivered") && !document.getElementById("repNavigationDialog").open);
     assert.deepEqual(errors,[]);
-    console.log("PASS Google Places suggestions, keyboard choice, session rotation, stale responses and error/Search fallback; checkout forward/reverse lookup, manual invalidation, auth error; courier 70% map, exit/reopen, live 1km button, cash confirmation and completion");
+    console.log("PASS Google Places suggestions, keyboard choice, session rotation, stale responses and error/Search fallback; checkout forward/reverse lookup, manual invalidation, auth error; courier blue route/heading arrow, moving camera, pause/recenter, stale GPS, 70% mobile/desktop map, no banner, exit/reopen, live 1km button, cash confirmation and completion");
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});

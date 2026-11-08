@@ -50,7 +50,7 @@
   let lastLocationSyncAt = 0;
   const deliveryMaps = new Map();
   let lastOrderRenderSignature = "";
-  let navigationOrderId = "", navigationFocus = null, voiceEnabled = false, lastSpoken = "";
+  let navigationOrderId = "", navigationFocus = null;
 
   const read = (key, fallback = []) => window.DartState?.read?.(key, fallback) ?? fallback;
   const write = (key, value) => {
@@ -668,17 +668,7 @@
     document.body.classList.remove("dart-rep-navigating");
     navigationOrderId = "";
     clearDeliveryMaps();
-    if (voiceEnabled) window.speechSynthesis?.cancel();
-    lastSpoken = "";
     if (navigationFocus?.isConnected) navigationFocus.focus();
-  }
-  function speakInstruction(instruction) {
-    if (!voiceEnabled || instruction === lastSpoken || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
-    lastSpoken = instruction;
-    window.speechSynthesis.cancel();
-    const speech = new window.SpeechSynthesisUtterance(instruction);
-    speech.lang = "ar-EG";
-    window.speechSynthesis.speak(speech);
   }
   function distanceToRoadPath(location, path) {
     if (!path?.length) return Infinity;
@@ -694,9 +684,8 @@
     }
     return nearest;
   }
-  function showNavigationStep(entry, location) {
+  function updateRouteProgress(entry, location) {
     if (!navigationDialog()?.open || entry.orderId !== navigationOrderId || !entry.steps?.length) return;
-    const km = point => point ? distanceKm(location.lat, location.lng, point.lat, point.lng) : Infinity;
     let nearest = entry.stepIndex || 0, nearestDistance = Infinity;
     // Examine nearby steps only: crossing roads later in the route must not skip turns.
     for (let i = Math.max(0, nearest - 1); i < Math.min(entry.steps.length, nearest + 5); i++) {
@@ -706,18 +695,6 @@
     }
     entry.offRoute = nearestDistance > 0.15;
     entry.stepIndex = Math.max(entry.stepIndex || 0, nearest);
-    const current = entry.steps[entry.stepIndex];
-    const next = entry.steps[entry.stepIndex + 1];
-    const target = next && km(current.start) > 0.03 ? next : current;
-    const distance = km(target.start);
-    const instruction = target.instruction || "Continue to the delivery address";
-    document.getElementById("repNavigationInstruction").textContent = entry.offRoute ? "Updating route from your location..." : instruction;
-    const maneuver = target.maneuver.toUpperCase();
-    document.getElementById("repNavigationArrow").textContent = maneuver.includes("U_TURN") ? "↶" : maneuver.includes("LEFT") ? "↰" : maneuver.includes("RIGHT") ? "↱" : "↑";
-    document.getElementById("repNavigationDistance").textContent =
-      (Number.isFinite(distance) ? `${distance < 1 ? Math.round(distance * 1000) + " m" : distance.toFixed(1) + " km"} · ` : "") +
-      "Google Maps directions";
-    if (!entry.offRoute) speakInstruction(instruction);
   }
   function updateDeliveryControls() {
     const orders = repOrders(currentRep());
@@ -741,8 +718,11 @@
     const entry = deliveryMaps.get(navigationOrderId);
     if (entry && order.courierLocation) {
       const updatedAt = Date.parse(order.courierLocation.updatedAt || "");
-      if (Date.now() - updatedAt <= LOCATION_MAX_AGE_MS) showNavigationStep(entry, order.courierLocation);
-      else document.getElementById("repNavigationInstruction").textContent = "Waiting for a fresh GPS location...";
+      if (Date.now() - updatedAt <= LOCATION_MAX_AGE_MS) {
+        updateRouteProgress(entry, order.courierLocation);
+        if (entry.steps.length && !entry.pending && !entry.failed) document.getElementById("repNavigationStatus").textContent = "";
+      }
+      else document.getElementById("repNavigationStatus").textContent = "Waiting for a fresh GPS location...";
     }
   }
   async function openNavigation(order) {
@@ -753,8 +733,10 @@
     const container = document.getElementById("repNavigationMap");
     container.dataset.repLiveMap = ""; container.dataset.orderId = navigationOrderId;
     container.textContent = "Loading Google Maps...";
-    document.getElementById("repNavigationInstruction").textContent = "Waiting for your location...";
-    document.getElementById("repNavigationDistance").textContent = "";
+    document.getElementById("repNavigationStatus").textContent = "Waiting for your location...";
+    const follow = document.getElementById("repNavigationFollow");
+    follow.setAttribute("aria-pressed", "true");
+    follow.textContent = "Following your location";
     document.getElementById("repNavigationWarnings").textContent = "";
     document.getElementById("repNavigationRetry").hidden = true;
     navigationDialog().showModal();
@@ -768,7 +750,7 @@
     await window.DartGoogleMaps?.attachRepresentatives?.([order]);
     if (deliveryMaps.get(entry.orderId) !== entry) return;
     if (!entry.destination) {
-      document.getElementById("repNavigationInstruction").textContent = "Manual address — no verified destination pin.";
+      document.getElementById("repNavigationStatus").textContent = "Manual address — no verified destination pin.";
       return;
     }
     const courier = order.courierLocation || latestApiLocation;
@@ -783,6 +765,7 @@
     if (!force && entry.failed && currentTime - entry.lastRoadRouteAt < 60000) return;
     if (Date.now() - Date.parse(location.updatedAt || "") > LOCATION_MAX_AGE_MS) return;
     entry.lastRoadRouteAt = currentTime; entry.pending = true;
+    document.getElementById("repNavigationStatus").textContent = "Updating Google route...";
     const requestId = ++entry.roadRouteRequestId;
     let timeout;
     try {
@@ -794,14 +777,14 @@
       entry.steps = route.steps; entry.stepIndex = 0; entry.failed = false;
       entry.lastRouteOrigin = { lat: Number(location.lat), lng: Number(location.lng) };
       document.dispatchEvent(new CustomEvent("dart:rep-road-route", { detail: { orderId: entry.orderId, geometry: route.geometry } }));
+      document.getElementById("repNavigationStatus").textContent = "";
       document.getElementById("repNavigationWarnings").textContent = route.warnings.join(" · ");
       document.getElementById("repNavigationRetry").hidden = true;
       updateDeliveryControls();
     } catch {
       if (deliveryMaps.get(entry.orderId) !== entry) return;
       entry.failed = true; entry.steps = [];
-      document.getElementById("repNavigationInstruction").textContent = "Google directions unavailable. Check Routes API access or retry.";
-      document.getElementById("repNavigationDistance").textContent = "";
+      document.getElementById("repNavigationStatus").textContent = "Google directions unavailable. Check Routes API access or retry.";
       document.getElementById("repNavigationRetry").hidden = false;
     } finally { clearTimeout(timeout); entry.pending = false; }
   }
@@ -1515,12 +1498,13 @@
     bindImagePreviews(registerForm);
     document.getElementById("repNavigationExit").addEventListener("click", closeNavigation);
     navigationDialog().addEventListener("cancel", event => { event.preventDefault(); closeNavigation(); });
-    document.getElementById("repNavigationVoice").addEventListener("click", event => {
-      voiceEnabled = !voiceEnabled; lastSpoken = "";
-      event.currentTarget.setAttribute("aria-pressed", String(voiceEnabled));
-      event.currentTarget.textContent = voiceEnabled ? "Sound on" : "Sound off";
-      if (!voiceEnabled) window.speechSynthesis?.cancel();
-      updateDeliveryControls();
+    document.getElementById("repNavigationFollow").addEventListener("click", event => {
+      window.DartGoogleMaps?.setRepresentativeFollow?.(event.currentTarget.getAttribute("aria-pressed") !== "true");
+    });
+    document.addEventListener("dart:rep-map-follow", event => {
+      const follow = document.getElementById("repNavigationFollow");
+      follow.setAttribute("aria-pressed", String(Boolean(event.detail?.following)));
+      follow.textContent = event.detail?.following ? "Following your location" : "Follow my location";
     });
     document.getElementById("repNavigationComplete").addEventListener("click", () => {
       const card = [...document.querySelectorAll("#repOrdersList [data-order-id]")].find(el => el.dataset.orderId === navigationOrderId);
@@ -1532,7 +1516,7 @@
     });
     document.addEventListener("dart:google-maps-error", event => {
       if (!navigationDialog()?.open) return;
-      document.getElementById("repNavigationInstruction").textContent = event.detail?.message || "Google Maps unavailable.";
+      document.getElementById("repNavigationStatus").textContent = event.detail?.message || "Google Maps unavailable.";
       document.getElementById("repNavigationRetry").hidden = false;
     });
     document.getElementById("repLoginTab").onclick = () => showAuth("login");
