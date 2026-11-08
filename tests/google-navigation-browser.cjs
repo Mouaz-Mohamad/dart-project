@@ -7,7 +7,7 @@ window.DART_GOOGLE_MAPS_BROWSER_KEY = 'synthetic-browser-key';
 window.__geocodes = []; window.__routes = 0; window.__maps = 0; window.__markers = [];
 window.__lookup = (lat=30.05,lng=31.25) => ({formatted_address:'Test street, Cairo, Egypt',
 address_components:[{types:['country'],short_name:'EG',long_name:'Egypt'},
-{types:['administrative_area_level_1'],long_name:'Cairo Governorate'},
+{types:['administrative_area_level_1'],long_name:'\u202bمحافظة القاهرة\u202c',short_name:'القاهرة'},
 {types:['sublocality'],long_name:'Test district'}, {types:['route'],long_name:'Test street'}],
 geometry:{location:{lat:()=>lat,lng:()=>lng}}});
 window.google={maps:{
@@ -28,6 +28,10 @@ const server = http.createServer((req, res) => {
     res.setHeader("Content-Type", pathname.endsWith(".js") ? "text/javascript" : "text/css");
     return res.end(fs.readFileSync(pathname.slice(1)));
   }
+  if (pathname === "/api/v1/shipping/checkout-coverage") {
+    res.setHeader("Content-Type", "application/json");
+    return res.end(JSON.stringify({governorates:Array.from({length:27},(_,i)=>({id:i===0?"Cairo":i===1?"Giza":`Synthetic-${i}`,en:i===0?"Cairo":"Other",ar:i===0?"القاهرة":"أخرى",available:true,carriers:["dart"],cities:[]})),companies:[]}));
+  }
   if (pathname === "/api/v1/shipping/validate-point") {res.setHeader("Content-Type", "application/json");return res.end('{"valid":true}');}
   res.setHeader("Content-Type", "text/html");res.end(pathname === "/rep.html" ? repHtml : checkoutHtml);
 });
@@ -42,10 +46,11 @@ const server = http.createServer((req, res) => {
     await page.goto(origin+"/cart-checkout.html");
     await page.addScriptTag({content:mockGoogle});
     await page.evaluate(()=>{
-      window.DartShippingAvailability={ready:true,canonical:()=>"Cairo",isAddressCovered:()=>true};
       document.getElementById("checkoutView").style.display="block";
     });
     await page.addScriptTag({path:"Js/dart-google-maps.js"});
+    await page.addScriptTag({path:"Js/dart-checkout-regions.js"});
+    await page.waitForFunction(()=>window.DartShippingAvailability?.ready);
     await page.addScriptTag({path:"Js/dart-checkout-google.js"});
     await page.waitForFunction(()=>window.dartCheckoutAddress && window.__maps===1);
     await page.evaluate(()=>{document.getElementById("checkout-building").value="10";document.getElementById("checkout-floor").value="2"});

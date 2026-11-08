@@ -5,6 +5,7 @@
 const $=id=>document.getElementById(id);
 const pickup=Boolean($("returnRequestForm"));
 const norm=value=>String(value||"").trim().toLowerCase()
+.replace(/[\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f]/g,"")
 .replace(/[\u064b-\u065f\u0670\u0640]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه")
 .replace(/[\s_-]+/g,"");
 
@@ -14,8 +15,8 @@ let regions=[
 ], companies=[],ready=false;
 let activePromise=null;
 const canonical=value=>{
-const v=norm(value);
-const known=regions.find(x=>[x.id,x.en,x.ar,"محافظة "+x.ar,x.id+" governorate"]
+const v=norm(value).replace(/^(?:محافظه|governorateof|governorate)/,"").replace(/(?:محافظه|governorate)$/,"");
+const known=regions.find(x=>[x.id,x.en,x.ar]
 .some(label=>norm(label)===v));
 if(known)return known.id;
 if(["cairo","cairogovernorate","alqahirah","القاهرة","محافظهالقاهرة"].includes(v))return "Cairo";

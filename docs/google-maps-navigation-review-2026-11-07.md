@@ -61,3 +61,22 @@ The build refreshed previously stale generated CSS/JS from their checked-in cano
 ## Post-deployment CI observations
 
 Vercel production succeeded and served all four reviewed JavaScript files byte-for-byte; frontend/API health checks returned 200. GitHub static checks and the new Google browser test passed. The broader browser job stopped in the existing Products navigation/history scenario; backend checks stopped on the pre-existing unused `customerPasswordOrThrow` helper in social-auth.service.ts (not modified here). These unrelated checks are not represented as passing.
+
+## Live recheck — 8 November 2026
+
+After the owner corrected Google Cloud settings, the actual checkout viewport displayed a Google map on www.dartofficial.com. A bounded Routes API request for two public Cairo landmarks returned a route. Live Google search reached the checkout controller but its governorate mapping rejected the result. The follow-up correction accepts long/short administrative names, removes Unicode direction controls, supports Arabic/English governorate affixes, and checks administrative-area/locality fallbacks when level 1 is absent. Unknown names still fail closed; the server still validates the chosen pin against governorate polygons.
+
+The browser regression now loads the real checkout coverage controller rather than a canonicalizer stub. It uses synthetic Arabic Google components with direction marks and verifies that building/floor and shipping-area changes preserve a verified pin. The real canonicalizer also has static regressions for Arabic/English labels, direction marks, prefix/suffix variants and unknown-region rejection. Build, all 50 static checks and the isolated Chromium checkout/courier test passed before publication. No order was submitted or delivery marked during live verification. Live address search/pin verification must be repeated after publication of this follow-up.
+
+| Quality area | Follow-up result |
+| --- | --- |
+| States | Pass: unknown governorates still show a recoverable error. |
+| Server authority | Pass: polygon and coverage validation unchanged. |
+| Concurrency | Pass: existing version checks and action locks retained. |
+| Validation/auth | Pass: no new endpoint or permission. |
+| Idempotency | No new durable operation. |
+| Audit | Existing server workflows retained; no new audited action. |
+| External cost | Existing Google Cloud usage reporting; no Dart billing ledger added. |
+| Regression | Pass: build, source freshness and 50 static checks. |
+| Tests | Pass: real coverage mapping plus isolated Chromium flows. |
+| Secrets | Pass: no actual API key or sign-in value in changes/logs. |

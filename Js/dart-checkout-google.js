@@ -102,8 +102,11 @@
       const part = (...types) => parts.find(p => types.some(type => p.types.includes(type)))?.long_name || "";
       const country = parts.find(p => p.types.includes("country"));
       if (country?.short_name && country.short_name !== "EG") throw new Error("Choose an address inside Egypt.");
-      const province = part("administrative_area_level_1");
-      const canonical = window.DartShippingAvailability?.canonical(province);
+      const provinces = parts.filter(p => p.types.includes("administrative_area_level_1"));
+      const candidates = provinces.length ? provinces : parts.filter(p =>
+        p.types.some(type => ["administrative_area_level_2", "locality"].includes(type)));
+      const canonical = candidates.flatMap(p => [p.long_name, p.short_name])
+        .map(label => window.DartShippingAvailability?.canonical(label)).find(Boolean);
       if (!canonical) throw new Error("Google could not identify the governorate. Choose a more precise street location.");
       if (fields.governorate.value !== canonical) {
         fields.governorate.value = canonical;
