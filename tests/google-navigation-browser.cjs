@@ -215,6 +215,12 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator("#repOrdersList [data-rep-live-map]").count(),0);
     assert.equal(await page.locator("#repNavigationComplete").isVisible(),false);
     assert.equal(await page.locator(".dart-rep-navigation-banner").count(),0);
+    assert.equal(await page.locator(".dart-rep-navigation-footer button").count(),2);
+    assert.equal(await page.locator("#repNavigationExit").textContent(),"خروج");
+    assert.equal(await page.locator("#repNavigationComplete").textContent(),"وصلت");
+    assert.equal(await page.evaluate(()=>window.__map.options.disableDefaultUI),true);
+    assert.equal(await page.locator(".dart-rep-direction").isVisible(),true);
+    assert.equal(await page.locator(".dart-rep-direction").evaluate(el=>getComputedStyle(el).backgroundColor),"rgb(0, 94, 96)");
     assert.equal(await page.locator("#repNavigationStatus").textContent(),"");
     assert.equal(await page.evaluate(()=>window.__polyline.strokeColor),"#1a73e8");
     assert.equal(await page.evaluate(()=>window.__path.length),2);
@@ -236,13 +242,12 @@ const server = http.createServer((req, res) => {
     assert(Math.abs(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation))<.01,"missing heading uses actual northbound movement");
     assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lat),30.021);
     await page.evaluate(()=>{window.__panBefore=window.__panCalls.length;window.__map.events.dragstart()});
-    await page.getByRole("button",{name:"Follow my location",exact:true}).waitFor();
+
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.251,accuracy:5,heading:null,updatedAt:new Date().toISOString()}));
     await page.waitForFunction(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lng===31.251);
     assert.equal(await page.evaluate(()=>window.__panCalls.length===window.__panBefore),true,"dragging pauses follow while the marker keeps moving");
     assert(Math.abs(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation)-90)<.01);
-    await page.getByRole("button",{name:"Follow my location",exact:true}).click();
-    assert.equal(await page.locator("#repNavigationFollow").getAttribute("aria-pressed"),"true");
+    await page.evaluate(()=>window.DartGoogleMaps.setRepresentativeFollow(true));
     assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lng),31.251);
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:31,lng:32,heading:180,updatedAt:new Date(Date.now()-180000).toISOString()}));
     assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lng),31.251,"stale GPS does not move the live arrow or camera");
@@ -253,9 +258,11 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(()=>window.__map.heading>350 || window.__map.heading<10),true,"camera crosses north by the shortest turn");
     await page.waitForFunction(()=>window.__map.heading===10);
     // Devices without a vector renderer retain a working flat map and correctly oriented marker.
-    await page.locator('#repNavigationStandard').click();
+    await page.evaluate(()=>window.DartGoogleMaps.useStandardRepresentativeMap());
     await page.waitForFunction(()=>document.getElementById('repNavigationMap').dataset.mapRenderer==='RASTER' && document.getElementById('repNavigationMap').dataset.mapState==='ready');
-    assert.equal(await page.locator('#repNavigationStandard').isDisabled(),true,"a ready standard map cannot be remounted by duplicate clicks");
+    const rasterCount = await page.evaluate(()=>window.__maps);
+    await page.evaluate(()=>window.DartGoogleMaps.useStandardRepresentativeMap());
+    assert.equal(await page.evaluate(()=>window.__maps),rasterCount,"a ready standard map is not remounted");
     assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='You').options.icon.rotation),10);
     await page.emulateMedia({reducedMotion:"reduce"});
     const reducedPosition=await page.evaluate(()=>{
@@ -275,12 +282,14 @@ const server = http.createServer((req, res) => {
     await page.evaluate(()=>{window.__routeFailure=true});
     await page.locator('[data-action="navigate"]').click();
     await page.evaluate(()=>document.dispatchEvent(new CustomEvent("dart:google-maps-error",{detail:{message:"Synthetic Google failure"}})));
-    await page.locator("#repNavigationRetry").click();
-    await page.waitForFunction(()=>window.__routes===2 && !document.getElementById("repNavigationRetry").hidden);
-    assert.match(await page.locator("#repNavigationStatus").textContent(),/directions unavailable/);
+    await page.locator("#repNavigationExit").click();
+    await page.locator('[data-action="navigate"]').click();
+    await page.waitForFunction(()=>window.__routes===2 && document.getElementById("repNavigationStatus").textContent.includes("تعذر"));
+    assert.match(await page.locator("#repNavigationStatus").textContent(),/تعذر/);
     await page.evaluate(()=>{window.__routeFailure=false});
-    await page.locator("#repNavigationRetry").click();
-    await page.waitForFunction(()=>document.getElementById("repNavigationRetry").hidden && window.__routes===3);
+    await page.locator("#repNavigationExit").click();
+    await page.locator('[data-action="navigate"]').click();
+    await page.waitForFunction(()=>window.__routes===3 && document.getElementById("repNavigationStatus").textContent==="");
 
     // Closing the window is UI-only, then reopening still shows the active delivery.
     await page.locator("#repNavigationExit").click();assert.deepEqual(await page.evaluate(()=>window.__actions),["start"]);

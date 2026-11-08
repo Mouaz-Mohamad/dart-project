@@ -675,25 +675,11 @@
     navigationOrderId = "";
     clearDeliveryMaps();
     document.getElementById("repNavigationResume").hidden = true;
-    window.documentPictureInPicture?.window?.close();
   }
-  let floatingInstruction = null;
-  function showInstruction(text) {
+  function showInstruction(text, maneuver = "STRAIGHT") {
     document.getElementById("repNavigationInstruction").textContent = text;
-    if (floatingInstruction) floatingInstruction.textContent = text;
-  }
-  async function openFloatingDirections() {
-    if (!window.documentPictureInPicture || !navigationOrderId) return;
-    try {
-      const pip = await window.documentPictureInPicture.requestWindow({width: 320, height: 180});
-      pip.document.documentElement.lang = "en";
-      pip.document.title = "Dart directions";
-      const title = pip.document.createElement("h2"); title.textContent = "Delivery directions";
-      floatingInstruction = pip.document.createElement("p");
-      floatingInstruction.textContent = document.getElementById("repNavigationInstruction").textContent;
-      pip.document.body.replaceChildren(title, floatingInstruction);
-      pip.addEventListener("pagehide", () => { floatingInstruction = null; }, {once:true});
-    } catch { document.getElementById("repNavigationStatus").textContent = "Floating directions unavailable. Keep this page open or use Google Maps."; }
+    document.getElementById("repNavigationManeuver").textContent =
+      maneuver.includes("U_TURN") ? "↶" : maneuver.includes("LEFT") ? "↰" : maneuver.includes("RIGHT") ? "↱" : maneuver.includes("ROUNDABOUT") ? "⟳" : "↑";
   }
   function distanceToRoadPath(location, path) {
     if (!path?.length) return Infinity;
@@ -722,7 +708,7 @@
     entry.stepIndex = Math.max(entry.stepIndex || 0, nearest);
     const step = entry.steps[entry.stepIndex];
     const remaining = step.end ? Math.round(distanceKm(location.lat, location.lng, step.end.lat, step.end.lng) * 1000) : null;
-    showInstruction(entry.offRoute ? "Off route — updating directions..." : `${step.instruction}${remaining == null ? "" : ` · ${remaining} m to the turn (approx.)`}`);
+    showInstruction(entry.offRoute ? "جارٍ تحديث الاتجاهات بعد تغيير المسار..." : `${step.instruction}${remaining == null ? "" : ` · ${remaining} متر تقريبًا`}`, step.maneuver);
   }
   function updateDeliveryControls() {
     const rep = currentRep();
@@ -753,14 +739,14 @@
         if (entry.steps.length && !entry.pending && !entry.failed) document.getElementById("repNavigationStatus").textContent = "";
       }
       else {
-        document.getElementById("repNavigationStatus").textContent = "Waiting for a fresh GPS location...";
-        showInstruction("Location is stale — waiting for GPS. Directions may be outdated.");
+        document.getElementById("repNavigationStatus").textContent = "بانتظار إشارة موقع حديثة...";
+        showInstruction("إشارة الموقع قديمة. انتظر تحديث GPS قبل متابعة الاتجاهات.");
       }
     }
   }
   async function openNavigation(order) {
     if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) return;
-    if (navigationOrderId === String(order.id) && deliveryMaps.has(navigationOrderId)) {
+    if (navigationOrderId === String(order.id) && deliveryMaps.has(navigationOrderId) && !deliveryMaps.get(navigationOrderId).failed && document.getElementById("repNavigationMap").dataset.mapState !== "error") {
       navigationDialog().showModal();
       window.DartGoogleMaps?.resizeRepresentatives?.();
       document.body.classList.add("dart-rep-navigating");
@@ -774,16 +760,11 @@
     const container = document.getElementById("repNavigationMap");
     container.dataset.repLiveMap = ""; container.dataset.orderId = navigationOrderId;
     container.textContent = "Loading Google Maps...";
-    showInstruction("Waiting for a fresh location and route...");
+    showInstruction("جارٍ تحديد موقعك وحساب المسار...");
     document.getElementById("repNavigationResume").hidden = true;
-    document.getElementById("repNavigationGoogle").href = googleMapsRoute(order);
-    document.getElementById("repNavigationStatus").textContent = "Waiting for your location...";
+    document.getElementById("repNavigationStatus").textContent = "جارٍ تحديد موقعك...";
     document.getElementById("repNavigationMapStatus").textContent = "";
-    const follow = document.getElementById("repNavigationFollow");
-    follow.setAttribute("aria-pressed", "true");
-    follow.textContent = "Following your location";
     document.getElementById("repNavigationWarnings").textContent = "";
-    document.getElementById("repNavigationRetry").hidden = true;
     navigationDialog().showModal();
     document.body.classList.add("dart-rep-navigating");
     const lat = Number(order.latitude), lng = Number(order.longitude);
@@ -810,7 +791,7 @@
     if (!force && entry.failed && currentTime - entry.lastRoadRouteAt < 60000) return;
     if (Date.now() - Date.parse(location.updatedAt || "") > LOCATION_MAX_AGE_MS) return;
     entry.lastRoadRouteAt = currentTime; entry.pending = true;
-    document.getElementById("repNavigationStatus").textContent = "Updating Google route...";
+    document.getElementById("repNavigationStatus").textContent = "جارٍ تحديث المسار...";
     const requestId = ++entry.roadRouteRequestId;
     let timeout;
     try {
@@ -824,14 +805,12 @@
       document.dispatchEvent(new CustomEvent("dart:rep-road-route", { detail: { orderId: entry.orderId, geometry: route.geometry } }));
       document.getElementById("repNavigationStatus").textContent = "";
       document.getElementById("repNavigationWarnings").textContent = route.warnings.join(" · ");
-      document.getElementById("repNavigationRetry").hidden = document.getElementById("repNavigationMap").dataset.mapState !== "error";
       updateDeliveryControls();
     } catch {
       if (deliveryMaps.get(entry.orderId) !== entry) return;
       entry.failed = true; entry.steps = [];
-      showInstruction("Directions unavailable — retry Google Maps.");
-      document.getElementById("repNavigationStatus").textContent = "Google directions unavailable. Check Routes API access or retry.";
-      document.getElementById("repNavigationRetry").hidden = false;
+      showInstruction("تعذر حساب الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.");
+      document.getElementById("repNavigationStatus").textContent = "تعذر تحميل الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.";
     } finally { clearTimeout(timeout); entry.pending = false; }
   }
   function updateDeliveryMapsLocation(location) {
@@ -1542,38 +1521,22 @@
       changeForm = document.getElementById("repChangePasswordForm");
     bindImagePreviews(registerForm);
     document.getElementById("repNavigationResume").addEventListener("click", () => openNavigation(activeNavigationOrder()));
-    const floating = document.getElementById("repNavigationFloat");
-    floating.hidden = !window.documentPictureInPicture;
-    floating.addEventListener("click", openFloatingDirections);
     document.getElementById("repNavigationExit").addEventListener("click", closeNavigation);
     navigationDialog().addEventListener("cancel", event => { event.preventDefault(); closeNavigation(); });
-    document.getElementById("repNavigationFollow").addEventListener("click", event => {
-      window.DartGoogleMaps?.setRepresentativeFollow?.(event.currentTarget.getAttribute("aria-pressed") !== "true");
-    });
-    document.getElementById("repNavigationStandard").addEventListener("click", () => window.DartGoogleMaps?.useStandardRepresentativeMap?.());
-    document.addEventListener("dart:rep-map-follow", event => {
-      const follow = document.getElementById("repNavigationFollow");
-      follow.setAttribute("aria-pressed", String(Boolean(event.detail?.following)));
-      follow.textContent = event.detail?.following ? "Following your location" : "Follow my location";
-    });
     document.getElementById("repNavigationComplete").addEventListener("click", () => {
       const card = [...document.querySelectorAll("#repOrdersList [data-order-id]")].find(el => el.dataset.orderId === navigationOrderId);
       card?.querySelector('[data-action="complete"]')?.click();
     });
-    document.getElementById("repNavigationRetry").addEventListener("click", async () => {
-      const order = activeNavigationOrder();
-      if (order) { stopNavigation(); await openNavigation(order); }
-    });
     document.addEventListener("dart:rep-map-state", event => {
-      if (!navigationDialog()?.open || event.detail?.orderId !== navigationOrderId) return;
-      document.getElementById("repNavigationMapStatus").textContent = event.detail.message;
-      document.getElementById("repNavigationStandard").disabled = document.getElementById("repNavigationMap").dataset.mapRenderer === "RASTER" && event.detail.state !== "error";
-      if (event.detail.state === "error") document.getElementById("repNavigationRetry").hidden = false;
+      if (!navigationOrderId || event.detail?.orderId !== navigationOrderId) return;
+      document.getElementById("repNavigationMapStatus").textContent =
+        event.detail.state === "error" ? "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة." : "";
     });
-    document.addEventListener("dart:google-maps-error", event => {
-      if (!navigationDialog()?.open) return;
-      document.getElementById("repNavigationStatus").textContent = event.detail?.message || "Google Maps unavailable.";
-      document.getElementById("repNavigationRetry").hidden = false;
+    document.addEventListener("dart:google-maps-error", () => {
+      if (!navigationOrderId) return;
+      const entry = deliveryMaps.get(navigationOrderId);
+      if (entry) entry.failed = true;
+      document.getElementById("repNavigationStatus").textContent = "تعذر تحميل الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.";
     });
     document.getElementById("repLoginTab").onclick = () => showAuth("login");
     document.getElementById("repRegisterTab").onclick = () =>

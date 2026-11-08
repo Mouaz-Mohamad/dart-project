@@ -41,6 +41,6 @@ vm.runInNewContext(source,{window,document,sessionStorage,location:{protocol:'ht
   assert.match(element('repNavigationInstruction').textContent,/Turn right/);
   nav.closeNavigation();nav.seed({...order,status:'Delivered'});nav.updateDeliveryControls();
   assert.equal(destroys,1);assert.equal(nav.entry(),undefined);assert.equal(element('repNavigationResume').hidden,true);
-  assert.equal(pipClosed,1);
+  assert.equal(pipClosed,0);
   console.log('PASS courier navigation: 499/501m gate, stale/missing GPS, unchanged pickup radius, retained map/route on exit/reopen and cleanup after completion');
 })().catch(error=>{console.error(error);process.exitCode=1});

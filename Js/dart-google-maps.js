@@ -136,6 +136,7 @@
   }
   function disposeRepresentativeMap(entry) {
     clearTimeout(entry.tileTimer);
+    clearTimeout(entry.followTimer);
     window.cancelAnimationFrame(entry.frame);
     entry.frame = null;
     entry.destination?.setMap(null); entry.courier?.setMap(null); entry.route?.setMap(null);
@@ -169,12 +170,15 @@
       map = new google.maps.Map(canvas, { center, zoom: 17, renderingType: renderer,
         tilt: renderer === "VECTOR" ? 60 : 0, heading: renderer === "VECTOR" ? entry.heading ?? 0 : 0,
         tiltInteractionEnabled: true, headingInteractionEnabled: true, isFractionalZoomEnabled: true,
-        clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
+        disableDefaultUI: true, colorScheme: "LIGHT", clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
       entry.map = map;
       entry.drawnLocation = entry.location; entry.drawnHeading = entry.heading ?? 0;
       entry.destination = entry.target ? new google.maps.Marker({ map, position: entry.target, title: "Customer destination" }) : null;
       entry.route = new google.maps.Polyline({ map, path: entry.path, strokeColor: "#1a73e8", strokeOpacity: 1, strokeWeight: 6 });
-      map.addListener("dragstart", () => setFollow(entry, false));
+      map.addListener("dragstart", () => { clearTimeout(entry.followTimer); setFollow(entry, false); });
+      map.addListener("dragend", () => {
+        entry.followTimer = setTimeout(() => { if (mounted.get(entry.id) === entry && entry.map === map) setFollow(entry, true); }, 8000);
+      });
       map.addListener("heading_changed", () => {
         entry.courier?.setIcon(courierIcon(((entry.drawnHeading - (map.getHeading() || 0)) % 360 + 360) % 360));
       });
