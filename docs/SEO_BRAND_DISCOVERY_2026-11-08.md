@@ -16,7 +16,9 @@ No database changes, migrations, backend endpoints, business rules, prices, auth
 - Targeted checks passed: `tests/seo_checks.js`, `tests/product_ssr_seo.cjs`, `tests/news-seo.cjs`, `tests/product_deep_links.cjs`, `tests/founder-media-runtime.cjs`, `tests/database-authoritative-storage.cjs`, JavaScript syntax and `git diff --check`.
 - SEO regression coverage: home/product brand consistency, social profiles, canonical navigation and redirect, visible Arabic copy, staged original Story and unique founder image.
 - Before release, live home, robots, root sitemap and all child sitemaps returned HTTP 200. Static sitemap: 5 URLs; products: 5 URLs; News: 0 URLs. An empty valid News sitemap is expected without published articles.
-- Local preview could not be reached by the remote browser. Final visual and HTTP verification runs on the deployed production release.
+- Local preview could not be reached by the remote browser. Production visual checks passed for the original Story/founder image, visible Arabic footer and Products link. About and Products had no horizontal overflow at the observed 1363 px viewport. Separate mobile viewport verification was not performed.
+- Production HTTP checks passed: Home, About and Products returned 200 with canonical URLs and CSP-authorized JSON-LD. `/index.html` redirected to `/`; root/product/News sitemaps returned valid XML. Storefront release `02bcc8d` is READY on both custom domains; the previous READY API release was preserved by cancelling its unnecessary automatic rebuild.
+- CI's navigation browser test initially searched for the old `/index.html` menu link. Its selector now follows the canonical `/` link; navigation behavior itself was checked in the live browser. The static CI job still reports the inherited CSS failure described below.
 
 ## Inherited check failures
 

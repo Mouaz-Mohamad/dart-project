@@ -135,7 +135,7 @@ function nativeScenario(origin) {
         await wait(() => Math.abs(window.scrollY - 400) <= 1);
         await wait(() => document.getElementById('productFiltersPanel').getBoundingClientRect().height > 0);
         await report(phase);
-        document.querySelector('.side-menu a[href="/index.html"]').click();
+        document.querySelector('.side-menu a[href="/"]').click();
       } else if (phase === 2) {
         await wait(() => window.DartNavigation && window.__criticalReady && cart().length === 1);
         await report(phase);
