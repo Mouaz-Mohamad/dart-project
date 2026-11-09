@@ -6260,3 +6260,282 @@ body.dart-rep-navigating { overflow: hidden; }
 .dart-rep-resume:not([hidden]) { position: fixed; bottom: 20px; inset-inline-end: 16px; z-index: 1000; width: auto; }
 
 .dart-rep-resume[hidden] { display: none; }
+
+
+/* BEGIN DART-CSS-CONTACT-PAGE | Scoped contact landing; all other pages unchanged. */
+.dart-contact-page {
+  gap: 0;
+  padding: 0 10px 24px;
+  color: #251c20;
+  font-family: var(--font-main);
+  background: #fff !important;
+}
+.dart-contact-page .dart-contact-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 262px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 28px 23px 30px;
+  margin: 0 -10px;
+  color: #fff;
+  background: linear-gradient(132deg, #370b1c 0%, #760f30 60%, #ab012b 100%);
+}
+.dart-contact-page .dart-contact-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -85px -150px auto;
+  width: 265px;
+  height: 265px;
+  border: 1px solid #ffffff22;
+  border-radius: 50%;
+  box-shadow: 0 0 0 35px #ffffff08, 0 0 0 72px #ffffff06;
+  pointer-events: none;
+}
+.dart-contact-hero-copy { position: relative; z-index: 1; max-width: 340px; }
+.dart-contact-eyebrow, .dart-contact-overline {
+  display: block;
+  font: 600 11px/1.5 var(--font-cabin);
+  letter-spacing: 0.16em;
+}
+.dart-contact-eyebrow { color: #f4c8d4; margin-bottom: 18px; }
+.dart-contact-page .dart-contact-hero h1 {
+  margin: 0 0 10px;
+  color: #fff;
+  font: 700 clamp(42px, 12vw, 62px)/1 var(--font-cabin);
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+}
+.dart-contact-page .dart-contact-hero h1 span { color: #ffcfda; }
+.dart-contact-page .dart-contact-hero p {
+  max-width: 310px;
+  margin: 12px 0 20px;
+  color: #f5e9ed;
+  font-size: 13px;
+  line-height: 1.85;
+  text-align: start;
+}
+.dart-contact-hero-decor {
+  position: absolute;
+  right: -7px;
+  bottom: -73px;
+  color: #ffffff0b;
+  font: 700 250px/1 var(--font-cabin);
+  pointer-events: none;
+  user-select: none;
+}
+.dart-contact-page .dart-contact-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 1px solid #ffffff55;
+  border-radius: 9px;
+  background: #ffffff12;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.dart-contact-page .dart-contact-hero-cta:hover { background: #ffffff2a; color: #fff; transform: translateY(-2px); }
+.dart-contact-page .dart-contact-methods { padding: 32px 0 26px; background: #fff; scroll-margin-top: 24px; }
+.dart-contact-page .dart-contact-section-header { margin-bottom: 18px; }
+.dart-contact-page .dart-contact-overline { color: #a2133b; margin-bottom: 7px; }
+.dart-contact-page .dart-contact-section-header h2 {
+  color: #251c20;
+  font: 700 clamp(26px, 7vw, 34px)/1.15 var(--font-cabin);
+  margin-bottom: 7px;
+}
+.dart-contact-page .dart-contact-section-header p {
+  color: #74666b;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0;
+  text-align: start;
+}
+.dart-contact-page .dart-contact-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.dart-contact-page .dart-contact-channel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 116px;
+  padding: 14px 11px;
+  border: 1px solid #ebdce0;
+  border-radius: 14px;
+  background: #fffdfc;
+  color: #2f2227;
+  box-shadow: 0 5px 14px #4a162009;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.dart-contact-page .dart-contact-channel:hover {
+  border-color: #ab012b55;
+  background: #fff9fa;
+  color: #2f2227;
+  box-shadow: 0 8px 24px #4a162016;
+  transform: translateY(-3px);
+}
+.dart-contact-page .dart-contact-channel--whatsapp {
+  grid-column: 1 / -1;
+  min-height: 88px;
+  background: #f6fcf9;
+  border-color: #dbefe3;
+}
+.dart-contact-page .dart-contact-channel--email { grid-column: 1 / -1; min-height: 88px; }
+.dart-contact-page .dart-contact-channel-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: #f7eaee;
+  color: #970a33;
+  font-size: 21px;
+}
+.dart-contact-page .dart-contact-channel--whatsapp .dart-contact-channel-icon { background: #e0f6e9; color: #178a4b; }
+.dart-contact-page .dart-contact-channel-info { display: grid; gap: 6px; min-width: 0; flex: 1; }
+.dart-contact-page .dart-contact-channel-info strong {
+  color: #251c20;
+  font: 600 17px/1.25 var(--font-cabin);
+}
+.dart-contact-page .dart-contact-channel-info small {
+  color: #7c6b71;
+  font-size: 10px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.dart-contact-page .dart-contact-channel-arrow { color: #ab012b; font-size: 11px; flex-shrink: 0; align-self: flex-start; opacity: 0.75; }
+.dart-contact-page .dart-contact-channel:focus-visible,
+.dart-contact-page .dart-contact-hero-cta:focus-visible,
+.dart-contact-page .dart-contact-shortcuts a:focus-visible {
+  outline: 3px solid #ab012b;
+  outline-offset: 3px;
+}
+.dart-contact-page .dart-contact-message {
+  padding: 25px 16px 24px;
+  margin: 0 -10px;
+  background: #faf5f3;
+  border-top: 1px solid #f0e6e3;
+  border-bottom: 1px solid #f0e6e3;
+}
+.dart-contact-page .dart-contact-message .dart-contact-section-header { margin-bottom: 18px; }
+.dart-contact-page #contact-form .dart-contact-form-section {
+  display: block;
+  width: 100%;
+  background: transparent;
+}
+.dart-contact-page #contact-form .dart-contact-form { width: 100%; text-align: left; }
+.dart-contact-page #contact-form .dart-contact-form .form-group { margin: 0 0 13px; min-width: 0; }
+.dart-contact-page #contact-form .dart-contact-form .form-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+.dart-contact-page #contact-form .dart-contact-form .form-row > .form-group { flex: 1 1 0; }
+.dart-contact-page #contact-form .dart-contact-form label {
+  display: block;
+  margin-bottom: 6px;
+  color: #463139;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+.dart-contact-page #contact-form .dart-contact-form label span { color: #ab012b; }
+.dart-contact-page #contact-form .dart-contact-form input,
+.dart-contact-page #contact-form .dart-contact-form textarea {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e7d6db;
+  border-radius: 9px;
+  background: #fff;
+  color: #291d21;
+  font-family: var(--font-main);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: start;
+  direction: auto;
+}
+.dart-contact-page #contact-form .dart-contact-form input { min-height: 46px; }
+.dart-contact-page #contact-form .dart-contact-form textarea { min-height: 126px; resize: vertical; }
+.dart-contact-page #contact-form .dart-contact-form input::placeholder,
+.dart-contact-page #contact-form .dart-contact-form textarea::placeholder { color: #887980; opacity: 1; }
+.dart-contact-page #contact-form .dart-contact-form input:focus-visible,
+.dart-contact-page #contact-form .dart-contact-form textarea:focus-visible {
+  outline: 2px solid #ab012b;
+  outline-offset: 1px;
+}
+.dart-contact-page #contact-form .dart-contact-extra {
+  margin: 0 0 15px;
+  border: 1px dashed #d9c4ca;
+  border-radius: 9px;
+  background: #fff;
+}
+.dart-contact-page #contact-form .dart-contact-extra summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 43px;
+  padding: 10px 12px;
+  color: #685158;
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+.dart-contact-page #contact-form .dart-contact-extra summary::-webkit-details-marker { display: none; }
+.dart-contact-page #contact-form .dart-contact-extra summary:focus-visible { outline: 2px solid #ab012b; outline-offset: 2px; }
+.dart-contact-page #contact-form .dart-contact-extra summary i { transition: transform 0.2s ease; }
+.dart-contact-page #contact-form .dart-contact-extra[open] summary i { transform: rotate(180deg); }
+.dart-contact-page #contact-form .dart-contact-extra .form-group { margin: 0; padding: 0 12px 12px; }
+.dart-contact-page #contact-form .dart-contact-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 48px;
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 9px;
+  border: 1px solid #ab012b;
+  background: #ab012b;
+  color: #fff;
+  font: 600 13px/1.3 var(--font-main);
+  cursor: pointer;
+}
+.dart-contact-page #contact-form .dart-contact-submit:hover { background: #83001f; color: #fff; }
+.dart-contact-page #contact-form .dart-contact-submit:disabled { opacity: 0.6; cursor: wait; }
+.dart-contact-page #contact-form .form-status {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f0f7f0;
+  color: #215a32;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.dart-contact-page #contact-form .form-status.is-error { background: #fff0f0; color: #a12228; }
+.dart-contact-page .dart-contact-shortcuts { padding: 25px 6px 4px; background: #fff; text-align: start; }
+.dart-contact-page .dart-contact-shortcuts p { color: #58474d; font-size: 12px; line-height: 1.75; margin-bottom: 12px; }
+.dart-contact-page .dart-contact-shortcuts > div { display: flex; flex-wrap: wrap; gap: 10px; }
+.dart-contact-page .dart-contact-shortcuts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  border: 1px solid #eadde1;
+  color: #80122e;
+  font-size: 11px;
+  font-weight: 600;
+}
+.dart-contact-page .dart-contact-shortcuts a:hover { color: #ab012b; background: #faf5f3; }
+/* END DART-CSS-CONTACT-PAGE */

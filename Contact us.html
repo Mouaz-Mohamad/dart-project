@@ -67,20 +67,83 @@
     <div class="mother">
         <header id="header-container" aria-label="Main Navigation"></header>
             
-            <main class="#">
-                <h1 class="sr-only">تواصل مع Dart</h1>
-
-                <section id="contact-form" aria-label="Contact Us "></section>
-
-                    <div class="social-icons-contact dja">
-                        <a href="https://www.instagram.com/dart.official.eg" target="_blank" rel="me noopener noreferrer" aria-label="Dart on Instagram"><i class="fa-brands fa-instagram"></i></a>
+            <main class="dart-contact-page" id="main-content">
+                <!-- BEGIN DART Contact experience: keep the shared navigation and server-backed form intact. -->
+                <section class="dart-contact-hero" aria-labelledby="dart-contact-title">
+                    <div class="dart-contact-hero-copy">
+                        <span class="dart-contact-eyebrow">DART | FOR YOU &nbsp; / &nbsp; CONTACT</span>
+                        <h1 id="dart-contact-title">LET'S <span>TALK.</span></h1>
+                        <p lang="ar" dir="rtl">عندك سؤال عن قطعة، أوردر أو أي حاجة تخص Dart؟ إحنا هنا علشانك.</p>
+                        <a href="#dart-contact-methods" class="dart-contact-hero-cta">تواصل معانا <i class="fa-solid fa-arrow-down" aria-hidden="true"></i></a>
                     </div>
+                    <span class="dart-contact-hero-decor" aria-hidden="true">D</span>
+                </section>
 
+                <section class="dart-contact-methods" id="dart-contact-methods" aria-labelledby="dart-contact-methods-title">
+                    <div class="dart-contact-section-header">
+                        <span class="dart-contact-overline">STAY CONNECTED</span>
+                        <h2 id="dart-contact-methods-title">Choose your way.</h2>
+                        <p lang="ar" dir="rtl">اختار الطريقة اللي تريحك وهتلاقينا معاك.</p>
+                    </div>
+                    <div class="dart-contact-channel-grid">
+                        <a class="dart-contact-channel dart-contact-channel--whatsapp" data-social-platform="whatsapp"
+                           data-social-url="https://wa.me/201036078016?text=%D8%A3%D9%87%D9%84%D9%8B%D8%A7%20Dart%D8%8C%20%D8%B9%D9%86%D8%AF%D9%8A%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1."
+                           href="https://wa.me/201036078016?text=%D8%A3%D9%87%D9%84%D9%8B%D8%A7%20Dart%D8%8C%20%D8%B9%D9%86%D8%AF%D9%8A%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1."
+                           target="_blank" rel="noopener noreferrer" aria-label="WhatsApp: افتح محادثة مع Dart">
+                            <span class="dart-contact-channel-icon"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></span>
+                            <span class="dart-contact-channel-info"><strong>WhatsApp</strong><small lang="ar">اسألنا مباشرة على واتساب</small></span>
+                            <i class="fa-solid fa-arrow-up-right-from-square dart-contact-channel-arrow" aria-hidden="true"></i>
+                        </a>
+                        <a class="dart-contact-channel" data-social-platform="instagram"
+                           data-social-url="https://www.instagram.com/dart.official.eg"
+                           href="https://www.instagram.com/dart.official.eg" target="_blank" rel="noopener noreferrer"
+                           aria-label="Instagram: زور حساب Dart">
+                            <span class="dart-contact-channel-icon"><i class="fa-brands fa-instagram" aria-hidden="true"></i></span>
+                            <span class="dart-contact-channel-info"><strong>Instagram</strong><small lang="ar">شوف جديدنا وابعتلنا</small></span>
+                            <i class="fa-solid fa-arrow-up-right-from-square dart-contact-channel-arrow" aria-hidden="true"></i>
+                        </a>
+                        <a class="dart-contact-channel" data-social-platform="messenger"
+                           data-social-url="https://www.facebook.com/share/1BM4sZGPVv/"
+                           href="https://www.facebook.com/share/1BM4sZGPVv/" target="_blank" rel="noopener noreferrer"
+                           aria-label="Messenger: افتح صفحة Dart على فيسبوك واضغط إرسال رسالة">
+                            <span class="dart-contact-channel-icon"><i class="fa-brands fa-facebook-messenger" aria-hidden="true"></i></span>
+                            <span class="dart-contact-channel-info"><strong>Messenger</strong><small lang="ar">افتح صفحتنا واضغط «إرسال رسالة»</small></span>
+                            <i class="fa-solid fa-arrow-up-right-from-square dart-contact-channel-arrow" aria-hidden="true"></i>
+                        </a>
+                        <a class="dart-contact-channel" data-social-platform="facebook"
+                           data-social-url="https://www.facebook.com/share/1BM4sZGPVv/"
+                           href="https://www.facebook.com/share/1BM4sZGPVv/" target="_blank" rel="noopener noreferrer"
+                           aria-label="Facebook: زور صفحة Dart">
+                            <span class="dart-contact-channel-icon"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></span>
+                            <span class="dart-contact-channel-info"><strong>Facebook</strong><small lang="ar">تابع أخبار وعروض Dart</small></span>
+                            <i class="fa-solid fa-arrow-up-right-from-square dart-contact-channel-arrow" aria-hidden="true"></i>
+                        </a>
+                        <a class="dart-contact-channel dart-contact-channel--email"
+                           href="mailto:dart.official.eg@gmail.com" aria-label="Email: ابعت رسالة إلى dart.official.eg@gmail.com">
+                            <span class="dart-contact-channel-icon"><i class="fa-regular fa-envelope" aria-hidden="true"></i></span>
+                            <span class="dart-contact-channel-info"><strong>Email</strong><small>dart.official.eg@gmail.com</small></span>
+                            <i class="fa-solid fa-arrow-up-right-from-square dart-contact-channel-arrow" aria-hidden="true"></i>
+                        </a>
+                    </div>
+                </section>
 
+                <section class="dart-contact-message" aria-labelledby="dart-contact-message-title">
+                    <div class="dart-contact-section-header">
+                        <span class="dart-contact-overline">DROP US A LINE</span>
+                        <h2 id="dart-contact-message-title">Send a message.</h2>
+                        <p lang="ar" dir="rtl">مش مستعجل؟ سيبلنا رسالتك من هنا وهنرد عليك.</p>
+                    </div>
+                    <div id="contact-form" aria-label="نموذج التواصل مع Dart"></div>
+                </section>
 
-
-
-
+                <nav class="dart-contact-shortcuts" aria-label="مساعدة سريعة" lang="ar" dir="rtl">
+                    <p>محتاج تتابع طلبك أو تقدم طلب استبدال واسترجاع؟</p>
+                    <div>
+                        <a href="/track.html">تتبع الأوردر <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+                        <a href="/form-return.html">استبدال أو استرجاع <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+                    </div>
+                </nav>
+                <!-- END DART Contact experience -->
             </main>
 
             <footer id="footer" aria-label="footer."></footer>

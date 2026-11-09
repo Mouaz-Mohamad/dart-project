@@ -444,3 +444,21 @@
 @media (prefers-reduced-motion: reduce) {
   .product-filter-panel, .product-filter-toggle, .product-filter-toggle-arrow { transition: none; }
 }
+
+
+/* BEGIN DART-CSS-CONTACT-PAGE-MOBILE | Contact page breakpoints only. */
+@media (max-width: 380px) {
+  .dart-contact-page .dart-contact-channel-grid { grid-template-columns: 1fr; }
+  .dart-contact-page .dart-contact-channel { grid-column: 1 / -1; min-height: 82px; }
+  .dart-contact-page #contact-form .dart-contact-form .form-row { flex-direction: column; gap: 0; }
+  .dart-contact-page .dart-contact-hero { min-height: 244px; padding-inline: 16px; }
+  .dart-contact-page .dart-contact-message { padding-inline: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dart-contact-page .dart-contact-channel,
+  .dart-contact-page .dart-contact-hero-cta,
+  .dart-contact-page #contact-form .dart-contact-extra summary i { transition: none; }
+  .dart-contact-page .dart-contact-channel:hover,
+  .dart-contact-page .dart-contact-hero-cta:hover { transform: none; }
+}
+/* END DART-CSS-CONTACT-PAGE-MOBILE */
