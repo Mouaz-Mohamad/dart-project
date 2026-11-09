@@ -48,6 +48,28 @@ async function main() {
   };
   assert.equal((await checkout.runCheckout(form)).orderId, "K-ALREADY-COMMITTED");
 
+  // A valid fixed-amount code must survive both authoritative price quoting and order submission.
+  checkout.window.dartAppliedPromotion = { type: "DiscountCode", code: "MOUAS100", kind: "amount" };
+  checkout.cartData = [{ id: "M1", color: "Raw navy blue", size: "32", quantity: 1 }];
+  checkout.window.dartDisplayedTotalMinor = 75000;
+  let confirmedCodeQuote = false, confirmedCodeCheckout = false;
+  checkout.apiRequest = async (url, options) => {
+    if (url.includes("/cart/quote")) {
+      assert.match(url, /promotionCode=MOUAS100/, "the coupon must be sent to server pricing");
+      confirmedCodeQuote = true;
+      return { lines: [{ modelId: "M1", baseMinor: 85000, finalMinor: 75000, discountSource: "Discount Code" }],
+        fingerprint: "d".repeat(64), subtotalMinor: 85000, discountMinor: 10000, totalMinor: 75000 };
+    }
+    assert.equal(options.body.promotionCode, "MOUAS100", "the submitted order must preserve its coupon");
+    assert.equal(options.body.expectedTotalMinor, 75000);
+    confirmedCodeCheckout = true;
+    return { order: { orderId: "K-COUPON" } };
+  };
+  assert.equal((await checkout.runCheckout(form)).orderId, "K-COUPON");
+  assert.ok(confirmedCodeQuote && confirmedCodeCheckout);
+  assert.match(fs.readFileSync("Js/dart-ui.js", "utf8"), /quote\.lines\.some\(\(line\) =>/,
+    "the cart must not claim code success before server-confirmed line savings");
+
   // A commerce poll refreshes statistics but retains the current customer's edit inputs and Cancel button.
   const draftInput = { value: "Unsaved draft" }, editButton = { dataset: { mode: "edit", customerId: "customer-1" }, textContent: "Save", addEventListener() {} };
   let removed = false, replaced = false;

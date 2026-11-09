@@ -1067,7 +1067,13 @@ function initCartAndCheckoutEvents() {
                 // Never show a coupon as applied unless the authoritative quote confirms savings.
                 if (promotion.type === 'DiscountCode' && window.DartPlatform?.quoteCart) {
                     try {
-                        await window.DartPlatform.quoteCart({ force: true });
+                        const quote = await window.DartPlatform.quoteCart({ force: true });
+                        // Validation is not application: require server-confirmed savings on an eligible piece.
+                        const codeSaved = Array.isArray(quote?.lines) && quote.lines.some((line) =>
+                            line.discountSource === 'Discount Code' && Number(line.baseMinor) > Number(line.finalMinor)
+                        );
+                        if (!codeSaved) throw new Error('الكود صحيح، لكن لم يُطبق خصم على القطع الحالية. راجع شروط الكود.');
+                        window.applyCartQuote?.(quote);
                     } catch (error) {
                         window.dartAppliedPromotion = previousPromotion;
                         appliedDiscountRate = previousDiscountRate;

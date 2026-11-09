@@ -234,7 +234,8 @@ if (!products.includes('rel="canonical" href="https://www.dartofficial.com/produ
 // Run against the actual build output when staging has completed, not only source metadata.
 if (fs.existsSync(path.join(root, "public/about.html"))) {
   const stagedAbout = read("public/about.html");
-  if (!stagedAbout.includes(read("sections/story.html")) ||
+  const withoutAssetVersions = html => html.replace(/(\b(?:src|href)=["'][^"'?]+)\?v=[^"'#]*/g, "$1");
+  if (!withoutAssetVersions(stagedAbout).includes(withoutAssetVersions(read("sections/story.html"))) ||
       !/<section\b[^>]*id="story"[^>]*data-dart-static=/.test(stagedAbout))
     errors.push("About: original story must be present in initial HTML without a duplicate JS load");
   if (count(stagedAbout, /id="dart-founder-image"/g) !== 1)

@@ -139,7 +139,7 @@ paths:
     get:
       tags: [Catalog]
       operationId: readPublicCatalog
-      description: Without query parameters preserves the legacy full catalog. Explicit paging returns only selected models and their fresh stock plus pagination.total for the complete filter. Never returns physical item IDs, acquisition cost or customer data. Stable model_id ordering breaks ties. No-store.
+      description: Without query parameters preserves the legacy full catalog. Explicit paging returns only selected models and their fresh stock plus pagination.total for the complete filter. Never returns physical item IDs, acquisition cost or customer data. Stable model_id ordering breaks ties. Browser-only HTTP caching with private, no-cache, max-age=0, must-revalidate. Every request reads current PostgreSQL stock before ETag validation; unchanged responses return 304. Shared caches must not store this response.
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
@@ -148,6 +148,7 @@ paths:
         - { name: sort, in: query, schema: { type: string, enum: [newest, price-low, price-high, name] } }
       responses:
         "200": { description: Versioned public models, current stock, and optional pagination. Display prices retain the existing EGP API representation; database money remains integer piastres. }
+        "304": { description: Public catalog representation is unchanged after authoritative stock read; reuse the previously stored HTTP response body. }
         "422": { description: Invalid bounded paging input }
   /admin/catalog-state:
     get:

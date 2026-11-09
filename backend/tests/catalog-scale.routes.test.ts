@@ -33,13 +33,35 @@ describe("catalogue scale HTTP boundaries", () => {
     expect((await request(app).get("/api/v1/catalog")).status).toBe(200);
     expect(service.publicCatalog).toHaveBeenLastCalledWith(undefined);
     const response = await request(app).get("/api/v1/catalog").query({ page: 2, limit: 50, q: " shirt ", sort: "price-low" });
-    expect(response.status).toBe(200); expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.status).toBe(200); expect(response.headers["cache-control"]).toBe("private, no-cache, max-age=0, must-revalidate");
     expect(service.publicCatalog).toHaveBeenLastCalledWith({ page: 2, limit: 50, q: "shirt", sort: "price-low" });
+  });
+  it("revalidates cached public bytes against current stock and transfers only changes", async () => {
+    const { app, service } = application();
+    const first = await request(app).get("/api/v1/catalog").query({ page: 1, limit: 100 });
+    expect(first.headers.etag).toBeTruthy();
+    const etag = String(first.headers.etag);
+    const unchanged = await request(app).get("/api/v1/catalog").query({ page: 1, limit: 100 }).set("If-None-Match", etag);
+    expect(unchanged.status).toBe(304);
+    expect(unchanged.text).toBe("");
+    expect(unchanged.headers["cache-control"]).toContain("must-revalidate");
+    expect(service.publicCatalog).toHaveBeenCalledTimes(2);
+    // Stock can change independently of a model edit: validate the whole public
+    // representation, rather than trusting a version-only conditional response.
+    service.publicCatalog.mockResolvedValue({ version: 1, models: [], stock: { '["M","Black","L"]': 1 } });
+    const changed = await request(app).get("/api/v1/catalog").query({ page: 1, limit: 100 }).set("If-None-Match", etag);
+    expect(changed.status).toBe(200);
+    expect(changed.headers.etag).not.toBe(first.headers.etag);
+    service.publicCatalog.mockResolvedValue(Object.assign({ version: 1, models: [], stock: {} }, { pagination: { page: 2, limit: 100, total: 0 } }));
+    const otherPage = await request(app).get("/api/v1/catalog").query({ page: 2, limit: 100 }).set("If-None-Match", etag);
+    expect(otherPage.status).toBe(200);
   });
   it("rejects invalid public paging before issuing a catalogue read", async () => {
     for (const query of [{ limit: 201 }, { page: 0 }, { sort: "sql" }, { q: "q".repeat(161) }]) {
       const { app, service } = application();
-      expect((await request(app).get("/api/v1/catalog").query(query)).status).toBe(422);
+      const response = await request(app).get("/api/v1/catalog").query(query);
+      expect(response.status).toBe(422);
+      expect(response.headers["cache-control"]).toBe("no-store");
       expect(service.publicCatalog).not.toHaveBeenCalled();
     }
   });
