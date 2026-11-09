@@ -3,7 +3,7 @@
   let reviewedQuote = null;
   function cartQuoteSignature() {
     const cart = typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
-    return JSON.stringify([currentUser()?.id, CART_RESERVATION_ID, window.dartAppliedPromotion?.type === "Promotion" ? window.dartAppliedPromotion.code : "",
+    return JSON.stringify([currentUser()?.id, CART_RESERVATION_ID, ["Promotion", "DiscountCode"].includes(window.dartAppliedPromotion?.type) ? window.dartAppliedPromotion.code : "",
       cart.map((line) => [line.id, line.color, line.size, line.quantity, line.dartSetKey || ""])]);
   }
   function currentCartQuote() {
@@ -35,7 +35,7 @@
     const signature = cartQuoteSignature();
     if (!options.force && cartQuoteCache?.signature === signature && Date.now() - cartQuoteCache.at < 2000) return cartQuoteCache.quote;
     if (cartQuotePending?.signature === signature) return cartQuotePending.task;
-    const code = window.dartAppliedPromotion?.type === "Promotion" ? window.dartAppliedPromotion.code : "";
+    const code = ["Promotion", "DiscountCode"].includes(window.dartAppliedPromotion?.type) ? window.dartAppliedPromotion.code : "";
     const task = (async () => {
       const quote = await apiRequest(`/api/v1/me/cart/quote?reservationId=${encodeURIComponent(CART_RESERVATION_ID)}${code ? `&promotionCode=${encodeURIComponent(code)}` : ""}`);
       if (signature !== cartQuoteSignature()) throw new Error("Cart changed while pricing. Review it and retry.");
@@ -230,7 +230,7 @@
           },
           deliveryNotes: details.deliveryNotes || "",
           ...(options.acceptPriceChanges ? { acceptPriceChanges: true } : {}),
-          ...(window.dartAppliedPromotion?.type === "Promotion" &&
+          ...(["Promotion", "DiscountCode"].includes(window.dartAppliedPromotion?.type) &&
           window.dartAppliedPromotion?.code
             ? { promotionCode: String(window.dartAppliedPromotion.code) }
             : {}),
