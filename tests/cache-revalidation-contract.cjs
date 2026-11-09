@@ -13,6 +13,19 @@ const recovery = fs.readFileSync(path.join(root, 'Js', 'dart-cache-recovery.js')
 const staging = fs.readFileSync(path.join(root, 'scripts', 'stage-vercel-public.cjs'), 'utf8');
 const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+const imageManifest = JSON.parse(fs.readFileSync(path.join(root, 'scripts/store-image-manifest.json'), 'utf8'));
+for (const image of imageManifest.images) {
+  const original = fs.readFileSync(path.join(root, image.source));
+  assert.equal(crypto.createHash('sha256').update(original).digest('hex'), image.sourceSha256,
+    'Optimization must preserve the reviewed original image');
+  for (const variant of image.variants) {
+    const bytes = fs.readFileSync(path.join(root, variant.path));
+    assert.equal(bytes.length, variant.bytes);
+    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), variant.sha256);
+    assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
+    assert(bytes.length < 100_000, 'Each delivered photo must stay below 100 KB');
+  }
+}
 
 assert.match(sw, /DART_CACHE_PREFIX = 'dart-static-'/);
 assert.match(sw, /caches\.keys\(\)/);
@@ -110,6 +123,14 @@ if (fs.existsSync(path.join(root, 'public/index.html'))) {
           if (/^(?:https?:)?\/\//i.test(match[1])) continue;
           verify(file, match[1], match[2]); images++;
         }
+        for (const match of html.matchAll(/\b(?:srcset|imagesrcset)="([^"]+)"/gi)) {
+          if (!match[1].includes('/Photos/optimized/')) continue;
+          for (const candidate of match[1].split(',')) {
+            const parts = candidate.trim().match(/^(\S+)\?v=([a-f0-9]{16}) (480|960)w$/);
+            assert(parts, 'Every responsive candidate must be content-versioned');
+            verify(file, parts[1], parts[2]);
+          }
+        }
       } else if (entry.name.endsWith('.css')) {
         for (const match of fs.readFileSync(file, 'utf8').matchAll(/url\(["']?([^"'()]+\.(?:png|jpe?g|webp|avif|gif|svg|ico|woff2?))\?v=([a-f0-9]{16})/gi)) {
           if (/^(?:https?:)?\/\//i.test(match[1])) continue;
@@ -123,6 +144,16 @@ if (fs.existsSync(path.join(root, 'public/index.html'))) {
   const html = fs.readFileSync(path.join(staged, 'index.html'), 'utf8');
   const preload = html.match(/rel="preload" as="image" href="([^"]+)"/)[1];
   assert(html.includes(`src="${preload}"`), 'Hero preload and displayed image must use the same cache key');
+  const hero = html.match(/<img id="dart-hero-image"[^>]+>/)[0];
+  const preloadTag = html.match(/<link rel="preload" as="image"[^>]+>/)[0];
+  assert.equal(preloadTag.match(/imagesrcset="([^"]+)"/)[1], hero.match(/srcset="([^"]+)"/)[1]);
+  assert.equal(preloadTag.match(/imagesizes="([^"]+)"/)[1], hero.match(/sizes="([^"]+)"/)[1]);
+  assert.match(hero, /width="960" height="1280"/);
+  for (const page of ['index.html', 'products.html']) {
+    const source = fs.readFileSync(path.join(staged, page), 'utf8');
+    assert.doesNotMatch(source, /(?:src|href)="[^"']*Made For You[^"']*\.png/);
+    assert.equal([...source.matchAll(/class="Made-For-You2"[^>]*srcset=/g)].length, 2);
+  }
 }
 
 console.log('PASS public HTML revalidation, private no-store, static shell and content-versioned delivery');

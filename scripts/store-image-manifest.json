@@ -1,0 +1,69 @@
+{
+  "format": "webp",
+  "quality": 88,
+  "images": [
+    {
+      "source": "Photos/Made For You2.png",
+      "sourceBytes": 3812540,
+      "sourceSha256": "fcf443889f10bbed3dfcaa8a56bac61c07e2caa5895ae9b88bb169c14baf0c85",
+      "variants": [
+        {
+          "path": "Photos/optimized/made-for-you-2-480.webp",
+          "width": 480,
+          "height": 640,
+          "bytes": 30562,
+          "sha256": "5e84f78d0c764e0cb848f6d62bc0bb6dcdd8b54290e0e47bfb872ac205bcb33b"
+        },
+        {
+          "path": "Photos/optimized/made-for-you-2-960.webp",
+          "width": 960,
+          "height": 1280,
+          "bytes": 88320,
+          "sha256": "beab6fa1fdf815dfb3b3a6507adff502f85223d8216b04d3042e768bdd37665d"
+        }
+      ]
+    },
+    {
+      "source": "Photos/Made For You 4.png",
+      "sourceBytes": 3860388,
+      "sourceSha256": "736e2608c324b425a90520791a379420ce4c465566ced727750b3c811a0bf1df",
+      "variants": [
+        {
+          "path": "Photos/optimized/made-for-you-4-480.webp",
+          "width": 480,
+          "height": 640,
+          "bytes": 32438,
+          "sha256": "73e36b4966f1aec48d9e91129828a876e5705d86c48d688b4cf2c7ea00cbe1c8"
+        },
+        {
+          "path": "Photos/optimized/made-for-you-4-960.webp",
+          "width": 960,
+          "height": 1280,
+          "bytes": 92128,
+          "sha256": "68777ec210faa25e5bcbc878cf75999b717562a855248ef6a897258bce689c98"
+        }
+      ]
+    },
+    {
+      "source": "Photos/model1.jpg",
+      "sourceBytes": 476906,
+      "sourceSha256": "dfa86a4b9a89feb2cfc7108ab112c3a73f90a4484917d5996edee97de6a70230",
+      "variants": [
+        {
+          "path": "Photos/optimized/hero-model1-480.webp",
+          "width": 480,
+          "height": 640,
+          "bytes": 26990,
+          "sha256": "6b0ce7b1327287ac0a027181935fb677365000b1716a32cc2f4f1ea4a1d03b30"
+        },
+        {
+          "path": "Photos/optimized/hero-model1-960.webp",
+          "width": 960,
+          "height": 1280,
+          "bytes": 87560,
+          "sha256": "1830bb0903954beb5270af4a7865c22e17d2501923ebb03261a53c8ccd78d1da"
+        }
+      ]
+    }
+  ]
+}

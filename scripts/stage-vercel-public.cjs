@@ -97,7 +97,7 @@ function versionHtmlAssets() {
   let versionedReferences = 0;
   for (const htmlPath of collectHtmlFiles(OUTPUT_DIR)) {
     const html = fs.readFileSync(htmlPath, 'utf8');
-    const next = html.replace(
+    let next = html.replace(
       VERSIONABLE_ASSET_RE,
       (match, attribute, quote, assetUrl, fragment = '') => {
         const localAsset = resolveLocalAsset(htmlPath, assetUrl);
@@ -106,6 +106,22 @@ function versionHtmlAssets() {
         return `${attribute}=${quote}${assetUrl}?v=${contentVersion(localAsset)}${fragment || ''}${quote}`;
       },
     );
+    // Keep responsive images and their preload on the same content-versioned URLs.
+    next = next.replace(/\b(srcset|imagesrcset)\s*=\s*(["'])(.*?)\2/gi,
+      (match, attribute, quote, candidates) => {
+        if (/data:/i.test(candidates)) return match;
+        const versioned = candidates.split(',').map((candidate) => {
+          const parts = candidate.trim().match(/^(\S+)(\s+\d+(?:\.\d+)?[wx])?$/);
+          if (!parts) return candidate;
+          const url = parts[1].match(/^([^?#]+)(?:\?[^#]*)?(#.*)?$/);
+          if (!url || !/\.(?:png|jpe?g|webp|avif|gif|svg)$/i.test(url[1])) return candidate;
+          const localAsset = resolveLocalAsset(htmlPath, url[1]);
+          if (!localAsset) return candidate;
+          versionedReferences += 1;
+          return `${url[1]}?v=${contentVersion(localAsset)}${url[2] || ''}${parts[2] || ''}`;
+        }).join(', ');
+        return `${attribute}=${quote}${versioned}${quote}`;
+      });
     if (next !== html) fs.writeFileSync(htmlPath, next);
   }
   if (!versionedReferences)

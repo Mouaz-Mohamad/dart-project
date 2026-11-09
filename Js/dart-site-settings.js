@@ -21,6 +21,8 @@
   let publicSettingsEtag = "";
   let lastSettingsCheckAt = 0;
   let founderMediaRequest = 0;
+  let heroMediaRequest = 0;
+  const heroDefaults = new WeakMap();
   const SETTINGS_POLL_MS = 60_000;
   const defaults = Object.freeze({
     version: 1,
@@ -318,23 +320,33 @@
     const settings = get();
     const founder = root.document?.getElementById("dart-founder-image");
     const founderRequest = ++founderMediaRequest;
+    const heroRequest = ++heroMediaRequest;
     const hero = root.document?.querySelector(".hero > img[data-dart-hero]");
     if (hero) {
+      if (!heroDefaults.has(hero)) heroDefaults.set(hero, {
+        src: hero.getAttribute("src") || "/Photos/hero 2.png",
+        srcset: hero.getAttribute("srcset"),
+        sizes: hero.getAttribute("sizes"),
+      });
+      const original = heroDefaults.get(hero);
       const isDay = cairoParts().hour >= 6 && cairoParts().hour < 18;
       const selected = isDay
         ? settings.heroDayImage || settings.heroNightImage
         : settings.heroNightImage || settings.heroDayImage;
-      const currentSource = hero.getAttribute("src") || "/Photos/hero 2.png";
-      const nextSource = await resolveImage(selected, currentSource);
-      const currentUrl = hero.src;
-      let nextUrl = nextSource;
-      try { nextUrl = new URL(nextSource, root.location?.href || "http://localhost/").href; } catch {}
-      if (nextSource && nextUrl !== currentUrl) {
-        hero.dataset.dartMediaReady = "false";
-        hero.src = nextSource;
+      const nextSource = await resolveImage(selected, original.src);
+      if (heroRequest === heroMediaRequest && root.document?.querySelector(".hero > img[data-dart-hero]") === hero) {
+        // A saved dashboard photo must override every static responsive candidate.
+        for (const attribute of ["srcset", "sizes"]) {
+          if ((selected && nextSource !== original.src) || !original[attribute]) hero.removeAttribute(attribute);
+          else hero.setAttribute(attribute, original[attribute]);
+        }
+        if (hero.getAttribute("src") !== nextSource) {
+          hero.dataset.dartMediaReady = "false";
+          hero.src = nextSource;
+        }
+        hero.dataset.timeMode = isDay ? "day" : "night";
+        hero.dataset.dartMediaReady = "true";
       }
-      hero.dataset.timeMode = isDay ? "day" : "night";
-      hero.dataset.dartMediaReady = "true";
     }
     if (founder) {
       const source = await resolveImage(settings.founderImage, FOUNDER_FALLBACK_SRC);
