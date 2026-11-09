@@ -106,14 +106,15 @@ async function messageDatabase() {
       locked_at timestamptz,published_at timestamptz,last_error text,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now());
     CREATE UNIQUE INDEX outbox_events_deduplication_key_unique ON outbox_events(deduplication_key) WHERE deduplication_key IS NOT NULL;
     CREATE TABLE dashboard_domain_state(domain text PRIMARY KEY,version bigint DEFAULT 1,data jsonb DEFAULT '[]',updated_by uuid,updated_at timestamptz);
-    INSERT INTO dashboard_domain_state(domain) VALUES('birthday_messages'),('message_queue');
+    INSERT INTO dashboard_domain_state(domain) VALUES('birthday_messages'),('message_queue'),('customers');
     CREATE TABLE message_records(domain text,record_id text,position bigint,payload jsonb,updated_at timestamptz DEFAULT now(),PRIMARY KEY(domain,record_id));
     CREATE TABLE site_settings(id text,data jsonb);INSERT INTO site_settings VALUES('main','{"birthdayDiscountPercent":30}');
     CREATE TABLE audit_logs(actor_type text,actor_id uuid,action text,entity_type text,entity_id text,request_id text,old_values jsonb,new_values jsonb,metadata jsonb);
-    CREATE TABLE orders(id uuid PRIMARY KEY,order_code text,customer_user_id uuid,status text,delivered_at timestamptz,is_deleted boolean DEFAULT false);`);
+    CREATE TABLE orders(id uuid PRIMARY KEY,order_code text,customer_user_id uuid,status text,delivered_at timestamptz,is_deleted boolean DEFAULT false,contact_snapshot jsonb);`);
     await db.exec(await readFile(new URL("../migrations/0061_delivery_safety_and_birthday_consent.sql", import.meta.url), "utf8"));
     await db.exec(await readFile(new URL("../migrations/0066_whatsapp_delivery_status.sql", import.meta.url), "utf8"));
     await db.exec(await readFile(new URL("../migrations/0067_whatsapp_automations.sql", import.meta.url), "utf8"));
+    await db.exec(await readFile(new URL("../migrations/0082_whatsapp_guest_customer_delivery.sql", import.meta.url), "utf8"));
     return db;
 }
 const deliveryConfig = { whatsappSendEnabled: true, whatsappAccessToken: "synthetic-nonsecret", whatsappPhoneNumberId: "123456789", whatsappGraphApiVersion: "v26.0",
@@ -198,15 +199,15 @@ async function birthdayCustomer(db: PGlite) {
     await db.query("INSERT INTO account_phones VALUES($1,'customer',true,'201000000000')", [id]);
     return { id, today, actor: randomUUID() };
 }
-describe("birthday command and explicit opt-in", () => {
-    it("refuses missing configuration and consent without inventing a queued message", async () => {
+describe("birthday command with account and guest eligibility", () => {
+    it("requires a template but not a separate opt-in row", async () => {
         const db = await messageDatabase(), customer = await birthdayCustomer(db);
         await expect(new BirthdayMessagingService(poolFor(db), "").queue([customer.id], customer.today, customer.actor, "request"))
             .rejects.toMatchObject({ code: "BIRTHDAY_TEMPLATE_NOT_CONFIGURED" });
         const service = new BirthdayMessagingService(poolFor(db), "synthetic_birthday");
         expect(await service.preference(customer.id)).toMatchObject({ birthdayMarketing: false });
-        await expect(service.queue([customer.id], customer.today, customer.actor, "request")).rejects.toMatchObject({ code: "BIRTHDAY_RECIPIENTS_NOT_ELIGIBLE" });
-        expect((await db.query("SELECT * FROM outbox_events")).rows).toHaveLength(0);
+        expect(await service.queue([customer.id], customer.today, customer.actor, "request")).toMatchObject({queued:1});
+        expect((await db.query("SELECT * FROM outbox_events")).rows).toHaveLength(1);
     });
     it("atomically creates one event and two projections, deduplicates, and suppresses after opt-out", async () => {
         const db = await messageDatabase(), customer = await birthdayCustomer(db), pool = poolFor(db);
