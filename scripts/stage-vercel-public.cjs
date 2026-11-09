@@ -131,7 +131,11 @@ function inlineSharedShell() {
         `(<(?:header|footer|section|div)\\b[^>]*\\bid=["']${id}["'][^>]*)(>\\s*</(?:header|footer|section|div)>)`,
         'i',
       );
-      html = html.replace(pattern, (_match, opening, ending) => {
+      html = html.replace(pattern, (_match, opening, ending, offset) => {
+        // Never inject a live section into an HTML comment. Comments may
+        // include copied page markup that must remain disabled.
+        const before = html.slice(0, offset);
+        if (before.lastIndexOf('<!--') > before.lastIndexOf('-->')) return _match;
         inlined += 1;
         return `${opening} data-dart-static="${contentVersion(path.join(OUTPUT_DIR, 'sections', partial))}">${markup}${ending.slice(ending.indexOf('</'))}`;
       });
@@ -188,6 +192,13 @@ require('./check-google-setup.cjs');
 
 const cssBytesSaved = minifyStylesheets(OUTPUT_DIR);
 const inlined = inlineSharedShell();
+// Checkout must never contain archived marketing/story sections.
+const checkoutMarkup = fs.readFileSync(path.join(OUTPUT_DIR, 'cart-checkout.html'), 'utf8');
+if (/<section\\b[^>]*\\bid=["'](?:story|birthday|birthday-details|dart-for-you|card-details|why|feedback-form|leaderboard-card)["']/i.test(checkoutMarkup) ||
+    checkoutMarkup.includes('The Story') || checkoutMarkup.includes('HBD to you')) {
+  throw new Error('Checkout contains retired non-checkout sections');
+}
+
 const versionedReferences = versionHtmlAssets();
 console.log(
   `Vercel static output staged in public/: ${inlined} shared sections and ${versionedReferences} versioned CSS/JS references; ${cssBytesSaved} CSS bytes removed from delivery.`,
