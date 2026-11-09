@@ -13,13 +13,13 @@ export interface JoinWaitingInput {
 }
 
 export interface ManualWaitingInput {
-  customerUserId?: string;
-  customerName?: string;
-  phone?: string;
+  customerUserId?: string | undefined;
+  customerName?: string | undefined;
+  phone?: string | undefined;
   modelId: string;
   size: string;
   color: string;
-  notes?: string;
+  notes?: string | undefined;
   consentConfirmed: boolean;
 }
 
