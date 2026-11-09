@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 const root = path.resolve(__dirname, '..');
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
@@ -77,5 +78,51 @@ assert.match(cacheControlFor('/sw.js'), /no-store/,
   '/sw.js must bypass browser/CDN caches during retirement');
 assert.match(cacheControlFor('/Js/dart-cache-recovery.js'), /no-store/,
   'Cache recovery script must bypass browser/CDN caches during migration');
+
+const staticSource = '/(CSS|Js|Photos|Icons)/(.*)';
+const versionedRule = config.headers.find(entry => entry.source === staticSource && entry.has);
+assert.deepEqual(versionedRule?.has, [{ type: 'query', key: 'v', value: '[a-f0-9]{16}' }]);
+assert.match(versionedRule.headers[0].value, /max-age=31536000, immutable/);
+const plainRule = config.headers.find(entry => entry.source === staticSource && !entry.has);
+assert.match(plainRule.headers[0].value, /max-age=0, must-revalidate/);
+for (const protectedPath of ['/Photos/me.png', '/Photos/me.webp', '/Js/dart-cache-recovery.js'])
+  assert(config.headers.findIndex(entry => entry.source === protectedPath) > config.headers.indexOf(versionedRule),
+    'Founder fallbacks and cache recovery retain their explicit no-store override');
+
+// Validate actual delivery bytes: a stale hash after an image/style edit must fail.
+if (fs.existsSync(path.join(root, 'public/index.html'))) {
+  const staged = path.join(root, 'public');
+  let images = 0, backgrounds = 0;
+  const verify = (file, assetUrl, hash) => {
+    const asset = assetUrl.startsWith('/') ? path.join(staged, decodeURIComponent(assetUrl)) :
+      path.resolve(path.dirname(file), decodeURIComponent(assetUrl));
+    assert(asset.startsWith(staged + path.sep));
+    assert.equal(hash, crypto.createHash('sha256').update(fs.readFileSync(asset)).digest('hex').slice(0, 16),
+      `${file}: URL must change when ${assetUrl} changes`);
+  };
+  function walk(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
+      if (entry.isDirectory()) { walk(file); continue; }
+      if (entry.name.endsWith('.html')) {
+        const html = fs.readFileSync(file, 'utf8');
+        for (const match of html.matchAll(/\b(?:src|href)=["']([^"']+\.(?:png|jpe?g|webp|avif|gif|svg|ico))\?v=([a-f0-9]{16})/gi)) {
+          if (/^(?:https?:)?\/\//i.test(match[1])) continue;
+          verify(file, match[1], match[2]); images++;
+        }
+      } else if (entry.name.endsWith('.css')) {
+        for (const match of fs.readFileSync(file, 'utf8').matchAll(/url\(["']?([^"'()]+\.(?:png|jpe?g|webp|avif|gif|svg|ico|woff2?))\?v=([a-f0-9]{16})/gi)) {
+          if (/^(?:https?:)?\/\//i.test(match[1])) continue;
+          verify(file, match[1], match[2]); backgrounds++;
+        }
+      }
+    }
+  }
+  walk(staged);
+  assert(images > 0 && backgrounds > 0, 'HTML and CSS media must both be content-versioned');
+  const html = fs.readFileSync(path.join(staged, 'index.html'), 'utf8');
+  const preload = html.match(/rel="preload" as="image" href="([^"]+)"/)[1];
+  assert(html.includes(`src="${preload}"`), 'Hero preload and displayed image must use the same cache key');
+}
 
 console.log('PASS public HTML revalidation, private no-store, static shell and content-versioned delivery');

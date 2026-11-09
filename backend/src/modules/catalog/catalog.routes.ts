@@ -73,10 +73,14 @@ export function createCatalogRouter(
   });
 
   router.get("/catalog", async (request, response) => {
-    response.setHeader("Cache-Control", "no-store");
-    response.status(200).json(await catalog.publicCatalog(
+    const state = await catalog.publicCatalog(
       ["page", "limit", "q", "category", "sort"].some((key) => key in request.query) ? pageSchema.parse(request.query) : undefined,
-    ));
+    );
+    // Only the public projection may be kept in the browser HTTP cache. Always
+    // read authoritative stock before Express validates the response ETag (304).
+    response.setHeader("Cache-Control", "private, no-cache, max-age=0, must-revalidate");
+    response.removeHeader("Pragma");
+    response.status(200).json(state);
   });
 
   router.get("/catalog/sitemap.xml", async (_request, response) => {

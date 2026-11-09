@@ -18,7 +18,7 @@ const PUBLIC_ROOT_FILES = new Set([
   'push-sw.js',
 ]);
 const VERSIONABLE_ASSET_RE =
-  /\b(src|href)\s*=\s*(["'])([^"'?#]+\.(?:css|js))(?:\?[^"'#]*)?(#[^"']*)?\2/gi;
+  /\b(src|href)\s*=\s*(["'])([^"'?#]+\.(?:css|js|png|jpe?g|webp|avif|gif|svg|ico|woff2?))(?:\?[^"'#]*)?(#[^"']*)?\2/gi;
 
 function copyEntry(source) {
   const destination = path.join(OUTPUT_DIR, source);
@@ -71,6 +71,7 @@ function resolveLocalAsset(htmlPath, assetUrl) {
     /^(?:data|blob|javascript):/i.test(assetUrl)
   )
     return null;
+  try { assetUrl = decodeURIComponent(assetUrl); } catch { return null; }
   const candidate = assetUrl.startsWith('/')
     ? path.resolve(OUTPUT_DIR, `.${assetUrl}`)
     : path.resolve(path.dirname(htmlPath), assetUrl);
@@ -110,6 +111,28 @@ function versionHtmlAssets() {
   if (!versionedReferences)
     throw new Error('No local CSS/JS references were content-versioned');
   return versionedReferences;
+}
+
+// Background images/fonts use the same content-based identity as HTML images.
+// Run before hashing CSS references so the final stylesheet bytes are versioned.
+function versionCssAssets(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) versionCssAssets(file);
+    else if (entry.name.endsWith('.css')) {
+      const source = fs.readFileSync(file, 'utf8');
+      const next = source.replace(/url\(\s*(?:(["'])(.*?)\1|([^'"()\s]+))\s*\)/gi,
+        (match, quote, quoted, unquoted) => {
+          const url = quoted ?? unquoted ?? '';
+          const parts = url.match(/^([^?#]+\.(?:png|jpe?g|webp|avif|gif|svg|ico|woff2?))(?:\?[^#]*)?(#.*)?$/i);
+          if (!parts) return match;
+          const asset = resolveLocalAsset(file, parts[1]);
+          if (!asset) return match;
+          return `url(${quote || ''}${parts[1]}?v=${contentVersion(asset)}${parts[2] || ''}${quote || ''})`;
+        });
+      if (next !== source) fs.writeFileSync(file, next);
+    }
+  }
 }
 
 function inlineSharedShell() {
@@ -191,6 +214,7 @@ fs.writeFileSync(
 require('./check-google-setup.cjs');
 
 const cssBytesSaved = minifyStylesheets(OUTPUT_DIR);
+versionCssAssets(OUTPUT_DIR);
 const inlined = inlineSharedShell();
 // Checkout must never contain archived marketing/story sections.
 const checkoutMarkup = fs.readFileSync(path.join(OUTPUT_DIR, 'cart-checkout.html'), 'utf8');
