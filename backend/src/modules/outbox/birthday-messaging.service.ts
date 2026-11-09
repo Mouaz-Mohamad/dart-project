@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { normalizeEgyptianPhone } from "../../security/normalization.js";
 export const BIRTHDAY_CONSENT_VERSION = "birthday-whatsapp-v1";
 export const REVIEW_CONSENT_VERSION = "post-delivery-whatsapp-v1";
 export class BirthdayMessagingService {
@@ -56,24 +57,33 @@ export class BirthdayMessagingService {
             client.release();
         }
     }
+
     async queueToday(): Promise<{ queued: number }> {
         if (!this.template) return { queued: 0 };
-        const result = await this.pool.query<{ user_id: string; birthday_date: string }>(`
-          SELECT c.user_id::text,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS birthday_date
+        // Account and manual dashboard clients are equally eligible when a birthday and phone exist.
+        const result = await this.pool.query<{ ref: string; birthday_date: string }>(`
+          WITH today AS (SELECT (now() AT TIME ZONE 'Africa/Cairo')::date AS date)
+          SELECT c.user_id::text AS ref,t.date::text AS birthday_date
           FROM customers c JOIN users u ON u.id=c.user_id
-          JOIN customer_whatsapp_preferences p ON p.customer_user_id=c.user_id
           JOIN account_phones ph ON ph.user_id=c.user_id AND ph.is_primary AND ph.account_type='customer'
-          WHERE u.status='active' AND u.deleted_at IS NULL AND p.birthday_marketing
-            AND p.consented_at IS NOT NULL AND p.consent_version=$1 AND p.phone_normalized=ph.phone_normalized
-            AND to_char(c.birthday,'MM-DD')=to_char(now() AT TIME ZONE 'Africa/Cairo','MM-DD')
-            AND NOT EXISTS(SELECT 1 FROM outbox_events e WHERE e.deduplication_key=
-              'birthday:'||c.user_id::text||':'||(now() AT TIME ZONE 'Africa/Cairo')::date::text)
-          ORDER BY c.user_id LIMIT 100`, [BIRTHDAY_CONSENT_VERSION]);
-        const date = result.rows[0]?.birthday_date;
-        if (!date) return { queued: 0 };
-        return this.queue(result.rows.map(row => row.user_id), date, null, 'whatsapp-auto-birthday');
+          CROSS JOIN today t
+          WHERE u.status='active' AND u.deleted_at IS NULL
+            AND to_char(c.birthday,'MM-DD')=to_char(t.date,'MM-DD')
+          UNION ALL
+          SELECT COALESCE(NULLIF(p.data->>'clientId',''),NULLIF(p.data->>'id','')) AS ref,
+                 t.date::text AS birthday_date
+          FROM dashboard_domain_state d CROSS JOIN LATERAL jsonb_array_elements(d.data) AS p(data)
+          CROSS JOIN today t
+          WHERE d.domain='customers' AND p.data->>'birthday' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+            AND substring(p.data->>'birthday' FROM 6 FOR 5)=to_char(t.date,'MM-DD')
+            AND COALESCE(p.data->>'isDeleted','false')<>'true'
+            AND COALESCE(p.data->>'isArchived','false')<>'true'
+          ORDER BY ref LIMIT 200`);
+        if (!result.rows.length) return { queued: 0 };
+        return this.queue([...new Set(result.rows.map(row => row.ref).filter(Boolean))].slice(0,100),
+          result.rows[0]!.birthday_date, null, "whatsapp-auto-birthday");
     }
-    async queue(customerRefs: string[], birthdayDate: string, actorId: string | null, requestId: string) {
+        async queue(customerRefs: string[], birthdayDate: string, actorId: string | null, requestId: string) {
         if (!this.template)
             throw new AppError(503, "BIRTHDAY_TEMPLATE_NOT_CONFIGURED", "Configure the approved birthday WhatsApp template before sending");
         const client = await this.pool.connect();
@@ -91,46 +101,80 @@ export class BirthdayMessagingService {
                 data: Record<string, unknown>;
             }>("SELECT data FROM site_settings WHERE id='main'");
             const percent = Math.max(0, Math.min(100, Number(settings.rows[0]?.data.birthdayDiscountPercent ?? 30)));
-            const customers = await client.query<{
-                user_id: string;
-                client_code: string;
-                full_name: string;
-                phone_normalized: string;
-                consented: boolean;
+            const accounts = await client.query<{
+                user_id: string; client_code: string; full_name: string; phone_normalized: string;
             }>(`
-        SELECT c.user_id::text,c.client_code,c.full_name,ph.phone_normalized,
-          COALESCE(p.birthday_marketing AND p.phone_normalized=ph.phone_normalized AND p.consented_at IS NOT NULL AND p.consent_version=$3,false) AS consented
-        FROM customers c JOIN users u ON u.id=c.user_id
-        JOIN account_phones ph ON ph.user_id=c.user_id AND ph.is_primary AND ph.account_type='customer'
-        LEFT JOIN customer_whatsapp_preferences p ON p.customer_user_id=c.user_id
-        WHERE (c.user_id::text=ANY($1::text[]) OR c.client_code=ANY($1::text[]))
-          AND u.status='active' AND u.deleted_at IS NULL
-          AND to_char(c.birthday,'MM-DD')=to_char($2::date,'MM-DD') ORDER BY c.user_id FOR SHARE OF c,u,ph`, [customerRefs, birthdayDate, BIRTHDAY_CONSENT_VERSION]);
-            let queued = 0, alreadyQueued = 0;
-            const matched = new Set(customers.rows.flatMap(row => [row.user_id, row.client_code]));
+              SELECT c.user_id::text,c.client_code,c.full_name,ph.phone_normalized
+              FROM customers c JOIN users u ON u.id=c.user_id
+              JOIN account_phones ph ON ph.user_id=c.user_id AND ph.is_primary AND ph.account_type='customer'
+              WHERE (c.user_id::text=ANY($1::text[]) OR c.client_code=ANY($1::text[]))
+                AND u.status='active' AND u.deleted_at IS NULL
+                AND to_char(c.birthday,'MM-DD')=to_char($2::date,'MM-DD')
+              ORDER BY c.user_id FOR SHARE OF c,u,ph`, [customerRefs,birthdayDate]);
+            const manual = await client.query<{
+                user_id: null; client_code: string; full_name: string; phone_normalized: string;
+            }>(`
+              SELECT NULL::text AS user_id,
+                COALESCE(NULLIF(p.data->>'clientId',''),NULLIF(p.data->>'id','')) AS client_code,
+                COALESCE(NULLIF(p.data->>'clientName',''),'Dart customer') AS full_name,
+                p.data->>'phone1' AS phone_normalized
+              FROM dashboard_domain_state d CROSS JOIN LATERAL jsonb_array_elements(d.data) AS p(data)
+              WHERE d.domain='customers'
+                AND (p.data->>'clientId'=ANY($1::text[]) OR p.data->>'id'=ANY($1::text[]))
+                AND p.data->>'birthday' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                AND substring(p.data->>'birthday' FROM 6 FOR 5)=to_char($2::date,'MM-DD')
+                AND COALESCE(p.data->>'isDeleted','false')<>'true'
+                AND COALESCE(p.data->>'isArchived','false')<>'true'`,
+              [customerRefs,birthdayDate]);
+            // Prefer registered account data when a phone appears in both projections.
+            const recipients = [...accounts.rows,...manual.rows];
+            const matched = new Set(recipients.flatMap(row => [row.user_id,row.client_code].filter(Boolean)));
             const skipped: string[] = customerRefs.filter(ref => !matched.has(ref));
-            for (const row of customers.rows) {
-                if (!row.consented) {
-                    skipped.push(row.client_code);
-                    continue;
+            const seenPhones = new Set<string>();
+            let queued = 0, alreadyQueued = 0;
+            for (const row of recipients) {
+                let phone: string;
+                try { phone=normalizeEgyptianPhone(row.phone_normalized || ""); }
+                catch { skipped.push(row.client_code); continue; }
+                if (seenPhones.has(phone)) { alreadyQueued++; continue; }
+                seenPhones.add(phone);
+                // Respect a customer's explicit opt-out, but do not require an online account or opt-in row.
+                if (row.user_id) {
+                    const optedOut = await client.query<{ denied: boolean }>(`
+                      SELECT EXISTS(SELECT 1 FROM customer_whatsapp_preferences
+                        WHERE customer_user_id=$1 AND NOT birthday_marketing
+                          AND consent_version=$2) AS denied`,
+                      [row.user_id,BIRTHDAY_CONSENT_VERSION]);
+                    if (optedOut.rows[0]?.denied) { skipped.push(row.client_code); continue; }
                 }
-                const id = randomUUID(), key = `birthday:${row.user_id}:${birthdayDate}`, recordId = `BDAY-${birthdayDate}-${row.client_code}`;
-                const inserted = await client.query<{
-                    id: string;
-                }>(`INSERT INTO outbox_events(id,aggregate_type,aggregate_id,event_type,payload,deduplication_key,available_at)
-          VALUES($1,'customer',$2,'CUSTOMER_BIRTHDAY_MESSAGE',$3::jsonb,$4,($5::date+time '13:00') AT TIME ZONE 'Africa/Cairo')
-          ON CONFLICT(deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING RETURNING id::text`, [id, row.user_id, JSON.stringify({ channel: "whatsapp", to: row.phone_normalized, template: this.template,
-                        birthdayDate, category: "marketing", consentVersion: BIRTHDAY_CONSENT_VERSION, parameters: [row.full_name, String(percent), "7"] }), key, birthdayDate]);
-                if (!inserted.rows.length) {
-                    alreadyQueued += 1;
-                    continue;
-                }
-                const record = { id: recordId, messageKey: key, clientId: row.client_code, customerRecordId: row.user_id,
-                    birthdayDate, outboxEventId: id, queuedAt: new Date().toISOString(), status: "Queued", channel: "whatsapp" };
-                for (const domain of ["birthday_messages", "message_queue"])
+                const existing = await client.query<{ already: boolean }>(`
+                  SELECT EXISTS(SELECT 1 FROM outbox_events
+                    WHERE event_type='CUSTOMER_BIRTHDAY_MESSAGE'
+                      AND payload->>'to'=$1 AND payload->>'birthdayDate'=$2) AS already`,
+                  [phone,birthdayDate]);
+                if (existing.rows[0]?.already) { alreadyQueued++; continue; }
+                const id=randomUUID(), key=`birthday:${phone}:${birthdayDate}`;
+                const recordId=`BDAY-${birthdayDate}-${row.client_code}`;
+                const inserted=await client.query<{ id: string }>(`
+                  INSERT INTO outbox_events(id,aggregate_type,aggregate_id,event_type,payload,deduplication_key,available_at)
+                  VALUES($1,'customer',$2,'CUSTOMER_BIRTHDAY_MESSAGE',$3::jsonb,$4,
+                    ($5::date+time '13:00') AT TIME ZONE 'Africa/Cairo')
+                  ON CONFLICT(deduplication_key) WHERE deduplication_key IS NOT NULL DO NOTHING
+                  RETURNING id::text`,
+                  [id,row.user_id || row.client_code,JSON.stringify({channel:"whatsapp",to:phone,
+                    template:this.template,birthdayDate,category:"marketing",
+                    parameters:[row.full_name,String(percent),"7"]}),key,birthdayDate]);
+                if (!inserted.rows.length) { alreadyQueued++; continue; }
+                const record={id:recordId,messageKey:key,clientId:row.client_code,
+                    customerRecordId:row.user_id || null,birthdayDate,outboxEventId:id,
+                    queuedAt:new Date().toISOString(),status:"Queued",channel:"whatsapp"};
+                for (const domain of ["birthday_messages","message_queue"])
                     await client.query(`INSERT INTO message_records(domain,record_id,position,payload)
-          VALUES($1,$2,0,$3::jsonb) ON CONFLICT(domain,record_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=now()`, [domain, recordId, JSON.stringify(record)]);
-                queued += 1;
+                      VALUES($1,$2,0,$3::jsonb)
+                      ON CONFLICT(domain,record_id)
+                      DO UPDATE SET payload=EXCLUDED.payload,updated_at=now()`,
+                      [domain,recordId,JSON.stringify(record)]);
+                queued++;
             }
             if (!queued && !alreadyQueued)
                 throw new AppError(422, "BIRTHDAY_RECIPIENTS_NOT_ELIGIBLE", "No eligible customers with recorded WhatsApp birthday consent were selected");

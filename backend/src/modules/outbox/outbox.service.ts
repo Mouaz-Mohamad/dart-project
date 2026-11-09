@@ -462,30 +462,48 @@ export class OutboxService {
       if (!eligible.rows[0]?.allowed) return {suppressed:true};
     }
     if (row.event_type === "CUSTOMER_BIRTHDAY_MESSAGE") {
-      const eligible=await this.pool.query<{ allowed:boolean }>(`SELECT EXISTS (
-        SELECT 1 FROM customer_whatsapp_preferences p JOIN users u ON u.id=p.customer_user_id
-        JOIN customers c ON c.user_id=p.customer_user_id
-        JOIN account_phones ph ON ph.user_id=p.customer_user_id AND ph.is_primary=true
-        WHERE p.customer_user_id::text=$1 AND u.status='active' AND u.deleted_at IS NULL
-          AND p.birthday_marketing AND p.phone_normalized=$2 AND ph.phone_normalized=p.phone_normalized AND p.consent_version=$4
-          AND $3::date=(now() AT TIME ZONE 'Africa/Cairo')::date
-          AND to_char(c.birthday,'MM-DD')=to_char($3::date,'MM-DD')) AS allowed`,
-        [row.aggregate_id,String(row.payload.to||""),String(row.payload.birthdayDate||""),String(row.payload.consentVersion||"")]);
+      const eligible=await this.pool.query<{allowed:boolean}>(`SELECT
+        $3::date=(now() AT TIME ZONE 'Africa/Cairo')::date AND
+        (EXISTS (
+          SELECT 1 FROM customers c JOIN users u ON u.id=c.user_id
+          JOIN account_phones ph ON ph.user_id=c.user_id AND ph.is_primary AND ph.account_type='customer'
+          WHERE c.user_id::text=$1 AND u.status='active' AND u.deleted_at IS NULL
+            AND ph.phone_normalized=$2
+            AND to_char(c.birthday,'MM-DD')=to_char($3::date,'MM-DD')
+            AND NOT EXISTS(SELECT 1 FROM customer_whatsapp_preferences p
+              WHERE p.customer_user_id=c.user_id AND NOT p.birthday_marketing
+                AND p.consent_version='birthday-whatsapp-v1')
+        ) OR EXISTS (
+          SELECT 1 FROM dashboard_domain_state d
+          CROSS JOIN LATERAL jsonb_array_elements(d.data) p(profile)
+          WHERE d.domain='customers'
+            AND (p.profile->>'clientId'=$1 OR p.profile->>'id'=$1)
+            AND p.profile->>'birthday' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+            AND substring(p.profile->>'birthday' FROM 6 FOR 5)=to_char($3::date,'MM-DD')
+            AND dart_whatsapp_order_phone(p.profile->>'phone1')=$2
+            AND COALESCE(p.profile->>'isDeleted','false')<>'true'
+            AND COALESCE(p.profile->>'isArchived','false')<>'true'
+        )) AS allowed`,
+        [row.aggregate_id,String(row.payload.to||""),String(row.payload.birthdayDate||"")]);
       if (!eligible.rows[0]?.allowed) return {suppressed:true};
     }
     if (row.event_type === "CUSTOMER_POST_DELIVERY_REVIEW") {
-      const eligible = await this.pool.query<{ allowed: boolean }>(`SELECT EXISTS(
-        SELECT 1 FROM orders o JOIN users u ON u.id=o.customer_user_id
-        JOIN customer_whatsapp_preferences p ON p.customer_user_id=o.customer_user_id
-        JOIN account_phones ph ON ph.user_id=o.customer_user_id AND ph.is_primary AND ph.account_type='customer'
+      const eligible=await this.pool.query<{allowed:boolean}>(`SELECT EXISTS (
+        SELECT 1 FROM orders o
         WHERE o.id::text=$1 AND o.status='Delivered' AND NOT o.is_deleted
-          AND o.delivered_at=$2::timestamptz AND o.delivered_at+interval '7 hours'<=now()
-          AND now()<$3::timestamptz AND u.status='active' AND u.deleted_at IS NULL
-          AND p.post_delivery_review AND p.review_consented_at IS NOT NULL
-          AND p.review_consent_version='post-delivery-whatsapp-v1' AND $5='post-delivery-whatsapp-v1'
-          AND p.phone_normalized=$4 AND ph.phone_normalized=p.phone_normalized) AS allowed`,
-        [row.aggregate_id,String(row.payload.deliveredAt||""),String(row.payload.expiresAt||""),
-          String(row.payload.to||""),String(row.payload.consentVersion||"")]);
+          AND o.delivered_at=$2::timestamptz
+          AND o.delivered_at + interval '7 hours' <= now()
+          AND now()<$3::timestamptz
+          AND dart_whatsapp_order_phone(o.contact_snapshot->>'phone1')=$4
+          AND NOT EXISTS (
+            SELECT 1 FROM customer_whatsapp_preferences p
+            WHERE p.customer_user_id=o.customer_user_id AND
+              ((NOT p.post_delivery_review AND p.review_consent_version='post-delivery-whatsapp-v1')
+                OR p.phone_normalized<>$4)
+          )
+      ) AS allowed`,
+        [row.aggregate_id,String(row.payload.deliveredAt||""),
+          String(row.payload.expiresAt||""),String(row.payload.to||"")]);
       if (!eligible.rows[0]?.allowed) return {suppressed:true};
     }
     const payload = this.externalPayload(row.payload || {});

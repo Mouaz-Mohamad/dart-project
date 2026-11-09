@@ -72,7 +72,7 @@ describe("durable WhatsApp automations and receipts", () => {
     "2026-12-01T06:00:00+02:00",
   ])("queues post-delivery feedback at seven elapsed hours with no quiet-hour shift: %s",async(deliveredAt)=>{
     const buyer=await delivered(true,false);
-    // Consent must precede the synthetic historic delivery for the trigger to queue.
+    // Delivery timing is independent of profile preference records.
     await store.pool.query("UPDATE customer_whatsapp_preferences SET review_consented_at=$2::timestamptz-interval '1 day' WHERE customer_user_id=$1",[buyer.id,deliveredAt]);
     await store.pool.query("UPDATE orders SET status='Delivered', delivered_at=$2::timestamptz WHERE id=$1",[buyer.order,deliveredAt]);
     const result=(await store.pool.query("SELECT available_at,payload->>'expiresAt' AS expiry FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
@@ -86,7 +86,7 @@ describe("durable WhatsApp automations and receipts", () => {
     const birthday=new BirthdayMessagingService(store.pool,"birthday");
     await birthday.setPreference(buyer.id,true,"birthday-quiet-test");
     await birthday.queueToday();
-    const key=`birthday:${buyer.id}:${today}`;await makeDue(key);
+    const key=`birthday:${buyer.phone}:${today}`;await makeDue(key);
     const fetch=fakeProvider();
     expect(whatsappSendWindow(quietClock())).toBe(false);
     expect((await sender(true,quietClock).processBatch(1,key)).claimed).toBe(0);
@@ -94,9 +94,9 @@ describe("durable WhatsApp automations and receipts", () => {
     const event=(await store.pool.query("SELECT status,attempts FROM outbox_events WHERE deduplication_key=$1",[key])).rows[0]!;
     expect(event).toMatchObject({status:"pending",attempts:0});
   });
-  it("requires independent review consent and queues only a new delivery, once",async()=>{
+  it("queues account deliveries without requiring a preferences row, only once",async()=>{
     const no=await delivered(false);
-    expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[no.key])).rows).toHaveLength(0);
+    expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[no.key])).rows).toHaveLength(1);
     const yes=await delivered();
     await store.pool.query("UPDATE orders SET status='Delivered' WHERE id=$1",[yes.order]);
     const events=await store.pool.query("SELECT payload,available_at FROM outbox_events WHERE deduplication_key=$1",[yes.key]);
@@ -155,7 +155,7 @@ describe("durable WhatsApp automations and receipts", () => {
     const birthday=new BirthdayMessagingService(store.pool,"birthday");
     await birthday.setPreference(buyer.id,true,"birthday-test");
     await birthday.queueToday();
-    const key=`birthday:${buyer.id}:${today}`;await makeDue(key);
+    const key=`birthday:${buyer.phone}:${today}`;await makeDue(key);
     const fetch=fakeProvider();
     expect((await sender().processBatch(1,key)).published).toBe(1);
     const sent=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
@@ -163,6 +163,36 @@ describe("durable WhatsApp automations and receipts", () => {
     expect(sent.template.components).toEqual([{
       type:"header",parameters:[{type:"image",image:{link:"https://www.dartofficial.com/Photos/dart-birthday-reward.jpg"}}],
     }]);
+  });
+  it("queues a manual guest order seven hours after delivery, without profile preferences",async()=>{
+    const phone="010"+String(Math.floor(Math.random()*100000000)).padStart(8,"0");
+    const order=(await store.pool.query(`INSERT INTO orders(status,order_source,subtotal_minor,final_minor,
+      delivery_address,contact_snapshot) VALUES('New','Manual',0,0,'{}',
+      jsonb_build_object('phone1',$1::text,'name','Manual Buyer')) RETURNING id::text`,[phone])).rows[0]!.id;
+    await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '7 hours' WHERE id=$1",[order]);
+    const key=`post-delivery-review:${order}`;
+    const event=(await store.pool.query("SELECT payload FROM outbox_events WHERE deduplication_key=$1",[key])).rows[0]!;
+    expect(event.payload.to).toBe(`20${phone.slice(1)}`);
+    const fetch=fakeProvider();
+    expect((await sender().processBatch(1,key)).published).toBe(1);
+    expect((await sender().processBatch(1,key)).claimed).toBe(0);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+  it("queues manual customer birthday with no account and never duplicates the phone",async()=>{
+    const today=(await store.pool.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today")).rows[0]!.today as string;
+    const phone="010"+String(Math.floor(Math.random()*100000000)).padStart(8,"0");
+    const clientId=`G-${randomUUID()}`;
+    await store.pool.query(`UPDATE dashboard_domain_state SET data=data||jsonb_build_array(
+      jsonb_build_object('clientId',$1::text,'id',$1::text,'clientName','Guest',
+      'phone1',$2::text,'birthday',$3::text)),version=version+1
+      WHERE domain='customers'`,[clientId,phone,`2001-${today.slice(5)}`]);
+    const service=new BirthdayMessagingService(store.pool,"synthetic_birthday");
+    const first=await service.queue([clientId],today,null,"test-manual-birthday");
+    expect(first.queued).toBe(1);
+    const again=await service.queue([clientId],today,null,"test-repeat-birthday");
+    expect(again.alreadyQueued).toBe(1);
+    const key=`birthday:20${phone.slice(1)}:${today}`;
+    expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[key])).rows).toHaveLength(1);
   });
   async function restockFixture(optIn: boolean) {
     const buyer=await customer();
@@ -345,23 +375,23 @@ describe("durable WhatsApp automations and receipts", () => {
     if(reason==="cancelled")await store.pool.query("UPDATE orders SET status='Cancelled' WHERE id=$1",[buyer.order]);
     if(reason==="changed-delivery")await store.pool.query("UPDATE orders SET delivered_at=delivered_at+interval '1 minute' WHERE id=$1",[buyer.order]);
     if(reason==="expired")await store.pool.query("UPDATE outbox_events SET payload=jsonb_set(payload,'{expiresAt}',to_jsonb((now()-interval '1 hour')::text)) WHERE deduplication_key=$1",[buyer.key]);
-    if(reason==="changed-phone")await store.pool.query("UPDATE customer_whatsapp_preferences SET phone_normalized='201100000000' WHERE customer_user_id=$1",[buyer.id]);
+    if(reason==="changed-phone")await store.pool.query("UPDATE orders SET contact_snapshot=jsonb_set(contact_snapshot,'{phone1}',to_jsonb('01100000000'::text)) WHERE id=$1",[buyer.order]);
     const fetch=fakeProvider();expect((await sender().processBatch(5,buyer.key)).published).toBe(1);expect(fetch).not.toHaveBeenCalled();
     const row=(await store.pool.query("SELECT a.state FROM outbox_delivery_attempts a JOIN outbox_events e ON e.id=a.event_id WHERE e.deduplication_key=$1",[buyer.key])).rows[0]!;
     expect(row.state).toBe("suppressed");
   });
-  it("automatically queues birthday opt-ins at 13:00 and shares manual deduplication",async()=>{
+  it("automatically queues birthdays without a preferences row at 13:00 and deduplicates",async()=>{
     const today=(await store.pool.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today")).rows[0]!.today as string;
     const buyer=await customer(`2000-${today.slice(5)}`), no=await customer(`2000-${today.slice(5)}`);
     const service=new BirthdayMessagingService(store.pool,"synthetic_birthday");
     await service.setPreference(buyer.id,true,"opt-in");
-    expect((await service.queueToday()).queued).toBe(1);
+    expect((await service.queueToday()).queued).toBe(2);
     expect((await service.queueToday()).queued).toBe(0);
     expect((await service.queue([buyer.id],today,null,"manual-retry")).alreadyQueued).toBe(1);
     const row=(await store.pool.query(`SELECT to_char(available_at AT TIME ZONE 'Africa/Cairo','HH24:MI') AS time,
-      payload FROM outbox_events WHERE deduplication_key=$1`,[`birthday:${buyer.id}:${today}`])).rows[0]!;
+      payload FROM outbox_events WHERE deduplication_key=$1`,[`birthday:${buyer.phone}:${today}`])).rows[0]!;
     expect(row.time).toBe("13:00");expect(row.payload.category).toBe("marketing");
-    expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[`birthday:${no.id}:${today}`])).rows).toHaveLength(0);
+    expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[`birthday:${no.phone}:${today}`])).rows).toHaveLength(1);
   });
   it("audits real receipt transitions atomically; duplicate or late callbacks create no audit entry",async()=>{
     const buyer=await delivered();await makeDue(buyer.key);fakeProvider();await sender().processBatch(1,buyer.key);
