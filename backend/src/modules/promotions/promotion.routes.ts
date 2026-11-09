@@ -118,6 +118,14 @@ export function createPromotionRouter(
         z.uuid().parse(request.params.id),data.expectedVersion) });
     });
 
+  router.delete("/admin/discount-codes/:id", signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requirePermission("promotions.manage"), async (request, response) => {
+      const data = z.object({expectedVersion:z.number().int().positive()}).strict().parse(request.body);
+      response.setHeader("Cache-Control","no-store");
+      response.json(await promotions.deleteDiscountCode(
+        z.uuid().parse(request.params.id),data.expectedVersion,request.auth!.userId,String(request.id)));
+    });
+
   router.get(
     "/admin/promotions",
     signedIn,

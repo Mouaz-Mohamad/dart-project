@@ -174,6 +174,45 @@ export class DiscountCodeService {
     } finally { db.release(); }
   }
 
+  /** Permanently remove the coupon definition without erasing order accounting. */
+  public async delete(id: string, expectedVersion: number, actorId: string, requestId: string) {
+    const db = await this.pool.connect();
+    try {
+      await db.query("BEGIN");
+      const current = await db.query<DiscountCode>(`${selectCode} WHERE id=$1 FOR UPDATE`, [id]);
+      const code = current.rows[0];
+      if (!code) throw new AppError(404,"DISCOUNT_CODE_NOT_FOUND","Discount code not found");
+      if (code.version !== expectedVersion)
+        throw new AppError(409,"DISCOUNT_CODE_CONFLICT","Discount code changed; refresh and retry");
+      // Checkout locks the same coupon row; a concurrent redemption cannot race deletion.
+      // Financial usages survive by retaining their code text and discount amounts.
+      const historical = await db.query(
+        "SELECT 1 FROM discount_code_usages WHERE discount_code_id=$1 LIMIT 1", [id]);
+      if (historical.rows.length) {
+        // Unused codes can be hard-deleted with the current schema. Used codes
+        // require migration 0080 to preserve financial rows instead of deleting them.
+        const schema = await db.query<{ ready: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1 FROM information_schema.columns
+              WHERE table_schema=current_schema() AND table_name='discount_code_usages'
+                AND column_name='code_snapshot'
+           ) AS ready`);
+        if (!schema.rows[0]?.ready)
+          throw new AppError(503,"DISCOUNT_CODE_DELETE_MIGRATION_REQUIRED",
+            "Database migration 0080 is required before deleting a redeemed discount code");
+        await db.query("UPDATE discount_code_usages SET code_snapshot=$2 WHERE discount_code_id=$1",
+          [id,code.code]);
+      }
+      await db.query("DELETE FROM discount_codes WHERE id=$1", [id]);
+      await db.query(`INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,old_values,metadata)
+        VALUES('staff',$1,'DISCOUNT_CODE_DELETED','discount_codes',$2,$3,$4::jsonb,$5::jsonb)`,
+        [actorId,id,requestId,JSON.stringify(code),JSON.stringify({code:code.code})]);
+      await db.query("COMMIT");
+      return {deleted:true,id,code:code.code};
+    } catch(error) { await db.query("ROLLBACK").catch(()=>undefined); throw error; }
+    finally { db.release(); }
+  }
+
   public async resolveInTransaction(client: PoolClient, customerId: string, raw: string, cart: DiscountLine[]): Promise<DiscountCode | null> {
     const code = raw.trim().toUpperCase();
     if (!code) return null;

@@ -1050,3 +1050,7 @@ body[data-dart-density="compact"] .dart-compact-record {
     flex-basis: 100%;
   }
 }
+
+#settings .dart-code-row-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+#settings .dart-code-delete-button{color:var(--dart-settings-danger);border-color:#e5b5ae}
+#settings .dart-code-delete-button:hover:not(:disabled){background:#fff0ee;color:var(--dart-settings-danger-deep)}

@@ -1085,6 +1085,29 @@ paths:
       responses:
         "200": { description: Highest-priority eligible campaign or null. Scope and minimum quantity/value are evaluated on matching cart pieces; checkout applies the campaign to those pieces only }
         "409": { $ref: "#/components/responses/Conflict" }
+  /admin/discount-codes/{id}:
+    delete:
+      tags: [Promotions]
+      operationId: permanentlyDeleteDiscountCode
+      description: Permanently removes the redeemable code definition while preserving usage and order financial history after migration 0080. Requires Staff MFA and promotions.manage.
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expectedVersion]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        "200": { description: Code permanently deleted }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /admin/promotions:
     get:
       tags: [Promotions]

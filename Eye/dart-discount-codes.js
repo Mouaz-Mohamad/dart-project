@@ -79,7 +79,42 @@
       btn.textContent="Edit";
       btn.disabled=!can("manage");
       btn.addEventListener("click",()=>edit(code));
-      row.append(info,btn);
+      const actions=document.createElement("div");
+      actions.className="dart-code-row-actions";
+      const remove=document.createElement("button");
+      remove.type="button";
+      remove.className="dart-code-delete-button";
+      remove.textContent="Delete";
+      remove.disabled=!can("manage");
+      remove.addEventListener("click",async()=>{
+        if (!can("manage")) return notice("Not authorized to delete discount codes",true);
+        if (typeof window.DartDialog?.confirm!=="function")
+          return notice("Confirmation unavailable; reload the dashboard",true);
+        const confirmed=await window.DartDialog.confirm(
+          `Delete ${code.code} permanently? New orders cannot use this code. Existing orders retain their financial history.`,
+          {title:"Delete discount code",confirmText:"Delete permanently",cancelText:"Cancel"}
+        );
+        if (!confirmed) return;
+        btn.disabled=true;
+        remove.disabled=true;
+        notice(`Deleting ${code.code}…`);
+        try {
+          await api(`/api/v1/admin/discount-codes/${encodeURIComponent(code.id)}`,
+            {method:"DELETE",body:{expectedVersion:Number(code.version)}});
+          if ($("dart-code-id").value===code.id) clear();
+          codes=codes.filter(entry=>entry.id!==code.id);
+          render();
+          notice(`Deleted ${code.code} permanently`);
+          await load();
+        } catch(error) {
+          notice(error.message||"Unable to delete discount code",true);
+          btn.disabled=!can("manage");
+          remove.disabled=!can("manage");
+          if (error.status===409 || error.status===404) await load();
+        }
+      });
+      actions.append(btn,remove);
+      row.append(info,actions);
       list.append(row);
     }
   }

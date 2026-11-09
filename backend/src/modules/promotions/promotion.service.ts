@@ -215,6 +215,9 @@ export class PromotionService {
   public constructor(private readonly pool: Pool) {}
 
   public listDiscountCodes() { return new DiscountCodeService(this.pool).list(); }
+  public deleteDiscountCode(id:string,version:number,actor:string,requestId:string) {
+    return new DiscountCodeService(this.pool).delete(id,version,actor,requestId);
+  }
   public saveDiscountCode(input: DiscountCodeInput, actorId: string, requestId: string,
     id?: string, expectedVersion?: number) {
     return new DiscountCodeService(this.pool).save(input,actorId,requestId,id,expectedVersion);

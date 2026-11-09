@@ -26,4 +26,10 @@ assert(migration.includes("count(DISTINCT pu.customer_user_id)"), "first-custome
 assert(migration.includes("FOR UPDATE"), "campaign reservation and reward restoration must lock authoritative rows");
 assert(migration.includes("dart_restore_birthday_discount_after_return"), "birthday reuse after a full return must be database-backed");
 
+const couponUi=fs.readFileSync(path.join(root,"Eye","dart-discount-codes.js"),"utf8");
+const couponRoutes=fs.readFileSync(path.join(root,"backend","src","modules","promotions","promotion.routes.ts"),"utf8");
+assert(couponUi.includes('method:"DELETE"') && couponUi.includes("window.DartDialog.confirm"),
+  "admin must confirm permanent removal before calling the API");
+assert(couponRoutes.includes('router.delete("/admin/discount-codes/:id"') && couponRoutes.includes('requirePermission("promotions.manage")'),
+  "coupon hard delete requires staff authorization");
 console.log("Promotion settings and item-priority contract checks passed.");

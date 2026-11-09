@@ -88,6 +88,35 @@ describe("Discount Code: line-level priority, single order amount, lifecycle", (
     expect((await store.pool.query("SELECT status FROM discount_code_usages WHERE order_id=$1",[order.id])).rows[0].status).toBe("Used");
   },30000);
 
+  it("permanently deletes an unused code, rejects stale writes and future redemption", async()=>{
+    const f=await fixture();
+    await expect(coupons.delete(f.offer.id,f.offer.version+1,owner,"stale"))
+      .rejects.toMatchObject({code:"DISCOUNT_CODE_CONFLICT"});
+    expect(await coupons.delete(f.offer.id,f.offer.version,owner,"delete-unused"))
+      .toMatchObject({deleted:true,code:f.couponCode});
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM discount_codes WHERE id=$1",[f.offer.id])).rows[0].n).toBe(0);
+    await expect(coupons.delete(f.offer.id,f.offer.version,owner,"delete-again"))
+      .rejects.toMatchObject({code:"DISCOUNT_CODE_NOT_FOUND"});
+    await expect(commerce.customerCartQuote(f.user,f.reservationId,f.couponCode))
+      .rejects.toMatchObject({code:"PROMOTION_NOT_ELIGIBLE"});
+    expect((await store.pool.query("SELECT action FROM audit_logs WHERE entity_id=$1 AND action='DISCOUNT_CODE_DELETED'",[f.offer.id])).rows).toHaveLength(1);
+  },30000);
+
+  it("preserves ledger and order history when permanently deleting a previously redeemed code", async()=>{
+    const f=await fixture();
+    const order=await commerce.checkout(f.user,f.input,"before-removal",undefined,`checkout-${f.reservationId}`);
+    await coupons.delete(f.offer.id,f.offer.version,owner,"delete-redeemed");
+    const usage=(await store.pool.query(`SELECT discount_code_id,code_snapshot,discount_minor::int AS discount_minor,status
+      FROM discount_code_usages WHERE order_id=$1`,[order.id])).rows[0];
+    expect(usage).toEqual({discount_code_id:null,code_snapshot:f.couponCode,discount_minor:15000,status:"Reserved"});
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM orders WHERE id=$1",[order.id])).rows[0].n).toBe(1);
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM order_items WHERE order_id=$1 AND discount_source='Discount Code'",[order.id])).rows[0].n).toBe(1);
+    await store.pool.query("UPDATE orders SET status='Representative On The Way' WHERE id=$1",[order.id]);
+    await commerce.adminOrderWorkflowAction(owner,String(order.orderId),
+      {expectedStatus:"Representative On The Way",target:"Delivered"},"after-deletion-delivered",false);
+    expect((await store.pool.query("SELECT status FROM discount_code_usages WHERE order_id=$1",[order.id])).rows[0].status).toBe("Used");
+  },30000);
+
   it("rejects an assigned code for another customer", async()=>{
     const f=await fixture();
     const alternate = randomUUID(), email=`${alternate}@example.test`;

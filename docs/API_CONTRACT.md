@@ -306,3 +306,9 @@ The two no-store quantity-offer GET routes are advisory public/customer projecti
 ## Public catalog HTTP revalidation
 
 `GET /api/v1/catalog` permits a browser-only HTTP response cache with `private, no-cache, max-age=0, must-revalidate`. Every request still reads PostgreSQL stock; Express computes the ETag from the full response, including stock and pagination. Matching `If-None-Match` yields 304 without a body; changes yield 200 with fresh data. Default browser fetch transparently reuses a validated body. Shared CDNs, LocalStorage, IndexedDB, offline fallback and authoritative checkout from cached data are not allowed. `/catalog/version`, admin catalog, customer, cart and checkout responses retain no-store. Existing direct-change notifications and version reconciliation remain active.
+
+## Permanent discount code deletion — migration 0080
+
+`DELETE /api/v1/admin/discount-codes/:id` with `{ "expectedVersion": n }` permanently removes the coupon definition (real SQL DELETE), not a soft delete. Staff session, MFA, CSRF and `promotions.manage` are mandatory; Dart Eye prompts for confirmation. Checkout and deletion lock the same discount_codes row. Stale versions return 409; repeat deletes return 404.
+
+Run `0080_discount_code_permanent_delete.sql` on Neon **before using the delete endpoint**. It adds `code_snapshot` to discount_code_usages and changes its FK to `ON DELETE SET NULL`. The delete transaction snapshots the original redeemed code text before deleting the definition; existing order amounts, refunds, Reserved/Used status changes and audit records remain intact. Applying the migration does not delete any of the currently defined codes.
