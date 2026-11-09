@@ -69,6 +69,20 @@
 
 /* BEGIN Mobile storefront and representative layout */
 @media (max-width: 700px) {
+  /* Match news ticker, cart button and menu offset to the compact header. */
+  .under-nav,
+  .dart-nav-ticker,
+  .dart-nav-ticker-message,
+  .under-nav .icon-shop {
+    height: 38px;
+  }
+  .dart-nav-ticker-message {
+    font-size: 15px;
+  }
+  .side-menu,
+  .menu-facke {
+    top: 108px;
+  }
   .product-filter-panel {
     padding: 10px;
   }
