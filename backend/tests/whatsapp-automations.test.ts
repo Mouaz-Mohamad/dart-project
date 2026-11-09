@@ -42,8 +42,9 @@ describe("durable WhatsApp automations and receipts", () => {
       await preferences.setPreference(buyer.id,false,"synthetic",true);
       await store.pool.query("UPDATE customer_whatsapp_preferences SET review_consented_at=now()-interval '2 days' WHERE customer_user_id=$1",[buyer.id]);
     }
-    const order=(await store.pool.query(`INSERT INTO orders(customer_user_id,status,subtotal_minor,final_minor,delivery_address)
-      VALUES($1,'New',0,0,'{}') RETURNING id::text`,[buyer.id])).rows[0]!.id as string;
+    const order=(await store.pool.query(`INSERT INTO orders(customer_user_id,status,subtotal_minor,final_minor,delivery_address,contact_snapshot)
+      VALUES($1,'New',0,0,'{}',jsonb_build_object('phone1',$2::text,'name','Synthetic Customer'))
+      RETURNING id::text`,[buyer.id,buyer.phone])).rows[0]!.id as string;
     if(markDelivered)await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '7 hours' WHERE id=$1",[order]);
     const key=`post-delivery-review:${order}`;
     return {...buyer,order,key,preferences};
