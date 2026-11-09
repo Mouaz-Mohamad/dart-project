@@ -681,8 +681,18 @@ export class WaitingService {
         metadata:{fifo:true,consentConfirmed:true,whatsappOnRestock:true,customerProfileCreated:!existingId},
       });
       await this.bumpVersion(client);
-      // Recheck new stock in the transaction; the DB allocator remains authoritative.
-      await client.query("SELECT dart_waitlist_try_allocate_entry($1,'staff',$2,'manual_waiting_join',$3)",[id,staffId,requestId]);
+      // If stock returned during enrollment, allocate by item, NOT by the
+      // just-created entry. The item allocator selects the oldest eligible
+      // matching request and preserves FIFO for earlier customers.
+      await client.query(
+        `SELECT dart_waitlist_try_allocate_item(i.id)
+           FROM inventory_items i
+          WHERE i.model_id=$1 AND i.size=$2 AND i.color=$3
+            AND i.active AND NOT i.is_archived AND NOT i.is_deleted
+            AND lower(i.status)='in stock'
+          ORDER BY i.created_at,i.id LIMIT 1`,
+        [modelId,size,color],
+      );
       const entry=await this.entryById(client,id);
       await client.query("COMMIT");
       return entry;

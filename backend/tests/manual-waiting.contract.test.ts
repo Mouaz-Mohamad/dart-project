@@ -14,7 +14,8 @@ describe("manual waiting contract",()=>{
  it("enforces out-of-stock exact variants without priority override or WhatsApp at sign-up",()=>{
    expect(s).toContain("STOCK_AVAILABLE");
    expect(s).toContain("false,'manual'");
-   expect(s).toContain("dart_waitlist_try_allocate_entry");
+   expect(s).toContain("dart_waitlist_try_allocate_item(i.id)");
+   expect(s).not.toContain("manual_waiting_join");
    expect(s).toContain("WAITLIST_MANUAL_CREATED");
    expect(m).toContain("source IN ('website','manual')");
  });
