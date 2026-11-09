@@ -80,8 +80,15 @@ export class BirthdayMessagingService {
             AND COALESCE(p.data->>'isArchived','false')<>'true'
           ORDER BY ref LIMIT 200`);
         if (!result.rows.length) return { queued: 0 };
-        return this.queue([...new Set(result.rows.map(row => row.ref).filter(Boolean))].slice(0,100),
-          result.rows[0]!.birthday_date, null, "whatsapp-auto-birthday");
+        try {
+            return await this.queue([...new Set(result.rows.map(row => row.ref).filter(Boolean))].slice(0,100),
+                result.rows[0]!.birthday_date, null, "whatsapp-auto-birthday");
+        } catch (error) {
+            // A birthday list containing only explicitly opted-out/invalid recipients is not a failed cron run.
+            if (error instanceof AppError && error.code === "BIRTHDAY_RECIPIENTS_NOT_ELIGIBLE")
+                return { queued: 0 };
+            throw error;
+        }
     }
         async queue(customerRefs: string[], birthdayDate: string, actorId: string | null, requestId: string) {
         if (!this.template)
