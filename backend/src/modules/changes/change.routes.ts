@@ -10,6 +10,7 @@ import type { ChangeFeed, ChangeSignal } from "./change-feed.js";
 const CATALOG_READ = ["catalog.manage", "catalog.read", "inventory.manage"];
 export function canReceiveChange(signal: ChangeSignal, permissions: string[], admin: boolean): boolean {
   if (!admin) return signal.scope === "version" && signal.name === "catalog_inventory";
+  if (signal.scope === "version" && signal.name === "admin_notifications") return permissions.includes("notifications.read");
   if (signal.scope === "version") return signal.name === "orders" ? permissions.includes("orders.read")
     : signal.name === "catalog_inventory" && CATALOG_READ.some(permission => permissions.includes(permission));
   return DASHBOARD_DOMAINS.includes(signal.name as DashboardDomain) && hasDomainPermission(signal.name as DashboardDomain, "read", permissions);

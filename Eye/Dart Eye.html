@@ -132,6 +132,17 @@
 </nav>
 
     <main>
+      <div id="dart-notification-bar" class="dart-notification-bar" hidden>
+        <button id="dart-notification-bell" type="button" aria-label="Notifications" aria-controls="dart-notification-panel" aria-expanded="false"><i class="fa-solid fa-bell" aria-hidden="true"></i><span id="dart-notification-count" class="dart-nav-unread" aria-live="polite" hidden></span></button>
+        <aside id="dart-notification-panel" class="dart-notification-panel" aria-label="Notifications" hidden>
+          <div class="dart-inbox-heading"><h2>Notifications</h2><button id="dart-notification-close" type="button" aria-label="Close notifications">×</button></div>
+          <div class="dart-inbox-actions"><button id="dart-notification-read" type="button">Mark displayed as read</button><button id="dart-notification-retry" type="button">Refresh</button><label><input id="dart-notification-sound" type="checkbox"> Sound</label></div>
+          <p id="dart-notification-status" role="status"></p>
+          <div id="dart-notification-list"></div>
+          <button id="dart-notification-more" type="button" hidden>Load older notifications</button>
+          <div class="dart-push-controls"><button id="dart-push-enable" type="button">Enable phone notifications</button><button id="dart-push-disable" type="button" hidden>Disable on this device</button><p id="dart-push-status" role="status">Enable once on each device to receive alerts while Dart Eye is closed.</p></div>
+        </aside>
+      </div>
 <!--=============== سكشن Brand Information ==============-->
         <section id="brand" class="dashboard-section brand" aria-labelledby="dart-brand-title">
             <header class="dart-brand-page-header">
@@ -382,6 +393,7 @@
                             <select id="notificationFilter" aria-label="Filter notifications">
                                 <option value="all">All</option>
                                 <option value="order">Orders</option>
+                                <option value="review">Reviews</option>
                                 <option value="inventory">Inventory</option>
                                 <option value="return">Returns</option>
                                 <option value="damage">Damage</option>
@@ -2845,6 +2857,7 @@
     <script src="dart-domain-state.js?v=20261105-independent-sessions"></script>
     <script src="../Js/dart-dialog.js"></script>
     <script src="dart-admin-auth.js?v=20261105-independent-sessions"></script>
+    <script src="dart-admin-notifications.js" defer></script>
     <script src="dart.js?v=20261105-contrast-palette-loader-1"></script>
     <script src="dart-waiting.js"></script>
     <script src="dart-inventory.js?v=20261105-related-cards-2"></script>

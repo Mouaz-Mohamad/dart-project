@@ -40,6 +40,9 @@ describe("direct database change feed", () => {
     connection.emit("error", new Error("synthetic disconnect")); expect(disconnected).toHaveBeenCalledOnce(); expect(feed.subscriberCount).toBe(0);
   });
   it.each([
+    [{ scope: "version", name: "admin_notifications", version: 1 }, [], false, false],
+    [{ scope: "version", name: "admin_notifications", version: 1 }, ["orders.read"], true, false],
+    [{ scope: "version", name: "admin_notifications", version: 1 }, ["notifications.read"], true, true],
     [catalog, [], false, true], [{ scope: "version", name: "orders", version: 1 }, [], false, false],
     [{ scope: "domain", name: "customers", version: 1 }, ["orders.read"], true, false],
     [{ scope: "domain", name: "customers", version: 1 }, ["customers.read"], true, true],

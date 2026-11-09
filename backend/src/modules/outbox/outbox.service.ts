@@ -1,3 +1,4 @@
+import { deliverAdminPush } from "../notifications/admin-push-dispatch.js";
 // DART CODE GUIDE | backend/src/modules/outbox/outbox.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { randomUUID } from "node:crypto";
@@ -311,7 +312,7 @@ export class OutboxService {
       return this.publishWhatsApp(row, attemptId);
     }
     if (channel === "web_push") {
-      try { return await deliverWebPush(this.pool,this.config.mfaEncryptionKey,this.webPushProvider,row.payload); }
+      try { return await (row.payload.audience === "staff" ? deliverAdminPush : deliverWebPush)(this.pool,this.config.mfaEncryptionKey,this.webPushProvider,row.payload); }
       catch(error) {
         if (error instanceof PushDeliveryError) throw error;
         throw new PushDeliveryError("unknown","Push delivery outcome requires reconciliation");

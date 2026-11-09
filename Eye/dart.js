@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:0fd3f797be9143542da6fed65ab5b4fda9cc95f472621180b756487ac9df5028 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:508edd38fa6044442030283285fc04b5ab07c619b1aee2f5abddce922e934e6e */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -4422,10 +4422,11 @@ function renderNotifications() {
   if (!feed) return;
   const filter = document.getElementById("notificationFilter")?.value || "all",
     list = notificationData
+      .filter((n) => !window.DartAdminNotifications?.owns?.(n))
       .filter((n) => filter === "all" || dartNotificationCategory(n) === filter)
       .slice(0, 80);
   feed.innerHTML =
-    list
+    (window.DartAdminNotifications?.renderRows?.(false, filter) || "") + list
       .map((n) => {
         const cat = dartNotificationCategory(n);
         return `<div class="dart-notification notif-${cat} ${n.read ? "read" : "unread"}" data-notification-id="${dartEsc(n.id)}"><span class="notif-icon"><i class="${dartNotificationIcon(cat)}"></i></span><div class="notif-main"><div class="notif-title">${dartEsc(n.title)}</div><small>${dartEsc(n.message)}</small></div><time>${dartEsc(new Date(n.timestamp).toLocaleString())}</time></div>`;
@@ -4466,6 +4467,35 @@ function renderNotifications() {
   }
 }
 
+
+// Open a server-owned inbox target independently of list filters/grouped view.
+window.dartOpenAdminNotification = async function (notification) {
+  if (notification.section === "orders") {
+    const order = ordersData.find(row => String(row.id) === notification.entityId);
+    if (order) {
+      dartShowOrderHistory(order);
+      const fields = [["Order", order.orderId], ["Customer", order.clientName],
+        ["Items", (order.items || []).map(item => typeof item === "object" ? item.itemCode || item.name || item.modelId : item).join(", ")],
+        ["Total", dartMoney(dartOrderNet(order))]];
+      document.getElementById("history-modal-body").insertAdjacentHTML("afterbegin", fields.map(([label, value]) => `<p><b>${dartEsc(label)}:</b> ${dartEsc(value || "-")}</p>`).join(""));
+      return true;
+    }
+  }
+  if (notification.section === "returns" || notification.section === "review") {
+    const domain = notification.section === "returns" ? "returns" : "reviews";
+    await window.DartDomainState?.hydrateDomain?.(domain, true);
+    const data = notification.section === "returns" ? returnsData : reviewsData;
+    const record = data.find(row => String(row.id) === notification.entityId);
+    if (record) {
+      const modal = document.getElementById("history-modal");
+      document.getElementById("history-modal-title").textContent = notification.title;
+      const fields = notification.section === "returns" ? ["returnId", "orderId", "requestType", "status", "reason", "notes"] : ["clientName", "rating", "title", "review", "status"];
+      document.getElementById("history-modal-body").innerHTML = fields.map(field => `<p><b>${dartEsc(field)}:</b> ${dartEsc(record[field] || "-")}</p>`).join("");
+      openModal(modal); return true;
+    }
+  }
+  return false;
+};
 function dartCairoCalendar(reference = new Date()) {
   return Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", {

@@ -338,3 +338,41 @@ body.dart-sidebar-collapsed .cont-menu #dart-admin-logout:not([hidden]) { paddin
   main > .dashboard-section,
   .cont-menu .menu li a[data-target] { transition: none !important; }
 }
+/* Staff notification counts: a white circle with black digits in every sidebar state. */
+.cont-menu [data-target], .nav-tow [data-target] { position: relative; }
+.cont-menu .dart-nav-unread, .nav-tow .dart-nav-unread, .dart-notification-bar .dart-nav-unread {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  margin-inline-start: auto;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  font: 700 11px/1 Inter, sans-serif;
+  opacity: 1;
+}
+.cont-menu .dart-nav-unread[hidden], .nav-tow .dart-nav-unread[hidden], .dart-notification-bar .dart-nav-unread[hidden] { display: none; }
+body.dart-sidebar-collapsed .cont-menu .dart-nav-unread { position: absolute; top: 1px; right: 1px; min-width: 18px; height: 18px; font-size: 10px; }
+.nav-tow .dart-nav-unread { position: absolute; top: -3px; right: 0; min-width: 18px; height: 18px; font-size: 10px; }
+.dart-notification-bar { position: sticky; top: 10px; z-index: 90; display: flex; justify-content: flex-end; margin: 0 16px; pointer-events: none; }
+.dart-notification-bar[hidden], .dart-notification-panel[hidden] { display: none; }
+.dart-notification-bar button, .dart-notification-panel { pointer-events: auto; }
+#dart-notification-bell { display: flex; align-items: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 10px; border: 1px solid #ffffff50; border-radius: 50px; background: #381724; color: #fff; box-shadow: 0 4px 16px #38172422; cursor: pointer; }
+.dart-notification-panel { position: absolute; top: 52px; right: 0; width: min(430px, calc(100vw - 36px)); max-height: min(650px, calc(100dvh - 130px)); overflow-y: auto; padding: 16px; border: 1px solid #e7dbe0; border-radius: 16px; background: #fffdf9; color: #26121b; box-shadow: 0 12px 40px #26121b30; }
+.dart-inbox-heading, .dart-inbox-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.dart-inbox-heading h2 { font-size: 18px; margin: 0; }
+.dart-notification-panel button:not(.dart-inbox-row) { border: 1px solid #e7dbe0; border-radius: 8px; padding: 8px; background: #fff; color: #381724; cursor: pointer; }
+.dart-inbox-actions { margin: 12px 0; font-size: 12px; }
+.dart-inbox-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 8px; border: 0; border-bottom: 1px solid #eadfe3; text-align: start; background: transparent; color: #26121b; cursor: pointer; }
+.dart-inbox-row > span:nth-child(2) { display: grid; flex: 1; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.dart-inbox-row strong { font-size: 13px; }
+.dart-inbox-row small { color: #75616b; font-size: 11px; }
+.dart-inbox-row.is-unread { background: #ab012b0c; }
+.dart-inbox-row .dart-inbox-dot { flex: 0 0 7px; height: 7px; border-radius: 50%; background: #ab012b; }
+.dart-inbox-row.is-read .dart-inbox-dot { background: #d7cbd0; }
+.dart-push-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eadfe3; }
+.dart-push-controls p, #dart-notification-status { font-size: 12px; line-height: 1.6; }
+.dart-notification-panel :focus-visible, #dart-notification-bell:focus-visible { outline: 2px solid #ab012b; outline-offset: 3px; }

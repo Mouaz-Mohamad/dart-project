@@ -40,7 +40,10 @@ export class CustomerNotificationService {
   constructor(
     private readonly pool: Pool,
     private readonly config: NotificationConfig,
+    private readonly audience: "customer" | "staff" = "customer",
   ) {}
+
+  private get subscriptionTable() { return this.audience === "staff" ? "admin_push_subscriptions" : "web_push_subscriptions"; }
 
   public pushConfig(): { configured: boolean; publicKey: string | null } {
     const configured = Boolean(
@@ -129,7 +132,7 @@ export class CustomerNotificationService {
       `SELECT p.id::text,p.endpoint_hash,
       (p.active AND p.session_family_id=s.family_id AND p.vapid_fingerprint=$3 AND s.revoked_at IS NULL AND s.expires_at>now()
         AND s.user_session_version=u.session_version) AS enabled
-      FROM web_push_subscriptions p JOIN users u ON u.id=p.customer_user_id JOIN sessions s ON s.id=$2 AND s.user_id=u.id
+      FROM ${this.subscriptionTable} p JOIN users u ON u.id=p.customer_user_id JOIN sessions s ON s.id=$2 AND s.user_id=u.id
       WHERE p.customer_user_id=$1 ORDER BY p.updated_at DESC LIMIT 100`,
       [userId, sessionId, fingerprint(this.config.webPushVapidPublicKey || "")],
     );
@@ -196,7 +199,7 @@ export class CustomerNotificationService {
         credentials_fingerprint: string;
         vapid_fingerprint: string;
       }>(
-        "SELECT id::text,customer_user_id::text,session_family_id::text,active,credentials_fingerprint,vapid_fingerprint FROM web_push_subscriptions WHERE endpoint_hash=$1 FOR UPDATE",
+        `SELECT id::text,customer_user_id::text,session_family_id::text,active,credentials_fingerprint,vapid_fingerprint FROM ${this.subscriptionTable} WHERE endpoint_hash=$1 FOR UPDATE`,
         [endpointHash],
       );
       if (existing.rows[0] && existing.rows[0].customer_user_id !== userId)
@@ -215,13 +218,13 @@ export class CustomerNotificationService {
         return { id: prior.id, enabled: true };
       // Clear consent from ended sessions; queued versions will fail their dispatch check.
       await client.query(
-        `UPDATE web_push_subscriptions p SET active=false,version=version+1,disabled_reason='session_ended',updated_at=now()
+        `UPDATE ${this.subscriptionTable} p SET active=false,version=version+1,disabled_reason='session_ended',updated_at=now()
         WHERE p.customer_user_id=$1 AND p.active AND NOT EXISTS (SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id
           WHERE s.family_id=p.session_family_id AND s.user_id=p.customer_user_id AND s.revoked_at IS NULL AND s.expires_at>now() AND s.user_session_version=u.session_version)`,
         [userId],
       );
       const count = await client.query<{ count: string }>(
-        "SELECT count(*)::text FROM web_push_subscriptions WHERE customer_user_id=$1 AND active AND endpoint_hash<>$2",
+        `SELECT count(*)::text FROM ${this.subscriptionTable} WHERE customer_user_id=$1 AND active AND endpoint_hash<>$2`,
         [userId, endpointHash],
       );
       if (Number(count.rows[0]?.count || 0) >= 10)
@@ -231,13 +234,13 @@ export class CustomerNotificationService {
           "The browser notification device limit has been reached",
         );
       const result = await client.query<{ id: string }>(
-        `INSERT INTO web_push_subscriptions
+        `INSERT INTO ${this.subscriptionTable}
         (customer_user_id,session_family_id,endpoint_hash,encrypted_subscription,vapid_fingerprint,credentials_fingerprint)
         VALUES($1,$2,$3,$4,$5,$6)
         ON CONFLICT(endpoint_hash) DO UPDATE SET session_family_id=EXCLUDED.session_family_id,
           encrypted_subscription=EXCLUDED.encrypted_subscription,vapid_fingerprint=EXCLUDED.vapid_fingerprint,credentials_fingerprint=EXCLUDED.credentials_fingerprint,
-          active=true,disabled_reason=NULL,version=web_push_subscriptions.version+1,updated_at=now()
-        WHERE web_push_subscriptions.customer_user_id=EXCLUDED.customer_user_id RETURNING id::text`,
+          active=true,disabled_reason=NULL,version=${this.subscriptionTable}.version+1,updated_at=now()
+        WHERE ${this.subscriptionTable}.customer_user_id=EXCLUDED.customer_user_id RETURNING id::text`,
         [
           userId,
           familyId,
@@ -272,7 +275,7 @@ export class CustomerNotificationService {
   ): Promise<void> {
     await this.transaction(async (client) => {
       const result = await client.query(
-        `UPDATE web_push_subscriptions SET active=false,version=version+1,
+        `UPDATE ${this.subscriptionTable} SET active=false,version=version+1,
         disabled_reason='customer_opt_out',updated_at=now() WHERE id=$1 AND customer_user_id=$2 AND active RETURNING id`,
         [id, userId],
       );
@@ -291,7 +294,7 @@ export class CustomerNotificationService {
   ): Promise<void> {
     await client.query(
       `INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,request_id,old_values,new_values)
-      VALUES('customer',$1,$2,'web_push_subscriptions',$3,$4,$5::jsonb,$6::jsonb)`,
+      VALUES($7,$1,$2,'${this.subscriptionTable}',$3,$4,$5::jsonb,$6::jsonb)`,
       [
         userId,
         action,
@@ -299,6 +302,7 @@ export class CustomerNotificationService {
         requestId,
         JSON.stringify({ enabled: oldActive }),
         JSON.stringify({ enabled: action === "WEB_PUSH_ENABLED" }),
+        this.audience,
       ],
     );
   }

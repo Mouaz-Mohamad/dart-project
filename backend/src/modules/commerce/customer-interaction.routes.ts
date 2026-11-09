@@ -1,3 +1,5 @@
+import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
+import type { OutboxService } from "../outbox/outbox.service.js";
 // DART CODE GUIDE | backend/src/modules/commerce/customer-interaction.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { Router } from "express";
@@ -65,6 +67,7 @@ export function createCustomerInteractionRouter(
   interactions: CustomerInteractionService,
   identity: IdentityService,
   config: Pick<AppConfig, "sessionCookieName" | "authPepper">,
+  outbox?: OutboxService,
 ): Router {
   const router = Router();
   const signedIn = authenticate(identity, config);
@@ -107,6 +110,7 @@ export function createCustomerInteractionRouter(
     response.status(201).json(
       await interactions.submitPublicReview(body, String(request.id)),
     );
+    await dispatchOutbox(outbox, 10);
   });
 
   router.post(
@@ -120,6 +124,7 @@ export function createCustomerInteractionRouter(
       response.status(201).json(
         await interactions.submitReview(request.auth!.userId, body, String(request.id)),
       );
+      await dispatchOutbox(outbox, 10);
     },
   );
 
@@ -134,6 +139,7 @@ export function createCustomerInteractionRouter(
       response.status(201).json(
         await interactions.submitReturn(request.auth!.userId, body, String(request.id)),
       );
+      await dispatchOutbox(outbox, 10);
     },
   );
 

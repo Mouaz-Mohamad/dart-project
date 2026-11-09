@@ -1,3 +1,4 @@
+import { queueAdminNotification } from "../notifications/admin-notification.queue.js";
 import type { PoolClient } from "pg";
 import { sendNotification } from "../notifications/notification.queue.js";
 
@@ -16,6 +17,7 @@ export async function queueOrderNotifications(client: PoolClient, orderId: strin
   );
   const order = result.rows[0];
   if (!order) return;
+  if (eventType === "order.created") await queueAdminNotification(client, "ORDER_CREATED", orderId, order.order_code);
   const notificationEvent = eventType === "order.created" ? "ORDER_PLACED" :
     order.status === "Representative On The Way" ? "ORDER_OUT_FOR_DELIVERY" :
     order.status === "Delivered" ? "ORDER_DELIVERED" : null;

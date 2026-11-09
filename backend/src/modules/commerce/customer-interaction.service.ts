@@ -1,3 +1,4 @@
+import { queueAdminNotification } from "../notifications/admin-notification.queue.js";
 // DART CODE GUIDE | backend/src/modules/commerce/customer-interaction.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { randomUUID } from "node:crypto";
@@ -538,6 +539,7 @@ export class CustomerInteractionService {
       };
 
       await this.insertReturnRecord(client, returnsState.version, record);
+      await queueAdminNotification(client, input.requestType === "Exchange" ? "EXCHANGE_CREATED" : "RETURN_CREATED", id, returnId);
       await this.appendNotification(client, {
         type: "return_created",
         title: `Return ${returnId}`,
@@ -695,5 +697,6 @@ export class CustomerInteractionService {
       resolved: false,
     };
     await this.appendDomain(client, "notifications", record);
+    if (input.type === "review_created") await queueAdminNotification(client, "REVIEW_CREATED", input.relatedEntityId);
   }
 }

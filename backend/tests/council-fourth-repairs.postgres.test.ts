@@ -70,6 +70,8 @@ describe("fourth Council: order, return, finance and least-privilege acceptance"
   async function beginReturn(f: Awaited<ReturnType<typeof fixture>>, requestType: "Refund" | "Exchange") {
     const r = await interactions.submitReturn(customer, { itemCode: f.item, requestType, reason: "Synthetic return", address,
       ...(requestType === "Exchange" ? { requestedColor: "Navy", requestedSize: "L" } : {}) }, "synthetic");
+    const notification = (await store.pool.query("SELECT event_type FROM admin_notifications WHERE entity_id=$1", [String(r.id)])).rows;
+    expect(notification).toEqual([{ event_type: requestType === "Exchange" ? "EXCHANGE_CREATED" : "RETURN_CREATED" }]);
     await commerce.adminReturnAction(actor, String(r.id), { action: "approve", ...(requestType === "Exchange" ? { replacementItemCode: f.replacement } : {}) }, "synthetic");
     await commerce.adminReturnAction(actor, String(r.id), { action: "assign", representativeId: rep }, "synthetic");
     await commerce.representativeReturnAction(rep, String(r.id), "start");

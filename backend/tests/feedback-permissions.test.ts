@@ -13,6 +13,7 @@ beforeEach(async () => {
   db = new PGlite();
   await db.exec(`CREATE TABLE dashboard_domain_state (domain text PRIMARY KEY, version bigint,
     data jsonb, updated_by text, updated_at timestamptz);
+    CREATE TABLE admin_notifications (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), event_type text, entity_id text, entity_code text, UNIQUE(event_type,entity_id));
     CREATE TABLE audit_logs (actor_type text, actor_id text, action text, entity_type text,
       entity_id text, request_id text, metadata jsonb);`);
   await db.query("INSERT INTO dashboard_domain_state VALUES ('reviews',3,$1::jsonb,NULL,NULL),('contacts',2,$2::jsonb,NULL,NULL)",
@@ -100,6 +101,7 @@ describe("customer review submission persistence", () => {
       rating: 4, title: "Second", review: "Fast delivery",
     }, "second-request");
     expect(first.id).not.toBe(second.id);
+    expect((await db.query("SELECT * FROM admin_notifications WHERE event_type='REVIEW_CREATED'")).rows).toHaveLength(2);
     const firstRecord = (await service.read("reviews")).data.find(
       (row) => (row as { id: string }).id === first.id,
     ) as Record<string, unknown>;

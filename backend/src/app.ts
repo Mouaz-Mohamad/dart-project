@@ -1,3 +1,4 @@
+import { AdminNotificationService } from "./modules/notifications/admin-notification.service.js";
 // DART CODE GUIDE | backend/src/app.ts
 // الغرض: إنشاء Runtime وربط الخدمات وقاعدة البيانات بالتطبيق، مع fallback آمن عند سوء الإعداد.
 import express, { type Express } from "express";
@@ -149,6 +150,7 @@ export function createRuntimeApplication(
     outboxService,
     whatsappWebhookPool: database,
     customerNotificationService: new CustomerNotificationService(database,config),
+    adminNotificationService: new AdminNotificationService(database,config),
     birthdayMessagingService,
     maintenanceJob: () => runMaintenanceTasks([
       ["reservation_cleanup", () => catalogService.cleanupReservations()],

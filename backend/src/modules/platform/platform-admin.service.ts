@@ -49,7 +49,7 @@ export class PlatformAdminService {
       // Cancel queued deliveries for deleted orders, waitlist reservations and customer logins.
       // Keep staff access, invitation and representative messages intact.
       await remove("outboxBusiness", `DELETE FROM outbox_events
-         WHERE aggregate_type IN ('order', 'waitlist', 'customer')
+         WHERE aggregate_type IN ('order', 'waitlist', 'customer', 'admin_notification')
             OR (aggregate_type='user' AND aggregate_id IN
                 (SELECT id::text FROM users WHERE account_type='customer'))`);
       await remove("businessNotifications", `DELETE FROM notification_records
@@ -96,6 +96,8 @@ export class PlatformAdminService {
       await remove("waitlistEntries", "DELETE FROM waitlist_entries");
       await remove("setWaitingEntries", "DELETE FROM set_waiting_entries");
       await remove("deliveryRouteStops", "DELETE FROM delivery_route_stops");
+      await remove("adminNotifications", "DELETE FROM admin_notifications");
+      await client.query("UPDATE domain_state_versions SET version=version+1,updated_at=now() WHERE domain='admin_notifications'");
       await remove("customerNotifications", "DELETE FROM customer_notifications");
       await remove("orderEvents", "DELETE FROM order_events");
       await remove("orderItems", "DELETE FROM order_items");
