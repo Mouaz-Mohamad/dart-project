@@ -3,12 +3,24 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
+import { normalizeEgyptianPhone } from "../../security/normalization.js";
 
 export interface JoinWaitingInput {
   modelId: string;
   size: string;
   color: string;
   whatsappRestockOptIn?: boolean;
+}
+
+export interface ManualWaitingInput {
+  customerUserId?: string;
+  customerName?: string;
+  phone?: string;
+  modelId: string;
+  size: string;
+  color: string;
+  notes?: string;
+  consentConfirmed: boolean;
 }
 
 export type WaitingAdminAction =
@@ -581,6 +593,104 @@ export class WaitingService {
     } finally {
       client.release();
     }
+  }
+
+
+  public async manualOptions(search = ""): Promise<{
+    models: Array<Record<string, unknown>>;
+    customers: Array<Record<string, unknown>>;
+  }> {
+    const [models,customers]=await Promise.all([
+      this.pool.query<{model_id:string;name:string;size_options:Array<{name:string;active?:boolean}>|null;color_options:Array<{name:string;active?:boolean}>|null}>(
+        `SELECT model_id,name,size_options,color_options FROM catalog_models
+          WHERE active AND NOT is_archived AND NOT is_deleted ORDER BY name,model_id LIMIT 500`,
+      ),
+      this.pool.query<{id:string;full_name:string;client_code:string;phone_normalized:string}>(
+        `SELECT c.user_id::text AS id,c.full_name,c.client_code,p.phone_normalized
+          FROM customers c JOIN users u ON u.id=c.user_id
+          JOIN account_phones p ON p.user_id=c.user_id AND p.account_type='customer' AND p.is_primary
+          WHERE u.status='active' AND u.deleted_at IS NULL
+          AND (c.full_name ILIKE $1 OR c.client_code ILIKE $1 OR p.phone_normalized ILIKE $1)
+          ORDER BY c.full_name,c.user_id LIMIT 20`,
+        ["%"+text(search).slice(0,120)+"%"],
+      ),
+    ]);
+    return {
+      models:models.rows.map(m=>({
+        id:m.model_id,name:m.name,
+        sizes:(m.size_options||[]).filter(o=>o.active!==false&&text(o.name)).map(o=>o.name),
+        colors:(m.color_options||[]).filter(o=>o.active!==false&&text(o.name)).map(o=>o.name),
+      })),
+      customers:customers.rows.map(c=>({id:c.id,name:c.full_name,code:c.client_code,phone:c.phone_normalized})),
+    };
+  }
+
+  public async createManual(input:ManualWaitingInput,staffId:string,requestId:string):Promise<Record<string,unknown>> {
+    if(input.consentConfirmed!==true)
+      throw new AppError(422,"WHATSAPP_REQUEST_REQUIRED","Confirm the customer requested a restock WhatsApp alert");
+    const existingId=text(input.customerUserId),name=text(input.customerName),rawPhone=text(input.phone);
+    if(existingId ? Boolean(name||rawPhone) : name.length<3||!rawPhone)
+      throw new AppError(422,"WAITING_CUSTOMER_INVALID","Choose an existing customer or enter a new customer name and phone");
+    const modelId=text(input.modelId),size=text(input.size),color=text(input.color);
+    const client=await this.pool.connect();
+    try{
+      await client.query("BEGIN");
+      await this.releaseExpired(client);
+      if(!(await this.settings(client)).enabled)
+        throw new AppError(409,"WAITING_DISABLED","Waiting is temporarily unavailable");
+      await this.validateVariant(client,modelId,size,color);
+      const stock=await client.query<{available:boolean}>(
+        `SELECT EXISTS(SELECT 1 FROM inventory_items WHERE model_id=$1 AND size=$2 AND color=$3
+           AND active AND NOT is_archived AND NOT is_deleted AND lower(status)='in stock') AS available`,
+        [modelId,size,color],
+      );
+      if(stock.rows[0]?.available)
+        throw new AppError(409,"STOCK_AVAILABLE","This variant is in stock; create an order instead");
+      let customerId=existingId,phone:string;
+      if(existingId){
+        const linked=await client.query<{phone_normalized:string}>(
+          `SELECT p.phone_normalized FROM customers c JOIN users u ON u.id=c.user_id
+           JOIN account_phones p ON p.user_id=c.user_id AND p.account_type='customer' AND p.is_primary
+           WHERE c.user_id=$1 AND u.status='active' AND u.deleted_at IS NULL FOR SHARE OF c,u,p`,
+          [existingId],
+        );
+        if(!linked.rows[0]) throw new AppError(404,"CUSTOMER_NOT_FOUND","Choose a customer with a valid WhatsApp phone");
+        phone=linked.rows[0].phone_normalized;
+      }else{
+        try{phone=normalizeEgyptianPhone(rawPhone)}
+        catch{throw new AppError(422,"INVALID_PHONE","Enter a valid Egyptian WhatsApp phone")}
+        const duplicate=await client.query("SELECT 1 FROM account_phones WHERE account_type='customer' AND phone_normalized=$1 LIMIT 1",[phone]);
+        if(duplicate.rows.length)throw new AppError(409,"CUSTOMER_ALREADY_EXISTS","Phone belongs to a registered customer; select that customer instead");
+        customerId=randomUUID();
+        await client.query("INSERT INTO users(id,account_type,email,email_normalized,password_hash,status) VALUES($1,'customer',NULL,NULL,NULL,'active')",[customerId]);
+        await client.query("INSERT INTO account_phones(user_id,account_type,phone_normalized,phone_display,is_primary) VALUES($1,'customer',$2,$3,true)",[customerId,phone,rawPhone]);
+        await client.query("INSERT INTO customers(user_id,full_name) VALUES($1,$2)",[customerId,name]);
+        await client.query("INSERT INTO user_roles(user_id,role_id) SELECT $1,id FROM roles WHERE name='Customer'",[customerId]);
+      }
+      const inserted=await client.query<{id:string}>(
+        `INSERT INTO waitlist_entries(customer_user_id,model_id,size,desired_color,
+          allow_alternative_color,source,manual_notes,created_by_staff,
+          whatsapp_restock_opt_in_at,whatsapp_restock_phone_normalized)
+          VALUES($1,$2,$3,$4,false,'manual',$5,$6,now(),$7) RETURNING id::text`,
+        [customerId,modelId,size,color,text(input.notes),staffId,phone],
+      );
+      const id=inserted.rows[0]!.id;
+      await this.audit(client,{
+        actorType:"staff",actorId:staffId,entryId:id,requestId,action:"WAITLIST_MANUAL_CREATED",
+        newValues:{modelId,size,color,customerUserId:customerId,source:"manual"},
+        metadata:{fifo:true,consentConfirmed:true,whatsappOnRestock:true,customerProfileCreated:!existingId},
+      });
+      await this.bumpVersion(client);
+      // Recheck new stock in the transaction; the DB allocator remains authoritative.
+      await client.query("SELECT dart_waitlist_try_allocate_entry($1,'staff',$2,'manual_waiting_join',$3)",[id,staffId,requestId]);
+      const entry=await this.entryById(client,id);
+      await client.query("COMMIT");
+      return entry;
+    }catch(error){
+      await client.query("ROLLBACK").catch(()=>undefined);
+      if(pgCode(error)==="23505")throw new AppError(409,"WAITING_ALREADY_EXISTS","Customer or phone already has a matching Waiting request");
+      throw error;
+    }finally{client.release()}
   }
 
   public async version(): Promise<number> {
@@ -1938,6 +2048,7 @@ export class WaitingService {
       converted_order_code: string | null;
       cancelled_at: Date | null;
       queue_position: string | null;
+      source: string;
       allocation_id: string | null;
       item_code: string | null;
       match_type: string | null;
@@ -1962,6 +2073,7 @@ export class WaitingService {
               w.converted_at,
               w.converted_order_code,
               w.cancelled_at,
+              w.source,
               CASE WHEN w.status='waiting' THEN (
                 SELECT (count(*)+1)::text
                   FROM waitlist_entries q
@@ -2024,6 +2136,7 @@ export class WaitingService {
       customerUserId: row.customer_user_id,
       clientCode: row.client_code,
       customerName: row.customer_name,
+      source: row.source,
       modelId: row.model_id,
       modelName: row.model_name,
       size: row.size,

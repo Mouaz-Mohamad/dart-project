@@ -1,0 +1,21 @@
+#waiting #waiting-add-manual-btn{background:#ab012b;border-color:#ab012b;color:#fff}
+.dart-waiting-manual-dialog{width:min(560px,96vw)}
+.dart-waiting-manual-dialog form{margin:0}
+.dart-waiting-manual-dialog .dart-waiting-dialog-body{display:grid;gap:10px}
+.dart-waiting-manual-dialog .dart-waiting-dialog-body p{font-size:12px;line-height:1.6;margin:0;color:#6e5a67}
+.dart-waiting-manual-dialog label{font-size:12px;font-weight:700;color:#4c2639}
+.dart-waiting-manual-dialog section{display:grid;gap:8px}
+.dart-waiting-manual-dialog section[hidden]{display:none}
+.dart-waiting-manual-dialog input:not([type=radio]):not([type=checkbox]),
+.dart-waiting-manual-dialog select,.dart-waiting-manual-dialog textarea{width:100%;min-height:42px;padding:9px;border:1px solid #ddcad4;border-radius:8px;background:#fff;color:#382634;font-size:13px}
+.dart-waiting-manual-dialog .manual-wait-choice{display:flex;flex-wrap:wrap;gap:16px;border:1px solid #e2d1db;border-radius:9px;padding:10px}
+.dart-waiting-manual-dialog .manual-wait-choice label,.dart-waiting-manual-dialog .manual-wait-consent{display:flex;align-items:center;gap:8px}
+.dart-waiting-manual-dialog .manual-wait-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dart-waiting-manual-dialog .manual-wait-pair>div{display:grid;gap:7px}
+.dart-waiting-manual-dialog .manual-wait-consent{align-items:flex-start;line-height:1.7}
+.dart-waiting-manual-dialog input[type=checkbox]{margin-top:4px;accent-color:#ab012b}
+.dart-waiting-manual-dialog .manual-wait-submit{background:#ab012b;color:#fff;border:0;border-radius:9px;min-height:43px;font-weight:800}
+.dart-waiting-manual-dialog .manual-wait-submit:disabled{opacity:.55}
+.dart-waiting-manual-dialog #manual-wait-error{color:#ab012b;background:#fff1f2;padding:10px;border-radius:8px}
+.dart-waiting-manual-label{display:inline-block;margin-left:6px;padding:3px 7px;border-radius:8px;background:#f6e6ec;color:#852548;font-size:10px;font-weight:800}
+@media(max-width:420px){.dart-waiting-manual-dialog .manual-wait-pair{grid-template-columns:1fr}}

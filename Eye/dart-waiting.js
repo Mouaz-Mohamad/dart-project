@@ -130,7 +130,7 @@
         <td data-column-label="Color">${escapeHtml(entry.color)}</td><td data-column-label="Size">${escapeHtml(entry.size)}</td>
         <td data-column-label="Requested">${escapeHtml(formatDate(entry.requestedAt))}</td>
         <td data-column-label="Queue" class="${entry.priorityOverride ? "dart-waiting-priority" : ""}">${entry.queuePosition ? `#${entry.queuePosition}` : "-"}${entry.priorityOverride ? " · override" : ""}</td>
-        <td data-column-label="Status"><span class="dart-waiting-status">${escapeHtml(entry.status)}</span></td>
+        <td data-column-label="Status"><span class="dart-waiting-status">${escapeHtml(entry.status)}</span>${entry.source === "manual" ? '<small class="dart-waiting-manual-label">Manual</small>' : ""}</td>
         <td data-column-label="Notified">${escapeHtml(formatDate(entry.notifiedAt))}</td>
         <td data-column-label="Reservation expiry">${escapeHtml(formatDate(entry.reservationExpiry))}</td>
         <td data-column-label="Reserved item">${escapeHtml(allocation.itemCode || "-")}<br><small>${escapeHtml(allocation.offeredColor || "")}</small></td>

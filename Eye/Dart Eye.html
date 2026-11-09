@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="dart-models.css?v=20261105-related-cards-2">
     <link rel="stylesheet" href="dart-items-clients.css?v=20261105-items-clients-1">
     <link rel="stylesheet" href="dart-waiting-returns.css?v=20261105-waiting-returns-1">
+    <link rel="stylesheet" href="dart-waiting-manual.css?v=20261109-manual-1">
     <link rel="stylesheet" href="dart-damage-review-rep.css?v=20261105-drr-1">
     <link rel="stylesheet" href="dart-live-card-refresh.css?v=20261105-live-card-1">
     <link rel="stylesheet" href="dart-news-finance-settings.css?v=20261105-summary-collapsed-3">
@@ -1421,6 +1422,7 @@
                     <p>FIFO by default. Manual priority and reassignment are permission-controlled and audited.</p>
                 </div>
                 <div class="dart-waiting-head-actions">
+                    <button type="button" id="waiting-add-manual-btn" hidden><i class="fa-solid fa-plus"></i> Add Reservation</button>
                     <button type="button" id="waiting-reconcile-btn"><i class="fa-solid fa-arrows-rotate"></i> Match available stock</button>
                     <button type="button" id="waiting-refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button>
                 </div>
@@ -2860,6 +2862,7 @@
     <script src="dart-admin-notifications.js" defer></script>
     <script src="dart.js?v=20261105-contrast-palette-loader-1"></script>
     <script src="dart-waiting.js"></script>
+    <script src="dart-waiting-manual.js?v=20261109-manual-1"></script>
     <script src="dart-inventory.js?v=20261105-related-cards-2"></script>
     <script src="dart-operations.js"></script>
     <script src="dart-size-chart.js"></script>

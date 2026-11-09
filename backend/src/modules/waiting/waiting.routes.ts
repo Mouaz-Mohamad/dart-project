@@ -201,6 +201,37 @@ export function createWaitingRouter(
     },
   );
 
+
+  router.get("/admin/waiting/create-options",
+    signedIn,requireAccountType("staff"),requireMfa,requirePermission("waiting.create"),
+    async(request,response)=>{
+      const query=z.object({search:z.string().trim().max(120).optional()}).parse(request.query);
+      response.setHeader("Cache-Control","no-store");
+      response.status(200).json(await waiting.manualOptions(query.search));
+    },
+  );
+
+  router.post("/admin/waiting",
+    rateLimit({store:sharedRateLimitStore(config,"waiting-manual"),windowMs:60000,limit:30,
+      standardHeaders:"draft-8",legacyHeaders:false}),
+    signedIn,csrf,requireAccountType("staff"),requireMfa,requirePermission("waiting.create"),
+    async(request,response)=>{
+      const body=z.object({
+        customerUserId:z.string().uuid().optional(),
+        customerName:z.string().trim().min(3).max(160).optional(),
+        phone:z.string().trim().min(10).max(30).optional(),
+        modelId:z.string().trim().min(1).max(120),
+        color:z.string().trim().min(1).max(120),
+        size:z.string().trim().min(1).max(120),
+        notes:z.string().trim().max(500).optional(),
+        consentConfirmed:z.literal(true),
+      }).strict().parse(request.body);
+      const entry=await waiting.createManual(body,request.auth!.userId,String(request.id));
+      await dispatchOutbox(outbox,10);
+      response.status(201).json({entry});
+    },
+  );
+
   router.get(
     "/admin/waiting/:entryId/audit",
     signedIn,
