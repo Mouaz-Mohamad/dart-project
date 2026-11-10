@@ -476,3 +476,15 @@
   .dart-contact-page .dart-contact-hero-cta:hover { transform: none; }
 }
 /* END DART-CSS-CONTACT-PAGE-MOBILE */
+
+/* Compact review overlays: media rules moved from main.css without changing declarations. */
+@media (prefers-reduced-motion: reduce) {
+  .reviews-container { scroll-behavior: auto; }
+}
+@media (max-width: 360px) {
+  .dart-review-dialog { padding: 14px; gap: 11px; }
+  .dart-review-dialog-label { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dart-review-dialog-body { scroll-behavior: auto; }
+}

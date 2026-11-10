@@ -1240,9 +1240,6 @@ body.dart-set-image-open {
   flex: 0 0 auto;
   align-self: center;
 }
-@media (prefers-reduced-motion: reduce) {
-  .reviews-container { scroll-behavior: auto; }
-}
 /* END Dart compact customer review. */
 
 /* BEGIN Dart compact review popup — same palette as the mini review cards. */
@@ -1391,13 +1388,6 @@ body.dart-set-image-open {
 .dart-review-dialog-brand {
   color: var(--bragnte);
   font-weight: 600;
-}
-@media (max-width: 360px) {
-  .dart-review-dialog { padding: 14px; gap: 11px; }
-  .dart-review-dialog-label { font-size: 10px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dart-review-dialog-body { scroll-behavior: auto; }
 }
 /* END Dart compact review popup. */
 
