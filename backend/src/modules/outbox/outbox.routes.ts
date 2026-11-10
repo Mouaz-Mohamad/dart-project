@@ -51,8 +51,8 @@ export function createOutboxRouter(
   }
 
   router.post("/internal/outbox/process", process);
-  // Vercel Cron invokes GET; authentication is identical to the internal POST route.
-  router.get("/internal/outbox/process", process);
+  // Vercel Cron uses an isolated protected GET endpoint; processing remains POST-only.
+  router.get("/internal/outbox/cron", process);
 
   return router;
 }

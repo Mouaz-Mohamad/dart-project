@@ -39,10 +39,10 @@ describe("outbox maintenance isolation", () => {
   it("accepts the Vercel Cron bearer token on authenticated GET, but never anonymously",async()=>{
     const vercelToken="a-different-synthetic-vercel-cron-token-32-plus";
     const {app,outbox}=fixture(undefined,vercelToken);
-    expect((await request(app).get("/internal/outbox/process")).status).toBe(401);
-    expect((await request(app).get("/internal/outbox/process").auth("invalid-token",{type:"bearer"})).status).toBe(401);
+    expect((await request(app).get("/internal/outbox/cron")).status).toBe(401);
+    expect((await request(app).get("/internal/outbox/cron").auth("invalid-token",{type:"bearer"})).status).toBe(401);
     expect(outbox.processBatch).not.toHaveBeenCalled();
-    const response=await request(app).get("/internal/outbox/process").auth(vercelToken,{type:"bearer"});
+    const response=await request(app).get("/internal/outbox/cron").auth(vercelToken,{type:"bearer"});
     expect(response.status).toBe(200);
     expect(outbox.processBatch).toHaveBeenCalledExactlyOnceWith(10);
     expect(response.body.health).toMatchObject({duePending:0});

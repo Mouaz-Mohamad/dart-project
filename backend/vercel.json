@@ -9,7 +9,7 @@
   "buildCommand": "npm run build",
   "crons": [
     {
-      "path": "/api/v1/internal/outbox/process",
+      "path": "/api/v1/internal/outbox/cron",
       "schedule": "*/5 * * * *"
     }
   ]

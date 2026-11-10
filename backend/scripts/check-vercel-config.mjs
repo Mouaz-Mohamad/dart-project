@@ -43,7 +43,7 @@ for (const cron of config.crons ?? []) {
   // Dart's API project is verified on Vercel Pro. Its only permitted subdaily
   // cron is the protected durable outbox; all other jobs remain Hobby-safe.
   const authorizedProOutbox =
-    cron.path === "/api/v1/internal/outbox/process" &&
+    cron.path === "/api/v1/internal/outbox/cron" &&
     cron.schedule === "*/5 * * * *";
   if (!oncePerDay && !authorizedProOutbox) {
     throw new Error(
