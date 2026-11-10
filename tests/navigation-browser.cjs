@@ -91,10 +91,20 @@ function nativeScenario(origin) {
   window.addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
   document.addEventListener('securitypolicyviolation', (event) => errors.push(`CSP ${event.effectiveDirective}: ${event.blockedURI}`));
   document.addEventListener('dart:critical-ready', () => { window.__criticalReady = true; });
-  const wait = async (condition) => {
+  const wait = async (condition, label = "state") => {
     const deadline = Date.now() + 10000;
     while (!condition()) {
-      if (Date.now() > deadline) throw new Error('Native scenario timed out: ' + location.pathname + ', phase ' + lastPhase);
+      if (Date.now() > deadline) {
+        const snapshot = {
+          label, restored: window.__restored, navigation: !!window.DartNavigation,
+          product: !!document.querySelector('.product-card[data-id="DW-NAV"]'),
+          cartLength: cart().length, scrollY: window.scrollY,
+          scrollRestoration: history.scrollRestoration,
+          errors: errors.slice(-3),
+        };
+        throw new Error('Native scenario timed out: ' + location.pathname + ', phase ' +
+          lastPhase + ' ' + JSON.stringify(snapshot));
+      }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
   };
@@ -141,7 +151,7 @@ function nativeScenario(origin) {
         await report(phase);
         window.DartNavigation.go('/products.html');
       } else if (phase === 3) {
-        await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]') && cart().length === 0);
+        await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]') && cart().length === 0, "product and cart refresh");
         // pageshow precedes the browser's persisted scroll restoration. Observe
         // its completed result before reporting or immediately navigating away.
         await wait(() => Math.abs(window.scrollY - 400) <= 1);
