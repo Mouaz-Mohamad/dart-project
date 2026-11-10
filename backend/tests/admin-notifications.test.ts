@@ -9,7 +9,7 @@ import { loadConfig } from "../src/config/env.js";
 import { createApp } from "../src/application.js";
 import { AdminNotificationService } from "../src/modules/notifications/admin-notification.service.js";
 import { queueAdminNotification, type AdminNotificationEvent } from "../src/modules/notifications/admin-notification.queue.js";
-import { deliverAdminPush } from "../src/modules/notifications/admin-push-dispatch.js";
+import { deliverAdminPush, deliverAdminTestPush } from "../src/modules/notifications/admin-push-dispatch.js";
 import { queueOrderNotifications } from "../src/modules/commerce/commerce.notifications.js";
 import { CustomerInteractionService } from "../src/modules/commerce/customer-interaction.service.js";
 import { OutboxService } from "../src/modules/outbox/outbox.service.js";
@@ -89,6 +89,35 @@ describe("staff notifications",()=>{
       if(barrier==="permission")await store.pool.query("INSERT INTO user_permission_overrides(user_id,permission_id,allowed) SELECT $1,id,false FROM permissions WHERE key='orders.read'",[userId]);
       const calls:string[]=[];expect(await deliverAdminPush(store.pool,config.mfaEncryptionKey,provider(calls),payload)).toEqual({suppressed:true});expect(calls).toHaveLength(0);
     }
+  });
+  it("broadcasts to all subscribed staff devices without creating a fake inbox record",async()=>{
+    await store.pool.query("UPDATE staff_users SET is_owner=true WHERE user_id=$1",[userId]);
+    const secondSession=randomUUID();
+    await store.pool.query("INSERT INTO sessions(id,user_id,token_hash,csrf_token_hash,user_session_version,expires_at) VALUES($1,$2,$3,$3,1,now()+interval '1 day')",
+      [secondSession,otherId,"b"+randomUUID().replaceAll("-","")+"c".repeat(31)]);
+    await subscribe();
+    await service.push.subscribe(otherId,secondSession,browser(),config.webPushVapidPublicKey!,"synthetic");
+    const batch=await service.queueTestBroadcast(userId,"broadcast-synthetic");
+    expect(batch.queued).toBe(2);
+    expect((await service.list(userId,permissions)).unreadCount).toBe(0);
+    const calls:string[]=[];
+    const outbox=new OutboxService(store.pool,config,null,provider(calls));
+    await outbox.processBatch(10);
+    expect(calls).toHaveLength(2);
+    expect(calls.every(call=>JSON.parse(call).eventType==="ADMIN_PUSH_TEST")).toBe(true);
+    expect((await service.testBroadcastStatus(userId,batch.testId)).accepted).toBe(2);
+    await expect(service.queueTestBroadcast(userId,"broadcast-duplicate")).rejects.toBeTruthy();
+  });
+  it("blocks non-owner tests and suppresses delivery if notification permission is removed",async()=>{
+    await subscribe();
+    await expect(service.queueTestBroadcast(userId,"not-owner")).rejects.toBeTruthy();
+    await store.pool.query("UPDATE staff_users SET is_owner=true WHERE user_id=$1",[userId]);
+    const batch=await service.queueTestBroadcast(userId,"owner");
+    const row=await store.pool.query("SELECT payload FROM outbox_events WHERE aggregate_id=$1",[batch.testId]);
+    await store.pool.query("INSERT INTO user_permission_overrides(user_id,permission_id,allowed) SELECT $1,id,false FROM permissions WHERE key='notifications.read'",[userId]);
+    const calls:string[]=[];
+    expect(await deliverAdminTestPush(store.pool,config.mfaEncryptionKey,provider(calls),row.rows[0].payload)).toEqual({suppressed:true});
+    expect(calls).toHaveLength(0);
   });
   it("hooks new orders and public reviews without backfilling history",async()=>{
     expect((await service.list(userId,permissions)).notifications).toHaveLength(0);
