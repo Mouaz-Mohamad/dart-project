@@ -2452,6 +2452,7 @@
             <nav id="settings-quick-nav" class="dart-settings-quick-nav" aria-label="Quick access to General settings">
                 <div class="dart-settings-quick-heading"><strong>Jump to a setting</strong><span>Go straight to the section you need — no changes are saved automatically.</span></div>
                 <div class="dart-settings-quick-links">
+                    <button type="button" data-settings-go="settings-push-test-card"><i class="fa-solid fa-bell" aria-hidden="true"></i> Notifications</button>
                     <button type="button" data-settings-go="settings-display-card"><i class="fa-solid fa-table-columns" aria-hidden="true"></i> Display</button>
                     <button type="button" data-settings-go="settings-commerce-card"><i class="fa-solid fa-calculator" aria-hidden="true"></i> Pricing &amp; fees</button>
                     <button type="button" data-settings-go="settings-return-period-card"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Return periods</button>
@@ -2466,6 +2467,17 @@
                 </div>
             </nav>
             <div id="settings-content" class="dart-settings-grid" data-active-settings-tab="general">
+                <!-- Owner-only test broadcast; does not create business records. -->
+                <article id="settings-push-test-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-bell"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>DASHBOARD NOTIFICATIONS</span>
+                        <h2>Test phone notifications</h2>
+                        <p>Send a test to every eligible device connected to Dart Eye. Disabled or expired device subscriptions are excluded.</p>
+                        <button id="settings-push-test-send" class="dart-settings-save" type="button">Send Test Notification</button>
+                        <p id="settings-push-test-status" class="dart-settings-status" role="status" aria-live="polite"></p>
+                    </div>
+                </article>
                 <article id="settings-display-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-table-columns"></i></div>
                     <div class="dart-settings-card-copy"><h2>Dashboard display</h2><p>Choose the summary columns and spacing for this browser. Every field and action remains available in Details.</p></div>
@@ -2859,7 +2871,7 @@
     <script src="dart-domain-state.js?v=20261105-independent-sessions"></script>
     <script src="../Js/dart-dialog.js"></script>
     <script src="dart-admin-auth.js?v=20261105-independent-sessions"></script>
-    <script src="dart-admin-notifications.js" defer></script>
+    <script src="dart-admin-notifications.js?v=20261110-broadcast-test" defer></script>
     <script src="dart.js?v=20261105-contrast-palette-loader-1"></script>
     <script src="dart-waiting.js"></script>
     <script src="dart-waiting-manual.js?v=20261109-manual-1"></script>
