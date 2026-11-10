@@ -181,7 +181,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   app.use("/api/v1/health", createHealthRouter({ ...dependencies, directChanges: Boolean(dependencies.changeFeed) }));
   if (dependencies.changeFeed && dependencies.identityService) app.use("/api/v1", createChangeRouter(dependencies.changeFeed, dependencies.identityService, config));
   if (dependencies.identityService) {
-    if (dependencies.adminNotificationService) app.use("/api/v1",createAdminNotificationRouter(dependencies.adminNotificationService,dependencies.identityService,config));
+    if (dependencies.adminNotificationService) app.use("/api/v1",createAdminNotificationRouter(dependencies.adminNotificationService,dependencies.identityService,config,dependencies.outboxService));
     if (dependencies.customerNotificationService) app.use("/api/v1",createCustomerNotificationRouter(dependencies.customerNotificationService,dependencies.identityService,config));
     if (dependencies.birthdayMessagingService && dependencies.outboxService) app.use("/api/v1",
       createBirthdayMessagingRouter(dependencies.birthdayMessagingService,dependencies.identityService,config,dependencies.outboxService));
