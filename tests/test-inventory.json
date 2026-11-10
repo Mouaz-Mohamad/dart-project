@@ -53,7 +53,8 @@
     "source-layout-contract.cjs",
     "test-inventory-contract.cjs",
     "rep-google-contract.cjs",
-    "rep-navigation-session.cjs"
+    "rep-navigation-session.cjs",
+    "rep-reliability-runtime.cjs"
   ],
   "ciBrowser": [
     "brand-details-browser.cjs",

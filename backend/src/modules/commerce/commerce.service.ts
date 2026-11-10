@@ -2558,50 +2558,47 @@ export class CommerceService {
     latitude: number,
     longitude: number,
     accuracyMeters: number | null,
-  ): Promise<{ updatedAt: string }> {
-    const active = await this.pool.query(
-      `SELECT 1
-         FROM orders
-        WHERE representative_user_id=$1
-          AND status IN ('Out With Representative','Representative On The Way')
-          AND NOT is_deleted
-          AND NOT is_archived
-        LIMIT 1`,
+    sampledAt?: string,
+  ): Promise<{ updatedAt: string; accepted: boolean }> {
+    const sampleTime = sampledAt ? new Date(sampledAt) : new Date();
+    const age = Date.now() - sampleTime.getTime();
+    if (!Number.isFinite(age) || age > 120_000 || age < -30_000) {
+      throw new AppError(422, "LOCATION_SAMPLE_STALE", "Send a recent GPS reading");
+    }
+    // EXISTS keeps work authorization bounded; never download the entire returns domain for a GPS update.
+    const active = await this.pool.query<{ active: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM orders
+          WHERE representative_user_id=$1
+            AND status IN ('Out With Representative','Representative On The Way')
+            AND NOT is_deleted AND NOT is_archived
+       ) OR EXISTS (
+         SELECT 1 FROM return_requests rr
+         JOIN representatives r ON r.user_id=$1 AND r.approval_status='approved'
+          WHERE rr.representative_id IN ($1::text, r.representative_code)
+            AND rr.status='Pickup On The Way'
+            AND COALESCE(rr.payload->>'isDeleted','false') <> 'true'
+            AND COALESCE(rr.payload->>'isArchived','false') <> 'true'
+       ) AS active`,
       [representativeUserId],
     );
-    const activeReturnRows = await readRelationalDashboardDomain(
-      this.pool,
-      "returns",
-    );
-    const repCodeResult = await this.pool.query<{ representative_code: string }>(
-      "SELECT representative_code FROM representatives WHERE user_id=$1 AND approval_status='approved'",
-      [representativeUserId],
-    );
-    const repCode = repCodeResult.rows[0]?.representative_code || "";
-    const hasActiveReturn = activeReturnRows.some((raw) => {
-      const row = raw as Record<string, unknown>;
-      return (
-        [representativeUserId, repCode].includes(String(row.representativeId || "")) &&
-        String(row.status || "") === "Pickup On The Way"
-      );
-    });
-    if (!active.rowCount && !hasActiveReturn) {
+    if (!active.rows[0]?.active) {
       throw new AppError(409, "NO_ACTIVE_TRIP", "Start an assigned delivery or pickup before sharing location");
     }
-
     const result = await this.pool.query<{ updated_at: Date }>(
       `INSERT INTO representative_locations (
          representative_user_id, latitude, longitude, accuracy_meters, updated_at
-       ) VALUES ($1,$2,$3,$4,now())
+       ) VALUES ($1,$2,$3,$4,$5)
        ON CONFLICT (representative_user_id) DO UPDATE SET
          latitude=EXCLUDED.latitude,
          longitude=EXCLUDED.longitude,
          accuracy_meters=EXCLUDED.accuracy_meters,
-         updated_at=now()
+         updated_at=EXCLUDED.updated_at
+       WHERE representative_locations.updated_at <= EXCLUDED.updated_at - interval '5 seconds'
        RETURNING updated_at`,
-      [representativeUserId, latitude, longitude, accuracyMeters],
+      [representativeUserId, latitude, longitude, accuracyMeters, sampleTime],
     );
-    return { updatedAt: result.rows[0]!.updated_at.toISOString() };
+    return { updatedAt: (result.rows[0]?.updated_at || sampleTime).toISOString(), accepted: Boolean(result.rowCount) };
   }
 
   public async representativeOrderAction(
@@ -2722,9 +2719,10 @@ export class CommerceService {
         const locationResult = await client.query<{
           latitude: number;
           longitude: number;
+          accuracy_meters: number | null;
           updated_at: Date;
         }>(
-          `SELECT latitude, longitude, updated_at
+          `SELECT latitude, longitude, accuracy_meters, updated_at
              FROM representative_locations
             WHERE representative_user_id=$1
             FOR UPDATE`,
@@ -2746,6 +2744,9 @@ export class CommerceService {
         // A manual address has no geofence. A fresh authenticated courier GPS
         // reading is still required above; never invent a destination pin.
         if (hasVerifiedPin) {
+          if (location.accuracy_meters == null || !Number.isFinite(location.accuracy_meters) || location.accuracy_meters > 100) {
+            throw new AppError(409, "LOCATION_INACCURATE", "Wait for GPS accuracy of 100 m or better before confirming delivery");
+          }
           const distance = distanceKm(location.latitude, location.longitude, destinationLat, destinationLng);
           if (distance > 0.5) {
             throw new AppError(409, "DELIVERY_TOO_FAR",
@@ -4247,9 +4248,10 @@ export class CommerceService {
         const locationResult = await client.query<{
           latitude: number;
           longitude: number;
+          accuracy_meters: number | null;
           updated_at: Date;
         }>(
-          `SELECT latitude, longitude, updated_at
+          `SELECT latitude, longitude, accuracy_meters, updated_at
              FROM representative_locations
             WHERE representative_user_id=$1
             FOR UPDATE`,
@@ -4258,6 +4260,9 @@ export class CommerceService {
         const location = locationResult.rows[0];
         if (!location || Date.now() - location.updated_at.getTime() > 2 * 60_000) {
           throw new AppError(409, "LOCATION_STALE", "Refresh your location before confirming pickup");
+        }
+        if (location.accuracy_meters == null || !Number.isFinite(location.accuracy_meters) || location.accuracy_meters > 100) {
+          throw new AppError(409, "LOCATION_INACCURATE", "Wait for GPS accuracy of 100 m or better before confirming pickup");
         }
         const destinationLat = Number(record.latitude);
         const destinationLng = Number(record.longitude);

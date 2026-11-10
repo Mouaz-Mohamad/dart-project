@@ -162,8 +162,8 @@ for (const file of jsFiles) {
     failures.push(`${file}: ${Math.ceil(size / 1024)}KB exceeds the 260KB per-file JS budget`);
   }
 }
-// Bounded camera updates, early library loading and separate route retry add at most 4 KiB.
-if (googleNavigationBytes > 124 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 124 KiB cap");
+// Page-only serialized GPS, recovery, session isolation and pickup navigation: 8 KiB allowance; Home/core caps unchanged.
+if (googleNavigationBytes > 132 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 132 KiB cap");
 for (const file of rootHtml.filter(file => !["cart-checkout.html", "rep.html"].includes(file))) {
   if (/<script[^>]+src=["'][^"']*dart-(?:rep|google-maps|checkout-google|checkout-places)\.js/.test(fs.readFileSync(file, "utf8")))
     failures.push(`${file}: Google checkout/courier code must stay page-scoped`);

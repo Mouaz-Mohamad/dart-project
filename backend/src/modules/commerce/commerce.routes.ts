@@ -822,15 +822,17 @@ export function createCommerceRouter(
 
   router.put(
     "/representatives/location",
-    rateLimit({ store: sharedRateLimitStore(config, "commerce-6"), windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }),
     signedIn,
     csrf,
     requireAccountType("representative"),
+    rateLimit({ store: sharedRateLimitStore(config, "commerce-6"), windowMs: 60000, limit: 30,
+      keyGenerator: request => request.auth!.userId, standardHeaders: "draft-8", legacyHeaders: false }),
     async (request, response) => {
       const body = z.object({
         latitude: z.number().min(-90).max(90),
         longitude: z.number().min(-180).max(180),
         accuracyMeters: z.number().min(0).max(5000).nullable().optional(),
+        sampledAt: z.iso.datetime().optional(),
       }).parse(request.body);
       response.status(200).json(
         await commerce.updateRepresentativeLocation(
@@ -838,6 +840,7 @@ export function createCommerceRouter(
           body.latitude,
           body.longitude,
           body.accuracyMeters ?? null,
+          body.sampledAt,
         ),
       );
     },

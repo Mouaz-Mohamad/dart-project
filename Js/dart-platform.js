@@ -2688,7 +2688,7 @@
       let index = 0;
       window.dartNavTickerTimer = setInterval(() => {
         index = (index + 1) % messages.length;
-        track.style.transform = `translateY(-${index * (track.firstElementChild?.offsetHeight || 30)}px)`;
+        track.style.transform = `translateY(-${index * 30}px)`;
       }, 4000);
     }
   }

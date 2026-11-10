@@ -96,10 +96,11 @@
   }
   function setFollow(entry, enabled) {
     entry.follow = Boolean(enabled);
-    if (entry.follow && entry.location && mapIsVisible(entry)) {
+    if (entry.follow && mapIsVisible(entry)) {
       entry.cameraAt = null; entry.cameraLocation = null;
       if (entry.tilesReady) entry.map.setZoom(17);
-      drawCourier(entry, entry.drawnLocation || entry.location, entry.drawnHeading ?? entry.heading ?? 0);
+      if (entry.location) drawCourier(entry, entry.drawnLocation || entry.location, entry.drawnHeading ?? entry.heading ?? 0);
+      else if (entry.target) applyCamera(entry, entry.target, entry.heading ?? 0);
     }
     document.dispatchEvent(new CustomEvent("dart:rep-map-follow", { detail: { following: entry.follow } }));
   }
@@ -255,6 +256,8 @@
             entry.fallbackReason = "google-selected-raster";
             entry.container.dataset.mapFallbackReason = entry.fallbackReason;
           }
+          // Google may resolve the rendering type after tilesloaded. Restore the real 60-degree camera then too.
+          if (entry.tilesReady && actual === "VECTOR") setFollow(entry, entry.follow);
         }
       };
       map.addListener("renderingtype_changed", readRenderer);
@@ -272,7 +275,7 @@
           entry.container.dataset.mapFallbackReason = entry.fallbackReason;
         }
         mapState(entry, "ready", "");
-        if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
+        setFollow(entry, entry.follow);
       });
       canvas.addEventListener("webglcontextlost", () => recover("webgl-context-lost"), { once: true, capture: true });
       mapState(entry, "loading", renderer === "RASTER" ? "Switching to the standard Google Maps view..." : "Loading Google road map...");
@@ -313,6 +316,7 @@
         google.maps.event?.trigger?.(entry.map, "resize");
         entry.cameraAt = null; entry.cameraLocation = null;
         if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
+        else if (entry.target) applyCamera(entry, entry.target, entry.heading ?? 0);
       }
     }
   }

@@ -190,13 +190,13 @@ header {
 }
 
 .under-nav {
-  height: 30px;
+  height: 44px;
   padding: 0 0 0 50px;
-  font-family: var(--font-cabin);
+  font-family: var(--font-main);
   color: var(--white);
   background-color: var(--bragnte);
-  font-size: clamp(0.85rem, 1.5vw, 1rem);
-  border-bottom: 3px solid var(--bragnte);
+  font-size: 18px;
+  border-bottom: 0;
 }
 
 .logo img {
@@ -223,7 +223,7 @@ header {
 
 .icon-shop {
   width: 70px;
-  height: 30px;
+  height: 44px;
   background-color: var(--white);
 }
 
@@ -234,7 +234,7 @@ header {
 .side-menu,
 .menu-facke {
   position: fixed;
-  top: 100px;
+  top: 114px;
 
   display: flex; /* ثابتة كـ flex دائماً */
   flex-direction: column;
@@ -1015,42 +1015,45 @@ body.dart-set-image-open {
 
 .reviews-container {
   display: flex;
-  gap: 15px;
+  gap: 10px;
   overflow-x: auto;
-  padding: 10px 5px;
+  padding: 8px 2px 11px;
   scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
 }
 
 .review-card {
-  flex: 0 0 300px;
+  flex: 0 0 244px;
   flex-shrink: 0;
   font-family: var(--font-inter);
 }
 .reviews-section .review-card {
-  width: 300px;
-  height: 348px;
+  width: 244px;
+  height: 178px;
   box-sizing: border-box;
-  padding: 17px 16px 14px;
+  padding: 13px 13px 11px;
+  gap: 8px;
+  justify-content: flex-start;
+  scroll-snap-align: start;
+  background: #fffcfa;
+  border: 1px solid #e4dcda;
+  border-radius: 12px;
+  color: #252020;
+  box-shadow: 0 2px 9px rgba(36, 27, 25, 0.05);
 }
 .dart-review-card-main {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
+  gap: 3px;
 }
 .stars {
   color: #d4af37;
   font-size: 20px;
   margin: 8px;
   justify-self: center;
-}
-.reviews-section .review-card .stars,
-.dart-review-dialog .stars {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin: 2px 0 17px;
 }
 /* Review cards use the same hand-drawn gold/silver SVG tiles as the form. */
 .dart-review-display-stars .dart-rating-choice.is-filled {
@@ -1065,13 +1068,33 @@ body.dart-set-image-open {
   fill: rgba(255, 255, 255, 0.85);
 }
 .reviews-section .dart-review-display-stars .dart-rating-choice {
-  width: 42px;
-  height: 44px;
-  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 14px;
+  flex: 0 0 13px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
 }
 .reviews-section .dart-review-display-stars .dart-rating-star {
-  width: 27px;
-  height: 27px;
+  width: 13px;
+  height: 13px;
+}
+.reviews-section .dart-review-display-stars .dart-rating-choice .dart-star-shape {
+  fill: #e9e1e1;
+  stroke: #c1b2b4;
+}
+.reviews-section .dart-review-display-stars .dart-rating-choice.is-filled .dart-star-shape {
+  fill: var(--bragnte);
+  stroke: var(--bragnte);
+}
+.reviews-section .dart-review-display-stars .dart-star-spark {
+  display: none;
 }
 
 .dart-review-avatar {
@@ -1117,12 +1140,19 @@ body.dart-set-image-open {
 .reviews-section .review-card .review-title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  height: 2.7em;
-  line-height: 1.35;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  height: auto;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #252020;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+.reviews-section .review-card .review-title:empty {
+  display: none;
 }
 .review-text {
   font-size: 16px;
@@ -1135,102 +1165,235 @@ body.dart-set-image-open {
 .reviews-section .review-card .review-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  height: 6em;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  height: auto;
+  max-height: 4.95em;
   margin: 0;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.65;
+  color: #625d5a;
   overflow: hidden;
   overflow-wrap: anywhere;
 }
 .dart-review-read-more {
   display: inline-flex;
-  gap: 8px;
+  gap: 3px;
   align-items: center;
-  align-self: center;
   justify-content: center;
-  margin-top: 12px;
-  padding: 8px 17px;
-  border: 1px solid rgba(171, 1, 43, 0.25);
-  border-radius: 999px;
-  background: #fff7f8;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--bragnte);
-  font: 600 13px var(--font-inter);
+  font: 600 11px var(--font-cabin);
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease;
 }
- .dart-review-read-more[hidden] { display: none !important; }
+.dart-review-read-more[hidden] { display: none !important; }
 .dart-review-read-more:hover {
-  background: #fce8eb;
-  border-color: var(--bragnte);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .dart-review-read-more:focus-visible,
 .dart-review-dialog-close:focus-visible {
   outline: 2px solid var(--bragnte);
   outline-offset: 4px;
 }
-.reviews-section .review-card .user-info { margin-top: 10px; }
+/* BEGIN Dart compact customer review — 244 × 178, homepage only. */
+.dart-review-card-head,
+.dart-review-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.reviews-section .review-card .user-name- {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: start;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #252020;
+}
+.reviews-section .review-card .stars {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin: 0;
+  line-height: 1;
+}
+.dart-review-card-foot {
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid #e8dfdd;
+}
+.reviews-section .review-card .review-date {
+  color: #817978;
+  font: 500 10px var(--font-cabin);
+  white-space: nowrap;
+}
+.reviews-section .review-card .dart-review-read-more {
+  flex: 0 0 auto;
+  align-self: center;
+}
+/* END Dart compact customer review. */
+
+/* BEGIN Dart compact review popup — same palette as the mini review cards. */
 .dart-review-dialog {
   position: fixed;
   inset: 0;
   margin: auto;
-  width: 90vw;
-  height: 90vh;
-  height: 90dvh;
-  max-width: 90vw;
-  max-height: 90vh;
-  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
   box-sizing: border-box;
+  width: min(350px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  height: auto;
+  max-height: 80vh;
+  max-height: 80dvh;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid #e4dcda;
+  border-radius: 18px;
+  background: #fffcfa;
+  color: #252020;
+  box-shadow: 0 18px 55px rgba(36, 27, 25, 0.19);
+  font-family: var(--font-inter);
+}
+.dart-review-dialog:not([open]) { display: none; }
+.dart-review-dialog::backdrop { background: rgba(22, 15, 19, 0.53); }
+.dart-review-dialog-header,
+.dart-review-dialog-author,
+.dart-review-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.dart-review-dialog-header {
+  padding-bottom: 11px;
+  border-bottom: 1px solid #e8dfdd;
+}
+.dart-review-dialog-label {
+  margin: 0;
+  font: 600 11px var(--font-cabin);
+  letter-spacing: 0.02em;
+  color: var(--bragnte);
+}
+.dart-review-dialog-label span {
+  color: #928889;
+  font-weight: 400;
+}
+.dart-review-dialog .dart-review-dialog-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  margin: -6px -5px -6px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #55504d;
+  font: 400 25px/1 var(--font-inter);
+  cursor: pointer;
+}
+.dart-review-dialog .dart-review-dialog-close:hover {
+  background: #f4ebea;
+}
+.dart-review-dialog-author .dart-review-dialog-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #252020;
+}
+.dart-review-dialog .stars {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin: 0;
+  line-height: 1;
+}
+.dart-review-dialog .dart-review-display-stars .dart-rating-choice {
+  width: 14px;
+  height: 15px;
+  flex: 0 0 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+.dart-review-dialog .dart-review-display-stars .dart-rating-star {
+  width: 14px;
+  height: 14px;
+}
+.dart-review-dialog .dart-review-display-stars .dart-star-shape {
+  fill: #e9e1e1;
+  stroke: #c1b2b4;
+}
+.dart-review-dialog .dart-review-display-stars .is-filled .dart-star-shape {
+  fill: var(--bragnte);
+  stroke: var(--bragnte);
+}
+.dart-review-dialog .dart-review-display-stars .dart-star-spark { display: none; }
+.dart-review-dialog-body {
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding: 32px 26px 24px;
-  border: 1px solid rgba(171, 1, 43, 0.25);
-  border-radius: 18px;
-  background: #fff;
-  color: var(--bg-dark);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+  scrollbar-width: thin;
+  scrollbar-color: #d1c2c1 transparent;
 }
-.dart-review-dialog:not([open]) { display: none; }
-.dart-review-dialog::backdrop { background: rgba(22, 15, 19, 0.64); }
-.dart-review-dialog .dart-review-dialog-close {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: #f5ecee;
-  color: var(--bragnte);
-  font-size: 24px;
-  cursor: pointer;
-}
-.dart-review-dialog .stars { margin-bottom: 16px; }
-.dart-review-dialog h2 {
-  margin: 0 0 14px;
-  font-size: clamp(21px, 4vw, 27px);
-  line-height: 1.4;
-  color: var(--bragnte);
+.dart-review-dialog-body h2 {
+  margin: 0 0 9px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #252020;
   overflow-wrap: anywhere;
 }
-.dart-review-dialog p {
+.dart-review-dialog-body h2:empty { display: none; }
+.dart-review-dialog-body p {
   margin: 0;
-  font-size: 16px;
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1.85;
+  color: #56504d;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .dart-review-dialog-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 22px;
-  padding-top: 14px;
-  border-top: 1px solid #ece7e8;
-  font-size: 13px;
-  color: #68646a;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  padding-top: 11px;
+  border-top: 1px solid #e8dfdd;
+  font: 500 10px var(--font-cabin);
 }
-.dart-review-dialog-name { font-weight: 700; color: var(--bg-dark); }
+.dart-review-dialog-date { color: #817978; }
+.dart-review-dialog-brand {
+  color: var(--bragnte);
+  font-weight: 600;
+}
+/* END Dart compact review popup. */
 
 .user-info {
   display: flex;
@@ -1827,20 +1990,151 @@ body.dart-set-image-open {
 /* Home birthday, shared footer and contact form blocks follow. */
 /* ========================================== */
 
-.birthday-conteiner {
-  color: var(--bg-dark);
-  text-align: center;
+/* BEGIN DART Birthday Offer | homepage-only premium campaign card */
+#birthday-offer.birthday-conteiner {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  min-height: 345px;
+  padding: 26px 24px 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 230, 216, 0.14);
+  border-radius: 24px;
+  color: #fff9f5;
+  text-align: left;
+  background:
+    radial-gradient(circle at 96% 3%, rgba(218, 115, 139, 0.22), transparent 39%),
+    radial-gradient(circle at 5% 100%, rgba(149, 28, 62, 0.25), transparent 51%),
+    linear-gradient(130deg, #1d1217 0%, #3d1224 53%, #680f2d 100%);
+  box-shadow: 0 14px 30px rgba(41, 12, 24, 0.13);
 }
 
-.birthday-conteiner span {
-  font-size: clamp(18px, 3vw, 30px);
-  color: var(--bragnte);
+#birthday-offer::before,
+#birthday-offer::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  border: 1px solid rgba(247, 213, 197, 0.13);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
-.birthday-conteiner img {
-  width: 120px;
-  height: auto;
+#birthday-offer::before {
+  top: -125px;
+  right: -115px;
+  width: 270px;
+  height: 270px;
 }
+
+#birthday-offer::after {
+  bottom: -145px;
+  left: -110px;
+  width: 240px;
+  height: 240px;
+}
+
+#birthday-offer .birthday-offer-emblem {
+  position: absolute;
+  z-index: 1;
+  top: 21px;
+  right: 20px;
+  width: 71px;
+  height: 71px;
+  color: #ebc9b2;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+#birthday-offer .birthday-offer-emblem svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#birthday-offer .birthday-offer-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 0;
+}
+
+#birthday-offer .birthday-offer-eyebrow {
+  margin-bottom: 29px;
+  color: #e8c6b7;
+  font: 500 11px/1.4 var(--font-main);
+  letter-spacing: 0.1em;
+}
+
+#birthday-offer .birthday-offer-heading {
+  margin: 0;
+  color: #fff9f5;
+  font: 500 clamp(24px, 6.5vw, 32px)/1.35 var(--font-main);
+  letter-spacing: 0;
+}
+
+#birthday-offer .birthday-offer-discount {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 11px 0 0;
+  color: #f6dbc9;
+}
+
+#birthday-offer .birthday-offer-discount strong {
+  font: 600 clamp(48px, 12vw, 64px)/1.1 var(--font-main);
+  letter-spacing: -0.035em;
+}
+
+#birthday-offer .birthday-offer-discount span {
+  color: #fff9f5;
+  font: 600 19px/1.2 var(--font-main);
+  letter-spacing: 0.065em;
+}
+
+#birthday-offer .birthday-offer-message {
+  margin: 10px 0 0;
+  color: rgba(255, 249, 245, 0.87);
+  font: 400 14px/1.45 var(--font-main);
+}
+
+#birthday-offer .birthday-offer-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+  min-height: 49px;
+  margin-top: 24px;
+  padding: 11px 16px;
+  border: 1px solid #fff9f5;
+  border-radius: 10px;
+  background: #fff9f5;
+  color: #46192b;
+  font: 600 14px/1.35 var(--font-main);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#birthday-offer .birthday-offer-cta span {
+  color: #8c1c41;
+  font: 600 20px/1 var(--font-main);
+}
+
+#birthday-offer .birthday-offer-cta:hover {
+  border-color: #f1dfd5;
+  background: #f1dfd5;
+}
+
+#birthday-offer .birthday-offer-cta:focus-visible {
+  outline: 3px solid #f4c7a1;
+  outline-offset: 4px;
+}
+/* END DART Birthday Offer */
 
 .paragraph-btn {
   gap: 15px;
@@ -4760,7 +5054,7 @@ button,
 .dart-nav-ticker {
   min-width: 0;
   flex: 1 1 auto;
-  height: 30px;
+  height: 44px;
   overflow: hidden;
 }
 .dart-nav-ticker-track {
@@ -4770,11 +5064,11 @@ button,
 .dart-nav-ticker-message {
   display: flex;
   align-items: center;
-  height: 30px;
+  height: 44px;
   margin: 0;
   padding-inline: 8px;
   color: #fff;
-  font: 600 clamp(0.78rem, 2.4vw, 0.98rem) / 1 var(--font-cabin, sans-serif);
+  font: 500 18px / 1.3 var(--font-main, sans-serif);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6134,6 +6428,285 @@ body.dart-rep-navigating { overflow: hidden; }
 
 .dart-rep-resume[hidden] { display: none; }
 
+
+/* BEGIN DART-CSS-CONTACT-PAGE | Scoped contact landing; all other pages unchanged. */
+.dart-contact-page {
+  gap: 0;
+  padding: 0 10px 24px;
+  color: #251c20;
+  font-family: var(--font-main);
+  background: #fff !important;
+}
+.dart-contact-page .dart-contact-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 262px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 28px 23px 30px;
+  margin: 0 -10px;
+  color: #fff;
+  background: linear-gradient(132deg, #370b1c 0%, #760f30 60%, #ab012b 100%);
+}
+.dart-contact-page .dart-contact-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -85px -150px auto;
+  width: 265px;
+  height: 265px;
+  border: 1px solid #ffffff22;
+  border-radius: 50%;
+  box-shadow: 0 0 0 35px #ffffff08, 0 0 0 72px #ffffff06;
+  pointer-events: none;
+}
+.dart-contact-hero-copy { position: relative; z-index: 1; max-width: 340px; }
+.dart-contact-eyebrow, .dart-contact-overline {
+  display: block;
+  font: 600 11px/1.5 var(--font-cabin);
+  letter-spacing: 0.16em;
+}
+.dart-contact-eyebrow { color: #f4c8d4; margin-bottom: 18px; }
+.dart-contact-page .dart-contact-hero h1 {
+  margin: 0 0 10px;
+  color: #fff;
+  font: 700 clamp(42px, 12vw, 62px)/1 var(--font-cabin);
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+}
+.dart-contact-page .dart-contact-hero h1 span { color: #ffcfda; }
+.dart-contact-page .dart-contact-hero p {
+  max-width: 310px;
+  margin: 12px 0 20px;
+  color: #f5e9ed;
+  font-size: 13px;
+  line-height: 1.85;
+  text-align: start;
+}
+.dart-contact-hero-decor {
+  position: absolute;
+  right: -7px;
+  bottom: -73px;
+  color: #ffffff0b;
+  font: 700 250px/1 var(--font-cabin);
+  pointer-events: none;
+  user-select: none;
+}
+.dart-contact-page .dart-contact-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 1px solid #ffffff55;
+  border-radius: 9px;
+  background: #ffffff12;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.dart-contact-page .dart-contact-hero-cta:hover { background: #ffffff2a; color: #fff; transform: translateY(-2px); }
+.dart-contact-page .dart-contact-methods { padding: 32px 0 26px; background: #fff; scroll-margin-top: 24px; }
+.dart-contact-page .dart-contact-section-header { margin-bottom: 18px; }
+.dart-contact-page .dart-contact-overline { color: #a2133b; margin-bottom: 7px; }
+.dart-contact-page .dart-contact-section-header h2 {
+  color: #251c20;
+  font: 700 clamp(26px, 7vw, 34px)/1.15 var(--font-cabin);
+  margin-bottom: 7px;
+}
+.dart-contact-page .dart-contact-section-header p {
+  color: #74666b;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0;
+  text-align: start;
+}
+.dart-contact-page .dart-contact-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.dart-contact-page .dart-contact-channel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 116px;
+  padding: 14px 11px;
+  border: 1px solid #ebdce0;
+  border-radius: 14px;
+  background: #fffdfc;
+  color: #2f2227;
+  box-shadow: 0 5px 14px #4a162009;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.dart-contact-page .dart-contact-channel:hover {
+  border-color: #ab012b55;
+  background: #fff9fa;
+  color: #2f2227;
+  box-shadow: 0 8px 24px #4a162016;
+  transform: translateY(-3px);
+}
+.dart-contact-page .dart-contact-channel--whatsapp {
+  grid-column: 1 / -1;
+  min-height: 88px;
+  background: #f6fcf9;
+  border-color: #dbefe3;
+}
+.dart-contact-page .dart-contact-channel--email { grid-column: 1 / -1; min-height: 88px; }
+.dart-contact-page .dart-contact-channel-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: #f7eaee;
+  color: #970a33;
+  font-size: 21px;
+}
+.dart-contact-page .dart-contact-channel--whatsapp .dart-contact-channel-icon { background: #e0f6e9; color: #178a4b; }
+.dart-contact-page .dart-contact-channel-info { display: grid; gap: 6px; min-width: 0; flex: 1; }
+.dart-contact-page .dart-contact-channel-info strong {
+  color: #251c20;
+  font: 600 17px/1.25 var(--font-cabin);
+}
+.dart-contact-page .dart-contact-channel-info small {
+  color: #7c6b71;
+  font-size: 10px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.dart-contact-page .dart-contact-channel-arrow { color: #ab012b; font-size: 11px; flex-shrink: 0; align-self: flex-start; opacity: 0.75; }
+.dart-contact-page .dart-contact-channel:focus-visible,
+.dart-contact-page .dart-contact-hero-cta:focus-visible,
+.dart-contact-page .dart-contact-shortcuts a:focus-visible {
+  outline: 3px solid #ab012b;
+  outline-offset: 3px;
+}
+.dart-contact-page .dart-contact-message {
+  padding: 25px 16px 24px;
+  margin: 0 -10px;
+  background: #faf5f3;
+  border-top: 1px solid #f0e6e3;
+  border-bottom: 1px solid #f0e6e3;
+}
+.dart-contact-page .dart-contact-message .dart-contact-section-header { margin-bottom: 18px; }
+.dart-contact-page #contact-form .dart-contact-form-section {
+  display: block;
+  width: 100%;
+  background: transparent;
+}
+.dart-contact-page #contact-form .dart-contact-form { width: 100%; text-align: left; }
+.dart-contact-page #contact-form .dart-contact-form .form-group { margin: 0 0 13px; min-width: 0; }
+.dart-contact-page #contact-form .dart-contact-form .form-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+.dart-contact-page #contact-form .dart-contact-form .form-row > .form-group { flex: 1 1 0; }
+.dart-contact-page #contact-form .dart-contact-form label {
+  display: block;
+  margin-bottom: 6px;
+  color: #463139;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+.dart-contact-page #contact-form .dart-contact-form label span { color: #ab012b; }
+.dart-contact-page #contact-form .dart-contact-form input,
+.dart-contact-page #contact-form .dart-contact-form textarea {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e7d6db;
+  border-radius: 9px;
+  background: #fff;
+  color: #291d21;
+  font-family: var(--font-main);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: start;
+  direction: auto;
+}
+.dart-contact-page #contact-form .dart-contact-form input { min-height: 46px; }
+.dart-contact-page #contact-form .dart-contact-form textarea { min-height: 126px; resize: vertical; }
+.dart-contact-page #contact-form .dart-contact-form input::placeholder,
+.dart-contact-page #contact-form .dart-contact-form textarea::placeholder { color: #887980; opacity: 1; }
+.dart-contact-page #contact-form .dart-contact-form input:focus-visible,
+.dart-contact-page #contact-form .dart-contact-form textarea:focus-visible {
+  outline: 2px solid #ab012b;
+  outline-offset: 1px;
+}
+.dart-contact-page #contact-form .dart-contact-extra {
+  margin: 0 0 15px;
+  border: 1px dashed #d9c4ca;
+  border-radius: 9px;
+  background: #fff;
+}
+.dart-contact-page #contact-form .dart-contact-extra summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 43px;
+  padding: 10px 12px;
+  color: #685158;
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+.dart-contact-page #contact-form .dart-contact-extra summary::-webkit-details-marker { display: none; }
+.dart-contact-page #contact-form .dart-contact-extra summary:focus-visible { outline: 2px solid #ab012b; outline-offset: 2px; }
+.dart-contact-page #contact-form .dart-contact-extra summary i { transition: transform 0.2s ease; }
+.dart-contact-page #contact-form .dart-contact-extra[open] summary i { transform: rotate(180deg); }
+.dart-contact-page #contact-form .dart-contact-extra .form-group { margin: 0; padding: 0 12px 12px; }
+.dart-contact-page #contact-form .dart-contact-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 48px;
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 9px;
+  border: 1px solid #ab012b;
+  background: #ab012b;
+  color: #fff;
+  font: 600 13px/1.3 var(--font-main);
+  cursor: pointer;
+}
+.dart-contact-page #contact-form .dart-contact-submit:hover { background: #83001f; color: #fff; }
+.dart-contact-page #contact-form .dart-contact-submit:disabled { opacity: 0.6; cursor: wait; }
+.dart-contact-page #contact-form .form-status {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f0f7f0;
+  color: #215a32;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.dart-contact-page #contact-form .form-status.is-error { background: #fff0f0; color: #a12228; }
+.dart-contact-page .dart-contact-shortcuts { padding: 25px 6px 4px; background: #fff; text-align: start; }
+.dart-contact-page .dart-contact-shortcuts p { color: #58474d; font-size: 12px; line-height: 1.75; margin-bottom: 12px; }
+.dart-contact-page .dart-contact-shortcuts > div { display: flex; flex-wrap: wrap; gap: 10px; }
+.dart-contact-page .dart-contact-shortcuts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  border: 1px solid #eadde1;
+  color: #80122e;
+  font-size: 11px;
+  font-weight: 600;
+}
+.dart-contact-page .dart-contact-shortcuts a:hover { color: #ab012b; background: #faf5f3; }
+/* END DART-CSS-CONTACT-PAGE */
+
 /* === CSS/base.css === */
 /* DART CODE GUIDE | CSS/base.css
    الغرض: تنسيقات الواجهة العامة؛ حافظ على تقسيم base/main/responsive وتجنب تكرار القواعد. */
@@ -6499,6 +7072,20 @@ picture.dart-picture {
 
 /* BEGIN Mobile storefront and representative layout */
 @media (max-width: 700px) {
+  /* Match news ticker, cart button and menu offset to the compact header. */
+  .under-nav,
+  .dart-nav-ticker,
+  .dart-nav-ticker-message,
+  .under-nav .icon-shop {
+    height: 38px;
+  }
+  .dart-nav-ticker-message {
+    font-size: 15px;
+  }
+  .side-menu,
+  .menu-facke {
+    top: 108px;
+  }
   .product-filter-panel {
     padding: 10px;
   }
@@ -6873,4 +7460,34 @@ picture.dart-picture {
 
 @media (prefers-reduced-motion: reduce) {
   .product-filter-panel, .product-filter-toggle, .product-filter-toggle-arrow { transition: none; }
+}
+
+
+/* BEGIN DART-CSS-CONTACT-PAGE-MOBILE | Contact page breakpoints only. */
+@media (max-width: 380px) {
+  .dart-contact-page .dart-contact-channel-grid { grid-template-columns: 1fr; }
+  .dart-contact-page .dart-contact-channel { grid-column: 1 / -1; min-height: 82px; }
+  .dart-contact-page #contact-form .dart-contact-form .form-row { flex-direction: column; gap: 0; }
+  .dart-contact-page .dart-contact-hero { min-height: 244px; padding-inline: 16px; }
+  .dart-contact-page .dart-contact-message { padding-inline: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dart-contact-page .dart-contact-channel,
+  .dart-contact-page .dart-contact-hero-cta,
+  .dart-contact-page #contact-form .dart-contact-extra summary i { transition: none; }
+  .dart-contact-page .dart-contact-channel:hover,
+  .dart-contact-page .dart-contact-hero-cta:hover { transform: none; }
+}
+/* END DART-CSS-CONTACT-PAGE-MOBILE */
+
+/* Compact review overlays: media rules moved from main.css without changing declarations. */
+@media (prefers-reduced-motion: reduce) {
+  .reviews-container { scroll-behavior: auto; }
+}
+@media (max-width: 360px) {
+  .dart-review-dialog { padding: 14px; gap: 11px; }
+  .dart-review-dialog-label { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dart-review-dialog-body { scroll-behavior: auto; }
 }

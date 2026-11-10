@@ -277,9 +277,14 @@ const server = http.createServer((req, res) => {
 
       window.DartState={formatMoney:v=>String(v)};
       window.DartApi={isConfigured:true,request:async(path,options)=>{
+        if(path.endsWith("/logout"))return {};
         if(path.endsWith("/me"))return {user:{id:"rep-test",code:"Rep-test",name:"Synthetic",phones:[],status:"active"}};
-        if(path.endsWith("/work"))return {orders:window.__order.status==="Delivered"?[]:[structuredClone(window.__order)],returns:[]};
+        if(path.endsWith("/work"))return {orders:window.__order.status==="Delivered"?[]:[structuredClone(window.__order)],returns:window.__return && window.__return.status!=="Completed"?[structuredClone(window.__return)]:[]};
         if(path.endsWith("/location")){if(window.__delayLocation)await new Promise(resolve=>{window.__finishLocation=resolve});return {updatedAt:new Date().toISOString()}};
+        if(path.includes("/returns/") && path.endsWith("/action")) {
+          window.__return.status=options.body.action==="complete"?"Completed":"Pickup On The Way";
+          window.__return.pickupStartedAt=new Date().toISOString();return {};
+        }
         if(path.endsWith("/action")){window.__actions.push(options.body.action);window.__order.status=options.body.action==="delivered"?"Delivered":"Representative On The Way";window.__order.deliveryStartedAt=new Date().toISOString();return {}};
         throw Error('Unexpected synthetic endpoint '+path);
       }};
@@ -379,7 +384,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(()=>window.__maps),cachedMaps,"reopening must preserve the loaded map");
     assert.equal(await page.evaluate(()=>window.__routes),3,"reopening must preserve the route");
     // Visual fixes must not wait for the API or unlock server-backed delivery confirmation.
-    await page.waitForTimeout(1100);
+    await page.waitForTimeout(6100);
     await page.evaluate(()=>{window.__delayLocation=true;window.__gps.latitude=30.046;window.__watch({coords:window.__gps,timestamp:Date.now()})});
     await page.waitForFunction(()=>Boolean(window.__finishLocation));
     await page.waitForFunction(()=>window.__markers.findLast(m=>m.options.title==='You').options.position.lat===30.046);
@@ -399,6 +404,20 @@ const server = http.createServer((req, res) => {
     await page.locator("#repNavigationComplete").click();
     await page.locator(".dart-dialog-button.is-primary").click();
     await page.waitForFunction(()=>window.__actions.includes("delivered") && !document.getElementById("repNavigationDialog").open);
+    // Return pickups use the same embedded navigation and can reopen it after Exit.
+    await page.evaluate(()=>{window.__return={id:"synthetic-return",returnId:"TEST-RETURN",requestType:"Refund",
+      status:"Representative Assigned",latitude:30.05,longitude:31.25,clientName:"Synthetic pickup",phone1:"",
+      customerCourierFee:0,brandCourierFee:50,itemCode:"SYN-PIECE"};});
+    await page.locator('[data-return-action="start"]').click();
+    await page.waitForFunction(()=>document.getElementById('repNavigationDialog').open);
+    await page.locator('#repNavigationExit').click();
+    await page.locator('[data-return-action="navigate"]').click();
+    await page.waitForFunction(()=>document.getElementById('repNavigationDialog').open);
+    await page.locator('#repNavigationExit').click();
+    await page.locator('#repLogout').click();
+    await page.locator('#repAuthView').waitFor({state:"visible"});
+    assert.equal(await page.locator('#repOrdersList').textContent(),"");
+    assert.equal(await page.locator('#repReturnsList').textContent(),"");
     // Isolated tile lifecycle: marker creation is not proof that the base map rendered.
     const recovery = await browser.newPage({viewport:{width:390,height:844}});
     await recovery.route(/https:\/\//, route=>route.abort());

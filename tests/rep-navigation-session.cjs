@@ -15,7 +15,7 @@ const window = {addEventListener(){}, DartApi:{isConfigured:true,request(){}}, D
 },documentPictureInPicture:{window:{close(){pipClosed++}}}};
 const document = {addEventListener(){},dispatchEvent(){},getElementById:element,querySelectorAll:()=>[],
   body:{classList:{add(){},remove(){}}}};
-const sessionStorage = {getItem:()=>null,removeItem(){}};
+const sessionStorage = {getItem:()=>null,setItem(){},removeItem(){}};
 const source = fs.readFileSync('Js/dart-rep.js','utf8').replace('  window.DartRepPortal = {', `
   window.testNavigation = {openNavigation, closeNavigation, stopNavigation, updateDeliveryControls, refreshApiWork,
     work(){return apiWork}, logout(){apiRepresentative=null},
@@ -23,12 +23,12 @@ const source = fs.readFileSync('Js/dart-rep.js','utf8').replace('  window.DartRe
     entry(){return deliveryMaps.get(navigationOrderId)}};
   window.DartRepPortal = {`);
 vm.runInNewContext(source,{window,document,sessionStorage,location:{protocol:'https:',hostname:'example.test'},
-  console,setTimeout,clearTimeout,CustomEvent:class{},Date,Math,JSON,Map,Set});
+  console,setTimeout,clearTimeout,navigator:{geolocation:{watchPosition(){return 1},clearWatch(){}}},AbortController,CustomEvent:class{},Date,Math,JSON,Map,Set});
 (async()=>{
   const order = {id:'synthetic',status:'Representative On The Way',deliveryStartedAt:'yes',latitude:30.01,longitude:31,
-    courierLocation:{lat:30,lng:31,updatedAt:new Date().toISOString()}};
+    courierLocation:{lat:30,lng:31,updatedAt:new Date().toISOString(),accuracy:5}};
   const portal = window.DartRepPortal, nav = window.testNavigation;
-  const at = metres => ({...order,courierLocation:{lat:30.01-metres/111195,lng:31,updatedAt:new Date().toISOString()}});
+  const at = metres => ({...order,courierLocation:{lat:30.01-metres/111195,lng:31,updatedAt:new Date().toISOString(),accuracy:5}});
   assert.equal(portal.deliveryProximity(at(499)).ok,true);
   assert.equal(portal.deliveryProximity(at(501)).ok,false);
   assert.equal(portal.deliveryProximity({...at(100),courierLocation:{...at(100).courierLocation,updatedAt:'2000-01-01'}}).ok,false);

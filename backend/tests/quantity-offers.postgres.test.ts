@@ -110,7 +110,7 @@ describe("quantity offers on the production schema", () => {
       pickupStartedAt: new Date().toISOString(), representativeId: repCode, representativeBusinessId: repCode,
       latitude: 30.05, longitude: 31.35, inspectionStatus: "Pending" };
     await store.pool.query("INSERT INTO return_requests(record_id,payload) VALUES($1,$2::jsonb)", [ref, JSON.stringify(record)]);
-    await store.pool.query("INSERT INTO representative_locations(representative_user_id,latitude,longitude) VALUES($1,30.05,31.35)", [rep]);
+    await store.pool.query("INSERT INTO representative_locations(representative_user_id,latitude,longitude,accuracy_meters) VALUES($1,30.05,31.35,5)", [rep]);
     const second = await commerce.representativeReturnAction(rep, ref, "complete");
     expect(second.refundAmount).toBe(1000);
     const before = (await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [order.id])).rows[0].amount_refunded_minor;
@@ -131,7 +131,7 @@ describe("quantity offers on the production schema", () => {
       requestType: "Exchange", status: "Pickup On The Way", pickupStartedAt: new Date().toISOString(), representativeId: repCode,
       requestedColor: "Black", requestedSize: "M", latitude: 30.05, longitude: 31.35, inspectionStatus: "Pending" };
     await store.pool.query("INSERT INTO return_requests(record_id,payload) VALUES($1,$2::jsonb)", [ref, JSON.stringify(record)]);
-    await store.pool.query("INSERT INTO representative_locations(representative_user_id,latitude,longitude) VALUES($1,30.05,31.35)", [rep]);
+    await store.pool.query("INSERT INTO representative_locations(representative_user_id,latitude,longitude,accuracy_meters) VALUES($1,30.05,31.35,5)", [rep]);
     await commerce.representativeReturnAction(rep, ref, "complete");
     const first = await commerce.adminManualReturn(actor, { itemCode: f.pieces[1]![0]!, condition: "Good", reason: "Test", refundAmount: 0 }, "post-exchange-return");
     expect(first.refundAmount).toBe(900); // Exchanged A + retained C still qualify.

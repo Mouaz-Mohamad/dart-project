@@ -25,30 +25,34 @@
   const MAX_SAVED_BYTES = 650 * 1024;
   const DELIVERY_RADIUS_KM = 0.5;
   const LOCATION_MAX_AGE_MS = 2 * 60 * 1000;
-  const LOCATION_SYNC_MS = 1000;
+  const LOCATION_SYNC_MS = 6000;
+  const LOCATION_MAX_ACCURACY_METERS = 100;
   const ROAD_ROUTE_REFRESH_MS = 15000;
   const API_ENABLED = Boolean(window.DartApi?.isConfigured);
   const API_REQUIRED =
     location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
   const API_REP_CACHE_KEY = "dart_api_representative_cache";
   let apiRepresentative = null;
-  try {
-    apiRepresentative = JSON.parse(sessionStorage.getItem(API_REP_CACHE_KEY) || "null");
-  } catch {
-    sessionStorage.removeItem(API_REP_CACHE_KEY);
+  sessionStorage.removeItem(API_REP_CACHE_KEY);
+  function readActiveIds(key) {
+    try {
+      const ids = JSON.parse(sessionStorage.getItem(key) || "[]");
+      return new Set(Array.isArray(ids) ? ids.filter(id => typeof id === "string") : []);
+    } catch { return new Set(); }
   }
-  const activeOrderIds = new Set(
-    JSON.parse(sessionStorage.getItem("dart_rep_active_orders") || "[]"),
-  );
-  const activeReturnIds = new Set(
-    JSON.parse(sessionStorage.getItem("dart_rep_active_returns") || "[]"),
-  );
+  const activeOrderIds = readActiveIds("dart_rep_active_orders");
+  const activeReturnIds = readActiveIds("dart_rep_active_returns");
   let locationWatch = null;
   let locationPermissionBlocked = false;
   let apiWork = { orders: [], returns: [] };
   let nextWorkRead = 0, appliedWorkRead = 0;
   let latestApiLocation = null;
   let lastLocationSyncAt = 0;
+  let locationRequest = null, locationGeneration = 0, locationRetryAt = 0;
+  let latestPreviewLocation = null;
+  let sessionRecoveryPending = false;
+  const returnActionsPending = new Set();
+  const orderActionsPending = new Set();
   const deliveryMaps = new Map();
   let lastOrderRenderSignature = "";
   let navigationOrderId = "", navigationFocus = null, didWarmMaps = false;
@@ -106,6 +110,16 @@
     if (!status) return;
     status.textContent = message;
     status.dataset.state = state;
+    const navigationStatus = document.getElementById("repNavigationStatus");
+    if (navigationOrderId && navigationStatus) {
+      if (state === "error") {
+        navigationStatus.dataset.locationError = message;
+        navigationStatus.textContent = message;
+      } else if (state === "success") {
+        delete navigationStatus.dataset.locationError;
+        updateDeliveryControls();
+      }
+    }
   }
 
   function distanceKm(lat1, lng1, lat2, lng2) {
@@ -147,6 +161,10 @@
     if (!hasDestination) {
       return { ok: true, manual: true,
         reason: "Manual address: no verified customer pin. Confirm delivery in person before marking Delivered." };
+    }
+    const accuracy = order?.courierLocation?.accuracy;
+    if (accuracy == null || !Number.isFinite(Number(accuracy)) || Number(accuracy) > LOCATION_MAX_ACCURACY_METERS) {
+      return { ok: false, reason: "إشارة GPS غير دقيقة. تحرّك إلى مكان مفتوح وانتظر تحديث الموقع." };
     }
     const distance = distanceKm(
       courierLat,
@@ -265,6 +283,7 @@
 
   function saveSession(rep) {
     if (API_ENABLED) {
+      if (apiRepresentative) clearRepresentativeSession();
       apiRepresentative = {
         id: rep.id,
         repId: rep.code,
@@ -276,7 +295,6 @@
         mustChangePassword: rep.mustChangePassword,
         serverAuthoritative: true,
       };
-      sessionStorage.setItem(API_REP_CACHE_KEY, JSON.stringify(apiRepresentative));
       return;
     }
     write(KEYS.session, {
@@ -559,6 +577,7 @@
     if (latestApiLocation) {
       [...apiWork.orders, ...apiWork.returns].forEach((record) => {
         if (record.deliveryStartedAt || record.pickupStartedAt || record.status === "Representative On The Way" || record.status === "Pickup On The Way") {
+          if (Date.parse(record.courierLocation?.updatedAt || "") > Date.parse(latestApiLocation.updatedAt)) return;
           record.courierLocation = latestApiLocation;
         }
       });
@@ -651,6 +670,8 @@
       call.href = record.phone1 ? `tel:${record.phone1}` : "#";
       call.hidden = !record.phone1;
       card.querySelector('[data-return-action="start"]').hidden = started;
+      card.querySelector('[data-return-action="navigate"]').hidden = !started;
+      card.querySelectorAll('[data-return-action]').forEach(button => { button.disabled = returnActionsPending.has(String(record.id)); });
       card.querySelector('[data-return-action="cancel"]').hidden = false;
       card.querySelector('[data-return-action="complete"]').hidden = !started || !proximity.ok;
       card.querySelector('[data-return-field="proximity"]').classList.toggle("is-ready", proximity.ok);
@@ -667,7 +688,14 @@
   }
 
   const navigationDialog = () => document.getElementById("repNavigationDialog");
-  const activeNavigationOrder = () => repOrders(currentRep()).find(order => String(order.id) === navigationOrderId);
+  const activeNavigationOrder = () => [...repOrders(currentRep()), ...repReturns(currentRep())]
+    .find(order => String(order.id) === navigationOrderId);
+  const navigationStarted = order => Boolean(order && (
+    (order.status === "Representative On The Way" && order.deliveryStartedAt) ||
+    (order.status === "Pickup On The Way" && order.pickupStartedAt)));
+  const sameNavigationDestination = (entry, order) =>
+    Number(entry?.destination?.lat || 0) === Number(order.latitude || 0) &&
+    Number(entry?.destination?.lng || 0) === Number(order.longitude || 0);
   function closeNavigation() {
     navigationDialog()?.close();
     window.DartGoogleMaps?.pauseRepresentatives?.();
@@ -704,7 +732,8 @@
     if (!navigationOrderId || entry.orderId !== navigationOrderId || !entry.steps?.length) return;
     let nearest = entry.stepIndex || 0, nearestDistance = Infinity;
     // Examine nearby steps only: crossing roads later in the route must not skip turns.
-    for (let i = Math.max(0, nearest - 1); i < Math.min(entry.steps.length, nearest + 5); i++) {
+    const searchStart = Math.max(0, nearest - 1), searchEnd = Math.min(entry.steps.length, nearest + 5);
+    for (let i = searchStart; i < searchEnd; i++) {
       const step = entry.steps[i];
       const distance = distanceToRoadPath(location, [step.start, ...(step.path || []), step.end].filter(Boolean));
       if (distance < nearestDistance) { nearestDistance = distance; nearest = i; }
@@ -722,6 +751,9 @@
     for (const card of document.querySelectorAll("#repOrdersList [data-order-id]")) {
       const order = orders.find(row => String(row.id) === card.dataset.orderId);
       if (!order) continue;
+      card.querySelectorAll('[data-action]').forEach(button => {
+        button.disabled = orderActionsPending.has(String(order.id));
+      });
       const proximity = deliveryProximity(order);
       const started = activeOrderIds.has(order.id) && Boolean(order.deliveryStartedAt);
       const complete = card.querySelector('[data-action="complete"]');
@@ -729,19 +761,43 @@
       const label = card.querySelector(".dart-rep-proximity");
       if (label && started) { label.textContent = proximity.reason; label.classList.toggle("is-ready", proximity.ok); }
     }
+    for (const card of document.querySelectorAll("#repReturnsList [data-return-id]")) {
+      const record = repReturns(rep).find(row => String(row.id) === card.dataset.returnId);
+      if (!record) continue;
+      card.querySelectorAll('[data-return-action]').forEach(button => {
+        button.disabled = returnActionsPending.has(String(record.id));
+      });
+      const proximity = deliveryProximity(record);
+      const complete = card.querySelector('[data-return-action="complete"]');
+      if (complete) complete.hidden = !navigationStarted(record) || !proximity.ok;
+      const label = card.querySelector('[data-return-field="proximity"]');
+      if (label && navigationStarted(record)) label.textContent = proximity.reason;
+    }
     if (!navigationOrderId) return;
     const order = activeNavigationOrder();
-    if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) { stopNavigation(); return; }
+    if (!navigationStarted(order)) { stopNavigation(); return; }
+    const cachedEntry = deliveryMaps.get(navigationOrderId);
+    if (cachedEntry && !sameNavigationDestination(cachedEntry, order)) {
+      const reopen = navigationDialog().open;
+      stopNavigation();
+      if (reopen) void openNavigation(order);
+      return;
+    }
     const proximity = deliveryProximity(order);
     document.getElementById("repNavigationProximity").textContent = proximity.reason;
     // An unknown destination cannot satisfy the 500 m rule. Existing manual-order actions stay on the order card.
     document.getElementById("repNavigationComplete").hidden = !proximity.ok || Boolean(proximity.manual);
+    document.getElementById("repNavigationComplete").disabled =
+      orderActionsPending.has(navigationOrderId) || returnActionsPending.has(navigationOrderId);
     const entry = deliveryMaps.get(navigationOrderId);
     if (entry && order.courierLocation) {
       const updatedAt = Date.parse(order.courierLocation.updatedAt || "");
       if (Date.now() - updatedAt <= LOCATION_MAX_AGE_MS) {
         updateRouteProgress(entry, order.courierLocation);
-        if (entry.steps.length && !entry.pending && !entry.failed) document.getElementById("repNavigationStatus").textContent = "";
+        if (entry.steps.length && !entry.pending && !entry.failed) {
+          const status = document.getElementById("repNavigationStatus");
+          status.textContent = status.dataset.locationError || "";
+        }
       }
       else {
         document.getElementById("repNavigationStatus").textContent = "بانتظار إشارة موقع حديثة...";
@@ -750,9 +806,13 @@
     }
   }
   async function openNavigation(order) {
-    if (!order || order.status !== "Representative On The Way" || !order.deliveryStartedAt) return;
-    if (navigationOrderId === String(order.id) && deliveryMaps.has(navigationOrderId) && document.getElementById("repNavigationMap").dataset.mapState !== "error") {
-      navigationDialog().showModal();
+    if (!navigationStarted(order)) return;
+    locationPermissionBlocked = false;
+    ensureLocationWatch();
+    if (navigationOrderId === String(order.id) && deliveryMaps.has(navigationOrderId) &&
+        sameNavigationDestination(deliveryMaps.get(navigationOrderId), order) &&
+        document.getElementById("repNavigationMap").dataset.mapState !== "error") {
+      if (!navigationDialog().open) navigationDialog().showModal();
       window.DartGoogleMaps?.resizeRepresentatives?.();
       document.body.classList.add("dart-rep-navigating");
       document.getElementById("repNavigationResume").hidden = true;
@@ -760,6 +820,7 @@
       const entry = deliveryMaps.get(navigationOrderId);
       const courier = order.courierLocation || latestApiLocation;
       if (entry.failed && courier) void refreshDeliveryRoadRoute(entry, courier, true);
+      if (!courier) void syncFreshRepresentativeLocation();
       return;
     }
     if (navigationOrderId) stopNavigation();
@@ -784,6 +845,7 @@
     const mounting = window.DartGoogleMaps?.attachRepresentatives?.([order]);
     const courier = order.courierLocation || latestApiLocation;
     if (entry.destination && courier) void refreshDeliveryRoadRoute(entry, courier, true);
+    else if (!courier) void syncFreshRepresentativeLocation();
     await mounting;
     if (deliveryMaps.get(entry.orderId) !== entry) return;
     if (!entry.destination) {
@@ -871,6 +933,8 @@
       String(order.latitude || ""),
       String(order.longitude || ""),
       String(order.addressSource || ""),
+      order.clientName, order.phone1, order.phone2, fullAddress(order), order.deliveryNotes,
+      order.priceSnapshot, orderTotal(order), order.orderId, order.date, order.time,
     ]));
     activeOrderIds.clear();
     orders
@@ -964,43 +1028,94 @@
     window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
     return location;
   }
+  function clearRepresentativeSession() {
+    sessionRecoveryPending = false;
+    locationGeneration += 1;
+    locationRequest?.controller.abort();
+    locationRequest = null;
+    if (locationWatch != null) navigator.geolocation?.clearWatch(locationWatch);
+    locationWatch = null;
+    apiRepresentative = null;
+    apiWork = { orders: [], returns: [] };
+    latestApiLocation = null; latestPreviewLocation = null;
+    lastLocationSyncAt = 0; locationRetryAt = 0;
+    activeOrderIds.clear(); activeReturnIds.clear();
+    lastOrderRenderSignature = ""; didWarmMaps = false;
+    returnActionsPending.clear(); orderActionsPending.clear();
+    sessionStorage.removeItem(API_REP_CACHE_KEY);
+    saveActiveIds();
+    stopNavigation();
+    delete document.getElementById("repNavigationStatus").dataset.locationError;
+    delete window.DART_REP_LAST_LOCATION;
+    document.getElementById("repOrdersList").replaceChildren();
+    document.getElementById("repReturnsList").replaceChildren();
+  }
+
+  async function publishRepresentativeLocation(preview) {
+    const owner = currentRep(), generation = locationGeneration;
+    if (!API_ENABLED || !owner || !preview) return false;
+    if (Date.parse(preview.sampledAt) <= Date.parse(latestApiLocation?.sampledAt || "")) return false;
+    if (locationRequest) return locationRequest.promise;
+    const time = Date.now();
+    if (time < locationRetryAt || time - lastLocationSyncAt < LOCATION_SYNC_MS) return false;
+    if (Math.abs(time - Date.parse(preview.sampledAt)) > LOCATION_MAX_AGE_MS) return false;
+    const controller = new AbortController();
+    lastLocationSyncAt = time;
+    const pending = { controller, promise: null, timedOut: false };
+    const timeout = setTimeout(() => { pending.timedOut = true; controller.abort(); }, 12000);
+    pending.promise = (async () => {
+      try {
+        const payload = await window.DartApi.request("/api/v1/representatives/location", {
+          method: "PUT", signal: controller.signal,
+          body: { latitude: preview.lat, longitude: preview.lng,
+            accuracyMeters: Number.isFinite(preview.accuracy) ? preview.accuracy : null,
+            sampledAt: preview.sampledAt },
+        });
+        if (generation !== locationGeneration || currentRep() !== owner || payload.accepted === false) return false;
+        if (Date.parse(preview.sampledAt) < Date.parse(latestApiLocation?.sampledAt || "")) return false;
+        latestApiLocation = { ...preview, updatedAt: payload.updatedAt || preview.sampledAt };
+        [...apiWork.orders, ...apiWork.returns].forEach(record => {
+          if (record.status === "Representative On The Way" || record.status === "Pickup On The Way") {
+            record.courierLocation = latestApiLocation;
+          }
+        });
+        updateDeliveryMapsLocation(latestApiLocation);
+        setLocationStatus("Live location is being shared securely with Dart every 6 seconds.", "success");
+        return true;
+      } catch (error) {
+        if (generation !== locationGeneration || currentRep() !== owner || (error.name === "AbortError" && !pending.timedOut)) return false;
+        if (error.status === 401 || error.status === 403) {
+          clearRepresentativeSession(); showAuth("login");
+          return false;
+        }
+        locationRetryAt = Date.now() + (error.status === 429 ? 15000 : LOCATION_SYNC_MS);
+        setLocationStatus("تعذر إرسال الموقع. ستتم إعادة المحاولة تلقائيًا عند عودة الاتصال.", "error");
+        return false;
+      } finally {
+        clearTimeout(timeout);
+        if (locationRequest === pending) locationRequest = null;
+      }
+    })();
+    locationRequest = pending;
+    return pending.promise;
+  }
+
   async function syncFreshRepresentativeLocation() {
-    if (!API_ENABLED || !navigator.geolocation) return false;
+    if (!API_ENABLED || !navigator.geolocation || !currentRep()) return false;
+    const owner = currentRep(), generation = locationGeneration;
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 12000,
+          enableHighAccuracy: true, maximumAge: 0, timeout: 12000,
         });
       });
-      const preview = previewRepresentativePosition(position);
-      const payload = await window.DartApi.request("/api/v1/representatives/location", {
-        method: "PUT",
-        body: {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracyMeters: Number.isFinite(position.coords.accuracy)
-            ? position.coords.accuracy
-            : null,
-        },
-      });
-      if (Date.parse(preview.sampledAt) < Date.parse(latestApiLocation?.sampledAt || "")) return true;
-      lastLocationSyncAt = Date.now();
-      latestApiLocation = { ...preview, updatedAt: payload.updatedAt || now() };
-      [...apiWork.orders, ...apiWork.returns].forEach((record) => {
-        if (record.status === "Representative On The Way" || record.status === "Pickup On The Way") {
-          record.courierLocation = latestApiLocation;
-        }
-      });
-      updateDeliveryMapsLocation(latestApiLocation);
-      setLocationStatus("Live location is being shared securely with Dart.", "success");
-      return true;
-    } catch (error) {
-      setLocationStatus(
-        `Waiting for a precise location: ${error?.message || "location unavailable"}`,
-        "error",
-      );
+      if (generation !== locationGeneration || currentRep() !== owner) return false;
+      latestPreviewLocation = previewRepresentativePosition(position);
+      return await publishRepresentativeLocation(latestPreviewLocation);
+    } catch {
+      if (generation === locationGeneration && currentRep() === owner) {
+        setLocationStatus("تعذر تحديد موقعك. اسمح بالوصول للموقع الدقيق وافتح GPS ثم أعد المحاولة.", "error");
+      }
       return false;
     }
   }
@@ -1405,19 +1520,17 @@
   }
 
   function ensureLocationWatch() {
-    const hasAssignedDeliveryWork =
-      API_ENABLED &&
-      (apiWork.orders || []).some((order) =>
-        ["Out With Representative", "Representative On The Way"].includes(String(order.status || "")),
-      );
-    if (!hasAssignedDeliveryWork && !activeOrderIds.size && !activeReturnIds.size) {
-      if (locationWatch != null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(locationWatch);
-        locationWatch = null;
+    const hasAssignedDeliveryWork = API_ENABLED && currentRep() &&
+      (apiWork.orders || []).some(order =>
+        ["Out With Representative", "Representative On The Way"].includes(String(order.status || "")));
+    if (!currentRep() || (!hasAssignedDeliveryWork && !activeOrderIds.size && !activeReturnIds.size)) {
+      if (locationWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(locationWatch);
+      locationWatch = null;
+      if (!currentRep()) {
+        locationGeneration += 1;
+        locationRequest?.controller.abort(); locationRequest = null;
       }
-      setLocationStatus(
-        "Location sharing starts when Dart assigns active delivery work to you.",
-      );
+      setLocationStatus("Location sharing starts when Dart assigns active delivery work to you.");
       return;
     }
     if (locationWatch != null || locationPermissionBlocked) return;
@@ -1429,43 +1542,15 @@
       return;
     }
     setLocationStatus("Requesting precise location permission…", "loading");
+    const watchOwner = currentRep(), watchGeneration = locationGeneration;
     locationWatch = navigator.geolocation.watchPosition(
       async (position) => {
         const rep = currentRep();
+        if (!rep || rep !== watchOwner || watchGeneration !== locationGeneration) return;
         const preview = previewRepresentativePosition(position);
         if (API_ENABLED) {
-          const currentTime = Date.now();
-          if (currentTime - lastLocationSyncAt < LOCATION_SYNC_MS) return;
-          lastLocationSyncAt = currentTime;
-          try {
-            const payload = await window.DartApi.request("/api/v1/representatives/location", {
-              method: "PUT",
-              body: {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracyMeters: Number.isFinite(position.coords.accuracy)
-                  ? position.coords.accuracy
-                  : null,
-              },
-            });
-            if (Date.parse(preview.sampledAt) < Date.parse(latestApiLocation?.sampledAt || "")) return;
-            latestApiLocation = { ...preview, updatedAt: payload.updatedAt || now() };
-            [...apiWork.orders, ...apiWork.returns].forEach((record) => {
-              if (
-                activeOrderIds.has(record.id) ||
-                activeReturnIds.has(record.id) ||
-                record.status === "Representative On The Way" ||
-                record.status === "Pickup On The Way"
-              ) record.courierLocation = latestApiLocation;
-            });
-            setLocationStatus(
-              "Live location is being shared securely with Dart.",
-              "success",
-            );
-            updateDeliveryMapsLocation(latestApiLocation);
-          } catch (error) {
-            setLocationStatus(error.message || "Could not update live location.", "error");
-          }
+          latestPreviewLocation = preview;
+          void publishRepresentativeLocation(preview);
           return;
         }
         const orders = read(KEYS.orders, []),
@@ -1517,12 +1602,16 @@
         }
       },
       (error) => {
-        locationWatch = null;
-        locationPermissionBlocked = error.code === 1;
-        setLocationStatus(
-          `Live location unavailable: ${error.message}`,
-          "error",
-        );
+        if (watchGeneration !== locationGeneration || currentRep() !== watchOwner) return;
+        if (error.code === 1) {
+          navigator.geolocation.clearWatch(locationWatch);
+          locationWatch = null;
+          locationPermissionBlocked = true;
+        }
+        // TIMEOUT/POSITION_UNAVAILABLE do not end a watch; keep its id so retries cannot leak subscriptions.
+        setLocationStatus(error.code === 1
+          ? "اسمح للموقع باستخدام موقعك الدقيق من إعدادات المتصفح، ثم افتح الملاحة مجددًا."
+          : "إشارة GPS غير متاحة مؤقتًا. انتقل لمكان مفتوح؛ ستتم المحاولة تلقائيًا.", "error");
       },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
     );
@@ -1537,8 +1626,9 @@
     document.getElementById("repNavigationExit").addEventListener("click", closeNavigation);
     navigationDialog().addEventListener("cancel", event => { event.preventDefault(); closeNavigation(); });
     document.getElementById("repNavigationComplete").addEventListener("click", () => {
-      const card = [...document.querySelectorAll("#repOrdersList [data-order-id]")].find(el => el.dataset.orderId === navigationOrderId);
-      card?.querySelector('[data-action="complete"]')?.click();
+      const card = [...document.querySelectorAll("#repOrdersList [data-order-id], #repReturnsList [data-return-id]")]
+        .find(el => (el.dataset.orderId || el.dataset.returnId) === navigationOrderId);
+      card?.querySelector('[data-action="complete"], [data-return-action="complete"]')?.click();
     });
     document.addEventListener("dart:rep-map-state", event => {
       if (!navigationOrderId || event.detail?.orderId !== navigationOrderId) return;
@@ -1637,22 +1727,18 @@
     };
     document.getElementById("repLogout").onclick = async () => {
       const rep = currentRep();
+      // Stop and erase local work immediately, even if the network cannot revoke the server cookie yet.
+      clearRepresentativeSession(); showAuth("login");
       if (API_ENABLED) {
         try {
           await window.DartApi.request("/api/v1/auth/logout", { method: "POST" });
-        } finally {
-          apiRepresentative = null;
-          sessionStorage.removeItem(API_REP_CACHE_KEY);
+        } catch {
+          setStatus(loginForm, "تم إيقاف التتبع. تعذر إنهاء جلسة الخادم؛ أعد تسجيل الخروج عند عودة الاتصال.", true);
         }
       } else {
         if (rep) audit("REP_LOGOUT", rep.id);
         window.DartState?.remove?.(KEYS.session, { source: "rep" });
       }
-      activeOrderIds.clear();
-      activeReturnIds.clear();
-      saveActiveIds();
-      ensureLocationWatch();
-      showAuth("login");
     };
     document
       .getElementById("repOrdersList")
@@ -1666,6 +1752,8 @@
           orderId = card?.dataset.orderId,
           orders = API_ENABLED ? apiWork.orders : read(KEYS.orders, []),
           order = orders.find((row) => String(row.id) === String(orderId));
+        if (orderActionsPending.has(String(orderId))) return;
+        orderActionsPending.add(String(orderId));
         try {
           if (!order) throw new Error("The assigned order could not be found.");
           if (button.dataset.action === "navigate") await openNavigation(order);
@@ -1727,6 +1815,7 @@
         } catch (error) {
           window.DartDialog.alert(error.message);
         } finally {
+          orderActionsPending.delete(String(orderId));
           button.disabled = false;
           modalComplete.disabled = false;
           updateDeliveryControls();
@@ -1736,19 +1825,24 @@
       .getElementById("repReturnsList")
       .addEventListener("click", async (event) => {
         const button = event.target.closest("[data-return-action]");
-        if (!button) return;
+        if (!button || button.disabled) return;
         const card = button.closest("[data-return-id]"),
           recordId = card?.dataset.returnId,
           records = API_ENABLED ? apiWork.returns : read(KEYS.returns, []),
           record = records.find((row) => String(row.id) === String(recordId));
+        if (returnActionsPending.has(String(recordId))) return;
+        returnActionsPending.add(String(recordId));
+        card.querySelectorAll('[data-return-action]').forEach(action => { action.disabled = true; });
         try {
           if (!record) throw new Error("The assigned return could not be found.");
+          if (button.dataset.returnAction === "navigate") await openNavigation(record);
           if (button.dataset.returnAction === "start") {
-            window.open(googleMapsRoute(record), "_blank", "noopener");
             locationPermissionBlocked = false;
-            await startReturnPickup(record.id);
+            const started = await startReturnPickup(record.id);
             ensureLocationWatch();
+            void syncFreshRepresentativeLocation();
             renderOrders();
+            await openNavigation(started);
           }
           if (button.dataset.returnAction === "complete") {
             const fresh = (API_ENABLED ? apiWork.returns : read(KEYS.returns, [])).find(
@@ -1774,6 +1868,10 @@
           }
         } catch (error) {
           window.DartDialog.alert(error.message);
+        } finally {
+          returnActionsPending.delete(String(recordId));
+          card.querySelectorAll('[data-return-action]').forEach(action => { action.disabled = false; });
+          updateDeliveryControls();
         }
       });
   }
@@ -1797,6 +1895,9 @@
   document.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
     setInterval(updateDeliveryControls, 10000);
+    setInterval(() => {
+      if (currentRep() && locationWatch != null && latestPreviewLocation) void publishRepresentativeLocation(latestPreviewLocation);
+    }, LOCATION_SYNC_MS);
     if (API_ENABLED) {
       try {
         const payload = await window.DartApi.request("/api/v1/representatives/me");
@@ -1806,6 +1907,7 @@
           apiRepresentative = null;
           sessionStorage.removeItem(API_REP_CACHE_KEY);
         } else {
+          sessionRecoveryPending = true;
           setLocationStatus("Representative account service is temporarily unavailable.", "error");
         }
       }
@@ -1815,7 +1917,10 @@
       if (rep.mustChangePassword) {
         showAuth("change");
       } else {
-        if (API_ENABLED) await refreshApiWork();
+        if (API_ENABLED) {
+          try { await refreshApiWork(); }
+          catch { setLocationStatus("تعذر تحميل التوصيلات. سنعيد المحاولة تلقائيًا.", "error"); }
+        }
         renderOrders();
       }
     } else {
@@ -1824,12 +1929,21 @@
     // Run only one network refresh at a time. Idle couriers do not need 5s polling.
     const pollAssignedWork = async () => {
       try {
+        if (API_ENABLED && !currentRep() && !document.hidden && sessionRecoveryPending) {
+          try {
+            const payload = await window.DartApi.request("/api/v1/representatives/me");
+            saveSession(payload.user); sessionRecoveryPending = false;
+          } catch (error) {
+            if (error.status === 401 || error.status === 403) sessionRecoveryPending = false;
+          }
+        }
         if (currentRep() && !document.hidden) {
           if (API_ENABLED) {
             try {
               await refreshApiWork();
             } catch (error) {
-              setLocationStatus(error.message || "Could not refresh assigned work.", "error");
+              if (error.status === 401 || error.status === 403) { clearRepresentativeSession(); showAuth("login"); }
+              else setLocationStatus("تعذر تحديث التوصيلات. سنعيد المحاولة تلقائيًا.", "error");
             }
           }
           renderOrders();

@@ -130,6 +130,7 @@ jobs:
           node tests/profile-compact-records.cjs
           node tests/sets-runtime-contract.cjs
           node tests/rep-navigation-session.cjs
+          node tests/rep-reliability-runtime.cjs
           node tests/test-inventory-contract.cjs
 
   browser-smoke:
@@ -182,3 +183,23 @@ jobs:
           node tests/storefront-settings-regression.js
           node tests/full-site-browser.js
           DART_CSS_BASE_REF=HEAD^ node tests/css-cascade-browser.cjs
+
+  courier-navigation-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install frontend tools and synthetic browser runner
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Check courier reliability independently of other page tests
+        run: |
+          node tests/rep-google-contract.cjs
+          node tests/rep-navigation-session.cjs
+          node tests/rep-reliability-runtime.cjs
+          node tests/google-navigation-browser.cjs
