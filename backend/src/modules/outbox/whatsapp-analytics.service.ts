@@ -16,10 +16,10 @@ export type WhatsAppAnalyticsType = typeof WHATSAPP_ANALYTICS_TYPES[number] | "a
 
 export interface WhatsAppAnalyticsQuery {
   period: WhatsAppAnalyticsPeriod;
-  type?: WhatsAppAnalyticsType;
-  status?: WhatsAppAnalyticsStatus;
-  limit?: number;
-  offset?: number;
+  type?: WhatsAppAnalyticsType | undefined;
+  status?: WhatsAppAnalyticsStatus | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
 }
 
 interface StatsRow {
