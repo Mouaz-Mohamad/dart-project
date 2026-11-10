@@ -155,6 +155,7 @@ export interface AppConfig {
   whatsappPostDeliveryTemplate?: string;
   whatsappRestockTemplate?: string;
   outboxCronSecret: string | null;
+  vercelCronSecret?: string | null;
   outboxBatchSize: number;
   webPushVapidPublicKey?: string;
   webPushVapidPrivateKey?: string;
@@ -318,6 +319,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     whatsappPostDeliveryTemplate: parsed.data.WHATSAPP_POST_DELIVERY_TEMPLATE,
     whatsappRestockTemplate: parsed.data.WHATSAPP_RESTOCK_TEMPLATE,
     outboxCronSecret: outboxCronSecret || null,
+    vercelCronSecret: parsed.data.CRON_SECRET || null,
     outboxBatchSize: parsed.data.OUTBOX_BATCH_SIZE,
     webPushVapidPublicKey: parsed.data.WEB_PUSH_VAPID_PUBLIC_KEY,
     webPushVapidPrivateKey: parsed.data.WEB_PUSH_VAPID_PRIVATE_KEY,

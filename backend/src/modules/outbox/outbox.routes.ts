@@ -15,18 +15,21 @@ function safeTokenEquals(actual: string, expected: string): boolean {
 
 export function createOutboxRouter(
   outbox: OutboxService,
-  config: Pick<AppConfig, "outboxCronSecret">,
+  config: Pick<AppConfig, "outboxCronSecret" | "vercelCronSecret">,
   maintenance?: () => Promise<void | MaintenanceResult>,
 ): Router {
   const router = Router();
 
   async function process(request: Request, response: Response) {
-    const expected = config.outboxCronSecret;
     const authorization = String(request.get("authorization") || "");
     const token = authorization.startsWith("Bearer ")
       ? authorization.slice("Bearer ".length)
       : "";
-    if (!expected || expected.length < 32 || !safeTokenEquals(token, expected)) {
+    // GitHub's legacy worker and Vercel's native cron use independent server-only tokens.
+    // Neither allows anonymous access; both retain the same durable idempotent processor.
+    const validSecrets = [config.outboxCronSecret,config.vercelCronSecret]
+      .filter((secret): secret is string => typeof secret === "string" && secret.length >= 32);
+    if (!validSecrets.some((expected) => safeTokenEquals(token, expected))) {
       response.status(401).json({
         error: {
           code: "OUTBOX_UNAUTHORIZED",
@@ -35,7 +38,7 @@ export function createOutboxRouter(
       });
       return;
     }
-    const query = z.object({ limit: z.coerce.number().int().min(1).max(10).default(5) }).parse(request.query);
+    const query = z.object({ limit: z.coerce.number().int().min(1).max(10).default(request.method === "GET" ? 10 : 5) }).parse(request.query);
     let maintenanceResult: MaintenanceResult = { ok: true, failedJobs: [] };
     try {
       maintenanceResult = await maintenance?.() || maintenanceResult;
@@ -48,6 +51,8 @@ export function createOutboxRouter(
   }
 
   router.post("/internal/outbox/process", process);
+  // Vercel Cron invokes GET; authentication is identical to the internal POST route.
+  router.get("/internal/outbox/process", process);
 
   return router;
 }
