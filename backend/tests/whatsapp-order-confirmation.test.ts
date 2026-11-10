@@ -94,7 +94,7 @@ describe("interactive WhatsApp order confirmation", () => {
     const key=`order-whatsapp-ack:${f.confirmation}:confirm:already_accepted`;
     const fetch=provider();
     expect((await sender().processBatch(1,key)).published).toBe(1);
-    const payload=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    const payload=JSON.parse((fetch.mock.calls[0] as unknown as [string,{body:string}])[1].body);
     expect(payload.text.body).toContain("متأكد بالفعل");
   });
   it("keeps a confirmed acknowledgment eligible if the accepted order progresses to preparation",async()=>{
