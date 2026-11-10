@@ -185,6 +185,32 @@
     epoch++; inFlight = null; queued = false; rows = []; sessionSeen.clear(); hydrated = false; unread = 0; subscriptionId = null;
     clearTimeout(fallbackTimer); bar.hidden = true; showPanel(false); render({});
   });
+  // Settings action broadcasts only to eligible subscribed staff devices.
+  // Results distinguish queued, provider acceptance and local display.
+  const testButton=document.getElementById("settings-push-test-send");
+  const testStatus=document.getElementById("settings-push-test-status");
+  if(testButton && testStatus) {
+    testButton.addEventListener("click",async()=>{
+      testButton.disabled=true;
+      testStatus.textContent="Preparing a real phone notification test…";
+      const generation=epoch;
+      try {
+        const batch=await api("/api/v1/admin/push/test",{method:"POST",body:{}});
+        if(generation!==epoch)return;
+        testStatus.textContent=`Queued for ${batch.queued} connected device(s). Checking provider acceptance…`;
+        for(let i=0;i<12 && generation===epoch;i++){
+          if(i)await new Promise(resolve=>setTimeout(resolve,2000));
+          const result=await api("/api/v1/admin/push/test/"+encodeURIComponent(batch.testId));
+          if(generation!==epoch)return;
+          testStatus.textContent=`Devices: ${result.total} · Provider accepted: ${result.accepted} · Pending: ${result.pending} · Skipped: ${result.suppressed} · Failed: ${result.failed} · Unknown: ${result.unknown}. Provider acceptance does not guarantee phone display.`;
+          if(!result.pending)break;
+        }
+      }catch(error){
+        if(generation===epoch)testStatus.textContent=error.status===429?"Test already sent recently. Retry after one minute.":error.status===403?"Only the Dart owner can run a notification test.":error.status===409?"No active connected notification devices. Enable phone notifications on a device first.":"Could not run the phone notification test. Check your connection and retry.";
+      }finally{testButton.disabled=false;}
+    });
+  }
+
   window.DartAdminNotifications = Object.freeze({ refresh, renderRows, owns: legacy => ["order_created", "review_created", "return_created"].includes(legacy.type) && rows.some(row => [row.entityId, row.entityCode].includes(String(legacy.relatedEntityId || ""))) });
   start();
 })();
