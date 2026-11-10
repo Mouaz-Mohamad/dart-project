@@ -1252,68 +1252,161 @@ body.dart-set-image-open {
 }
 /* END Dart compact customer review. */
 
+/* BEGIN Dart compact review popup — same palette as the mini review cards. */
 .dart-review-dialog {
   position: fixed;
   inset: 0;
   margin: auto;
-  width: 90vw;
-  height: 90vh;
-  height: 90dvh;
-  max-width: 90vw;
-  max-height: 90vh;
-  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
   box-sizing: border-box;
+  width: min(350px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  height: auto;
+  max-height: 80vh;
+  max-height: 80dvh;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid #e4dcda;
+  border-radius: 18px;
+  background: #fffcfa;
+  color: #252020;
+  box-shadow: 0 18px 55px rgba(36, 27, 25, 0.19);
+  font-family: var(--font-inter);
+}
+.dart-review-dialog:not([open]) { display: none; }
+.dart-review-dialog::backdrop { background: rgba(22, 15, 19, 0.53); }
+.dart-review-dialog-header,
+.dart-review-dialog-author,
+.dart-review-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.dart-review-dialog-header {
+  padding-bottom: 11px;
+  border-bottom: 1px solid #e8dfdd;
+}
+.dart-review-dialog-label {
+  margin: 0;
+  font: 600 11px var(--font-cabin);
+  letter-spacing: 0.02em;
+  color: var(--bragnte);
+}
+.dart-review-dialog-label span {
+  color: #928889;
+  font-weight: 400;
+}
+.dart-review-dialog .dart-review-dialog-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  margin: -6px -5px -6px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #55504d;
+  font: 400 25px/1 var(--font-inter);
+  cursor: pointer;
+}
+.dart-review-dialog .dart-review-dialog-close:hover {
+  background: #f4ebea;
+}
+.dart-review-dialog-author .dart-review-dialog-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #252020;
+}
+.dart-review-dialog .stars {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin: 0;
+  line-height: 1;
+}
+.dart-review-dialog .dart-review-display-stars .dart-rating-choice {
+  width: 14px;
+  height: 15px;
+  flex: 0 0 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+.dart-review-dialog .dart-review-display-stars .dart-rating-star {
+  width: 14px;
+  height: 14px;
+}
+.dart-review-dialog .dart-review-display-stars .dart-star-shape {
+  fill: #e9e1e1;
+  stroke: #c1b2b4;
+}
+.dart-review-dialog .dart-review-display-stars .is-filled .dart-star-shape {
+  fill: var(--bragnte);
+  stroke: var(--bragnte);
+}
+.dart-review-dialog .dart-review-display-stars .dart-star-spark { display: none; }
+.dart-review-dialog-body {
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding: 32px 26px 24px;
-  border: 1px solid rgba(171, 1, 43, 0.25);
-  border-radius: 18px;
-  background: #fff;
-  color: var(--bg-dark);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+  scrollbar-width: thin;
+  scrollbar-color: #d1c2c1 transparent;
 }
-.dart-review-dialog:not([open]) { display: none; }
-.dart-review-dialog::backdrop { background: rgba(22, 15, 19, 0.64); }
-.dart-review-dialog .dart-review-dialog-close {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: #f5ecee;
-  color: var(--bragnte);
-  font-size: 24px;
-  cursor: pointer;
-}
-.dart-review-dialog .stars { margin-bottom: 16px; }
-.dart-review-dialog h2 {
-  margin: 0 0 14px;
-  font-size: clamp(21px, 4vw, 27px);
-  line-height: 1.4;
-  color: var(--bragnte);
+.dart-review-dialog-body h2 {
+  margin: 0 0 9px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #252020;
   overflow-wrap: anywhere;
 }
-.dart-review-dialog p {
+.dart-review-dialog-body h2:empty { display: none; }
+.dart-review-dialog-body p {
   margin: 0;
-  font-size: 16px;
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1.85;
+  color: #56504d;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .dart-review-dialog-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 22px;
-  padding-top: 14px;
-  border-top: 1px solid #ece7e8;
-  font-size: 13px;
-  color: #68646a;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  padding-top: 11px;
+  border-top: 1px solid #e8dfdd;
+  font: 500 10px var(--font-cabin);
 }
-.dart-review-dialog-name { font-weight: 700; color: var(--bg-dark); }
+.dart-review-dialog-date { color: #817978; }
+.dart-review-dialog-brand {
+  color: var(--bragnte);
+  font-weight: 600;
+}
+@media (max-width: 360px) {
+  .dart-review-dialog { padding: 14px; gap: 11px; }
+  .dart-review-dialog-label { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dart-review-dialog-body { scroll-behavior: auto; }
+}
+/* END Dart compact review popup. */
 
 .user-info {
   display: flex;

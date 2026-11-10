@@ -323,14 +323,22 @@
                         </div>
                     </div>
                 </section>
-                <dialog id="dartReviewDialog" class="dart-review-dialog" aria-labelledby="dart-review-full-title" aria-describedby="dart-review-full-text">
-                    <button type="button" class="dart-review-dialog-close" data-review-dialog-close aria-label="Close full review">&times;</button>
-                    <div class="dart-review-dialog-stars stars" aria-label="Review rating"></div>
-                    <h2 id="dart-review-full-title" dir="auto"></h2>
-                    <p id="dart-review-full-text" dir="auto"></p>
+                <dialog id="dartReviewDialog" class="dart-review-dialog" aria-labelledby="dart-review-dialog-label" aria-describedby="dart-review-full-text">
+                    <div class="dart-review-dialog-header">
+                        <p id="dart-review-dialog-label" class="dart-review-dialog-label">DART. <span>/ CUSTOMER REVIEW</span></p>
+                        <button type="button" class="dart-review-dialog-close" data-review-dialog-close aria-label="Close full review">&times;</button>
+                    </div>
+                    <div class="dart-review-dialog-author">
+                        <span class="dart-review-dialog-name" dir="auto"></span>
+                        <div class="dart-review-dialog-stars stars" aria-label="Review rating"></div>
+                    </div>
+                    <div class="dart-review-dialog-body">
+                        <h2 id="dart-review-full-title" dir="auto"></h2>
+                        <p id="dart-review-full-text" dir="auto"></p>
+                    </div>
                     <div class="dart-review-dialog-footer">
-                        <span class="dart-review-dialog-name"></span>
                         <time class="dart-review-dialog-date"></time>
+                        <span class="dart-review-dialog-brand">DART | FOR YOU</span>
                     </div>
                 </dialog>
                 <div class="margen2020"></div>
