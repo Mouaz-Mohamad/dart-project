@@ -440,8 +440,11 @@ export class OutboxService {
     if (row.event_type === "ORDER_WHATSAPP_ACK") {
       if (!(new Date(String(row.payload.expiresAt || "")).getTime() > this.now().getTime())) return {suppressed:true};
       const state = await this.pool.query<{status:string}>("SELECT status FROM orders WHERE id::text=$1 AND NOT is_deleted", [row.aggregate_id]);
-      if (!state.rows[0] || (row.payload.outcome === "confirmed" && !["Accepted","Preparing"].includes(state.rows[0].status))
-        || (row.payload.outcome === "cancelled" && state.rows[0].status !== "Cancelled")) return {suppressed:true};
+      const currentStatus = state.rows[0]?.status;
+      const acceptedStatuses = ["Accepted","Preparing","Ready for Dispatch","Out With Representative","Representative On The Way","Delivered"];
+      if (!currentStatus || (["confirmed","already_accepted"].includes(String(row.payload.outcome || ""))
+          && !acceptedStatuses.includes(currentStatus))
+        || (row.payload.outcome === "cancelled" && currentStatus !== "Cancelled")) return {suppressed:true};
     }
     if (row.event_type === "WAITLIST_WHATSAPP_RESTOCK") {
       if (!this.config.whatsappRestockTemplate) return {suppressed:true};
@@ -495,7 +498,7 @@ export class OutboxService {
         SELECT 1 FROM orders o
         WHERE o.id::text=$1 AND o.status='Delivered' AND NOT o.is_deleted
           AND o.delivered_at=$2::timestamptz
-          AND o.delivered_at + interval '7 hours' <= now()
+          AND o.delivered_at + interval '1 hour' <= now()
           AND now()<$3::timestamptz
           AND dart_whatsapp_order_phone(o.contact_snapshot->>'phone1')=$4
           AND NOT EXISTS (

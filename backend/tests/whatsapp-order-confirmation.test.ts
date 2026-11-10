@@ -83,6 +83,29 @@ describe("interactive WhatsApp order confirmation", () => {
     await store.pool.query("UPDATE inventory_items SET order_id=$2 WHERE id=$1",[f.piece,f.order.orderId]);
     await commerce.orderWhatsAppReply(input);expect((await status(f.order.id)).status).toBe("Accepted");
   });
+  it("acknowledges dashboard-accepted orders without a false stale warning or duplicate acceptance",async()=>{
+    const f=await fixture();
+    await store.pool.query("UPDATE orders SET status='Accepted',version=version+1 WHERE id=$1",[f.order.id]);
+    const before=await status(f.order.id);
+    await commerce.orderWhatsAppReply(tap(f));
+    expect(await status(f.order.id)).toEqual(before);
+    const reply=(await store.pool.query("SELECT outcome FROM order_whatsapp_replies WHERE confirmation_id=$1",[f.confirmation])).rows[0]!;
+    expect(reply.outcome).toBe("already_accepted");
+    const key=`order-whatsapp-ack:${f.confirmation}:confirm:already_accepted`;
+    const fetch=provider();
+    expect((await sender().processBatch(1,key)).published).toBe(1);
+    const payload=JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit)?.body));
+    expect(payload.text.body).toContain("متأكد بالفعل");
+  });
+  it("keeps a confirmed acknowledgment eligible if the accepted order progresses to preparation",async()=>{
+    const f=await fixture();
+    await commerce.orderWhatsAppReply(tap(f));
+    await store.pool.query("UPDATE orders SET status='Preparing',version=version+1 WHERE id=$1",[f.order.id]);
+    const fetch=provider();
+    const key=`order-whatsapp-ack:${f.confirmation}:confirm:confirmed`;
+    expect((await sender().processBatch(1,key)).published).toBe(1);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
   it("keeps order sending independent of the legacy birthday/review switch",async()=>{
     const f=await fixture(),fetch=provider();
     const service=new OutboxService(store.pool,{whatsappSendEnabled:false,whatsappOrderConfirmationEnabled:true,

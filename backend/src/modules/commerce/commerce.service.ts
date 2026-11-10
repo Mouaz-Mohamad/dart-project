@@ -5932,13 +5932,20 @@ export class CommerceService {
           [order.customer_user_id,order.id,input.messageId,JSON.stringify({status:order.status,verification:order.cod_verification_status}),
             JSON.stringify({status:target,source:"whatsapp"})]);
         outcome = canConfirm ? "confirmed" : "cancelled";
-      } else if ((action === "confirm" && order.confirmation_state === "confirmed" && order.status === "Accepted")
-        || (action === "cancel" && order.confirmation_state === "cancelled" && order.status === "Cancelled")) {
-        outcome = action === "confirm" ? "confirmed" : "cancelled";
+      } else if (action === "confirm" && order.fresh
+        && order.final_minor === order.snapshot_minor
+        && ["Accepted","Preparing","Ready for Dispatch","Out With Representative","Representative On The Way","Delivered"].includes(order.status)
+        && ["pending","confirmed"].includes(order.confirmation_state)) {
+        // Dashboard acceptance can advance status/version before the buyer taps.
+        // Acknowledge the real accepted state without re-accepting or changing stock.
+        outcome = "already_accepted";
+      } else if (action === "cancel" && order.confirmation_state === "cancelled" && order.status === "Cancelled") {
+        outcome = "cancelled";
       }
       await client.query("UPDATE order_whatsapp_replies SET outcome=$2 WHERE message_id=$1", [input.messageId,outcome]);
       // One acknowledgment per decision/outcome, even when Meta gives repeated taps different message IDs.
       const body = outcome === "confirmed" ? `تم تأكيد طلبك ${order.order_code} بنجاح ✅ هنبدأ تجهيزه.` :
+        outcome === "already_accepted" ? `طلبك ${order.order_code} متأكد بالفعل ✅ وإحنا شغالين عليه.` :
         outcome === "cancelled" ? `تم إلغاء طلبك ${order.order_code}.` :
         `تعذّر تنفيذ الاختيار للطلب ${order.order_code} لأن حالته أو تفاصيله اتغيّرت أو انتهت صلاحية التأكيد. راجع حسابك أو تواصل مع Dart.`;
       await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,event_type,payload,deduplication_key)

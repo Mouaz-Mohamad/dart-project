@@ -45,7 +45,7 @@ describe("durable WhatsApp automations and receipts", () => {
     const order=(await store.pool.query(`INSERT INTO orders(customer_user_id,status,subtotal_minor,final_minor,delivery_address,contact_snapshot)
       VALUES($1,'New',0,0,'{}',jsonb_build_object('phone1',$2::text,'name','Synthetic Customer'))
       RETURNING id::text`,[buyer.id,buyer.phone])).rows[0]!.id as string;
-    if(markDelivered)await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '7 hours' WHERE id=$1",[order]);
+    if(markDelivered)await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '1 hour' WHERE id=$1",[order]);
     const key=`post-delivery-review:${order}`;
     return {...buyer,order,key,preferences};
   }
@@ -62,7 +62,7 @@ describe("durable WhatsApp automations and receipts", () => {
     ["2026-10-28T23:00:00+03:00","2026-10-29 13:00"],
     ["2026-10-29T20:00:00+03:00","2026-10-30 13:00"],
     ["2026-12-01T06:00:00+02:00","2026-12-01 13:00"],
-  ])("schedules delivery %s at %s using Cairo and seven elapsed hours",async(input,expected)=>{
+  ])("preserves the independent Cairo send-window conversion for %s => %s",async(input,expected)=>{
     const row=(await store.pool.query(`SELECT to_char(dart_whatsapp_send_at($1::timestamptz+interval '7 hours')
       AT TIME ZONE 'Africa/Cairo','YYYY-MM-DD HH24:MI') AS scheduled`,[input])).rows[0]!;
     expect(row.scheduled).toBe(expected);
@@ -71,15 +71,24 @@ describe("durable WhatsApp automations and receipts", () => {
     "2026-10-28T05:00:00+03:00",
     "2026-10-28T18:00:00+03:00",
     "2026-12-01T06:00:00+02:00",
-  ])("queues post-delivery feedback at seven elapsed hours with no quiet-hour shift: %s",async(deliveredAt)=>{
+  ])("queues post-delivery feedback one hour after delivery even during Cairo quiet hours: %s",async(deliveredAt)=>{
     const buyer=await delivered(true,false);
     // Delivery timing is independent of profile preference records.
     await store.pool.query("UPDATE customer_whatsapp_preferences SET review_consented_at=$2::timestamptz-interval '1 day' WHERE customer_user_id=$1",[buyer.id,deliveredAt]);
     await store.pool.query("UPDATE orders SET status='Delivered', delivered_at=$2::timestamptz WHERE id=$1",[buyer.order,deliveredAt]);
     const result=(await store.pool.query("SELECT available_at,payload->>'expiresAt' AS expiry FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
-    const expected=new Date(new Date(deliveredAt).getTime()+7*3600000);
+    const expected=new Date(new Date(deliveredAt).getTime()+1*3600000);
     expect(new Date(result.available_at).toISOString()).toBe(expected.toISOString());
     expect(new Date(result.expiry).toISOString()).toBe(new Date(expected.getTime()+24*3600000).toISOString());
+  });
+  it("does not send a post-delivery review before the one-hour mark",async()=>{
+    const buyer=await delivered(true,false);
+    await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '30 minutes' WHERE id=$1",[buyer.order]);
+    const fetch=fakeProvider();
+    expect((await sender().processBatch(5,buyer.key)).claimed).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    const due=(await store.pool.query("SELECT available_at FROM outbox_events WHERE deduplication_key=$1",[buyer.key])).rows[0]!;
+    expect(new Date(due.available_at).getTime()).toBeGreaterThan(Date.now());
   });
   it("keeps birthday greetings queued outside 13:00–22:00 Cairo",async()=>{
     const today=(await store.pool.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today")).rows[0]!.today as string;
@@ -128,7 +137,7 @@ describe("durable WhatsApp automations and receipts", () => {
     const buyer=await delivered(true,false), key=buyer.key;
     await store.pool.query("BEGIN");
     try {
-      await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '7 hours' WHERE id=$1",[buyer.order]);
+      await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '1 hour' WHERE id=$1",[buyer.order]);
       expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[key])).rows).toHaveLength(1);
     } finally { await store.pool.query("ROLLBACK"); }
     expect((await store.pool.query("SELECT id FROM outbox_events WHERE deduplication_key=$1",[key])).rows).toHaveLength(0);
@@ -165,12 +174,12 @@ describe("durable WhatsApp automations and receipts", () => {
       type:"header",parameters:[{type:"image",image:{link:"https://www.dartofficial.com/Photos/dart-birthday-reward.jpg"}}],
     }]);
   });
-  it("queues a manual guest order seven hours after delivery, without profile preferences",async()=>{
+  it("queues a manual guest order one hour after delivery, without profile preferences",async()=>{
     const phone="010"+String(Math.floor(Math.random()*100000000)).padStart(8,"0");
     const order=(await store.pool.query(`INSERT INTO orders(status,order_source,subtotal_minor,final_minor,
       delivery_address,contact_snapshot) VALUES('New','Manual',0,0,'{}',
       jsonb_build_object('phone1',$1::text,'name','Manual Buyer')) RETURNING id::text`,[phone])).rows[0]!.id;
-    await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '7 hours' WHERE id=$1",[order]);
+    await store.pool.query("UPDATE orders SET status='Delivered',delivered_at=now()-interval '1 hour' WHERE id=$1",[order]);
     const key=`post-delivery-review:${order}`;
     const event=(await store.pool.query("SELECT payload FROM outbox_events WHERE deduplication_key=$1",[key])).rows[0]!;
     expect(event.payload.to).toBe(`20${phone.slice(1)}`);
