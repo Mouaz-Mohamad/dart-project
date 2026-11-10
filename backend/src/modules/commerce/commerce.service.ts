@@ -5875,7 +5875,7 @@ export class CommerceService {
       // Lock the order first, matching the admin workflow's lock order.
       const result = await client.query<{
         id: string; order_code: string; status: string; version: string; final_minor: string;
-        customer_user_id: string; promotion: Record<string, unknown> | null;
+        customer_user_id: string | null; promotion: Record<string, unknown> | null;
         legacy: Record<string, unknown> | null; cod_verification_status: string;
         confirmation_id: string; confirmation_state: string; expected_version: string;
         fresh: boolean; snapshot_minor: string; phone: string;
@@ -5886,10 +5886,11 @@ export class CommerceService {
           o.contact_snapshot->>'phone1' AS phone
         FROM orders o JOIN order_whatsapp_confirmations c ON c.order_id=o.id
         WHERE c.id=$1 AND c.phone_normalized=$2 AND NOT o.is_deleted AND NOT o.is_archived
-          AND EXISTS(SELECT 1 FROM users u WHERE u.id=o.customer_user_id AND u.status='active' AND u.deleted_at IS NULL)
+          AND ((o.customer_user_id IS NULL AND o.order_source<>'Website')
+            OR EXISTS(SELECT 1 FROM users u WHERE u.id=o.customer_user_id AND u.status='active' AND u.deleted_at IS NULL))
         FOR UPDATE OF o,c`, [match[2], phone]);
       const order = result.rows[0];
-      if (!order || !order.customer_user_id) { await client.query("COMMIT"); return; }
+      if (!order) { await client.query("COMMIT"); return; }
       // Editing the checkout phone also invalidates previously issued buttons.
       try { if (normalizeEgyptianPhone(order.phone || "") !== phone) { await client.query("COMMIT"); return; } }
       catch { await client.query("COMMIT"); return; }
@@ -6552,7 +6553,7 @@ export class CommerceService {
     previousStatus: string | null,
     nextStatus: string,
     promotion: Record<string, unknown> | null,
-    actorId: string,
+    actorId: string | null,
     actorType: "staff" | "representative" | "customer" = "staff",
   ): Promise<void> {
     if (previousStatus === nextStatus) return;

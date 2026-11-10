@@ -427,11 +427,12 @@ export class OutboxService {
     if (row.event_type === "ORDER_WHATSAPP_CONFIRMATION") {
       const eligible = await this.pool.query<{allowed:boolean}>(`SELECT EXISTS(
         SELECT 1 FROM order_whatsapp_confirmations c JOIN orders o ON o.id=c.order_id
-        JOIN users u ON u.id=o.customer_user_id
+        LEFT JOIN users u ON u.id=o.customer_user_id
         WHERE c.id::text=$1 AND c.order_id::text=$2 AND c.phone_normalized=$3
           AND c.state='pending' AND c.expires_at>now() AND c.expected_version=o.version
           AND c.final_minor=o.final_minor AND o.status='New' AND NOT o.is_deleted AND NOT o.is_archived
-          AND u.status='active' AND u.deleted_at IS NULL
+          AND ((o.customer_user_id IS NULL AND o.order_source<>'Website')
+            OR (u.status='active' AND u.deleted_at IS NULL))
           AND regexp_replace(o.contact_snapshot->>'phone1','[^0-9]','','g') IN ($3,'0'||substring($3 from 3))) AS allowed`,
         [String(row.payload.confirmationId || ""),row.aggregate_id,String(row.payload.to || "")]);
       if (!eligible.rows[0]?.allowed) return {suppressed:true};
