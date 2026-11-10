@@ -10,7 +10,7 @@ import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { AdminNotificationService } from "./admin-notification.service.js";
 import { pushSubscriptionSchema } from "./push-validation.js";
-import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
+import { dispatchAdminTestBroadcast } from "../outbox/outbox.dispatch.js";
 import type { OutboxService } from "../outbox/outbox.service.js";
 export function createAdminNotificationRouter(service: AdminNotificationService, identity: IdentityService, config: Pick<AppConfig,"sessionCookieName"|"authPepper">, outbox?: OutboxService) {
   const router = Router();
@@ -40,7 +40,7 @@ export function createAdminNotificationRouter(service: AdminNotificationService,
     z.object({}).strict().parse(req.body??{});
     const queued=await service.queueTestBroadcast(req.auth!.userId,String(req.id));
     res.status(202).json(queued); // Not a delivery confirmation.
-    await dispatchOutbox(outbox,10);
+    await dispatchAdminTestBroadcast(outbox,queued.testId,queued.queued);
   });
   router.get("/admin/push/test/:id",...gates,async(req,res)=>{
     const id=z.string().uuid().parse(req.params.id);
