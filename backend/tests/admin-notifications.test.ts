@@ -26,15 +26,23 @@ function browser(){const key=createECDH("prime256v1");key.generateKeys();return 
 describe("staff notifications",()=>{
   let store:Awaited<ReturnType<typeof embeddedStore>>,service:AdminNotificationService,app:ReturnType<typeof createApp>,auth:AuthenticatedAccount;
   let userId:string,otherId:string,sessionId:string;
+  // One real owner is retained throughout the isolated test suite. Production
+  // triggers prohibit demoting the protected owner, even in test schemas.
+  let testOwnerId:string,testOwnerSessionId:string;
   beforeAll(async()=>{store=await embeddedStore(true);service=new AdminNotificationService(store.pool,config);
     app=createApp(config,{logger:pino({level:"silent"}),databasePing:async()=>{},startedAt:new Date(),version:"synthetic",
       identityService:{authenticate:async()=>auth} as unknown as IdentityService,adminNotificationService:service});
+    testOwnerId=randomUUID();testOwnerSessionId=randomUUID();
+    const ownerEmail=`${testOwnerId}@example.test`;
+    await store.pool.query("INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at) VALUES($1,'staff',$2,$2,'synthetic','active',now())",[testOwnerId,ownerEmail]);
+    await store.pool.query("INSERT INTO staff_users(user_id,display_name,is_owner,mfa_required) VALUES($1,'Synthetic Owner',true,false)",[testOwnerId]);
+    await store.pool.query("INSERT INTO user_roles(user_id,role_id) SELECT $1,id FROM roles WHERE name='Owner'",[testOwnerId]);
+    await store.pool.query("INSERT INTO sessions(id,user_id,token_hash,csrf_token_hash,user_session_version,expires_at) VALUES($1,$2,$3,$3,1,now()+interval '1 day')",
+      [testOwnerSessionId,testOwnerId,"o"+randomUUID().replaceAll("-","")+"p".repeat(31)]);
   },30000);
   afterAll(async()=>{await store?.db.close();});
   beforeEach(async()=>{
     await store.pool.query("DELETE FROM outbox_events");await store.pool.query("DELETE FROM admin_notifications");await store.pool.query("DELETE FROM admin_push_subscriptions");
-    // Reset the previous synthetic owner between cases: the isolated schema permits only one owner.
-    await store.pool.query("UPDATE staff_users SET is_owner=false WHERE is_owner=true");
     userId=randomUUID();otherId=randomUUID();sessionId=randomUUID();
     for(const id of [userId,otherId]){
       await store.pool.query("INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at) VALUES($1,'staff',$2,$2,'synthetic','active',now())",[id,`${id}@example.test`]);
@@ -93,13 +101,12 @@ describe("staff notifications",()=>{
     }
   });
   it("broadcasts to all subscribed staff devices without creating a fake inbox record",async()=>{
-    await store.pool.query("UPDATE staff_users SET is_owner=true WHERE user_id=$1",[userId]);
     const secondSession=randomUUID();
     await store.pool.query("INSERT INTO sessions(id,user_id,token_hash,csrf_token_hash,user_session_version,expires_at) VALUES($1,$2,$3,$3,1,now()+interval '1 day')",
       [secondSession,otherId,"b"+randomUUID().replaceAll("-","")+"c".repeat(31)]);
-    await subscribe();
+    await service.push.subscribe(testOwnerId,testOwnerSessionId,browser(),config.webPushVapidPublicKey!,"synthetic");
     await service.push.subscribe(otherId,secondSession,browser(),config.webPushVapidPublicKey!,"synthetic");
-    const batch=await service.queueTestBroadcast(userId,"broadcast-synthetic");
+    const batch=await service.queueTestBroadcast(testOwnerId,"broadcast-synthetic");
     expect(batch.queued).toBe(2);
     expect((await service.list(userId,permissions)).unreadCount).toBe(0);
     const calls:string[]=[];
@@ -107,16 +114,16 @@ describe("staff notifications",()=>{
     await outbox.processBatch(10);
     expect(calls).toHaveLength(2);
     expect(calls.every(call=>JSON.parse(call).eventType==="ADMIN_PUSH_TEST")).toBe(true);
-    expect((await service.testBroadcastStatus(userId,batch.testId)).accepted).toBe(2);
-    await expect(service.queueTestBroadcast(userId,"broadcast-duplicate")).rejects.toBeTruthy();
+    expect((await service.testBroadcastStatus(testOwnerId,batch.testId)).accepted).toBe(2);
+    await expect(service.queueTestBroadcast(testOwnerId,"broadcast-duplicate")).rejects.toBeTruthy();
   });
   it("blocks non-owner tests and suppresses delivery if notification permission is removed",async()=>{
     await subscribe();
     await expect(service.queueTestBroadcast(userId,"not-owner")).rejects.toBeTruthy();
-    await store.pool.query("UPDATE staff_users SET is_owner=true WHERE user_id=$1",[userId]);
-    const batch=await service.queueTestBroadcast(userId,"owner");
-    const row=await store.pool.query("SELECT payload FROM outbox_events WHERE aggregate_id=$1",[batch.testId]);
-    await store.pool.query("INSERT INTO user_permission_overrides(user_id,permission_id,allowed) SELECT $1,id,false FROM permissions WHERE key='notifications.read'",[userId]);
+    const ownerDevice=await service.push.subscribe(testOwnerId,testOwnerSessionId,browser(),config.webPushVapidPublicKey!,"synthetic");
+    const batch=await service.queueTestBroadcast(testOwnerId,"owner");
+    const row=await store.pool.query("SELECT payload FROM outbox_events WHERE aggregate_id=$1 AND payload->>'subscriptionId'=$2",[batch.testId,ownerDevice.id]);
+    await store.pool.query("INSERT INTO user_permission_overrides(user_id,permission_id,allowed) SELECT $1,id,false FROM permissions WHERE key='notifications.read'",[testOwnerId]);
     const calls:string[]=[];
     expect(await deliverAdminTestPush(store.pool,config.mfaEncryptionKey,provider(calls),row.rows[0].payload)).toEqual({suppressed:true});
     expect(calls).toHaveLength(0);
