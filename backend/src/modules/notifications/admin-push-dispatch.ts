@@ -8,6 +8,45 @@ import { allowedAdminEvents, type AdminNotificationEvent } from "./admin-notific
 import { fingerprint,pushSubscriptionSchema } from "./push-validation.js";
 import { PushDeliveryError, type WebPushProvider } from "./web-push-provider.js";
 const schema=z.object({notificationId:z.string().uuid(),subscriptionId:z.string().uuid(),subscriptionVersion:z.number().int().positive()});
+
+const testSchema=z.object({testId:z.string().uuid(),subscriptionId:z.string().uuid(),subscriptionVersion:z.number().int().positive()});
+// The test path deliberately does not create or read a real order/review.
+export async function deliverAdminTestPush(pool:Pool,encryptionKey:Buffer,provider:WebPushProvider|null,payload:Record<string,unknown>):Promise<{suppressed?:boolean}> {
+  const parsed=testSchema.safeParse(payload);
+  if(!parsed.success)throw new PushDeliveryError("terminal","Invalid staff test push identifiers");
+  const {testId,subscriptionId,subscriptionVersion}=parsed.data;
+  const found=await pool.query<{customer_user_id:string;encrypted_subscription:Buffer;vapid_fingerprint:string}>(`
+    SELECT p.customer_user_id::text,p.encrypted_subscription,p.vapid_fingerprint
+    FROM admin_push_subscriptions p
+    JOIN users u ON u.id=p.customer_user_id JOIN staff_users staff ON staff.user_id=u.id
+    WHERE p.id=$1 AND p.version=$2 AND p.active AND u.account_type='staff'
+      AND u.status='active' AND u.deleted_at IS NULL AND staff.disabled_at IS NULL
+      AND EXISTS(SELECT 1 FROM outbox_events e WHERE e.aggregate_type='admin_push_test'
+        AND e.aggregate_id=$3 AND e.event_type='ADMIN_PUSH_TEST'
+        AND e.created_at>now()-interval '24 hours' AND e.payload->>'subscriptionId'=$1::text)
+      AND EXISTS(SELECT 1 FROM sessions s WHERE s.user_id=u.id AND s.family_id=p.session_family_id
+        AND s.revoked_at IS NULL AND s.expires_at>now() AND s.user_session_version=u.session_version
+        AND (NOT staff.mfa_required OR s.mfa_verified_at IS NOT NULL))
+  `,[subscriptionId,subscriptionVersion,testId]);
+  const row=found.rows[0];
+  if(!row || !(await effectivePermissionsForUser(row.customer_user_id,pool)).includes("notifications.read"))return {suppressed:true};
+  if(!provider?.configured())throw new PushDeliveryError("retryable","Browser notification delivery is not configured");
+  const disable=async(reason:string)=>{
+    await pool.query("UPDATE admin_push_subscriptions SET active=false,version=version+1,disabled_reason=$3,updated_at=now() WHERE id=$1 AND version=$2",
+      [subscriptionId,subscriptionVersion,reason]);
+    return {suppressed:true};
+  };
+  if(row.vapid_fingerprint!==fingerprint(provider.publicKey()))return disable("key_changed");
+  let subscription;
+  try {subscription=pushSubscriptionSchema.parse(JSON.parse(decryptSecret(Buffer.from(row.encrypted_subscription),encryptionKey)));}
+  catch {throw new PushDeliveryError("terminal","Stored staff subscription requires renewal");}
+  if(subscription.expirationTime && subscription.expirationTime<=Date.now())return disable("expired");
+  const outcome=await provider.send(subscription,JSON.stringify({eventType:"ADMIN_PUSH_TEST",testId}),
+    fingerprint(testId+subscriptionId).slice(0,32));
+  if(outcome==="expired")return disable("provider_expired");
+  return {};
+}
+
 export async function deliverAdminPush(pool: Pool,encryptionKey: Buffer,provider: WebPushProvider|null,payload:Record<string,unknown>):Promise<{suppressed?:boolean}> {
   const input=schema.safeParse(payload);
   if(!input.success)throw new PushDeliveryError("terminal","Invalid staff push identifiers");
