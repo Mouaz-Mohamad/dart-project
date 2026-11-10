@@ -63,10 +63,10 @@ export class AdminNotificationService {
       const testId=randomUUID();
       await client.query(`
         INSERT INTO outbox_events(aggregate_type,aggregate_id,event_type,payload,deduplication_key)
-        SELECT 'admin_push_test',$1,'ADMIN_PUSH_TEST',
+        SELECT 'admin_push_test',$1::text,'ADMIN_PUSH_TEST',
           jsonb_build_object('channel','web_push','audience','staff',
-            'testId',$1,'subscriptionId',devices.id,'subscriptionVersion',devices.version),
-          'admin-push-test:'||$1||':'||devices.id::text
+            'testId',$1::text,'subscriptionId',devices.id::text,'subscriptionVersion',devices.version),
+          'admin-push-test:'||$1::text||':'||devices.id::text
         FROM unnest($2::uuid[],$3::int[]) AS devices(id,version)
       `,[testId,eligible.map(p=>p.id),eligible.map(p=>p.version)]);
       await client.query(`
