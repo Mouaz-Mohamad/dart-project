@@ -10,7 +10,7 @@ function fixture(maintenance?: Parameters<typeof createOutboxRouter>[2], vercelC
   const outbox = { processBatch: vi.fn().mockResolvedValue({ claimed: 2, published: 2, failed: 0 }),
     health: vi.fn().mockResolvedValue({ uncertain: 0, exhausted: 0, duePending: 0 }) };
   const app = express();
-  app.use(createOutboxRouter(outbox as unknown as OutboxService, { outboxCronSecret: secret, vercelCronSecret }, maintenance));
+  app.use(createOutboxRouter(outbox as unknown as OutboxService, { outboxCronSecret: secret, ...(vercelCronSecret ? { vercelCronSecret } : {}) }, maintenance));
   return { app, outbox };
 }
 
