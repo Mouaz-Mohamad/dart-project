@@ -10,7 +10,9 @@ import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { AdminNotificationService } from "./admin-notification.service.js";
 import { pushSubscriptionSchema } from "./push-validation.js";
-export function createAdminNotificationRouter(service: AdminNotificationService, identity: IdentityService, config: Pick<AppConfig,"sessionCookieName"|"authPepper">) {
+import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
+import type { OutboxService } from "../outbox/outbox.service.js";
+export function createAdminNotificationRouter(service: AdminNotificationService, identity: IdentityService, config: Pick<AppConfig,"sessionCookieName"|"authPepper">, outbox?: OutboxService) {
   const router = Router();
   const gates = [authenticate(identity,config),requireAccountType("staff"),requireMfa,requirePermission("notifications.read")];
   const mutate = [csrfProtection(config),rateLimit({store:sharedRateLimitStore(config,"admin-notifications"),windowMs:60_000,limit:40,standardHeaders:"draft-8",legacyHeaders:false})];
@@ -32,6 +34,17 @@ export function createAdminNotificationRouter(service: AdminNotificationService,
   router.post("/admin/push/subscriptions",...gates,...mutate,async(req,res)=>{
     const body=z.object({subscription:pushSubscriptionSchema,publicKey:z.string().max(100)}).strict().parse(req.body);
     res.json(await service.push.subscribe(req.auth!.userId,req.auth!.sessionId,body.subscription,body.publicKey,String(req.id)));
+  });
+  // The server re-checks owner status, CSRF and active device permissions.
+  router.post("/admin/push/test",...gates,...mutate,async(req,res)=>{
+    z.object({}).strict().parse(req.body??{});
+    const queued=await service.queueTestBroadcast(req.auth!.userId,String(req.id));
+    res.status(202).json(queued); // Not a delivery confirmation.
+    await dispatchOutbox(outbox,10);
+  });
+  router.get("/admin/push/test/:id",...gates,async(req,res)=>{
+    const id=z.string().uuid().parse(req.params.id);
+    res.json(await service.testBroadcastStatus(req.auth!.userId,id));
   });
   router.delete("/admin/push/subscriptions/:id",...gates,...mutate,async(req,res)=>{
     await service.push.unsubscribe(req.auth!.userId,z.string().uuid().parse(req.params.id),String(req.id));res.sendStatus(204);
