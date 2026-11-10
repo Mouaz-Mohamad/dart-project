@@ -162,6 +162,7 @@ export class OutboxService {
   public async processBatch(
     limit = this.config.outboxBatchSize,
     deduplicationKey?: string,
+    adminTestId?: string,
   ): Promise<{ configured: boolean; claimed: number; published: number; failed: number; uncertain: number; terminal: number }> {
     const client = await this.pool.connect();
     let rows: OutboxRow[] = [];
@@ -178,6 +179,7 @@ export class OutboxService {
           WHERE attempts < 12 AND available_at <= now()
             AND payload->>'channel' IN ('email','whatsapp','web_push')
             AND ($2::text IS NULL OR deduplication_key=$2)
+            AND ($9::text IS NULL OR (aggregate_type='admin_push_test' AND aggregate_id=$9))
             AND (payload->>'channel'<>'whatsapp' OR CASE WHEN event_type='WAITLIST_WHATSAPP_RESTOCK' THEN ($3::boolean AND $8::boolean) WHEN event_type='ORDER_WHATSAPP_DISPATCHED' THEN $7::boolean WHEN event_type IN ('ORDER_WHATSAPP_CONFIRMATION','ORDER_WHATSAPP_ACK')
               THEN $6::boolean ELSE ($3::boolean AND (event_type<>'CUSTOMER_BIRTHDAY_MESSAGE' OR $4::boolean)
               AND (event_type<>'CUSTOMER_POST_DELIVERY_REVIEW' OR $5::boolean)) END)
@@ -187,7 +189,7 @@ export class OutboxService {
             AND (status IN ('pending','failed') OR (status='processing' AND locked_at < now() - interval '5 minutes'))
           ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT $1`,
         [Math.min(100, Math.max(1, limit)), deduplicationKey || null,
-          this.configured("whatsapp"), whatsappSendWindow(this.now()), Boolean(this.config.whatsappPostDeliveryTemplate), this.orderMessagingConfigured(), this.dispatchMessagingConfigured(),Boolean(this.config.whatsappRestockTemplate)],
+          this.configured("whatsapp"), whatsappSendWindow(this.now()), Boolean(this.config.whatsappPostDeliveryTemplate), this.orderMessagingConfigured(), this.dispatchMessagingConfigured(),Boolean(this.config.whatsappRestockTemplate),adminTestId||null],
       );
       rows = result.rows;
       if (rows.length) await client.query(`UPDATE outbox_events
