@@ -58,7 +58,7 @@
       rows.replaceChildren(fragment);
     }
     async function refresh(){
-      if(!active||!canRead()||loading||document.hidden)return;
+      if(!active||!canRead()||document.hidden)return;
       const seq=++sequence;loading=true;feedback.classList.remove("is-error");feedback.textContent="جارٍ تحديث بيانات واتساب…";
       try{
         const data=await window.DartAdminApi.request("/api/v1/admin/messaging/whatsapp-analytics?period="+encodeURIComponent(period.value));
@@ -68,7 +68,7 @@
       }catch(error){
         if(seq!==sequence||!active)return;
         feedback.classList.add("is-error");feedback.textContent=error?.message||"تعذّر تحميل إحصائيات واتساب.";
-      }finally{loading=false;}
+      }finally{if(seq===sequence)loading=false;}
     }
     function addCell(row,text,className){
       const td=make("td");const item=className?make("span",className,text):document.createTextNode(String(text));
@@ -104,11 +104,11 @@
         if(current!==detailSequence)return;
         detailStatus.classList.add("is-error");detailStatus.textContent=error?.message||"تعذر تحميل الرسائل.";
         more.hidden=false;
-      }finally{detailLoading=false;}
+      }finally{if(current===detailSequence)detailLoading=false;}
     }
     function showDetails(type,status){
       if(!canRead())return;
-      selection={type,status};offset=0;
+      detailSequence++;detailLoading=false;selection={type,status};offset=0;
       document.getElementById("dart-wa-dialog-title").textContent=type==="all"?"كل رسائل واتساب":labels[type]||type;
       document.getElementById("dart-wa-dialog-caption").textContent=states[status]||"الكل";
       if(!dialog.open)dialog.showModal();

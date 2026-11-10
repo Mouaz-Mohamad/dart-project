@@ -51,3 +51,5 @@
 .dart-wa-state[data-state="failed"],.dart-wa-state[data-state="attention"]{color:#a22b35;background:#fdf0f1}
 .dart-wa-state[data-state="pending"],.dart-wa-state[data-state="sent"]{color:#8b5c09;background:#fbf4e5}
 @media(max-width:800px){.dart-wa-section{padding:13px}.dart-wa-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.dart-wa-kpi{padding:13px;min-height:108px}.dart-wa-heading{align-items:flex-start}.dart-wa-controls{width:100%}.dart-wa-controls select{flex:1;min-width:100px}.dart-wa-table th,.dart-wa-table td{padding:11px 9px}}
+
+#dart-wa-nav-desktop[hidden],#dart-wa-nav-mobile[hidden]{display:none!important}
