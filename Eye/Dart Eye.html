@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="dart-live-card-refresh.css?v=20261105-live-card-1">
     <link rel="stylesheet" href="dart-news-finance-settings.css?v=20261105-summary-collapsed-3">
     <link rel="stylesheet" href="dart-sidebar.css?v=20261108-sidebar-v1">
+    <link rel="stylesheet" href="dart-whatsapp-analytics.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -97,6 +98,7 @@
         <li><a href="#" data-target="live-operations"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span class="dart-sidebar-label">Live Map</span></a></li>
         <li class="dart-sidebar-heading" role="presentation">Marketing</li>
         <li><a href="#" data-target="review"><i class="fa-solid fa-star" aria-hidden="true"></i><span class="dart-sidebar-label">Review</span></a></li>
+        <li id="dart-wa-nav-desktop" hidden><a href="#" data-target="whatsapp"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><span class="dart-sidebar-label">WhatsApp</span></a></li>
         <li><a href="#" data-target="card"><i class="fa-solid fa-id-card" aria-hidden="true"></i><span class="dart-sidebar-label">Dart Card</span></a></li>
         <li hidden><a href="#" data-target="news"><i class="fa-solid fa-newspaper" aria-hidden="true"></i><span class="dart-sidebar-label">News</span></a></li>
         <li class="dart-sidebar-heading" role="presentation">Management</li>
@@ -123,6 +125,7 @@
         <li><a href="#" data-target="returns"><i class='bx bx-undo'></i><span>Returns</span></a></li>
         <li><a href="#" data-target="damage"><i class='bx bx-error-circle'></i><span>Damage</span></a></li>
         <li><a href="#" data-target="review"><i class='bx bx-star'></i><span>Review</span></a></li>
+        <li id="dart-wa-nav-mobile" hidden><a href="#" data-target="whatsapp"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><span>WhatsApp</span></a></li>
         <li><a href="#" data-target="representative"><i class='bx bx-group'></i><span>Rep</span></a></li>
         <li><a href="#" data-target="live-operations"><i class="fa-solid fa-map-location-dot"></i><span>Live</span></a></li>
         <li><a href="#" data-target="card"><i class='bx bx-credit-card'></i><span>Card</span></a></li>
@@ -1765,6 +1768,53 @@
         <div class="modal" id="damage-modal"><div class="modal-content"><span class="close-modal">&times;</span><h3>Damage Record</h3><form id="damage-form"><input type="hidden" id="damage-edit-id"><div class="modal-grid"><div class="form-group"><label>Item Code</label><input id="damage-item-code" required></div><div class="form-group"><label>Reason</label><input id="damage-reason" required></div><div class="form-group"><label>Notes</label><textarea id="damage-notes" rows="3"></textarea></div><div class="form-group"><label>Status</label><select id="damage-status"><option value="Damaged">Damaged</option><option value="Repaired">Repaired</option><option value="Destroyed">Destroyed</option></select></div></div><button type="button" class="btn-done">DONE</button></form></div></div>
 <!--============================= END Damage modals. ============================ -->
 
+<!-- BEGIN WhatsApp analytics: secure server-authoritative Meta delivery reporting. -->
+        <section id="whatsapp" class="dashboard-section dart-wa-section" aria-labelledby="dart-wa-title">
+          <header class="dart-wa-heading">
+            <div>
+              <p class="dart-wa-eyebrow"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> MARKETING / MESSAGING</p>
+              <h1 id="dart-wa-title">WhatsApp Analytics</h1>
+              <p>حالة رسائل Dart لكل قالب، من سجل Neon وتأكيدات التسليم من Meta.</p>
+            </div>
+            <div class="dart-wa-controls">
+              <label for="dart-wa-period">الفترة</label>
+              <select id="dart-wa-period" aria-label="فترة إحصائيات واتساب">
+                <option value="today">اليوم</option><option value="month" selected>الشهر الحالي</option><option value="all">كل الوقت</option>
+              </select>
+              <button type="button" id="dart-wa-refresh"><i class="fa-solid fa-rotate" aria-hidden="true"></i> تحديث</button>
+            </div>
+          </header>
+          <p id="dart-wa-feedback" class="dart-wa-feedback" role="status" aria-live="polite">افتح القسم لعرض إحصائيات الرسائل.</p>
+          <div class="dart-wa-kpis" aria-label="ملخص حالة رسائل واتساب">
+            <button type="button" class="dart-wa-kpi" data-wa-type="all" data-wa-status="all"><span>إجمالي الرسائل</span><strong data-wa-total="total">—</strong><small>كل رسائل واتساب</small></button>
+            <button type="button" class="dart-wa-kpi" data-wa-type="all" data-wa-status="delivered"><span>وصلت</span><strong data-wa-total="delivered">—</strong><small>تشمل المقروءة</small></button>
+            <button type="button" class="dart-wa-kpi" data-wa-type="all" data-wa-status="read"><span>مقروءة</span><strong data-wa-total="read">—</strong><small>تأكيد Meta بالقراءة</small></button>
+            <button type="button" class="dart-wa-kpi" data-wa-type="all" data-wa-status="pending"><span>معلقة</span><strong data-wa-total="pending">—</strong><small>مجدولة أو بانتظار Meta</small></button>
+            <button type="button" class="dart-wa-kpi" data-wa-type="all" data-wa-status="failed"><span>فشلت</span><strong data-wa-total="failed">—</strong><small>خطأ تسليم أو توقف نهائي</small></button>
+            <button type="button" class="dart-wa-kpi" data-wa-type="all" data-wa-status="attention"><span>تحتاج مراجعة</span><strong data-wa-total="attention">—</strong><small>حالة إرسال غير مؤكدة</small></button>
+          </div>
+          <article class="dart-wa-card">
+            <div class="dart-wa-card-heading"><h2>التفاصيل حسب القالب</h2><span>اضغط على أي عدد لعرض الرسائل</span></div>
+            <div class="dart-wa-table-scroll">
+              <table class="dart-wa-table">
+                <thead><tr><th scope="col">القالب / الرسالة</th><th scope="col">الإجمالي</th><th scope="col">وصلت</th><th scope="col">مقروءة</th><th scope="col">معلقة</th><th scope="col">بانتظار Meta</th><th scope="col">فشلت</th><th scope="col">تحتاج مراجعة</th><th scope="col">لم تُرسل</th></tr></thead>
+                <tbody id="dart-wa-templates"><tr><td colspan="9">جارٍ تحميل إحصائيات واتساب…</td></tr></tbody>
+              </table>
+            </div>
+            <p class="dart-wa-footnote">«وصلت» تشمل «مقروءة»؛ و«بانتظار Meta» جزء من «معلقة». «لم تُرسل» تشمل الرسائل المستبعدة عمدًا. وقت الأرقام محسوب حسب إنشاء الرسالة بتوقيت القاهرة.</p>
+          </article>
+          <dialog id="dart-wa-dialog" class="dart-wa-dialog" aria-labelledby="dart-wa-dialog-title">
+            <div class="dart-wa-dialog-head">
+              <div><h2 id="dart-wa-dialog-title">تفاصيل الرسائل</h2><p id="dart-wa-dialog-caption"></p></div>
+              <button type="button" id="dart-wa-dialog-close" aria-label="إغلاق التفاصيل"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </div>
+            <p id="dart-wa-dialog-status" role="status" aria-live="polite"></p>
+            <div class="dart-wa-table-scroll"><table class="dart-wa-table dart-wa-details-table"><thead><tr><th scope="col">النوع / الأوردر</th><th scope="col">الرقم</th><th scope="col">الحالة</th><th scope="col">إنشاء</th><th scope="col">موعد الإرسال</th><th scope="col">الإرسال</th><th scope="col">التفاصيل</th></tr></thead><tbody id="dart-wa-detail-rows"></tbody></table></div>
+            <div class="dart-wa-dialog-actions"><button id="dart-wa-more" type="button" hidden>عرض المزيد</button><button id="dart-wa-done" type="button">إغلاق</button></div>
+          </dialog>
+        </section>
+<!-- END WhatsApp analytics. -->
+
 <!--============================= review  ============================-->
         <section id="review" class="dashboard-section" aria-labelledby="dart-review-title">
             <header class="dart-operations-page-head">
@@ -2887,5 +2937,6 @@
 <script src="dart-orders-ui.js?v=20261105-orders-ui-v1"></script>
 <script src="dart-display-preferences.js"></script>
 <script src="dart-sidebar.js?v=20261108-sidebar-v1"></script>
+<script src="dart-whatsapp-analytics.js" defer></script>
 </body>
 </html>

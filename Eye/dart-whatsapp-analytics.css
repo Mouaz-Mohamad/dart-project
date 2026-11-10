@@ -1,0 +1,53 @@
+/* DART CODE GUIDE | Eye/dart-whatsapp-analytics.css */
+/* WhatsApp reporting: neutral off-white surfaces, restrained Dart burgundy accents. */
+.dart-wa-section{--wa-ink:#252027;--wa-burgundy:#761d3c;--wa-line:#e8e0e3;--wa-muted:#746d73;color:var(--wa-ink);padding:24px;max-width:1500px;margin:auto}
+.dart-wa-section button,.dart-wa-section select{cursor:pointer}
+.dart-wa-heading,.dart-wa-card-heading,.dart-wa-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.dart-wa-heading{margin-bottom:20px}
+.dart-wa-heading h1{font-size:clamp(1.5rem,3vw,2rem);font-weight:800;letter-spacing:-.02em}
+.dart-wa-heading p{color:var(--wa-muted);margin-top:4px}
+.dart-wa-eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.12em;color:var(--wa-burgundy)!important}
+.dart-wa-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dart-wa-controls label{font-size:.85rem;font-weight:700}
+.dart-wa-controls select,.dart-wa-controls button,.dart-wa-dialog-actions button{border:1px solid var(--wa-line);border-radius:10px;background:#fff;padding:9px 13px;font-size:.9rem}
+#dart-wa-refresh,#dart-wa-more{background:var(--wa-burgundy);color:#fff;border-color:var(--wa-burgundy)}
+.dart-wa-feedback{font-size:.83rem;min-height:1.6rem;color:var(--wa-muted);margin-bottom:13px}
+.dart-wa-feedback.is-error,.dart-wa-dialog #dart-wa-dialog-status.is-error{color:#ac243d}
+.dart-wa-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.dart-wa-kpi{text-align:start;display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid var(--wa-line);border-radius:15px;padding:17px;min-height:126px;transition:border-color .15s,transform .15s;box-shadow:0 4px 18px rgba(46,20,32,.035)}
+.dart-wa-kpi:hover,.dart-wa-kpi:focus-visible{border-color:var(--wa-burgundy);transform:translateY(-1px)}
+.dart-wa-kpi span{color:var(--wa-muted);font-size:.86rem}
+.dart-wa-kpi strong{font-size:clamp(1.5rem,3vw,2rem);font-weight:800;font-variant-numeric:tabular-nums}
+.dart-wa-kpi small{font-size:.75rem;color:var(--wa-muted)}
+.dart-wa-card{background:#fff;border:1px solid var(--wa-line);border-radius:16px;overflow:hidden;box-shadow:0 4px 18px rgba(46,20,32,.035)}
+.dart-wa-card-heading{padding:17px;border-bottom:1px solid var(--wa-line)}
+.dart-wa-card-heading h2{font-weight:800;font-size:1.1rem}
+.dart-wa-card-heading span{font-size:.8rem;color:var(--wa-muted)}
+.dart-wa-table-scroll{overflow:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+.dart-wa-table{border-collapse:collapse;width:100%;min-width:890px;text-align:start}
+.dart-wa-table th,.dart-wa-table td{border-bottom:1px solid #f1e9ec;padding:13px 10px;font-size:.81rem;white-space:nowrap;text-align:start}
+.dart-wa-table thead th{font-weight:750;color:#51474d;background:#faf7f8}
+.dart-wa-table tbody tr:last-child td{border-bottom:0}
+.dart-wa-table tbody td:first-child{font-weight:700}
+.dart-wa-table button[data-wa-type]{background:#f9f4f6;border:1px solid transparent;border-radius:8px;min-width:42px;padding:6px 8px;color:var(--wa-burgundy);font-variant-numeric:tabular-nums;font-weight:750}
+.dart-wa-table button[data-wa-type]:hover,.dart-wa-table button[data-wa-type]:focus-visible{border-color:var(--wa-burgundy)}
+.dart-wa-table button:disabled{cursor:default;opacity:.58}
+.dart-wa-footnote{padding:14px 17px;font-size:.76rem;color:var(--wa-muted);line-height:1.7;border-top:1px solid var(--wa-line)}
+.dart-wa-dialog{position:fixed;inset:0;margin:auto;width:min(1040px,calc(100vw - 24px));max-height:min(85vh,920px);border:1px solid var(--wa-line);border-radius:16px;background:#fff;color:var(--wa-ink);padding:0;box-shadow:0 22px 80px rgba(0,0,0,.25)}
+.dart-wa-dialog::backdrop{background:rgba(22,18,23,.6)}
+.dart-wa-dialog-head{padding:17px 20px;border-bottom:1px solid var(--wa-line)}
+.dart-wa-dialog-head h2{font-size:1.1rem}
+.dart-wa-dialog-head p{font-size:.78rem;color:var(--wa-muted);margin-top:3px}
+#dart-wa-dialog-close{border:1px solid var(--wa-line);background:white;border-radius:8px;padding:8px 11px}
+.dart-wa-dialog #dart-wa-dialog-status{margin:12px 18px;color:var(--wa-muted);font-size:.82rem}
+.dart-wa-details-table{min-width:930px}
+.dart-wa-details-table td{white-space:normal;min-width:84px;vertical-align:top}
+.dart-wa-details-table td:first-child{min-width:180px}
+.dart-wa-detail-code{display:block;font-weight:700;color:var(--wa-burgundy)}
+.dart-wa-detail-hint{font-size:.75rem;color:var(--wa-muted);display:block}
+.dart-wa-dialog-actions{padding:13px 19px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--wa-line)}
+.dart-wa-state{display:inline-block;padding:4px 9px;border-radius:7px;background:#f2edf0;color:#4e3440;font-size:.77rem;font-weight:700}
+.dart-wa-state[data-state="read"],.dart-wa-state[data-state="delivered"]{color:#1e6746;background:#e9f5ee}
+.dart-wa-state[data-state="failed"],.dart-wa-state[data-state="attention"]{color:#a22b35;background:#fdf0f1}
+.dart-wa-state[data-state="pending"],.dart-wa-state[data-state="sent"]{color:#8b5c09;background:#fbf4e5}
+@media(max-width:800px){.dart-wa-section{padding:13px}.dart-wa-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.dart-wa-kpi{padding:13px;min-height:108px}.dart-wa-heading{align-items:flex-start}.dart-wa-controls{width:100%}.dart-wa-controls select{flex:1;min-width:100px}.dart-wa-table th,.dart-wa-table td{padding:11px 9px}}
