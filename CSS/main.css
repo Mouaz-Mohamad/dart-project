@@ -1011,28 +1011,39 @@ body.dart-set-image-open {
 
 .reviews-container {
   display: flex;
-  gap: 15px;
+  gap: 10px;
   overflow-x: auto;
-  padding: 10px 5px;
+  padding: 8px 2px 11px;
   scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
 }
 
 .review-card {
-  flex: 0 0 300px;
+  flex: 0 0 244px;
   flex-shrink: 0;
   font-family: var(--font-inter);
 }
 .reviews-section .review-card {
-  width: 300px;
-  height: 348px;
+  width: 244px;
+  height: 178px;
   box-sizing: border-box;
-  padding: 17px 16px 14px;
+  padding: 13px 13px 11px;
+  gap: 8px;
+  justify-content: flex-start;
+  scroll-snap-align: start;
+  background: #fffcfa;
+  border: 1px solid #e4dcda;
+  border-radius: 12px;
+  color: #252020;
+  box-shadow: 0 2px 9px rgba(36, 27, 25, 0.05);
 }
 .dart-review-card-main {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
+  gap: 3px;
 }
 .stars {
   color: #d4af37;
@@ -1040,7 +1051,6 @@ body.dart-set-image-open {
   margin: 8px;
   justify-self: center;
 }
-.reviews-section .review-card .stars,
 .dart-review-dialog .stars {
   display: flex;
   align-items: center;
@@ -1061,13 +1071,33 @@ body.dart-set-image-open {
   fill: rgba(255, 255, 255, 0.85);
 }
 .reviews-section .dart-review-display-stars .dart-rating-choice {
-  width: 42px;
-  height: 44px;
-  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 14px;
+  flex: 0 0 13px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
 }
 .reviews-section .dart-review-display-stars .dart-rating-star {
-  width: 27px;
-  height: 27px;
+  width: 13px;
+  height: 13px;
+}
+.reviews-section .dart-review-display-stars .dart-rating-choice .dart-star-shape {
+  fill: #e9e1e1;
+  stroke: #c1b2b4;
+}
+.reviews-section .dart-review-display-stars .dart-rating-choice.is-filled .dart-star-shape {
+  fill: var(--bragnte);
+  stroke: var(--bragnte);
+}
+.reviews-section .dart-review-display-stars .dart-star-spark {
+  display: none;
 }
 
 .dart-review-avatar {
@@ -1113,12 +1143,19 @@ body.dart-set-image-open {
 .reviews-section .review-card .review-title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  height: 2.7em;
-  line-height: 1.35;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  height: auto;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #252020;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+.reviews-section .review-card .review-title:empty {
+  display: none;
 }
 .review-text {
   font-size: 16px;
@@ -1131,40 +1168,90 @@ body.dart-set-image-open {
 .reviews-section .review-card .review-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  height: 6em;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  height: auto;
+  max-height: 4.95em;
   margin: 0;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.65;
+  color: #625d5a;
   overflow: hidden;
   overflow-wrap: anywhere;
 }
 .dart-review-read-more {
   display: inline-flex;
-  gap: 8px;
+  gap: 3px;
   align-items: center;
-  align-self: center;
   justify-content: center;
-  margin-top: 12px;
-  padding: 8px 17px;
-  border: 1px solid rgba(171, 1, 43, 0.25);
-  border-radius: 999px;
-  background: #fff7f8;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--bragnte);
-  font: 600 13px var(--font-inter);
+  font: 600 11px var(--font-cabin);
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease;
 }
- .dart-review-read-more[hidden] { display: none !important; }
+.dart-review-read-more[hidden] { display: none !important; }
 .dart-review-read-more:hover {
-  background: #fce8eb;
-  border-color: var(--bragnte);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .dart-review-read-more:focus-visible,
 .dart-review-dialog-close:focus-visible {
   outline: 2px solid var(--bragnte);
   outline-offset: 4px;
 }
-.reviews-section .review-card .user-info { margin-top: 10px; }
+/* BEGIN Dart compact customer review — 244 × 178, homepage only. */
+.dart-review-card-head,
+.dart-review-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.reviews-section .review-card .user-name- {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: start;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #252020;
+}
+.reviews-section .review-card .stars {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin: 0;
+  line-height: 1;
+}
+.dart-review-card-foot {
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid #e8dfdd;
+}
+.reviews-section .review-card .review-date {
+  color: #817978;
+  font: 500 10px var(--font-cabin);
+  white-space: nowrap;
+}
+.reviews-section .review-card .dart-review-read-more {
+  flex: 0 0 auto;
+  align-self: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reviews-container { scroll-behavior: auto; }
+}
+/* END Dart compact customer review. */
+
 .dart-review-dialog {
   position: fixed;
   inset: 0;
