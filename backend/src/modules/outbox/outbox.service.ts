@@ -10,6 +10,7 @@ import { renderOutboxEmail } from "./email-templates.js";
 import { deliverWebPush } from "../notifications/push-dispatch.js";
 import { PushDeliveryError, type WebPushProvider } from "../notifications/web-push-provider.js";
 import { whatsappSendWindow } from "./whatsapp-schedule.js";
+import { whatsappAnalytics, type WhatsAppAnalyticsQuery } from "./whatsapp-analytics.service.js";
 
 class DeferredWhatsAppDelivery extends Error {}
 
@@ -107,6 +108,8 @@ export class OutboxService {
       && this.config.whatsappAccessToken && this.config.whatsappPhoneNumberId
       && /^v\d+\.\d+$/.test(this.config.whatsappGraphApiVersion || "v26.0"));
   }
+
+  public async whatsappAnalytics(query: WhatsAppAnalyticsQuery) { return whatsappAnalytics(this.pool,query); }
 
   public async recentEvents(limit = 50): Promise<Array<Record<string, unknown>>> {
     const result = await this.pool.query<{
