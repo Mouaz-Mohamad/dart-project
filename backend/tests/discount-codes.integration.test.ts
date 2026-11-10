@@ -93,7 +93,7 @@ describe("Discount Code: line-level priority, single order amount, lifecycle", (
     await expect(coupons.delete(f.offer.id,f.offer.version+1,owner,"stale"))
       .rejects.toMatchObject({code:"DISCOUNT_CODE_CONFLICT"});
     expect(await coupons.delete(f.offer.id,f.offer.version,owner,"delete-unused"))
-      .toMatchObject({deleted:true,code:f.couponCode});
+      .toMatchObject({deleted:true,code:f.offer.code});
     expect((await store.pool.query("SELECT count(*)::int AS n FROM discount_codes WHERE id=$1",[f.offer.id])).rows[0].n).toBe(0);
     await expect(coupons.delete(f.offer.id,f.offer.version,owner,"delete-again"))
       .rejects.toMatchObject({code:"DISCOUNT_CODE_NOT_FOUND"});
@@ -108,7 +108,7 @@ describe("Discount Code: line-level priority, single order amount, lifecycle", (
     await coupons.delete(f.offer.id,f.offer.version,owner,"delete-redeemed");
     const usage=(await store.pool.query(`SELECT discount_code_id,code_snapshot,discount_minor::int AS discount_minor,status
       FROM discount_code_usages WHERE order_id=$1`,[order.id])).rows[0];
-    expect(usage).toEqual({discount_code_id:null,code_snapshot:f.couponCode,discount_minor:15000,status:"Reserved"});
+    expect(usage).toEqual({discount_code_id:null,code_snapshot:f.offer.code,discount_minor:15000,status:"Reserved"});
     expect((await store.pool.query("SELECT count(*)::int AS n FROM orders WHERE id=$1",[order.id])).rows[0].n).toBe(1);
     expect((await store.pool.query("SELECT count(*)::int AS n FROM order_items WHERE order_id=$1 AND discount_source='Discount Code'",[order.id])).rows[0].n).toBe(1);
     await store.pool.query("UPDATE orders SET status='Representative On The Way' WHERE id=$1",[order.id]);

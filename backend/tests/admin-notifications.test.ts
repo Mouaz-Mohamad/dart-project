@@ -33,6 +33,8 @@ describe("staff notifications",()=>{
   afterAll(async()=>{await store?.db.close();});
   beforeEach(async()=>{
     await store.pool.query("DELETE FROM outbox_events");await store.pool.query("DELETE FROM admin_notifications");await store.pool.query("DELETE FROM admin_push_subscriptions");
+    // Reset the previous synthetic owner between cases: the isolated schema permits only one owner.
+    await store.pool.query("UPDATE staff_users SET is_owner=false WHERE is_owner=true");
     userId=randomUUID();otherId=randomUUID();sessionId=randomUUID();
     for(const id of [userId,otherId]){
       await store.pool.query("INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at) VALUES($1,'staff',$2,$2,'synthetic','active',now())",[id,`${id}@example.test`]);
