@@ -6,14 +6,14 @@ import { describe, expect, it } from "vitest";
 import { assertMigrationNamingPolicy } from "../src/database/migrate.js";
 
 describe("migration naming policy", () => {
-  it("keeps the real migration directory unique and consecutive from 0001 through 0083", () => {
+  it("keeps the real migration directory unique and consecutive from 0001 onward", () => {
     const names = readdirSync(resolve(process.cwd(), "migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
 
-    expect(names).toHaveLength(83);
+    expect(names.length).toBeGreaterThanOrEqual(84);
     expect(names.map((name) => name.slice(0, 4))).toEqual(
-      Array.from({ length: 83 }, (_, index) => String(index + 1).padStart(4, "0")),
+      Array.from({ length: names.length }, (_, index) => String(index + 1).padStart(4, "0")),
     );
     expect(() => assertMigrationNamingPolicy(names)).not.toThrow();
   });

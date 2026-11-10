@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
 import { embeddedStore } from "./embedded-store.js";
+import { readMigrationFiles } from "../src/database/migrate.js";
+import { resolve } from "node:path";
 
 it("validates and executes dependent SQL functions inside an isolated migration schema", async () => {
   const store = await embeddedStore(true);
@@ -10,6 +12,7 @@ it("validates and executes dependent SQL functions inside an isolated migration 
     expect((await store.pool.query("SELECT 1 AS value")).rowCount).toBe(1);
     expect(row.benefits).toEqual([{ type: "Birthday", rewardId: "synthetic" }]);
     expect((await store.pool.query("SELECT current_setting('check_function_bodies') AS enabled")).rows[0].enabled).toBe("on");
-    expect((await store.pool.query("SELECT count(*)::int AS n FROM dart_schema_migrations")).rows[0].n).toBe(83);
+    const expected=(await readMigrationFiles(resolve(process.cwd(),"migrations"))).length;
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM dart_schema_migrations")).rows[0].n).toBe(expected);
   } finally { await store.db.close(); }
 }, 30000);

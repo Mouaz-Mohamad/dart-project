@@ -5938,7 +5938,9 @@ export class CommerceService {
         && ["pending","confirmed"].includes(order.confirmation_state)) {
         // Dashboard acceptance can advance status/version before the buyer taps.
         // Acknowledge the real accepted state without re-accepting or changing stock.
-        outcome = "already_accepted";
+        // Repeated taps after a WhatsApp acceptance reuse the original ACK key.
+        // Only dashboard-first acceptance receives the distinct "already" reply.
+        outcome = order.confirmation_state === "confirmed" ? "confirmed" : "already_accepted";
       } else if (action === "cancel" && order.confirmation_state === "cancelled" && order.status === "Cancelled") {
         outcome = "cancelled";
       }

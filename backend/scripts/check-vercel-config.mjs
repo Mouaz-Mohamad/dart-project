@@ -40,16 +40,23 @@ for (const cron of config.crons ?? []) {
     month === "*" &&
     dayOfWeek === "*";
 
-  if (!oncePerDay) {
+  // Dart's API project is verified on Vercel Pro. Its only permitted subdaily
+  // cron is the protected durable outbox; all other jobs remain Hobby-safe.
+  const authorizedProOutbox =
+    cron.path === "/api/v1/internal/outbox/process" &&
+    cron.schedule === "*/5 * * * *";
+  if (!oncePerDay && !authorizedProOutbox) {
     throw new Error(
-      `Vercel Hobby-safe cron must run at most once per day: ${cron.path} -> ${cron.schedule}`,
+      `Only daily cron jobs or Dart's approved Pro outbox are allowed: ${cron.path} -> ${cron.schedule}`,
     );
   }
 
-  const minuteNumber = Number(minute);
-  const hourNumber = Number(hour);
-  if (minuteNumber > 59 || hourNumber > 23) {
-    throw new Error(`Cron time is out of range: ${cron.schedule}`);
+  if (oncePerDay) {
+    const minuteNumber = Number(minute);
+    const hourNumber = Number(hour);
+    if (minuteNumber > 59 || hourNumber > 23) {
+      throw new Error(`Cron time is out of range: ${cron.schedule}`);
+    }
   }
 }
 
