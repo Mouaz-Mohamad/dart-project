@@ -4,7 +4,7 @@
   const mounted = new Map(), pendingPaths = new Map();
   let preloadRequest = null, libraryStartedAt = 0, libraryLoadMs = null;
   let request = null, authFailed = false, errorMessage = "", mountGeneration = 0;
-  const configurationError = "Google Maps authorization failed. Check Maps JavaScript API, billing and allowed Dart website domains in Google Cloud.";
+  const configurationError = "تعذر تشغيل خرائط Google. تحقق من إعدادات واجهة الخرائط والفوترة والدومين المسموح في Google Cloud.";
   function fail(message) {
     errorMessage = message;
     document.dispatchEvent(new CustomEvent("dart:google-maps-error", { detail: { message } }));
@@ -70,7 +70,7 @@
     }
     const rotation = ((heading - (entry.map.getHeading?.() || 0)) % 360 + 360) % 360;
     if (!entry.courier) entry.courier = new google.maps.Marker({ map: entry.map,
-      position: location, title: "You", icon: courierIcon(rotation), zIndex: 10 });
+      position: location, title: "موقعك الحالي", icon: courierIcon(rotation), zIndex: 10 });
     else { entry.courier.setPosition(location); entry.courier.setIcon(courierIcon(rotation)); }
   }
   function animateCourier(entry, location, heading) {
@@ -115,7 +115,7 @@
   function loadMaps() {
     const key = String(window.DART_GOOGLE_MAPS_BROWSER_KEY || "").trim();
     if (authFailed || !key) {
-      fail(authFailed ? configurationError : "Google Maps browser key is missing from this deployment.");
+      fail(authFailed ? configurationError : "مفتاح خرائط Google غير مفعّل في إعدادات النشر.");
       return Promise.resolve(false);
     }
     if (window.google?.maps?.Map) return Promise.resolve(true);
@@ -135,7 +135,7 @@
         resolve(Boolean(ok && !authFailed && window.google?.maps?.Map));
       };
       const timer = window.setTimeout(() => {
-        fail("Google Maps loading timed out. Check your connection and retry.");
+        fail("انتهت مهلة تحميل خرائط Google. تحقق من الاتصال وحاول مجددًا.");
         script.remove();
         finish(false);
       }, 15000);
@@ -154,7 +154,7 @@
       });
       script.async = true;
       script.referrerPolicy = "strict-origin-when-cross-origin";
-      script.onerror = () => { fail("Google Maps failed to load. Check your connection and retry."); script.remove(); finish(false); };
+      script.onerror = () => { fail("تعذر تحميل خرائط Google. تحقق من الاتصال وحاول مجددًا."); script.remove(); finish(false); };
       document.head.appendChild(script);
     });
     return request;
@@ -219,31 +219,43 @@
       if (renderer === "VECTOR") createRepresentativeMap(entry, "RASTER");
       else {
         disposeRepresentativeMap(entry);
-        entry.container.textContent = "Google map streets could not load. Check your connection and retry Google Maps.";
+        entry.container.textContent = "تعذر تحميل شوارع الخريطة. تحقق من الاتصال وحاول مجددًا.";
         mapState(entry, "error", entry.container.textContent);
       }
     };
     try {
       map = new google.maps.Map(canvas, { center, zoom: 17, renderingType: renderer,
-        // Start top-down while Google's vector tiles initialize, then tilt/rotate after tilesloaded.
-        tilt: 0, heading: 0,
+        // Google Maps road view: native map gestures and controls, 60° follow camera on VECTOR.
+        // Raster mode cannot tilt, so keep its normal readable Google road map instead.
+        tilt: 0, heading: 0, mapTypeId: "roadmap",
         tiltInteractionEnabled: true, headingInteractionEnabled: true, isFractionalZoomEnabled: true,
-        disableDefaultUI: true, colorScheme: "LIGHT", clickableIcons: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
+        disableDefaultUI: false, gestureHandling: "greedy", keyboardShortcuts: true,
+        zoomControl: true, rotateControl: true, scaleControl: true,
+        colorScheme: "LIGHT", clickableIcons: false, mapTypeControl: false,
+        streetViewControl: false, fullscreenControl: false });
       entry.map = map;
       entry.drawnLocation = entry.location; entry.drawnHeading = entry.heading ?? 0;
-      entry.destination = entry.target ? new google.maps.Marker({ map, position: entry.target, title: "Customer destination" }) : null;
+      entry.destination = entry.target ? new google.maps.Marker({ map, position: entry.target, title: "مكان التسليم" }) : null;
       entry.route = new google.maps.Polyline({ map, path: entry.path, strokeColor: "#1a73e8", strokeOpacity: 1, strokeWeight: 6 });
+      // Panning or rotating pauses automatic follow until the courier taps recenter.
+      // Do not override a manually selected direction after an arbitrary timeout.
       map.addListener("dragstart", () => { clearTimeout(entry.followTimer); setFollow(entry, false); });
-      map.addListener("dragend", () => {
-        entry.followTimer = setTimeout(() => { if (mounted.get(entry.id) === entry && entry.map === map) setFollow(entry, true); }, 8000);
+      const recenterButton = document.createElement("button");
+      recenterButton.type = "button";
+      recenterButton.className = "dart-google-map-recenter";
+      recenterButton.textContent = "⌖";
+      recenterButton.setAttribute("aria-label", "العودة إلى موقعي ومتابعة الاتجاه");
+      recenterButton.title = "العودة إلى موقعي";
+      recenterButton.addEventListener("click", () => {
+        if (mounted.get(entry.id) === entry) setFollow(entry, true);
       });
+      map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(recenterButton);
       map.addListener("heading_changed", () => {
         // User rotation must not be immediately overwritten by the next GPS camera update.
         if (entry.tilesReady && entry.follow && entry.cameraHeading != null &&
             Math.abs(angleDifference(entry.cameraHeading, map.getHeading() || 0)) > 0.5) {
           setFollow(entry, false);
           clearTimeout(entry.followTimer);
-          entry.followTimer = setTimeout(() => { if (mounted.get(entry.id) === entry && entry.map === map) setFollow(entry, true); }, 8000);
         }
         entry.courier?.setIcon(courierIcon(((entry.drawnHeading - (map.getHeading() || 0)) % 360 + 360) % 360));
       });
@@ -278,7 +290,7 @@
         setFollow(entry, entry.follow);
       });
       canvas.addEventListener("webglcontextlost", () => recover("webgl-context-lost"), { once: true, capture: true });
-      mapState(entry, "loading", renderer === "RASTER" ? "Switching to the standard Google Maps view..." : "Loading Google road map...");
+      mapState(entry, "loading", renderer === "RASTER" ? "جارٍ عرض خريطة Google العادية..." : "جارٍ تحميل خريطة الشوارع...");
       // A delayed all-visible-tiles event is not proof that VECTOR failed. Never recreate on a timer.
       entry.visibleSince = mapIsVisible(entry) ? Date.now() : null;
       const checkTiles = () => {
@@ -387,10 +399,10 @@
       language: "ar", region: "eg", fields: ["path", "legs", "distanceMeters", "durationMillis", "warnings"],
     });
     const route = result.routes?.[0];
-    if (!route?.path?.length) throw new Error("Google could not find a driving route.");
+    if (!route?.path?.length) throw new Error("تعذر العثور على مسار مناسب للسيارة.");
     return { geometry: route.path.map(p => { const c = point(p); return c ? [c.lat, c.lng] : null; }).filter(Boolean),
       steps: (route.legs || []).flatMap(leg => leg.steps || []).map(step => ({
-        instruction: String(step.instructions || "Continue"), maneuver: String(step.maneuver || "STRAIGHT"),
+        instruction: String(step.instructions || "استمر للأمام"), maneuver: String(step.maneuver || "STRAIGHT"),
         start: point(step.startLocation), end: point(step.endLocation),
         path: (step.path || []).map(point).filter(Boolean), distanceMeters: step.distanceMeters,
       })), distanceMeters: route.distanceMeters, durationMillis: route.durationMillis,
