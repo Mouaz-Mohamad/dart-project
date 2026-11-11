@@ -306,3 +306,23 @@
 @media (max-width: 350px) {
   #repOrdersList .dart-rep-order-actions, #repReturnsList .dart-rep-order-actions { grid-template-columns: 1fr; }
 }
+
+/* Navigation-only controls; the footer remains Exit and Arrived. */
+#repNavigationDialog .dart-rep-navigation-tools {
+  position: absolute; z-index: 3; inset-inline-end: 12px; top: 132px;
+  display: grid; gap: 6px; max-width: 155px; color: #202124;
+}
+#repNavigationDialog .dart-rep-navigation-tools label {
+  display: grid; gap: 2px; padding: 6px 10px; border-radius: 10px; background: #fff;
+  font-size: 11px; box-shadow: 0 2px 8px #0002;
+}
+#repNavigationDialog .dart-rep-navigation-tools select,
+#repNavigationDialog .dart-rep-navigation-tools button {
+  min-height: 42px; max-width: 100%; border: 1px solid #dadce0;
+  border-radius: 10px; background: #fff; color: #202124; font: inherit;
+  padding: 7px 10px; touch-action: manipulation;
+}
+#repNavigationDialog .dart-rep-navigation-tools button[aria-pressed="true"] { color: #1769aa; background: #e8f0fe; }
+#repNavigationDialog .dart-rep-navigation-tools :focus-visible { outline: 3px solid #1a73e8; }
+#repNavigationMap .gm-style canvas,
+#repNavigationMap .gm-style img { max-width: none; max-height: none; }

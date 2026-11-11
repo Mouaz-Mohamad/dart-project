@@ -54,7 +54,8 @@
     "test-inventory-contract.cjs",
     "rep-google-contract.cjs",
     "rep-navigation-session.cjs",
-    "rep-reliability-runtime.cjs"
+    "rep-reliability-runtime.cjs",
+    "rep-compass-runtime.cjs"
   ],
   "ciBrowser": [
     "brand-details-browser.cjs",

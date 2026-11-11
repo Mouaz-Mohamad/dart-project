@@ -27,7 +27,7 @@ function fixture() {
       computeRoute:async()=>({geometry:[],steps:[],warnings:[]})}};
   const source=fs.readFileSync('Js/dart-rep.js','utf8').replace('    bindEvents();','    /* Event wiring is covered separately by browser CI. */')
     .replace('  window.DartRepPortal = {',`  window.audit = {publishRepresentativeLocation,ensureLocationWatch,clearRepresentativeSession,updateRouteProgress,
-      renderOrders,openNavigation,closeNavigation,updateDeliveryControls,
+      renderOrders,openNavigation,closeNavigation,updateDeliveryControls,latestNavigationPosition,previewRepresentativePosition,
       entry(){return deliveryMaps.get(navigationOrderId);},location(){return latestApiLocation;},work(){return apiWork;},
       seed(work){saveSession({id:'rep',code:'REP-1',name:'Synthetic',phones:[],status:'active'});apiWork=work;},
       replaceWork(work){apiWork=work;},setNavigation(id){navigationOrderId=id;}};
@@ -74,7 +74,13 @@ function fixture() {
   const changed={...f.order,latitude:30.06};f.api.replaceWork({orders:[changed],returns:[]});
   await f.api.openNavigation(changed);assert.notEqual(f.api.entry(),original);assert.equal(f.api.entry().destination.lat,30.06);
   const entry=f.api.entry();entry.steps=Array.from({length:12},(_,i)=>({instruction:'Step '+i,start:{lat:30+(12-i)/1000,lng:31},end:{lat:30+(12-i)/1000,lng:31}}));
-  f.api.updateRouteProgress(entry,{lat:30,lng:31});assert(entry.stepIndex<=4,'one fix must not scan beyond a fixed five-step window');
+  f.api.updateRouteProgress(entry,{lat:30,lng:31});assert.equal(entry.stepIndex,0,'crossing/later steps must not skip unvisited Google turns');
+  entry.steps=[{instruction:'First',start:{lat:30,lng:31},end:{lat:30.001,lng:31}},
+    {instruction:'Next',start:{lat:30.001,lng:31},end:{lat:30.002,lng:31}}];entry.stepIndex=0;
+  f.api.updateRouteProgress(entry,{lat:30.001,lng:31});assert.equal(entry.stepIndex,1,'reaching a Google turn advances in order');
+  f.advance(1000);const fresh={...f.preview(),lat:30.041};f.window.DART_REP_LAST_LOCATION=fresh;
+  assert.equal(f.api.latestNavigationPosition(f.order).lat,30.041,'route origin uses local GPS ahead of the database acknowledgement');
+  f.advance(121000);assert.equal(f.api.latestNavigationPosition(f.order),null,'stale fixes cannot start navigation');
   const pickup={...f.order,id:'pickup',status:'Pickup On The Way',pickupStartedAt:'yes',requestType:'Return'};
   f.api.replaceWork({orders:[],returns:[pickup]});await f.api.openNavigation(pickup);assert.equal(f.api.entry().orderId,'pickup');
 

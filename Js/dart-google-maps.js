@@ -44,13 +44,16 @@
   function applyCamera(entry, location, heading) {
     clearTimeout(entry.cameraTimer); entry.cameraTimer = null;
     if (!entry.follow || !entry.tilesReady || !mapIsVisible(entry) || entry.state === "error") return;
+    if (entry.tilesPendingSince && Date.now() - entry.tilesPendingSince < 2000) return;
     entry.cameraAt = performance.now(); entry.cameraLocation = location; entry.cameraHeading = heading;
+    entry.tilesPendingSince ??= Date.now();
     entry.cameraUpdates = (entry.cameraUpdates || 0) + 1;
     if (entry.map.getRenderingType?.() === "VECTOR") entry.map.moveCamera({ center: location, heading, tilt: 60 });
     else entry.map.setCenter(location);
   }
   function drawCourier(entry, location, heading, final = false) {
     if (entry.container.dataset.mapState === "error" || !mapIsVisible(entry)) return;
+    heading = window.DartRepCompass?.heading ?? heading;
     entry.drawnLocation = location; entry.drawnHeading = heading;
     // Keep the initial viewport still until streets load. GPS/marker animation must not churn tiles.
     if (entry.follow && entry.tilesReady) {
@@ -59,7 +62,7 @@
         Math.abs(angleDifference(entry.cameraHeading ?? heading, heading)) >= 1;
       entry.pendingCamera = { location, heading };
       if (changed) {
-        const remaining = entry.cameraAt == null ? 0 : 200 - (time - entry.cameraAt);
+        const remaining = entry.cameraAt == null ? 0 : 1000 - (time - entry.cameraAt);
         if (remaining <= 0) applyCamera(entry, location, heading);
         else if (!entry.cameraTimer) entry.cameraTimer = setTimeout(() => {
           entry.cameraTimer = null;
@@ -171,6 +174,8 @@
     clearTimeout(entry.tileTimer);
     clearTimeout(entry.followTimer);
     clearTimeout(entry.cameraTimer); entry.cameraTimer = null;
+    entry.resizeObserver?.disconnect();
+    clearTimeout(entry.resizeTimer);
     window.cancelAnimationFrame(entry.frame);
     entry.frame = null;
     entry.destination?.setMap(null); entry.courier?.setMap(null); entry.route?.setMap(null);
@@ -197,13 +202,15 @@
       visible: mapIsVisible(entry), heading: entry.map?.getHeading?.() ?? null,
       tilt: entry.map?.getTilt?.() ?? null, startupFailure: entry.startupFailure || "",
       libraryLoadMs, firstTilesMs: entry.firstTilesMs ?? null, loadingIssue: entry.loadingIssue || "",
-      cameraUpdates: entry.cameraUpdates || 0,
+      cameraUpdates: entry.cameraUpdates || 0, recoveryUsed: Boolean(entry.recoveryUsed),
+      viewport: { width: Math.round(entry.container.getBoundingClientRect().width), height: Math.round(entry.container.getBoundingClientRect().height) },
     }));
   }
   function createRepresentativeMap(entry, renderer = "VECTOR") {
     const center = (!entry.follow && point(entry.map?.getCenter?.())) || entry.location || entry.target || { lat: 30.0444, lng: 31.2357 };
     disposeRepresentativeMap(entry);
     entry.tilesReady = false; entry.createdAt = Date.now(); entry.firstTilesMs = null; entry.loadingIssue = "";
+    entry.tilesPendingSince = null;
     entry.cameraAt = null; entry.cameraLocation = null;
     const canvas = document.createElement("div");
     canvas.className = "dart-google-map-overlay";
@@ -271,7 +278,7 @@
         if (actual === "VECTOR" || actual === "RASTER") {
           entry.container.dataset.mapRenderer = actual;
           if (renderer === "VECTOR" && actual === "RASTER") {
-            entry.fallbackReason = "google-selected-raster";
+            entry.fallbackReason ||= "google-selected-raster";
             entry.container.dataset.mapFallbackReason = entry.fallbackReason;
           }
           // Google may resolve the rendering type after tilesloaded. Restore the real 60-degree camera then too.
@@ -281,15 +288,16 @@
       map.addListener("renderingtype_changed", readRenderer);
       readRenderer();
       map.addListener("tilesloaded", () => {
-        if (entry.map !== map || mounted.get(entry.id) !== entry || entry.tilesReady) return;
+        if (entry.map !== map || mounted.get(entry.id) !== entry) return;
+        entry.tilesPendingSince = null;
+        if (entry.tilesReady) return;
         entry.tilesReady = true; entry.loadingIssue = "";
         entry.firstTilesMs = Date.now() - entry.createdAt;
         entry.cameraAt = null; entry.cameraLocation = null;
-        clearTimeout(entry.tileTimer);
         window.cancelAnimationFrame(entry.frame); entry.frame = null;
         entry.container.dataset.mapRenderer = map.getRenderingType?.() || renderer;
         if (renderer === "VECTOR" && entry.container.dataset.mapRenderer === "RASTER") {
-          entry.fallbackReason = "google-selected-raster";
+          entry.fallbackReason ||= "google-selected-raster";
           entry.container.dataset.mapFallbackReason = entry.fallbackReason;
         }
         mapState(entry, "ready", "");
@@ -297,24 +305,49 @@
       });
       canvas.addEventListener("webglcontextlost", () => recover("webgl-context-lost"), { once: true, capture: true });
       mapState(entry, "loading", renderer === "RASTER" ? "جارٍ عرض خريطة Google العادية..." : "جارٍ تحميل خريطة الشوارع...");
-      // A delayed all-visible-tiles event is not proof that VECTOR failed. Never recreate on a timer.
+      // Observe the real viewport: a dialog/browser-bar resize can leave only the old tile rectangle painted.
+      if (typeof ResizeObserver === "function") {
+        let size = "";
+        entry.resizeObserver = new ResizeObserver(() => {
+          const rect = entry.container.getBoundingClientRect(), next = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+          if (next === size || !mapIsVisible(entry)) return;
+          size = next; clearTimeout(entry.resizeTimer);
+          entry.resizeTimer = setTimeout(() => {
+            if (mounted.get(entry.id) !== entry || entry.map !== map) return;
+            google.maps.event?.trigger?.(map, "resize");
+            entry.cameraAt = null;
+          }, 100);
+        });
+        entry.resizeObserver.observe(entry.container);
+      }
       entry.visibleSince = mapIsVisible(entry) ? Date.now() : null;
       const checkTiles = () => {
-        if (entry.map !== map || mounted.get(entry.id) !== entry || entry.tilesReady) return;
-        if (!mapIsVisible(entry)) entry.visibleSince = null;
+        if (entry.map !== map || mounted.get(entry.id) !== entry) return;
+        if (!mapIsVisible(entry)) { entry.visibleSince = null; entry.tilesPendingSince = null; }
         else {
           entry.visibleSince ??= Date.now();
-          const elapsed = Date.now() - entry.visibleSince;
-          if (elapsed >= 20000) {
+          const since = entry.tilesReady ? entry.tilesPendingSince : entry.visibleSince;
+          const elapsed = since == null ? 0 : Date.now() - since;
+          if (elapsed >= 12000 && !entry.recoveryUsed && map.getRenderingType?.() === "VECTOR") {
+            // One native renderer switch preserves the Google map, route, markers and controls. No reload loop.
+            entry.recoveryUsed = true; entry.fallbackReason = "vector-load-deadline";
+            entry.container.dataset.mapFallbackReason = entry.fallbackReason;
+            entry.tilesReady = false; entry.tilesPendingSince = null; entry.visibleSince = Date.now();
+            entry.cameraHeading = 0;
+            if (typeof map.setRenderingType === "function") {
+              mapState(entry, "recovering", "جارٍ استعادة خريطة Google بالعرض الخفيف...");
+              entry.container.dataset.mapRenderer = "RASTER";
+              map.setRenderingType("RASTER"); map.setTilt?.(0); map.setHeading?.(0);
+            } else { createRepresentativeMap(entry, "RASTER"); return; }
+          } else if (elapsed >= 20000) {
             entry.loadingIssue = "streets-timeout";
-            mapState(entry, "error", "لم يكتمل تحميل الشوارع. أغلق النافذة وافتحها مجددًا لإعادة المحاولة.");
+            mapState(entry, "error", "تعذر تحميل الشوارع. تحقق من الاتصال واضغط إعادة التحميل.");
             return;
-          }
-          if (elapsed >= 8000) mapState(entry, "slow", "تحميل الشوارع يستغرق وقتًا أطول. ما زالت المحاولة جارية.");
+          } else if (elapsed >= 6000 && !entry.tilesReady) mapState(entry, "slow", "جارٍ تحميل الشوارع؛ ستتم استعادة العرض تلقائيًا إذا تعطل.");
         }
-        entry.tileTimer = setTimeout(checkTiles, 4000);
+        entry.tileTimer = setTimeout(checkTiles, 2000);
       };
-      entry.tileTimer = setTimeout(checkTiles, 4000);
+      entry.tileTimer = setTimeout(checkTiles, 2000);
       setFollow(entry, entry.follow);
     } catch (error) {
       entry.startupFailure = error instanceof Error ? error.name : "Error";
@@ -322,15 +355,17 @@
     }
   }
   function destroyRepresentatives() {
+    window.DartRepCompass?.pause?.();
     mountGeneration += 1;
     for (const entry of mounted.values()) disposeRepresentativeMap(entry);
     mounted.clear();
     pendingPaths.clear();
   }
   function resizeRepresentatives() {
+    window.DartRepCompass?.resume?.();
     for (const entry of mounted.values()) {
       if (entry.map && entry.container.getBoundingClientRect().height > 0) {
-        if (!entry.tilesReady) entry.visibleSince = Date.now();
+        if (!entry.tilesReady && entry.visibleSince == null) entry.visibleSince = Date.now();
         google.maps.event?.trigger?.(entry.map, "resize");
         entry.cameraAt = null; entry.cameraLocation = null;
         if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0);
@@ -339,6 +374,7 @@
     }
   }
   function pauseRepresentatives() {
+    window.DartRepCompass?.pause?.();
     for (const entry of mounted.values()) {
       window.cancelAnimationFrame(entry.frame); clearTimeout(entry.cameraTimer);
       entry.frame = null; entry.cameraTimer = null; entry.visibleSince = null;
@@ -366,6 +402,7 @@
       pendingPaths.delete(id);
       mounted.set(id, entry);
       createRepresentativeMap(entry);
+      window.DartRepCompass?.resume?.();
     }
   }
   function updateRepresentativeLocation(position) {
@@ -398,23 +435,33 @@
     if (document.hidden) pauseRepresentatives();
     else resizeRepresentatives();
   });
-  async function computeRoute(origin, destination) {
+  async function computeRoute(origin, destination, travelMode = "DRIVING") {
     if (!await loadMaps()) throw new Error(errorMessage);
     const { Route } = await google.maps.importLibrary("routes");
-    const result = await Route.computeRoutes({ origin, destination, travelMode: "DRIVING",
+    const mode = travelMode === "WALKING" ? "WALKING" : "DRIVING";
+    const result = await Route.computeRoutes({ origin, destination, travelMode: mode,
+      ...(mode === "DRIVING" ? { routingPreference: "TRAFFIC_AWARE_OPTIMAL" } : {}),
       language: "ar", region: "eg", fields: ["path", "legs", "distanceMeters", "durationMillis", "warnings"],
     });
     const route = result.routes?.[0];
-    if (!route?.path?.length) throw new Error("تعذر العثور على مسار مناسب للسيارة.");
+    if (!route?.path?.length) throw new Error("تعذر العثور على مسار مناسب لوسيلة التنقل المحددة.");
     return { geometry: route.path.map(p => { const c = point(p); return c ? [c.lat, c.lng] : null; }).filter(Boolean),
       steps: (route.legs || []).flatMap(leg => leg.steps || []).map(step => ({
         instruction: String(step.instructions || "استمر للأمام"), maneuver: String(step.maneuver || "STRAIGHT"),
         start: point(step.startLocation), end: point(step.endLocation),
         path: (step.path || []).map(point).filter(Boolean), distanceMeters: step.distanceMeters,
       })), distanceMeters: route.distanceMeters, durationMillis: route.durationMillis,
-      warnings: (route.warnings || []).map(String),
+      warnings: [...(route.warnings || []).map(String), ...(mode === "WALKING"
+        ? ["قد لا تتضمن اتجاهات المشي جميع الأرصفة وممرات المشاة. انتبه للطريق."] : [])],
     };
   }
+  document.addEventListener("dart:rep-compass", event => {
+    if (!Number.isFinite(event.detail?.heading)) return;
+    for (const entry of mounted.values()) {
+      entry.heading = event.detail.heading;
+      if (entry.location) drawCourier(entry, entry.drawnLocation || entry.location, entry.heading);
+    }
+  });
   document.addEventListener("dart:rep-road-route", event => {
     const { orderId, geometry } = event.detail || {};
     if (!Array.isArray(geometry) || geometry.length < 2 || geometry.length > 30000) return;
@@ -424,7 +471,11 @@
     if (entry) { entry.path = path; entry.route?.setPath(path); }
     else { pendingPaths.clear(); pendingPaths.set(String(orderId), path); }
   });
-  window.DartGoogleMaps = Object.freeze({ loadMaps, preloadRepresentativeLibraries, pauseRepresentatives, attachRepresentatives,
+  function clearRepresentativeRoute() {
+    pendingPaths.clear();
+    for (const entry of mounted.values()) { entry.path = []; entry.route?.setPath([]); }
+  }
+  window.DartGoogleMaps = Object.freeze({ clearRepresentativeRoute, loadMaps, preloadRepresentativeLibraries, pauseRepresentatives, attachRepresentatives,
     getRepresentativeDiagnostics, resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
     get errorMessage() { return errorMessage; },
   });

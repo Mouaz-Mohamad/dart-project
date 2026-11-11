@@ -165,7 +165,14 @@
         <span id="repNavigationManeuver" aria-hidden="true">↑</span>
         <p id="repNavigationInstruction" dir="auto"></p>
       </div>
+      <div class="dart-rep-navigation-tools" aria-label="إعدادات الملاحة">
+        <label>طريقة الوصول<select id="repNavigationTravelMode" aria-label="طريقة الوصول"><option value="DRIVING">سيارة</option><option value="WALKING">مشي</option></select></label>
+        <button id="repNavigationCompass" type="button" aria-pressed="false">اتجاه الهاتف</button>
+        <button id="repNavigationRetry" type="button" hidden>إعادة تحميل الخريطة</button>
+      </div>
       <div class="dart-rep-navigation-messages" dir="rtl">
+        <p id="repNavigationSummary" role="status"></p>
+        <p id="repNavigationCompassStatus" role="status"></p>
         <p id="repNavigationStatus" role="status"></p>
         <p id="repNavigationMapStatus" role="status"></p>
         <p id="repNavigationWarnings" dir="auto"></p>
@@ -192,6 +199,7 @@
     <script src="Js/dart-dialog.js"></script>
     <script  src="Js/dart-platform.js" defer></script>
   <script src="Js/dart-google-maps-config.js" defer></script>
+  <script src="Js/dart-rep-compass.js" defer></script>
   <script src="Js/dart-google-maps.js" defer></script>
   <script  src="Js/dart-rep.js" defer></script>
 </body>

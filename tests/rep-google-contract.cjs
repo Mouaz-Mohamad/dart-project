@@ -33,7 +33,7 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
 // Execute the renderer lifecycle with synthetic maps and time; no browser, GPS or Google calls.
 (async () => {
   const vm = require('node:vm');
-  let time = 1800000000000, nextTimer = 0, mapCount = 0, cameraWrites = 0, latestMap, blank = true, chooseRaster = false;
+  let time = 1800000000000, nextTimer = 0, mapCount = 0, cameraWrites = 0, nativeSwitches = 0, latestMap, blank = true, chooseRaster = false;
   const timers = new Map(), callbacks = new Map();
   const later = (fn, ms) => { const id=++nextTimer;timers.set(id,{fn,at:time+ms});return id; };
   function advance(ms) {
@@ -50,11 +50,14 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
     addEventListener(type,fn){callbacks.set(type,fn)},dispatchEvent(event){callbacks.get(event.type)?.(event)}};
   class Clock extends Date { static now(){return time;} }
   const google={maps:{Map:class{
-    constructor(_el,options){mapCount++;latestMap=this;this.options=options;this.heading=options.heading;this.tilt=options.tilt;this.events={};
+    constructor(_el,options){mapCount++;latestMap=this;this.options=options;this.renderer=options.renderingType;this.heading=options.heading;this.tilt=options.tilt;this.events={};
       if(!blank)later(()=>this.events.tilesloaded?.(),0);}
-    addListener(type,fn){this.events[type]=fn;}getRenderingType(){return chooseRaster ? "RASTER" : this.options.renderingType;}
+    addListener(type,fn){this.events[type]=()=>{if(type==='tilesloaded')this.ready=true;fn();};}
+    getRenderingType(){return chooseRaster ? "RASTER" : this.renderer;}
+    setRenderingType(value){nativeSwitches++;this.renderer=value;this.ready=false;this.events.renderingtype_changed?.();}
+    setTilt(value){this.tilt=value;}setHeading(value){this.heading=value;}
     getHeading(){return this.heading;}getTilt(){return this.tilt;}setCenter(){cameraWrites++;}setZoom(){}
-    moveCamera(value){cameraWrites++;this.heading=value.heading;this.tilt=value.tilt;this.events.heading_changed?.();}
+    moveCamera(value){cameraWrites++;this.heading=value.heading;this.tilt=value.tilt;this.events.heading_changed?.();if(this.ready)this.events.tilesloaded?.();}
   },Marker:class{setMap(){}setPosition(){}setIcon(){}},Polyline:class{constructor(options){window.__routePath=options.path;}setMap(){}setPath(){}},Point:class{},
     event:{clearInstanceListeners(map){map.events={};},trigger(){}}}};
   const window={google,DART_GOOGLE_MAPS_BROWSER_KEY:'synthetic',setTimeout:later,clearTimeout:id=>timers.delete(id),
@@ -82,17 +85,21 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
     advance(16);
     window.DartGoogleMaps.updateRepresentativeLocation({lat:30.03+i/100000,lng:31.25,heading:90,speed:2,updatedAt:new Clock(time).toISOString()});
   }
-  advance(200);
+  advance(1200);
   assert(cameraWrites-beforeBurst<=4,'burst GPS must coalesce camera movement instead of moving on every frame');
   assert.equal(window.DartGoogleMaps.getRepresentativeDiagnostics()[0].cameraUpdates,cameraWrites);
   window.DartGoogleMaps.updateRepresentativeLocation({lat:30.04,lng:31.25,heading:349.9,speed:2,updatedAt:new Clock(time).toISOString()});
-  advance(200);
+  advance(1200);
   window.DartGoogleMaps.updateRepresentativeLocation({lat:30.04,lng:31.25,heading:350,speed:2,updatedAt:new Clock(time).toISOString()});
-  advance(200);assert.equal(latestMap.heading,350,'final heading below the coalescing threshold must still reach the camera');
+  advance(1200);assert.equal(latestMap.heading,350,'final heading below the coalescing threshold must still reach the camera');
   document.hidden=true;callbacks.get('visibilitychange')();const beforeHidden=cameraWrites;
   window.DartGoogleMaps.updateRepresentativeLocation({lat:30.04,lng:31.25,heading:80,speed:2,updatedAt:new Clock(time).toISOString()});
   assert.equal(cameraWrites,beforeHidden);document.hidden=false;callbacks.get('visibilitychange')();
   assert.equal(latestMap.heading,80,'returning to a visible tab applies the latest GPS without waiting for movement');
+  await mount();latestMap.events.tilesloaded();latestMap.ready=false;
+  window.DartGoogleMaps.updateRepresentativeLocation({lat:30.041,lng:31.25,heading:90,speed:2,updatedAt:new Clock(time).toISOString()});
+  advance(14000);assert.equal(node.dataset.mapRenderer,'RASTER','streets that stall after first paint also trigger recovery');
+  latestMap.events.tilesloaded();assert.equal(node.dataset.mapState,'ready');
   await mount();dialog.open=false;const hiddenCount=mapCount;advance(90000);
   assert.equal(mapCount,hiddenCount,'closed cached maps must not trigger a raster downgrade');
   dialog.open=true;latestMap.events.tilesloaded();assert.equal(latestMap.tilt,60);
@@ -104,11 +111,12 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   assert.equal(latestMap.heading,90,'explicit recenter resumes directional follow');
   const info=window.DartGoogleMaps.getRepresentativeDiagnostics()[0];
   assert.equal(info.actualRenderer,'VECTOR');assert.equal('orderId' in info,false);assert.equal('location' in info,false);
-  await mount();const timeoutCount=mapCount;advance(30000);
-  assert.equal(node.dataset.mapRenderer,'VECTOR');assert.equal(mapCount,timeoutCount,'timeout never destroys and reloads a healthy vector instance');
-  assert.equal(node.dataset.mapState,'error');
+  await mount();const timeoutCount=mapCount,switches=nativeSwitches;advance(35000);
+  assert.equal(node.dataset.mapRenderer,'RASTER');assert.equal(mapCount,timeoutCount,'native recovery preserves the existing map instance');
+  assert.equal(nativeSwitches,switches+1,'a stalled renderer switches only once');
+  assert.equal(node.dataset.mapState,'error');assert.equal(node.dataset.mapFallbackReason,'vector-load-deadline');
   assert.equal(window.DartGoogleMaps.getRepresentativeDiagnostics()[0].loadingIssue,'streets-timeout');
-  latestMap.events.tilesloaded();assert.equal(node.dataset.mapState,'ready');assert.equal(latestMap.tilt,60);
+  latestMap.events.tilesloaded();assert.equal(node.dataset.mapState,'ready');assert.equal(latestMap.tilt,0);
   assert.equal(mapCount,timeoutCount,'late streets recover the same map after timeout');
   chooseRaster=true;await mount();const selectedCount=mapCount;
   assert.equal(node.dataset.mapRenderer,'RASTER','actual rendering type must be recorded before all streets load');
@@ -123,5 +131,19 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   await window.DartGoogleMaps.attachRepresentatives([{id:'synthetic',latitude:30.05,longitude:31.25}]);
   latestMap.events.tilesloaded();assert.equal(latestMap.tilt,60,'60 degree camera is applied even before the first GPS fix');
   window.DartGoogleMaps.destroyRepresentatives();assert.equal(timers.size,0);
-  console.log('PASS renderer lifecycle: delayed vector readiness, closed-dialog timer pause, manual rotation, 60-degree follow, no timeout downgrade, actual Google raster selection, parallel route retention and location-free diagnostics');
+  const requests=[];
+  google.maps.importLibrary=async()=>({Route:{computeRoutes:async options=>{
+    requests.push(options);return {routes:[{path:[{lat:30,lng:31},{lat:30.01,lng:31.01}],distanceMeters:1500,durationMillis:180000,
+      legs:[{steps:[{instructions:'Google turn',maneuver:'TURN_RIGHT',startLocation:{lat:30,lng:31},endLocation:{lat:30.01,lng:31.01}}]}],warnings:[]}]};
+  }}});
+  const origin={lat:30,lng:31},destination={lat:30.01,lng:31.01};
+  const driving=await window.DartGoogleMaps.computeRoute(origin,destination,'DRIVING');
+  assert.equal(requests[0].routingPreference,'TRAFFIC_AWARE_OPTIMAL');assert.equal(driving.steps[0].instruction,'Google turn');
+  assert.equal(driving.distanceMeters,1500);assert.equal(driving.durationMillis,180000);
+  const walking=await window.DartGoogleMaps.computeRoute(origin,destination,'WALKING');
+  assert.equal(requests[1].travelMode,'WALKING');assert.equal('routingPreference' in requests[1],false);
+  assert(walking.warnings.some(w=>w.includes('المشي')),'Google walking safety warning is displayed');
+  assert.deepEqual(requests[1].origin,origin);assert.deepEqual(requests[1].destination,destination);
+
+  console.log('PASS renderer lifecycle: delayed vector readiness, closed-dialog timer pause, manual rotation, 60-degree follow, bounded native timeout recovery, actual Google raster selection, parallel route retention and location-free diagnostics');
 })().catch(error=>{console.error(error);process.exitCode=1});

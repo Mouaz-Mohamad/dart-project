@@ -131,6 +131,7 @@ jobs:
           node tests/sets-runtime-contract.cjs
           node tests/rep-navigation-session.cjs
           node tests/rep-reliability-runtime.cjs
+          node tests/rep-compass-runtime.cjs
           node tests/test-inventory-contract.cjs
 
   browser-smoke:
@@ -189,6 +190,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -202,4 +205,11 @@ jobs:
           node tests/rep-google-contract.cjs
           node tests/rep-navigation-session.cjs
           node tests/rep-reliability-runtime.cjs
+          node tests/rep-compass-runtime.cjs
           node tests/google-navigation-browser.cjs
+      - name: Verify real Google provider for renderer changes (public landmarks only)
+        shell: bash
+        run: |
+          if git diff --name-only HEAD^ HEAD -- Js/dart-google-maps.js | rg -q .; then
+            node scripts/diagnostics/check-rep-google-provider.cjs
+          fi
