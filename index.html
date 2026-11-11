@@ -134,6 +134,90 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="/CSS/dart-card-visibility.css">
+
+    <!-- BEGIN DART Birthday Welcome Popup: homepage only. -->
+    <style id="dart-birthday-welcome-style">
+      #dart-birthday-welcome-popup {
+        box-sizing: border-box;
+        width: min(410px, calc(100vw - 32px));
+        height: min(530px, calc(100dvh - 32px));
+        max-width: none;
+        max-height: none;
+        margin: auto;
+        padding: 0;
+        position: fixed;
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 22px;
+        overflow: hidden auto;
+        color: #fff;
+        background-color: #29020f;
+        background-image:
+          linear-gradient(180deg, rgba(12,0,3,.46), rgba(12,0,3,.48) 43%, rgba(10,0,4,.8)),
+          url('/Photos/dart-birthday-curtain.webp');
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        box-shadow: 0 24px 78px rgba(0,0,0,.42);
+        text-align: center;
+        direction: rtl;
+      }
+      #dart-birthday-welcome-popup[open] { display: flex; }
+      #dart-birthday-welcome-popup:not([open]) { display: none; }
+      #dart-birthday-welcome-popup::backdrop { background: rgba(0,0,0,.64); }
+      #dart-birthday-welcome-popup,
+      #dart-birthday-welcome-popup * { box-sizing: border-box; font-family: 'Readex Pro', sans-serif; }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-inner {
+        display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center;
+        width: 100%; min-height: 100%; padding: 68px 26px 40px; gap: 15px;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-close {
+        position: absolute; top: 14px; left: 14px; z-index: 1;
+        width: 42px; height: 42px; border-radius: 50%;
+        border: 1px solid rgba(255,255,255,.52);
+        background: rgba(0,0,0,.2); color: #fff; font-size: 25px;
+        line-height: 1; cursor: pointer; display: grid; place-items: center;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-brand {
+        margin: 0; color: #fff; font-size: 13px; font-weight: 600;
+        letter-spacing: .12em; direction: ltr;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-kicker {
+        margin: 0; color: #fff; font-size: 12px; font-weight: 600;
+        letter-spacing: .02em;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-heading {
+        margin: 0; color: #fff; font-size: clamp(23px,5.8vw,30px);
+        font-weight: 700; line-height: 1.65;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-percent {
+        color: #fff; font-size: clamp(64px,15vw,84px);
+        font-weight: 700; line-height: 1.05; direction: ltr;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-copy {
+        margin: 0; color: #fff; font-size: 14px; line-height: 2;
+        max-width: 315px;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-action {
+        width: 100%; min-height: 50px; display: flex; justify-content: center; align-items: center;
+        margin-top: 6px; padding: 11px 14px; border-radius: 11px;
+        border: 1px solid rgba(255,255,255,.65); background: #a20f3d;
+        color: #fff !important; text-decoration: none !important;
+        font-weight: 700; font-size: 14px; line-height: 1.6;
+      }
+      #dart-birthday-welcome-popup .dart-birthday-welcome-footnote {
+        margin: 0; color: #fff; font-size: 11px; line-height: 1.9; opacity: .88;
+      }
+      #dart-birthday-welcome-popup :is(a,button):focus-visible {
+        outline: 3px solid #fff; outline-offset: 3px;
+      }
+      @media (max-height: 550px) {
+        #dart-birthday-welcome-popup .dart-birthday-welcome-inner { gap: 8px; padding: 55px 22px 20px; }
+        #dart-birthday-welcome-popup .dart-birthday-welcome-percent { font-size: 52px; }
+        #dart-birthday-welcome-popup .dart-birthday-welcome-heading { font-size: 21px; }
+      }
+    </style>
+    <!-- END DART Birthday Welcome Popup. -->
+
 </head>
 <body class='dja-flexdir'>
     
@@ -383,5 +467,22 @@
     <script src="Js/dart-set-navigation.js" defer></script>
     <script src="Js/dart-home-sets.js" defer></script>
     <script src="Js/dart-news.js?v=20261008-news-v1" defer></script>
+
+    <!-- BEGIN DART Birthday Welcome Popup: guest-only, once per tab session. -->
+    <dialog id="dart-birthday-welcome-popup" aria-labelledby="dart-birthday-welcome-title" aria-describedby="dart-birthday-welcome-description" aria-modal="true" dir="rtl">
+      <button class="dart-birthday-welcome-close" type="button" data-dart-birthday-welcome-close aria-label="إغلاق النافذة">&times;</button>
+      <div class="dart-birthday-welcome-inner">
+        <p class="dart-birthday-welcome-brand">DART | FOR YOU</p>
+        <p class="dart-birthday-welcome-kicker">هدية عيد ميلادك مستنياك 🎂</p>
+        <h2 class="dart-birthday-welcome-heading" id="dart-birthday-welcome-title">سجّل في Dart...<br>واحتفل بيومك معانا!</h2>
+        <div class="dart-birthday-welcome-percent">15%</div>
+        <p class="dart-birthday-welcome-copy" id="dart-birthday-welcome-description">أنشئ حسابك وسجّل تاريخ ميلادك، واستمتع بخصم 15% على منتجات Dart المؤهلة بمناسبة عيد ميلادك.</p>
+        <a class="dart-birthday-welcome-action" href="/Sign%20Up%20modern.html" data-dart-birthday-welcome-cta>إنشاء حساب أو تسجيل الدخول</a>
+        <p class="dart-birthday-welcome-footnote">هدية مرة واحدة كل سنة • صالحة لمدة 7 أيام</p>
+      </div>
+    </dialog>
+    <script src="Js/dart-birthday-welcome.js" defer></script>
+    <!-- END DART Birthday Welcome Popup. -->
+
 </body>
 </html>
