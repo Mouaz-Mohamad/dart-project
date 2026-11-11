@@ -249,7 +249,13 @@
       recenterButton.addEventListener("click", () => {
         if (mounted.get(entry.id) === entry) setFollow(entry, true);
       });
-      map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(recenterButton);
+      // Some test/fallback map adapters lack Google control buckets.
+      const controlPosition = google.maps.ControlPosition?.RIGHT_BOTTOM;
+      if (controlPosition != null && map.controls?.[controlPosition]?.push) {
+        map.controls[controlPosition].push(recenterButton);
+      } else {
+        canvas.appendChild(recenterButton);
+      }
       map.addListener("heading_changed", () => {
         // User rotation must not be immediately overwritten by the next GPS camera update.
         if (entry.tilesReady && entry.follow && entry.cameraHeading != null &&
