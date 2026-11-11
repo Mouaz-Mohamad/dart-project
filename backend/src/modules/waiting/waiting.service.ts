@@ -1,3 +1,4 @@
+import { upsertCustomerRecord } from "../identity/customer-record.js";
 // DART CODE GUIDE | backend/src/modules/waiting/waiting.service.ts
 // الغرض: منطق Waiting / Restock Reservation الخادمي؛ قاعدة البيانات هي مصدر الحقيقة.
 import { randomUUID } from "node:crypto";
@@ -659,13 +660,7 @@ export class WaitingService {
       }else{
         try{phone=normalizeEgyptianPhone(rawPhone)}
         catch{throw new AppError(422,"INVALID_PHONE","Enter a valid Egyptian WhatsApp phone")}
-        const duplicate=await client.query("SELECT 1 FROM account_phones WHERE account_type='customer' AND phone_normalized=$1 LIMIT 1",[phone]);
-        if(duplicate.rows.length)throw new AppError(409,"CUSTOMER_ALREADY_EXISTS","Phone belongs to a registered customer; select that customer instead");
-        customerId=randomUUID();
-        await client.query("INSERT INTO users(id,account_type,email,email_normalized,password_hash,status) VALUES($1,'customer',NULL,NULL,NULL,'active')",[customerId]);
-        await client.query("INSERT INTO account_phones(user_id,account_type,phone_normalized,phone_display,is_primary) VALUES($1,'customer',$2,$3,true)",[customerId,phone,rawPhone]);
-        await client.query("INSERT INTO customers(user_id,full_name) VALUES($1,$2)",[customerId,name]);
-        await client.query("INSERT INTO user_roles(user_id,role_id) SELECT $1,id FROM roles WHERE name='Customer'",[customerId]);
+        customerId=await upsertCustomerRecord(client,{name,phone1:rawPhone},"admin");
       }
       const inserted=await client.query<{id:string}>(
         `INSERT INTO waitlist_entries(customer_user_id,model_id,size,desired_color,

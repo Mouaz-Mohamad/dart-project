@@ -52,6 +52,19 @@
   }
   function installCustomerDetails(dialog, general, ref, context) {
     const selection = context.selection;
+    const customer = context.customer;
+    if (customer) {
+      const extra = doc.createElement("div"); extra.className = "dart-client-panel-body";
+      const phones = [...new Set(customer.contactPhones || [])];
+      const addresses = customer.addresses || [];
+      extra.innerHTML = `${customer.identityConflict ? '<p role="alert">Identity conflict: review the primary phone and email before merging this customer.</p>' : ''}
+        <h3>Contact numbers</h3><p>${phones.length ? phones.map(esc).join(" · ") : "No additional numbers"}</p>
+        <h3>Address history</h3>${addresses.length ? clientTable(["Address", "Source", "Date"], addresses.map(record => [
+          esc(record.address?.fullAddress || [record.address?.building,record.address?.street,record.address?.area,record.address?.governorate,record.address?.country].filter(Boolean).join(" · ")),
+          esc(String(record.source || "").startsWith("order:") ? "Order" : "Saved address"), esc(clientDate(record.date)),
+        ])) : '<p>No saved addresses</p>'}`;
+      general.append(extra);
+    }
     const epoch = customerEpoch;
     const container = doc.createElement("div"); container.className = "dart-client-panels";
     const first = doc.createElement("details"); first.dataset.clientPanel = "general"; first.open = true;

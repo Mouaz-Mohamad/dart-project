@@ -1,3 +1,4 @@
+import { upsertCustomerRecord, type CustomerRecordInput } from "./customer-record.js";
 import { effectivePermissionsForUser } from "./effective-permissions.js";
 // DART CODE GUIDE | backend/src/modules/identity/identity.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
@@ -96,6 +97,10 @@ export interface IdentityPublicProfile {
   emailVerified: boolean;
   mustChangePassword: boolean;
   birthday: string | null;
+  contactPhones?: string[];
+  governorate?: string;
+  country?: string;
+  addresses?: Record<string, unknown>[];
 }
 
 function mapDatabaseConflict(error: unknown): never {
@@ -201,43 +206,10 @@ export class IdentityService {
     input: RegisterCustomerInput,
     metadata: RequestMetadata,
   ): Promise<IssuedSession> {
-    const email = input.email?.trim() || null;
-    const emailNormalized = email ? normalizeEmail(email) : null;
-    const phones = [input.phone1, input.phone2].filter(
-      (value): value is string => Boolean(value?.trim()),
-    );
-    const normalizedPhones = normalizePhonesOrThrow(phones);
-    if (normalizedPhones.length === 0) {
-      throw new AppError(
-        422,
-        "PHONE_REQUIRED",
-        "At least one valid Egyptian phone number is required",
-      );
-    }
-    const userId = randomUUID();
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      // Identifier-only access is an explicit owner policy for customers only.
-      await client.query(
-        `INSERT INTO users (
-          id, account_type, email, email_normalized, password_hash, status
-        ) VALUES ($1, 'customer', $2, $3, NULL, 'active')`,
-        [userId, email, emailNormalized],
-      );
-      await this.insertPhones(
-        client,
-        userId,
-        "customer",
-        phones,
-        normalizedPhones,
-      );
-      await client.query(
-        `INSERT INTO customers (user_id, full_name, birthday)
-         VALUES ($1, $2, $3::date)`,
-        [userId, input.name.trim(), input.birthday ?? null],
-      );
-      await this.assignRole(client, userId, "Customer");
+      const userId = await upsertCustomerRecord(client, input, "website");
       await this.audit(
         client,
         "customer",
@@ -1683,7 +1655,7 @@ export class IdentityService {
           WHERE u.account_type='customer' AND u.deleted_at IS NULL
             AND (u.email_normalized=$1 OR ($2::text IS NOT NULL AND EXISTS (
               SELECT 1 FROM account_phones ap WHERE ap.user_id=u.id
-                AND ap.account_type='customer' AND ap.phone_normalized=$2
+                AND ap.account_type='customer' AND ap.is_primary AND ap.phone_normalized=$2
             ))) FOR UPDATE OF u`,
         [normalized, phone],
       );
@@ -1935,13 +1907,31 @@ export class IdentityService {
     );
     const row = result.rows[0];
     if (!row) throw new AppError(404, "ACCOUNT_NOT_FOUND", "The account was not found");
+    const details = row.account_type === "customer" ? (await this.pool.query<{
+      contacts: string[]; governorate: string; country: string; addresses: Record<string, unknown>[];
+    }>(`SELECT
+      ARRAY(SELECT p.phone_display FROM customer_contact_phones p WHERE p.customer_user_id=c.user_id
+        AND NOT EXISTS(SELECT 1 FROM account_phones ap WHERE ap.user_id=c.user_id AND ap.phone_normalized=p.phone_normalized)
+        ORDER BY p.recorded_at DESC,p.phone_normalized) AS contacts,
+      COALESCE(NULLIF(d.governorate,''),NULLIF(pref.last_address->>'governorate',''),
+        (SELECT address->>'governorate' FROM customer_address_history h WHERE h.customer_user_id=c.user_id
+         AND NULLIF(address->>'governorate','') IS NOT NULL ORDER BY recorded_at DESC,source_key DESC LIMIT 1),'') AS governorate,
+      COALESCE(d.country,'Egypt') AS country,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object('address',address,'source',source_key,'date',recorded_at)
+        ORDER BY recorded_at DESC,source_key) FROM customer_address_history h WHERE h.customer_user_id=c.user_id),'[]') AS addresses
+      FROM customers c LEFT JOIN customer_profile_details d ON d.customer_user_id=c.user_id
+      LEFT JOIN customer_preferences pref ON pref.customer_user_id=c.user_id WHERE c.user_id=$1`, [row.id])).rows[0] : undefined;
     return {
       id: row.id,
       accountType: row.account_type,
       code: row.code,
       name: row.name,
       email: row.email || "",
-      phones: row.phones ?? [],
+      phones: [...(row.phones ?? []), ...(details?.contacts || [])],
+      contactPhones: details?.contacts || [],
+      governorate: details?.governorate || "",
+      country: details?.country || "Egypt",
+      addresses: details?.addresses || [],
       status: row.status,
       emailVerified: Boolean(row.email_verified_at),
       mustChangePassword: row.account_type === "customer" ? false : row.must_change_password,
@@ -1957,35 +1947,10 @@ export class IdentityService {
     if (account.accountType !== "customer") {
       throw new AppError(403, "FORBIDDEN", "Only customer profiles can be changed through this endpoint");
     }
-    const email = input.email?.trim() || null;
-    const emailNormalized = email ? normalizeEmail(email) : null;
-    const displayPhones = [input.phone1, input.phone2].filter(
-      (value): value is string => Boolean(value?.trim()),
-    );
-    const normalizedPhones = normalizePhonesOrThrow(displayPhones);
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const locked = await client.query<{ email_normalized: string; email: string }>(
-        "SELECT email_normalized, email FROM users WHERE id = $1 AND deleted_at IS NULL AND status='active' FOR UPDATE",
-        [account.userId],
-      );
-      const current = locked.rows[0];
-      if (!current) throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
-      const emailChanged = current.email_normalized !== emailNormalized;
-      await client.query(
-        `UPDATE customers SET full_name = $2, birthday = $3::date, updated_at = now()
-         WHERE user_id = $1`,
-        [account.userId, input.name.trim(), input.birthday ?? null],
-      );
-      await client.query("DELETE FROM account_phones WHERE user_id = $1", [account.userId]);
-      await this.insertPhones(client, account.userId, "customer", displayPhones, normalizedPhones);
-      await client.query(
-        `UPDATE users SET email=$2,email_normalized=$3,
-          email_verified_at=CASE WHEN $4 THEN NULL ELSE email_verified_at END,
-          updated_at=now(),version=version+1 WHERE id=$1`,
-        [account.userId, email, emailNormalized, emailChanged],
-      );
+      await upsertCustomerRecord(client, input, "profile", account.userId);
       await this.audit(client, "customer", account.userId, "CUSTOMER_PROFILE_UPDATED", "customers", account.userId, metadata);
       await client.query("COMMIT");
     } catch (error) {
@@ -2166,6 +2131,21 @@ export class IdentityService {
     }
   }
 
+  public async adminCreateCustomer(account: AuthenticatedAccount, input: CustomerRecordInput, metadata: RequestMetadata) {
+    if (account.accountType !== "staff" || !account.permissions.includes("customers.manage") || !account.mfaSatisfied) {
+      throw new AppError(403, "FORBIDDEN", "You do not have permission to manage customers");
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const id = await upsertCustomerRecord(client, input, "admin");
+      await this.audit(client, "staff", account.userId, "CUSTOMER_ADMIN_UPSERTED", "customers", id, metadata);
+      await client.query("COMMIT");
+      return { id };
+    } catch (error) { await client.query("ROLLBACK"); mapDatabaseConflict(error); }
+    finally { client.release(); }
+  }
+
   public async adminUpdateCustomer(
     account: AuthenticatedAccount,
     customerUserId: string,
@@ -2175,6 +2155,8 @@ export class IdentityService {
       phone1: string;
       phone2?: string | undefined;
       birthday?: string | null | undefined;
+      country?: string | undefined;
+      governorate?: string | undefined;
       dartCardDrawEligible?: boolean | undefined;
     },
     metadata: RequestMetadata,
@@ -2187,84 +2169,23 @@ export class IdentityService {
       throw new AppError(403, "FORBIDDEN", "You do not have permission to manage customers");
     }
 
-    const email = input.email?.trim() || null;
-    const emailNormalized = email ? normalizeEmail(email) : null;
-    const displayPhones = [input.phone1, input.phone2].filter(
-      (value): value is string => Boolean(value?.trim()),
-    );
-    const normalizedPhones = normalizePhonesOrThrow(displayPhones);
-
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const locked = await client.query<{
-        email: string;
-        email_normalized: string;
-      }>(
-        `SELECT email, email_normalized
-           FROM users
-          WHERE id=$1 AND account_type='customer' AND deleted_at IS NULL
-          FOR UPDATE`,
-        [customerUserId],
+      const before = await client.query<{ email: string | null; phone: string | null }>(
+        `SELECT u.email,(SELECT phone_normalized FROM account_phones WHERE user_id=u.id AND is_primary) AS phone
+         FROM users u WHERE u.id=$1 AND u.account_type='customer' AND u.deleted_at IS NULL`, [customerUserId],
       );
-      const current = locked.rows[0];
-      if (!current) {
-        throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
-      }
-
-      const contactsChanged =
-        current.email_normalized !== emailNormalized ||
-        (
-          await client.query<{ values: string[] }>(
-            `SELECT COALESCE(
-               array_agg(phone_normalized ORDER BY is_primary DESC, created_at),
-               ARRAY[]::text[]
-             ) AS values
-               FROM account_phones
-              WHERE user_id=$1 AND account_type='customer'`,
-            [customerUserId],
-          )
-        ).rows[0]!.values.join("|") !== normalizedPhones.join("|");
-
-      await client.query(
-        `UPDATE customers
-            SET full_name=$2,
-                birthday=$3::date,
-                dart_card_draw_eligible=COALESCE($4, dart_card_draw_eligible),
-                updated_at=now()
-          WHERE user_id=$1`,
-        [
-          customerUserId,
-          input.name.trim(),
-          input.birthday || null,
-          input.dartCardDrawEligible ?? null,
-        ],
+      if (!before.rows[0]) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found");
+      await upsertCustomerRecord(client, input, "admin", customerUserId);
+      const after = await client.query<{ email: string | null; phone: string | null }>(
+        `SELECT u.email,(SELECT phone_normalized FROM account_phones WHERE user_id=u.id AND is_primary) AS phone
+         FROM users u WHERE u.id=$1`, [customerUserId],
       );
-
-      await client.query(
-        `UPDATE users
-            SET email=$2,
-                email_normalized=$3,
-                email_verified_at=CASE WHEN email_normalized IS NOT DISTINCT FROM $3 THEN email_verified_at ELSE NULL END,
-                session_version=session_version + CASE WHEN $4 THEN 1 ELSE 0 END,
-                version=version+1,
-                updated_at=now()
-          WHERE id=$1`,
-        [customerUserId, email, emailNormalized, contactsChanged],
+      const contactsChanged = before.rows[0].email !== after.rows[0]?.email || before.rows[0].phone !== after.rows[0]?.phone;
+      if (input.dartCardDrawEligible !== undefined) await client.query(
+        "UPDATE customers SET dart_card_draw_eligible=$2 WHERE user_id=$1", [customerUserId, input.dartCardDrawEligible],
       );
-
-      await client.query(
-        "DELETE FROM account_phones WHERE user_id=$1 AND account_type='customer'",
-        [customerUserId],
-      );
-      await this.insertPhones(
-        client,
-        customerUserId,
-        "customer",
-        displayPhones,
-        normalizedPhones,
-      );
-
       if (contactsChanged) {
         await client.query(
           `UPDATE sessions

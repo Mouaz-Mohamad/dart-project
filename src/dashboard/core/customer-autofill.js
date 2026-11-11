@@ -6,7 +6,7 @@ function autofillCustomerByPhone(phoneInput, fieldsMap) {
     if (phoneVal.length < 10) return;
 
     const customer = customersData.find(
-      (c) => c.phone1 === phoneVal || c.phone2 === phoneVal,
+      (c) => dartNormalizeCustomerPhone(c.phone1) === dartNormalizeCustomerPhone(phoneVal),
     );
     if (customer) {
       if (fieldsMap.name && document.getElementById(fieldsMap.name))

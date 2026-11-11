@@ -8,7 +8,7 @@ function dartNormalizeCustomerEmail(value) {
 }
 
 function dartNormalizeCustomerPhone(value) {
-  const digits = String(value || "").replace(/\D/g, "");
+  const digits = String(value || "").replace(/[٠-٩۰-۹]/g, char => String(char.charCodeAt(0) - (char >= "۰" ? 1776 : 1632))).replace(/\D/g, "").replace(/^0020/, "20");
   if (digits.startsWith("20") && digits.length === 12) return `+${digits}`;
   if (digits.startsWith("01") && digits.length === 11) return `+2${digits}`;
   return digits ? `+${digits}` : "";
@@ -16,7 +16,7 @@ function dartNormalizeCustomerPhone(value) {
 
 function dartCustomerConflict(payload, editId = "") {
   const wantedEmail = dartNormalizeCustomerEmail(payload?.email);
-  const wantedPhones = [payload?.phone1, payload?.phone2]
+  const wantedPhones = [payload?.phone1]
     .map(dartNormalizeCustomerPhone)
     .filter(Boolean);
 
@@ -25,7 +25,7 @@ function dartCustomerConflict(payload, editId = "") {
     const sameEmail =
       wantedEmail &&
       dartNormalizeCustomerEmail(customer.email) === wantedEmail;
-    const currentPhones = [customer.phone1, customer.phone2]
+    const currentPhones = [customer.phone1]
       .map(dartNormalizeCustomerPhone)
       .filter(Boolean);
     return sameEmail || wantedPhones.some((phone) => currentPhones.includes(phone));
@@ -60,7 +60,7 @@ function setupCustomerModal() {
         governorate: document.getElementById("custGovernorate").value || "",
       };
 
-    if (dartCustomerConflict(p, id)) {
+    if (id && dartCustomerConflict(p, id)) {
       window.DartDialog.alert("Email or phone is already registered.");
       return;
     }
@@ -86,6 +86,8 @@ function setupCustomerModal() {
                 phone1: p.phone1,
                 ...(p.phone2 && p.phone2 !== "-" ? { phone2: p.phone2 } : {}),
                 birthday: p.birthday && p.birthday !== "-" ? p.birthday : null,
+                country: p.country,
+                governorate: p.governorate,
                 dartCardDrawEligible: x.dartCardDrawEligible !== false,
               },
             },
@@ -105,7 +107,9 @@ function setupCustomerModal() {
           try {
             await window.DartDomainState.syncDomain("customers");
           } catch (error) {
-            console.warn("Customer CRM state sync failed", error);
+            Object.assign(x, oldValues);
+            window.DartDialog.alert(error.message || "Customer update failed. Review the primary phone and email.");
+            return;
           }
         }
         if (x.serverAuthoritative && window.DartDomainState.hydrateDomain) {
@@ -115,24 +119,25 @@ function setupCustomerModal() {
         dartSaveAll();
       }
     } else {
-      const x = {
-        id: dartUid("CDB"),
-        clientId: dartNextBusinessCode("DA", customersData, "clientId"),
-        dartCard: "no",
-        serverAuthoritative: false,
-        isArchived: false,
-        isDeleted: false,
-        isChecked: false,
-        registeredAt: dartNowISO(),
-        ...p,
-      };
-      customersData.push(x);
-      dartAudit("CREATE", "customers", x.id, {}, x);
-      if (window.DartDomainState?.write) {
-        window.DartDomainState.write("dart_customers", customersData);
-      } else {
-        dartSaveAll();
-      }
+      const submit = form.querySelector('[type="submit"]');
+      if (form.dataset.saving) return;
+      form.dataset.saving = "1";
+      if (submit) submit.disabled = true;
+      try {
+        await window.DartAdminApi.request("/api/v1/admin/customers", { method: "POST", body: {
+          name: p.clientName, phone1: p.phone1,
+          ...(p.phone2 && p.phone2 !== "-" ? { phone2: p.phone2 } : {}),
+          ...(p.email ? { email: p.email } : {}),
+          ...(p.birthday && p.birthday !== "-" ? { birthday: p.birthday } : {}),
+          country: p.country, governorate: p.governorate,
+        } });
+        await window.DartDomainState.hydrateDomain("customers", true);
+        loadAllDataFromStorage(false);
+      } catch (error) {
+        window.DartDialog.alert(error.message || "Customer save failed. Check the details and retry.");
+        return;
+      } finally { delete form.dataset.saving; if (submit) submit.disabled = false; }
+
     }
 
     dartRefreshAll();

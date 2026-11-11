@@ -119,6 +119,11 @@ export class PlatformAdminService {
       await remove("webPushSubscriptions", "DELETE FROM web_push_subscriptions");
       await remove("customerPasswordResets", `DELETE FROM password_reset_requests
         WHERE account_type='customer'`);
+      await remove("customerProfileDetails", "DELETE FROM customer_profile_details");
+      await remove("customerContactPhones", "DELETE FROM customer_contact_phones");
+      await remove("customerIdentityAliases", "DELETE FROM customer_identity_aliases");
+      await remove("customerAddressHistory", "DELETE FROM customer_address_history");
+      await remove("customerIdentityConflicts", "DELETE FROM customer_identity_conflicts");
       await remove("customers", "DELETE FROM customers");
       await remove("customerUsers", "DELETE FROM users WHERE account_type='customer'");
 

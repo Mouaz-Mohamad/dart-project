@@ -100,9 +100,9 @@ describe("customer identifier access", () => {
     expect(cleared.profile.email).toBe("");
     await expect(service.loginCustomer(email,metadata)).rejects.toMatchObject({ code:"INVALID_CREDENTIALS" });
   });
-  it("retains unique phone ownership and rejects customer password recovery", async () => {
+  it("reuses the existing phone identity and rejects customer password recovery", async () => {
     const f = await customer();
-    await expect(service.registerCustomer({name:"Duplicate Test",phone1:f.phone1,birthday:"2000-01-01"},metadata)).rejects.toMatchObject({code:"IDENTITY_ALREADY_EXISTS"});
+    expect((await service.registerCustomer({name:"Duplicate Test",phone1:f.phone1,birthday:"2000-01-01"},metadata)).account.userId).toBe(f.session.account.userId);
     await expect(service.requestPasswordReset("customer",f.phone1,metadata)).rejects.toMatchObject({code:"CUSTOMER_PASSWORD_RETIRED"});
     expect(Number((await store.pool.query("SELECT count(*) FROM password_reset_requests WHERE user_id=$1",[f.session.account.userId])).rows[0].count)).toBe(0);
   });

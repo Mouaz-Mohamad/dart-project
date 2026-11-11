@@ -152,17 +152,10 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     expect(otp).toMatch(/^\d{6}$/);
   });
 
-  it("rejects duplicate customer identities but permits the same contact in another realm", async () => {
-    await expect(
-      service!.registerCustomer(
-        {
-          name: "Duplicate Customer",
-          email: "mouaz@example.com",
-          phone1: "01099999999",
-        },
-        requestMetadata,
-      ),
-    ).rejects.toMatchObject({ code: "IDENTITY_ALREADY_EXISTS" });
+  it("reuses duplicate customer identities but permits the same contact in another realm", async () => {
+    const before = (await testPool!.query("SELECT id FROM users WHERE account_type='customer' AND email_normalized='mouaz@example.com'")).rows[0].id;
+    const reused = await service!.registerCustomer({name:"Duplicate Customer", email:"mouaz@example.com", phone1:"01099999999"},requestMetadata);
+    expect(reused.account.userId).toBe(before);
 
     const representative = await service!.registerRepresentative(
       {

@@ -11,6 +11,10 @@
       emailVerified: profile.emailVerified,
       mustChangePassword: profile.mustChangePassword,
       birthday: profile.birthday || "",
+      governorate: profile.governorate || "",
+      country: profile.country || "Egypt",
+      contactPhones: profile.contactPhones || [],
+      addresses: profile.addresses || [],
       status: profile.status,
       isArchived: false,
       serverAuthoritative: true,
@@ -276,7 +280,6 @@
     const normalized = [
       normalizeEmail(email),
       normalizePhone(phone1),
-      normalizePhone(phone2),
     ].filter(Boolean);
     if (new Set(normalized).size !== normalized.length)
       return "لا يمكن استخدام الرقم نفسه في خانتي الهاتف.";
@@ -293,7 +296,6 @@
       const identities = [
         normalizeEmail(user.email),
         normalizePhone(user.phone1),
-        normalizePhone(user.phone2),
       ].filter(Boolean);
       if (normalized.some((value) => identities.includes(value)))
         return "البريد الإلكتروني أو رقم الهاتف مستخدم في حساب آخر.";
@@ -302,7 +304,6 @@
       const identities = [
         normalizeEmail(customer.email),
         normalizePhone(customer.phone1),
-        normalizePhone(customer.phone2),
       ].filter(Boolean);
       if (normalized.some((value) => identities.includes(value)))
         return "البريد الإلكتروني أو رقم الهاتف مسجل بالفعل لعميل آخر.";

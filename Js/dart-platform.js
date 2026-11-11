@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:8e399644bc76b9a70581609ad30f7192face2e547985b78327b08be48c0864f6 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:544c7acf4991fd710a524fed2ab52da69dd3526a87cb89f718945e1adec18cfd */
 (function () {
   "use strict";
 
@@ -778,6 +778,10 @@
       emailVerified: profile.emailVerified,
       mustChangePassword: profile.mustChangePassword,
       birthday: profile.birthday || "",
+      governorate: profile.governorate || "",
+      country: profile.country || "Egypt",
+      contactPhones: profile.contactPhones || [],
+      addresses: profile.addresses || [],
       status: profile.status,
       isArchived: false,
       serverAuthoritative: true,
@@ -1043,7 +1047,6 @@
     const normalized = [
       normalizeEmail(email),
       normalizePhone(phone1),
-      normalizePhone(phone2),
     ].filter(Boolean);
     if (new Set(normalized).size !== normalized.length)
       return "لا يمكن استخدام الرقم نفسه في خانتي الهاتف.";
@@ -1060,7 +1063,6 @@
       const identities = [
         normalizeEmail(user.email),
         normalizePhone(user.phone1),
-        normalizePhone(user.phone2),
       ].filter(Boolean);
       if (normalized.some((value) => identities.includes(value)))
         return "البريد الإلكتروني أو رقم الهاتف مستخدم في حساب آخر.";
@@ -1069,7 +1071,6 @@
       const identities = [
         normalizeEmail(customer.email),
         normalizePhone(customer.phone1),
-        normalizePhone(customer.phone2),
       ].filter(Boolean);
       if (normalized.some((value) => identities.includes(value)))
         return "البريد الإلكتروني أو رقم الهاتف مسجل بالفعل لعميل آخر.";
@@ -1686,6 +1687,7 @@
         })),
         Promise.resolve().then(() => window.DartCatalog?.checkForServerChanges?.()),
         Promise.resolve().then(hydrateCustomerCommerce),
+        Promise.resolve().then(() => typeof hydrateApiSession === "function" ? hydrateApiSession() : undefined),
       ]);
       return response.order;
     }
@@ -3626,6 +3628,7 @@
       "#user-numder-1": displayPhone(user.phone1),
       "#user-numder-2": user.phone2 ? displayPhone(user.phone2) : "-",
       "#user-birthday": user.birthday || "-",
+      "#user-governorate": user.governorate || "-",
     };
     Object.entries(fields).forEach(([s, v]) => set(s, v));
     set(".dart-card-acount .name", user.name);

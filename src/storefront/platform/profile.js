@@ -87,6 +87,7 @@
       "#user-numder-1": displayPhone(user.phone1),
       "#user-numder-2": user.phone2 ? displayPhone(user.phone2) : "-",
       "#user-birthday": user.birthday || "-",
+      "#user-governorate": user.governorate || "-",
     };
     Object.entries(fields).forEach(([s, v]) => set(s, v));
     set(".dart-card-acount .name", user.name);

@@ -442,6 +442,15 @@ export function createIdentityRouter(
     },
   );
 
+  router.post("/admin/customers", signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requirePermission("customers.manage"), async (request, response) => {
+      const body = z.object({ name: z.string().trim().min(3).max(120), email: optionalCustomerEmail,
+        phone1: egyptianPhone, phone2: optionalEgyptianPhone, birthday: z.iso.date().optional(),
+        country: z.string().trim().max(100).optional(), governorate: z.string().trim().max(100).optional(),
+      }).parse(request.body);
+      response.status(200).json(await service.adminCreateCustomer(request.auth!, body, metadata(request)));
+    });
+
   router.patch(
     "/admin/customers/:id",
     signedIn,
@@ -456,6 +465,8 @@ export function createIdentityRouter(
         phone1: egyptianPhone,
         phone2: egyptianPhone.optional(),
         birthday: z.union([z.iso.date(), z.null()]).optional(),
+        country: z.string().trim().max(100).optional(),
+        governorate: z.string().trim().max(100).optional(),
         dartCardDrawEligible: z.boolean().optional(),
       }).parse(request.body);
       await service.adminUpdateCustomer(

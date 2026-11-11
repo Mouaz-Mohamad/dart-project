@@ -129,6 +129,23 @@ function app(service: IdentityService, outboxService?: OutboxService) {
 }
 
 describe("identity HTTP boundaries", () => {
+  it("requires Staff, customers.manage, MFA and CSRF for unified customer creation", async () => {
+    const body = { name:"Test Customer",phone1:"01012345678",birthday:"2000-01-01" };
+    for (const auth of [account(), account({accountType:"staff",permissions:[]}),
+      account({accountType:"staff",permissions:["customers.manage"],mfaRequired:true,mfaSatisfied:false})]) {
+      const service=fakeService(auth), create=vi.fn(); Object.assign(service,{adminCreateCustomer:create});
+      const response=await request(app(service)).post("/api/v1/admin/customers")
+        .set("Cookie",`dart_session_staff=${sessionId}.${secret}`).set("X-CSRF-Token",csrf).send(body);
+      expect(response.status).toBe(403); expect(create).not.toHaveBeenCalled();
+    }
+    const auth=account({accountType:"staff",permissions:["customers.manage"],mfaRequired:true,mfaSatisfied:true});
+    const service=fakeService(auth), create=vi.fn().mockResolvedValue({id:auth.userId}); Object.assign(service,{adminCreateCustomer:create});
+    const missingCsrf=await request(app(service)).post("/api/v1/admin/customers").set("Cookie",`dart_session_staff=${sessionId}.${secret}`).send(body);
+    expect(missingCsrf.status).toBe(403); expect(create).not.toHaveBeenCalled();
+    const allowed=await request(app(service)).post("/api/v1/admin/customers").set("Cookie",`dart_session_staff=${sessionId}.${secret}`).set("X-CSRF-Token",csrf).send(body);
+    expect(allowed.status).toBe(200); expect(create).toHaveBeenCalledWith(auth,body,expect.any(Object));
+  });
+
   it("queues an email OTP password reset without revealing whether the account exists", async () => {
     const service = fakeService();
     const outbox = {

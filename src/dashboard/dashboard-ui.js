@@ -233,7 +233,7 @@
     if (state.customerStarted || state.customerLoading) return;
     if (root.DartCustomerDetails) {
       state.customerStarted = true;
-      root.DartCustomerDetails.install(state.dialog, state.grid, state.key, { selection: () => openRecord?.key === state.key ? openRecord : null });
+      root.DartCustomerDetails.install(state.dialog, state.grid, state.key, { selection: () => openRecord?.key === state.key ? openRecord : null, customer: root.DartDomainState?.read?.("dart_customers")?.find(row => String(row.id) === String(state.key)) });
     } else {
       state.customerLoading = true;
       const script = doc.createElement("script"); script.src = "dart-customer-details.js?v=20261031";

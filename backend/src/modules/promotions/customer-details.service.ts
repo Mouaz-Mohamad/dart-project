@@ -10,7 +10,7 @@ export type CustomerDetailSection = keyof typeof CUSTOMER_DETAIL_PERMISSIONS;
 export async function customerDetails(pool: Pool, ref: string, section: CustomerDetailSection, offset: number,
   actorId: string, permissions: string[]) {
   const customer = (await pool.query<{ user_id: string; client_code: string; birthday: string | null }>(
-    "SELECT user_id::text,client_code,birthday::text FROM customers WHERE user_id::text=$1 OR client_code=$1", [ref])).rows[0];
+    "SELECT user_id::text,client_code,birthday::text FROM customers WHERE user_id::text=$1 OR client_code=$1 OR user_id IN (SELECT customer_user_id FROM customer_identity_aliases WHERE alias=$1)", [ref])).rows[0];
   if (!customer) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found");
   const limit = 50;
   let rows: Record<string, unknown>[] = [];

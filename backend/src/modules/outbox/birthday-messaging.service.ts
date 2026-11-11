@@ -78,6 +78,7 @@ export class BirthdayMessagingService {
             AND substring(p.data->>'birthday' FROM 6 FOR 5)=to_char(t.date,'MM-DD')
             AND COALESCE(p.data->>'isDeleted','false')<>'true'
             AND COALESCE(p.data->>'isArchived','false')<>'true'
+                AND NOT EXISTS(SELECT 1 FROM customers c WHERE c.user_id::text=p.data->>'id' OR c.client_code=p.data->>'clientId')
           ORDER BY ref LIMIT 200`);
         if (!result.rows.length) return { queued: 0 };
         try {
@@ -114,7 +115,7 @@ export class BirthdayMessagingService {
               SELECT c.user_id::text,c.client_code,c.full_name,ph.phone_normalized
               FROM customers c JOIN users u ON u.id=c.user_id
               JOIN account_phones ph ON ph.user_id=c.user_id AND ph.is_primary AND ph.account_type='customer'
-              WHERE (c.user_id::text=ANY($1::text[]) OR c.client_code=ANY($1::text[]))
+              WHERE (c.user_id::text=ANY($1::text[]) OR c.client_code=ANY($1::text[]) OR EXISTS(SELECT 1 FROM customer_identity_aliases a WHERE a.customer_user_id=c.user_id AND a.alias=ANY($1::text[])))
                 AND u.status='active' AND u.deleted_at IS NULL
                 AND to_char(c.birthday,'MM-DD')=to_char($2::date,'MM-DD')
               ORDER BY c.user_id FOR SHARE OF c,u,ph`, [customerRefs,birthdayDate]);
@@ -131,7 +132,8 @@ export class BirthdayMessagingService {
                 AND p.data->>'birthday' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
                 AND substring(p.data->>'birthday' FROM 6 FOR 5)=to_char($2::date,'MM-DD')
                 AND COALESCE(p.data->>'isDeleted','false')<>'true'
-                AND COALESCE(p.data->>'isArchived','false')<>'true'`,
+                AND COALESCE(p.data->>'isArchived','false')<>'true'
+                AND NOT EXISTS(SELECT 1 FROM customers c WHERE c.user_id::text=p.data->>'id' OR c.client_code=p.data->>'clientId')`,
               [customerRefs,birthdayDate]);
             // Prefer registered account data when a phone appears in both projections.
             const recipients = [...accounts.rows,...manual.rows];

@@ -57,7 +57,7 @@ async function main() {
     if (url.includes("/cart/quote")) {
       assert.match(url, /promotionCode=MOUAS100/, "the coupon must be sent to server pricing");
       confirmedCodeQuote = true;
-      return { lines: [{ modelId: "M1", baseMinor: 85000, finalMinor: 75000, discountSource: "Discount Code" }],
+      return { lines: [{ modelId: "M1", color: "Raw navy blue", size: "32", baseMinor: 85000, finalMinor: 75000, discountSource: "Discount Code" }],
         fingerprint: "d".repeat(64), subtotalMinor: 85000, discountMinor: 10000, totalMinor: 75000 };
     }
     assert.equal(options.body.promotionCode, "MOUAS100", "the submitted order must preserve its coupon");

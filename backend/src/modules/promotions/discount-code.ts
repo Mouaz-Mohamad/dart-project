@@ -102,7 +102,7 @@ export class DiscountCodeService {
   private async resolveCustomerRef(client: PoolClient, ref: string | null): Promise<string | null> {
     if (!ref) return null;
     const customer = await client.query<{ user_id: string }>(
-      "SELECT user_id::text FROM customers WHERE client_code=$1 OR user_id::text=$1 LIMIT 1", [ref]);
+      "SELECT user_id::text FROM customers WHERE client_code=$1 OR user_id::text=$1 OR user_id IN (SELECT customer_user_id FROM customer_identity_aliases WHERE alias=$1) LIMIT 1", [ref]);
     if (!customer.rows[0]) throw new AppError(422,"DISCOUNT_CUSTOMER_NOT_FOUND","Selected customer does not exist");
     return customer.rows[0].user_id;
   }

@@ -69,7 +69,7 @@ export async function saveManualDiscount(pool: Pool, clientRef: string, actor: s
     await db.query("BEGIN");
     await requireManualDiscountOwner(db, actor);
     const customer = (await db.query<{ user_id: string }>(
-      "SELECT user_id::text FROM customers WHERE client_code=$1 OR user_id::text=$1", [clientRef])).rows[0];
+      "SELECT user_id::text FROM customers WHERE client_code=$1 OR user_id::text=$1 OR user_id IN (SELECT customer_user_id FROM customer_identity_aliases WHERE alias=$1)", [clientRef])).rows[0];
     if (!customer) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found");
     await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customer.user_id}`]);
     const previous = (await db.query<Record<string, unknown>>("SELECT * FROM customer_manual_discounts WHERE id=$1 FOR UPDATE", [id])).rows[0];

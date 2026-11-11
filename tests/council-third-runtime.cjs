@@ -7,14 +7,14 @@ function money() {
   for (const [value, expected] of [[120.75, "120.75"], [0.05, "0.05"], [100, "100"], [-5.25, "-5.25"], [NaN, "0"]]) assert.equal(state.formatMoney(value), expected);
   for (const file of ["Js/dart-rep.js", "Js/dart-tracking.js"]) {
     const line = read(file).split("\n").find((line) => line.includes("const money ="));
-    const ctx = { window: { DartState: state } };
+    const ctx = { window: { DartState: state }, englishDigits: String };
     vm.runInNewContext(line + "\nthis.money=money;", ctx);
-    assert.equal(ctx.money(120.75), "120.75 EGP", file);
+    assert.equal(ctx.money(120.75), file.includes("dart-rep") ? "120.75 ج.م" : "120.75 EGP", file);
   }
   const rep = read("Js/dart-rep.js"), start = rep.indexOf("  const orderTotal ="), end = rep.indexOf("\n\n", start);
-  const ctx = { window: { DartState: state }, order: { finalAmount: 120.75 } };
+  const ctx = { window: { DartState: state }, englishDigits: String, order: { finalAmount: 120.75 } };
   vm.runInNewContext(rep.split("\n").find((line) => line.includes("const money =")) + rep.slice(start, end) + "\nthis.collect=money(orderTotal(order));", ctx);
-  assert.equal(ctx.collect, "120.75 EGP");
+  assert.equal(ctx.collect, "120.75 ج.م");
   return state;
 }
 async function ownStock(state) {
@@ -78,7 +78,7 @@ async function recovery() {
 async function promotion() {
   let handler; const requests = [], input = { value: "OLDCODE", disabled: false, closest: () => null }, button = { addEventListener(_type, fn) { handler = fn; } };
   const lines = [{ id: "M1", quantity: 1 }];
-  const context = { cartData: lines, appliedDiscountRate: 0, renderCart() {}, showToast() {},
+  const context = { cartData: lines, appliedDiscountRate: 0, resolveAutomaticCampaign: async () => null, renderCart() {}, showToast() {},
     window: { dartAppliedPromotion: { type: "Promotion", code: "OLDCODE", discountPercent: 10, automatic: false },
       DartState: { read: () => lines }, DartCatalog: { model: () => ({ discount: 0 }) },
       DartPlatform: { currentUser: () => ({ id: "U1" }), cleanupCartReservations() {}, cartReservationId: "CART-OWN",

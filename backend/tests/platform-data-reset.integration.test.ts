@@ -32,7 +32,8 @@ describe("owner selective reset — executable SQL", () => {
         "INSERT INTO finance_records(domain,record_id,payload) VALUES ('finance_expenses','test-expense','{}'::jsonb), ('finance_budgets','test-budget','{}'::jsonb)",
       );
       await pool.query(
-        "INSERT INTO dashboard_domain_state (domain,data) VALUES ('customers','[{\"id\":\"old\"}]'::jsonb), ('representatives','[{\"id\":\"kept\"}]'::jsonb) ON CONFLICT(domain) DO UPDATE SET data=excluded.data",
+        "INSERT INTO dashboard_domain_state (domain,data) VALUES ('customers',jsonb_build_array(jsonb_build_object('id',$1::text))), ('representatives','[{\"id\":\"kept\"}]'::jsonb) ON CONFLICT(domain) DO UPDATE SET data=excluded.data",
+        [customerId],
       );
       await pool.query(
         "INSERT INTO site_settings (id,data) VALUES ('main','{\"hero\":\"keep\",\"waiting\":{\"hours\":4},\"modelCards\":[\"old\"]}'::jsonb) ON CONFLICT(id) DO UPDATE SET data=excluded.data",

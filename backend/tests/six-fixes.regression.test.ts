@@ -100,6 +100,7 @@ async function messageDatabase() {
     databases.push(db);
     await db.exec(`CREATE TABLE users(id uuid PRIMARY KEY,status text,deleted_at timestamptz);
     CREATE TABLE customers(user_id uuid PRIMARY KEY REFERENCES users(id),client_code text,full_name text,birthday date);
+    CREATE TABLE customer_identity_aliases(alias text PRIMARY KEY,customer_user_id uuid);
     CREATE TABLE account_phones(user_id uuid,account_type text,is_primary boolean,phone_normalized text);
     CREATE TABLE outbox_events(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),aggregate_type text,aggregate_id text,event_type text,
       payload jsonb,deduplication_key text,status text DEFAULT 'pending',attempts integer DEFAULT 0,available_at timestamptz DEFAULT now(),

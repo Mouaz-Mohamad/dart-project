@@ -262,6 +262,7 @@
         })),
         Promise.resolve().then(() => window.DartCatalog?.checkForServerChanges?.()),
         Promise.resolve().then(hydrateCustomerCommerce),
+        Promise.resolve().then(() => typeof hydrateApiSession === "function" ? hydrateApiSession() : undefined),
       ]);
       return response.order;
     }

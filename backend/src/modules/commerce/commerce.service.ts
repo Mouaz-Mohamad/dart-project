@@ -1,3 +1,4 @@
+import { resolveCustomerReference, upsertCustomerRecord } from "../identity/customer-record.js";
 // DART CODE GUIDE | backend/src/modules/commerce/commerce.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { createHash, randomUUID } from "node:crypto";
@@ -4837,14 +4838,12 @@ export class CommerceService {
       const manualDeliveryCostMinor = manualCourierFeePerOrderMinor;
 
       const clientCode = String(input.clientId || "").trim();
-      const customerResult =
-        clientCode && clientCode !== "-"
-          ? await client.query<{ user_id: string }>(
-              "SELECT user_id::text FROM customers WHERE client_code=$1 LIMIT 1",
-              [clientCode],
-            )
-          : { rows: [] as { user_id: string }[] };
-      const customerUserId = customerResult.rows[0]?.user_id || null;
+      const referencedCustomer = clientCode && clientCode !== "-" ? await resolveCustomerReference(client, clientCode) : null;
+      if (clientCode && clientCode !== "-" && !referencedCustomer) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Select a valid customer");
+      const customerUserId = referencedCustomer || await upsertCustomerRecord(client, {
+        name: input.clientName, phone1: input.phone1, ...(input.email ? { email: input.email } : {}),
+        ...(input.phone2 ? { phone2: input.phone2 } : {}),
+      }, "admin");
 
       const contact = {
         name: String(input.clientName || "").trim(),
@@ -5135,7 +5134,7 @@ export class CommerceService {
       const customerResult =
         clientCode && clientCode !== "-"
           ? await client.query<{ user_id: string }>(
-              "SELECT user_id::text FROM customers WHERE client_code=$1 LIMIT 1",
+              "SELECT user_id::text FROM customers WHERE client_code=$1 UNION SELECT customer_user_id::text FROM customer_identity_aliases WHERE alias=$1",
               [clientCode],
             )
           : { rows: [] as { user_id: string }[] };
@@ -6919,6 +6918,11 @@ export class CommerceService {
            last_address=EXCLUDED.last_address,
            updated_at=now()`,
         [customerUserId, address ? JSON.stringify(address) : null],
+      );
+      if (address) await client.query(
+        `INSERT INTO customer_address_history(customer_user_id,source_key,address)
+         VALUES($1,'saved:' || md5($2::jsonb::text),$2::jsonb)
+         ON CONFLICT(customer_user_id,source_key) DO NOTHING`, [customerUserId, JSON.stringify(address)],
       );
       await client.query(
         `INSERT INTO audit_logs (

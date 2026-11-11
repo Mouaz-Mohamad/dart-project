@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/dashboard/dashboard-state.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
+import { customerRecordError } from "../identity/customer-record.js";
 import { AppError } from "../../http/app-error.js";
 import { isDartCardEnabled } from "../settings/dart-card-switch.js";
 import { isRelationalDashboardDomain, readRelationalDashboardDomain } from "./relational-domain.store.js";
@@ -164,10 +165,10 @@ export class DashboardStateService {
         data = protectReturnSnapshots(data, before.rows.map(row => row.payload));
       }
       const next = version + 1;
-      await client.query(
+      const written = await client.query<{ data: unknown[] }>(
         `UPDATE dashboard_domain_state
             SET data=$2::jsonb, version=$3, updated_by=$4, updated_at=now()
-          WHERE domain=$1`,
+          WHERE domain=$1 RETURNING data`,
         [domain, JSON.stringify(data), next, actorId],
       );
       await client.query(
@@ -177,10 +178,10 @@ export class DashboardStateService {
         [actorId, domain, requestId, JSON.stringify({ previousVersion: version, newVersion: next, count: data.length })],
       );
       await client.query("COMMIT");
-      return { domain, version: next, data };
+      return { domain, version: next, data: domain === "customers" && Array.isArray(written.rows[0]?.data) ? written.rows[0].data : data };
     } catch (error) {
       await client.query("ROLLBACK");
-      throw error;
+      customerRecordError(error);
     } finally {
       client.release();
     }
@@ -336,6 +337,8 @@ export class DashboardStateService {
       deleted_at: Date | null;
       created_at: Date;
       phones: Array<{ phone_display: string; is_primary: boolean }>;
+      contacts: string[]; address_governorate: string; address_country: string; aliases: string[];
+      addresses: Record<string, unknown>[];
     }>(
       `SELECT c.user_id::text, c.client_code, c.full_name, c.birthday::text,
               c.dart_card_draw_eligible, u.email, u.status, u.deleted_at, c.created_at,
@@ -347,12 +350,24 @@ export class DashboardStateService {
                   ) ORDER BY p.is_primary DESC, p.created_at
                 ) FILTER (WHERE p.id IS NOT NULL),
                 '[]'::jsonb
-              ) AS phones
+              ) AS phones,
+              ARRAY(SELECT cp.phone_display FROM customer_contact_phones cp WHERE cp.customer_user_id=c.user_id
+                AND NOT EXISTS(SELECT 1 FROM account_phones ap WHERE ap.user_id=c.user_id AND ap.phone_normalized=cp.phone_normalized)
+                ORDER BY cp.recorded_at DESC,cp.phone_normalized) AS contacts,
+              COALESCE(NULLIF(d.governorate,''),NULLIF(pref.last_address->>'governorate',''),
+                (SELECT address->>'governorate' FROM customer_address_history h WHERE h.customer_user_id=c.user_id
+                 AND NULLIF(address->>'governorate','') IS NOT NULL ORDER BY recorded_at DESC,source_key DESC LIMIT 1),'') AS address_governorate,
+              COALESCE(d.country,'Egypt') AS address_country,
+              ARRAY(SELECT alias FROM customer_identity_aliases a WHERE a.customer_user_id=c.user_id) AS aliases,
+              COALESCE((SELECT jsonb_agg(jsonb_build_object('address',address,'source',source_key,'date',recorded_at)
+                ORDER BY recorded_at DESC,source_key) FROM customer_address_history h WHERE h.customer_user_id=c.user_id),'[]') AS addresses
          FROM customers c
          JOIN users u ON u.id=c.user_id
+         LEFT JOIN customer_profile_details d ON d.customer_user_id=c.user_id
+         LEFT JOIN customer_preferences pref ON pref.customer_user_id=c.user_id
          LEFT JOIN account_phones p ON p.user_id=c.user_id AND p.account_type='customer'
         GROUP BY c.user_id, c.client_code, c.full_name, c.birthday,
-                 c.dart_card_draw_eligible, u.email, u.status, u.deleted_at, c.created_at
+                 c.dart_card_draw_eligible, u.email, u.status, u.deleted_at, c.created_at, d.customer_user_id,pref.customer_user_id
         ORDER BY c.created_at DESC`,
     );
 
@@ -364,7 +379,7 @@ export class DashboardStateService {
       const previous = legacy.get(row.client_code) || {};
       const phones = Array.isArray(row.phones) ? row.phones : [];
       const primary = phones.find((phone) => phone.is_primary)?.phone_display || phones[0]?.phone_display || "";
-      const secondary = phones.find((phone) => !phone.is_primary)?.phone_display || "-";
+      const secondary = row.contacts?.[0] || "-";
       merged.push({
         ...previous,
         id: row.user_id,
@@ -374,12 +389,15 @@ export class DashboardStateService {
         email: row.email,
         phone1: primary,
         phone2: secondary,
+        contactPhones: row.contacts || [],
+        aliases: row.aliases || [],
+        addresses: row.addresses || [],
         accountStatus: row.status,
         dartCardDrawEligible: row.dart_card_draw_eligible,
         registeredAt: row.created_at.toISOString(),
         serverAuthoritative: true,
-        country: String(previous.country || "Egypt"),
-        governorate: String(previous.governorate || ""),
+        country: String(row.address_country || previous.country || "Egypt"),
+        governorate: String(row.address_governorate || previous.governorate || ""),
         isArchived: row.status === "suspended" || Boolean(previous.isArchived),
         isDeleted: false,
         isChecked: false,

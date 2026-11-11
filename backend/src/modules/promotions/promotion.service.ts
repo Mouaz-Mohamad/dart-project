@@ -233,7 +233,7 @@ export class PromotionService {
     if (section !== "discounts") return details;
     const db = await this.pool.connect();
     try {
-      const customer = (await db.query<{ user_id: string }>("SELECT user_id::text FROM customers WHERE client_code=$1 OR user_id::text=$1", [ref])).rows[0]!;
+      const customer = (await db.query<{ user_id: string }>("SELECT user_id::text FROM customers WHERE client_code=$1 OR user_id::text=$1 OR user_id IN (SELECT customer_user_id FROM customer_identity_aliases WHERE alias=$1)", [ref])).rows[0]!;
       const facts = await this.customerFacts(db, customer.user_id);
       const campaigns = await this.loadCampaigns(db);
       const active = [];
