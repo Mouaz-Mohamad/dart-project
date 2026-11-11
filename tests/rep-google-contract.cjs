@@ -46,7 +46,7 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   const node={dataset:{repLiveMap:'',orderId:'synthetic'},isConnected:true,
     closest:()=>dialog,getBoundingClientRect:()=>({width:390,height:dialog.open?675:0}),
     replaceChildren(){},appendChild(){}};
-  const document={hidden:false,querySelectorAll:()=>[node],createElement:()=>({addEventListener(){}}),
+  const document={hidden:false,querySelectorAll:()=>[node],createElement:()=>({addEventListener(){},setAttribute(){},appendChild(){}}),
     addEventListener(type,fn){callbacks.set(type,fn)},dispatchEvent(event){callbacks.get(event.type)?.(event)}};
   class Clock extends Date { static now(){return time;} }
   const google={maps:{Map:class{
