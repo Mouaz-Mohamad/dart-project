@@ -72,8 +72,20 @@
             .join("-");
     return `${prefix}-${randomPart}`;
   };
+  // Translate digits for display only; API values and identities are not changed.
+  const englishDigits = (value) => String(value ?? "").replace(/[٠-٩۰-۹]/g, digit =>
+    String("٠١٢٣٤٥٦٧٨٩".indexOf(digit) >= 0 ? "٠١٢٣٤٥٦٧٨٩".indexOf(digit) : "۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
+  const repLabels = Object.freeze({
+    "Out With Representative": "جاهز للتوصيل", "Representative On The Way": "جاري التوصيل",
+    "Delivered": "تم التسليم", "Waiting": "في انتظار العميل", "Problem": "توجد مشكلة",
+    "Upcoming": "قادم", "Pending": "قيد المراجعة", "Representative Assigned": "تم تعيين المندوب",
+    "Pickup On The Way": "جاري الاستلام", "Completed": "مكتمل", "Cancelled": "ملغي",
+    "Rejected": "مرفوض", "Approved": "تمت الموافقة",
+    "Return": "استرجاع", "Refund": "استرجاع", "Exchange": "استبدال",
+  });
+  const repLabel = (value) => englishDigits(repLabels[String(value ?? "")] || value || "-");
   const esc = (value) =>
-    String(value ?? "").replace(
+    englishDigits(value).replace(
       /[&<>'"]/g,
       (char) =>
         ({
@@ -93,7 +105,7 @@
       .replace(/\D/g, "")
       .replace(/^0020/, "0")
       .replace(/^20(?=1)/, "0");
-  const money = (value) => `${window.DartState.formatMoney(value)} EGP`;
+  const money = (value) => `${englishDigits(window.DartState.formatMoney(value))} ج.م`;
   const orderTotal = (order) =>
     Number.isFinite(Number(order?.finalAmount))
       ? Math.max(0, Number(order.finalAmount))
@@ -108,7 +120,7 @@
   function setLocationStatus(message, state = "") {
     const status = document.getElementById("repLocationStatus");
     if (!status) return;
-    status.textContent = message;
+    status.textContent = englishDigits(message);
     status.dataset.state = state;
     const navigationStatus = document.getElementById("repNavigationStatus");
     if (navigationOrderId && navigationStatus) {
@@ -143,24 +155,24 @@
     const courierLng = Number(order?.courierLocation?.lng);
     if (!Number.isFinite(courierLat) || !Number.isFinite(courierLng) ||
         !courierLat || !courierLng) {
-      return { ok: false, reason: "Waiting for a precise representative location." };
+      return { ok: false, reason: "في انتظار تحديد موقعك بدقة." };
     }
     const hasDestination = Number.isFinite(destinationLat) && Number.isFinite(destinationLng) &&
       destinationLat !== 0 && destinationLng !== 0;
     if (!hasDestination && order?.addressSource !== "manual") {
-      return { ok: false, reason: "Customer destination coordinates are missing." };
+      return { ok: false, reason: "إحداثيات موقع العميل غير متاحة." };
     }
     const updatedAt = Date.parse(order?.courierLocation?.updatedAt || 0);
     if (!updatedAt || Date.now() - updatedAt > LOCATION_MAX_AGE_MS) {
       return {
         ok: false,
         reason:
-          "Your location must be refreshed before delivery can be confirmed.",
+          "يجب تحديث موقعك قبل تأكيد التسليم.",
       };
     }
     if (!hasDestination) {
       return { ok: true, manual: true,
-        reason: "Manual address: no verified customer pin. Confirm delivery in person before marking Delivered." };
+        reason: "العنوان مكتوب يدويًا بدون دبوس مؤكد. تحقق من التسليم للعميل شخصيًا." };
     }
     const accuracy = order?.courierLocation?.accuracy;
     if (accuracy == null || !Number.isFinite(Number(accuracy)) || Number(accuracy) > LOCATION_MAX_ACCURACY_METERS) {
@@ -178,8 +190,8 @@
       distance,
       reason:
         distance <= radius
-          ? `You are within ${radius * 1000} m of the delivery address.`
-          : `${distance.toFixed(1)} km remaining before the Delivered button is enabled.`,
+          ? `أنت داخل نطاق ${radius * 1000} متر من عنوان التوصيل.`
+          : `متبقّي ${distance.toFixed(1)} كم للوصول إلى نطاق تأكيد التسليم.`,
     };
   }
 
@@ -611,7 +623,7 @@
       const template = document.getElementById("rep-operational-group-template");
       if (!template) return;
       const fragment = template.content.cloneNode(true), wrapper = fragment.querySelector("[data-rep-operational-group]");
-      wrapper.querySelector('[data-rep-group-field="title"]').textContent = type === "order" ? `${cards.length} orders · one delivery route` : `${cards.length} returns · one pickup route`;
+      wrapper.querySelector('[data-rep-group-field="title"]').textContent = type === "order" ? `${cards.length} أوردرات · نفس مسار التوصيل` : `${cards.length} استلامات · نفس مسار الاستلام`;
       cards[0].before(fragment);
       cards.forEach((card) => wrapper.appendChild(card));
     });
@@ -631,7 +643,7 @@
     if (!records.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.textContent = "No active return pickups are assigned to you.";
+      empty.textContent = "لا توجد طلبات استرجاع أو استبدال مسندة إليك حاليًا.";
       list.appendChild(empty);
       return;
     }
@@ -641,29 +653,29 @@
         started = activeReturnIds.has(record.id) && Boolean(record.pickupStartedAt),
         proximity = started
           ? deliveryProximity(record)
-          : { ok: false, reason: "Start pickup to open Google Maps and begin secure location sharing." },
+          : { ok: false, reason: "ابدأ الاستلام لفتح الملاحة ومشاركة موقعك أثناء الرحلة." },
         customerFee = Number(record.customerCourierFee) || 0,
         brandFee = Number(record.brandCourierFee) || 0,
         isExchange = window.DartReturns?.isExchange(record) || record.requestType === "Exchange";
       card.dataset.returnId = record.id;
       const values = {
-        title: `${record.requestType || "Return"} #${record.returnId || record.id}`,
+        title: `${repLabel(record.requestType || "Return")} #${englishDigits(record.returnId || record.id)}`,
         date: `${record.date || ""}`,
-        status: window.DartReturns?.publicStatus?.(record) || record.status || "-",
-        customer: record.clientName || record.clientId || "Customer",
+        status: repLabel(window.DartReturns?.publicStatus?.(record) || record.status),
+        customer: record.clientName || record.clientId || "عميل",
         phones: [record.phone1, record.phone2].filter((phone) => phone && phone !== "-").join(" · ") || "-",
-        address: fullAddress(record) || "Address missing",
-        reason: record.reason || "No reason entered",
-        originalItem: `Original: ${record.itemCode || "-"}`,
-        requestType: record.requestType || "Return",
+        address: fullAddress(record) || "العنوان غير متاح",
+        reason: record.reason || "لا توجد ملاحظات",
+        originalItem: `القطعة الأصلية: ${record.itemCode || "-"}`,
+        requestType: repLabel(record.requestType || "Return"),
         replacementItem: record.replacementItemCode || `${record.requestedColor || "-"} / ${record.requestedSize || "-"}`,
-        feeLabel: customerFee > 0 ? "Collect from customer" : brandFee > 0 ? "Dart owes representative" : "Courier fee",
+        feeLabel: customerFee > 0 ? "المطلوب تحصيله من العميل" : brandFee > 0 ? "مستحق لك لدى دارت" : "رسوم المندوب",
         feeAmount: money(customerFee || brandFee),
         proximity: proximity.reason,
       };
       Object.entries(values).forEach(([field, value]) => {
         const element = card.querySelector(`[data-return-field="${field}"]`);
-        if (element) element.textContent = value;
+        if (element) element.textContent = englishDigits(value);
       });
       card.querySelector("[data-return-replacement-row]").hidden = !isExchange;
       const call = card.querySelector("[data-return-call]");
@@ -710,7 +722,7 @@
     document.getElementById("repNavigationResume").hidden = true;
   }
   function showInstruction(text, maneuver = "STRAIGHT") {
-    document.getElementById("repNavigationInstruction").textContent = text;
+    document.getElementById("repNavigationInstruction").textContent = englishDigits(text);
     document.getElementById("repNavigationManeuver").textContent =
       maneuver.includes("U_TURN") ? "↶" : maneuver.includes("LEFT") ? "↰" : maneuver.includes("RIGHT") ? "↱" : maneuver.includes("ROUNDABOUT") ? "⟳" : "↑";
   }
@@ -784,7 +796,7 @@
       return;
     }
     const proximity = deliveryProximity(order);
-    document.getElementById("repNavigationProximity").textContent = proximity.reason;
+    document.getElementById("repNavigationProximity").textContent = englishDigits(proximity.reason);
     // An unknown destination cannot satisfy the 500 m rule. Existing manual-order actions stay on the order card.
     document.getElementById("repNavigationComplete").hidden = !proximity.ok || Boolean(proximity.manual);
     document.getElementById("repNavigationComplete").disabled =
@@ -828,7 +840,7 @@
     navigationOrderId = String(order.id);
     const container = document.getElementById("repNavigationMap");
     container.dataset.repLiveMap = ""; container.dataset.orderId = navigationOrderId;
-    container.textContent = "Loading Google Maps...";
+    container.textContent = "جارٍ تحميل خرائط Google...";
     showInstruction("جارٍ تحديد موقعك وحساب المسار...");
     document.getElementById("repNavigationResume").hidden = true;
     document.getElementById("repNavigationStatus").textContent = "جارٍ تحديد موقعك...";
@@ -849,7 +861,7 @@
     await mounting;
     if (deliveryMaps.get(entry.orderId) !== entry) return;
     if (!entry.destination) {
-      document.getElementById("repNavigationStatus").textContent = "Manual address — no verified destination pin.";
+      document.getElementById("repNavigationStatus").textContent = "العنوان مكتوب يدويًا بدون دبوس موقع مؤكد.";
       return;
     }
   }
@@ -875,7 +887,7 @@
       entry.lastRouteOrigin = { lat: Number(location.lat), lng: Number(location.lng) };
       document.dispatchEvent(new CustomEvent("dart:rep-road-route", { detail: { orderId: entry.orderId, geometry: route.geometry } }));
       document.getElementById("repNavigationStatus").textContent = "";
-      document.getElementById("repNavigationWarnings").textContent = route.warnings.join(" · ");
+      document.getElementById("repNavigationWarnings").textContent = englishDigits(route.warnings.join(" · "));
       updateDeliveryControls();
     } catch {
       if (deliveryMaps.get(entry.orderId) !== entry) return;
@@ -909,7 +921,7 @@
       void window.DartGoogleMaps?.preloadRepresentativeLibraries?.();
     }
     document.getElementById("repIdentity").textContent =
-      `${rep.name} · ${rep.repId} · ${rep.phone1}`;
+      englishDigits(`${rep.name} · ${rep.repId} · ${rep.phone1}`);
     const orders = [...repOrders(rep)].sort((first, second) => {
         const firstCurrent = first.routeState === "current" || first.status === "Representative On The Way";
         const secondCurrent = second.routeState === "current" || second.status === "Representative On The Way";
@@ -962,7 +974,7 @@
             : {
                 ok: false,
                 reason:
-                  "Start delivery to open Google Maps and begin secure location sharing.",
+                  "ابدأ التوصيل لفتح الملاحة ومشاركة موقعك أثناء الرحلة.",
               };
           const items =
             (order.priceSnapshot || [])
@@ -970,38 +982,38 @@
                 (line) =>
                   `<div class="dart-rep-line"><span>${Number(line.qty) || 1}× ${esc(line.name || line.modelCode || "Item")} · ${esc(line.size || "-")} · ${esc(line.color || "-")}</span><b>${esc(money((Number(line.finalUnitPrice) || 0) * (Number(line.qty) || 1)))}</b></div>`,
               )
-              .join("") || "<div>No item details</div>";
-          return `<article class="rep-driver-card" data-order-id="${esc(order.id)}">
-        <div class="rep-header"><div><h2>Order #${esc(order.orderId)}</h2><span>${esc(order.date || "")} ${esc(order.time || "")}</span></div><span class="rep-status-badge">${esc(order.status)}</span></div>
+              .join("") || "<div>لا توجد تفاصيل للقطع</div>";
+          return `<article class="rep-driver-card" dir="rtl" lang="ar" data-order-id="${esc(order.id)}">
+        <div class="rep-header"><div><h2>أوردر #${esc(order.orderId)}</h2><span>${esc(order.date || "")} ${esc(order.time || "")}</span></div><span class="rep-status-badge">${esc(repLabel(order.status))}</span></div>
         <div class="dart-rep-route-hint">
           <span class="dart-rep-route-state dart-route-${esc(order.routeState || (started ? "current" : "upcoming"))}">${esc(
             order.routeState === "waiting"
-              ? "Waiting"
+              ? "في انتظار العميل"
               : order.routeState === "problem"
-                ? "Problem"
+                ? "توجد مشكلة"
                 : started
-                  ? "Delivering now"
-                  : "Upcoming"
+                  ? "جاري التوصيل"
+                  : "قادم"
           )}</span>
-          ${Number(order.suggestedSequence) > 0 ? `<span>Suggested stop #${esc(order.suggestedSequence)}</span>` : ""}
-          ${order.manuallyOrdered && Number(order.routeSequence) > 0 ? `<span>Saved route #${esc(order.routeSequence)}</span>` : ""}
+          ${Number(order.suggestedSequence) > 0 ? `<span>التوقف المقترح #${esc(order.suggestedSequence)}</span>` : ""}
+          ${order.manuallyOrdered && Number(order.routeSequence) > 0 ? `<span>ترتيب المسار #${esc(order.routeSequence)}</span>` : ""}
         </div>
-        <div class="rep-info-box"><div class="rep-info-title">Customer &amp; address</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "Address missing")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
-        <div class="rep-info-box"><div class="rep-info-title">Items &amp; cash collection</div>${items}<div class="dart-rep-total"><span>Collect cash</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>
+        <div class="rep-info-box"><div class="rep-info-title">بيانات العميل ومكان التسليم</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "العنوان غير متاح")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
+        <div class="rep-info-box"><div class="rep-info-title">محتويات الأوردر</div>${items}<div class="dart-rep-total"><span>المبلغ المطلوب تحصيله</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>
         <p class="dart-rep-proximity ${proximity.ok ? "is-ready" : ""}" role="status">${esc(proximity.reason)}</p>
         <div class="dart-rep-order-actions">
-          <a href="tel:${esc(order.phone1)}" class="rep-btn rep-btn-call"><i class="fa-solid fa-phone"></i> Call customer</a>
-          ${!started ? '<button type="button" class="rep-btn rep-btn-go" data-action="start"><i class="fa-solid fa-diamond-turn-right"></i> Start delivery</button>' : ""}
-          ${started ? `<button type="button" class="rep-btn rep-btn-go" data-action="navigate"><i class="fa-solid fa-map-location-dot"></i> Open navigation</button><a class="rep-btn rep-btn-call" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener">Open Google Maps app</a>` : ""}
-          ${started ? '<button type="button" class="rep-btn rep-btn-wait" data-action="waiting"><i class="fa-solid fa-clock"></i> Waiting</button>' : ""}
-          ${started ? '<button type="button" class="rep-btn rep-btn-problem" data-action="problem"><i class="fa-solid fa-triangle-exclamation"></i> Report problem</button>' : ""}
-          ${started ? '<button type="button" class="rep-btn rep-btn-cancel" data-action="cancel"><i class="fa-solid fa-arrow-rotate-left"></i> Stop current delivery</button>' : ""}
-          ${started ? `<button type="button" class="rep-btn rep-btn-complete" data-action="complete" ${proximity.ok ? "" : "hidden"}><i class="fa-solid fa-circle-check"></i> Delivered</button>` : ""}
+          <a href="tel:${esc(order.phone1)}" class="rep-btn rep-btn-call"><i class="fa-solid fa-phone"></i> اتصال بالعميل</a>
+          ${!started ? '<button type="button" class="rep-btn rep-btn-go" data-action="start"><i class="fa-solid fa-diamond-turn-right"></i> بدء التوصيل</button>' : ""}
+          ${started ? `<button type="button" class="rep-btn rep-btn-go" data-action="navigate"><i class="fa-solid fa-map-location-dot"></i> فتح الملاحة</button><a class="rep-btn rep-btn-call" href="${esc(googleMapsRoute(order))}" target="_blank" rel="noopener">فتح في خرائط Google</a>` : ""}
+          ${started ? '<button type="button" class="rep-btn rep-btn-wait" data-action="waiting"><i class="fa-solid fa-clock"></i> انتظار العميل</button>' : ""}
+          ${started ? '<button type="button" class="rep-btn rep-btn-problem" data-action="problem"><i class="fa-solid fa-triangle-exclamation"></i> الإبلاغ عن مشكلة</button>' : ""}
+          ${started ? '<button type="button" class="rep-btn rep-btn-cancel" data-action="cancel"><i class="fa-solid fa-arrow-rotate-left"></i> إيقاف التوصيل</button>' : ""}
+          ${started ? `<button type="button" class="rep-btn rep-btn-complete" data-action="complete" ${proximity.ok ? "" : "hidden"}><i class="fa-solid fa-circle-check"></i> تم التسليم</button>` : ""}
         </div>
       </article>`;
         })
         .join("") ||
-      '<div class="empty-state">No active orders are assigned to you.</div>';
+      '<div class="empty-state">لا توجد أوردرات مسندة إليك حاليًا.</div>';
     wrapOperationalGroups(list, orders, "order");
     updateDeliveryMapsLocation(latestApiLocation);
     renderReturns(rep);
@@ -1080,7 +1092,7 @@
           }
         });
         updateDeliveryMapsLocation(latestApiLocation);
-        setLocationStatus("Live location is being shared securely with Dart every 6 seconds.", "success");
+        setLocationStatus("مشاركة الموقع مفعّلة أثناء التوصيل.", "success");
         return true;
       } catch (error) {
         if (generation !== locationGeneration || currentRep() !== owner || (error.name === "AbortError" && !pending.timedOut)) return false;
@@ -1633,7 +1645,7 @@
     document.addEventListener("dart:rep-map-state", event => {
       if (!navigationOrderId || event.detail?.orderId !== navigationOrderId) return;
       document.getElementById("repNavigationMapStatus").textContent =
-        ["slow", "error"].includes(event.detail.state) ? event.detail.message || "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة." :
+        ["slow", "error"].includes(event.detail.state) ? englishDigits(event.detail.message || "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة.") :
         event.detail.state === "ready" && event.detail.renderer === "RASTER" ?
           "المتصفح يستخدم خريطة مسطّحة؛ الميل والدوران غير متاحين في هذا العرض." : "";
     });
