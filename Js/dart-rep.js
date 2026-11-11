@@ -1137,7 +1137,7 @@
       const order = (apiWork.orders || []).find(
         (row) => String(row.id) === String(orderId),
       );
-      if (!order) throw new Error("The assigned order could not be found.");
+      if (!order) throw new Error("تعذر العثور على الأوردر المسند إليك.");
       const action =
         status === "Representative On The Way"
           ? "start"
@@ -1150,7 +1150,7 @@
                 : status === "Out With Representative"
                   ? "cancel"
                   : "";
-      if (!action) throw new Error("Unsupported delivery action.");
+      if (!action) throw new Error("إجراء التوصيل غير مدعوم.");
       await window.DartApi.request(
         `/api/v1/representatives/orders/${encodeURIComponent(order.orderId)}/action`,
         { method: "POST", body: { action } },
@@ -1184,7 +1184,7 @@
       (String(order.representativeId) !== String(rep.id) &&
         String(order.representativeId) !== String(rep.repId))
     )
-      throw new Error("This order is not assigned to your account.");
+      throw new Error("هذا الأوردر غير مسند إلى حسابك.");
     const previous = order.status;
     const routeOnlyState = status === "Waiting" || status === "Problem";
     order.status = routeOnlyState ? "Out With Representative" : status;
@@ -1271,7 +1271,7 @@
       (String(record.representativeId) !== String(rep.id) &&
         String(record.representativeId) !== String(rep.repId))
     )
-      throw new Error("This return pickup is not assigned to your account.");
+      throw new Error("طلب الاستلام غير مسند إلى حسابك.");
     return { rep, records, record };
   }
 
@@ -1293,7 +1293,7 @@
       const record = (apiWork.returns || []).find(
         (row) => String(row.id) === String(recordId),
       );
-      if (!record) throw new Error("The assigned return could not be found.");
+      if (!record) throw new Error("تعذر العثور على طلب الاسترجاع أو الاستبدال.");
       await window.DartApi.request(
         `/api/v1/representatives/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
         { method: "POST", body: { action: "start" } },
@@ -1308,7 +1308,7 @@
     }
     const { rep, records, record } = assignedReturn(recordId);
     if (!["Representative Assigned", "Pickup On The Way"].includes(record.status))
-      throw new Error("This pickup cannot be started in its current status.");
+      throw new Error("لا يمكن بدء الاستلام في حالته الحالية.");
     const previous = record.status;
     if (record.status === "Representative Assigned")
       record.pickupSnapshot = window.DartReturns?.captureWorkflowSnapshot?.(
@@ -1333,7 +1333,7 @@
       const record = (apiWork.returns || []).find(
         (row) => String(row.id) === String(recordId),
       );
-      if (!record) throw new Error("The assigned return could not be found.");
+      if (!record) throw new Error("تعذر العثور على طلب الاسترجاع أو الاستبدال.");
       await window.DartApi.request(
         `/api/v1/representatives/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
         { method: "POST", body: { action: "cancel" } },
@@ -1348,7 +1348,7 @@
     }
     const { rep, records, record } = assignedReturn(recordId);
     if (!["Representative Assigned", "Pickup On The Way"].includes(record.status))
-      throw new Error("This pickup cannot be cancelled in its current status.");
+      throw new Error("لا يمكن إلغاء الاستلام في حالته الحالية.");
     const previous = record.status;
     record.status = "Approved - Awaiting Representative";
     record.pickupStartedAt = null;
@@ -1376,7 +1376,7 @@
       const record = (apiWork.returns || []).find(
         (row) => String(row.id) === String(recordId),
       );
-      if (!record) throw new Error("The assigned return could not be found.");
+      if (!record) throw new Error("تعذر العثور على طلب الاسترجاع أو الاستبدال.");
       await window.DartApi.request(
         `/api/v1/representatives/returns/${encodeURIComponent(record.returnId || record.id)}/action`,
         { method: "POST", body: { action: "complete" } },
@@ -1389,7 +1389,7 @@
     const { rep, records, record } = assignedReturn(recordId),
       proximity = deliveryProximity(record);
     if (record.status !== "Pickup On The Way" || !record.pickupStartedAt)
-      throw new Error("Start pickup before confirming it.");
+      throw new Error("ابدأ الاستلام أولًا قبل تأكيده.");
     if (!proximity.ok) throw new Error(proximity.reason);
     const items = read(KEYS.items, []),
       orders = read(KEYS.orders, []),
@@ -1398,15 +1398,15 @@
       completedAt = now(),
       isExchange = window.DartReturns?.isExchange(record) || record.requestType === "Exchange",
       isRefund = window.DartReturns?.isRefund(record) || record.requestType === "Refund";
-    if (!originalItem) throw new Error("The original physical item could not be found.");
-    if (!order) throw new Error("The original delivered order could not be found.");
+    if (!originalItem) throw new Error("تعذر العثور على القطعة الأصلية.");
+    if (!order) throw new Error("تعذر العثور على أوردر التسليم الأصلي.");
 
     const replacement = isExchange
       ? items.find((item) => String(item.itemCode) === String(record.replacementItemCode))
       : null;
     if (isExchange && !record.exchangeCompletionApplied &&
         (!replacement || String(replacement.status).toLowerCase() !== "processing/held"))
-      throw new Error("The held replacement item is no longer available.");
+      throw new Error("القطعة البديلة المحجوزة لم تعد متاحة.");
     const cards = isRefund && order.dartCardId ? read(KEYS.cards, []) : [];
     const card = order.dartCardId
       ? cards.find((row) => String(row.cardId) === String(order.dartCardId))
@@ -1542,18 +1542,18 @@
         locationGeneration += 1;
         locationRequest?.controller.abort(); locationRequest = null;
       }
-      setLocationStatus("Location sharing starts when Dart assigns active delivery work to you.");
+      setLocationStatus("مشاركة الموقع تبدأ عند وجود أوردر توصيل نشط مسند إليك.");
       return;
     }
     if (locationWatch != null || locationPermissionBlocked) return;
     if (!navigator.geolocation) {
       setLocationStatus(
-        "This device does not support the location required for delivery confirmation.",
+        "هذا الجهاز لا يدعم تحديد الموقع المطلوب لتأكيد التسليم.",
         "error",
       );
       return;
     }
-    setLocationStatus("Requesting precise location permission…", "loading");
+    setLocationStatus("جارٍ طلب إذن تحديد الموقع الدقيق...", "loading");
     const watchOwner = currentRep(), watchGeneration = locationGeneration;
     locationWatch = navigator.geolocation.watchPosition(
       async (position) => {
@@ -1607,7 +1607,7 @@
         if (returnsChanged) write(KEYS.returns, records);
         if (ordersChanged || returnsChanged) {
           setLocationStatus(
-            "Live location is being shared for the active delivery or pickup.",
+            "مشاركة الموقع مفعّلة أثناء التوصيل أو الاستلام.",
             "success",
           );
           renderOrders();
@@ -1767,7 +1767,7 @@
         if (orderActionsPending.has(String(orderId))) return;
         orderActionsPending.add(String(orderId));
         try {
-          if (!order) throw new Error("The assigned order could not be found.");
+          if (!order) throw new Error("تعذر العثور على الأوردر المسند إليك.");
           if (button.dataset.action === "navigate") await openNavigation(order);
           if (button.dataset.action === "start") {
             if (
@@ -1777,7 +1777,7 @@
               ].includes(order.status)
             )
               throw new Error(
-                "Dashboard must move the order to Out With Representative first.",
+                "لازم يتم تأكيد خروج الأوردر للتوصيل من لوحة الإدارة أولًا.",
               );
             locationPermissionBlocked = false;
             activeOrderIds.add(order.id);
@@ -1795,11 +1795,11 @@
               !activeOrderIds.has(freshOrder.id) ||
               !freshOrder.deliveryStartedAt
             )
-              throw new Error("Start delivery before confirming it.");
+              throw new Error("ابدأ التوصيل أولًا قبل تأكيد التسليم.");
             if (!proximity.ok) throw new Error(proximity.reason);
             const confirmation = proximity.manual
-              ? `Manual address has no verified customer pin. Have you physically delivered ${freshOrder.orderId} and collected the payment?`
-              : `Confirm the customer received Order ${freshOrder.orderId} and you collected ${money(orderTotal(freshOrder))}?`;
+              ? `العنوان غير مؤكد على الخريطة. هل سلّمت أوردر ${englishDigits(freshOrder.orderId)} بنفسك وحصّلت المبلغ؟`
+              : `هل استلم العميل أوردر ${englishDigits(freshOrder.orderId)} وتم تحصيل ${money(orderTotal(freshOrder))}؟`;
             if (!await window.DartDialog.confirm(confirmation))
               return;
             await updateOrderStatus(freshOrder.id, "Delivered");
@@ -1812,7 +1812,7 @@
             renderOrders();
           }
           if (button.dataset.action === "problem") {
-            if (!await window.DartDialog.confirm(`Report a delivery problem for ${order.orderId}?`)) return;
+            if (!await window.DartDialog.confirm(`هل تريد الإبلاغ عن مشكلة في أوردر ${englishDigits(order.orderId)}؟`)) return;
             activeOrderIds.delete(order.id);
             await updateOrderStatus(order.id, "Problem");
             ensureLocationWatch();
@@ -1825,7 +1825,7 @@
             renderOrders();
           }
         } catch (error) {
-          window.DartDialog.alert(error.message);
+          window.DartDialog.alert(englishDigits(error.message));
         } finally {
           orderActionsPending.delete(String(orderId));
           button.disabled = false;
@@ -1846,7 +1846,7 @@
         returnActionsPending.add(String(recordId));
         card.querySelectorAll('[data-return-action]').forEach(action => { action.disabled = true; });
         try {
-          if (!record) throw new Error("The assigned return could not be found.");
+          if (!record) throw new Error("تعذر العثور على طلب الاسترجاع أو الاستبدال.");
           if (button.dataset.returnAction === "navigate") await openNavigation(record);
           if (button.dataset.returnAction === "start") {
             locationPermissionBlocked = false;
@@ -1862,24 +1862,24 @@
             );
             const proximity = deliveryProximity(fresh);
             if (!activeReturnIds.has(fresh.id) || !fresh.pickupStartedAt)
-              throw new Error("Start pickup before confirming it.");
+              throw new Error("ابدأ الاستلام أولًا قبل تأكيده.");
             if (!proximity.ok) throw new Error(proximity.reason);
             const fee = Number(fresh.customerCourierFee) || 0;
             const promptText = fee > 0
-              ? `Confirm pickup and that ${money(fee)} was collected directly from the customer?`
-              : `Confirm pickup for ${fresh.returnId}?`;
+              ? `هل تم استلام القطعة وتحصيل ${money(fee)} من العميل؟`
+              : `هل تم استلام طلب ${englishDigits(fresh.returnId)}؟`;
             if (!await window.DartDialog.confirm(promptText)) return;
             await completeReturnPickup(fresh.id);
             renderOrders();
           }
           if (button.dataset.returnAction === "cancel") {
-            if (!await window.DartDialog.confirm("Record this pickup attempt as failed/cancelled?")) return;
+            if (!await window.DartDialog.confirm("هل تريد تسجيل محاولة الاستلام كملغاة أو غير ناجحة؟")) return;
             await cancelReturnPickup(record.id);
             ensureLocationWatch();
             renderOrders();
           }
         } catch (error) {
-          window.DartDialog.alert(error.message);
+          window.DartDialog.alert(englishDigits(error.message));
         } finally {
           returnActionsPending.delete(String(recordId));
           card.querySelectorAll('[data-return-action]').forEach(action => { action.disabled = false; });
@@ -1920,7 +1920,7 @@
           sessionStorage.removeItem(API_REP_CACHE_KEY);
         } else {
           sessionRecoveryPending = true;
-          setLocationStatus("Representative account service is temporarily unavailable.", "error");
+          setLocationStatus("خدمة حساب المندوب غير متاحة مؤقتًا.", "error");
         }
       }
     }
