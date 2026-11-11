@@ -837,6 +837,9 @@
       updateDeliveryControls();
       const entry = deliveryMaps.get(navigationOrderId);
       const courier = latestNavigationPosition(order);
+      if (window.DartGoogleMaps?.hasRepresentativeMap?.(order.id) === false) {
+        void window.DartGoogleMaps.attachRepresentatives([{ ...order, courierLocation: courier }]);
+      }
       if (entry.failed && courier) void refreshDeliveryRoadRoute(entry, courier, true);
       if (!courier) void syncFreshRepresentativeLocation();
       return;
@@ -1692,10 +1695,11 @@
       document.getElementById("repNavigationMapStatus").textContent =
         ["slow", "error", "recovering"].includes(event.detail.state) ? englishDigits(event.detail.message || "تعذر تحميل الخريطة. أغلق النافذة وافتحها مجددًا للمحاولة.") :
         event.detail.state === "ready" && event.detail.renderer === "RASTER" ?
-          "المتصفح يستخدم خريطة مسطّحة؛ الميل والدوران غير متاحين في هذا العرض." : "";
+          "تعذر تشغيل دوران الخريطة على هذا الجهاز؛ عرض Google العادي يتابع موقعك والسهم يوضح اتجاهك." : "";
     });
     document.addEventListener("dart:google-maps-error", () => {
       if (!navigationOrderId) return;
+      document.getElementById("repNavigationRetry").hidden = false;
       const entry = deliveryMaps.get(navigationOrderId);
       if (entry) entry.failed = true;
       document.getElementById("repNavigationMap").dataset.mapState = "error";

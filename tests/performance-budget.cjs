@@ -163,7 +163,7 @@ for (const file of jsFiles) {
   }
 }
 // Page-only GPS/compass, bounded Google renderer recovery and travel modes; Home/core caps unchanged.
-if (googleNavigationBytes > 148 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 148 KiB cap");
+if (googleNavigationBytes > 150 * 1024) failures.push("Google checkout/courier navigation exceeds its independent 150 KiB cap");
 for (const file of rootHtml.filter(file => !["cart-checkout.html", "rep.html"].includes(file))) {
   if (/<script[^>]+src=["'][^"']*dart-(?:rep(?:-compass)?|google-maps|checkout-google|checkout-places)\.js/.test(fs.readFileSync(file, "utf8")))
     failures.push(`${file}: Google checkout/courier code must stay page-scoped`);

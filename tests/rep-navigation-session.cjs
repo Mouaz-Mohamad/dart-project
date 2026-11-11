@@ -61,5 +61,9 @@ vm.runInNewContext(source,{window,document,sessionStorage,location:{protocol:'ht
   nav.seed(order);const previousSession=nav.refreshApiWork();nav.logout();nav.seed(order);
   workReads[3]({orders:[{id:'old-session'}],returns:[]});await previousSession;
   assert.equal(nav.work().orders[0].id,order.id,'same-account re-login rejects a response from the previous session');
+  window.DartGoogleMaps.attachRepresentatives=async()=>{mounts++;};
+  nav.seed(order);await nav.openNavigation(order);nav.closeNavigation();
+  const beforeResume=mounts;window.DartGoogleMaps.hasRepresentativeMap=()=>false;
+  await nav.openNavigation(order);assert.equal(mounts,beforeResume+1,'resume attaches a map skipped because the dialog closed during SDK loading');
   console.log('PASS courier navigation: 499/501m gate, stale/missing GPS, unchanged pickup radius, retained map/route on exit/reopen and cleanup after completion');
 })().catch(error=>{console.error(error);process.exitCode=1});

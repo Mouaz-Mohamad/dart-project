@@ -46,7 +46,7 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   const node={dataset:{repLiveMap:'',orderId:'synthetic'},isConnected:true,
     closest:()=>dialog,getBoundingClientRect:()=>({width:390,height:dialog.open?675:0}),
     replaceChildren(){},appendChild(){}};
-  const document={hidden:false,querySelectorAll:()=>[node],createElement:()=>({addEventListener(){},setAttribute(){},appendChild(){}}),
+  const document={hidden:false,querySelectorAll:()=>[node],createElement:()=>({style:{},addEventListener(){},setAttribute(){},appendChild(){}}),
     addEventListener(type,fn){callbacks.set(type,fn)},dispatchEvent(event){callbacks.get(event.type)?.(event)}};
   class Clock extends Date { static now(){return time;} }
   const google={maps:{Map:class{
@@ -56,7 +56,7 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
     getRenderingType(){return chooseRaster ? "RASTER" : this.renderer;}
     setRenderingType(value){nativeSwitches++;this.renderer=value;this.ready=false;this.events.renderingtype_changed?.();}
     setTilt(value){this.tilt=value;}setHeading(value){this.heading=value;}
-    getHeading(){return this.heading;}getTilt(){return this.tilt;}setCenter(){cameraWrites++;}setZoom(){}
+    getHeading(){return this.heading;}getTilt(){return this.tilt;}getCenter(){return this.center;}setCenter(value){cameraWrites++;this.center=value;}panTo(value){cameraWrites++;this.center=value;}setZoom(){}
     moveCamera(value){cameraWrites++;this.heading=value.heading;this.tilt=value.tilt;this.events.heading_changed?.();if(this.ready)this.events.tilesloaded?.();}
   },Marker:class{setMap(){}setPosition(){}setIcon(){}},Polyline:class{constructor(options){window.__routePath=options.path;}setMap(){}setPath(){}},Point:class{},
     event:{clearInstanceListeners(map){map.events={};},trigger(){}}}};
@@ -70,6 +70,7 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
     await window.DartGoogleMaps.attachRepresentatives([{id:'synthetic',latitude:30.05,longitude:31.25,
       courierLocation:{lat:30.02,lng:31.25,heading:90,speed:2,updatedAt:new Clock(time).toISOString()}}]);
   };
+  dialog.open=true;const beforeClosedLoad=mapCount;const closing=window.DartGoogleMaps.attachRepresentatives([{id:'synthetic',latitude:30.05,longitude:31.25}]);dialog.open=false;await closing;assert.equal(mapCount,beforeClosedLoad,'SDK completion after exit cannot construct a hidden map');
   await mount();
   const beforeStartupGps=cameraWrites;
   for(let i=1;i<=20;i++) {
@@ -77,8 +78,8 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
     window.DartGoogleMaps.updateRepresentativeLocation({lat:30.02+i/100000,lng:31.25,heading:90,speed:2,updatedAt:new Clock(time).toISOString()});
   }
   assert.equal(cameraWrites,beforeStartupGps,'continuous GPS must not move the camera while first tiles load');
-  advance(6000);assert.equal(node.dataset.mapRenderer,'VECTOR','slow initial streets must keep vector');
-  latestMap.events.tilesloaded();assert.equal(latestMap.tilt,60);assert.equal(latestMap.heading,90);
+  advance(1000);assert.equal(node.dataset.mapRenderer,'VECTOR','slow initial streets must keep vector');
+  latestMap.events.tilesloaded();assert.equal(latestMap.tilt,0);assert.equal(latestMap.heading,90);
   const healthyCount=mapCount;advance(60000);assert.equal(mapCount,healthyCount);
   const beforeBurst=cameraWrites;
   for(let i=1;i<=20;i++) {
@@ -98,11 +99,11 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   assert.equal(latestMap.heading,80,'returning to a visible tab applies the latest GPS without waiting for movement');
   await mount();latestMap.events.tilesloaded();latestMap.ready=false;
   window.DartGoogleMaps.updateRepresentativeLocation({lat:30.041,lng:31.25,heading:90,speed:2,updatedAt:new Clock(time).toISOString()});
-  advance(14000);assert.equal(node.dataset.mapRenderer,'RASTER','streets that stall after first paint also trigger recovery');
+  const cachedCount=mapCount;advance(35000);assert.equal(mapCount,cachedCount,'cached camera movement without a tilesloaded event is not a rendering outage');
   latestMap.events.tilesloaded();assert.equal(node.dataset.mapState,'ready');
   await mount();dialog.open=false;const hiddenCount=mapCount;advance(90000);
   assert.equal(mapCount,hiddenCount,'closed cached maps must not trigger a raster downgrade');
-  dialog.open=true;latestMap.events.tilesloaded();assert.equal(latestMap.tilt,60);
+  dialog.open=true;latestMap.events.tilesloaded();assert.equal(latestMap.tilt,0);
   latestMap.heading=130;latestMap.events.heading_changed();
   window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.25,heading:90,speed:2,updatedAt:new Clock(time).toISOString()});
   assert.equal(latestMap.heading,130,'manual rotation survives the next GPS reading');
@@ -112,12 +113,12 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   const info=window.DartGoogleMaps.getRepresentativeDiagnostics()[0];
   assert.equal(info.actualRenderer,'VECTOR');assert.equal('orderId' in info,false);assert.equal('location' in info,false);
   await mount();const timeoutCount=mapCount,switches=nativeSwitches;advance(35000);
-  assert.equal(node.dataset.mapRenderer,'RASTER');assert.equal(mapCount,timeoutCount,'native recovery preserves the existing map instance');
-  assert.equal(nativeSwitches,switches+1,'a stalled renderer switches only once');
+  assert.equal(node.dataset.mapRenderer,'RASTER');assert.equal(mapCount,timeoutCount+1,'a stalled WebGL surface is replaced once with an independent image-tile map');
+  assert.equal(nativeSwitches,switches,'do not attempt to repair the failed WebGL surface in place');
   assert.equal(node.dataset.mapState,'error');assert.equal(node.dataset.mapFallbackReason,'vector-load-deadline');
   assert.equal(window.DartGoogleMaps.getRepresentativeDiagnostics()[0].loadingIssue,'streets-timeout');
   latestMap.events.tilesloaded();assert.equal(node.dataset.mapState,'ready');assert.equal(latestMap.tilt,0);
-  assert.equal(mapCount,timeoutCount,'late streets recover the same map after timeout');
+  assert.equal(mapCount,timeoutCount+1,'late streets recover the same replacement map after timeout');
   chooseRaster=true;await mount();const selectedCount=mapCount;
   assert.equal(node.dataset.mapRenderer,'RASTER','actual rendering type must be recorded before all streets load');
   latestMap.events.tilesloaded();advance(30000);assert.equal(mapCount,selectedCount);
@@ -129,7 +130,7 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   assert.equal(window.__routePath.length,2,'parallel road geometry must survive mounting');
   delete window.DART_REP_LAST_LOCATION;window.DartGoogleMaps.destroyRepresentatives();
   await window.DartGoogleMaps.attachRepresentatives([{id:'synthetic',latitude:30.05,longitude:31.25}]);
-  latestMap.events.tilesloaded();assert.equal(latestMap.tilt,60,'60 degree camera is applied even before the first GPS fix');
+  latestMap.events.tilesloaded();assert.equal(latestMap.tilt,0,'flat camera remains flat even before the first GPS fix');
   window.DartGoogleMaps.destroyRepresentatives();assert.equal(timers.size,0);
   const requests=[];
   google.maps.importLibrary=async()=>({Route:{computeRoutes:async options=>{
@@ -145,5 +146,5 @@ console.log("PASS courier Google Maps only, route polylines and manual orders");
   assert(walking.warnings.some(w=>w.includes('المشي')),'Google walking safety warning is displayed');
   assert.deepEqual(requests[1].origin,origin);assert.deepEqual(requests[1].destination,destination);
 
-  console.log('PASS renderer lifecycle: delayed vector readiness, closed-dialog timer pause, manual rotation, 60-degree follow, bounded native timeout recovery, actual Google raster selection, parallel route retention and location-free diagnostics');
+  console.log('PASS renderer lifecycle: delayed vector readiness, closed-dialog timer pause, manual rotation, flat heading-up follow, bounded independent image-tile recovery, actual Google raster selection, parallel route retention and location-free diagnostics');
 })().catch(error=>{console.error(error);process.exitCode=1});

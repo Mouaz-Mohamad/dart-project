@@ -13,12 +13,12 @@ address_components:[{types:['country'],short_name:'EG',long_name:'Egypt'},
 {types:['sublocality'],long_name:'Test district'}, {types:['route'],long_name:'Test street'}],
 geometry:{location:{lat:()=>lat,lng:()=>lng}}});
 window.google={maps:{
-Map:class {constructor(el,options){window.__maps++;window.__mapHistory.push(this);this.options=options;this.zoom=options.zoom;this.events={};this.heading=options.heading||0;this.renderingType=window.__actualRaster?'RASTER':options.renderingType||'RASTER';
+Map:class {constructor(el,options){window.__maps++;window.__mapHistory.push(this);this.options=options;this.center=options.center;this.zoom=options.zoom;this.events={};this.heading=options.heading||0;this.tilt=options.tilt||0;this.renderingType=window.__actualRaster?'RASTER':options.renderingType||'RASTER';
 if(window.__throwVector && this.renderingType==='VECTOR')throw Error('Synthetic WebGL initialization failure');
 el.textContent='Synthetic Google Map';window.__map=this;
 if(!(this.renderingType==='VECTOR'?window.__blankVector:window.__blankRaster))setTimeout(()=>this.events.tilesloaded?.(),0);
-} addListener(n,fn){this.events[n]=(...args)=>{if(n==='tilesloaded')this.ready=true;fn(...args)}} setRenderingType(value){this.renderingType=value;this.ready=false;this.events.renderingtype_changed?.();if(!(value==='VECTOR'?window.__blankVector:window.__blankRaster))setTimeout(()=>this.events.tilesloaded?.(),0)} setTilt(value){this.tilt=value}setHeading(value){this.heading=value} panTo(location){window.__panCalls.push(location)} setZoom(zoom){this.zoom=zoom} setCenter(location){window.__panCalls.push(location);if(this.ready)this.events.tilesloaded?.()} fitBounds(){} getRenderingType(){return this.renderingType} getHeading(){return this.heading} getTilt(){return this.tilt??this.options.tilt} moveCamera(options){this.heading=options.heading;this.tilt=options.tilt;window.__panCalls.push(options.center);this.events.heading_changed?.();if(this.ready)this.events.tilesloaded?.()}},
-Marker:class {constructor(options){this.options=options;this.events={};window.__markers.push(this)}setMap(){}setPosition(position){this.options.position=position}setIcon(icon){this.options.icon=icon}addListener(n,fn){this.events[n]=fn}},
+} addListener(n,fn){this.events[n]=(...args)=>{if(n==='tilesloaded')this.ready=true;fn(...args)}} setRenderingType(value){this.renderingType=value;this.ready=false;this.events.renderingtype_changed?.();if(!(value==='VECTOR'?window.__blankVector:window.__blankRaster))setTimeout(()=>this.events.tilesloaded?.(),0)} setTilt(value){this.tilt=value}setHeading(value){this.heading=value;this.events.heading_changed?.()} getCenter(){return this.center} panTo(location){this.center=location;window.__panCalls.push(location)} setZoom(zoom){this.zoom=zoom} setCenter(location){this.center=location;window.__panCalls.push(location);if(this.ready)this.events.tilesloaded?.()} fitBounds(){} getRenderingType(){return this.renderingType} getHeading(){return this.heading} getTilt(){return this.tilt??this.options.tilt} moveCamera(options){this.heading=options.heading;this.tilt=options.tilt;window.__panCalls.push(options.center);this.events.heading_changed?.();if(this.ready)this.events.tilesloaded?.()}},
+Marker:class {constructor(options){this.options=options;this.events={};window.__markers.push(this)}setMap(){}setPosition(position){this.options.position=position}setIcon(icon){this.options.icon=icon}setVisible(value){this.options.visible=value}addListener(n,fn){this.events[n]=fn}},
 Point:class{constructor(x,y){this.x=x;this.y=y}},Polyline:class{constructor(options){this.options=options;window.__polyline=options}setMap(){}setPath(path){this.options.path=path;window.__path=path}},LatLngBounds:class{extend(){}},event:{clearInstanceListeners(map){map.events={}}},
 Geocoder:class{geocode(request,callback){window.__geocodes.push({request,callback});if(!window.__delayGeocode)callback([window.__lookup()], 'OK')}},
 importLibrary:async name=>name==='places'?{AutocompleteSessionToken:class{},AutocompleteSuggestion:{fetchAutocompleteSuggestions:async request=>{
@@ -307,6 +307,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator("#repNavigationComplete").textContent(),"وصلت");
     assert.equal(await page.evaluate(()=>window.__map.options.disableDefaultUI),false);
     assert.equal(await page.evaluate(()=>window.__map.options.zoomControl),true);
+    assert.equal(await page.evaluate(()=>window.__map.options.tiltInteractionEnabled),false);
     assert.equal(await page.evaluate(()=>window.__map.options.gestureHandling),"greedy");
     assert.equal(await page.locator(".dart-rep-direction").isVisible(),true);
     assert.equal(await page.locator(".dart-rep-direction").evaluate(el=>getComputedStyle(el).backgroundColor),"rgb(8, 126, 118)");
@@ -315,16 +316,22 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(()=>window.__path.length),2);
     assert.equal(await page.evaluate(()=>window.__map.options.renderingType),"VECTOR");
     assert.equal(await page.evaluate(()=>window.__routeRequest.routingPreference),"TRAFFIC_AWARE_OPTIMAL");
-    await page.waitForFunction(()=>window.__map.tilt===60);
-    assert.equal(await page.evaluate(()=>window.__map.tilt),60);
+    await page.waitForFunction(()=>window.__map.tilt===0);
+    assert.equal(await page.evaluate(()=>window.__map.tilt),0);
     assert.equal(await page.evaluate(()=>window.__map.heading),90);
     assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.icon.rotation),0,"the navigation arrow faces ahead while the vector camera rotates with travel");
     assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.icon.fillColor),"#1a73e8");
     assert.equal(await page.evaluate(()=>window.__map.zoom),17);
+    const fixedArrow=page.locator('#repNavigationMap .dart-google-map-follow-arrow');
+    const arrowCenter=async()=>fixedArrow.evaluate(el=>{const a=el.getBoundingClientRect(),m=el.parentElement.getBoundingClientRect();return {dx:Math.abs(a.x+a.width/2-m.x-m.width/2),dy:Math.abs(a.y+a.height/2-m.y-m.height/2),transform:getComputedStyle(el).transform}});
+    assert.equal(await fixedArrow.isVisible(),true);
+    assert((await arrowCenter()).dx<1&&(await arrowCenter()).dy<1,'navigation arrow is fixed at the map viewport center');
+    assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.visible),false,'hide the moving map marker while screen-following');
     const compassPosition=await page.evaluate(()=>({...window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.position}));
     await page.locator('#repNavigationCompass').click();
     await page.evaluate(()=>window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute',{absolute:true,alpha:180,beta:30,gamma:0})));
-    await page.waitForFunction(()=>window.DartRepCompass.heading===180);
+    await page.waitForFunction(()=>window.DartRepCompass.heading===180&&window.__map.heading===180);
+    assert.equal((await arrowCenter()).transform,"matrix(1, 0, 0, 1, -25, -25)","the arrow points up while Google turns the map underneath it");
     assert.deepEqual(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.position),compassPosition,'turning the phone must not invent GPS movement');
     await page.evaluate(()=>{window.DartRepCompass.pause();window.DartGoogleMaps.updateRepresentativeLocation({lat:30.02,lng:31.25,accuracy:5,heading:90,speed:2,updatedAt:new Date().toISOString()})});
     await page.waitForFunction(()=>window.__map.heading===90);
@@ -332,26 +339,29 @@ const server = http.createServer((req, res) => {
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.02,lng:31.25,accuracy:5,heading:270,speed:0,updatedAt:new Date().toISOString()}));
     assert.equal(await page.evaluate(()=>window.__map.heading),90);
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.25,accuracy:5,heading:null,speed:null,updatedAt:new Date().toISOString()}));
-    await page.waitForFunction(()=>{const lat=window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.position.lat;return lat>30.02&&lat<30.021});
-    assert.equal(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.position.lat<30.021),true,"position interpolates through intermediate frames instead of jumping");
     await page.waitForFunction(()=>window.__panCalls.at(-1).lat===30.021);
     assert(Math.abs(await page.evaluate(()=>window.__map.heading))<.01,"missing heading uses actual northbound movement");
     assert(Math.abs(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.icon.rotation))<.01,"missing heading uses actual northbound movement");
     assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lat),30.021);
+    assert((await arrowCenter()).dx<1&&(await arrowCenter()).dy<1,"GPS must move the map while the screen arrow stays centered");
     await page.evaluate(()=>{window.__panBefore=window.__panCalls.length;window.__map.events.dragstart()});
 
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.251,accuracy:5,heading:null,updatedAt:new Date().toISOString()}));
+    assert.equal(await fixedArrow.isVisible(),false,'manual browsing pauses fixed-arrow follow');
+    assert.equal(await page.locator('.dart-google-map-recenter').isVisible(),true);
+    await page.waitForFunction(()=>{const lng=window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.position.lng;return lng>31.25&&lng<31.251});
     await page.waitForFunction(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.position.lng===31.251);
     assert.equal(await page.evaluate(()=>window.__panCalls.length===window.__panBefore),true,"dragging pauses follow while the marker keeps moving");
     assert(Math.abs(await page.evaluate(()=>window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.icon.rotation)-90)<.01);
-    await page.evaluate(()=>window.DartGoogleMaps.setRepresentativeFollow(true));
+    await page.locator(".dart-google-map-recenter").click();
+    assert.equal(await fixedArrow.isVisible(),true);
+    assert.equal(await page.locator(".dart-google-map-recenter").isVisible(),false);
     assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lng),31.251);
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:31,lng:32,heading:180,updatedAt:new Date(Date.now()-180000).toISOString()}));
     assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lng),31.251,"stale GPS does not move the live arrow or camera");
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.251,heading:350,speed:2,updatedAt:new Date().toISOString()}));
     await page.waitForFunction(()=>window.__map.heading===350);
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.251,heading:10,speed:2,updatedAt:new Date().toISOString()}));
-    await page.waitForFunction(()=>{const rotation=window.__markers.findLast(m=>m.options.title==='موقعك الحالي').options.icon.rotation;return rotation>0&&rotation<20});
     await page.waitForFunction(()=>window.__map.heading===10);
     // Devices without a vector renderer retain a working flat map and correctly oriented marker.
     await page.evaluate(()=>window.DartGoogleMaps.useStandardRepresentativeMap());
@@ -457,7 +467,7 @@ const server = http.createServer((req, res) => {
     await mountRecovery({});await recovery.clock.runFor(10);
     const healthyCount=await recovery.evaluate(()=>window.__maps);
     await recovery.clock.fastForward(20000);
-    assert.equal(await recovery.evaluate(()=>window.__maps),healthyCount,"loaded vector maps never downgrade on a timer");
+    assert.equal(await recovery.evaluate(()=>window.__maps),healthyCount,"healthy flat maps are not recreated on a timer");
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
     await mountRecovery({actualRaster:true});await recovery.clock.runFor(10);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER');
@@ -466,11 +476,11 @@ const server = http.createServer((req, res) => {
 
     // A delayed renderer has a short grace period, then one native Google raster recovery.
     await mountRecovery({vector:true});
-    await recovery.clock.fastForward(10001);
+    await recovery.clock.fastForward(6000);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'VECTOR');
     await recovery.evaluate(()=>window.__map.events.tilesloaded());
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
-    assert.equal(await recovery.evaluate(()=>window.__map.tilt),60);
+    assert.equal(await recovery.evaluate(()=>window.__map.tilt),0);
     // A cached closed dialog is not a failed GPU, even while its parent tab remains visible.
     await mountRecovery({vector:true});
     const hiddenCount=await recovery.evaluate(()=>{document.getElementById('repNavigationDialog').close();return window.__maps});
@@ -479,7 +489,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'VECTOR');
     await recovery.evaluate(()=>{document.getElementById('repNavigationDialog').showModal();window.DartGoogleMaps.resizeRepresentatives();window.__map.events.tilesloaded()});
     assert.equal(await recovery.evaluate(()=>window.__maps),hiddenCount);
-    assert.equal(await recovery.evaluate(()=>window.__map.tilt),60);
+    assert.equal(await recovery.evaluate(()=>window.__map.tilt),0);
     const safeDiagnostic=await recovery.evaluate(()=>window.DartGoogleMaps.getRepresentativeDiagnostics()[0]);
     assert.equal(safeDiagnostic.actualRenderer,'VECTOR');
     assert.equal('orderId' in safeDiagnostic,false);assert.equal('location' in safeDiagnostic,false);
@@ -490,11 +500,11 @@ const server = http.createServer((req, res) => {
     await recovery.clock.runFor(10);
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-renderer'),'RASTER');
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
-    assert.equal(await recovery.evaluate(()=>window.__maps),stalledCount,"a streets timeout never destroys and reloads a map");
+    assert.equal(await recovery.evaluate(()=>window.__maps),stalledCount+1,"a failed WebGL surface is replaced once with a fresh Google image-tile map");
     await recovery.evaluate(()=>window.__map.events.tilesloaded());
     assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
     assert.equal(await recovery.evaluate(()=>window.__map.tilt),0);
-    assert.equal(await recovery.evaluate(()=>window.__maps),stalledCount,"native recovery preserves the same Google map");
+    assert.equal(await recovery.evaluate(()=>window.__maps),stalledCount+1,"late callbacks cannot create further replacements");
     assert.equal(await recovery.evaluate(()=>window.__polyline.path.length),2);
 
     await mountRecovery({});await recovery.clock.runFor(10);
@@ -517,6 +527,12 @@ const server = http.createServer((req, res) => {
     await recovery.clock.fastForward(30000);
     assert.equal(await recovery.evaluate(()=>window.__maps),failedCount,"a complete tile outage never loops through new maps");
 
+    await mountRecovery({});await recovery.clock.runFor(10);
+    await recovery.evaluate(()=>{const img=document.createElement('img');img.id='failed-street';Object.assign(img.style,{position:'absolute',left:'0',top:'0',width:'256px',height:'256px'});img.src='https://maps.googleapis.com/maps/vt?synthetic-failure=1';document.querySelector('#repNavigationMap .dart-google-map-overlay').append(img);img.dispatchEvent(new Event('error'));});
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'error','a real image-tile failure cannot be presented as a ready map');
+    assert.equal(await recovery.evaluate(()=>window.DartGoogleMaps.getRepresentativeDiagnostics()[0].loadingIssue),'tile-network-error');
+    await recovery.evaluate(()=>{document.getElementById('failed-street').remove();window.__map.events.tilesloaded()});
+    assert.equal(await recovery.locator('#repNavigationMap').getAttribute('data-map-state'),'ready');
     await mountRecovery({vector:true});
     await recovery.evaluate(()=>{document.getElementById('repNavigationDialog').close();window.DartGoogleMaps.destroyRepresentatives()});
     const closedCount=await recovery.evaluate(()=>window.__maps);
@@ -524,6 +540,6 @@ const server = http.createServer((req, res) => {
     assert.equal(await recovery.evaluate(()=>window.__maps),closedCount,"closing cancels pending recovery");
     await recovery.close();
     assert.deepEqual(errors,[]);
-    console.log("PASS map lifecycle: delayed streets retain the same vector; actual Google raster selection recorded; explicit constructor/context failures recover once; path/pins/GPS preserved; complete outages bounded; late/closed callbacks safe. Google checkout/Places regressions; courier vector 60-degree camera, heading-up arrow, interpolated motion, shortest turns, pause/recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 80% map, retry, cached exit/reopen, 500m gate and cash confirmation");
+    console.log("PASS map lifecycle: delayed streets retain the same vector; actual Google raster selection recorded; explicit constructor/context failures recover once; path/pins/GPS preserved; complete outages bounded; late/closed callbacks safe. Google checkout/Places regressions; flat heading-up Google navigation, fixed centered arrow, native map movement, manual browsing/interpolated marker, explicit recenter and cleanup; visual GPS before delayed API acknowledgement without unlocking delivery or rolling back newer fixes; 80% map, retry, cached exit/reopen, 500m gate and cash confirmation");
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});

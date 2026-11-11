@@ -44,12 +44,24 @@
   function applyCamera(entry, location, heading) {
     clearTimeout(entry.cameraTimer); entry.cameraTimer = null;
     if (!entry.follow || !entry.tilesReady || !mapIsVisible(entry) || entry.state === "error") return;
-    if (entry.tilesPendingSince && Date.now() - entry.tilesPendingSince < 2000) return;
     entry.cameraAt = performance.now(); entry.cameraLocation = location; entry.cameraHeading = heading;
-    entry.tilesPendingSince ??= Date.now();
     entry.cameraUpdates = (entry.cameraUpdates || 0) + 1;
-    if (entry.map.getRenderingType?.() === "VECTOR") entry.map.moveCamera({ center: location, heading, tilt: 60 });
+    // Google's own pan animation moves the streets under the fixed navigation arrow.
+    // Never rotate/stretch the map DOM, its controls, imagery or attribution with CSS.
+    if (entry.map.getRenderingType?.() === "VECTOR") entry.map.setHeading?.(heading);
+    if (entry.map.panTo) entry.map.panTo(location);
     else entry.map.setCenter(location);
+  }
+  function syncFollowArrow(entry) {
+    const visible = entry.follow && entry.tilesReady && entry.location && entry.state !== "error";
+    if (entry.followArrow) {
+      entry.followArrow.hidden = !visible;
+      const rotation = entry.map?.getRenderingType?.() === "VECTOR" ? 0 : entry.drawnHeading ?? entry.heading ?? 0;
+      entry.arrowRotation = (entry.arrowRotation ?? rotation) + angleDifference(entry.arrowRotation ?? rotation, rotation);
+      entry.followArrow.style.transform = `translate(-50%, -50%) rotate(${entry.arrowRotation}deg)`;
+    }
+    entry.courier?.setVisible?.(!entry.follow);
+    if (entry.recenterButton) entry.recenterButton.hidden = Boolean(entry.follow);
   }
   function drawCourier(entry, location, heading, final = false) {
     if (entry.container.dataset.mapState === "error" || !mapIsVisible(entry)) return;
@@ -58,11 +70,11 @@
     // Keep the initial viewport still until streets load. GPS/marker animation must not churn tiles.
     if (entry.follow && entry.tilesReady) {
       const time = performance.now();
-      const changed = final || entry.cameraAt == null || !entry.cameraLocation || metresBetween(entry.cameraLocation, location) >= 1 ||
-        Math.abs(angleDifference(entry.cameraHeading ?? heading, heading)) >= 1;
+      const changed = entry.cameraAt == null || !entry.cameraLocation || metresBetween(entry.cameraLocation, location) >= (final ? 0.01 : 1) ||
+        Math.abs(angleDifference(entry.cameraHeading ?? heading, heading)) >= (final ? 0.01 : 1);
       entry.pendingCamera = { location, heading };
       if (changed) {
-        const remaining = entry.cameraAt == null ? 0 : 1000 - (time - entry.cameraAt);
+        const remaining = entry.cameraAt == null ? 0 : 250 - (time - entry.cameraAt);
         if (remaining <= 0) applyCamera(entry, location, heading);
         else if (!entry.cameraTimer) entry.cameraTimer = setTimeout(() => {
           entry.cameraTimer = null;
@@ -73,12 +85,14 @@
     }
     const rotation = ((heading - (entry.map.getHeading?.() || 0)) % 360 + 360) % 360;
     if (!entry.courier) entry.courier = new google.maps.Marker({ map: entry.map,
-      position: location, title: "موقعك الحالي", icon: courierIcon(rotation), zIndex: 10 });
+      position: location, visible: !entry.follow, title: "موقعك الحالي", icon: courierIcon(rotation), zIndex: 10 });
     else { entry.courier.setPosition(location); entry.courier.setIcon(courierIcon(rotation)); }
+    syncFollowArrow(entry);
   }
   function animateCourier(entry, location, heading) {
     window.cancelAnimationFrame(entry.frame);
     if (!mapIsVisible(entry)) { entry.frame = null; return; }
+    if (entry.follow) { drawCourier(entry, location, heading, true); entry.frame = null; return; }
     const from = entry.drawnLocation, fromHeading = entry.drawnHeading ?? heading;
     const started = performance.now();
     const duration = Math.max(300, Math.min(1000, started - (entry.lastAnimationAt ?? started - 800)));
@@ -99,10 +113,13 @@
   }
   function setFollow(entry, enabled) {
     entry.follow = Boolean(enabled);
+    clearTimeout(entry.cameraTimer); entry.cameraTimer = null;
+    syncFollowArrow(entry);
     if (entry.follow && mapIsVisible(entry)) {
+      window.cancelAnimationFrame(entry.frame); entry.frame = null;
       entry.cameraAt = null; entry.cameraLocation = null;
       if (entry.tilesReady) entry.map.setZoom(17);
-      if (entry.location) drawCourier(entry, entry.drawnLocation || entry.location, entry.drawnHeading ?? entry.heading ?? 0);
+      if (entry.location) drawCourier(entry, entry.location, entry.heading ?? 0, true);
       else if (entry.target) applyCamera(entry, entry.target, entry.heading ?? 0);
     }
     document.dispatchEvent(new CustomEvent("dart:rep-map-follow", { detail: { following: entry.follow } }));
@@ -172,7 +189,6 @@
   }
   function disposeRepresentativeMap(entry) {
     clearTimeout(entry.tileTimer);
-    clearTimeout(entry.followTimer);
     clearTimeout(entry.cameraTimer); entry.cameraTimer = null;
     entry.resizeObserver?.disconnect();
     clearTimeout(entry.resizeTimer);
@@ -181,11 +197,12 @@
     entry.destination?.setMap(null); entry.courier?.setMap(null); entry.route?.setMap(null);
     if (entry.map) window.google?.maps?.event?.clearInstanceListeners(entry.map);
     entry.container.replaceChildren();
-    entry.courier = null;
+    entry.courier = null; entry.followArrow = null; entry.recenterButton = null;
   }
   function mapState(entry, state, message = "") {
     entry.container.dataset.mapState = state;
     entry.state = state;
+    syncFollowArrow(entry);
     document.dispatchEvent(new CustomEvent("dart:rep-map-state", { detail: {
       orderId: entry.id, state, message, renderer: entry.container.dataset.mapRenderer,
       fallbackReason: entry.fallbackReason || "",
@@ -203,6 +220,8 @@
       tilt: entry.map?.getTilt?.() ?? null, startupFailure: entry.startupFailure || "",
       libraryLoadMs, firstTilesMs: entry.firstTilesMs ?? null, loadingIssue: entry.loadingIssue || "",
       cameraUpdates: entry.cameraUpdates || 0, recoveryUsed: Boolean(entry.recoveryUsed),
+      following: Boolean(entry.follow),
+      centerErrorMetres: entry.location && entry.map?.getCenter ? Math.round(metresBetween(point(entry.map.getCenter()), entry.location)) : null,
       viewport: { width: Math.round(entry.container.getBoundingClientRect().width), height: Math.round(entry.container.getBoundingClientRect().height) },
     }));
   }
@@ -210,10 +229,12 @@
     const center = (!entry.follow && point(entry.map?.getCenter?.())) || entry.location || entry.target || { lat: 30.0444, lng: 31.2357 };
     disposeRepresentativeMap(entry);
     entry.tilesReady = false; entry.createdAt = Date.now(); entry.firstTilesMs = null; entry.loadingIssue = "";
-    entry.tilesPendingSince = null;
     entry.cameraAt = null; entry.cameraLocation = null;
     const canvas = document.createElement("div");
     canvas.className = "dart-google-map-overlay";
+    const viewport = entry.container.getBoundingClientRect();
+    canvas.style.width = `${Math.round(viewport.width)}px`;
+    canvas.style.height = `${Math.round(viewport.height)}px`;
     entry.container.appendChild(canvas);
     entry.container.dataset.mapRenderer = renderer;
     entry.requestedRenderer ??= renderer;
@@ -223,7 +244,10 @@
       if (mounted.get(entry.id) !== entry || authFailed || (map && entry.map !== map)) return;
       entry.fallbackReason = reason;
       entry.container.dataset.mapFallbackReason = reason;
-      if (renderer === "VECTOR") createRepresentativeMap(entry, "RASTER");
+      if (renderer === "VECTOR" && !entry.recoveryUsed) {
+        entry.recoveryUsed = true;
+        createRepresentativeMap(entry, "RASTER");
+      }
       else {
         disposeRepresentativeMap(entry);
         entry.container.textContent = "تعذر تحميل شوارع الخريطة. تحقق من الاتصال وحاول مجددًا.";
@@ -232,10 +256,9 @@
     };
     try {
       map = new google.maps.Map(canvas, { center, zoom: 17, renderingType: renderer,
-        // Google Maps road view: native map gestures and controls, 60° follow camera on VECTOR.
-        // Raster mode cannot tilt, so keep its normal readable Google road map instead.
+        // Flat Google navigation. VECTOR is needed for native heading-up rotation, not for a 3D view.
         tilt: 0, heading: 0, mapTypeId: "roadmap",
-        tiltInteractionEnabled: true, headingInteractionEnabled: true, isFractionalZoomEnabled: true,
+        tiltInteractionEnabled: false, headingInteractionEnabled: true, isFractionalZoomEnabled: true,
         disableDefaultUI: false, gestureHandling: "greedy", keyboardShortcuts: true,
         zoomControl: true, rotateControl: true, scaleControl: true,
         colorScheme: "LIGHT", clickableIcons: false, mapTypeControl: false,
@@ -244,15 +267,21 @@
       entry.drawnLocation = entry.location; entry.drawnHeading = entry.heading ?? 0;
       entry.destination = entry.target ? new google.maps.Marker({ map, position: entry.target, title: "مكان التسليم" }) : null;
       entry.route = new google.maps.Polyline({ map, path: entry.path, strokeColor: "#1a73e8", strokeOpacity: 1, strokeWeight: 6 });
+      const followArrow = document.createElement("span");
+      followArrow.className = "dart-google-map-follow-arrow";
+      followArrow.setAttribute("aria-hidden", "true");
+      entry.followArrow = followArrow;
+      entry.container.appendChild(followArrow);
       // Panning or rotating pauses automatic follow until the courier taps recenter.
       // Do not override a manually selected direction after an arbitrary timeout.
-      map.addListener("dragstart", () => { clearTimeout(entry.followTimer); setFollow(entry, false); });
+      map.addListener("dragstart", () => { setFollow(entry, false); });
       const recenterButton = document.createElement("button");
       recenterButton.type = "button";
       recenterButton.className = "dart-google-map-recenter";
-      recenterButton.textContent = "⌖";
+      recenterButton.textContent = "إعادة التوسيط";
       recenterButton.setAttribute("aria-label", "العودة إلى موقعي ومتابعة الاتجاه");
       recenterButton.title = "العودة إلى موقعي";
+      entry.recenterButton = recenterButton;
       recenterButton.addEventListener("click", () => {
         if (mounted.get(entry.id) === entry) setFollow(entry, true);
       });
@@ -268,9 +297,9 @@
         if (entry.tilesReady && entry.follow && entry.cameraHeading != null &&
             Math.abs(angleDifference(entry.cameraHeading, map.getHeading() || 0)) > 0.5) {
           setFollow(entry, false);
-          clearTimeout(entry.followTimer);
         }
         entry.courier?.setIcon(courierIcon(((entry.drawnHeading - (map.getHeading() || 0)) % 360 + 360) % 360));
+        syncFollowArrow(entry);
       });
       const readRenderer = () => {
         if (entry.map !== map || mounted.get(entry.id) !== entry) return;
@@ -281,15 +310,33 @@
             entry.fallbackReason ||= "google-selected-raster";
             entry.container.dataset.mapFallbackReason = entry.fallbackReason;
           }
-          // Google may resolve the rendering type after tilesloaded. Restore the real 60-degree camera then too.
+          // Google may resolve the rendering type after tilesloaded. Restore flat heading-up follow then too.
           if (entry.tilesReady && actual === "VECTOR") setFollow(entry, entry.follow);
         }
       };
       map.addListener("renderingtype_changed", readRenderer);
       readRenderer();
+      const visibleStreetImage = img => {
+        if (!/\/vt[/?]/.test(img.currentSrc || img.src || "")) return false;
+        const tile = img.getBoundingClientRect(), view = entry.container.getBoundingClientRect();
+        return tile.width > 0 && tile.height > 0 && tile.right > view.left && tile.left < view.right && tile.bottom > view.top && tile.top < view.bottom;
+      };
+      const failedStreetImages = () => [...(canvas.querySelectorAll?.("img") || [])]
+        .filter(img => img.complete && !img.naturalWidth && visibleStreetImage(img)).length;
+      canvas.addEventListener("error", event => {
+        if (entry.map !== map || mounted.get(entry.id) !== entry ||
+            event.target?.tagName !== "IMG" || !visibleStreetImage(event.target)) return;
+        entry.loadingIssue = "tile-network-error";
+        mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. تحقق من الاتصال واضغط إعادة تحميل الخريطة.");
+      }, true);
       map.addListener("tilesloaded", () => {
         if (entry.map !== map || mounted.get(entry.id) !== entry) return;
-        entry.tilesPendingSince = null;
+        if (failedStreetImages()) {
+          entry.loadingIssue = "tile-network-error";
+          mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. اضغط إعادة تحميل الخريطة.");
+          return;
+        }
+        if (entry.state === "error") entry.tilesReady = false;
         if (entry.tilesReady) return;
         entry.tilesReady = true; entry.loadingIssue = "";
         entry.firstTilesMs = Date.now() - entry.createdAt;
@@ -312,6 +359,8 @@
           const rect = entry.container.getBoundingClientRect(), next = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
           if (next === size || !mapIsVisible(entry)) return;
           size = next; clearTimeout(entry.resizeTimer);
+          canvas.style.width = `${Math.round(rect.width)}px`;
+          canvas.style.height = `${Math.round(rect.height)}px`;
           entry.resizeTimer = setTimeout(() => {
             if (mounted.get(entry.id) !== entry || entry.map !== map) return;
             google.maps.event?.trigger?.(map, "resize");
@@ -323,27 +372,23 @@
       entry.visibleSince = mapIsVisible(entry) ? Date.now() : null;
       const checkTiles = () => {
         if (entry.map !== map || mounted.get(entry.id) !== entry) return;
-        if (!mapIsVisible(entry)) { entry.visibleSince = null; entry.tilesPendingSince = null; }
+        if (!mapIsVisible(entry)) { entry.visibleSince = null; }
         else {
           entry.visibleSince ??= Date.now();
-          const since = entry.tilesReady ? entry.tilesPendingSince : entry.visibleSince;
+          // Moving within cached streets need not emit tilesloaded; it is not a tile outage.
+          const since = entry.tilesReady ? null : entry.visibleSince;
           const elapsed = since == null ? 0 : Date.now() - since;
-          if (elapsed >= 12000 && !entry.recoveryUsed && map.getRenderingType?.() === "VECTOR") {
-            // One native renderer switch preserves the Google map, route, markers and controls. No reload loop.
+          if (elapsed >= 8000 && !entry.recoveryUsed && map.getRenderingType?.() === "VECTOR") {
+            // Replace a failed WebGL surface once with an independent Google image-tile surface.
+            // A fresh canvas releases the failed WebGL painting surface.
             entry.recoveryUsed = true; entry.fallbackReason = "vector-load-deadline";
             entry.container.dataset.mapFallbackReason = entry.fallbackReason;
-            entry.tilesReady = false; entry.tilesPendingSince = null; entry.visibleSince = Date.now();
-            entry.cameraHeading = 0;
-            if (typeof map.setRenderingType === "function") {
-              mapState(entry, "recovering", "جارٍ استعادة خريطة Google بالعرض الخفيف...");
-              entry.container.dataset.mapRenderer = "RASTER";
-              map.setRenderingType("RASTER"); map.setTilt?.(0); map.setHeading?.(0);
-            } else { createRepresentativeMap(entry, "RASTER"); return; }
-          } else if (elapsed >= 20000) {
+            createRepresentativeMap(entry, "RASTER"); return;
+          } else if (elapsed >= 12000) {
             entry.loadingIssue = "streets-timeout";
             mapState(entry, "error", "تعذر تحميل الشوارع. تحقق من الاتصال واضغط إعادة التحميل.");
             return;
-          } else if (elapsed >= 6000 && !entry.tilesReady) mapState(entry, "slow", "جارٍ تحميل الشوارع؛ ستتم استعادة العرض تلقائيًا إذا تعطل.");
+          } else if (elapsed >= 4000 && !entry.tilesReady) mapState(entry, "slow", "جارٍ تحميل الشوارع؛ ستتم استعادة العرض تلقائيًا إذا تعطل.");
         }
         entry.tileTimer = setTimeout(checkTiles, 2000);
       };
@@ -388,10 +433,12 @@
       nodes.forEach(node => { node.textContent = errorMessage; node.dataset.mapState = "error"; });
       return;
     }
+    // Re-read the real modal after the SDK await; it may have closed while Google was loading.
     if (generation !== mountGeneration) return;
     for (const order of orders) {
       const id = String(order.id || "");
-      const container = nodes.find(node => node.isConnected && node.dataset.orderId === id);
+      const container = nodes.find(node => node.isConnected && node.dataset.orderId === id &&
+        node.closest("dialog")?.open && node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0);
       if (!container || mounted.has(id)) continue;
       const destination = coords(order.latitude, order.longitude);
       const saved = order.courierLocation, live = window.DART_REP_LAST_LOCATION;
@@ -475,8 +522,9 @@
     pendingPaths.clear();
     for (const entry of mounted.values()) { entry.path = []; entry.route?.setPath([]); }
   }
+  function hasRepresentativeMap(orderId) { return mounted.has(String(orderId)); }
   window.DartGoogleMaps = Object.freeze({ clearRepresentativeRoute, loadMaps, preloadRepresentativeLibraries, pauseRepresentatives, attachRepresentatives,
-    getRepresentativeDiagnostics, resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
+    getRepresentativeDiagnostics, hasRepresentativeMap, resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
     get errorMessage() { return errorMessage; },
   });
 })();

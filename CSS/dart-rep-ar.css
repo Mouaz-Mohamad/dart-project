@@ -208,21 +208,34 @@
 }
 /* Keep the real Google Maps surface unobstructed and the action bar compact. */
 #repNavigationDialog[open] { grid-template-rows: minmax(0, 1fr) auto; }
-#repNavigationMap { direction: ltr; background: #f6f7f8; color-scheme: light; }
+#repNavigationMap { position: relative; overflow: hidden; direction: ltr; background: #f6f7f8; color-scheme: light; }
+#repNavigationMap > .dart-google-map-overlay { position: absolute; inset: 0; }
+#repNavigationMap .dart-google-map-follow-arrow {
+  position: absolute; z-index: 1; left: 50%; top: 50%; width: 50px; height: 50px;
+  transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 8px #0003;
+}
+#repNavigationMap .dart-google-map-follow-arrow::before {
+  content: ""; position: absolute; inset: 9px; background: #1a73e8;
+  clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%);
+}
+#repNavigationMap .dart-google-map-follow-arrow[hidden] { display: none; }
 #repNavigationMap .dart-google-map-recenter {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 16px;
   margin: 10px 12px 20px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 24px;
   background: #fff;
   box-shadow: 0 2px 8px rgba(32,33,36,.28);
   color: #1a73e8;
   font-family: sans-serif;
-  font-size: 31px;
-  line-height: 1;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
   cursor: pointer;
   touch-action: manipulation;
 }
