@@ -1,0 +1,286 @@
+/* Dart representative portal — Arabic RTL work cards and Google navigation only.
+   Deliberately excludes the existing page header, footer and authentication screens. */
+#repOrdersList, #repReturnsList, .dart-rep-return-section,
+#repLocationStatus, #repNavigationDialog {
+  direction: rtl;
+  text-align: right;
+  font-family: "Readex Pro", "Tajawal", system-ui, sans-serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+#repDashboardView {
+  background: #fffcfa;
+  border: 1px solid #f0e6e8;
+  box-shadow: 0 12px 40px rgba(80, 15, 36, .07);
+}
+#repLocationStatus {
+  border: 1px solid #eadde1;
+  border-radius: 12px;
+  background: #fbf6f7;
+  color: #584550;
+  font-size: 13px;
+  line-height: 1.8;
+  padding: 12px 14px;
+  margin-block: 10px 20px;
+}
+#repOrdersList, #repReturnsList { gap: 16px; }
+#repOrdersList .rep-driver-card, #repReturnsList .rep-driver-card {
+  min-width: 0;
+  padding: clamp(15px, 2.5vw, 24px);
+  background: #fff;
+  border: 1px solid #ebd9df;
+  border-top: 3px solid #ab012b;
+  border-radius: 20px;
+  box-shadow: 0 8px 25px rgba(88, 14, 39, .06);
+  color: #24212a;
+}
+#repOrdersList .rep-header, #repReturnsList .rep-header {
+  direction: rtl;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1e7ea;
+}
+#repOrdersList .rep-header > div, #repReturnsList .rep-header > div { min-width: 0; }
+#repOrdersList .rep-header h2, #repReturnsList .rep-header h2 {
+  font-size: clamp(16px, 2.1vw, 21px);
+  font-weight: 750;
+  line-height: 1.5;
+  color: #371824;
+  overflow-wrap: anywhere;
+}
+#repOrdersList .rep-header span:not(.rep-status-badge),
+#repReturnsList .rep-header span:not(.rep-status-badge) {
+  font-size: 12px;
+  color: #71636a;
+}
+#repOrdersList .rep-status-badge, #repReturnsList .rep-status-badge {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #8b1531;
+  background: #fbeaf0;
+  border: 1px solid #f2d6df;
+  border-radius: 24px;
+}
+#repOrdersList .rep-info-box, #repReturnsList .rep-info-box {
+  background: #fffdfd;
+  border: 1px solid #eee2e6;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+#repOrdersList .rep-info-title, #repReturnsList .rep-info-title {
+  color: #8a0f32;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 10px;
+}
+#repOrdersList .rep-info-value, #repReturnsList .rep-info-value {
+  font-size: 15px;
+  font-weight: 750;
+  color: #26212a;
+}
+#repOrdersList .dart-rep-customer-phone,
+#repReturnsList .dart-rep-customer-phone {
+  direction: ltr;
+  text-align: right;
+  unicode-bidi: isolate;
+  font-size: 14px;
+  color: #6b5960;
+  margin: 6px 0;
+}
+#repOrdersList address, #repReturnsList address {
+  font-style: normal;
+  font-size: 14px;
+  line-height: 1.9;
+  color: #55454e;
+  overflow-wrap: anywhere;
+}
+#repOrdersList .dart-rep-line, #repReturnsList .dart-rep-line {
+  direction: rtl;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 1.8;
+  border-bottom-color: #f0e5e9;
+}
+#repOrdersList .dart-rep-line > span,
+#repReturnsList .dart-rep-line > span { min-width: 0; overflow-wrap: anywhere; }
+#repOrdersList .dart-rep-line b, #repReturnsList .dart-rep-line b,
+#repOrdersList .dart-rep-total strong, #repReturnsList .dart-rep-total strong {
+  flex-shrink: 0;
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  font-size: 14px;
+}
+#repOrdersList .dart-rep-total, #repReturnsList .dart-rep-total {
+  direction: rtl;
+  gap: 12px;
+  padding: 14px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #fbeef2;
+  color: #850c2e;
+  font-weight: 800;
+  align-items: center;
+}
+#repOrdersList .dart-rep-total strong, #repReturnsList .dart-rep-total strong { font-size: 18px; }
+#repOrdersList .dart-rep-notes, #repReturnsList .dart-rep-notes {
+  border-inline-start: 3px solid #ab012b;
+  background: #fcf5f7;
+  color: #514049;
+}
+#repOrdersList .dart-rep-route-hint {
+  justify-content: flex-start;
+  margin: 0 0 14px;
+  gap: 8px;
+  font-weight: 650;
+}
+#repOrdersList .dart-rep-route-hint > span:not(.dart-rep-route-state) {
+  background: #f7f3f4;
+  color: #66545b;
+  border: 1px solid #eee3e6;
+  border-radius: 18px;
+  padding: 5px 9px;
+}
+#repOrdersList .dart-rep-route-state { border-radius: 20px; }
+#repOrdersList .dart-rep-proximity, #repReturnsList .dart-rep-proximity {
+  border-radius: 12px;
+  line-height: 1.8;
+  padding: 12px;
+  margin: 0 0 12px;
+  font-size: 12px;
+}
+#repOrdersList .dart-rep-order-actions, #repReturnsList .dart-rep-order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 9px;
+}
+#repOrdersList .dart-rep-order-actions .rep-btn,
+#repReturnsList .dart-rep-order-actions .rep-btn {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 11px 10px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: center;
+  gap: 8px;
+  text-decoration: none;
+}
+#repOrdersList .rep-btn-go, #repReturnsList .rep-btn-go { background: #ab012b; color: white; }
+#repOrdersList .rep-btn-go:hover, #repReturnsList .rep-btn-go:hover { background: #810624; }
+#repOrdersList .rep-btn-call, #repReturnsList .rep-btn-call {
+  background: #fff;
+  color: #85132f;
+  border: 1px solid #e9c8d3;
+}
+#repOrdersList .rep-btn-cancel, #repReturnsList .rep-btn-cancel {
+  background: #f8eff2; color: #8a1432; border: 1px solid #efd8df;
+}
+#repOrdersList .rep-btn-wait { background: #fff5e4; color: #875511; border: 1px solid #f2dfb9; }
+#repOrdersList .rep-btn-problem { background: #fff3ed; color: #a34113; border: 1px solid #f0d2c0; }
+#repOrdersList .rep-btn-complete, #repReturnsList .rep-btn-complete { background: #168653; color: #fff; }
+#repOrdersList .dart-rep-order-actions [hidden], #repReturnsList .dart-rep-order-actions [hidden] { display: none !important; }
+#repOrdersList .dart-rep-operational-group, #repReturnsList .dart-rep-operational-group {
+  background: #fcf8f9; border: 1px solid #eddae0; border-radius: 18px;
+  gap: 12px; padding: 12px;
+}
+#repOrdersList .dart-rep-operational-group-head,
+#repReturnsList .dart-rep-operational-group-head {
+  direction: rtl; flex-wrap: wrap; font-size: 14px; text-align: right;
+}
+#repOrdersList .empty-state, #repReturnsList .empty-state {
+  padding: 30px 16px; text-align: center; background: #fff;
+  border-radius: 16px; border: 1px dashed #e8d3da; color: #62515a;
+}
+/* Keep the real Google Maps surface unobstructed and the action bar compact. */
+#repNavigationDialog[open] { grid-template-rows: minmax(0, 1fr) auto; }
+#repNavigationMap { direction: ltr; background: #f6f7f8; color-scheme: light; }
+#repNavigationDialog .dart-rep-direction {
+  direction: rtl;
+  top: max(12px, env(safe-area-inset-top));
+  inset-inline: 12px;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: #087e76;
+  box-shadow: 0 4px 14px rgba(0,0,0,.17);
+}
+#repNavigationDialog .dart-rep-direction p {
+  flex: 1;
+  min-width: 0;
+  font-size: clamp(16px, 3vw, 22px);
+  line-height: 1.6;
+  font-weight: 750;
+}
+#repNavigationDialog #repNavigationManeuver {
+  flex-basis: 35px;
+  font-size: 36px;
+}
+#repNavigationDialog .dart-rep-navigation-messages {
+  bottom: 12px;
+  inset-inline: 12px;
+  max-height: 30vh;
+  overflow: hidden;
+}
+#repNavigationDialog .dart-rep-navigation-messages p {
+  width: fit-content;
+  max-width: 100%;
+  margin: 4px 0;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.96);
+  border: 1px solid #e5e8ea;
+  border-radius: 10px;
+  color: #30343d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#repNavigationDialog .dart-rep-navigation-footer {
+  gap: 10px;
+  min-height: 76px;
+  padding: 10px 14px max(10px,env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  border-radius: 16px 16px 0 0;
+}
+#repNavigationDialog .dart-rep-navigation-footer .rep-btn {
+  min-height: 52px;
+  border-radius: 12px;
+  padding: 10px;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  margin: 0;
+}
+#repNavigationExit { background: #f1eff1; color: #6e203b; }
+#repNavigationComplete { background: #ab012b; color: #fff; }
+#repNavigationDialog [hidden] { display: none !important; }
+#repOrdersList .rep-btn:focus-visible, #repReturnsList .rep-btn:focus-visible,
+#repNavigationDialog .rep-btn:focus-visible { outline: 3px solid #0b80cc; outline-offset: 2px; }
+@media (max-width: 600px) {
+  #repDashboardView { padding: 14px 10px; }
+  #repOrdersList .rep-driver-card, #repReturnsList .rep-driver-card { padding: 15px 12px; }
+  #repOrdersList .rep-header h2, #repReturnsList .rep-header h2 { font-size: 17px; }
+  #repOrdersList .dart-rep-order-actions .rep-btn, #repReturnsList .dart-rep-order-actions .rep-btn {
+    font-size: 12px; padding-inline: 8px;
+  }
+  #repNavigationDialog .dart-rep-direction { padding: 12px 13px; inset-inline: 9px; }
+  #repNavigationDialog .dart-rep-direction p { font-size: 16px; }
+  #repNavigationDialog #repNavigationManeuver { font-size: 31px; flex-basis: 28px; }
+}
+@media (max-width: 350px) {
+  #repOrdersList .dart-rep-order-actions, #repReturnsList .dart-rep-order-actions { grid-template-columns: 1fr; }
+}
