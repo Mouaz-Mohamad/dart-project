@@ -29,6 +29,7 @@ function fixture(permission) {
   const pending=f.api.enable();assert(asked,'permission must be requested synchronously during the user gesture');
   f.dialog.open=false;f.api.pause();finish('granted');await pending;
   assert(!f.listeners.has('deviceorientation'),'late grant after exit/logout must not start background sensors');
+  f.api.resume();assert(!f.listeners.has('deviceorientation'),'shared Maps visibility handlers cannot resume a closed navigation compass');
   f.dialog.open=true;f.api.resume();assert(f.listeners.has('deviceorientation'));f.api.pause();
   f=fixture(async()=> 'denied');assert.equal(await f.api.enable(),false);assert.equal(f.events.at(-1).detail.state,'denied');
   f=fixture();delete f.window.DeviceOrientationEvent;assert.equal(await f.api.enable(),false);assert.equal(f.events.at(-1).detail.state,'unavailable');

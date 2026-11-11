@@ -207,9 +207,11 @@ jobs:
           node tests/rep-reliability-runtime.cjs
           node tests/rep-compass-runtime.cjs
           node tests/google-navigation-browser.cjs
-      - name: Verify real Google provider for renderer changes (public landmarks only)
+      - name: Verify real Google provider for navigation changes (public landmarks only)
         shell: bash
         run: |
-          if git diff --name-only HEAD^ HEAD -- Js/dart-google-maps.js | rg -q .; then
+          if ! git diff --quiet HEAD^ HEAD -- Js/dart-google-maps.js Js/dart-rep-compass.js scripts/diagnostics/check-rep-google-provider.cjs; then
             node scripts/diagnostics/check-rep-google-provider.cjs
+          else
+            echo "SKIP live Google probe: navigation provider sources unchanged"
           fi

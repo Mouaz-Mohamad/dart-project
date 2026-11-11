@@ -28,7 +28,7 @@
     document.dispatchEvent(new CustomEvent("dart:rep-compass", { detail: { heading: reading } }));
   }
   function resume() {
-    if (!permitted || active || document.hidden) return;
+    if (!permitted || active || document.hidden || !document.getElementById("repNavigationDialog")?.open) return;
     active = true;
     window.addEventListener("deviceorientationabsolute", receive, { passive: true });
     window.addEventListener("deviceorientation", receive, { passive: true });
