@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="CSS/main.css">
   <link rel="stylesheet" href="CSS/base.css">
   <link rel="stylesheet" href="CSS/responsive.css">
+  <link rel="stylesheet" href="CSS/dart-rep-ar.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/boxicons/2.1.4/css/boxicons.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://maps.googleapis.com">
@@ -107,12 +108,12 @@
         </div>
         <button type="button" id="repLogout" class="rep-btn rep-btn-cancel">Log out</button>
       </header>
-      <p id="repLocationStatus" class="dart-rep-location-status" role="status" aria-live="polite">Location sharing starts only after you start a delivery.</p>
-      <div id="repOrdersList" class="dart-rep-orders-list"></div>
-      <section class="dart-rep-return-section" aria-labelledby="repReturnsTitle">
+      <p id="repLocationStatus" class="dart-rep-location-status" dir="rtl" role="status" aria-live="polite">مشاركة الموقع تبدأ بعد بدء التوصيل.</p>
+      <div id="repOrdersList" class="dart-rep-orders-list" dir="rtl" lang="ar"></div>
+      <section class="dart-rep-return-section" dir="rtl" lang="ar" aria-labelledby="repReturnsTitle">
         <div class="dart-rep-section-heading">
-          <p class="dart-rep-eyebrow">RETURN PICKUPS</p>
-          <h2 id="repReturnsTitle">Assigned returns and exchanges</h2>
+          <p class="dart-rep-eyebrow">الاستلامات</p>
+          <h2 id="repReturnsTitle">الاسترجاع والاستبدال المسند إليك</h2>
         </div>
         <div id="repReturnsList" class="dart-rep-orders-list"></div>
       </section>
@@ -124,25 +125,25 @@
             <span class="rep-status-badge" data-return-field="status"></span>
           </div>
           <div class="rep-info-box">
-            <div class="rep-info-title">Customer &amp; pickup address</div>
+            <div class="rep-info-title">بيانات العميل وعنوان الاستلام</div>
             <div class="rep-info-value" data-return-field="customer"></div>
             <div class="dart-rep-customer-phone" data-return-field="phones"></div>
             <address data-return-field="address"></address>
             <p class="dart-rep-notes" data-return-field="reason"></p>
           </div>
           <div class="rep-info-box">
-            <div class="rep-info-title">Item &amp; settlement</div>
+            <div class="rep-info-title">القطعة والمبلغ</div>
             <div class="dart-rep-line"><span data-return-field="originalItem"></span><b data-return-field="requestType"></b></div>
-            <div class="dart-rep-line" data-return-replacement-row><span>Replacement item</span><b data-return-field="replacementItem"></b></div>
+            <div class="dart-rep-line" data-return-replacement-row><span>القطعة البديلة</span><b data-return-field="replacementItem"></b></div>
             <div class="dart-rep-total"><span data-return-field="feeLabel"></span><strong data-return-field="feeAmount"></strong></div>
           </div>
           <p class="dart-rep-proximity" data-return-field="proximity" role="status"></p>
           <div class="dart-rep-order-actions">
-            <a href="#" class="rep-btn rep-btn-call" data-return-call><i class="fa-solid fa-phone"></i> Call customer</a>
-            <button type="button" class="rep-btn rep-btn-go" data-return-action="start"><i class="fa-solid fa-diamond-turn-right"></i> Start pickup</button>
-            <button type="button" class="rep-btn rep-btn-go" data-return-action="navigate" hidden><i class="fa-solid fa-map-location-dot"></i> Open navigation</button>
-            <button type="button" class="rep-btn rep-btn-cancel" data-return-action="cancel"><i class="fa-solid fa-xmark"></i> Cancel pickup</button>
-            <button type="button" class="rep-btn rep-btn-complete" data-return-action="complete"><i class="fa-solid fa-circle-check"></i> Return received</button>
+            <a href="#" class="rep-btn rep-btn-call" data-return-call><i class="fa-solid fa-phone"></i> اتصال بالعميل</a>
+            <button type="button" class="rep-btn rep-btn-go" data-return-action="start"><i class="fa-solid fa-diamond-turn-right"></i> بدء الاستلام</button>
+            <button type="button" class="rep-btn rep-btn-go" data-return-action="navigate" hidden><i class="fa-solid fa-map-location-dot"></i> فتح الملاحة</button>
+            <button type="button" class="rep-btn rep-btn-cancel" data-return-action="cancel"><i class="fa-solid fa-xmark"></i> إلغاء الاستلام</button>
+            <button type="button" class="rep-btn rep-btn-complete" data-return-action="complete"><i class="fa-solid fa-circle-check"></i> تم الاستلام</button>
           </div>
         </article>
       </template>
@@ -150,16 +151,16 @@
         <section class="dart-rep-operational-group" data-rep-operational-group>
           <header class="dart-rep-operational-group-head">
             <strong data-rep-group-field="title"></strong>
-            <span data-rep-group-field="note">Each card remains independent.</span>
+            <span data-rep-group-field="note">كل أوردر له إجراء مستقل.</span>
           </header>
         </section>
       </template>
     </section>
   </main>
   <button id="repNavigationResume" class="rep-btn rep-btn-go dart-rep-resume" type="button" hidden>الرجوع للتوصيل</button>
-  <dialog id="repNavigationDialog" class="dart-rep-navigation" aria-label="Delivery navigation · Google Maps">
+  <dialog id="repNavigationDialog" class="dart-rep-navigation" dir="rtl" lang="ar" aria-label="الملاحة أثناء التوصيل باستخدام خرائط Google">
     <div class="dart-rep-navigation-viewport">
-      <div id="repNavigationMap" class="dart-rep-navigation-map" aria-label="Google delivery route"></div>
+      <div id="repNavigationMap" class="dart-rep-navigation-map" dir="ltr" aria-label="خريطة Google لمسار التوصيل"></div>
       <div class="dart-rep-direction" dir="rtl" role="status">
         <span id="repNavigationManeuver" aria-hidden="true">↑</span>
         <p id="repNavigationInstruction" dir="auto"></p>
