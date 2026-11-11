@@ -403,7 +403,7 @@ const server = http.createServer((req, res) => {
     await page.locator("#repNavigationComplete").click();
     await page.locator("#repNavigationDialog .dart-dialog-layer").waitFor({state:"visible"});
     assert.match(await page.locator("#dart-dialog-message").textContent(),/استلم العميل.*تحصيل 640/);
-    await page.getByRole("button",{name:"Cancel",exact:true}).click();
+    await page.getByRole("button",{name:"إلغاء",exact:true}).click();
     assert.deepEqual(await page.evaluate(()=>window.__actions),["start"]);
     await page.locator("#repNavigationComplete").click();
     await page.locator(".dart-dialog-button.is-primary").click();
