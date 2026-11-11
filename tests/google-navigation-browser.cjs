@@ -292,6 +292,8 @@ const server = http.createServer((req, res) => {
     await page.addScriptTag({path:"Js/dart-dialog.js"});
     await page.addScriptTag({path:"Js/dart-rep.js"});
     await page.evaluate(()=>document.dispatchEvent(new Event("DOMContentLoaded")));
+    await page.locator('#repDashboardView').waitFor({state:'visible'});
+    assert.equal(await page.locator('#repLogout').isVisible(),true,'courier logout must not inherit the legacy hidden cancel-button style');
     await page.locator('[data-action="start"]').click();
     await page.waitForFunction(()=>document.getElementById("repNavigationDialog").open && window.__routes===1);
     const sizes=await page.evaluate(()=>({dialog:document.getElementById("repNavigationDialog").getBoundingClientRect().height,map:document.getElementById("repNavigationMap").getBoundingClientRect().height,height:innerHeight}));
