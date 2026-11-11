@@ -209,6 +209,28 @@
 /* Keep the real Google Maps surface unobstructed and the action bar compact. */
 #repNavigationDialog[open] { grid-template-rows: minmax(0, 1fr) auto; }
 #repNavigationMap { direction: ltr; background: #f6f7f8; color-scheme: light; }
+#repNavigationMap .dart-google-map-recenter {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 10px 12px 20px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(32,33,36,.28);
+  color: #1a73e8;
+  font-family: sans-serif;
+  font-size: 31px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#repNavigationMap .dart-google-map-recenter:focus-visible {
+  outline: 3px solid #1a73e8;
+  outline-offset: 2px;
+}
+
 #repNavigationDialog .dart-rep-direction {
   direction: rtl;
   top: max(12px, env(safe-area-inset-top));
