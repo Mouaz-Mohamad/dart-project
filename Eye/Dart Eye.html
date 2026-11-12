@@ -2478,45 +2478,51 @@
                 <div>
                     <p class="dart-settings-eyebrow">DART CONTROL CENTER</p>
                     <h1 id="settings-page-title">Settings</h1>
-                    <p>Manage display preferences, sales rules, campaigns, media and staff access. Each group saves independently.</p>
+                    <p>Six organized categories for store operations, content and access. Changes are saved separately.</p>
                 </div>
                 <i class="fa-solid fa-gear" aria-hidden="true"></i>
             </header>
 
-            <div class="dart-settings-utility"><label for="settings-search">Search settings<input id="settings-search" type="search" placeholder="Find a setting in this tab"></label><label for="settings-jump">Jump to<select id="settings-jump"><option value="">Choose a settings group</option></select></label><p id="settings-search-status" role="status" aria-live="polite"></p></div>
-            <nav class="dart-settings-tabs" aria-label="Settings sections">
-                <button type="button" class="dart-settings-tab is-active" data-settings-tab="general" aria-selected="true">
-                    <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                    <span>General</span>
-                </button>
-                <button type="button" class="dart-settings-tab" data-settings-tab="hero" aria-selected="false">
-                    <i class="fa-solid fa-keyboard" aria-hidden="true"></i>
-                    <span>Hero Words</span>
-                </button>
-                <button id="settings-tab-staff" type="button" class="dart-settings-tab" data-settings-tab="staff" aria-selected="false" hidden>
-                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
-                    <span>Staff</span>
-                </button>
-            </nav>
-
-            <nav id="settings-quick-nav" class="dart-settings-quick-nav" aria-label="Quick access to General settings">
-                <div class="dart-settings-quick-heading"><strong>Jump to a setting</strong><span>Go straight to the section you need — no changes are saved automatically.</span></div>
-                <div class="dart-settings-quick-links">
-                    <button type="button" data-settings-go="settings-push-test-card"><i class="fa-solid fa-bell" aria-hidden="true"></i> Notifications</button>
-                    <button type="button" data-settings-go="settings-display-card"><i class="fa-solid fa-table-columns" aria-hidden="true"></i> Display</button>
-                    <button type="button" data-settings-go="settings-commerce-card"><i class="fa-solid fa-calculator" aria-hidden="true"></i> Pricing &amp; fees</button>
-                    <button type="button" data-settings-go="settings-return-period-card"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Return periods</button>
-                    <button type="button" data-settings-go="settings-dart-card-system"><i class="fa-solid fa-id-card" aria-hidden="true"></i> Dart Card</button>
-                    <button type="button" data-settings-go="settings-cod-risk-card"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> COD risk</button>
-                    <button type="button" data-settings-go="settings-waiting-card"><i class="fa-regular fa-clock" aria-hidden="true"></i> Waiting</button>
-                    <button type="button" data-settings-go="settings-discount-codes-card"><i class="fa-solid fa-ticket"></i> Discount codes</button>
-                    <button type="button" data-settings-go="settings-site-discount-card"><i class="fa-solid fa-percent" aria-hidden="true"></i> Promotions</button>
-                    <button type="button" data-settings-go="settings-media-card"><i class="fa-regular fa-images" aria-hidden="true"></i> Images</button>
-                    <button type="button" data-settings-go="settings-announcements-card"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> Announcements</button>
-                    <button type="button" data-settings-go="settings-model-cards-card"><i class="fa-solid fa-shirt" aria-hidden="true"></i> Product cards</button>
-                    <button type="button" data-settings-go="settings-storefront-products-card"><i class="fa-solid fa-star" aria-hidden="true"></i> Storefront products</button>
-                </div>
-            </nav>
+            <div class="dart-settings-utility">
+                <label for="settings-search"><span>Find an option</span><input id="settings-search" type="search" placeholder="Search all settings…" autocomplete="off"></label>
+                <label for="settings-jump"><span>Jump within category</span><select id="settings-jump"><option value="">Choose a setting</option></select></label>
+                <p id="settings-search-status" role="status" aria-live="polite"></p>
+                <div id="settings-search-results" class="dart-settings-search-results" aria-label="Matching settings" hidden></div>
+            </div>
+            <!-- BEGIN Settings category navigation — forms and IDs are preserved. -->
+            <div class="dart-settings-layout">
+                <nav class="dart-settings-tabs" aria-label="Settings categories">
+                    <button type="button" class="dart-settings-tab is-active" data-settings-tab="general" aria-selected="true">
+                        <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                        <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">General</span><small>Dashboard appearance and alerts</small></span>
+                    </button>
+                    <button type="button" class="dart-settings-tab" data-settings-tab="storefront" aria-selected="false">
+                        <i class="fa-solid fa-store" aria-hidden="true"></i>
+                        <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">Storefront & Content</span><small>Homepage, media and product display</small></span>
+                    </button>
+                    <button type="button" class="dart-settings-tab" data-settings-tab="sales" aria-selected="false">
+                        <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
+                        <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">Sales & Operations</span><small>Pricing, returns, COD and reservations</small></span>
+                    </button>
+                    <button type="button" class="dart-settings-tab" data-settings-tab="loyalty" aria-selected="false">
+                        <i class="fa-solid fa-percent" aria-hidden="true"></i>
+                        <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">Discounts & Loyalty</span><small>Campaigns, codes and Dart Card</small></span>
+                    </button>
+                    <button id="settings-tab-staff" type="button" class="dart-settings-tab" data-settings-tab="staff" aria-selected="false" hidden>
+                        <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                        <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">Staff & Permissions</span><small>Dashboard access and roles</small></span>
+                    </button>
+                    <button type="button" class="dart-settings-tab" data-settings-tab="maintenance" aria-selected="false">
+                        <i class="fa-solid fa-database" aria-hidden="true"></i>
+                        <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">Data & Maintenance</span><small>Protected data actions</small></span>
+                    </button>
+                </nav>
+                <div class="dart-settings-panel">
+                    <header class="dart-settings-active-heading">
+                        <p>SETTINGS CATEGORY</p>
+                        <h2 id="settings-active-title">General</h2>
+                        <span id="settings-active-description">Dashboard appearance and alerts</span>
+                    </header>
             <div id="settings-content" class="dart-settings-grid" data-active-settings-tab="general">
                 <!-- Owner-only test broadcast; does not create business records. -->
                 <article id="settings-push-test-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
@@ -2543,7 +2549,7 @@
                         <p id="settings-display-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
                     </form>
                 </article>
-                <article id="settings-dart-card-system" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                <article id="settings-dart-card-system" data-settings-group="loyalty" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-id-card"></i></div>
                     <div class="dart-settings-card-copy"><span>LOYALTY SYSTEM</span><h2>Dart Card System</h2>
                         <p>OFF يوقف الخصم والسحب والإصدار ويخفي النظام عن العملاء، مع حفظ البطاقات وتجميد مدة الصلاحية.</p></div>
@@ -2555,7 +2561,7 @@
                         <p id="settings-dart-card-switch-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
                     </form>
                 </article>
-                <article id="settings-commerce-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                <article id="settings-commerce-card" data-settings-group="sales" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-calculator"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>PRICING &amp; FEES</span>
@@ -2575,7 +2581,7 @@
 
 
                 <!-- Order-snapshotted eligibility windows; each duration is independent. -->
-                <article id="settings-return-period-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                <article id="settings-return-period-card" data-settings-group="sales" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-rotate-left"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>AFTER-SALES POLICY</span>
@@ -2591,7 +2597,7 @@
                     </form>
                 </article>
 
-                <article id="settings-cod-risk-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-cod-risk-card" data-settings-group="sales" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>COD RISK &amp; VERIFICATION</span>
@@ -2616,7 +2622,7 @@
                 </article>
 
 
-                <article id="settings-waiting-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
+                <article id="settings-waiting-card" data-settings-group="sales" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-regular fa-clock"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>WAITING / RESTOCK</span>
@@ -2633,7 +2639,7 @@
                     </form>
                 </article>
 
-                <article id="settings-site-discount-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-site-discount-card" data-settings-group="loyalty" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-percent"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>PROMOTION CAMPAIGNS</span>
@@ -2675,7 +2681,7 @@
 
 
                 <!-- BEGIN Discount Codes: separate from automatic promotion campaigns. -->
-                <article id="settings-discount-codes-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-discount-codes-card" data-settings-group="loyalty" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-ticket"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>DISCOUNT CODES</span>
@@ -2707,7 +2713,7 @@
                     <div id="dart-codes-list" class="dart-settings-list"></div>
                 </article>
                 <!-- END Discount Codes. -->
-                <article id="settings-media-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-media-card" data-settings-group="storefront" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-regular fa-images"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>SITE MEDIA</span>
@@ -2722,7 +2728,7 @@
                     </form>
                 </article>
 
-                <article id="settings-announcements-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-announcements-card" data-settings-group="storefront" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-bullhorn"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>UNDER NAV</span>
@@ -2743,7 +2749,7 @@
                     <template id="settings-announcement-row-template"><div class="dart-settings-list-row" data-announcement-row><div><strong data-announcement-field="text"></strong><small data-announcement-field="dates"></small></div><span data-announcement-field="status"></span><button type="button" data-announcement-action="edit">Edit</button><button type="button" data-announcement-action="delete">Delete</button></div></template>
                 </article>
 
-                <article id="settings-typing-card" data-settings-group="hero" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-typing-card" data-settings-group="storefront" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-keyboard"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>HERO WORDS</span>
@@ -2775,7 +2781,7 @@
                     </template>
                 </article>
 
-                <article id="settings-model-cards-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-model-cards-card" data-settings-group="storefront" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-shirt"></i></div>
                     <div class="dart-settings-card-copy"><span>PRODUCT CARDS</span><h2>Colors shown per model</h2><p>يتطبق على Home وProducts، بينما نافذة الموديل تظل تعرض كل ألوان التصميم.</p></div>
                     <form id="settings-model-cards-form">
@@ -2786,7 +2792,7 @@
                 </article>
 
                 <!-- Storefront products: Best Products is chosen by model ID and shared on all pages. -->
-                <article id="settings-storefront-products-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                <article id="settings-storefront-products-card" data-settings-group="storefront" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-star"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>STOREFRONT PRODUCTS</span><h2>Homepage &amp; Best Products</h2>
@@ -2850,7 +2856,7 @@
                     </div>
                 </article>
 
-                <article id="settings-reset-card" data-settings-group="general" class="dart-settings-card dart-settings-danger-card">
+                <article id="settings-reset-card" data-settings-group="maintenance" class="dart-settings-card dart-settings-danger-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <div class="dart-settings-card-copy">
                         <span>Danger Zone</span>
@@ -2861,6 +2867,9 @@
                     <button id="open-reset-data-modal" type="button" class="dart-settings-danger-button"><i class="fa-solid fa-trash-can"></i> Delete Selected Data</button>
                 </article>
             </div>
+                </div>
+            </div>
+            <!-- END Settings category navigation. -->
             <p id="settings-reset-status" class="dart-settings-status" role="status" aria-live="polite" hidden></p>
         </section>
 
