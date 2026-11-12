@@ -336,9 +336,14 @@ const server = http.createServer((request, response) => {
   });
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "general");
   await dashboard.locator('#settings-search').fill('Order verification policy');
+  const policyResult = dashboard.locator('[data-settings-result="settings-cod-risk-card"]');
+  assert.equal(await policyResult.isVisible(),true,'cross-category search exposes a navigation result');
+  assert.equal(await dashboard.locator('[data-settings-result="settings-commerce-card"]').count(),0);
+  await policyResult.click();
+  assert.equal(await dashboard.locator('#settings-content').getAttribute('data-active-settings-tab'),'sales');
   assert.equal(await dashboard.locator('#settings-cod-risk-card').isVisible(),true);
-  assert.equal(await dashboard.locator('#settings-commerce-card').isVisible(),false);
-  await dashboard.locator('#settings-search').fill('');
+  assert.equal(await dashboard.locator('#settings-search').inputValue(),'','opening a result clears the search');
+  assert.equal(await dashboard.locator('#settings-commerce-card').isVisible(),true);
   await dashboard.locator('[data-settings-tab="sales"]').click();
   await dashboard.locator('#settings-default-markup').fill('57');
   await dashboard.evaluate(()=>window.dispatchEvent(new CustomEvent('dart:site-settings-changed',{detail:window.DartSiteSettings.get()})));
