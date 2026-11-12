@@ -1,0 +1,115 @@
+/* DART RETURN WIZARD — page-scoped styling only. */
+.dart-return-page {
+  width: min(700px, calc(100% - 24px));
+  max-width: 700px;
+  margin: 24px auto 52px;
+  padding: 0 8px;
+  direction: rtl;
+  color: #2b1e23;
+}
+.dart-return-page .dart-return-heading { width: 100%; text-align: center; }
+.dart-return-page .dart-return-heading .section-title {
+  width: 100%; margin: 5px 0 8px; padding: 0; border: 0;
+  color: #760e30; text-align: center; font: 700 clamp(23px, 4vw, 31px)/1.4 "Readex Pro", sans-serif;
+}
+.dart-return-eyebrow { margin: 0; color: #760e30; font-size: 13px; font-weight: 700; }
+.dart-return-subtitle { margin: 0 0 19px; color: #746971; font-size: 13px; text-align: center; }
+.dart-return-progress {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%; gap: 9px; margin-bottom: 21px;
+}
+.dart-return-progress-step {
+  position: relative; display: flex; justify-content: center; align-items: center;
+  gap: 8px; padding: 11px 8px 13px; background: #f4f0f1;
+  border-radius: 10px; color: #75676e; font-size: 13px; font-weight: 600;
+}
+.dart-return-progress-step::after {
+  content: ""; position: absolute; inset-inline: 0; bottom: 0;
+  height: 3px; border-radius: 3px; background: #ded6da;
+}
+.dart-return-progress-step[aria-current="step"] { color: #760e30; background: #fbf3f5; }
+.dart-return-progress-step[aria-current="step"]::after { background: #760e30; }
+.dart-return-page .dart-return-form { width: 100%; text-align: right; }
+.dart-return-step[hidden] { display: none !important; }
+.dart-return-step { min-width: 0; }
+.dart-return-step-title {
+  margin: 0 0 15px; padding: 0; color: #3b2830;
+  font: 600 17px/1.5 "Readex Pro", sans-serif;
+}
+.dart-return-step-title:focus { outline: none; }
+.dart-return-page .form-group, .dart-return-page .container-select {
+  margin: 0 0 14px; min-width: 0; flex: 1 1 0;
+}
+.dart-return-page label {
+  display: block; margin-bottom: 7px; color: #46383d;
+  font-size: 13px; font-weight: 600;
+}
+.dart-return-page .form-row {
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.dart-return-page input:not([type="hidden"]),
+.dart-return-page select,
+.dart-return-page textarea {
+  box-sizing: border-box; display: block; width: 100%; min-width: 0;
+  min-height: 46px; padding: 10px 12px; border: 1px solid #ded6d9;
+  border-radius: 10px; background: #fff; color: #272226;
+  font: 500 14px/1.5 "Readex Pro", sans-serif; text-align: right;
+}
+.dart-return-page input:focus, .dart-return-page select:focus {
+  border-color: #760e30; outline: 2px solid rgba(118, 14, 48, 0.12);
+}
+.dart-return-page input::placeholder { color: #9a9095; opacity: 1; }
+.dart-return-page .dart-return-exchange-options,
+.dart-return-page .dart-return-address-panel {
+  min-width: 0; margin: 5px 0 18px; padding: 15px;
+  background: #fffdfc; border: 1px solid #e8d9de; border-radius: 12px;
+}
+.dart-return-page .dart-return-exchange-options[hidden] { display: none; }
+.dart-return-page .dart-return-exchange-options legend,
+.dart-return-page .dart-return-address-panel legend {
+  padding: 0 6px; color: #760e30; font-size: 14px; font-weight: 700;
+}
+.dart-return-page .dart-return-country-field[hidden] { display: none; }
+.dart-return-page .dart-return-address-map { height: 290px; margin: 11px 0; }
+.dart-return-page .dart-return-address-search { margin: 0; }
+.dart-return-page .dart-address-status { margin: 8px 0 15px; font-size: 12px; }
+.dart-return-page .dart-locate-address-btn { max-width: 100%; }
+.dart-return-buttons { display: flex; gap: 11px; margin: 19px 0 6px; }
+.dart-return-page .dart-return-primary, .dart-return-page .dart-return-secondary {
+  display: inline-flex; justify-content: center; align-items: center;
+  gap: 9px; min-width: 0; min-height: 49px; margin: 0;
+  padding: 11px 20px; border-radius: 10px;
+  font: 700 14px/1.4 "Readex Pro", sans-serif; cursor: pointer;
+}
+.dart-return-page .dart-return-primary {
+  width: 100%; background: #760e30; border: 1px solid #760e30; color: #fff;
+}
+.dart-return-page .dart-return-primary:hover { background: #610b27; }
+.dart-return-page .dart-return-secondary {
+  flex: 0 0 auto; background: #fff; border: 1px solid #d9c7cd; color: #760e30;
+}
+.dart-return-buttons .dart-return-primary { flex: 1 1 auto; }
+.dart-return-page .form-status { margin: 14px 0 4px; text-align: right; }
+.dart-return-page .dart-return-tracking-link { margin: 8px 0 12px; }
+.dart-return-notices {
+  width: 100%; margin-top: 22px; padding-top: 16px;
+  border-top: 1px solid #e9e1e4; color: #675b61;
+}
+.dart-return-notices h2 { margin: 0 0 9px; font: 700 13px/1.5 "Readex Pro", sans-serif; }
+.dart-return-notices ul { margin: 0; padding-inline-start: 20px; list-style: disc outside; }
+.dart-return-notices li { margin: 5px 0; font-size: 12px; line-height: 1.8; }
+.dart-return-notices .dart-return-fee-summary {
+  display: list-item; width: auto; margin: 5px 0; padding: 0; border: 0;
+  border-radius: 0; background: transparent; color: inherit;
+  font-weight: 600; font-size: 12px;
+}
+.dart-return-notices .dart-return-fee-summary[hidden] { display: none !important; }
+@media (max-width: 560px) {
+  .dart-return-page { width: calc(100% - 20px); margin: 15px auto 34px; padding: 0 3px; }
+  .dart-return-page .form-row { flex-direction: column; gap: 0; }
+  .dart-return-page .form-row > * { width: 100%; flex: 0 0 auto; }
+  .dart-return-page .dart-return-address-map { height: 250px; }
+  .dart-return-page .dart-return-exchange-options,
+  .dart-return-page .dart-return-address-panel { padding: 11px; }
+  .dart-return-page .dart-return-secondary { padding-inline: 13px; }
+}

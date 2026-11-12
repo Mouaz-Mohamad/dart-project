@@ -3086,7 +3086,13 @@
       const chainId = rules?.chainIdForItem(original, code?.value.trim()) || code?.value.trim();
       const completed = rules?.completedExchangeCount(read(KEYS.returns, []), chainId) || 0;
       const policy = rules?.courierPolicy(normalizedType, completed);
-      if (feeText) feeText.textContent = policy?.label || "";
+      if (feeText) {
+        feeText.textContent = policy?.payer === "Customer"
+          ? `رسوم المندوب: ${Number(policy.customerFee || 0)} جنيه، تُدفع للمندوب.`
+          : policy?.payer === "Brand"
+            ? "Dart تتحمل رسوم المندوب لأول استبدال مكتمل."
+            : "";
+      }
       if (feeBox) feeBox.hidden = !policy;
     };
 
@@ -3377,8 +3383,10 @@
           const order = deliveredOrderForItem(values.item_code, orders);
           const identityOk =
             order &&
-            (normalizeEmail(order.email) === normalizeEmail(values.email) ||
-              normalizePhone(order.phone1) === normalizePhone(values.phone1));
+            ((values.email && order.email &&
+              normalizeEmail(order.email) === normalizeEmail(values.email)) ||
+              (values.phone1 && order.phone1 &&
+                normalizePhone(order.phone1) === normalizePhone(values.phone1)));
           const deliveredAt =
             order &&
             new Date(order.deliveredAt || order.updatedAt || order.createdAt);

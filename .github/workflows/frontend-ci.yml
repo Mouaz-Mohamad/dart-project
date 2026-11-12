@@ -81,6 +81,7 @@ jobs:
         run: |
           node scripts/check-source-layout.cjs
           node tests/storefront-products-settings.cjs
+          node tests/return-wizard-contract.cjs
           node tests/source-layout-contract.cjs
           node tests/css-cascade-contract.cjs
           node tests/custom-domain-runtime.cjs

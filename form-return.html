@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- DART CODE GUIDE | form-return.html
      الغرض: صفحة HTML تشغيلية؛ الهيكل ثابت والمنطق الديناميكي موجود في ملفات JavaScript المرتبطة. -->
-<html lang="en">
+<html lang="ar">
     <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -62,6 +62,7 @@
     }
     </script>
     <link rel="stylesheet" href="CSS/dart-headings.css">
+    <link rel="stylesheet" href="CSS/dart-return-step-flow.css">
 </head>
 <body data-customer-private data-customer-auth="pending">
     <p class="dart-account-access-status" data-customer-access-status role="status">Checking account…</p>
@@ -69,139 +70,152 @@
         <header id="header-container" aria-label="Main Navigation"></header>
                     <main>
 
-<section class="feedback-section dja-flexdir" aria-label="Exchange or Return Request | طلب استبدال أو إرجاع">
-    <h1 class="section-title">&nbsp;Exchange <br>&nbsp;&nbsp;&nbsp;&nbsp;or Return Request</h1>
+<section class="feedback-section dja-flexdir dart-return-page" dir="rtl" aria-label="طلب استبدال أو استرجاع">
+    <div class="dart-return-heading">
+        <p class="dart-return-eyebrow">Dart | for you</p>
+        <h1 class="section-title">الاستبدال والاسترجاع</h1>
+        <p class="dart-return-subtitle">بيانات القطعة أولًا، ثم عنوان الاستلام.</p>
+    </div>
+    <nav class="dart-return-progress" aria-label="خطوات تقديم الطلب">
+        <span class="dart-return-progress-step" aria-current="step"><span aria-hidden="true">١</span> بيانات الطلب</span>
+        <span class="dart-return-progress-step"><span aria-hidden="true">٢</span> عنوان الاستلام</span>
+    </nav>
 
-    <form id="returnRequestForm" class="form" data-dart-address-ready="false">
-        <div class="form-group">
-            <label for="return-full-name">Full Name</label>
-            <input type="text" id="return-full-name" name="full_name" placeholder="you + Father + GrandPa" minlength="3" autocomplete="name" required>
-        </div>
+    <form id="returnRequestForm" class="form dart-return-form" data-dart-address-ready="false" data-dart-return-step="details">
+        <!-- Kept for compatibility with existing signed-in customer prefill and legacy lookup. -->
+        <input type="hidden" id="return-email" name="email">
 
-        <div class="form-row flex-center">
+        <section id="return-step-details" class="dart-return-step" aria-labelledby="return-details-heading">
+            <h2 id="return-details-heading" class="dart-return-step-title" tabindex="-1">بيانات العميل والقطعة</h2>
             <div class="form-group">
-                <label for="return-phone-1">Phone Number</label>
-                <input type="tel" id="return-phone-1" name="phone1" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel" required>
+                <label for="return-full-name">الاسم بالكامل</label>
+                <input type="text" id="return-full-name" name="full_name" placeholder="اكتب اسمك" minlength="3" autocomplete="name" required>
             </div>
-            <div class="form-group">
-                <label for="return-phone-2">Phone Number 2</label>
-                <input type="tel" id="return-phone-2" name="phone2" placeholder="01*********" pattern="01[0125][0-9]{8}" inputmode="tel">
-            </div>
-        </div>
-
-
-        <div class="form-group">
-            <label for="return-email">Email</label>
-            <input type="email" id="return-email" name="email" placeholder="Value" autocomplete="email" required>
-        </div>
-
-        <div class="form-group">
-            <label for="return-item-code">Item Code</label>
-            <input type="text" id="return-item-code" name="item_code" placeholder="Value" required>
-            <small class="dart-form-help">The model, size and color will be filled automatically from the item code.</small>
-        </div>
-        <div class="form-row flex-center">
-            <div class="container-select">
-                <label for="return-request-type"><h4>Request Type</h4></label>
-                <select id="return-request-type" name="request_type" required>
-                <option value="" selected disabled hidden> Select </option>
-                <option value="Exchange">Exchange | استبدال</option>
-                <option value="Refund">Refund | استرجاع</option>
-            </select>
-                <small class="dart-form-help">الطقم وقطع الطقم لا تُستبدل. الاسترجاع متاح حسب شروطه.</small>
-            </div>
-            <div class="container-select">
-                <h4>Reason for request</h4>
-                <select name="reason" required>
-                    <option value="" selected disabled hidden> Select </option>
-                    <option value="wrong_size">المقاس غير مناسب</option>
-                    <option value="defective">المنتج به عيب تصنيع أو تلف</option>
-                    <option value="not_as_described">المنتج يختلف عن الصورة أو الوصف</option>
-                    <option value="wrong_item">استلمت منتجًا مختلفًا عن طلبي</option>
-                    
-                    <!-- خيارات جودة أو تفضيل -->
-                    <option value="quality_issue">خامة المنتج لم تعجبني</option>
-                    <option value="changed_mind">لم أعد بحاجة إلى المنتج (تغيير رأي)</option>
-                    <option value="missing_parts">يوجد نقص في محتويات الشحنة</option>
-                    
-                    <!-- خيار عام -->
-                    <option value="other">سبب آخر</option>
-            </select>
-            </div>
-        </div>
-
-        <fieldset id="return-exchange-options" class="dart-return-exchange-options" hidden disabled>
-            <legend>Replacement item | القطعة البديلة</legend>
-            <p>يمكنك اختيار لون ومقاس مختلفين من نفس التصميم. يتم تأكيد توفر القطعة عند موافقة الإدارة.</p>
-            <div class="form-row flex-center">
-                <div class="container-select">
-                    <label for="return-exchange-color"><h4>New Color</h4></label>
-                    <select id="return-exchange-color" name="exchange_color">
-                        <option value="" selected>Select item code first</option>
-                    </select>
-                </div>
-                <div class="container-select">
-                    <label for="return-exchange-size"><h4>New Size</h4></label>
-                    <select id="return-exchange-size" name="exchange_size">
-                        <option value="" selected>Select item code first</option>
-                    </select>
-                </div>
-            </div>
-        </fieldset>
-
-        <div id="return-fee-summary" class="dart-return-fee-summary" role="status" aria-live="polite" hidden>
-            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-            <span id="return-fee-summary-text"></span>
-        </div>
-
-        <fieldset id="return-pickup-address" class="dart-return-address-panel">
-            <legend>Pickup Location | مكان استلام المرتجع</legend>
-            <p>حدد مكان الاستلام من الخريطة أو اكتب العنوان كاملًا من جديد.</p>
-
-            <div class="form-group dart-return-address-search">
-                <label for="return-address-search">Search for pickup address</label>
-                <input type="text" id="return-address-search" name="address_search" class="inp" placeholder="Enter an area or street in Egypt" autocomplete="street-address">
-                <ul id="return-address-results" class="results-list dart-address-results" hidden></ul>
-            </div>
-
-            <div id="return-address-map" class="dart-return-address-map" aria-label="Return pickup map"></div>
-            <p id="return-address-status" class="dart-address-status" role="status" aria-live="polite">Select an Egypt pickup pin or enter the complete pickup address manually.</p>
-
-            <input type="hidden" id="return-latitude" name="latitude">
-            <input type="hidden" id="return-longitude" name="longitude">
-            <input type="hidden" id="return-full-address" name="full_address">
-
-            <div class="form-row flex-center">
+            <div class="form-row">
                 <div class="form-group">
-                    <label for="return-country">Country</label>
+                    <label for="return-phone-1">رقم الهاتف</label>
+                    <input type="tel" id="return-phone-1" name="phone1" placeholder="01xxxxxxxxx" pattern="01[0125][0-9]{8}" inputmode="tel" autocomplete="tel" required>
+                </div>
+                <div class="form-group">
+                    <label for="return-phone-2">رقم هاتف إضافي (اختياري)</label>
+                    <input type="tel" id="return-phone-2" name="phone2" placeholder="01xxxxxxxxx" pattern="01[0125][0-9]{8}" inputmode="tel">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="return-item-code">كود القطعة</label>
+                <input type="text" id="return-item-code" name="item_code" placeholder="كود القطعة الموجودة معك" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group container-select">
+                    <label for="return-request-type">نوع الطلب</label>
+                    <select id="return-request-type" name="request_type" required>
+                        <option value="" selected disabled hidden>اختر نوع الطلب</option>
+                        <option value="Exchange">استبدال</option>
+                        <option value="Refund">استرجاع</option>
+                    </select>
+                </div>
+                <div class="form-group container-select">
+                    <label for="return-reason">سبب الطلب</label>
+                    <select id="return-reason" name="reason" required>
+                        <option value="" selected disabled hidden>اختر السبب</option>
+                        <option value="wrong_size">المقاس غير مناسب</option>
+                        <option value="defective">المنتج به عيب تصنيع أو تلف</option>
+                        <option value="not_as_described">المنتج يختلف عن الصورة أو الوصف</option>
+                        <option value="wrong_item">استلمت منتجًا مختلفًا عن طلبي</option>
+                        <option value="quality_issue">خامة المنتج لم تعجبني</option>
+                        <option value="changed_mind">تغيير رأي</option>
+                        <option value="missing_parts">نقص في محتويات الشحنة</option>
+                        <option value="other">سبب آخر</option>
+                    </select>
+                </div>
+            </div>
+
+            <fieldset id="return-exchange-options" class="dart-return-exchange-options" hidden disabled>
+                <legend>اختيار القطعة البديلة</legend>
+                <div class="form-row">
+                    <div class="form-group container-select">
+                        <label for="return-exchange-color">اللون الجديد</label>
+                        <select id="return-exchange-color" name="exchange_color">
+                            <option value="" selected>أدخل كود القطعة أولًا</option>
+                        </select>
+                    </div>
+                    <div class="form-group container-select">
+                        <label for="return-exchange-size">المقاس الجديد</label>
+                        <select id="return-exchange-size" name="exchange_size">
+                            <option value="" selected>أدخل كود القطعة أولًا</option>
+                        </select>
+                    </div>
+                </div>
+            </fieldset>
+            <button type="button" id="return-next-step" class="dart-return-primary">متابعة <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+        </section>
+
+        <section id="return-step-address" class="dart-return-step" aria-labelledby="return-address-heading" hidden>
+            <h2 id="return-address-heading" class="dart-return-step-title" tabindex="-1">عنوان استلام القطعة</h2>
+            <fieldset id="return-pickup-address" class="dart-return-address-panel" disabled>
+                <legend>مكان الاستلام</legend>
+                <div class="form-group dart-return-address-search">
+                    <label for="return-address-search">ابحث عن عنوان الاستلام</label>
+                    <input type="text" id="return-address-search" name="address_search" class="inp" placeholder="المنطقة أو الشارع" autocomplete="street-address">
+                    <ul id="return-address-results" class="results-list dart-address-results" hidden></ul>
+                </div>
+
+                <div id="return-address-map" class="dart-return-address-map" aria-label="خريطة تحديد عنوان الاستلام"></div>
+                <p id="return-address-status" class="dart-address-status" role="status" aria-live="polite">حدد موقع الاستلام على الخريطة ثم راجع بيانات العنوان.</p>
+
+                <input type="hidden" id="return-latitude" name="latitude">
+                <input type="hidden" id="return-longitude" name="longitude">
+                <input type="hidden" id="return-full-address" name="full_address">
+
+                <div class="form-group dart-return-country-field" hidden>
+                    <label for="return-country">الدولة</label>
                     <select id="return-country" name="country" class="select-cart" required><option value="Egypt" selected>Egypt</option></select>
                 </div>
-                <div class="form-group">
-                    <label for="return-governorate">Governorate</label>
-                    <select id="return-governorate" name="governorate" class="select-cart" required><option value="Cairo" selected>Cairo</option><option value="Giza">Giza</option></select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="return-governorate">المحافظة</label>
+                        <select id="return-governorate" name="governorate" class="select-cart" required><option value="Cairo" selected>القاهرة</option><option value="Giza">الجيزة</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="return-area">المنطقة</label>
+                        <input id="return-area" name="area" class="inp" type="text" required>
+                    </div>
                 </div>
+                <div class="form-group">
+                    <label for="return-street">الشارع</label>
+                    <input id="return-street" name="street" class="inp" type="text" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="return-building">اسم أو رقم العمارة</label>
+                        <input id="return-building" name="building" class="inp" type="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="return-floor">الدور</label>
+                        <input id="return-floor" name="floor" class="inp" type="text" required>
+                    </div>
+                </div>
+                <button type="button" id="return-locate-manual-address" class="dart-locate-address-btn"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> تحديد العنوان المكتوب</button>
+                <button type="button" id="return-confirm-manual-pin" class="dart-locate-address-btn" hidden style="display:none">تأكيد الموقع والعنوان</button>
+            </fieldset>
+            <div class="dart-return-buttons">
+                <button type="button" id="return-back-step" class="dart-return-secondary"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i> رجوع</button>
+                <button type="submit" class="submit-btn-form dart-return-primary">إرسال الطلب</button>
             </div>
-            <div class="form-row flex-center">
-                <div class="form-group"><label for="return-area">Area</label><input id="return-area" name="area" class="inp" type="text" required></div>
-                <div class="form-group"><label for="return-street">Street</label><input id="return-street" name="street" class="inp" type="text" required></div>
-            </div>
-            <div class="form-row flex-center">
-                <div class="form-group"><label for="return-building">Building Number / Name</label><input id="return-building" name="building" class="inp" type="text" required></div>
-                <div class="form-group"><label for="return-floor">Floor</label><input id="return-floor" name="floor" class="inp" type="text" required></div>
-            </div>
-            <button type="button" id="return-locate-manual-address" class="dart-locate-address-btn"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Locate this pickup address</button>
-            <button type="button" id="return-confirm-manual-pin" class="dart-locate-address-btn" hidden style="display:none">Confirm pin and typed address</button>
-        </fieldset>
-
-        <div class="form-group">
-            <label for="return-notes">Notes</label>
-            <textarea id="return-notes" name="notes" placeholder="Value" rows="4"></textarea>
-        </div>
-
+        </section>
 
         <p class="form-status" role="status" aria-live="polite"></p>
-        <a id="return-tracking-link" class="dart-return-tracking-link" href="track.html" hidden>Track this request</a>
-        <button type="submit" class="submit-btn-form">Submit</button>
+        <a id="return-tracking-link" class="dart-return-tracking-link" href="track.html" hidden>تتبع الطلب</a>
+
+        <aside class="dart-return-notices" aria-label="ملاحظات مهمة">
+            <h2>ملاحظات مهمة</h2>
+            <ul>
+                <li>قطع الطقم لا تُستبدل، ويمكن تقديم طلب استرجاع حسب الشروط.</li>
+                <li>يتأكد فريق Dart من أهلية القطعة وتوفر البديل قبل الموافقة.</li>
+                <li>راجع عنوان الاستلام ورقم الهاتف قبل إرسال الطلب.</li>
+                <li id="return-fee-summary" class="dart-return-fee-summary" role="status" aria-live="polite" hidden><span id="return-fee-summary-text"></span></li>
+            </ul>
+        </aside>
     </form>
 </section>
             </main>
@@ -214,6 +228,7 @@
     <script src="Js/dart-checkout-regions.js" defer></script>
     <script  src="Js/dart-address.js" defer></script>
     <script  src="Js/dart-returns.js" defer></script>
+    <script src="Js/dart-return-step-flow.js" defer></script>
     <script src="Js/dart-navigation.min.js" defer></script>
     <script  src="Js/dart-ui.js" defer></script>
     <script  src="Js/dart-storefront.js" defer></script>
