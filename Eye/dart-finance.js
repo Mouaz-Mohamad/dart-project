@@ -184,7 +184,7 @@
   let financeBackoffMs = 5_000;
   let financeLastAttemptAt = 0;
   let financeWarnedBackoffMs = 0;
-  const FINANCE_REFRESH_MS = 30_000;
+  const FINANCE_REFRESH_MS = 600_000; // SSE-driven; ten-minute reconciliation.
   const FINANCE_MAX_BACKOFF_MS = 300_000;
 
   function getStorage() {

@@ -11,8 +11,15 @@ const CATALOG_READ = ["catalog.manage", "catalog.read", "inventory.manage"];
 export function canReceiveChange(signal: ChangeSignal, permissions: string[], admin: boolean): boolean {
   if (!admin) return signal.scope === "version" && signal.name === "catalog_inventory";
   if (signal.scope === "version" && signal.name === "admin_notifications") return permissions.includes("notifications.read");
-  if (signal.scope === "version") return signal.name === "orders" ? permissions.includes("orders.read")
-    : signal.name === "catalog_inventory" && CATALOG_READ.some(permission => permissions.includes(permission));
+  if (signal.scope === "version") {
+    if (signal.name === "orders") return permissions.includes("orders.read");
+    if (signal.name === "catalog_inventory") return CATALOG_READ.some(permission => permissions.includes(permission));
+    if (signal.name === "waiting") return permissions.includes("waiting.view");
+    if (signal.name === "sets") return permissions.includes("sets.read") || permissions.includes("sets.manage");
+    if (signal.name === "news") return permissions.includes("news.read") || permissions.includes("news.manage");
+    if (signal.name === "staff") return permissions.includes("staff.read");
+    return false;
+  }
   return DASHBOARD_DOMAINS.includes(signal.name as DashboardDomain) && hasDomainPermission(signal.name as DashboardDomain, "read", permissions);
 }
 
@@ -20,7 +27,8 @@ export function createChangeRouter(feed: ChangeFeed, identity: IdentityService, 
   timing = { lifetimeMs: 240_000, heartbeatMs: 15_000, coalesceMs: 100 }) {
   const router = Router(), streams = new Map<string, number>();
   const gates: RequestHandler[] = [authenticate(identity, config), requireAccountType("staff"), requireMfa,
-    requireAnyPermission("orders.read", ...CATALOG_READ, ...FINANCE_DOMAIN_READ_GATE_PERMISSIONS)];
+    requireAnyPermission("orders.read", ...CATALOG_READ, "waiting.view", "sets.read", "sets.manage",
+      "news.read", "news.manage", "staff.read", ...FINANCE_DOMAIN_READ_GATE_PERMISSIONS)];
   const stream = (admin: boolean): RequestHandler => async (request, response) => {
     const origin = request.get("origin");
     if (origin && origin !== `${request.protocol}://${request.get("host")}` && !config.corsOrigins.includes(origin)) throw new AppError(403, "ORIGIN_NOT_ALLOWED", "Stream origin is not allowed");

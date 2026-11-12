@@ -23,7 +23,15 @@
       .then(response => response.ok ? response.json() : null)
       .then(payload => payload?.capabilities?.includes("direct-updates-v1") === true)
       .catch(() => { capability = null; return false; });
-    if (!(await capability) || probeEpoch !== epoch || source || !authenticated || document.hidden || navigator.onLine === false) return;
+    const supported = await capability;
+    if (!supported) {
+      // Retry a transiently failed live-capability probe rather than disabling SSE until reload.
+      capability = null;
+      if (probeEpoch === epoch && authenticated && !document.hidden && navigator.onLine !== false)
+        retryTimer = window.setTimeout(connect, 60000);
+      return;
+    }
+    if (probeEpoch !== epoch || source || !authenticated || document.hidden || navigator.onLine === false) return;
     const generation = ++epoch;
     let current;
     try { current = new window.EventSource(base + (admin ? "/api/v1/admin/changes" : "/api/v1/catalog/changes"), { withCredentials: true }); }
@@ -55,10 +63,10 @@
       const reconcile = () => {
         if (generation !== epoch || !active) return;
         emit({ reconcile: true });
-        reconcileTimer = window.setTimeout(reconcile, 60000);
+        reconcileTimer = window.setTimeout(reconcile, 600000);
       };
       clearTimeout(reconcileTimer);
-      reconcileTimer = window.setTimeout(reconcile, 60000);
+      reconcileTimer = window.setTimeout(reconcile, 600000);
     });
     current.addEventListener("change", event => {
       if (generation !== epoch || !active) return;

@@ -434,6 +434,16 @@
   card.querySelectorAll('[data-staff-directory]').forEach(button=>button.addEventListener('click',()=>{card.querySelectorAll('[data-staff-directory]').forEach(node=>node.setAttribute('aria-pressed',String(node===button)));card.querySelectorAll('[data-staff-directory-panel]').forEach(panel=>{panel.hidden=panel.dataset.staffDirectoryPanel!==button.dataset.staffDirectory;});}));
   window.addEventListener('dart:admin-logged-out',()=>{directoryRevision+=1;selectedStaffId=null;permissionDrafts.clear();pendingMembers.clear();directory={staff:[],invitations:[],permissions:[]};staffList.replaceChildren();invitationsList.replaceChildren();invitePermissions.replaceChildren();card.hidden=true;if(staffTab)staffTab.hidden=true;});
 
+  window.addEventListener("dart:server-change", event => {
+    const signal = event.detail;
+    if (!signal?.reconcile && !(signal?.scope === "version" && signal.name === "staff")) return;
+    if (!document.hidden && card.getClientRects().length && can("staff.read")) void load(true);
+  });
+  // Staff is rarely edited: reconcile at most every ten minutes without SSE.
+  window.setInterval(() => {
+    if (!window.DartChanges?.active && !document.hidden &&
+        card.getClientRects().length && can("staff.read")) void load(true);
+  }, 600000);
   window.addEventListener("dart:admin-authenticated", load);
   document.addEventListener("DOMContentLoaded", () => {
     if (can("staff.read")) void load();

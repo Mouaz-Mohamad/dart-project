@@ -11,7 +11,7 @@
   const money = (minor) => `${(Math.max(0,Number(minor)||0)/100).toLocaleString("en-EG",{maximumFractionDigits:2})} EGP`;
   let initialized=false, rows=[], editRecord=null, settingsCache=null, currentView="models";
   const selectedSetIds=new Set();
-  const freshnessMs=60000;
+  const freshnessMs=600000;
   let listGeneration=0, pendingList=null, loaded=false, loadedAt=0, accessKey="";
 
   function can(permission) { return root.DartAdminAccess?.can?.(permission) === true; }
@@ -406,6 +406,13 @@
   root.addEventListener("dart:admin-logged-out",clearPrivateState);
   root.addEventListener("dart:sets-client-ready",init);
   new root.MutationObserver(()=>{if(root.document.body.classList.contains("dart-admin-locked"))clearPrivateState();}).observe(root.document.body,{attributes:true,attributeFilter:["class"]});
-  root.setInterval(()=>{if(!root.document.hidden&&currentView==="sets"&&dashboardControls().section?.classList.contains("active-section"))void loadSets(false);},freshnessMs);
+  root.addEventListener("dart:server-change", event => {
+    const signal=event.detail;
+    if(!signal?.reconcile && !(signal?.scope==="version" && signal.name==="sets"))return;
+    invalidateList();
+    if(!root.document.hidden && currentView==="sets" && dashboardControls().section?.classList.contains("active-section"))
+      void loadSets(true);
+  });
+  root.setInterval(()=>{if(!root.DartChanges?.active&&!root.document.hidden&&currentView==="sets"&&dashboardControls().section?.classList.contains("active-section"))void loadSets(false);},freshnessMs);
   if(root.DartAdminHydration?.ready===true)init();
 })(typeof window!=="undefined"?window:globalThis);

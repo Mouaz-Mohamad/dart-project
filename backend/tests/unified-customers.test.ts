@@ -47,6 +47,18 @@ describe("unified customer records", () => {
     expect(results[0]!.account.userId).toBe(results[1]!.account.userId);
     expect((await store.pool.query("SELECT user_id FROM account_phones WHERE phone_normalized=$1",[`20${primary.slice(1)}`])).rows).toHaveLength(1);
   });
+  it("updates Customers version after signup, profile edits and order addresses", async () => {
+    const before = (await dashboard.versions()).customers;
+    const f = await customer();
+    const created = (await dashboard.versions()).customers;
+    expect(created).toBeGreaterThan(before);
+    await identity.updateCustomerProfile(f.session.account,
+      { name: "Website Updated", phone1: f.phone1, phone2: phone() }, metadata);
+    const edited = (await dashboard.versions()).customers;
+    expect(edited).toBeGreaterThan(created);
+    await order(f.profile.id, "", "", "2026-11-11", "Giza");
+    expect((await dashboard.versions()).customers).toBeGreaterThan(edited);
+  });
   it("keeps birthday usage attached through repeated signup, legacy linking and birthday correction", async () => {
     const f=await customer();
     const year=(await store.pool.query("SELECT dart_cairo_year(now()) AS year")).rows[0].year;

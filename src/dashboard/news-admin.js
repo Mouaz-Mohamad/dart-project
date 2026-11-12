@@ -13,7 +13,7 @@
   let rows = [], record = null, newId = "", coverAssetId = "", previewUrl = "", pendingAssetId = "";
   let offset = 0, nextOffset = null, generation = 0, searchTimer = 0, busy = false, editorFocus = null;
   let editorOverflow = "", uploadVersion = 0, uploadedVersion = -1, editorGeneration = 0;
-  const freshnessMs = 60000;
+  const freshnessMs = 600000;
   let loadedQuery = "", loadedAt = 0, pendingList = null, accessKey = "";
   const allowed = () => !doc.body.classList.contains("dart-admin-locked") && root.DartAdminHydration?.ready === true && readable();
   const writable = () => can("news.manage") && !doc.body.classList.contains("dart-admin-locked");
@@ -245,6 +245,12 @@
   root.addEventListener("dart:admin-logged-out", applyAccess);
   new root.MutationObserver(() => { if (doc.body.classList.contains("dart-admin-locked")) applyAccess(); })
     .observe(doc.body, { attributes: true, attributeFilter: ["class"] });
-  root.setInterval(() => { if (!doc.hidden && section.classList.contains("active-section")) void load(false, false); }, freshnessMs);
+  root.addEventListener("dart:server-change", event => {
+    const signal = event.detail;
+    if (!signal?.reconcile && !(signal?.scope === "version" && signal.name === "news")) return;
+    invalidateList();
+    if (!doc.hidden && section.classList.contains("active-section") && allowed()) void load(false, true);
+  });
+  root.setInterval(() => { if (!root.DartChanges?.active && !doc.hidden && section.classList.contains("active-section")) void load(false, false); }, freshnessMs);
   applyAccess();
 })(window);

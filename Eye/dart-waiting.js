@@ -380,9 +380,19 @@
   root.addEventListener("dart:admin-authenticated",applyAccess);
   document.addEventListener("DOMContentLoaded",applyAccess);
 
+  root.addEventListener("dart:server-change", (event) => {
+    if (document.hidden || !can("waiting.view")) return;
+    const signal = event.detail;
+    if (signal?.scope === "version" && signal.name === "waiting" && Number(signal.version || 0) > state.version)
+      void hydrate(true);
+    else if (signal?.reconcile && $("waiting")?.classList.contains("active-section"))
+      void hydrate(false);
+  });
+  // Five-minute version fallback only when the live stream is unavailable.
   setInterval(() => {
-    if (!document.hidden && can("waiting.view") && $("waiting")?.classList.contains("active-section")) void hydrate(false);
-  },15000);
+    if (!root.DartChanges?.active && !document.hidden && can("waiting.view") &&
+      $("waiting")?.classList.contains("active-section")) void hydrate(false);
+  }, 300000);
 
   root.DartWaitingAdmin = Object.freeze({ hydrate, state });
 })(typeof window !== "undefined" ? window : globalThis);
