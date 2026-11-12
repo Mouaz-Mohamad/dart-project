@@ -3722,3 +3722,11 @@ body.dart-admin-locked > main {
 #settings-storefront-products-status[data-state="error"]{color:#a40025}
 @media(max-width:520px){.dart-storefront-model-list li{align-items:flex-start;flex-direction:column}}
 /* END DART Storefront Products settings */
+
+/* Orders: show the complete persisted discount code/reason instead of clipping it. */
+#orders-container > .model-row > .text-item:has(+ .order-final-amount) {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
