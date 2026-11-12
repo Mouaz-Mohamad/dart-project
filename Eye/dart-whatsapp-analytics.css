@@ -14,7 +14,7 @@
 .dart-wa-feedback{font-size:.83rem;min-height:1.6rem;color:var(--wa-muted);margin-bottom:13px}
 .dart-wa-feedback.is-error,.dart-wa-dialog #dart-wa-dialog-status.is-error{color:#ac243d}
 .dart-wa-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
-.dart-wa-kpi{text-align:start;display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid var(--wa-line);border-radius:15px;padding:17px;min-height:126px;transition:border-color .15s,transform .15s;box-shadow:0 4px 18px rgba(46,20,32,.035)}
+.dart-wa-kpi{color:var(--wa-ink);text-align:start;display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid var(--wa-line);border-radius:15px;padding:17px;min-height:126px;transition:border-color .15s,transform .15s;box-shadow:0 4px 18px rgba(46,20,32,.035)}
 .dart-wa-kpi:hover,.dart-wa-kpi:focus-visible{border-color:var(--wa-burgundy);transform:translateY(-1px)}
 .dart-wa-kpi span{color:var(--wa-muted);font-size:.86rem}
 .dart-wa-kpi strong{font-size:clamp(1.5rem,3vw,2rem);font-weight:800;font-variant-numeric:tabular-nums}
