@@ -75,7 +75,7 @@ sectionsMap.damage = {
   storageKey: "dart_damage",
 };
 
-function dartArchiveRecord(key, id) {
+async function dartArchiveRecord(key, id) {
   const sec = sectionsMap[key],
     x = sec?.data.find((v) => String(v.id) === String(id));
   if (!x) return;
@@ -92,7 +92,8 @@ function dartArchiveRecord(key, id) {
     { isArchived: old },
     { isArchived: !old },
   );
-  dartSaveAll();
+  if (key === "review") await dartSaveFeedback(x);
+  else dartSaveAll();
   dartRefreshAll();
 }
 function dartUpdateMasterCheckbox(key, viewData) {

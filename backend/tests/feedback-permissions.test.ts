@@ -15,7 +15,7 @@ beforeEach(async () => {
     data jsonb, updated_by text, updated_at timestamptz);
     CREATE TABLE admin_notifications (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), event_type text, entity_id text, entity_code text, UNIQUE(event_type,entity_id));
     CREATE TABLE audit_logs (actor_type text, actor_id text, action text, entity_type text,
-      entity_id text, request_id text, metadata jsonb);`);
+      entity_id text, request_id text, metadata jsonb, old_values jsonb, new_values jsonb);`);
   await db.query("INSERT INTO dashboard_domain_state VALUES ('reviews',3,$1::jsonb,NULL,NULL),('contacts',2,$2::jsonb,NULL,NULL)",
     [JSON.stringify([review, legacy]), JSON.stringify([contact])]);
   const query = (sql: string, values: unknown[] = []) => db.query(sql, values);
@@ -51,7 +51,9 @@ describe("independent reviews and Contact Us projections on actual SQL", () => {
     expect((await db.query<{ data: unknown[] }>("SELECT data FROM dashboard_domain_state WHERE domain='reviews'")).rows[0]?.data).toEqual([review]);
     expect((await db.query<{ entity_id: string; metadata: { previousVersion: number } }>("SELECT entity_id,metadata FROM audit_logs")).rows)
       .toMatchObject([{ entity_id: "contacts", metadata: { previousVersion: 4 } }]);
-    const deleted = await service.write("contacts", 6, [], "staff", "request-2");
+    await expect(service.write("contacts", 6, [], "staff", "request-2")).rejects.toMatchObject({ code: "FEEDBACK_SNAPSHOT_INCOMPLETE" });
+    const firstDelete = await service.removeFeedback("contacts", legacy.id, 6, "staff", "request-2");
+    const deleted = await service.removeFeedback("contacts", contact.id, firstDelete.version, "staff", "request-3");
     expect(deleted.data).toEqual([]);
     expect((await service.read("reviews")).data).toEqual([review]);
   });

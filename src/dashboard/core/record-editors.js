@@ -322,8 +322,12 @@ function setupReviewModal() {
       document.getElementById("modal-review-edit-id").value = "";
       openModal(modal);
     });
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (form.dataset.feedbackSaving) return;
+    form.dataset.feedbackSaving = "1";
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
     const id = document.getElementById("modal-review-edit-id").value,
       name = document.getElementById("modal-cust-rev-name").value,
       client = customersData.find((c) => c.clientName === name) || null,
@@ -348,8 +352,14 @@ function setupReviewModal() {
         status: document.getElementById("modal-cust-status").value || "Active",
       };
     if (id) {
-      const r = reviewsData.find((x) => String(x.id) === String(id)),
-        old = { ...r };
+      const r = reviewsData.find((x) => String(x.id) === String(id));
+      if (!r) {
+        delete form.dataset.feedbackSaving;
+        if (submit) submit.disabled = false;
+        window.DartDialog.alert("Reload the feedback list before editing this record.");
+        return;
+      }
+      const old = { ...r };
       Object.assign(r, p);
       dartAudit("EDIT", "review", r.id, old, p);
     } else {
@@ -365,7 +375,11 @@ function setupReviewModal() {
       reviewsData.push(r);
       dartAudit("CREATE", "review", r.id, {}, r);
     }
-    dartSaveAll();
+    const record = id ? reviewsData.find(row => String(row.id) === String(id)) : reviewsData.at(-1);
+    const saved = await dartSaveFeedback(record);
+    delete form.dataset.feedbackSaving;
+    if (submit) submit.disabled = false;
+    if (!saved) { dartRefreshAll(); return; }
     dartRefreshAll();
     closeModal(modal);
   });
@@ -617,9 +631,9 @@ function setupAllDelegatedEvents() {
   const reviews = document.getElementById("review-container");
   if (reviews && !reviews.dataset.dartV3Toggle) {
     reviews.dataset.dartV3Toggle = "1";
-    reviews.addEventListener("click", (e) => {
+    reviews.addEventListener("click", async (e) => {
       const btn = e.target.closest(".btn-toggle-review");
-      if (!btn) return;
+      if (!btn || btn.disabled) return;
       const id = btn.closest(".model-row")?.dataset.id,
         r = reviewsData.find((x) => String(x.id) === String(id));
       if (!r) return;
@@ -632,7 +646,9 @@ function setupAllDelegatedEvents() {
         { status: old },
         { status: r.status },
       );
-      dartSaveAll();
+      btn.disabled = true;
+      await dartSaveFeedback(r);
+      btn.disabled = false;
       dartRenderSection("review");
     });
   }

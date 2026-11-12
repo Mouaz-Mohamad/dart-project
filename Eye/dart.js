@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:e0065c09d66a8fe3d86d11e24d1cb031f49c726588a12c2f875987dbc31f1543 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:d3b5f59e3e4d86fa619cb8cd54892a55e5ee5469431a65fcf362006b8c33dd4f */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -1035,13 +1035,29 @@ function dartSaveAll() {
   saveDataToStorage("dart_customers", customersData);
   saveDataToStorage("dart_orders", ordersData);
   saveDataToStorage("dart_returns", returnsData);
-  saveDataToStorage("dart_reviews", reviewsData);
+  // Feedback saves are explicit at their own editor/actions, never part of an unrelated Save All.
   saveDataToStorage("dart_cards", cardsData);
   saveDataToStorage("dart_representatives", representativeData);
   saveDataToStorage("dart_damage", damageData);
   saveDataToStorage("dart_notifications", notificationData);
   saveDataToStorage("dart_audit", auditData);
   // Business schema state is server-authoritative.
+}
+
+async function dartSaveFeedback(record) {
+  const isContact = row => row.recordType === "contact" || row.source === "Contact Us";
+  const contact = isContact(record), domain = contact ? "contacts" : "reviews";
+  const key = contact ? "dart_contact_messages" : "dart_reviews";
+  const data = reviewsData.filter(row => isContact(row) === contact);
+  try {
+    if (window.DartDomainState?.writeAndSync) await window.DartDomainState.writeAndSync(key, data);
+    else saveDataToStorage(key, data, true);
+  } catch (error) {
+    await window.DartDomainState?.hydrateDomain?.(domain, true).catch(() => {});
+    window.DartDialog?.alert?.(error.message || "لم يتم حفظ التغيير. أعد تحميل الريفيوهات وحاول مرة أخرى.");
+    return false;
+  }
+  return true;
 }
 
 function getRowClass(item) {
@@ -1357,6 +1373,21 @@ async function dartCommitHardDelete(mode) {
     ["customers", "representative"].includes(sectionKey)
   ) {
     window.DartDialog.alert("Secure customer and representative accounts must be deleted through the account API.");
+    return;
+  }
+
+  if (serverMode && sectionKey === "review") {
+    const domain = target?.recordType === "contact" || target?.source === "Contact Us" ? "contacts" : "reviews";
+    try {
+      await window.DartDomainState.removeFeedback(domain, String(id));
+      await window.DartDomainState.hydrateAudit?.().catch(() => {});
+      dartPendingHardDelete = null;
+      dartRefreshAll();
+      closeModal(document.getElementById("hard-delete-modal"));
+    } catch (error) {
+      await window.DartDomainState?.hydrateDomain?.(domain, true).catch(() => {});
+      window.DartDialog.alert(error.message || "Feedback deletion was not committed.");
+    }
     return;
   }
 
@@ -2349,7 +2380,7 @@ sectionsMap.damage = {
   storageKey: "dart_damage",
 };
 
-function dartArchiveRecord(key, id) {
+async function dartArchiveRecord(key, id) {
   const sec = sectionsMap[key],
     x = sec?.data.find((v) => String(v.id) === String(id));
   if (!x) return;
@@ -2366,7 +2397,8 @@ function dartArchiveRecord(key, id) {
     { isArchived: old },
     { isArchived: !old },
   );
-  dartSaveAll();
+  if (key === "review") await dartSaveFeedback(x);
+  else dartSaveAll();
   dartRefreshAll();
 }
 function dartUpdateMasterCheckbox(key, viewData) {
@@ -5292,8 +5324,12 @@ function setupReviewModal() {
       document.getElementById("modal-review-edit-id").value = "";
       openModal(modal);
     });
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (form.dataset.feedbackSaving) return;
+    form.dataset.feedbackSaving = "1";
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
     const id = document.getElementById("modal-review-edit-id").value,
       name = document.getElementById("modal-cust-rev-name").value,
       client = customersData.find((c) => c.clientName === name) || null,
@@ -5318,8 +5354,14 @@ function setupReviewModal() {
         status: document.getElementById("modal-cust-status").value || "Active",
       };
     if (id) {
-      const r = reviewsData.find((x) => String(x.id) === String(id)),
-        old = { ...r };
+      const r = reviewsData.find((x) => String(x.id) === String(id));
+      if (!r) {
+        delete form.dataset.feedbackSaving;
+        if (submit) submit.disabled = false;
+        window.DartDialog.alert("Reload the feedback list before editing this record.");
+        return;
+      }
+      const old = { ...r };
       Object.assign(r, p);
       dartAudit("EDIT", "review", r.id, old, p);
     } else {
@@ -5335,7 +5377,11 @@ function setupReviewModal() {
       reviewsData.push(r);
       dartAudit("CREATE", "review", r.id, {}, r);
     }
-    dartSaveAll();
+    const record = id ? reviewsData.find(row => String(row.id) === String(id)) : reviewsData.at(-1);
+    const saved = await dartSaveFeedback(record);
+    delete form.dataset.feedbackSaving;
+    if (submit) submit.disabled = false;
+    if (!saved) { dartRefreshAll(); return; }
     dartRefreshAll();
     closeModal(modal);
   });
@@ -5587,9 +5633,9 @@ function setupAllDelegatedEvents() {
   const reviews = document.getElementById("review-container");
   if (reviews && !reviews.dataset.dartV3Toggle) {
     reviews.dataset.dartV3Toggle = "1";
-    reviews.addEventListener("click", (e) => {
+    reviews.addEventListener("click", async (e) => {
       const btn = e.target.closest(".btn-toggle-review");
-      if (!btn) return;
+      if (!btn || btn.disabled) return;
       const id = btn.closest(".model-row")?.dataset.id,
         r = reviewsData.find((x) => String(x.id) === String(id));
       if (!r) return;
@@ -5602,7 +5648,9 @@ function setupAllDelegatedEvents() {
         { status: old },
         { status: r.status },
       );
-      dartSaveAll();
+      btn.disabled = true;
+      await dartSaveFeedback(r);
+      btn.disabled = false;
       dartRenderSection("review");
     });
   }

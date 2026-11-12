@@ -74,6 +74,7 @@ function application(permissions: string[]) {
     readMany: vi.fn(async (domains: string[]) => domains.map((domain) => ({ domain, version: 2, data: [] }))),
     write: vi.fn(async (domain: string, version: number, data: unknown[]) => ({ domain, version: version + 1, data })),
     versions: vi.fn().mockResolvedValue({ contacts: 2, finance_expenses: 4, customers: 7 }),
+    removeFeedback: vi.fn(async (domain: string) => ({domain,version:3,data:[]})),
     publicReviews: vi.fn().mockResolvedValue([]),
     audit: vi.fn().mockResolvedValue([]),
   } as unknown as DashboardStateService;
@@ -186,6 +187,21 @@ describe("dashboard domain permissions", () => {
       .get("/api/v1/admin/domain-state/customers")
       .set("Cookie", `dart_session_staff=${sessionToken}`);
     expect(denied.status).toBe(403);
+  });
+
+  it("gates explicit feedback deletion by the domain permission, CSRF and expected version", async () => {
+    const {app,state}=application(["reviews.manage"]);
+    const remove=(domain: string,body: object,csrf=true)=>{
+      const call=request(app).delete(`/api/v1/admin/feedback/${domain}/review-one`).set("Cookie",`dart_session_staff=${sessionToken}`);
+      if(csrf)call.set("x-csrf-token","staff-csrf-token");
+      return call.send(body);
+    };
+    expect((await remove("contacts",{expectedVersion:2})).status).toBe(403);
+    expect((await remove("reviews",{expectedVersion:2},false)).status).toBe(403);
+    expect((await remove("reviews",{})).status).toBe(422);
+    expect((await remove("reviews",{expectedVersion:2})).status).toBe(200);
+    expect(state.removeFeedback).toHaveBeenCalledTimes(1);
+    expect(state.removeFeedback).toHaveBeenCalledWith("reviews","review-one",2,expect.any(String),expect.any(String));
   });
 
   it("filters version polling to domains readable by a granular Finance account", async () => {

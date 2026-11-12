@@ -256,6 +256,9 @@
           .catch(async (error) => {
             console.error(`Dart ${domain} sync failed`, error);
             if (error.status === 409) {
+              if (error.code === "FEEDBACK_SNAPSHOT_INCOMPLETE") {
+                window.DartDialog?.alert?.("لم يتم حفظ قائمة ريفيوهات ناقصة. تم الحفاظ على البيانات الأصلية وإعادة تحميلها.");
+              }
               dirty.delete(domain);
               await hydrateDomain(domain, true).catch(() => {});
             }
@@ -286,6 +289,31 @@
     dirty.add(domain);
     schedule(domain);
     return true;
+  }
+
+  async function removeFeedback(domain, recordId) {
+    if (!["reviews", "contacts"].includes(domain) || !recordId) throw new Error("Choose a feedback record.");
+    if (deniedDomains.has(domain)) throw new Error("You do not have permission to change this feedback.");
+    await syncNow(domain);
+    const queueKey = "feedback", session = sessionEpoch;
+    const next = (queues.get(queueKey) || Promise.resolve()).then(async () => {
+      await hydrateDomain(domain, true);
+      if (session !== sessionEpoch || dirty.has(domain)) throw new Error("Feedback changed. Reload it before deleting.");
+      const revision = revisions.get(domain) || 0;
+      const payload = await api(`/api/v1/admin/feedback/${domain}/${encodeURIComponent(recordId)}`, {
+        method: "DELETE", body: { expectedVersion: versions.get(domain) },
+      });
+      if (session !== sessionEpoch) return [];
+      for (const [related, version] of Object.entries(payload.relatedVersions || {})) {
+        if (versions.has(related) && Number(version) > versions.get(related)) versions.set(related, Number(version));
+      }
+      versions.set(domain, Number(payload.version));
+      confirmedData.set(domain, JSON.stringify(payload.data || []));
+      if (revision === (revisions.get(domain) || 0)) cache(STORAGE_BY_DOMAIN[domain], payload.data || [], domain);
+      return payload.data || [];
+    });
+    queues.set(queueKey, next.catch(() => undefined));
+    return next;
   }
 
   async function hydrateAudit(limit = 500) {
@@ -464,6 +492,7 @@
     syncNow,
     writeAndSync,
     createFinanceSettlement,
+    removeFeedback,
     checkAll,
     refreshChanged,
     hydrateAudit,

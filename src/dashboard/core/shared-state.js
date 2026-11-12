@@ -128,13 +128,29 @@ function dartSaveAll() {
   saveDataToStorage("dart_customers", customersData);
   saveDataToStorage("dart_orders", ordersData);
   saveDataToStorage("dart_returns", returnsData);
-  saveDataToStorage("dart_reviews", reviewsData);
+  // Feedback saves are explicit at their own editor/actions, never part of an unrelated Save All.
   saveDataToStorage("dart_cards", cardsData);
   saveDataToStorage("dart_representatives", representativeData);
   saveDataToStorage("dart_damage", damageData);
   saveDataToStorage("dart_notifications", notificationData);
   saveDataToStorage("dart_audit", auditData);
   // Business schema state is server-authoritative.
+}
+
+async function dartSaveFeedback(record) {
+  const isContact = row => row.recordType === "contact" || row.source === "Contact Us";
+  const contact = isContact(record), domain = contact ? "contacts" : "reviews";
+  const key = contact ? "dart_contact_messages" : "dart_reviews";
+  const data = reviewsData.filter(row => isContact(row) === contact);
+  try {
+    if (window.DartDomainState?.writeAndSync) await window.DartDomainState.writeAndSync(key, data);
+    else saveDataToStorage(key, data, true);
+  } catch (error) {
+    await window.DartDomainState?.hydrateDomain?.(domain, true).catch(() => {});
+    window.DartDialog?.alert?.(error.message || "لم يتم حفظ التغيير. أعد تحميل الريفيوهات وحاول مرة أخرى.");
+    return false;
+  }
+  return true;
 }
 
 function getRowClass(item) {

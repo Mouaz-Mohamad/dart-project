@@ -239,6 +239,21 @@ async function dartCommitHardDelete(mode) {
     return;
   }
 
+  if (serverMode && sectionKey === "review") {
+    const domain = target?.recordType === "contact" || target?.source === "Contact Us" ? "contacts" : "reviews";
+    try {
+      await window.DartDomainState.removeFeedback(domain, String(id));
+      await window.DartDomainState.hydrateAudit?.().catch(() => {});
+      dartPendingHardDelete = null;
+      dartRefreshAll();
+      closeModal(document.getElementById("hard-delete-modal"));
+    } catch (error) {
+      await window.DartDomainState?.hydrateDomain?.(domain, true).catch(() => {});
+      window.DartDialog.alert(error.message || "Feedback deletion was not committed.");
+    }
+    return;
+  }
+
   if (mode === "only") {
     sec.data = sec.data.filter((row) => String(row.id) !== String(id));
   } else {

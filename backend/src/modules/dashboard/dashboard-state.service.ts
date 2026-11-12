@@ -187,8 +187,13 @@ export class DashboardStateService {
     }
   }
 
+  async removeFeedback(domain: "reviews" | "contacts", recordId: string, expectedVersion: number,
+    actorId: string, requestId: string) {
+    return this.writeFeedback(domain, expectedVersion, [], actorId, requestId, recordId);
+  }
+
   private async writeFeedback(domain: "reviews" | "contacts", expectedVersion: number,
-    data: unknown[], actorId: string, requestId: string) {
+    data: unknown[], actorId: string, requestId: string, removeId?: string) {
     if (domain === "reviews" && data.some(isContact)) {
       throw new AppError(403, "FORBIDDEN", "Contact messages require contacts.manage");
     }
@@ -205,6 +210,23 @@ export class DashboardStateService {
       const state = feedbackState(result.rows), previousVersion = state.versions[domain];
       if (previousVersion !== expectedVersion) {
         throw new AppError(409, "DOMAIN_VERSION_CONFLICT", `${domain} changed on another device; reload and retry`);
+      }
+      const previousData = domain === "reviews" ? state.reviews.data.filter(value => !isContact(value)) : contactProjection(state);
+      const recordId = (value: unknown) => value && typeof value === "object" && !Array.isArray(value)
+        ? (typeof (value as Record<string, unknown>).id === "string" ? String((value as Record<string, unknown>).id).trim() : "") : "";
+      if (removeId !== undefined) {
+        if (!previousData.some(value => recordId(value) === removeId)) {
+          throw new AppError(404, "FEEDBACK_NOT_FOUND", "Feedback record not found");
+        }
+        data = previousData.filter(value => recordId(value) !== removeId);
+      }
+      const ids = data.map(recordId);
+      if (ids.some(id => !id || id.length > 200) || new Set(ids).size !== ids.length) {
+        throw new AppError(422, "FEEDBACK_RECORD_INVALID", "Feedback records require unique identifiers");
+      }
+      const incomingIds = new Set(ids);
+      if (previousData.some(value => !incomingIds.has(recordId(value)) && recordId(value) !== removeId)) {
+        throw new AppError(409, "FEEDBACK_SNAPSHOT_INCOMPLETE", "Feedback list is incomplete. Reload it; deletion requires a specific record command.");
       }
       const legacyContacts = state.reviews.data.filter(isContact);
       const reviewData = domain === "reviews" ? [...data, ...legacyContacts]
@@ -226,9 +248,11 @@ export class DashboardStateService {
         state.versions.contacts += 1;
       }
       await client.query(`INSERT INTO audit_logs (
-        actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
-      ) VALUES ('staff',$1,'DASHBOARD_DOMAIN_UPDATED','dashboard_domain_state',$2,$3,$4::jsonb)`,
-      [actorId, domain, requestId, JSON.stringify({ previousVersion, newVersion: state.versions[domain], count: data.length })]);
+        actor_type, actor_id, action, entity_type, entity_id, request_id, metadata, old_values, new_values
+      ) VALUES ('staff',$1,'DASHBOARD_DOMAIN_UPDATED','dashboard_domain_state',$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)`,
+      [actorId, domain, requestId, JSON.stringify({ previousVersion, newVersion: state.versions[domain], count: data.length,
+        ...(removeId !== undefined ? { removedRecordId: removeId } : {}) }),
+        JSON.stringify({ data: previousData }), JSON.stringify({ data: domain === "contacts" ? contactData : data })]);
       await client.query("COMMIT");
       return { domain, version: state.versions[domain], data: domain === "contacts" ? contactData : data,
         relatedVersions: state.versions };

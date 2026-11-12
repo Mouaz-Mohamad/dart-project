@@ -240,6 +240,18 @@ export function createDashboardStateRouter(
     },
   );
 
+  router.delete(
+    "/admin/feedback/:domain/:recordId", signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requireAnyPermission("reviews.manage", "contacts.manage"),
+    async (request, response) => {
+      const domain = z.enum(["reviews", "contacts"]).parse(request.params.domain);
+      requireSensitiveDomainPermission(domain, "write", request.auth!.permissions);
+      const recordId = z.string().trim().min(1).max(200).parse(request.params.recordId);
+      const { expectedVersion } = z.object({ expectedVersion: z.number().int().positive() }).strict().parse(request.body);
+      response.status(200).json(await state.removeFeedback(domain, recordId, expectedVersion, request.auth!.userId, String(request.id)));
+    },
+  );
+
   router.put(
     "/admin/domain-state/:domain",
     signedIn,

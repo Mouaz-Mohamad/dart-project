@@ -11,6 +11,7 @@
     "cache-revalidation-contract.cjs",
     "cart-shipping-recovery-runtime.cjs",
     "customer-shipping-runtime.cjs",
+    "feedback-safety-runtime.cjs",
     "catalog-category-contract.js",
     "checkout-address-runtime.cjs",
     "manual-checkout-contract.cjs",
