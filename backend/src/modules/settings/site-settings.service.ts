@@ -87,7 +87,7 @@ export class SiteSettingsService {
         }
       }
       // Older clients cannot erase configured durations by omitting newer keys.
-      for (const key of ["exchangePeriodDays", "refundPeriodDays"] as const) {
+      for (const key of ["exchangePeriodDays", "refundPeriodDays", "shippingFeePerOrder"] as const) {
         if (!(key in nextSettings) && key in currentSettings) nextSettings[key] = currentSettings[key];
       }
 
@@ -170,6 +170,8 @@ export class SiteSettingsService {
             newVersion: next,
             codRiskPolicyVersion,
             acceptedKeys: Object.keys(parsedSettings).sort(),
+            shippingFee: { previous: currentSettings.shippingFeePerOrder ?? 100,
+              next: nextSettings.shippingFeePerOrder ?? 100 },
           }),
         ],
       );

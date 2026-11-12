@@ -62,8 +62,12 @@ export async function quantityReturnRefund(
       AND lower(request_type) IN ('refund','return')
       AND (lower(status) IN ('completed','good','damaged') OR payload->>'financialCompletionApplied'='true')`, [orderId, excludeRecord]);
   const returned = new Set([...completed.rows.map((row) => row.item_code), itemCode]);
+  // Shipping is separate from merchandise and must not inflate a piece refund.
+  const shipping = await client.query<{ shipping_fee_minor: string }>(
+    "SELECT shipping_fee_minor::text FROM orders WHERE id=$1", [orderId]);
+  const merchandisePaidMinor = Math.max(0, paidMinor - Number(shipping.rows[0]?.shipping_fee_minor || 0));
   const result = quantityRefund(policy, lines.rows.map((line) => ({ itemCode: line.item_code, modelId: line.model_id,
-    baseMinor: Number(line.original_unit_minor), finalMinor: Number(line.final_unit_minor) })), returned, paidMinor, refundedMinor);
+    baseMinor: Number(line.original_unit_minor), finalMinor: Number(line.final_unit_minor) })), returned, merchandisePaidMinor, refundedMinor);
   const originalRefundMinor = Number(lines.rows.find((line) => line.item_code === itemCode)?.final_unit_minor || 0);
   return { ...result, originalRefundMinor, offerAdjustmentMinor: originalRefundMinor - result.refundMinor };
 }

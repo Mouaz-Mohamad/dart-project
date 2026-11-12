@@ -360,6 +360,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
       order_discount_minor: string;
       final_minor: string;
       delivery_cost_minor: string;
+      shipping_fee_minor: string;
       amount_paid_minor: string;
       amount_refunded_minor: string;
       promotion: Record<string, unknown> | null;
@@ -383,7 +384,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
     }>(
       `SELECT o.id, o.order_code, o.status, o.payment_method, o.payment_status, o.legacy,
               o.subtotal_minor::text, o.order_discount_minor::text, o.final_minor::text,
-              o.delivery_cost_minor::text, o.amount_paid_minor::text,
+              o.delivery_cost_minor::text, o.shipping_fee_minor::text, o.amount_paid_minor::text,
               o.amount_refunded_minor::text, o.promotion,
               o.contact_snapshot, o.delivery_address, o.delivery_notes,
               o.created_at, o.updated_at, o.delivered_at, o.delivery_started_at,
@@ -507,6 +508,7 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
         orderLevelDiscountAmount: discountAmount,
         finalAmount: Number(row.final_minor) / 100,
         deliveryCost: Number(row.delivery_cost_minor || 0) / 100,
+        shippingFee: Number(row.shipping_fee_minor || 0) / 100,
         amountPaid: Number(row.amount_paid_minor) / 100,
         amountRefunded: Number(row.amount_refunded_minor) / 100,
         discount: Number(row.promotion?.percent || 0),

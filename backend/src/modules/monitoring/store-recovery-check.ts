@@ -11,7 +11,7 @@ export async function verifyRecoveredStore(pool: Pool, expectedMigrations: strin
     SELECT
       (SELECT count(*)::int FROM orders o JOIN (
         SELECT order_id,sum(final_unit_minor) AS total FROM order_items GROUP BY order_id
-      ) lines ON lines.order_id=o.id WHERE lines.total<>o.final_minor) AS line_mismatches,
+      ) lines ON lines.order_id=o.id WHERE lines.total + o.shipping_fee_minor<>o.final_minor) AS line_mismatches,
       (SELECT count(*)::int FROM users WHERE status='active' AND deleted_at IS NOT NULL) AS deleted_active,
       (SELECT count(*)::int FROM orders o JOIN (
         SELECT order_code,sum(round((payload->>'refundAmount')::numeric*100)) AS refunded

@@ -21,6 +21,8 @@ describe("second Council regressions on the production schema", () => {
   const actor = randomUUID(), representative = randomUUID();
   beforeAll(async () => {
     store = await embeddedStore(); commerce = new CommerceService(store.pool); promotions = new PromotionService(store.pool);
+    // Keep these existing benefit/ledger fixtures on free shipping.
+    await store.pool.query("UPDATE site_settings SET data=data || '{\"shippingFeePerOrder\":0}'::jsonb WHERE id='main'");
     // This suite verifies ON-mode legacy Card accounting; production now defaults OFF.
     await store.pool.query("UPDATE site_settings SET data=data || '{\"dartCardEnabled\":true}'::jsonb WHERE id='main'");
     for (const [user, type] of [[actor, "staff"], [representative, "representative"]]) {

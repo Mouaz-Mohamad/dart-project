@@ -30,6 +30,7 @@
     heroNightImage: null,
     founderImage: null,
     defaultMarkupPercent: 50,
+    shippingFeePerOrder: 100,
     courierFeePerOrder: 100,
     birthdayDiscountPercent: 30,
     dartCardDiscountPercent: 40,
@@ -101,6 +102,7 @@
     return {
       ...clone(defaults),
       ...value,
+      shippingFeePerOrder: Math.round(Math.max(0, number(value.shippingFeePerOrder, defaults.shippingFeePerOrder)) * 100) / 100,
       courierFeePerOrder: number(
         value.courierFeePerOrder ?? value.deliveryCostPerPiece,
         defaults.courierFeePerOrder,

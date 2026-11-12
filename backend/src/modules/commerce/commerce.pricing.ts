@@ -18,6 +18,11 @@ export function campaignAppliesToItem(campaign: Record<string, unknown>, item: P
   return (scope.values || []).some((candidate) => String(candidate).toLowerCase() === String(value || "").toLowerCase());
 }
 
+export function shippingFeeMinor(settings: Record<string, unknown>): number {
+  const fee = Number(settings.shippingFeePerOrder ?? 100);
+  return Math.round(Math.max(0, Number.isFinite(fee) ? fee : 100) * 100);
+}
+
 export function finalModelPriceMinor(sellingMinor: number, discountPercent: number): number {
   return Math.max(0, Math.round(sellingMinor * (1 - Math.min(100, Math.max(0, discountPercent)) / 100)));
 }

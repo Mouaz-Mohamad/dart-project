@@ -32,6 +32,7 @@ import {
   campaignAppliesToItem,
   orderBenefit,
   customerOrderView,
+  shippingFeeMinor,
 } from "./commerce.pricing.js";
 import {
   cairoDateKey,
@@ -1849,17 +1850,18 @@ export class CommerceService {
         ? { type: "Mixed", percent: 0, discountMinor: benefitDiscountMinor, benefits: usedBenefits }
         : usedBenefits[0] || null;
       promotionPercent = Number(promotion?.percent || 0);
-      const fingerprint = createHash("sha256").update(JSON.stringify({ customerUserId, reservationId,
+      const shippingMinor = shippingFeeMinor(settings);
+      const fingerprint = createHash("sha256").update(JSON.stringify({ customerUserId, reservationId, shippingMinor,
         lines: itemSnapshots.map((line) => [line.row.item_code,line.sellingMinor,line.finalUnitMinor,line.discountSource,line.discountReference]),
       })).digest("hex");
-      return { itemSnapshots, subtotalMinor, finalMinor, orderDiscountMinor, promotion, promotionPercent,
+      return { itemSnapshots, subtotalMinor, finalMinor: finalMinor + shippingMinor, shippingMinor, orderDiscountMinor, promotion, promotionPercent,
         birthdayReward, appliedCard, birthdayState, cardState, fingerprint, discountCode,
         setItemIds: new Set(setPrices.keys()) };
   }
 
   private cartQuoteView(pricing: Awaited<ReturnType<CommerceService["checkoutPricing"]>>) {
     return { currency: "EGP", subtotalMinor: pricing.subtotalMinor, discountMinor: pricing.orderDiscountMinor,
-      totalMinor: pricing.finalMinor, fingerprint: pricing.fingerprint,
+      shippingMinor: pricing.shippingMinor, totalMinor: pricing.finalMinor, fingerprint: pricing.fingerprint,
       lines: pricing.itemSnapshots.map((line) => ({ itemCode: line.row.item_code, modelId: line.row.model_id,
         color: line.row.color, size: line.row.size, isSet: pricing.setItemIds.has(line.row.id), baseMinor: line.sellingMinor, finalMinor: line.finalUnitMinor,
         discountSource: line.discountSource, discountPercent: line.effectiveDiscountPercent, discountReference: line.discountReference })),
@@ -1990,7 +1992,7 @@ export class CommerceService {
         ) * 100,
       );
       const pricing = await this.checkoutPricing(client, customerUserId, input.reservationId, itemResult.rows, settings, input.promotionCode);
-      const { itemSnapshots, subtotalMinor, finalMinor, orderDiscountMinor, promotion, promotionPercent,
+      const { itemSnapshots, subtotalMinor, finalMinor, shippingMinor, orderDiscountMinor, promotion, promotionPercent,
         birthdayReward, appliedCard, birthdayState, cardState, discountCode } = pricing;
       if (input.quoteFingerprint && input.quoteFingerprint !== pricing.fingerprint) {
         throw new AppError(409, "PRICE_CHANGED", "Cart pricing changed. Review the current total before confirming.", {
@@ -2021,9 +2023,9 @@ export class CommerceService {
       const orderResult = await client.query<{ id: string; order_code: string; created_at: Date }>(
         `INSERT INTO orders (
            customer_user_id, subtotal_minor, order_discount_minor, final_minor,
-           delivery_cost_minor, promotion, contact_snapshot, delivery_address,
+           delivery_cost_minor, shipping_fee_minor, promotion, contact_snapshot, delivery_address,
            delivery_notes, order_source, legacy
-         ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,'Website',$10::jsonb)
+         ) VALUES ($1,$2,$3,$4,$5,$11,$6::jsonb,$7::jsonb,$8::jsonb,$9,'Website',$10::jsonb)
          RETURNING id, order_code, created_at`,
         [
           customerUserId,
@@ -2043,6 +2045,7 @@ export class CommerceService {
             promotionCode: orderBenefit(promotion, "Promotion")?.code || "",
             discountCode: orderBenefit(promotion, "Discount Code")?.code || "",
           }),
+          shippingMinor,
         ],
       );
       const order = orderResult.rows[0]!;
@@ -2269,6 +2272,7 @@ export class CommerceService {
         discount: promotionPercent,
         orderLevelDiscountAmount: orderDiscountMinor / 100,
         finalAmount: finalMinor / 100,
+        shippingFee: shippingMinor / 100,
         deliveryCost: deliveryCostMinor / 100,
         courierFee: deliveryCostMinor / 100,
         courierFeePerOrder: courierFeePerOrderMinor / 100,
@@ -4821,7 +4825,7 @@ export class CommerceService {
       }
 
       const manualSettingsResult = await client.query<{ data: Record<string, unknown> }>(
-        "SELECT data FROM site_settings WHERE id='main'",
+        "SELECT data FROM site_settings WHERE id='main' FOR SHARE",
       );
       const configuredManualCourierFee = Number(
         manualSettingsResult.rows[0]?.data?.courierFeePerOrder ??
@@ -4836,6 +4840,7 @@ export class CommerceService {
         ) * 100,
       );
       const manualDeliveryCostMinor = manualCourierFeePerOrderMinor;
+      const manualShippingMinor = shippingFeeMinor(manualSettingsResult.rows[0]?.data || {});
 
       const clientCode = String(input.clientId || "").trim();
       const referencedCustomer = clientCode && clientCode !== "-" ? await resolveCustomerReference(client, clientCode) : null;
@@ -4867,11 +4872,11 @@ export class CommerceService {
       const inserted = await client.query<{ id: string; order_code: string }>(
         `INSERT INTO orders (
            customer_user_id, status, payment_method, payment_status,
-           subtotal_minor, order_discount_minor, final_minor, delivery_cost_minor,
+           subtotal_minor, order_discount_minor, final_minor, delivery_cost_minor, shipping_fee_minor,
            amount_paid_minor, amount_refunded_minor, contact_snapshot,
            delivery_address, delivery_notes, order_source, legacy
          ) VALUES (
-           $1,'New',$2,$3,0,0,0,$4,0,0,$5::jsonb,$6::jsonb,$7,$8,$9::jsonb
+           $1,'New',$2,$3,0,0,0,$4,$10,0,0,$5::jsonb,$6::jsonb,$7,$8,$9::jsonb
          )
          RETURNING id::text, order_code`,
         [
@@ -4891,6 +4896,7 @@ export class CommerceService {
             courierFee: manualDeliveryCostMinor / 100,
             courierFeePerOrder: manualCourierFeePerOrderMinor / 100,
           }),
+          manualShippingMinor,
         ],
       );
       const order = inserted.rows[0]!;
@@ -4908,8 +4914,9 @@ export class CommerceService {
         100,
         Math.max(0, Number(input.discountPercent) || 0),
       );
-      const { subtotalMinor, finalMinor, manualBenefit } = await this.priceAdminOrderLines(client, order.id, discountPercent, customerUserId);
-      const discountMinor = Math.max(0, subtotalMinor - finalMinor);
+      const { subtotalMinor, finalMinor: itemsFinalMinor, manualBenefit } = await this.priceAdminOrderLines(client, order.id, discountPercent, customerUserId);
+      const discountMinor = Math.max(0, subtotalMinor - itemsFinalMinor);
+      const finalMinor = itemsFinalMinor + manualShippingMinor;
       const amountPaidMinor = Math.min(
         finalMinor,
         Math.max(0, Math.round((Number(input.amountPaid) || 0) * 100)),
@@ -5060,6 +5067,7 @@ export class CommerceService {
         order_discount_minor: string;
         final_minor: string;
         delivery_cost_minor: string;
+        shipping_fee_minor: string;
         customer_user_id: string | null;
         promotion: Record<string, unknown> | null;
         has_set_groups: boolean;
@@ -5076,7 +5084,7 @@ export class CommerceService {
       }>(
         `SELECT id::text, order_code, status, subtotal_minor::text,
                 order_discount_minor::text, final_minor::text,
-                delivery_cost_minor::text, customer_user_id::text, promotion,
+                delivery_cost_minor::text, shipping_fee_minor::text, customer_user_id::text, promotion,
                 payment_method,payment_status,amount_paid_minor::text,amount_refunded_minor::text,
                 contact_snapshot,delivery_address,delivery_notes,order_source,legacy,version::text,
                 EXISTS(SELECT 1 FROM order_set_groups g WHERE g.order_id=orders.id) AS has_set_groups
@@ -5164,7 +5172,7 @@ export class CommerceService {
         : Math.max(0, subtotalMinor - priced!.finalMinor);
       const finalMinor = preservePricing
         ? Number(existing.final_minor)
-        : priced!.finalMinor;
+        : priced!.finalMinor + Number(existing.shipping_fee_minor || 0);
 
       let updatedDeliveryCostMinor = Number(existing.delivery_cost_minor || 0);
       let updatedCourierFeePerOrderMinor = 0;

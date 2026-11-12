@@ -131,6 +131,7 @@ export interface AdminOrderRow {
   order_discount_minor: string | number;
   final_minor: string | number;
   delivery_cost_minor: string | number;
+  shipping_fee_minor: string | number;
   payment_method: string;
   payment_status: string;
   amount_paid_minor: string | number;

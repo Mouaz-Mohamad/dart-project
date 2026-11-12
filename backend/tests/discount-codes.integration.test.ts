@@ -15,6 +15,8 @@ describe("Discount Code: line-level priority, single order amount, lifecycle", (
 
   beforeAll(async () => {
     store = await embeddedStore();
+    // Keep these existing benefit/ledger fixtures on free shipping.
+    await store.pool.query("UPDATE site_settings SET data=data || '{\"shippingFeePerOrder\":0}'::jsonb WHERE id='main'");
     commerce = new CommerceService(store.pool);
     promotions = new PromotionService(store.pool);
     coupons = new DiscountCodeService(store.pool);

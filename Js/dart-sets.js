@@ -899,8 +899,12 @@
       }
     }
     groups.forEach((group)=>{ const p=groupPricing(group); subtotal+=p.baseMinor/100; finalTotal+=p.finalMinor/100; });
-    root.dartDisplayedTotalMinor = Math.round(finalTotal * 100);
     const discount=Math.max(0,subtotal-finalTotal);
+    const shipping = cart.length ? Math.round(Number(root.DartSiteSettings?.get?.().shippingFeePerOrder ?? 100) * 100) / 100 : 0;
+    finalTotal += shipping;
+    root.dartDisplayedTotalMinor = Math.round(finalTotal * 100);
+    const shippingEl=root.document.getElementById("shippingVal");
+    if (shippingEl) shippingEl.textContent=`${shipping.toLocaleString("en-EG", { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     const subtotalEl=root.document.getElementById("subtotalVal"),discountEl=root.document.getElementById("discountVal"),totalEl=root.document.getElementById("totalVal");
     if (subtotalEl) subtotalEl.textContent=`${subtotal.toLocaleString("en-EG", { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     if (discountEl) discountEl.textContent=`${discount.toLocaleString("en-EG", { maximumFractionDigits: 2, useGrouping: false })} EGP`;

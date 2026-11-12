@@ -45,7 +45,7 @@ if (typeof dartMoney === 'function') {
       const discountAmount = Number.isFinite(Number(order?.orderLevelDiscountAmount))
         ? Number(order.orderLevelDiscountAmount)
         : subtotal * (Number(order?.discount) || 0) / 100;
-      return Math.max(0, subtotal - discountAmount);
+      return Math.max(0, subtotal - discountAmount) + Number(order?.shippingFee || 0);
     };
   }
 
@@ -62,7 +62,7 @@ if (typeof dartMoney === 'function') {
       const discountAmount = Number.isFinite(Number(order.orderLevelDiscountAmount))
         ? Number(order.orderLevelDiscountAmount)
         : subtotal * (Number(order.discount) || 0) / 100;
-      const finalAmount = Math.max(0, subtotal - discountAmount);
+      const finalAmount = Math.max(0, subtotal - discountAmount) + Number(order.shippingFee || 0);
       if (order.totalPrice !== subtotal || order.orderLevelDiscountAmount !== discountAmount || order.finalAmount !== finalAmount) changed = true;
       order.totalPrice = subtotal;
       order.orderLevelDiscountAmount = discountAmount;
@@ -197,13 +197,15 @@ if (typeof dartMoney === 'function') {
       const subtotal = subtotalMinor / 100;
       const discountPercent = Math.min(100, Math.max(0, Number(value('deductions')) || 0));
       const discountAmount = Math.round(subtotalMinor * discountPercent / 100) / 100;
-      const finalAmount = Math.max(0, subtotalMinor - Math.round(discountAmount * 100)) / 100;
+      const shippingFee = selected.length ? Number(existing ? existing.shippingFee || 0 : window.DartSiteSettings?.get?.().shippingFeePerOrder ?? 100) : 0;
+      const finalAmount = (Math.max(0, subtotalMinor - Math.round(discountAmount * 100)) + Math.round(shippingFee * 100)) / 100;
       const money = amount => `${Number(amount).toLocaleString('en-EG',{maximumFractionDigits:2})} EGP`;
       if (field('subtotalVal')) field('subtotalVal').textContent = money(subtotal);
       if (field('discountVal')) field('discountVal').textContent = money(discountAmount);
+      if (field('shippingVal')) field('shippingVal').textContent = money(shippingFee);
       if (field('totalVal')) field('totalVal').textContent = money(finalAmount);
       if (field('customDiscount')) field('customDiscount').value = discountAmount;
-      return { snapshot, subtotal, discountPercent, discountAmount, finalAmount };
+      return { snapshot, subtotal, discountPercent, discountAmount, shippingFee, finalAmount };
     }
 
     function renderSelected() {
@@ -358,6 +360,7 @@ if (typeof dartMoney === 'function') {
         discount: prices.discountPercent,
         orderLevelDiscountAmount: prices.discountAmount,
         finalAmount: prices.finalAmount,
+        shippingFee: prices.shippingFee,
         reasonDeduction: prices.discountPercent ? 'Order discount' : '-',
         country: apiPayload.country,
         governorate: apiPayload.governorate,

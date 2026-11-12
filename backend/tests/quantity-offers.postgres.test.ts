@@ -54,12 +54,12 @@ describe("quantity offers on the production schema", () => {
     expect((await promotions.resolveForCheckout(f.user, f.reservation)).code).toBeNull();
     await expect(commerce.checkout(f.user, f.input, "invalid", undefined, `KEY-${f.reservation}`)).rejects.toMatchObject({ code: "PROMOTION_NOT_ELIGIBLE" });
   });
-  it("quotes and freezes per-piece prices, claws back a broken offer, and refunds all payments exactly once", async () => {
+  it("quotes and freezes per-piece prices, claws back a broken offer, and refunds merchandise exactly once without refunding shipping", async () => {
     const f = await fixture(); await f.reserve([0, 1, 2, 3]);
     const quote = await commerce.customerCartQuote(f.user, f.reservation);
-    expect(quote).toMatchObject({ totalMinor: 350000, discountMinor: 50000 });
+    expect(quote).toMatchObject({ totalMinor: 360000, discountMinor: 50000, shippingMinor: 10000 });
     const order = await commerce.checkout(f.user, f.input, "quantity-checkout", undefined, `KEY-${f.reservation}`);
-    expect(order.finalAmount).toBe(3500);
+    expect(order.finalAmount).toBe(3600);
     const again = await commerce.checkout(f.user, f.input, "retry", undefined, `KEY-${f.reservation}`);
     expect(again.id).toBe(order.id);
     const lines = (await store.pool.query("SELECT * FROM order_items WHERE order_id=$1", [order.id])).rows;
@@ -78,7 +78,7 @@ describe("quantity offers on the production schema", () => {
     await commerce.adminManualReturn(actor, { itemCode: f.pieces[2]![0]!, condition: "Good", reason: "Test", refundAmount: 0 }, "quantity-refund");
     await commerce.adminManualReturn(actor, { itemCode: f.pieces[3]![0]!, condition: "Good", reason: "Test", refundAmount: 0 }, "quantity-refund");
     const paid = (await store.pool.query("SELECT final_minor,amount_refunded_minor FROM orders WHERE id=$1", [order.id])).rows[0];
-    expect(Number(paid.amount_refunded_minor)).toBe(Number(paid.final_minor));
+    expect(Number(paid.amount_refunded_minor)).toBe(Number(paid.final_minor) - 10000);
     expect((await store.pool.query("SELECT status FROM promotion_usages WHERE order_id=$1", [order.id])).rows).toEqual([{ status: "Used" }]);
     await expect(commerce.adminManualReturn(actor, { itemCode: f.pieces[0]![0]!, condition: "Good", reason: "Duplicate", refundAmount: 1 }, "repeat")).rejects.toMatchObject({ code: "RETURN_ITEM_OWNERSHIP_CHANGED" });
     expect((await promotions.quantityOffers(f.user)).some((row) => row.id === f.campaign.id)).toBe(false);
@@ -86,7 +86,7 @@ describe("quantity offers on the production schema", () => {
   it("allocates a fixed saving in piastres and preserves it while enough different models remain", async () => {
     const f = await fixture("fixed", 2); await f.reserve([0, 1, 2]);
     const order = await commerce.checkout(f.user, f.input, "fixed-quantity", undefined, `KEY-${f.reservation}`);
-    expect(Math.round(Number(order.finalAmount) * 100)).toBe(269999);
+    expect(Math.round(Number(order.finalAmount) * 100)).toBe(279999);
     const allocation = (await store.pool.query("SELECT discount_minor FROM order_items WHERE order_id=$1", [order.id])).rows;
     expect(allocation.reduce((sum, row) => sum + Number(row.discount_minor), 0)).toBe(30001);
     await deliver(order);

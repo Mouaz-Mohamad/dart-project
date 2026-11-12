@@ -157,6 +157,7 @@ export async function readAdminOrders(pool: Pool, scope?: AdminOrdersScope): Pro
             orderLevelDiscountAmount: Number(row.order_discount_minor || 0) / 100,
             finalAmount: Number(row.final_minor || 0) / 100,
             deliveryCost: Number(row.delivery_cost_minor || 0) / 100,
+            shippingFee: Number(row.shipping_fee_minor || 0) / 100,
             paymentMethod: row.payment_method,
             paymentStatus: row.payment_status,
             amountPaid: Number(row.amount_paid_minor || 0) / 100,

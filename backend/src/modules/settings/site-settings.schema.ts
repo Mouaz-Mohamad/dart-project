@@ -106,6 +106,7 @@ export const siteSettingsSchema = z.object({
   heroNightImage: mediaAsset.optional(),
   founderImage: mediaAsset.optional(),
   defaultMarkupPercent: z.number().finite().min(0).max(1000).optional(),
+  shippingFeePerOrder: z.number().finite().min(0).max(1_000_000).multipleOf(0.01).optional(),
   courierFeePerOrder: z.number().finite().min(0).max(1_000_000).optional(),
   deliveryCostPerPiece: z.number().finite().min(0).max(1_000_000).optional(),
   birthdayDiscountPercent: z.number().finite().min(0).max(100).optional(),
@@ -133,7 +134,7 @@ export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 
 const PUBLIC_KEYS = [
   "version","heroDayImage","heroNightImage","founderImage","defaultMarkupPercent",
-  "courierFeePerOrder","deliveryCostPerPiece","birthdayDiscountPercent","dartCardDiscountPercent",
+  "shippingFeePerOrder","courierFeePerOrder","deliveryCostPerPiece","birthdayDiscountPercent","dartCardDiscountPercent",
   "dartCardEnabled",
   "refundCustomerFee","repeatExchangeCustomerFee","exchangePeriodDays","refundPeriodDays",
   "siteDiscount","waiting","announcements",

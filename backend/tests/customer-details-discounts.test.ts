@@ -12,6 +12,8 @@ describe("customer details and single-order manual discounts", () => {
   const owner = randomUUID(), staff = randomUUID();
   beforeAll(async () => {
     store = await embeddedStore(); commerce = new CommerceService(store.pool);
+    // Keep these existing benefit/ledger fixtures on free shipping.
+    await store.pool.query("UPDATE site_settings SET data=data || '{\"shippingFeePerOrder\":0}'::jsonb WHERE id='main'");
     for (const [id, isOwner] of [[owner, true], [staff, false]] as const) {
       await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
         VALUES($1,'staff',$2,$2,'test-only','active',now())`, [id, `${id}@example.test`]);

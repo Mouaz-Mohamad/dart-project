@@ -845,7 +845,7 @@ function syncBirthdayCheckoutDiscount(showNotice = false) {
 }
 function applyCartQuote(quote) {
     if (!quote?.fingerprint || window.DartPlatform?.currentCartQuote?.()?.fingerprint !== quote.fingerprint) return false;
-    for (const [id, value] of [['subtotalVal', quote.subtotalMinor], ['discountVal', quote.discountMinor], ['totalVal', quote.totalMinor]]) {
+    for (const [id, value] of [['subtotalVal', quote.subtotalMinor], ['discountVal', quote.discountMinor], ['shippingVal', quote.shippingMinor ?? 0], ['totalVal', quote.totalMinor]]) {
         const el = document.getElementById(id);
         if (el) { el.textContent = `${(value / 100).toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`; el.removeAttribute('aria-busy'); }
     }
@@ -877,6 +877,10 @@ function updateCartTotals() {
         }
     });
     const discountAmount = Math.max(0, subtotal - finalTotal);
+    const shipping = cartData.length ? Math.round(Number(window.DartSiteSettings?.get?.().shippingFeePerOrder ?? 100) * 100) / 100 : 0;
+    finalTotal += shipping;
+    const shippingEl = document.getElementById('shippingVal');
+    if (shippingEl) shippingEl.textContent = `${shipping.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     if (subtotalEl) subtotalEl.textContent = `${subtotal.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     if (discountEl) discountEl.textContent = `${discountAmount.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
     if (totalEl) totalEl.textContent = `${finalTotal.toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`;
@@ -1719,6 +1723,7 @@ if (dartHeroSettingsReady) {
 window.addEventListener("dart:site-settings-changed", () => {
     dartHeroSettingsReady = true;
     restartHeroTyping();
+    if (document.getElementById('shippingVal')) updateCartTotals();
 });
 window.setTimeout(() => {
     if (!dartHeroSettingsReady) {

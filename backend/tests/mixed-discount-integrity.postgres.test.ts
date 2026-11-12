@@ -13,6 +13,8 @@ describe("mixed line discounts and reward ledgers on the production schema", () 
   const actor = randomUUID();
   beforeAll(async () => {
     store = await embeddedStore(); commerce = new CommerceService(store.pool); promotions = new PromotionService(store.pool);
+    // Keep these existing benefit/ledger fixtures on free shipping.
+    await store.pool.query("UPDATE site_settings SET data=data || '{\"shippingFeePerOrder\":0}'::jsonb WHERE id='main'");
     // ON-mode accounting fixtures, isolated from the newly default-paused program.
     await store.pool.query("UPDATE site_settings SET data=data || '{\"dartCardEnabled\":true}'::jsonb WHERE id='main'");
     await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)

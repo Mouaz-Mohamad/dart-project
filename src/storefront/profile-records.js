@@ -247,7 +247,8 @@
     const payment = splitPayment(field(card,"Payment"));
     const grid = root.document.createElement("div"); grid.className = "dart-detail-grid";
     addFields(grid, [
-      ["Subtotal",field(card,"Subtotal")],["Final Total",field(card,"Final total")],
+      ["Subtotal",field(card,"Subtotal")],["Shipping",field(card,"Shipping")],
+      ["Final Total",field(card,"Final total")],
       ["Order Date",field(card,"Order date")],["Discount",field(card,"Discount")],
       ["Payment Method",payment.method],["Payment Status",payment.status],
       ["Created",field(card,"Created")],["Accepted",field(card,"Accepted")],
