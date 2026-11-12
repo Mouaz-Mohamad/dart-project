@@ -6,7 +6,7 @@
       "includeFiles": "migrations/**"
     }
   },
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:release",
   "crons": [
     {
       "path": "/api/v1/internal/outbox/cron",

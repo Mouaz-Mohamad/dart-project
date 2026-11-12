@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/build-home-css.cjs --versioned && node scripts/build-home-runtime.cjs && node scripts/stage-vercel-public.cjs",
+  "buildCommand": "node scripts/build-home-css.cjs --versioned && node scripts/build-home-runtime.cjs && npm run check:release && node scripts/stage-vercel-public.cjs",
   "outputDirectory": "public",
   "functions": {
     "api/news-page.js": {

@@ -8,7 +8,7 @@ const raw = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const open = openStorefrontFixture("index.html", raw);
 assert.doesNotMatch(open, /id="dart-coming-soon-(?:cover|style)"/);
 assert.match(open, /id="productsContainer"/);
-assert.match(open, /src="Js\/dart-platform.home.min.js"/);
+assert.match(open, /src="Js\/dart-platform.min.js"/);
 assert.equal(openStorefrontFixture("profile.html", raw), raw);
 const server = http.createServer((req, res) => {
   const pathname = decodeURIComponent(new URL(req.url, "http://localhost").pathname);

@@ -23,6 +23,8 @@ Codex reads this file automatically before every task, so the rules below apply 
 - Run storefront dev server: run the CSS build command after storefront CSS changes, then `python3 -m http.server 4173`
 - Run backend dev server: `cd backend && npm run dev`
 - Run backend checks: `cd backend && npm run check`
+- Build a tested API release: `cd backend && npm run build:release` (isolated build-time tests inherit no database/provider secrets; production migrations remain explicit).
+- Check the storefront release before staging: `npm run check:release`.
 - Run the isolated real-time order experiment: `cd backend && node --import tsx experiments/realtime-pilot/run.ts` (local synthetic database only; refuses configured database URLs and never changes production polling).
 - Run the provider-free direct update experiment: `cd backend && node --import tsx experiments/direct-realtime/run.ts`; browser check: `node experiments/direct-realtime/browser-check.mjs` (optional existing Playwright/Chromium setup). Experiments must never be imported by production. `TEST_DATABASE_URL`, if supplied, must point to a named loopback test database; production polling remains unchanged.
 - Run bounded read-only load checks: `cd backend && npm run test:load -- --base http://127.0.0.1:4000 --users 10 --duration 10`

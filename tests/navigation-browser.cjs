@@ -135,15 +135,18 @@ function nativeScenario(origin) {
         await report(phase);
         document.querySelector('[data-go-products]').click();
       } else if (phase === 1) {
-        await wait(() => window.DartNavigation && document.querySelector('.product-card[data-id="DW-NAV"]'));
+        await wait(() => window.DartNavigation && window.__criticalReady && document.querySelector('.product-card[data-id="DW-NAV"]'));
         document.getElementById('toggleProductFilters').click();
         const search = document.getElementById('productSearchInput');
         search.value = 'Navigation'; search.dispatchEvent(new Event('input', { bubbles: true }));
         const sort = document.getElementById('productSortSelect');
         sort.value = 'price-high'; sort.dispatchEvent(new Event('change', { bubbles: true }));
+        const panel = document.getElementById('productFiltersPanel');
+        await wait(() => panel.getBoundingClientRect().height > 0);
+        await Promise.all(panel.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+        await document.fonts.ready;
         window.scrollTo({ top: 400, left: 0, behavior: 'instant' });
         await wait(() => Math.abs(window.scrollY - 400) <= 1);
-        await wait(() => document.getElementById('productFiltersPanel').getBoundingClientRect().height > 0);
         await report(phase);
         document.querySelector('.side-menu a[href="/"]').click();
       } else if (phase === 2) {

@@ -343,7 +343,7 @@ assert.ok(
 );
 assert.ok(!dashboardHtml.includes('class=""'), "dashboard HTML must not retain empty class attributes");
 assert.ok(
-  !/<[^>]*\btype=["'][^"']+["'][^>]*\btype=["'][^"']+["'][^>]*>/i.test(dashboardHtml),
+  !/<[^>]*\stype=["'][^"']+["'][^>]*\stype=["'][^"']+["'][^>]*>/i.test(dashboardHtml),
   "dashboard HTML must not contain duplicate type attributes",
 );
 

@@ -49,12 +49,29 @@ function walk(root) {
 
 const generatedDeliveryFiles = new Set([
   "Js/dart-ui.home.min.js",
+  // Maintained inputs are not delivered: HTML uses their pinned minified variants.
+  "Js/dart-platform.js",
+  "Js/dart-dialog.js",
+  "Js/dart-home-performance.js",
   "Js/dart-platform.home.min.js",
   "Js/dart-navigation.min.js",
 ]);
 const jsFiles = ["Js", "Eye"]
   .flatMap(walk)
   .filter((file) => file.endsWith(".js") && !generatedDeliveryFiles.has(file));
+for (const [source, delivery] of [
+  ["Js/dart-platform.js", "Js/dart-platform.min.js"],
+  ["Js/dart-dialog.js", "Js/dart-dialog.min.js"],
+  ["Js/dart-home-performance.js", "Js/dart-home-performance.min.js"],
+]) {
+  const hash = crypto.createHash("sha256").update(fs.readFileSync(source, "utf8")).digest("hex");
+  if (!fs.existsSync(delivery) || !fs.readFileSync(delivery, "utf8").startsWith(`/* source-sha256:${hash}; terser:5.44.0 */`)) {
+    failures.push(`${delivery}: rebuild the pinned derivative of ${source}`);
+  }
+  if (rootHtml.some(file => fs.readFileSync(file, "utf8").includes(`src="${source}"`))) {
+    failures.push(`${source}: pages must load its verified minified derivative`);
+  }
+}
 const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
@@ -208,7 +225,7 @@ if (fs.statSync("Eye/dart-staff.js").size > 14 * 1024) failures.push("Staff dire
 if (coreJsBytes > 966 * 1024) {
   failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 966KB`);
 }
-if (fs.statSync('Eye/dart-dashboard-ui.js').size > 14 * 1024) failures.push('Dashboard details adapter exceeds its 14 KiB source budget');
+if (fs.statSync('Eye/dart-dashboard-ui.js').size > 14 * 1024) failures.push('Dashboard details adapter exceeds its 14 KiB delivery budget');
 // Combined finance hydration and public navigation add 14 KiB of source. Home delivery still fits 225 KiB.
 // Versioned inventory-only writes add under 0.5 KiB of scoped delivery code.
 if (fs.statSync("Eye/dart-catalog-admin.js").size > 3 * 1024) failures.push("Catalog editor exceeds its 3 KiB delivery budget");
@@ -220,7 +237,7 @@ if (lazyJsBytes > 449 * 1024) {
 }
 
 // Platform delivery is still an exact minified derivative of dart-platform.js.
-const generatedPlatformRuntime = ["Js/dart-platform.js", "Js/dart-platform.home.min.js"];
+const generatedPlatformRuntime = ["Js/dart-platform.js", "Js/dart-platform.min.js"];
 {
   const [sourceFile, generatedFile] = generatedPlatformRuntime;
   if (!fs.existsSync(generatedFile)) {
@@ -332,7 +349,10 @@ for (const source of homeCssSources) {
   }
 }
 
-const imageFiles = walk("Photos").filter((file) => /\.(?:png|jpe?g|webp)$/i.test(file));
+const imageReferences = [...rootHtml, ...walk("CSS").filter(file => file.endsWith(".css")), ...jsFiles]
+  .map(file => fs.readFileSync(file, "utf8")).join("\n");
+const imageFiles = walk("Photos").filter((file) => /\.(?:png|jpe?g|webp)$/i.test(file))
+  .filter(file => imageReferences.includes(file) || imageReferences.includes(encodeURI(file)));
 const maxImageBytes = 2500 * 1024;
 for (const file of imageFiles) {
   const size = fs.statSync(file).size;

@@ -29,16 +29,16 @@ describe("Dart custom browser dialogs", () => {
 
   it("loads DartDialog before the storefront and dashboard runtimes", () => {
     const storefront = readFileSync(join(repoRoot, "cart-checkout.html"), "utf8");
-    expect(storefront.indexOf('src="Js/dart-dialog.js"')).toBeGreaterThan(-1);
-    expect(storefront.indexOf('src="Js/dart-dialog.js"')).toBeLessThan(
-      storefront.indexOf('src="Js/dart-platform.js"'),
+    expect(storefront.indexOf('src="Js/dart-dialog.min.js"')).toBeGreaterThan(-1);
+    expect(storefront.indexOf('src="Js/dart-dialog.min.js"')).toBeLessThan(
+      storefront.indexOf('src="Js/dart-platform.min.js"'),
     );
 
     const dashboard = readFileSync(join(repoRoot, "Eye/Dart Eye.html"), "utf8");
     const authScriptIndex = dashboard.search(/src="dart-admin-auth\.js(?:\?[^\"]*)?"/);
     expect(authScriptIndex).toBeGreaterThan(-1);
-    expect(dashboard.indexOf('src="../Js/dart-dialog.js"')).toBeGreaterThan(-1);
-    expect(dashboard.indexOf('src="../Js/dart-dialog.js"')).toBeLessThan(
+    expect(dashboard.indexOf('src="../Js/dart-dialog.min.js"')).toBeGreaterThan(-1);
+    expect(dashboard.indexOf('src="../Js/dart-dialog.min.js"')).toBeLessThan(
       authScriptIndex,
     );
   });

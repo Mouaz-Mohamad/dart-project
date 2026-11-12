@@ -142,7 +142,7 @@ console.log("PASS Sets lazy runtime, storefront and Dart Eye contracts");
     { itemCode: "PLAIN-1", modelCode: "M1", setComponent: false },
   ] }];
   const context = {
-    window: { addEventListener() {}, DartReturns: { normalizeType: value => value, chainIdForItem: () => "chain", completedExchangeCount: () => 0, courierPolicy: () => ({ label: "Existing fee policy" }) },
+    window: { addEventListener() {}, DartReturns: { normalizeType: value => value, chainIdForItem: () => "chain", completedExchangeCount: () => 0, courierPolicy: () => ({ payer: "Customer", customerFee: 100 }) },
       DartCatalog: { model: () => ({ modelId: "M1", sizeOptions: ["M"], colorOptions: ["Black"] }), available: () => 1 } },
     document: { getElementById: id => fields[id], createElement: () => new Field() },
     currentUser: () => null, read: key => key === "orders" ? orders : [], KEYS: { orders: "orders", items: "items", returns: "returns", models: "models" }, displayPhone: value => value,
@@ -158,7 +158,7 @@ console.log("PASS Sets lazy runtime, storefront and Dart Eye contracts");
   assert.match(fields["return-fee-summary-text"].textContent, /لا تُستبدل/);
   fields["return-request-type"].value = "Refund";
   fields["return-request-type"].listeners.change();
-  assert.equal(fields["return-fee-summary-text"].textContent, "Existing fee policy", "Set refunds retain the existing policy");
+  assert.match(fields["return-fee-summary-text"].textContent, /100.*جنيه/, "Set refunds retain the server policy fee and payer");
   fields["return-item-code"].value = "PLAIN-1";
   fields["return-item-code"].listeners.change();
   assert.equal(exchange.disabled, false, "standalone sale of the same model remains exchangeable");

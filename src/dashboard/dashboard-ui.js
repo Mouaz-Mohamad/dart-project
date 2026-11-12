@@ -2,6 +2,7 @@
 (function (root) {
   "use strict";
   const doc = root.document;
+  const make = (tag) => doc.createElement(tag);
   if (!doc) return;
   const preferred = {
     orders: [/id order/i, /client name/i, /name area/i, /total products/i, /final amount/i, /^status$/i, /^representative$/i],
@@ -102,16 +103,16 @@
   // END Shared status colors.
   function notify(message,type='success') {
     let region=doc.getElementById('dart-operation-notices');
-    if(!region){region=doc.createElement('div');region.id='dart-operation-notices';region.setAttribute('aria-live','polite');doc.body.append(region);}
-    const notice=doc.createElement('div');notice.className=`dart-operation-notice is-${type}`;
-    const text=doc.createElement('span');text.textContent=message;
+    if(!region){region=make('div');region.id='dart-operation-notices';region.setAttribute('aria-live','polite');doc.body.append(region);}
+    const notice=make('div');notice.className=`dart-operation-notice is-${type}`;
+    const text=make('span');text.textContent=message;
     const close=button('×','dart-notice-close');close.setAttribute('aria-label','Dismiss notification');close.addEventListener('click',()=>notice.remove());notice.append(text,close);region.append(notice);
     while(region.children.length>3)region.firstElementChild.remove();
     root.setTimeout(()=>notice.remove(),type==='warning'?10000:5000);
   }
 
   function button(text, className) {
-    const node = doc.createElement("button");
+    const node = make("button");
     node.type = "button"; node.textContent = text; node.className = className;
     return node;
   }
@@ -160,14 +161,14 @@
     const labels = labelsFor(row, section);
     const isTableRow = row.tagName === "TR";
     const checkbox = cells.find(cell => cell.matches?.('input[type="checkbox"]')) || cells[0]?.querySelector?.('input[type="checkbox"]');
-    const main = doc.createElement(isTableRow ? "td" : "div");
+    const main = make(isTableRow ? "td" : "div");
     main.className = "dart-record-main";
     if (isTableRow) main.colSpan = section.id === "waiting" ? 1 : Math.max(cells.length,1);
-    const fields = doc.createElement("div"); fields.className = "dart-record-fields";
+    const fields = make("div"); fields.className = "dart-record-fields";
     primaryColumns(section.id, labels, cells).forEach(index => {
-      const field = doc.createElement("div"); field.className = "dart-record-field"; field.dataset.column = String(index);
-      const label = doc.createElement("small"); label.textContent = labels[index] || `Field ${index + 1}`;
-      const value = doc.createElement("strong");
+      const field = make("div"); field.className = "dart-record-field"; field.dataset.column = String(index);
+      const label = make("small"); label.textContent = labels[index] || `Field ${index + 1}`;
+      const value = make("strong");
       const summary = (cells[index].querySelector('.status-pill') || cells[index]).cloneNode(true);
       summary.querySelectorAll('br').forEach(node => node.replaceWith(' · '));
       value.textContent = summary.textContent.trim() || "—";
@@ -175,7 +176,7 @@
       if (image) { const preview = image.cloneNode(false); preview.removeAttribute("id"); preview.loading = "lazy"; value.replaceChildren(preview); }
       field.append(label,value); fields.append(field);
     });
-    const controls = doc.createElement("div"); controls.className = "dart-record-controls";
+    const controls = make("div"); controls.className = "dart-record-controls";
     const primary = row.querySelector(".dart-status-btn, .return-accept-btn:not([hidden]), [data-waiting-action]");
     let proxy;
     if (primary) {
@@ -185,19 +186,19 @@
       controls.append(proxy);
     }
     const trigger = button("Details", "dart-record-open"); controls.append(trigger);
-    const dialog = doc.createElement("dialog"); dialog.className = "dart-record-dialog"; dialog.id = `dart-record-dialog-${++serial}`;
-    const title = doc.createElement("h2"); title.id = `${dialog.id}-title`;
+    const dialog = make("dialog"); dialog.className = "dart-record-dialog"; dialog.id = `dart-record-dialog-${++serial}`;
+    const title = make("h2"); title.id = `${dialog.id}-title`;
     title.textContent = `${section.id.charAt(0).toUpperCase() + section.id.slice(1)} · ${fields.querySelector("strong")?.textContent || "Details"}`;
     dialog.setAttribute("aria-labelledby",title.id);
     trigger.setAttribute("aria-controls",dialog.id); trigger.setAttribute("aria-expanded","false");
     const close = button("Close", "dart-record-close");
-    const header = doc.createElement("header"); header.className = "dart-record-dialog-head"; header.append(title,close);
-    const grid = doc.createElement("div"); grid.className = "dart-record-detail-grid";
+    const header = make("header"); header.className = "dart-record-dialog-head"; header.append(title,close);
+    const grid = make("div"); grid.className = "dart-record-detail-grid";
     cells.forEach((cell,index) => {
       if (cell === checkbox) return;
-      const wrapper = doc.createElement("div"); wrapper.className = "dart-record-detail-field";
+      const wrapper = make("div"); wrapper.className = "dart-record-detail-field";
       wrapper.dataset.recordColumn=String(index);
-      const label = doc.createElement("h3"); label.textContent = labels[index] || (cell.querySelector("button") ? "Actions" : `Field ${index + 1}`);
+      const label = make("h3"); label.textContent = labels[index] || (cell.querySelector("button") ? "Actions" : `Field ${index + 1}`);
       if (cell.querySelector("button,details")) wrapper.classList.add("dart-record-detail-actions");
       wrapper.append(label,cell); grid.append(wrapper);
     });
@@ -236,7 +237,7 @@
       root.DartCustomerDetails.install(state.dialog, state.grid, state.key, { selection: () => openRecord?.key === state.key ? openRecord : null, customer: root.DartDomainState?.read?.("dart_customers")?.find(row => String(row.id) === String(state.key)) });
     } else {
       state.customerLoading = true;
-      const script = doc.createElement("script"); script.src = "dart-customer-details.js?v=20261031";
+      const script = make("script"); script.src = "dart-customer-details.js?v=20261031";
       script.onload = () => { state.customerLoading = false; if (state.dialog.isConnected) installCustomerDetails(state); };
       script.onerror = () => { state.customerLoading = false; script.remove(); notify("Reopen Details to retry.", "warning"); };
       doc.head.append(script);
@@ -259,7 +260,7 @@
     section.querySelectorAll(".cont-titel .title-name, .dart-sets-head").forEach(header => {
       if (!header.querySelector(".dart-compact-heading")) {
         header.classList.add("dart-compact-heading-row");
-        const label = doc.createElement("strong"); label.className = "dart-compact-heading"; label.textContent = "Records · open Details for all fields and actions"; header.append(label);
+        const label = make("strong"); label.className = "dart-compact-heading"; label.textContent = "Records · open Details for all fields and actions"; header.append(label);
       }
     });
     if (openRecord?.section === section.id && !doc.querySelector(".dart-record-dialog[open]")) {
@@ -289,6 +290,6 @@
     root.addEventListener("dart:admin-logged-out", () => { openRecord=null; doc.querySelectorAll(".dart-record-dialog[open]").forEach(dialog=>dialog.close()); });
     schedule();
   }
-  root.DartDashboardUI = Object.freeze({refresh,notify,columnIndices:(section,labels)=>primaryColumns(section,labels,labels.map(()=>doc.createElement('span')))});
+  root.DartDashboardUI = Object.freeze({refresh,notify,columnIndices:(section,labels)=>primaryColumns(section,labels,labels.map(()=>make('span')))});
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded",start,{once:true}); else start();
 })(window);

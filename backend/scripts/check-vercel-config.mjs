@@ -12,10 +12,10 @@ if ("ignoreCommand" in config) {
   throw new Error("backend/vercel.json must not gate deployments behind a numbered batch");
 }
 
-const expectedBuildCommand = "npm run build";
+const expectedBuildCommand = "npm run build:release";
 if (config.buildCommand !== expectedBuildCommand) {
   throw new Error(
-    "backend/vercel.json must build only; database migrations are an explicit operational step",
+    "backend/vercel.json must run the tested release build; database migrations remain an explicit operational step",
   );
 }
 if (/\bdb:migrate\b/.test(String(config.buildCommand || ""))) {

@@ -20,7 +20,7 @@ assert.match(
   "Font Awesome must start automatically without waiting for the first pointer or keyboard interaction",
 );
 
-const perfIndex = home.indexOf('src="Js/dart-home-performance.js"');
+const perfIndex = home.indexOf('src="Js/dart-home-performance.min.js"');
 const uiIndex = home.indexOf('src="Js/dart-ui.home.min.js"');
 assert.ok(perfIndex >= 0, "homepage must load dart-home-performance.js");
 assert.ok(uiIndex >= 0, "homepage must load the curated home UI runtime");
@@ -39,8 +39,8 @@ assert.match(reviewsUi, /syncReviewReadMore/, "long reviews must be checked afte
 assert.match(reviewsUi, /range\.getClientRects\(\)/, "rendered text lines must determine Read More visibility");
 assert.match(styles, /\.dart-review-dialog \{[\s\S]*?width: 90vw;[\s\S]*?height: 90dvh;/, "full-review dialog must use 90% of both viewport dimensions");
 assert.match(styles, /overflow-x: hidden;\s*overflow-y: auto;/, "full-review dialog scrolls vertically only");
-assert.match(styles, /-webkit-line-clamp: 2/, "review title must be two lines");
-assert.match(styles, /-webkit-line-clamp: 4/, "review body must be four lines");
+assert.match(styles, /\.reviews-section \.review-card \.review-title\s*\{[^}]*-webkit-line-clamp: 1/, "review titles keep their current one-line layout");
+assert.match(styles, /\.reviews-section \.review-card \.review-text\s*\{[^}]*-webkit-line-clamp: 3/, "review bodies keep three lines and the full-text dialog");
 assert.doesNotMatch(feedback, /<select[^>]+name="rating"/, "rating must not use a dropdown");
 assert.equal((feedback.match(/type="radio"[^>]+name="rating"/g) || []).length, 5, "choose from five native star radios");
 assert.doesNotMatch(feedback, /name="rating"[^>]+checked/, "star rating must start empty");
