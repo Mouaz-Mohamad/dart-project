@@ -136,6 +136,7 @@ jobs:
           node tests/rep-navigation-session.cjs
           node tests/rep-reliability-runtime.cjs
           node tests/rep-compass-runtime.cjs
+          node tests/release-ci-gate.cjs
           node tests/birthday-welcome-runtime.cjs
           node tests/admin-notifications-runtime.cjs
           node tests/test-inventory-contract.cjs

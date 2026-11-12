@@ -275,10 +275,10 @@ const server = http.createServer((request, response) => {
   assert.equal(await account.locator('#registerForm input[name="name"]').count(), 1);
   assert.equal(await account.locator('#registerForm input[name="phone1"]').getAttribute("required"), "");
   assert.equal(await account.locator('#registerForm input[name="birthday"]').count(), 1, "The date picker retains the required server-validated birthday value");
-  assert.equal(await account.locator('[data-social-login="google"]').count(), 0);
+  assert.equal(await account.locator('[data-social-login="google"]').count(), 2);
   assert.equal(await account.locator('[data-social-login="facebook"]').count(), 0);
-  assert.equal(await account.locator('script[data-dart-social-auth="1"]').count(), 0,
-    "Unavailable social entry points must not load an unused authentication runtime");
+  assert.equal(await account.locator('script[src*="dart-auth-social.js"]').count(), 1,
+    "The available Google entry points load one shared social runtime");
   assert.equal(await account.locator('#customerEmailVerificationForm').count(), 0);
   await account.locator(".login-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), false);

@@ -265,6 +265,8 @@ const server = http.createServer((request, response) => {
     const style = getComputedStyle(dialog);
     return {
       widthFraction: rect.width / innerWidth,
+      width: rect.width, expectedWidth: Math.min(350, innerWidth - 28),
+      bodyOverflowY: getComputedStyle(dialog.querySelector(".dart-review-dialog-body")).overflowY,
       heightFraction: rect.height / innerHeight,
       centeredX: Math.abs(rect.left - (innerWidth - rect.width) / 2) < 2,
       centeredY: Math.abs(rect.top - (innerHeight - rect.height) / 2) < 2,
@@ -272,12 +274,13 @@ const server = http.createServer((request, response) => {
       overflowY: style.overflowY,
     };
   });
-  assert(Math.abs(reviewDialogGeometry.widthFraction - 0.9) < 0.02);
-  assert(Math.abs(reviewDialogGeometry.heightFraction - 0.9) < 0.02);
+  assert(Math.abs(reviewDialogGeometry.width - reviewDialogGeometry.expectedWidth) < 2);
+  assert(reviewDialogGeometry.heightFraction > 0 && reviewDialogGeometry.heightFraction <= 0.82);
   assert.equal(reviewDialogGeometry.centeredX, true);
   assert.equal(reviewDialogGeometry.centeredY, true);
   assert.equal(reviewDialogGeometry.overflowX, "hidden");
-  assert.equal(reviewDialogGeometry.overflowY, "auto");
+  assert.equal(reviewDialogGeometry.overflowY, "hidden");
+  assert.equal(reviewDialogGeometry.bodyOverflowY, "auto");
   assert.match(await page.locator("#dart-review-full-title").textContent(), /overall Dart shopping experience/);
   assert.match(await page.locator("#dart-review-full-text").textContent(), /material felt great/);
   await page.locator("[data-review-dialog-close]").click();

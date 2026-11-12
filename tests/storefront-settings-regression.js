@@ -379,7 +379,7 @@ const server = http.createServer(async (request, response) => {
   await about.reload({ waitUntil: "domcontentloaded" });
   await expectFounder(null);
 
-  await dashboard.locator('[data-settings-tab="hero"]').click();
+  await dashboard.locator('[data-settings-tab="storefront"]').click();
   const scenes=dashboard.locator('[data-typing-scene]');
   assert.equal(await scenes.count(),2,'each original scene is a sentence group');
   assert.equal(await scenes.nth(0).locator('[data-typing-row]').count(),2);

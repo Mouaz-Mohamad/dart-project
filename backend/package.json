@@ -33,7 +33,7 @@
     "db:backup:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs verify",
     "db:restore:verify": "node --env-file-if-exists=.env scripts/database-backup.mjs restore-verify",
     "check:env": "node --env-file-if-exists=.env --import tsx scripts/check-env.ts",
-    "build:release": "npm run check:vercel && npm run lint && npm run typecheck && node scripts/release-tests.mjs && npm run build"
+    "build:release": "node ../scripts/verify-release-ci.mjs api && npm run check:vercel && npm run lint && npm run typecheck && node scripts/release-tests.mjs && npm run build"
   },
   "dependencies": {
     "@sentry/node": "10.75.2",
