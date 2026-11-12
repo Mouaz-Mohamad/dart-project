@@ -66,6 +66,26 @@ export class SiteSettingsService {
           Array.isArray(currentSettings.blockedGovernorates)) {
         nextSettings.blockedGovernorates = currentSettings.blockedGovernorates;
       }
+      // Older clients must not erase centrally configured storefront merchandising.
+      if (!Object.prototype.hasOwnProperty.call(nextSettings, "storefrontProducts") &&
+          currentSettings.storefrontProducts && typeof currentSettings.storefrontProducts === "object") {
+        nextSettings.storefrontProducts = currentSettings.storefrontProducts;
+      }
+      const incomingShowcase = parsedSettings.storefrontProducts;
+      if (incomingShowcase &&
+          JSON.stringify(incomingShowcase.bestModelIds) !==
+          JSON.stringify((currentSettings.storefrontProducts as {bestModelIds?: string[]}|undefined)?.bestModelIds || [])) {
+        const ids = incomingShowcase.bestModelIds;
+        if (ids.length) {
+          const matches = await client.query<{ model_id: string }>(
+            "SELECT model_id FROM catalog_models WHERE model_id=ANY($1::text[]) AND active AND NOT is_archived AND NOT is_deleted",
+            [ids],
+          );
+          if (matches.rows.length !== ids.length) {
+            throw new AppError(422, "BEST_PRODUCTS_INVALID_MODELS", "Choose existing active catalog models for Best Products");
+          }
+        }
+      }
       // Older clients cannot erase configured durations by omitting newer keys.
       for (const key of ["exchangePeriodDays", "refundPeriodDays"] as const) {
         if (!(key in nextSettings) && key in currentSettings) nextSettings[key] = currentSettings[key];

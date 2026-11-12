@@ -49,6 +49,7 @@
     "server-authority-contract.js",
     "sets-runtime-contract.cjs",
     "settings-and-groups-unit.js",
+    "storefront-products-settings.cjs",
     "settings-reset-unit.js",
     "source-layout-contract.cjs",
     "test-inventory-contract.cjs",

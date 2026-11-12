@@ -2514,6 +2514,7 @@
                     <button type="button" data-settings-go="settings-media-card"><i class="fa-regular fa-images" aria-hidden="true"></i> Images</button>
                     <button type="button" data-settings-go="settings-announcements-card"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> Announcements</button>
                     <button type="button" data-settings-go="settings-model-cards-card"><i class="fa-solid fa-shirt" aria-hidden="true"></i> Product cards</button>
+                    <button type="button" data-settings-go="settings-storefront-products-card"><i class="fa-solid fa-star" aria-hidden="true"></i> Storefront products</button>
                 </div>
             </nav>
             <div id="settings-content" class="dart-settings-grid" data-active-settings-tab="general">
@@ -2784,6 +2785,36 @@
                     <template id="settings-model-card-row-template"><div class="dart-settings-model-row" data-model-card-row><div><strong data-model-field="name"></strong><small data-model-field="code"></small></div><label>Cards<select data-model-field="mode"><option value="all">All colors</option><option value="one">One card</option><option value="two">Two cards</option><option value="count">Custom number</option><option value="custom">Choose colors</option></select></label><label data-model-count-wrap hidden>Number<input data-model-field="count" type="number" min="1" step="1" value="1"></label><div data-model-colors class="dart-settings-color-options"></div></div></template>
                 </article>
 
+                <!-- Storefront products: Best Products is chosen by model ID and shared on all pages. -->
+                <article id="settings-storefront-products-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-star"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>STOREFRONT PRODUCTS</span><h2>Homepage &amp; Best Products</h2>
+                        <p>Choose which models appear in Best Products across Home and Products. Product-page second group automatically displays all remaining products.</p>
+                    </div>
+                    <form id="settings-storefront-products-form" class="dart-settings-fields">
+                        <label>Products — First Group
+                            <input id="settings-products-first-count" type="number" min="0" max="300" step="1" required>
+                            <small>Second Group shows the rest; no products are hidden.</small>
+                        </label>
+                        <label>Home — Newest Products
+                            <input id="settings-home-newest-count" type="number" min="0" max="300" step="1" required>
+                        </label>
+                        <label>Best Products — Maximum shown
+                            <input id="settings-best-count" type="number" min="0" max="100" step="1" required>
+                            <small>Only your manually selected models appear, in your chosen order.</small>
+                        </label>
+                        <div class="dart-storefront-featured dart-settings-field-wide">
+                            <div><h3>Selected Best Products</h3><p id="settings-best-selected-count"></p>
+                                <ol id="settings-best-selected" class="dart-storefront-model-list" aria-label="Selected Best Products in display order"></ol></div>
+                            <div><label for="settings-best-search">Find a model<input id="settings-best-search" type="search" placeholder="Search model name or code"></label>
+                                <ul id="settings-best-available" class="dart-storefront-model-list" aria-label="Available models to add"></ul></div>
+                        </div>
+                        <button id="settings-storefront-products-save" class="dart-settings-save" type="submit">Save storefront products</button>
+                        <p id="settings-storefront-products-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
+                    </form>
+                </article>
+
                 <article id="settings-staff-access-card" data-settings-group="staff" class="dart-settings-card dart-settings-form-card dart-settings-wide" hidden>
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-user-shield"></i></div>
                     <div class="dart-settings-card-copy">
@@ -2929,6 +2960,8 @@
     <script src="dart-operations.js"></script>
     <script src="dart-size-chart.js"></script>
     <script src="dart-settings.js"></script>
+    <script src="../Js/dart-storefront-products.js" defer></script>
+    <script src="dart-storefront-products-settings.js" defer></script>
     <script src="dart-settings-features-loader.js?v=20261107-1"></script>
     <script src="dart-discount-codes.js?v=20261109-hard-delete"></script>
     <script src="dart-staff.js"></script>

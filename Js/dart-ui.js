@@ -236,8 +236,9 @@ function renderProductPageResults() {
             resetProductFilters
         ));
     } else if (productFiltersAreDefault()) {
-        appendProductCards(part1, filtered.slice(0, 6), template);
-        appendProductCards(part2, filtered.slice(6), template);
+        const [firstGroup, remaining] = window.DartStorefrontProducts.groups(filtered, window.DartSiteSettings?.get?.());
+        appendProductCards(part1, firstGroup, template);
+        appendProductCards(part2, remaining, template);
     } else {
         appendProductCards(part1, filtered, template, true);
     }
@@ -477,7 +478,7 @@ function renderProductsLogic() {
     const productsContainer = document.getElementById('productsContainer');
     if (productsContainer) {
         clearRenderedProducts(productsContainer);
-        const homeProducts = publicCatalogProducts().slice(0, 8);
+        const homeProducts = window.DartStorefrontProducts.newest(publicCatalogProducts(), window.DartSiteSettings?.get?.());
         appendProductCards(productsContainer, homeProducts, productTemplate);
         if (!homeProducts.length) productsContainer.appendChild(createUiState('empty', 'No products yet', 'New Dart products will appear here.'));
     }
@@ -485,9 +486,9 @@ function renderProductsLogic() {
     const bestProductsContainer = document.getElementById('bestProductsContainer');
     if (bestProductsContainer) {
         clearRenderedProducts(bestProductsContainer);
-        const bestProducts = publicCatalogProducts().filter(product => productStockPairs(product).some(pair => pair.quantity > 0)).slice(0, 5);
+        const bestProducts = window.DartStorefrontProducts.best(publicCatalogProducts(), window.DartSiteSettings?.get?.());
         appendProductCards(bestProductsContainer, bestProducts, productTemplate);
-        if (!bestProducts.length) bestProductsContainer.appendChild(createUiState('empty', 'No best sellers yet', 'Available products will appear here.'));
+        if (!bestProducts.length) bestProductsContainer.appendChild(createUiState('empty', 'No featured products', 'Featured models are selected by Dart.'));
     }
 
     const part1Container = document.getElementById('productsPart1');
@@ -1452,6 +1453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderProductsLogic();
         renderFilterButtons();
     });
+    window.addEventListener('dart:site-settings-changed', renderProductsLogic);
     renderReviewsLogic();
     if (document.getElementById('reviewsContainer')) void hydratePublicReviews();
     window.DartAddress?.initReturnRequest?.();

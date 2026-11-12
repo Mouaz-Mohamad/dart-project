@@ -184,7 +184,7 @@ function renderProductsLogic() {
   const newest = document.getElementById("productsContainer");
   if (newest) {
     clearRenderedProducts(newest);
-    const rows = cards.slice(0, 8);
+    const rows = window.DartStorefrontProducts.newest(cards, window.DartSiteSettings?.get?.());
     appendProductCards(newest, rows, template);
     if (!rows.length) newest.appendChild(createUiState("empty", "No products yet", "New Dart products will appear here."));
   }
@@ -192,9 +192,9 @@ function renderProductsLogic() {
   const best = document.getElementById("bestProductsContainer");
   if (best) {
     clearRenderedProducts(best);
-    const rows = cards.filter((product) => productStockPairs(product).some((pair) => pair.quantity > 0)).slice(0, 5);
+    const rows = window.DartStorefrontProducts.best(cards, window.DartSiteSettings?.get?.());
     appendProductCards(best, rows, template);
-    if (!rows.length) best.appendChild(createUiState("empty", "No best sellers yet", "Available products will appear here."));
+    if (!rows.length) best.appendChild(createUiState("empty", "No featured products", "Featured models are selected by Dart."));
   }
   window.dispatchEvent(new CustomEvent("dart:products-rendered"));
 }
@@ -533,6 +533,7 @@ window.addEventListener("dart:catalog-hydrated", () => {
 });
 
 window.addEventListener("dart:site-settings-changed", restartHeroTyping);
+window.addEventListener("dart:site-settings-changed", () => requestAnimationFrame(renderProductsLogic));
 
 document.querySelectorAll("[data-go-products]").forEach((button) => {
   button.addEventListener("click", () => {

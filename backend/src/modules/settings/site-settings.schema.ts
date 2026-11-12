@@ -92,6 +92,14 @@ export const shippingCompanySchema = z.object({
   }
 });
 
+const storefrontProducts = z.object({
+  productsFirstGroupCount: z.number().int().min(0).max(300),
+  homeNewestCount: z.number().int().min(0).max(300),
+  bestProductsLimit: z.number().int().min(0).max(100),
+  bestModelIds: z.array(z.string().trim().min(1).max(120)).max(100)
+    .refine(ids => new Set(ids).size === ids.length, "Best Products cannot contain duplicate models"),
+}).strict();
+
 export const siteSettingsSchema = z.object({
   version: z.number().int().positive().optional(),
   heroDayImage: mediaAsset.optional(),
@@ -113,6 +121,7 @@ export const siteSettingsSchema = z.object({
   waiting: waiting.optional(),
   announcements: z.array(z.record(z.string(), z.unknown())).max(200).optional(),
   modelCards: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+  storefrontProducts: storefrontProducts.optional(),
   typing: typing.optional(),
   codRisk: codRisk.optional(),
   blockedGovernorates: blockedGovernoratesSchema.optional(),
@@ -128,7 +137,7 @@ const PUBLIC_KEYS = [
   "dartCardEnabled",
   "refundCustomerFee","repeatExchangeCustomerFee","exchangePeriodDays","refundPeriodDays",
   "siteDiscount","waiting","announcements",
-  "modelCards","typing",
+  "modelCards","typing","storefrontProducts",
 ] as const;
 
 export function publicSiteSettings(value: Record<string, unknown>): Record<string, unknown> {

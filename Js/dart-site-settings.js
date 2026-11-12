@@ -48,6 +48,7 @@
     },
     announcements: [],
     modelCards: {},
+    storefrontProducts: {productsFirstGroupCount:6,homeNewestCount:8,bestProductsLimit:5,bestModelIds:[]},
     typing: {
       typingSpeed: 70,
       deletingSpeed: 10,
@@ -115,6 +116,7 @@
       },
       announcements: Array.isArray(value.announcements) ? value.announcements : [],
       modelCards: value.modelCards && typeof value.modelCards === "object" ? value.modelCards : {},
+      storefrontProducts: {...defaults.storefrontProducts, ...(value.storefrontProducts && typeof value.storefrontProducts === "object" ? value.storefrontProducts : {})},
     };
   }
 
