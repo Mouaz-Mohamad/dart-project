@@ -28,7 +28,10 @@ for (const name of staticTests) {
   assert(staticBlock.includes(`tests/${name}`), `${name} is classified ciStatic but is not wired into static-regression`);
 }
 for (const name of browserTests) {
-  assert(browserBlock.includes(`tests/${name}`), `${name} is classified ciBrowser but is not wired into browser-smoke`);
+  const manifestRunner = browserBlock.includes("require('./tests/test-inventory.json')") &&
+    browserBlock.includes("for (const file of inventory.ciBrowser)") &&
+    browserBlock.includes("spawnSync(process.execPath, [path.join('tests', file)]");
+  assert(manifestRunner || browserBlock.includes(`tests/${name}`), `${name} is classified ciBrowser but is not wired into browser-smoke`);
 }
 for (const name of [...legacyRewrite, ...legacyRetire]) {
   assert(!workflow.includes(`tests/${name}`), `${name} is legacy-classified and must not run in Frontend CI until rewritten`);

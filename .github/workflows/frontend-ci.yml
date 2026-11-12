@@ -136,6 +136,7 @@ jobs:
           node tests/rep-navigation-session.cjs
           node tests/rep-reliability-runtime.cjs
           node tests/rep-compass-runtime.cjs
+          node tests/birthday-welcome-runtime.cjs
           node tests/admin-notifications-runtime.cjs
           node tests/test-inventory-contract.cjs
 
@@ -169,26 +170,18 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Full storefront and dashboard Chromium smoke
         run: |
-          node tests/checkout-address-browser.cjs
-          node tests/google-navigation-browser.cjs
-          node tests/direct-changes-browser.cjs
-          node tests/dashboard-groups-browser.cjs
-          node tests/brand-details-browser.cjs
-          node tests/navigation-browser.cjs
-          node tests/product-waiting-browser.js
-          node tests/sets-admin-browser.js
-          node tests/sets-home-browser.js
-          node tests/sets-storefront-browser.js
-          node tests/home-storefront-browser.js
-          node tests/product-merchandising-browser.cjs
-          node tests/news-browser.cjs
-          node tests/customer-notifications-browser.cjs
-          node tests/customer-details-browser.cjs
-          node tests/representative-documents-browser.cjs
-          node tests/coming-soon-browser.cjs
-          node tests/storefront-settings-regression.js
-          node tests/full-site-browser.js
-          DART_CSS_BASE_REF=HEAD^ node tests/css-cascade-browser.cjs
+          node - <<'JS'
+          const {spawnSync} = require('node:child_process'), path = require('node:path');
+          const inventory = require('./tests/test-inventory.json'), failures = [];
+          for (const file of inventory.ciBrowser) {
+            const env = file === 'css-cascade-browser.cjs'
+              ? {...process.env, DART_CSS_BASE_REF: process.env.DART_CSS_BASE_REF || 'HEAD^'} : process.env;
+            const result = spawnSync(process.execPath, [path.join('tests', file)], {stdio:'inherit',env});
+            if (result.error || result.status !== 0) failures.push(file);
+          }
+          if (failures.length) {console.error('Failed browser suites:',failures.join(', '));process.exit(1);}
+          console.log('PASS all',inventory.ciBrowser.length,'browser suites');
+          JS
 
   courier-navigation-smoke:
     runs-on: ubuntu-latest
