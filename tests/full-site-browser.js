@@ -632,13 +632,21 @@ const server = http.createServer((request, response) => {
       active:true,isArchived:false,isDeleted:false,version:1,sizeOptions:[{name:'M',active:true}],colorOptions:[{name:'Black',active:true,images:[]}]};
     await page.route(/\/api\/v1\/(?:me|admin\/auth\/me)(?:\?|$)/,route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
       user:{id:'synthetic-staff',accountType:'staff'},session:{mfaRequired:false,mfaSatisfied:true},permissions})}));
+    let catalogReads=0;
+    const catalogState={version:1,models:[model],items:[]};
     await page.route('**/api/v1/admin/catalog-state',async route=>{
       const write=route.request().method()!=='GET';
       const body=write?route.request().postDataJSON():null;
-      if(write)stockWrites.push(body);
+      if(write){
+        stockWrites.push(body);
+        assert.equal(route.request().method(),'PATCH');
+        assert.equal(body.expectedVersion,catalogState.version);
+        catalogState.version+=1;
+        catalogState.items=body.items.map(row=>({...row,version:1}));
+      }else catalogReads+=1;
       await route.fulfill({contentType:'application/json',body:JSON.stringify(write
-        ?{version:2,baseVersion:1,committedVersion:2,models:[],items:body.items.map(row=>({...row,version:1}))}
-        :{version:1,models:[model],items:[]})});
+        ?{version:catalogState.version,baseVersion:body.expectedVersion,committedVersion:catalogState.version,models:[],items:catalogState.items}
+        :catalogState)});
     });
     await page.goto(`${origin}/Eye/Dart%20Eye.html`,{waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>window.DartAdminHydration?.ready===true);
@@ -657,6 +665,8 @@ const server = http.createServer((request, response) => {
       await page.waitForFunction(()=>window.DartCatalog?.serverVersion()>=2);
       assert.equal(stockWrites.length,1);assert.deepEqual(stockWrites[0].models,[]);
       assert.equal(stockWrites[0].items[0].itemCode,'I-PERM-NEW');
+      assert(catalogReads>=2,'confirmed inventory save must reload the persisted server state');
+      assert.equal(await page.evaluate(()=>window.DartCatalog.items()[0].itemCode),'I-PERM-NEW');
       assert.equal(await page.evaluate(()=>window.DartCatalog.models()[0].selling),150);
     }else{
       assert.equal(await hidden('#items .add-btn'),true);
