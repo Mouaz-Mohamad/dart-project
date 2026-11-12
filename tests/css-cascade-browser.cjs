@@ -230,7 +230,14 @@ async function initialize(page, origin, file, phase) {
             return Object.fromEntries(
               [...style]
                 .filter((prop) => !prop.startsWith('--'))
-                .map((prop) => [prop, style.getPropertyValue(prop)]),
+                .map((prop) => [prop, style.getPropertyValue(prop).replace(/url\((["']?)([^)]+?)\1\)/g, (match, quote, address) => {
+                  try {
+                    const url = new URL(address, location.href);
+                    if (!/^[a-f0-9]{16}$/i.test(url.searchParams.get('v') || '')) return match;
+                    url.searchParams.delete('v');
+                    return `url(${quote}${url.href}${quote})`;
+                  } catch { return match; }
+                })]),
             );
           }),
         }));

@@ -252,8 +252,8 @@ const server = http.createServer((request, response) => {
   await shortReview.waitFor({ state: "attached" });
   await longReview.locator("[data-review-read-more]").waitFor({ state: "visible" });
   assert.equal(await shortReview.locator("[data-review-read-more]").isVisible(), false, "short reviews must not show Read More");
-  assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-title")).webkitLineClamp), "2");
-  assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-text")).webkitLineClamp), "4");
+  assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-title")).webkitLineClamp), "1");
+  assert.equal(await longReview.evaluate(row => getComputedStyle(row.querySelector(".review-text")).webkitLineClamp), "3");
   const cardHeights = await page.locator('#reviewsContainer .review-card:not(#reviewTemplate)').evaluateAll(
     (rows) => rows.map(row => Math.round(row.getBoundingClientRect().height)),
   );

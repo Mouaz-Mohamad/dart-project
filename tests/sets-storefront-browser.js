@@ -366,6 +366,7 @@ const server = http.createServer(async (request, response) => {
       .filter((node) => getComputedStyle(node).display !== 'none').length,
     subtotal: document.getElementById('subtotalVal')?.textContent?.trim(),
     discount: document.getElementById('discountVal')?.textContent?.trim(),
+    shipping: document.getElementById('shippingVal')?.textContent?.trim(),
     total: document.getElementById('totalVal')?.textContent?.trim(),
     discountInput: document.getElementById('discountInput')?.value,
     appliedPromotion: window.dartAppliedPromotion?.type || null,
@@ -375,7 +376,8 @@ const server = http.createServer(async (request, response) => {
     visibleBaseCards: 0,
     subtotal: '1100 EGP',
     discount: '110 EGP',
-    total: '990 EGP',
+    shipping: '100 EGP',
+    total: '1090 EGP',
     discountInput: 'SET 10% — AUTO',
     appliedPromotion: null,
   }, 'Delayed cart renders must preserve Set identity and Set discount priority over Dart Card');

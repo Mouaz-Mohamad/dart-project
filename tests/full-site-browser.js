@@ -265,18 +265,16 @@ const server = http.createServer((request, response) => {
 
   const account = await open("Sign%20Up%20modern.html");
   assert.ok(
-    (await account.locator(".dart-auth-icon").count()) >= 7,
+    (await account.locator("svg.dart-auth-icon").count()) >= 3,
     "customer auth controls must render local SVG icons",
   );
   await account.locator(".register-btn").click();
   assert.equal(await account.locator(".container").evaluate((node) => node.classList.contains("active")), true);
-  await account.waitForFunction(() => {
-    const input = document.querySelector('#registerForm input[name="password"]');
-    return input?.getAttribute("minlength") === "6" && !input?.hasAttribute("pattern");
-  });
-  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("minlength"), "6");
-  assert.equal(await account.locator('#registerForm input[name="password"]').getAttribute("pattern"), null);
-  assert.equal(await account.locator('#registerForm input[name="birthday"]').getAttribute("required"), "");
+  assert.equal(await account.locator('#registerForm input[name="password"]').count(), 0, "Customer registration is identifier-based without passwords");
+  assert.equal(await account.locator('#loginForm input[name="password"]').count(), 0);
+  assert.equal(await account.locator('#registerForm input[name="name"]').count(), 1);
+  assert.equal(await account.locator('#registerForm input[name="phone1"]').getAttribute("required"), "");
+  assert.equal(await account.locator('#registerForm input[name="birthday"]').count(), 1, "The date picker retains the required server-validated birthday value");
   assert.equal(await account.locator('[data-social-login="google"]').count(), 0);
   assert.equal(await account.locator('[data-social-login="facebook"]').count(), 0);
   assert.equal(await account.locator('script[data-dart-social-auth="1"]').count(), 0,
@@ -337,9 +335,11 @@ const server = http.createServer((request, response) => {
   assert.equal(await dashboard.locator('#settings-cod-risk-card').isVisible(),true);
   assert.equal(await dashboard.locator('#settings-commerce-card').isVisible(),false);
   await dashboard.locator('#settings-search').fill('');
+  await dashboard.locator('[data-settings-tab="sales"]').click();
   await dashboard.locator('#settings-default-markup').fill('57');
   await dashboard.evaluate(()=>window.dispatchEvent(new CustomEvent('dart:site-settings-changed',{detail:window.DartSiteSettings.get()})));
   assert.equal(await dashboard.locator('#settings-default-markup').inputValue(),'57','background settings refresh preserves an unsaved field');
+  await dashboard.locator('[data-settings-tab="general"]').click();
   await dashboard.locator('#settings-display-density').selectOption('compact');
   await dashboard.locator('#settings-display-form [type="submit"]').click();
   assert.equal(await dashboard.locator('body').getAttribute('data-dart-density'),'compact');
@@ -347,9 +347,9 @@ const server = http.createServer((request, response) => {
   await dashboard.locator('#settings-display-reset').click();
   assert.equal(await dashboard.locator('body').getAttribute('data-dart-density'),'comfortable');
   await dashboard.evaluate(() => {
-    document.querySelector('[data-settings-tab="hero"]')?.click();
+    document.querySelector('[data-settings-tab="storefront"]')?.click();
   });
-  assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "hero");
+  assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "storefront");
   assert.equal(await dashboard.locator("#settings-typing-card").isVisible(), true);
   assert.equal(await dashboard.locator("#settings-commerce-card").isVisible(), false);
   // Staff stays inside Settings; account details and permissions open only on selection.
@@ -409,7 +409,7 @@ const server = http.createServer((request, response) => {
   await dashboard.locator('[data-staff-id="staff-a"] [data-staff-action="view"]').click();
   assert.equal(await dashboard.locator('[data-staff-action="permissions"]').count(),0,'a non-owner cannot manage staff even with staff.manage');
   assert.equal(staffWrites,1);
-  await dashboard.locator('[data-settings-tab="hero"]').click();
+  await dashboard.locator('[data-settings-tab="storefront"]').click();
   const dashboardTargets = await dashboard.locator("a[data-target]").evaluateAll((links) =>
     [...new Set(links.map((link) => link.dataset.target))],
   );

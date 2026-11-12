@@ -91,7 +91,7 @@ const server = http.createServer((request, response) => {
     const gallery = await cards.first().locator(".home-set-piece img").evaluateAll(images => images.map(image => new URL(image.src).pathname));
     assert.deepEqual(gallery, expectedGallery, "All Set photos lead, followed by every model photo and all color photos in component order, even after late hydration");
     catalogDelay = 0;
-    assert.equal(await page.evaluate(() => document.getElementById("dartHomeSets").nextElementSibling.classList.contains("products-section")), true);
+    assert.equal(await page.evaluate(() => Boolean(document.getElementById("dartHomeSets").compareDocumentPosition(document.querySelector(".products-section")) & Node.DOCUMENT_POSITION_FOLLOWING)), true);
 
     async function geometry() {
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));

@@ -290,6 +290,7 @@ const server = http.createServer(async (request, response) => {
     settingsLink?.click();
   });
 
+  await dashboard.locator('[data-settings-tab="sales"]').click();
   await dashboard.waitForSelector("#settings-commerce-form");
   const initialUrl = dashboard.url();
   await dashboard.locator("#settings-birthday-discount").fill("31");
@@ -309,6 +310,7 @@ const server = http.createServer(async (request, response) => {
 
   // Use the real upload/compression form and a fresh About page. A null-only
   // settings fixture cannot detect the historical PNG-locking observer.
+  await dashboard.locator('[data-settings-tab="storefront"]').click();
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7aUAAAAASUVORK5CYII=", "base64");
   async function uploadFounder(name, expectedPuts) {
     await dashboard.locator("#settings-founder-image").setInputFiles({ name, mimeType: "image/png", buffer: png });
