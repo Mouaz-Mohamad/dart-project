@@ -122,6 +122,7 @@ jobs:
           node tests/dashboard-refresh-runtime.cjs
           node tests/server-authority-contract.js
           node tests/settings-and-groups-unit.js
+          node tests/storefront-products-settings.cjs
           node tests/settings-reset-unit.js
           node tests/founder-media-runtime.cjs
           node tests/promotion-settings-contract.js
