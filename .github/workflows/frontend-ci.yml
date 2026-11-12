@@ -80,6 +80,7 @@ jobs:
       - name: Frontend regression contracts
         run: |
           node scripts/check-source-layout.cjs
+          node tests/storefront-products-settings.cjs
           node tests/source-layout-contract.cjs
           node tests/css-cascade-contract.cjs
           node tests/custom-domain-runtime.cjs
@@ -122,7 +123,6 @@ jobs:
           node tests/dashboard-refresh-runtime.cjs
           node tests/server-authority-contract.js
           node tests/settings-and-groups-unit.js
-          node tests/storefront-products-settings.cjs
           node tests/settings-reset-unit.js
           node tests/founder-media-runtime.cjs
           node tests/promotion-settings-contract.js
