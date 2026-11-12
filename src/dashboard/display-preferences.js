@@ -61,15 +61,78 @@
       catch{$('settings-display-status').textContent='This browser could not save the display preferences.';}
     });
     $('settings-display-reset').addEventListener('click',()=>{try{save({density:'comfortable',columns:{}});$('settings-display-density').value='comfortable';renderColumnChoices();$('settings-display-status').textContent='Default display restored.';}catch{$('settings-display-status').textContent='Unable to restore display preferences.';}});
-    const search=$('settings-search'),jump=$('settings-jump');
-    function searchSettings(){
-      const tab=$('settings-content').dataset.activeSettingsTab;const query=search.value.trim().toLowerCase();let matches=0;
-      doc.querySelectorAll('#settings-content > [data-settings-group]').forEach(card=>{const shown=card.dataset.settingsGroup===tab;const match=!query||card.textContent.toLowerCase().includes(query);card.classList.toggle('dart-settings-search-hidden',shown&&!match);if(shown&&match)matches+=1;});
-      $('settings-search-status').textContent=query?`${matches} matching settings group(s)` : '';
+    const search = $('settings-search');
+    const jump = $('settings-jump');
+    const results = $('settings-search-results');
+
+    // Search all permitted settings categories without exposing Staff cards.
+    function availableCards() {
+      return [...doc.querySelectorAll('#settings-content > [data-settings-group]')].filter(card => {
+        const tab = doc.querySelector('[data-settings-tab="' + card.dataset.settingsGroup + '"]');
+        return Boolean(tab && !tab.hidden && !card.hidden);
+      });
     }
-    function refreshGroups(){jump.replaceChildren(new Option('Choose a settings group',''));const tab=$('settings-content').dataset.activeSettingsTab;doc.querySelectorAll(`#settings-content > [data-settings-group="${tab}"]`).forEach(card=>{jump.add(new Option(card.querySelector('h2')?.textContent||card.id,card.id));});search.value='';searchSettings();}
-    search.addEventListener('input',searchSettings);jump.addEventListener('change',()=>{if(jump.value){search.value='';searchSettings();$(jump.value)?.scrollIntoView({behavior:'smooth',block:'start'});}});
-    doc.querySelectorAll('[data-settings-tab]').forEach(tab=>tab.addEventListener('click',refreshGroups));refreshGroups();
+    function searchSettings() {
+      const selected = $('settings-content').dataset.activeSettingsTab;
+      const query = search.value.trim().toLocaleLowerCase();
+      const cards = availableCards();
+      const matches = query ? cards.filter(card => card.textContent.toLocaleLowerCase().includes(query)) : [];
+      cards.forEach(card => card.classList.toggle('dart-settings-search-hidden',
+        Boolean(query) && card.dataset.settingsGroup === selected && !matches.includes(card)));
+      results.replaceChildren();
+      results.hidden = !query;
+      if (query) {
+        if (matches.length) {
+          matches.forEach(card => {
+            const tab = doc.querySelector('[data-settings-tab="' + card.dataset.settingsGroup + '"]');
+            const button = doc.createElement('button');
+            const name = doc.createElement('span');
+            const category = doc.createElement('small');
+            button.type = 'button';
+            button.className = 'dart-settings-search-result';
+            button.dataset.settingsResult = card.id;
+            name.textContent = card.querySelector('h2')?.textContent || card.id;
+            category.textContent = tab?.querySelector('.dart-settings-tab-label')?.textContent || card.dataset.settingsGroup;
+            button.append(name, category);
+            results.append(button);
+          });
+        } else {
+          const empty = doc.createElement('p');
+          empty.className = 'dart-settings-search-empty';
+          empty.textContent = 'No settings match this search.';
+          results.append(empty);
+        }
+      }
+      $('settings-search-status').textContent = query
+        ? matches.length + ' matching setting(s) across all categories'
+        : '';
+    }
+    function refreshGroups() {
+      jump.replaceChildren(new Option('Choose a setting', ''));
+      const selected = $('settings-content').dataset.activeSettingsTab;
+      availableCards().filter(card => card.dataset.settingsGroup === selected)
+        .forEach(card => jump.add(new Option(card.querySelector('h2')?.textContent || card.id, card.id)));
+      search.value = '';
+      searchSettings();
+    }
+    search.addEventListener('input', searchSettings);
+    jump.addEventListener('change', () => {
+      if (!jump.value) return;
+      search.value = '';
+      searchSettings();
+      $(jump.value)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    results?.addEventListener('click', event => {
+      const button = event.target.closest('[data-settings-result]');
+      if (!button) return;
+      const card = $(button.dataset.settingsResult);
+      if (!card) return;
+      root.DartSettingsTabs?.activate(card.dataset.settingsGroup);
+      refreshGroups();
+      root.requestAnimationFrame(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    });
+    doc.querySelectorAll('[data-settings-tab]').forEach(tab => tab.addEventListener('click', refreshGroups));
+    refreshGroups();
   }
   function start(){setupSettings();new MutationObserver(schedule).observe(doc.querySelector('main'),{childList:true,subtree:true});root.addEventListener('dart:dashboard-section-activated',schedule);apply();}
   root.DartDisplayPreferences=Object.freeze({get:()=>JSON.parse(JSON.stringify(preferences))});
