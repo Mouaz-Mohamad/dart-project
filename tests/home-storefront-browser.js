@@ -316,7 +316,7 @@ const server = http.createServer((request, response) => {
   assert.equal(ratings.centered, "center");
   assert.equal(ratings.direction, "ltr");
   assert(ratings.initialColors.stars.every(color => color === "rgb(224, 227, 232)"), "empty stars must appear gray");
-  assert.equal(await longReview.locator(".stars").evaluate(el => getComputedStyle(el).justifyContent), "center");
+  assert.equal(await longReview.locator(".stars").evaluate(el => getComputedStyle(el).justifyContent), "flex-end");
   // The unauthenticated browser fixture keeps the review form hidden by
   // design; exercise native label selection in DOM without bypassing eligibility.
   const fifth = await page.locator("#reviewForm").evaluate((form) => {

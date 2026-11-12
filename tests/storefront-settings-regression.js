@@ -434,7 +434,7 @@ const server = http.createServer(async (request, response) => {
   assert.equal(await dashboard.locator('[data-typing-scene]').nth(1).locator('.dart-typing-preview').textContent(),'For Everyone Dart | Today','saved sentence grouping survives reload');
 
   await dashboard.evaluate(() => document.querySelector('a[data-target="settings"]').click());
-  await dashboard.locator('[data-settings-tab="general"]').click();
+  await dashboard.locator('[data-settings-tab="loyalty"]').click();
   await dashboard.locator('#settings-promotion-name').fill('Quantity Regression');
   await dashboard.locator('#settings-promotion-code').fill('Q-REGRESSION');
   await dashboard.locator('#settings-promotion-kind').selectOption('fixed');

@@ -302,11 +302,15 @@ const server = http.createServer((request, response) => {
   const dashboard = await open("Eye/Dart%20Eye.html");
   await dashboard.waitForFunction(() => window.DartAdminHydration?.ready === true);
   assert.equal(await dashboard.locator("#dart-admin-auth").count(), 1);
-  assert.equal(
-    await dashboard.locator(".menu").evaluate((node) => getComputedStyle(node).overflowY),
-    "scroll",
-    "dashboard sidebar must keep its scrollable navigation after CSS compatibility cleanup",
+  assert.ok(
+    ["auto", "scroll"].includes(await dashboard.locator(".menu").evaluate(node => getComputedStyle(node).overflowY)),
+    "dashboard navigation must remain scrollable when its content exceeds the viewport",
   );
+  assert.equal(await dashboard.locator(".menu").evaluate(node => {
+    if (node.scrollHeight <= node.clientHeight) return true;
+    const previous = node.scrollTop; node.scrollTop = node.scrollHeight;
+    const moved = node.scrollTop > 0; node.scrollTop = previous; return moved;
+  }), true);
   // Authentication has dedicated backend/frontend contract coverage. This smoke suite
   // verifies the dashboard DOM and navigation without depending on a seeded Owner account.
   await dashboard.evaluate(() => {
