@@ -270,8 +270,10 @@
           const order = deliveredOrderForItem(values.item_code, orders);
           const identityOk =
             order &&
-            (normalizeEmail(order.email) === normalizeEmail(values.email) ||
-              normalizePhone(order.phone1) === normalizePhone(values.phone1));
+            ((values.email && order.email &&
+              normalizeEmail(order.email) === normalizeEmail(values.email)) ||
+              (values.phone1 && order.phone1 &&
+                normalizePhone(order.phone1) === normalizePhone(values.phone1)));
           const deliveredAt =
             order &&
             new Date(order.deliveredAt || order.updatedAt || order.createdAt);

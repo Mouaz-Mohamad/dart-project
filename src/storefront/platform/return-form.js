@@ -231,7 +231,13 @@
       const chainId = rules?.chainIdForItem(original, code?.value.trim()) || code?.value.trim();
       const completed = rules?.completedExchangeCount(read(KEYS.returns, []), chainId) || 0;
       const policy = rules?.courierPolicy(normalizedType, completed);
-      if (feeText) feeText.textContent = policy?.label || "";
+      if (feeText) {
+        feeText.textContent = policy?.payer === "Customer"
+          ? `رسوم المندوب: ${Number(policy.customerFee || 0)} جنيه، تُدفع للمندوب.`
+          : policy?.payer === "Brand"
+            ? "Dart تتحمل رسوم المندوب لأول استبدال مكتمل."
+            : "";
+      }
       if (feeBox) feeBox.hidden = !policy;
     };
 
