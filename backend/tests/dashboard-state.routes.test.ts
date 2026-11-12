@@ -204,6 +204,21 @@ describe("dashboard domain permissions", () => {
     expect(state.removeFeedback).toHaveBeenCalledWith("reviews","review-one",2,expect.any(String),expect.any(String));
   });
 
+  it("requires domain permission, CSRF and a version for explicit record deletion", async () => {
+    const { app, state } = application(["damage.manage"]);
+    const remove = (domain: string, body: object, csrf = true) => {
+      const call = request(app).delete(`/api/v1/admin/domain-state/${domain}/record-one`)
+        .set("Cookie", `dart_session_staff=${sessionToken}`);
+      if (csrf) call.set("x-csrf-token", "staff-csrf-token");
+      return call.send(body);
+    };
+    expect((await remove("cards", {expectedVersion:2})).status).toBe(403);
+    expect((await remove("damage", {expectedVersion:2}, false)).status).toBe(403);
+    expect((await remove("damage", {})).status).toBe(422);
+    expect((await remove("damage", {expectedVersion:2})).status).toBe(200);
+    expect(state.write).toHaveBeenCalledExactlyOnceWith("damage",2,[],expect.any(String),expect.any(String),"record-one");
+  });
+
   it("filters version polling to domains readable by a granular Finance account", async () => {
     const { app } = application(["finance.view_cost"]);
     const response = await request(app)

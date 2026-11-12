@@ -5,6 +5,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Pool, PoolClient } from "pg";
+import { protectRelationalMigration } from "./relational-migration-safety.js";
 import { loadConfig } from "../config/env.js";
 import { createLogger } from "../config/logger.js";
 import { createDatabasePool } from "./pool.js";
@@ -258,7 +259,9 @@ export async function runMigrations(
     for (const migration of pending) {
       await client.query("BEGIN");
       try {
+        await protectRelationalMigration(client, migration.name, true);
         await client.query(migration.sql);
+        await protectRelationalMigration(client, migration.name, false);
         await client.query(
           "INSERT INTO dart_schema_migrations (name, checksum) VALUES ($1, $2)",
           [migration.name, migration.checksum],

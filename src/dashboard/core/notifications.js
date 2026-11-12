@@ -54,7 +54,7 @@ function renderNotifications() {
       );
       if (!n) return;
       n.read = true;
-      dartSaveAll();
+      saveDataToStorage("dart_notifications", notificationData);
       renderNotifications();
       if (n.relatedEntityType && document.getElementById(n.relatedEntityType)) {
         document

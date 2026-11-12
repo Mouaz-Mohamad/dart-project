@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:d3b5f59e3e4d86fa619cb8cd54892a55e5ee5469431a65fcf362006b8c33dd4f */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:39999587a8a577c85391b75d71775dabf7503e14c8ad230a514b822a1ade0ed5 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -1376,6 +1376,17 @@ async function dartCommitHardDelete(mode) {
     return;
   }
 
+  if (serverMode && ["card", "damage", "returns"].includes(sectionKey)) {
+    const domain = { card: "cards", damage: "damage", returns: "returns" }[sectionKey];
+    try {
+      await window.DartDomainState.removeDomainRecord(domain, String(id));
+      dartPendingHardDelete = null;
+      dartRefreshAll();
+      closeModal(document.getElementById("hard-delete-modal"));
+    } catch (error) { window.DartDialog.alert(error.message || "Unable to delete this record. Reload and retry."); }
+    return;
+  }
+
   if (serverMode && sectionKey === "review") {
     const domain = target?.recordType === "contact" || target?.source === "Contact Us" ? "contacts" : "reviews";
     try {
@@ -2398,7 +2409,7 @@ async function dartArchiveRecord(key, id) {
     { isArchived: !old },
   );
   if (key === "review") await dartSaveFeedback(x);
-  else dartSaveAll();
+  else saveDataToStorage(sec.storageKey, sec.data);
   dartRefreshAll();
 }
 function dartUpdateMasterCheckbox(key, viewData) {
@@ -4474,7 +4485,7 @@ function renderNotifications() {
       );
       if (!n) return;
       n.read = true;
-      dartSaveAll();
+      saveDataToStorage("dart_notifications", notificationData);
       renderNotifications();
       if (n.relatedEntityType && document.getElementById(n.relatedEntityType)) {
         document

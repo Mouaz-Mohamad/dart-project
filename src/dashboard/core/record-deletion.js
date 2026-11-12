@@ -239,6 +239,17 @@ async function dartCommitHardDelete(mode) {
     return;
   }
 
+  if (serverMode && ["card", "damage", "returns"].includes(sectionKey)) {
+    const domain = { card: "cards", damage: "damage", returns: "returns" }[sectionKey];
+    try {
+      await window.DartDomainState.removeDomainRecord(domain, String(id));
+      dartPendingHardDelete = null;
+      dartRefreshAll();
+      closeModal(document.getElementById("hard-delete-modal"));
+    } catch (error) { window.DartDialog.alert(error.message || "Unable to delete this record. Reload and retry."); }
+    return;
+  }
+
   if (serverMode && sectionKey === "review") {
     const domain = target?.recordType === "contact" || target?.source === "Contact Us" ? "contacts" : "reviews";
     try {

@@ -252,6 +252,17 @@ export function createDashboardStateRouter(
     },
   );
 
+  router.delete("/admin/domain-state/:domain/:recordId",
+    signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requireAnyPermission(...FINANCE_DOMAIN_WRITE_GATE_PERMISSIONS),
+    async (request, response) => {
+      const domain = domainSchema.parse(request.params.domain) as DashboardDomain;
+      requireSensitiveDomainPermission(domain, "write", request.auth!.permissions);
+      const recordId = z.string().trim().min(1).max(200).parse(request.params.recordId);
+      const { expectedVersion } = z.object({ expectedVersion: z.number().int().positive() }).strict().parse(request.body);
+      response.status(200).json(await state.write(domain, expectedVersion, [], request.auth!.userId, String(request.id), recordId));
+    });
+
   router.put(
     "/admin/domain-state/:domain",
     signedIn,

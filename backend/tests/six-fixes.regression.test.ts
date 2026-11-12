@@ -300,7 +300,7 @@ describe("return snapshot adapter", () => {
         const db = new PGlite();
         databases.push(db);
         await db.exec(`CREATE TABLE dashboard_domain_state(domain text PRIMARY KEY,version bigint,data jsonb,updated_by text,updated_at timestamptz);
-      CREATE TABLE audit_logs(actor_type text,actor_id text,action text,entity_type text,entity_id text,request_id text,metadata jsonb);
+      CREATE TABLE audit_logs(actor_type text,actor_id text,action text,entity_type text,entity_id text,request_id text,metadata jsonb,old_values jsonb,new_values jsonb);
       CREATE TABLE customers(user_id uuid PRIMARY KEY,client_code text);CREATE TABLE orders(id uuid PRIMARY KEY,order_code text);
       CREATE TABLE inventory_items(id text PRIMARY KEY,item_code text,status text);
       INSERT INTO dashboard_domain_state VALUES('returns',1,'[]',NULL,now());`);

@@ -421,7 +421,7 @@
         timestamp: new Date().toISOString(),
       };
       rows.unshift(event);
-      if (rows.length > 2000) rows.length = 2000;
+      // Financial history is retained; a display limit must never delete stored audit events.
       writeJSON(STORAGE_KEYS.audit, rows);
       try {
         if (typeof dartAudit === "function") dartAudit(action, `finance:${resource}`, id, before || {}, after || {}, note);

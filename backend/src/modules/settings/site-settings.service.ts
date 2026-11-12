@@ -55,7 +55,7 @@ export class SiteSettingsService {
         !Array.isArray(parsedSettings.codRisk)
           ? parsedSettings.codRisk as Record<string, unknown>
           : null;
-      const nextSettings: Record<string, unknown> = { ...parsedSettings };
+      const nextSettings: Record<string, unknown> = { ...currentSettings, ...parsedSettings };
       // Older Settings clients do not know about shipping companies.
       // Never drop carrier configuration when saving unrelated settings.
       if (!Object.prototype.hasOwnProperty.call(nextSettings, "shippingCompanies") &&
@@ -160,8 +160,8 @@ export class SiteSettingsService {
       );
       await client.query(
         `INSERT INTO audit_logs (
-           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
-         ) VALUES ('staff',$1,'SITE_SETTINGS_UPDATED','site_settings','main',$2,$3::jsonb)`,
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata, old_values, new_values
+         ) VALUES ('staff',$1,'SITE_SETTINGS_UPDATED','site_settings','main',$2,$3::jsonb,$4::jsonb,$5::jsonb)`,
         [
           actorId,
           requestId,
@@ -173,6 +173,8 @@ export class SiteSettingsService {
             shippingFee: { previous: currentSettings.shippingFeePerOrder ?? 100,
               next: nextSettings.shippingFeePerOrder ?? 100 },
           }),
+          JSON.stringify(currentSettings),
+          JSON.stringify(nextSettings),
         ],
       );
       await client.query("COMMIT");

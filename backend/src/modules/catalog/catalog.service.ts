@@ -681,6 +681,14 @@ export class CatalogService {
       if (!patch && currentVersion !== expectedVersion) {
         throw new AppError(409, "CATALOG_VERSION_CONFLICT", "Catalogue changed on another device; reload and retry");
       }
+      if (!patch) {
+        const omitted = await client.query<{ missing: boolean }>(`SELECT
+          EXISTS(SELECT 1 FROM catalog_models WHERE NOT is_deleted AND NOT (model_id=ANY($1::text[]))) OR
+          EXISTS(SELECT 1 FROM inventory_items WHERE NOT is_deleted AND NOT (id=ANY($2::text[]))) AS missing`,
+          [models.map(row => text(row.modelId)), items.map(row => text(row.id))]);
+        if (omitted.rows[0]?.missing) throw new AppError(409, "CATALOG_SNAPSHOT_INCOMPLETE",
+          "Catalogue list is incomplete. Reload it; archive explicit records instead of omitting them.");
+      }
       const previousCounts = patch ? undefined : await client.query<{
         model_count: string;
         item_count: string;

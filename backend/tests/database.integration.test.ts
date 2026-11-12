@@ -250,15 +250,15 @@ describe.skipIf(!databaseUrl)("PostgreSQL production schema", () => {
     );
     expect(dedupedPayload.rows[0]!.status).toBe("Duplicate Legacy");
 
-    await testPool!.query(
+    await expect(testPool!.query(
       `UPDATE dashboard_domain_state
           SET data='[]'::jsonb, version=version+1, updated_at=now()
         WHERE domain='returns'`,
-    );
-    const cleared = await testPool!.query<{ count: string }>(
+    )).rejects.toThrow("DOMAIN_SNAPSHOT_INCOMPLETE");
+    const retained = await testPool!.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM return_requests",
     );
-    expect(cleared.rows[0]!.count).toBe("0");
+    expect(retained.rows[0]!.count).toBe("1");
   });
 
   it("blocks COD Preparing until verification, then accepts a verified order and rejects a stale verification retry", async () => {

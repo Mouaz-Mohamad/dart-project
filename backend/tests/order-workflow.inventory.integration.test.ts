@@ -202,13 +202,13 @@ describe.skipIf(!databaseUrl)("order workflow with physical inventory", () => {
     const created = await commerce.createAdminOrder(actorId, input, "manual-delta-create", await options());
     const changed = created.orders.find((row) => row.id !== oldSibling.orderId)!;
     expect(created.responseMode).toBe("delta");
-    expect(changed).toMatchObject({ status: "New", finalAmount: 540 });
+    expect(changed).toMatchObject({ status: "New", finalAmount: 640, shippingFee: 100 });
     const edited = await commerce.updateAdminOrder(actorId, String(changed.orderId),
       { ...input, clientId: newCustomer.code, discountPercent: 0 }, "manual-delta-edit", await options());
     expect(edited.responseMode).toBe("delta");
     expect(edited.orders.map((row) => row.id).sort()).toEqual([changed.id, oldSibling.orderId, newSibling.orderId].sort());
     const current = edited.orders.find((row) => row.id === changed.id)!;
-    expect(current.finalAmount).toBe(600);
+    expect(current).toMatchObject({ finalAmount: 700, shippingFee: 100 });
     const cod = await commerce.adminCodVerificationAction(actorId, String(changed.orderId),
       { expectedVersion: Number(current.version), decision: "verify", reason: "Test verification" }, "manual-delta-cod", await options());
     expect(cod).toMatchObject({ responseMode: "delta", orders: expect.arrayContaining([
@@ -219,7 +219,7 @@ describe.skipIf(!databaseUrl)("order workflow with physical inventory", () => {
     for (const action of ["archive", "restore", "delete"] as const) {
       const state = await commerce.adminOrderStateAction(actorId, String(changed.orderId), action, `manual-${action}`, await options());
       expect(state).toMatchObject({ responseMode: "delta", orders: expect.arrayContaining([
-        expect.objectContaining({ id: changed.id, isArchived: action !== "restore", isDeleted: action === "delete", finalAmount: 600 }),
+        expect.objectContaining({ id: changed.id, isArchived: action !== "restore", isDeleted: action === "delete", finalAmount: 700, shippingFee: 100 }),
       ]) });
     }
   });

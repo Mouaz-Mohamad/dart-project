@@ -93,7 +93,7 @@ async function dartArchiveRecord(key, id) {
     { isArchived: !old },
   );
   if (key === "review") await dartSaveFeedback(x);
-  else dartSaveAll();
+  else saveDataToStorage(sec.storageKey, sec.data);
   dartRefreshAll();
 }
 function dartUpdateMasterCheckbox(key, viewData) {

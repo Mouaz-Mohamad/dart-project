@@ -134,6 +134,7 @@ export class DashboardStateService {
     data: unknown[],
     actorId: string,
     requestId: string,
+    removeId?: string,
   ): Promise<{ domain: DashboardDomain; version: number; data: unknown[]; relatedVersions?: Record<string, number> }> {
     if (domain === "message_queue" || domain === "birthday_messages") {
       throw new AppError(405, "BIRTHDAY_COMMAND_REQUIRED", "Use the birthday messaging command to queue messages");
@@ -152,13 +153,35 @@ export class DashboardStateService {
           throw new AppError(409, "DART_CARD_DISABLED", "Dart Card is paused; existing records are read-only.");
         }
       }
-      const current = await client.query<{ version: string }>(
-        "SELECT version::text FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE",
+      const current = await client.query<{ version: string; data: unknown[] }>(
+        "SELECT version::text, data FROM dashboard_domain_state WHERE domain=$1 FOR UPDATE",
         [domain],
       );
       const version = Number(current.rows[0]?.version || 1);
       if (version !== expectedVersion) {
         throw new AppError(409, "DOMAIN_VERSION_CONFLICT", `${domain} changed on another device; reload and retry`);
+      }
+      const previousData = isRelationalDashboardDomain(domain)
+        ? await readRelationalDashboardDomain(client, domain) : current.rows[0]?.data || [];
+      const id = (value: unknown): string => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+        const row = value as Record<string, unknown>;
+        return String(row.id || row.returnId || row.cardId || row.damageId || row.code || JSON.stringify(row));
+      };
+      if (removeId !== undefined) {
+        if (!["cards", "damage", "notifications", "returns"].includes(domain)) {
+          throw new AppError(405, "DOMAIN_COMMAND_REQUIRED", "Use this record's account or workflow command");
+        }
+        if (!previousData.some(row => id(row) === removeId)) throw new AppError(404, "DOMAIN_RECORD_NOT_FOUND", "Record not found");
+        data = previousData.filter(row => id(row) !== removeId);
+        await client.query("SELECT set_config('dart.domain_remove_id',$1,true)", [removeId]);
+      }
+      const ids = data.map(id), incoming = new Set(ids);
+      if (ids.some(key => !key) || incoming.size !== ids.length) {
+        throw new AppError(422, "DOMAIN_RECORD_INVALID", "Records require unique identifiers");
+      }
+      if (previousData.some(row => !incoming.has(id(row)) && id(row) !== removeId)) {
+        throw new AppError(409, "DOMAIN_SNAPSHOT_INCOMPLETE", "List is incomplete. Reload it; deletion requires a specific record command.");
       }
       if (domain === "returns") {
         const before = await client.query<{ payload: unknown }>("SELECT payload FROM return_requests ORDER BY position,record_id FOR UPDATE");
@@ -173,9 +196,11 @@ export class DashboardStateService {
       );
       await client.query(
         `INSERT INTO audit_logs (
-           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata
-         ) VALUES ('staff',$1,'DASHBOARD_DOMAIN_UPDATED','dashboard_domain_state',$2,$3,$4::jsonb)`,
-        [actorId, domain, requestId, JSON.stringify({ previousVersion: version, newVersion: next, count: data.length })],
+           actor_type, actor_id, action, entity_type, entity_id, request_id, metadata, old_values, new_values
+         ) VALUES ('staff',$1,'DASHBOARD_DOMAIN_UPDATED','dashboard_domain_state',$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)`,
+        [actorId, domain, requestId, JSON.stringify({ previousVersion: version, newVersion: next, count: data.length,
+          ...(removeId === undefined ? {} : { removedRecordId: removeId }) }),
+          JSON.stringify({ data: previousData }), JSON.stringify({ data })],
       );
       await client.query("COMMIT");
       return { domain, version: next, data: domain === "customers" && Array.isArray(written.rows[0]?.data) ? written.rows[0].data : data };
