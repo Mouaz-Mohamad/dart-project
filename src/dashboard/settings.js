@@ -794,7 +794,7 @@
   const tabs = [...document.querySelectorAll("[data-settings-tab]")];
   if (!content || !tabs.length) return;
 
-  const allowed = new Set(["general", "hero", "staff"]);
+  const allowed = new Set(["general", "storefront", "sales", "loyalty", "staff", "maintenance"]);
 
   function activateSettingsTab(requested) {
     const target =
@@ -804,6 +804,11 @@
         : "general";
 
     content.dataset.activeSettingsTab = target;
+    const activeTab = tabs.find(tab => tab.dataset.settingsTab === target);
+    const heading = document.getElementById('settings-active-title');
+    const description = document.getElementById('settings-active-description');
+    if (heading) heading.textContent = activeTab?.querySelector('.dart-settings-tab-label')?.textContent || 'General';
+    if (description) description.textContent = activeTab?.querySelector('small')?.textContent || '';
     tabs.forEach((tab) => {
       const active = tab.dataset.settingsTab === target;
       tab.classList.toggle("is-active", active);
@@ -818,7 +823,7 @@
   tabs.forEach((tab) => {
     tab.setAttribute('role','tab');tab.id=tab.id||`settings-tab-${tab.dataset.settingsTab}`;tab.setAttribute('aria-controls','settings-content');
     tab.addEventListener("click", () => activateSettingsTab(tab.dataset.settingsTab));
-    tab.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const available=tabs.filter(item=>!item.hidden);const index=available.indexOf(tab);const next=event.key==='Home'?available[0]:event.key==='End'?available.at(-1):available[(index+(event.key==='ArrowRight'?1:-1)+available.length)%available.length];next?.click();next?.focus();});
+    tab.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;event.preventDefault();const available=tabs.filter(item=>!item.hidden);const index=available.indexOf(tab);const next=event.key==='Home'?available[0]:event.key==='End'?available.at(-1):available[(index+(['ArrowRight','ArrowDown'].includes(event.key)?1:-1)+available.length)%available.length];next?.click();next?.focus();});
   });
   document.querySelector('.dart-settings-tabs')?.setAttribute('role','tablist');
 
