@@ -43,7 +43,7 @@ describe("unified customer records", () => {
   }
   it.runIf(Boolean(process.env.TEST_DATABASE_URL))("serializes simultaneous signup requests for one normalized primary phone", async () => {
     const primary=phone();
-    const results=await Promise.all([primary,`+20${primary.slice(1)}`].map(phone1=>identity.registerCustomer({name:"Concurrent Customer",phone1},metadata)));
+    const results=await Promise.all([primary,`+20${primary.slice(1)}`].map(phone1=>identity.registerCustomer({name:"Concurrent Customer",phone1,birthday:"2001-01-01"},metadata)));
     expect(results[0]!.account.userId).toBe(results[1]!.account.userId);
     expect((await store.pool.query("SELECT user_id FROM account_phones WHERE phone_normalized=$1",[`20${primary.slice(1)}`])).rows).toHaveLength(1);
   });

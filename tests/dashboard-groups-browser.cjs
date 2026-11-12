@@ -112,10 +112,10 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>fixtureRelease.news.length===1);await page.locator('#news-search').fill('Beta');await page.waitForFunction(()=>fixtureRelease.news.length===2);
   await page.evaluate(()=>fixtureRelease.news[1]());await page.waitForFunction(()=>document.querySelector('.dart-news-row')?.textContent.includes('Beta'));
   await page.evaluate(()=>fixtureRelease.news[0]());await page.waitForTimeout(50);assert.ok((await page.locator('#news-rows').innerText()).includes('Beta'),'old response cannot overwrite a newer search');
-  await page.evaluate(()=>{fixtureHold.news=false;fixtureFailure.news=503;fixtureNow+=60001;activate('orders');activate('news');});
+  await page.evaluate(()=>{fixtureHold.news=false;fixtureFailure.news=503;fixtureNow+=600001;activate('orders');activate('news');});
   await page.locator('#news-retry').waitFor();assert.equal(await page.locator('.dart-news-row').count(),1,'failed background refresh keeps previous rows');
   await page.evaluate(()=>fixtureFailure.news=0);await page.locator('#news-retry').click();await page.waitForFunction(()=>document.getElementById('news-message').textContent==='');
-  await page.evaluate(()=>{fixtureNow+=60001;fixtureHold.news=fixtureHold.sets=true;activate('orders');activate('news');});
+  await page.evaluate(()=>{fixtureNow+=600001;fixtureHold.news=fixtureHold.sets=true;activate('orders');activate('news');});
   await page.waitForFunction(()=>fixtureRelease.news.length===3);await page.evaluate(()=>activate('models'));
   await page.locator('button[data-model-set-view="sets"]').click();await page.waitForFunction(()=>fixtureRelease.sets.length===1&&fixtureRelease.news.length===3);
   await page.evaluate(()=>{fixturePermissions=[];document.body.classList.add('dart-admin-locked');dispatchEvent(new CustomEvent('dart:admin-logged-out'));});
