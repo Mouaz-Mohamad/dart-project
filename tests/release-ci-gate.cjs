@@ -21,6 +21,18 @@ const assert=require('node:assert/strict');
   await assert.rejects(verifyReleaseCI('api',{env,log(){},fetchImpl:async()=>({ok:false,status:403})}),/unavailable/);
   await assert.rejects(verifyReleaseCI('api',{env,log(){},timeoutMs:0}),/release window/);
   await verifyReleaseCI('storefront',{env:{},log(){},fetchImpl:async()=>{throw Error('Local builds must not call GitHub');}});
+  const {equivalentFrontendCheck,unchangedStorefront}=await import('../scripts/verified-frontend-ci.mjs');
+  const ancestor='b'.repeat(40), candidate={...run('Frontend CI'),head_sha:ancestor};
+  const coverage = files => equivalentFrontendCheck(sha,async url=>({ok:true,json:async()=>url.includes('/compare/')
+    ? {status:'ahead',base_commit:{sha:ancestor},merge_base_commit:{sha:ancestor},files}
+    : {workflow_runs:[candidate]}}));
+  assert.equal(await coverage([{filename:'backend/src/server.ts'},{filename:'.github/workflows/database-backup.yml'}]),true);
+  assert.equal(await coverage([{filename:'index.html'}]),false);
+  assert.equal(await coverage([{filename:'docs/index.html',previous_filename:'index.html'}]),false);
+  assert.equal(unchangedStorefront(Array.from({length:300},()=>({filename:'docs/a.md'}))),false);
+  assert.equal(await equivalentFrontendCheck(sha,async()=>({ok:false})),false);
+  assert.deepEqual(assessReleaseRuns(passing.slice(0,2),sha,'storefront',true),[]);
+  assert.throws(()=>assessReleaseRuns([...passing.slice(0,2),run('Frontend CI',{conclusion:'failure'})],sha,'storefront',true),/blocked/);
   const {waitForProduction}=await import('../scripts/wait-production-release.mjs');
   let probes=0,pauses=0;
   await waitForProduction(sha,{wait:async()=>{pauses++},fetchImpl:async()=>({ok:true,json:async()=>({sha:++probes===1?'b'.repeat(40):sha})})});
