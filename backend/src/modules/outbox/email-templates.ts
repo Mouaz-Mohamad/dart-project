@@ -66,6 +66,10 @@ export function renderOutboxEmail(
     subject = "Verify your Dart email";
     english = `Your Dart verification code is ${otp}. It expires ${expiry || "soon"}.`;
     arabic = `كود تأكيد البريد الإلكتروني في Dart هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}.`;
+  } else if (eventType === "CUSTOMER_LOGIN_OTP_REQUESTED") {
+    subject = "Dart login code";
+    english = `Your Dart login code is ${otp}.`;
+    arabic = `كود الدخول إلى Dart هو ${otp}.`;
   } else if (eventType === "PASSWORD_RESET_CODE_REQUESTED") {
     subject = "Dart password reset code";
     english = `Your Dart password reset code is ${otp}. It expires ${expiry || "soon"}. Enter this code, then choose a new password. If you did not request a reset, ignore this email.`;
@@ -100,7 +104,7 @@ export function renderOutboxEmail(
 
   // Minimal branded OTP email shared by Staff and Customer authentication.
   // Non-OTP business emails keep the existing bilingual layout unchanged.
-  if (otp && /^\\d{6}$/.test(otp) && [
+  if (otp && /^\d{6}$/.test(otp) && [
     "STAFF_EMAIL_ACCESS_CODE_REQUESTED",
     "STAFF_INVITED",
     "STAFF_ONBOARDING_CODE_REQUESTED",

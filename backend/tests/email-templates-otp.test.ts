@@ -4,6 +4,8 @@ import { renderOutboxEmail } from "../src/modules/outbox/email-templates.js";
 describe("Dart minimal OTP email", () => {
   it.each([
     "STAFF_EMAIL_ACCESS_CODE_REQUESTED",
+    "STAFF_INVITED",
+    "STAFF_ONBOARDING_CODE_REQUESTED",
     "EMAIL_VERIFICATION_REQUESTED",
     "EMAIL_CHANGE_VERIFICATION_REQUESTED",
     "PASSWORD_RESET_CODE_REQUESTED",
