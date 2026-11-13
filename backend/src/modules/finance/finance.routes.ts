@@ -4,6 +4,7 @@ import { Router } from "express";
 import type { RequestHandler } from "express";
 import { AppError } from "../../http/app-error.js";
 import { z } from "zod";
+import { moneyPositive, moneyNonNegative } from "../../security/money.js";
 import type { AppConfig } from "../../config/env.js";
 import {
   authenticate,
@@ -277,8 +278,8 @@ export function createFinanceRouter(
         id: z.string().trim().min(1).max(200),
         orderId: z.string().trim().min(1).max(200),
         settlementDate: z.iso.date(),
-        amountReceived: z.number().finite().positive().max(1_000_000_000),
-        fee: z.number().finite().nonnegative().max(1_000_000_000),
+        amountReceived: moneyPositive.refine(value => value <= 1_000_000_000),
+        fee: moneyNonNegative.refine(value => value <= 1_000_000_000),
         reference: z.string().trim().max(500).optional(),
         notes: z.string().trim().max(4000).optional(),
       }).strict().refine((value) => value.fee <= value.amountReceived, {

@@ -136,6 +136,12 @@ export class DashboardStateService {
     requestId: string,
     removeId?: string,
   ): Promise<{ domain: DashboardDomain; version: number; data: unknown[]; relatedVersions?: Record<string, number> }> {
+    if (domain === "promotions") {
+      throw new AppError(405, "PROMOTION_COMMAND_REQUIRED", "Use the validated promotion campaign commands");
+    }
+    if (domain === "finance_audit") {
+      throw new AppError(405, "FINANCE_AUDIT_READ_ONLY", "Financial history is recorded by the server and cannot be edited");
+    }
     if (domain === "message_queue" || domain === "birthday_messages") {
       throw new AppError(405, "BIRTHDAY_COMMAND_REQUIRED", "Use the birthday messaging command to queue messages");
     }
@@ -145,6 +151,7 @@ export class DashboardStateService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SELECT set_config('dart.finance_actor_id',$1,true),set_config('dart.finance_request_id',$2,true)", [actorId, requestId]);
       if (domain === "cards") {
         const policy = await client.query<{data: Record<string, unknown>}>(
           "SELECT data FROM site_settings WHERE id='main' FOR SHARE"

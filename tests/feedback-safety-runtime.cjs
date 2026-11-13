@@ -5,7 +5,10 @@ const context={window:{},saveDataToStorage:(key,data)=>writes.push({key,data})};
 for(const key of ['modelsData','itemsData','customersData','ordersData','returnsData','reviewsData','cardsData','representativeData','damageData','notificationData','auditData'])context[key]=[];
 context.reviewsData=[{id:'original',review:'Original review'}];
 vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function dartSaveAll('),source.indexOf('function getRowClass(')),context);
-context.dartSaveAll();
+assert.throws(()=>context.dartSaveAll(),/explicit affected sections/);
+context.dartSaveAll(["models", "audit"]);
+assert.deepEqual(writes.map(row=>row.key),["dart_models","dart_audit"]);
+assert.equal(writes.some(row=>["dart_customers","dart_returns","dart_cards","dart_notifications"].includes(row.key)),false);
 assert.equal(writes.some(row=>['dart_reviews','dart_contact_messages'].includes(row.key)),false,'unrelated Save All must never write a feedback list');
 (async()=>{
  const calls=[],review={id:'r1',review:'Original'},contact={id:'c1',recordType:'contact',source:'Contact Us',review:'Message'};

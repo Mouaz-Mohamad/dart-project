@@ -1,5 +1,5 @@
 # DART CODE GUIDE | .github/workflows/database-backup.yml
-# الغرض: نسخة يومية مشفرة مع اختبار استعادة منفصل؛ تتطلب أسرار GitHub موثقة.
+# الغرض: نسخة مشفرة كل ست ساعات مع اختبار استعادة منفصل؛ تتطلب أسرار GitHub موثقة.
 name: Encrypted database backup
 
 on:
@@ -12,7 +12,7 @@ on:
       - "backend/scripts/recovery-schema.ts"
       - "backend/src/modules/monitoring/store-recovery-check.ts"
   schedule:
-    - cron: "17 3 * * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:

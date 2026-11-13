@@ -614,6 +614,7 @@ export class FinanceService {
     const feeMinor = Math.round(input.fee * 100);
     try {
       await client.query("BEGIN");
+      await client.query("SELECT set_config('dart.finance_actor_id',$1,true),set_config('dart.finance_request_id',$2,true)", [actorId,requestId]);
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtext('dart:finance:cod-settlements'))",
       );

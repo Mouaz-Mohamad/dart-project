@@ -17,6 +17,7 @@ import {
   CATALOG_ASSET_IMMUTABLE_CACHE,
   CATALOG_ASSET_REDIRECT_CACHE,
   catalogAssetUrl,
+  catalogAssetVersion,
   catalogAssetVersionMatches,
 } from "./catalog.asset.cache.js";
 import type { CatalogAssetService } from "./catalog.asset.service.js";
@@ -57,7 +58,7 @@ export function createCatalogAssetRouter(
 
   router.get("/catalog/assets/:assetId", async (request, response) => {
     const assetId = assetIdSchema.parse(request.params.assetId);
-    const asset = await assets.get(assetId);
+    const asset = await assets.get(assetId, catalogAssetVersion(request.query.v), request.get("if-none-match") || null);
     if (!asset) {
       response.status(404).json({ error: { code: "ASSET_NOT_FOUND", message: "Image not found" } });
       return;

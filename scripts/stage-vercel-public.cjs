@@ -243,3 +243,9 @@ const versionedReferences = versionHtmlAssets();
 console.log(
   `Vercel static output staged in public/: ${inlined} shared sections and ${versionedReferences} versioned CSS/JS references; ${cssBytesSaved} CSS bytes removed from delivery.`,
 );
+
+// Public commit identity contains no configuration or secrets.
+const releaseSha = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim();
+fs.writeFileSync(path.join(OUTPUT_DIR, 'release.json'), JSON.stringify({
+  sha: /^[a-f0-9]{40}$/i.test(releaseSha) ? releaseSha : null,
+}) + '\n');

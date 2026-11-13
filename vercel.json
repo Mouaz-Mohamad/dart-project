@@ -8,6 +8,19 @@
   },
   "headers": [
     {
+      "source": "/release.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
       "source": "/(CSS|Js|Photos|Icons)/(.*)",
       "headers": [
         {

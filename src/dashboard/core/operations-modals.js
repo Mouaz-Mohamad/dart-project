@@ -381,7 +381,7 @@ function dartSetupDamageModal() {
         d.id,
         "warning",
       );
-      dartSaveAll();
+      dartSaveAll(["damage", "items", "notifications", "audit"]);
       dartRefreshAll();
     }
     closeModal(modal);

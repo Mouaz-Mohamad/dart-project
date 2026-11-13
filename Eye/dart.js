@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:39999587a8a577c85391b75d71775dabf7503e14c8ad230a514b822a1ade0ed5 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:72d7726fa0f95e754dce27974a80650b9c166f7424b3a019adc311ecf4bd1be3 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -342,7 +342,7 @@ function setupCardModal() {
         : "no";
     });
     dartSyncUserCardFlags();
-    dartSaveAll();
+    dartSaveAll(["card", "customers", "audit"]);
     dartRefreshAll();
     closeModal(modal);
     form.reset();
@@ -1029,19 +1029,27 @@ function dartOrderNet(order) {
   return Math.max(0, subtotal - (subtotal * pct) / 100);
 }
 
-function dartSaveAll() {
-  saveDataToStorage("dart_models", modelsData);
-  saveDataToStorage("dart_items", itemsData);
-  saveDataToStorage("dart_customers", customersData);
-  saveDataToStorage("dart_orders", ordersData);
-  saveDataToStorage("dart_returns", returnsData);
-  // Feedback saves are explicit at their own editor/actions, never part of an unrelated Save All.
-  saveDataToStorage("dart_cards", cardsData);
-  saveDataToStorage("dart_representatives", representativeData);
-  saveDataToStorage("dart_damage", damageData);
-  saveDataToStorage("dart_notifications", notificationData);
-  saveDataToStorage("dart_audit", auditData);
-  // Business schema state is server-authoritative.
+// Every caller names its affected resources. Unrelated projections are never saved.
+function dartSaveAll(sectionKeys) {
+  const resources = {
+    models: ["dart_models", () => modelsData],
+    items: ["dart_items", () => itemsData],
+    customers: ["dart_customers", () => customersData],
+    orders: ["dart_orders", () => ordersData],
+    returns: ["dart_returns", () => returnsData],
+    card: ["dart_cards", () => cardsData],
+    representative: ["dart_representatives", () => representativeData],
+    damage: ["dart_damage", () => damageData],
+    notifications: ["dart_notifications", () => notificationData],
+    audit: ["dart_audit", () => auditData],
+  };
+  if (!Array.isArray(sectionKeys) || !sectionKeys.length || sectionKeys.some(key => !resources[key])) {
+    throw new Error("Dashboard saves require explicit affected sections");
+  }
+  for (const key of new Set(sectionKeys)) {
+    const [storageKey, read] = resources[key];
+    saveDataToStorage(storageKey, read());
+  }
 }
 
 async function dartSaveFeedback(record) {
@@ -1448,7 +1456,7 @@ async function dartCommitHardDelete(mode) {
     target || {},
     {},
   );
-  dartSaveAll();
+  dartSaveAll(mode === "cascade" ? preview.counts.filter(row => row.key !== "review").map(row => row.key).concat("audit") : [sectionKey, "audit"]);
 
   if (serverMode) {
     try {
@@ -1676,7 +1684,7 @@ function dartPersistOrderWorkflow() {
     saveDataToStorage("dart_notifications", notificationData);
     return;
   }
-  dartSaveAll();
+  dartSaveAll(["orders", "items", "card", "notifications", "audit"]);
 }
 
 async function dartApplyTransition(order, target, meta = {}) {
@@ -2003,7 +2011,7 @@ async function dartApproveReturn(record, replacementItemCode = "") {
   record.inspectionStatus = record.inspectionStatus || "Pending";
   dartAudit("RETURN_ACCEPTED", "returns", record.id, { status: old }, { status: record.status, replacementItemCode: record.replacementItemCode || "" });
   dartNotify("return_accepted", `${record.returnId}: Approved`, "Request approved and waiting for a pickup representative.", "returns", record.id);
-  dartSaveAll();
+  dartSaveAll(["returns", "items", "notifications", "audit"]);
   dartRefreshAll();
   return { ok: true };
 }
@@ -2034,7 +2042,7 @@ async function dartRejectReturn(record, reason) {
   record.updatedAt = record.rejectedAt;
   dartAudit("RETURN_REJECTED", "returns", record.id, { status: old }, { status: record.status, reason: record.rejectionReason });
   dartNotify("return_rejected", `${record.returnId}: Rejected`, record.rejectionReason, "returns", record.id, "warning");
-  dartSaveAll();
+  dartSaveAll(["returns", "notifications", "audit"]);
   dartRefreshAll();
   return { ok: true };
 }
@@ -2070,7 +2078,7 @@ async function dartAssignReturnRepresentative(record, representativeId, pickupGr
   record.updatedAt = record.assignedAt;
   dartAudit("RETURN_REP_ASSIGNED", "returns", record.id, { status: old }, { status: record.status, representativeId: representative.id });
   dartNotify("return_representative_assigned", `${record.returnId}: Representative assigned`, representative.name, "returns", record.id);
-  dartSaveAll();
+  dartSaveAll(["returns", "notifications", "audit"]);
   dartRefreshAll();
   return { ok: true };
 }
@@ -2161,7 +2169,7 @@ async function dartInspectReturn(record, condition) {
   }
   dartAudit("RETURN_INSPECTION", "returns", record.id, { inspectionStatus: previousInspection }, { inspectionStatus: condition });
   dartNotify(condition === "Good" ? "return_good" : "item_damaged", `${record.itemCode}: ${condition}`, condition === "Good" ? "Item returned to stock at the model's current selling price." : "Item moved to Damage.", "returns", record.id, condition === "Good" ? "info" : "warning");
-  dartSaveAll();
+  dartSaveAll(["returns", "items", "card", "damage", "notifications", "audit"]);
   dartRefreshAll();
 }
 
@@ -2216,7 +2224,7 @@ async function dartRollbackReturn(record) {
     record.id,
     "warning",
   );
-  dartSaveAll();
+  dartSaveAll(["returns", "orders", "items", "card", "damage", "notifications", "audit"]);
   dartRefreshAll();
 }
 
@@ -2310,7 +2318,7 @@ async function dartSetDamageStatus(d, status) {
     d.id,
     status === "Destroyed" ? "warning" : "info",
   );
-  dartSaveAll();
+  dartSaveAll(["damage", "items", "notifications", "audit"]);
   dartRefreshAll();
 }
 
@@ -2593,7 +2601,7 @@ async function dartBulkArchive(key, records) {
   });
 
   if (!serverMode) {
-    dartSaveAll();
+    dartSaveAll([key, "audit"]);
     return { archived: records.length, failed };
   }
 
@@ -3389,7 +3397,7 @@ function dartSetupDamageModal() {
         d.id,
         "warning",
       );
-      dartSaveAll();
+      dartSaveAll(["damage", "items", "notifications", "audit"]);
       dartRefreshAll();
     }
     closeModal(modal);
@@ -5129,7 +5137,7 @@ function setupCustomerModal() {
           await window.DartDomainState.hydrateDomain("customers", true);
         }
       } else {
-        dartSaveAll();
+        dartSaveAll(["customers", "audit"]);
       }
     } else {
       const submit = form.querySelector('[type="submit"]');
@@ -5297,7 +5305,7 @@ function setupRepresentativeModal() {
           await window.DartDomainState.hydrateDomain("representatives", true);
         }
       } else {
-        dartSaveAll();
+        dartSaveAll(["representative", "audit"]);
       }
     } else {
       const x = {
@@ -5314,7 +5322,7 @@ function setupRepresentativeModal() {
       if (window.DartDomainState?.write) {
         window.DartDomainState.write("dart_representatives", representativeData);
       } else {
-        dartSaveAll();
+        dartSaveAll(["representative", "audit"]);
       }
     }
 
@@ -5947,7 +5955,7 @@ function setupOrderModal() {
         order.id,
       );
     }
-    dartSaveAll();
+    dartSaveAll(["orders", "items", "customers", "notifications", "audit"]);
     dartRefreshAll();
     closeModal(modal);
     form.reset();
@@ -6479,7 +6487,7 @@ function setupReturnModal() {
           : "Partially Refunded";
     }
 
-    dartSaveAll();
+    dartSaveAll(["returns", "orders", "items", "damage", "audit"]);
     dartRefreshAll();
     closeModal(modal);
   });

@@ -574,7 +574,7 @@
         modelsData.push(m);
         dartAudit("CREATE", "models", m.id, {}, payload);
       }
-      dartSaveAll();
+      dartSaveAll(["models", "audit"]);
       dartRefreshAll();
       refreshFilters();
       closeModal($("model-modal"));

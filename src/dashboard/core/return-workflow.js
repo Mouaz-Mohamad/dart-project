@@ -97,7 +97,7 @@ async function dartApproveReturn(record, replacementItemCode = "") {
   record.inspectionStatus = record.inspectionStatus || "Pending";
   dartAudit("RETURN_ACCEPTED", "returns", record.id, { status: old }, { status: record.status, replacementItemCode: record.replacementItemCode || "" });
   dartNotify("return_accepted", `${record.returnId}: Approved`, "Request approved and waiting for a pickup representative.", "returns", record.id);
-  dartSaveAll();
+  dartSaveAll(["returns", "items", "notifications", "audit"]);
   dartRefreshAll();
   return { ok: true };
 }
@@ -128,7 +128,7 @@ async function dartRejectReturn(record, reason) {
   record.updatedAt = record.rejectedAt;
   dartAudit("RETURN_REJECTED", "returns", record.id, { status: old }, { status: record.status, reason: record.rejectionReason });
   dartNotify("return_rejected", `${record.returnId}: Rejected`, record.rejectionReason, "returns", record.id, "warning");
-  dartSaveAll();
+  dartSaveAll(["returns", "notifications", "audit"]);
   dartRefreshAll();
   return { ok: true };
 }
@@ -164,7 +164,7 @@ async function dartAssignReturnRepresentative(record, representativeId, pickupGr
   record.updatedAt = record.assignedAt;
   dartAudit("RETURN_REP_ASSIGNED", "returns", record.id, { status: old }, { status: record.status, representativeId: representative.id });
   dartNotify("return_representative_assigned", `${record.returnId}: Representative assigned`, representative.name, "returns", record.id);
-  dartSaveAll();
+  dartSaveAll(["returns", "notifications", "audit"]);
   dartRefreshAll();
   return { ok: true };
 }
@@ -255,7 +255,7 @@ async function dartInspectReturn(record, condition) {
   }
   dartAudit("RETURN_INSPECTION", "returns", record.id, { inspectionStatus: previousInspection }, { inspectionStatus: condition });
   dartNotify(condition === "Good" ? "return_good" : "item_damaged", `${record.itemCode}: ${condition}`, condition === "Good" ? "Item returned to stock at the model's current selling price." : "Item moved to Damage.", "returns", record.id, condition === "Good" ? "info" : "warning");
-  dartSaveAll();
+  dartSaveAll(["returns", "items", "card", "damage", "notifications", "audit"]);
   dartRefreshAll();
 }
 
@@ -310,7 +310,7 @@ async function dartRollbackReturn(record) {
     record.id,
     "warning",
   );
-  dartSaveAll();
+  dartSaveAll(["returns", "orders", "items", "card", "damage", "notifications", "audit"]);
   dartRefreshAll();
 }
 
@@ -404,7 +404,7 @@ async function dartSetDamageStatus(d, status) {
     d.id,
     status === "Destroyed" ? "warning" : "info",
   );
-  dartSaveAll();
+  dartSaveAll(["damage", "items", "notifications", "audit"]);
   dartRefreshAll();
 }
 

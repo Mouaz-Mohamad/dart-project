@@ -277,7 +277,7 @@ async function dartBulkArchive(key, records) {
   });
 
   if (!serverMode) {
-    dartSaveAll();
+    dartSaveAll([key, "audit"]);
     return { archived: records.length, failed };
   }
 

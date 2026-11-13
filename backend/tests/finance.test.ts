@@ -276,7 +276,7 @@ function settlementPool(options: { outstandingMinor?: number } = {}) {
     query: vi.fn(async (sql: string) => {
       queries.push(sql);
       if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
-      if (sql.includes("pg_advisory_xact_lock")) return { rows: [{}] };
+      if (sql.includes("pg_advisory_xact_lock") || sql.includes("set_config")) return { rows: [{}] };
       if (sql.includes("FROM orders") && sql.includes("cod_settled_minor")) {
         return { rows: [{
           id: "11111111-1111-4111-8111-111111111111",

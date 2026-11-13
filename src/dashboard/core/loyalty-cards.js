@@ -192,7 +192,7 @@ function setupCardModal() {
         : "no";
     });
     dartSyncUserCardFlags();
-    dartSaveAll();
+    dartSaveAll(["card", "customers", "audit"]);
     dartRefreshAll();
     closeModal(modal);
     form.reset();

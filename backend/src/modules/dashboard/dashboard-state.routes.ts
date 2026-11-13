@@ -13,6 +13,7 @@ import {
   requirePermission,
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
+import { validateDashboardDomainData } from "./dashboard-domain.validation.js";
 import { validateFinanceDomainData } from "./dashboard-finance.validation.js";
 import {
   DASHBOARD_DOMAINS,
@@ -277,6 +278,9 @@ export function createDashboardStateRouter(
         "write",
         request.auth!.permissions,
       );
+      if (domain === "finance_audit") {
+        throw new AppError(405, "FINANCE_AUDIT_READ_ONLY", "Financial history is recorded by the server");
+      }
       if (domain === "finance_settlements") {
         throw new AppError(
           405,
@@ -285,7 +289,7 @@ export function createDashboardStateRouter(
         );
       }
       const body = writeSchema.parse(request.body);
-      const data = validateFinanceDomainData(domain, body.data);
+      const data = validateFinanceDomainData(domain, validateDashboardDomainData(domain, body.data));
       response.status(200).json(
         await state.write(domain, body.expectedVersion, data, request.auth!.userId, String(request.id)),
       );

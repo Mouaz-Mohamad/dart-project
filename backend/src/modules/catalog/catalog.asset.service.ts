@@ -30,15 +30,19 @@ function detectedImageType(content: Buffer): "image/jpeg" | "image/png" | "image
 export class CatalogAssetService {
   constructor(private readonly pool: Pool) {}
 
-  async get(assetId: string): Promise<{ content: Buffer; contentType: string; originalName: string; sha256: string } | null> {
+  async get(assetId: string, requestedVersion: string | null = null, ifNoneMatch: string | null = null): Promise<{ content: Buffer | null; contentType: string; originalName: string; sha256: string } | null> {
     const result = await this.pool.query<{
-      content: Buffer;
+      content: Buffer | null;
       content_type: string;
       original_name: string;
       sha256: string;
     }>(
-      "SELECT content, content_type, original_name, sha256 FROM catalog_assets WHERE asset_id = $1",
-      [assetId],
+      `SELECT CASE
+         WHEN $2::text IS NOT NULL AND sha256<>$2 THEN NULL
+         WHEN $3::text = '"' || sha256 || '"' THEN NULL
+         ELSE content END AS content, content_type, original_name, sha256
+         FROM catalog_assets WHERE asset_id = $1`,
+      [assetId, requestedVersion, ifNoneMatch],
     );
     const row = result.rows[0];
     return row

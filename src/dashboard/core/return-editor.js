@@ -216,7 +216,7 @@ function setupReturnModal() {
           : "Partially Refunded";
     }
 
-    dartSaveAll();
+    dartSaveAll(["returns", "orders", "items", "damage", "audit"]);
     dartRefreshAll();
     closeModal(modal);
   });

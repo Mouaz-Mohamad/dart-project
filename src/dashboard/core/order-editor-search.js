@@ -278,7 +278,7 @@ function setupOrderModal() {
         order.id,
       );
     }
-    dartSaveAll();
+    dartSaveAll(["orders", "items", "customers", "notifications", "audit"]);
     dartRefreshAll();
     closeModal(modal);
     form.reset();

@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/src/modules/dashboard/dashboard-finance.validation.ts
 // الغرض: تحقق خادمي صارم لسجلات Finance قبل حفظها في PostgreSQL.
 import { z } from "zod";
+import { moneyPositive, moneyNonNegative } from "../../security/money.js";
 import type { DashboardDomain } from "./dashboard-state.service.js";
 
 const OPERATING_EXPENSE_CATEGORIES = [
@@ -35,8 +36,6 @@ const optionalTimestamp = z.union([
   z.literal(""),
   z.null(),
 ]).optional();
-const moneyPositive = z.number().finite().positive();
-const moneyNonNegative = z.number().finite().nonnegative();
 
 const recordMetadata = {
   id: z.string().trim().min(1).max(200).optional(),
@@ -46,6 +45,7 @@ const recordMetadata = {
   isDeleted: z.boolean().optional(),
   isArchived: z.boolean().optional(),
 };
+
 
 const expenseSchema = z.object({
   ...recordMetadata,

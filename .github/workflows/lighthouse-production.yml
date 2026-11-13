@@ -20,7 +20,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
     steps:
       - name: Checkout audited commit
         uses: actions/checkout@v4
@@ -47,6 +47,11 @@ jobs:
           echo "path=$CHROME_PATH" >> "$GITHUB_OUTPUT"
           "$CHROME_PATH" --version || true
 
+      - name: Wait for the exact production commit
+        env:
+          DART_EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/wait-production-release.mjs
+
       - name: Run Mobile Lighthouse
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.path }}
@@ -69,6 +74,11 @@ jobs:
             --only-categories=performance,accessibility,best-practices,seo \
             --output=json \
             --output-path=./lighthouse-desktop.json
+
+      - name: Verify production did not change during measurement
+        env:
+          DART_EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/wait-production-release.mjs --once
 
       - name: Print Dart Lighthouse summary
         run: node scripts/lighthouse-summary.mjs lighthouse-mobile.json lighthouse-desktop.json

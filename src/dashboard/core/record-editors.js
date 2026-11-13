@@ -116,7 +116,7 @@ function setupCustomerModal() {
           await window.DartDomainState.hydrateDomain("customers", true);
         }
       } else {
-        dartSaveAll();
+        dartSaveAll(["customers", "audit"]);
       }
     } else {
       const submit = form.querySelector('[type="submit"]');
@@ -284,7 +284,7 @@ function setupRepresentativeModal() {
           await window.DartDomainState.hydrateDomain("representatives", true);
         }
       } else {
-        dartSaveAll();
+        dartSaveAll(["representative", "audit"]);
       }
     } else {
       const x = {
@@ -301,7 +301,7 @@ function setupRepresentativeModal() {
       if (window.DartDomainState?.write) {
         window.DartDomainState.write("dart_representatives", representativeData);
       } else {
-        dartSaveAll();
+        dartSaveAll(["representative", "audit"]);
       }
     }
 

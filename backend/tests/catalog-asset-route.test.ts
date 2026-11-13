@@ -64,11 +64,12 @@ describe("catalog asset HTTP caching", () => {
   });
 
   it("returns 304 when If-None-Match matches the immutable asset", async () => {
-    const { app } = makeApp(fixture);
+    const { app, assets } = makeApp(fixture);
     const response = await request(app)
       .get(`/api/v1/catalog/assets/${assetId}?v=${sha256}`)
       .set("If-None-Match", `"${sha256}"`);
 
+    expect(assets.get).toHaveBeenCalledWith(assetId,sha256,`"${sha256}"`);
     expect(response.status).toBe(304);
     expect(response.headers.etag).toBe(`"${sha256}"`);
     expect(response.headers["cache-control"]).toBe(CATALOG_ASSET_IMMUTABLE_CACHE);

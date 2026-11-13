@@ -122,19 +122,27 @@ function dartOrderNet(order) {
   return Math.max(0, subtotal - (subtotal * pct) / 100);
 }
 
-function dartSaveAll() {
-  saveDataToStorage("dart_models", modelsData);
-  saveDataToStorage("dart_items", itemsData);
-  saveDataToStorage("dart_customers", customersData);
-  saveDataToStorage("dart_orders", ordersData);
-  saveDataToStorage("dart_returns", returnsData);
-  // Feedback saves are explicit at their own editor/actions, never part of an unrelated Save All.
-  saveDataToStorage("dart_cards", cardsData);
-  saveDataToStorage("dart_representatives", representativeData);
-  saveDataToStorage("dart_damage", damageData);
-  saveDataToStorage("dart_notifications", notificationData);
-  saveDataToStorage("dart_audit", auditData);
-  // Business schema state is server-authoritative.
+// Every caller names its affected resources. Unrelated projections are never saved.
+function dartSaveAll(sectionKeys) {
+  const resources = {
+    models: ["dart_models", () => modelsData],
+    items: ["dart_items", () => itemsData],
+    customers: ["dart_customers", () => customersData],
+    orders: ["dart_orders", () => ordersData],
+    returns: ["dart_returns", () => returnsData],
+    card: ["dart_cards", () => cardsData],
+    representative: ["dart_representatives", () => representativeData],
+    damage: ["dart_damage", () => damageData],
+    notifications: ["dart_notifications", () => notificationData],
+    audit: ["dart_audit", () => auditData],
+  };
+  if (!Array.isArray(sectionKeys) || !sectionKeys.length || sectionKeys.some(key => !resources[key])) {
+    throw new Error("Dashboard saves require explicit affected sections");
+  }
+  for (const key of new Set(sectionKeys)) {
+    const [storageKey, read] = resources[key];
+    saveDataToStorage(storageKey, read());
+  }
 }
 
 async function dartSaveFeedback(record) {

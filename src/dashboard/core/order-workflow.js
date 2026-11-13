@@ -125,7 +125,7 @@ function dartPersistOrderWorkflow() {
     saveDataToStorage("dart_notifications", notificationData);
     return;
   }
-  dartSaveAll();
+  dartSaveAll(["orders", "items", "card", "notifications", "audit"]);
 }
 
 async function dartApplyTransition(order, target, meta = {}) {

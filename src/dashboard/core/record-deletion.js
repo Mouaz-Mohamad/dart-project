@@ -311,7 +311,7 @@ async function dartCommitHardDelete(mode) {
     target || {},
     {},
   );
-  dartSaveAll();
+  dartSaveAll(mode === "cascade" ? preview.counts.filter(row => row.key !== "review").map(row => row.key).concat("audit") : [sectionKey, "audit"]);
 
   if (serverMode) {
     try {

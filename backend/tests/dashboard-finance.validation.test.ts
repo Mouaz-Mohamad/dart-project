@@ -23,6 +23,16 @@ describe("dashboard finance server validation", () => {
     expect(row.injectedAdminFlag).toBeUndefined();
   });
 
+  it("rejects sub-piastre money and unsafe amounts but accepts exact hundredths", () => {
+    const base = {id:"MONEY", date:"2026-11-14",category:"Other",status:"Unpaid"};
+    for (const amount of [0.001,1.001,Number.MAX_SAFE_INTEGER]) {
+      expect(() => validateFinanceDomainData("finance_expenses",[{...base,amount}])).toThrow();
+    }
+    for (const amount of [0.01,0.29,100.99]) {
+      expect(validateFinanceDomainData("finance_expenses",[{...base,amount}])).toMatchObject([{amount}]);
+    }
+  });
+
   it("rejects a paid expense without paidAt", () => {
     expect(() => validateFinanceDomainData("finance_expenses", [{
       id: "EXP-2",

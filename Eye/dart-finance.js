@@ -407,6 +407,12 @@
     },
     // BACKEND: POST every event to an append-only admin audit endpoint.
     audit(action, resource, id, before, after, note = "") {
+      if (root.DartDomainState?.hydrateDomain) {
+        // The committed financial mutation records its own immutable event.
+        void root.DartDomainState.hydrateDomain("finance_audit", true).catch(error =>
+          console.warn("Financial history refresh failed", error));
+        return;
+      }
       const rows = readJSON(STORAGE_KEYS.audit, []);
       const event = {
         id: uid("FAUD"),
@@ -2345,7 +2351,7 @@
       try {
         FinanceRepository.audit(existing ? "UPDATE" : "CREATE", resource, normalized.id, existing, normalized);
         if (typeof dartNotify === "function") dartNotify("payment", `${resource.slice(0, -1)} ${existing ? "updated" : "created"}`, normalized.name || normalized.number || normalized.description || normalized.id, `finance:${resource}`, normalized.id);
-        if (typeof dartSaveAll === "function") dartSaveAll();
+        if (typeof dartSaveAll === "function") dartSaveAll(["notifications", "audit"]);
       } catch {
         // The server has already saved the record and its domain audit event.
         console.warn("Finance record saved; supplementary dashboard updates could not complete.");
@@ -2454,7 +2460,7 @@
       await root.DartDomainState.hydrateDomain("customers", true).catch(() => {});
       await root.DartDomainState.hydrateAudit?.().catch(() => {});
     } else {
-      if (typeof dartSaveAll === "function") dartSaveAll();
+      if (typeof dartSaveAll === "function") dartSaveAll(["customers", "audit"]);
     }
 
     if (typeof dartRefreshAll === "function") dartRefreshAll();
