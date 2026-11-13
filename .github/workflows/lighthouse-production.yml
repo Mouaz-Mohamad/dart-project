@@ -47,9 +47,37 @@ jobs:
           echo "path=$CHROME_PATH" >> "$GITHUB_OUTPUT"
           "$CHROME_PATH" --version || true
 
+      - name: Resolve the actual storefront revision
+        id: storefront-release
+        env:
+          REQUESTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          function storefrontChanged(files) {
+            return !Array.isArray(files) || files.length >= 300 || files.some(file =>
+              typeof file.filename !== 'string' || [file.filename,file.previous_filename].filter(Boolean).some(name =>
+                !/^(?:backend\/|tests\/|docs\/|\.github\/|AGENTS\.md$|scripts\/vercel-ignore-frontend\.sh$)/.test(name)));
+          }
+          const requested = process.env.REQUESTED_RELEASE_SHA;
+          let measured = requested;
+          try {
+            const live = await fetch('https://www.dartofficial.com/release.json', {cache:'no-store',signal:AbortSignal.timeout(15000)});
+            const served = live.ok ? (await live.json()).sha : null;
+            if (/^[a-f0-9]{40}$/.test(served || '') && served !== requested) {
+              const compared = await fetch(`https://api.github.com/repos/Mouaz-Mohamad/dart-project/compare/${served}...${requested}`, {
+                headers:{Accept:'application/vnd.github+json','User-Agent':'Dart-Lighthouse-Revision'},signal:AbortSignal.timeout(15000)});
+              const comparison = compared.ok ? await compared.json() : null;
+              if (comparison && ['ahead','identical'].includes(comparison.status) && !storefrontChanged(comparison.files)) measured = served;
+            }
+          } catch { /* Unknown equivalence requires an exact new deployment. */ }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `sha=${measured}\n`);
+          fs.writeFileSync('lighthouse-release.json',JSON.stringify({requestedCommit:requested,measuredStorefrontCommit:measured}));
+          NODE
+
       - name: Wait for the exact production commit
         env:
-          DART_EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          DART_EXPECTED_RELEASE_SHA: ${{ steps.storefront-release.outputs.sha }}
         run: node scripts/wait-production-release.mjs
 
       - name: Run Mobile Lighthouse
@@ -77,7 +105,7 @@ jobs:
 
       - name: Verify production did not change during measurement
         env:
-          DART_EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          DART_EXPECTED_RELEASE_SHA: ${{ steps.storefront-release.outputs.sha }}
         run: node scripts/wait-production-release.mjs --once
 
       - name: Print Dart Lighthouse summary
@@ -94,4 +122,5 @@ jobs:
           path: |
             lighthouse-mobile.json
             lighthouse-desktop.json
+            lighthouse-release.json
           retention-days: 7
