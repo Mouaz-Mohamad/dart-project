@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 25
     services:
       recovery:
-        image: postgres:18.6
+        image: postgres:18.7
         env:
           POSTGRES_USER: dart_recovery
           POSTGRES_PASSWORD: isolated-ci-recovery-only
@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker pull postgres:18.6
+          docker pull postgres:18.7
           mkdir -p "$RUNNER_TEMP/dart-pg-bin"
           for tool in pg_dump pg_restore; do
             cat > "$RUNNER_TEMP/dart-pg-bin/$tool" <<'SH'
@@ -69,7 +69,7 @@ jobs:
           docker run --rm --network host -i --user "$(id -u):$(id -g)" \
             -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$PWD" \
             -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGCONNECT_TIMEOUT \
-            postgres:18.6 "$(basename "$0")" "$@"
+            postgres:18.7 "$(basename "$0")" "$@"
           SH
             chmod 700 "$RUNNER_TEMP/dart-pg-bin/$tool"
           done

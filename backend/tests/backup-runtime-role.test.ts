@@ -20,6 +20,8 @@ describe("backup RLS role compatibility",()=>{
   });
   it("creates the policy role idempotently without login or administrative privileges",async()=>{
     const workflow=await readFile(new URL("../../.github/workflows/database-backup.yml",import.meta.url),"utf8");
+    expect(workflow.match(/postgres:18\.7/g)).toHaveLength(3);
+    expect(workflow).not.toContain("postgres:18.6");
     const sql=/await recovery\.query\(`([\s\S]+?)`\)/.exec(workflow)?.[1];
     expect(sql).toBeTruthy();
     expect(workflow.indexOf("assertRecoveryDatabaseSafety(process.env")).toBeLessThan(workflow.indexOf("await recovery.connect()"));
