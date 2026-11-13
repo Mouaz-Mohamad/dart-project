@@ -98,6 +98,34 @@ export function renderOutboxEmail(
     throw new Error(`Unsupported email event type: ${eventType}`);
   }
 
+  // Minimal branded OTP email shared by Staff and Customer authentication.
+  // Non-OTP business emails keep the existing bilingual layout unchanged.
+  if (otp && /^\\d{6}$/.test(otp) && [
+    "STAFF_EMAIL_ACCESS_CODE_REQUESTED",
+    "STAFF_INVITED",
+    "STAFF_ONBOARDING_CODE_REQUESTED",
+    "EMAIL_VERIFICATION_REQUESTED",
+    "EMAIL_CHANGE_VERIFICATION_REQUESTED",
+    "PASSWORD_RESET_CODE_REQUESTED",
+    "CUSTOMER_LOGIN_OTP_REQUESTED",
+  ].includes(eventType)) {
+    const safeOtp = escapeHtml(otp);
+    const html = `<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#fff;font-family:Arial,Tahoma,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-collapse:collapse"><tr><td align="center" style="padding:42px 20px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:420px;border-collapse:collapse">
+      <tr><td align="center" style="padding-bottom:36px"><img src="https://www.dartofficial.com/Photos/Logos/01_Dart_original_transparent.png" alt="Dart" width="220" style="display:block;width:220px;max-width:90%;height:auto;border:0"></td></tr>
+      <tr><td align="center" style="font-size:20px;color:#1c1c1c;padding-bottom:18px">OTP الخاص بك</td></tr>
+      <tr><td align="center" dir="ltr" style="font-size:46px;font-weight:700;letter-spacing:8px;color:#AB012B;padding-bottom:34px;white-space:nowrap">${safeOtp}</td></tr>
+      <tr><td align="center" dir="ltr" style="font-size:17px;color:#1c1c1c">Dart | For you</td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+    return { subject: "Dart | For you — OTP", text: `OTP الخاص بك\n${otp}\nDart | For you`, html };
+  }
+
   const html = `<!doctype html>
 <html lang="en">
 <body style="margin:0;background:#f7f4ef;font-family:Arial,sans-serif;color:#1d1d1d">
