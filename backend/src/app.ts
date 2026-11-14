@@ -17,6 +17,8 @@ import { createLogger } from "./config/logger.js";
 import { createDatabasePool, pingDatabase } from "./database/pool.js";
 import { applySetHomepageMigration, SET_HOMEPAGE_MIGRATION } from "./database/set-homepage-migration.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
+import { CustomerEmailAuthService } from "./modules/identity/customer-email-auth.service.js";
+import { CustomerPasskeyService } from "./modules/identity/customer-passkeys.service.js";
 import {
   loadSocialAuthConfig,
   SocialAuthConfigError,
@@ -84,6 +86,8 @@ export function createRuntimeApplication(
     config.monitoringAlertCooldownMs ?? 300_000,
   );
   const identityService = new IdentityService(database, config);
+  const customerEmailAuthService = new CustomerEmailAuthService(database, config, identityService);
+  const customerPasskeyService = new CustomerPasskeyService(database, identityService, config);
   const socialAuthService = new SocialAuthService(
     database,
     identityService,
@@ -132,6 +136,8 @@ export function createRuntimeApplication(
     startedAt: new Date(),
     version: "0.6.2",
     identityService,
+    customerEmailAuthService,
+    customerPasskeyService,
     socialAuthService,
     catalogService,
     catalogAssetService,

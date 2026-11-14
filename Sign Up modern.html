@@ -33,12 +33,13 @@
 
                 <button type="submit" class="btn enter-btn">Sign in <span aria-hidden="true">→</span></button>
                 <button type="button" class="dart-google-login-btn" data-social-login="google" aria-label="Continue with Google"><span class="dart-google-g" aria-hidden="true">G</span> Continue with Google</button>
+                <button type="button" id="dartPasskeyLogin" class="dart-passkey-btn" hidden>الدخول بالبصمة أو الوجه</button>
             </form>
         </div>
 
         <div class="form-box register">
             <form id="registerForm" action="#" novalidate>
-                <div class="dart-auth-heading"><span class="dart-auth-kicker">DART / FOR YOU</span><h1>Join Dart.</h1><p>Your name, phone and birthday. That’s all.</p></div>
+                <div class="dart-auth-heading"><span class="dart-auth-kicker">DART / FOR YOU</span><h1>Join Dart.</h1><p>Your name, phone, email and birthday.</p></div>
                 <div class="input-box">
                     <label class="dart-auth-field-label" for="dartRegisterName">Full name</label>
                     <input id="dartRegisterName" type="text" name="name" placeholder="Full name" autocomplete="name" minlength="3" required>
@@ -52,6 +53,12 @@
                 </div>
 
 
+
+                <div class="input-box">
+                    <label class="dart-auth-field-label" for="dartRegisterEmail">Email address</label>
+                    <input id="dartRegisterEmail" type="email" name="email" placeholder="Email address" autocomplete="email" maxlength="254" required>
+                    <svg class="dart-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM3 5l9 7 9-7"/></svg>
+                </div>
 
                 <div class="dart-birthday-field">
                     <span class="dart-auth-field-label" id="dartBirthdayLabel">Date of birth</span>

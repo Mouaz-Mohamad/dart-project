@@ -231,6 +231,45 @@ export class IdentityService {
     }
   }
 
+  // Self-registration never links a new verified email to an existing phone/account.
+  // Existing customers need identity proof via their own verified channel or Dart support.
+  public async registerVerifiedEmailCustomer(
+    input: RegisterCustomerInput & { email: string },
+    metadata: RequestMetadata,
+  ): Promise<IssuedSession> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('dart_unified_customer_identity'))");
+      const emailNormalized = normalizeEmail(input.email);
+      const phone = normalizeEgyptianPhone(input.phone1);
+      const existing = await client.query<{ exists: boolean }>(
+        "SELECT EXISTS(SELECT 1 FROM users u WHERE u.account_type='customer' AND u.deleted_at IS NULL AND (u.email_normalized=$1 OR EXISTS(SELECT 1 FROM account_phones p WHERE p.user_id=u.id AND p.account_type='customer' AND p.phone_normalized=$2))) AS exists",
+        [emailNormalized,phone],
+      );
+      if (existing.rows[0]?.exists) {
+        throw new AppError(409,"CUSTOMER_ALREADY_EXISTS","This email or phone belongs to an existing customer. Contact Dart support to recover it.");
+      }
+      const userId = await upsertCustomerRecord(client,input,"website");
+      await client.query(
+        "UPDATE users SET email_verified_at=now(),status='active' WHERE id=$1 AND account_type='customer'",
+        [userId],
+      );
+      const session = await this.issueSession(client,userId,true,metadata);
+      await client.query(
+        "INSERT INTO customer_verified_sessions(session_id,customer_user_id,method) VALUES($1,$2,'email_otp')",
+        [session.account.sessionId,userId],
+      );
+      await this.audit(client,"customer",userId,"CUSTOMER_REGISTERED","users",userId,metadata,
+        {method:"verified_email_otp"});
+      await client.query("COMMIT");
+      return session;
+    } catch(error) {
+      await client.query("ROLLBACK").catch(()=>undefined);
+      mapDatabaseConflict(error);
+    } finally { client.release(); }
+  }
+
   public async verifyCustomerEmail(
     challengeId: string,
     code: string,
@@ -1608,6 +1647,7 @@ export class IdentityService {
   public async loginLinkedSocialCustomer(
     userId: string,
     metadata: RequestMetadata,
+    method: "linked_social_identity" | "email_otp" | "passkey" = "linked_social_identity",
   ): Promise<IssuedSession> {
     const client = await this.pool.connect();
     try {
@@ -1627,8 +1667,14 @@ export class IdentityService {
         [userId],
       );
       const session = await this.issueSession(client, userId, true, metadata);
+      if (method === "email_otp") {
+        await client.query(
+          "INSERT INTO customer_verified_sessions(session_id,customer_user_id,method) VALUES($1,$2,'email_otp')",
+          [session.account.sessionId,userId],
+        );
+      }
       await this.audit(client, "customer", userId, "LOGIN_SUCCEEDED", "sessions",
-        session.account.sessionId, metadata, { method: "linked_social_identity" });
+        session.account.sessionId, metadata, { method });
       await client.query("COMMIT");
       return session;
     } catch (error) {
@@ -1639,45 +1685,9 @@ export class IdentityService {
     }
   }
 
-  public async loginCustomer(identifier: string, metadata: RequestMetadata): Promise<IssuedSession> {
-    const normalized = normalizeIdentifier(identifier);
-    let phone: string | null = null;
-    if (!normalized.includes("@")) {
-      try { phone = normalizeEgyptianPhone(identifier); }
-      catch { throw new AppError(401, "INVALID_CREDENTIALS", "Enter a registered email or phone number"); }
-    }
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-      // Lock the user through session creation: suspension/deletion cannot race login.
-      const found = await client.query<{ id: string; status: string }>(
-        `SELECT u.id,u.status FROM users u
-          WHERE u.account_type='customer' AND u.deleted_at IS NULL
-            AND (u.email_normalized=$1 OR ($2::text IS NOT NULL AND EXISTS (
-              SELECT 1 FROM account_phones ap WHERE ap.user_id=u.id
-                AND ap.account_type='customer' AND ap.is_primary AND ap.phone_normalized=$2
-            ))) FOR UPDATE OF u`,
-        [normalized, phone],
-      );
-      const row = found.rows[0];
-      if (!row) throw new AppError(401, "INVALID_CREDENTIALS", "Enter a registered email or phone number");
-      if (!["active", "pending_verification"].includes(row.status)) {
-        throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
-      }
-      await client.query(
-        `UPDATE users SET status='active',must_change_password=false,
-          failed_login_count=0,locked_until=NULL,last_login_at=now(),updated_at=now()
-          WHERE id=$1 AND account_type='customer'`, [row.id],
-      );
-      const session = await this.issueSession(client, row.id, true, metadata);
-      await this.audit(client, "customer", row.id, "LOGIN_SUCCEEDED", "sessions",
-        session.account.sessionId, metadata, { method: "customer_identifier" });
-      await client.query("COMMIT");
-      return session;
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally { client.release(); }
+  // The legacy identifier-only login is never allowed to mint a customer session.
+  public async loginCustomer(_identifier:string,_metadata:RequestMetadata):Promise<IssuedSession> {
+    throw new AppError(403,"EMAIL_OTP_REQUIRED","Sign in using the email verification code or a registered passkey");
   }
 
   public async login(

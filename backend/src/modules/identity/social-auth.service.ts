@@ -661,20 +661,9 @@ export class SocialAuthService {
       }
 
       let existing = await this.existingCustomerForChallenge(current);
-      if (!existing && input.phone1) {
-        let normalizedPhone: string;
-        try { normalizedPhone = normalizeEgyptianPhone(input.phone1); }
-        catch { throw new AppError(422, "INVALID_PHONE", "Enter a valid Egyptian phone number"); }
-        const phoneMatch = await client.query<{ user_id: string; email: string; birthday: string | null }>(
-          `SELECT u.id::text AS user_id,COALESCE(u.email,'') AS email,c.birthday::text
-             FROM users u JOIN customers c ON c.user_id=u.id
-             JOIN account_phones ap ON ap.user_id=u.id AND ap.account_type='customer'
-            WHERE u.account_type='customer' AND u.deleted_at IS NULL AND ap.phone_normalized=$1`,
-          [normalizedPhone],
-        );
-        const match = phoneMatch.rows[0];
-        if (match) existing = { userId: match.user_id, email: match.email, birthday: match.birthday, linked: false };
-      }
+      // A caller knowing only a phone number must never attach their own Google
+      // identity to an existing phone-only Dart customer. Recovery requires proof
+      // of ownership of the account's verified email or manual support.
       let session: IssuedSession;
       let newlyRegistered = false;
       if (existing) {
@@ -703,7 +692,7 @@ export class SocialAuthService {
         if (!input.birthday) {
           throw new AppError(422, "BIRTHDAY_REQUIRED", "Birthday is required");
         }
-        session = await this.identity.registerCustomer(
+        session = await this.identity.registerVerifiedEmailCustomer(
           {
             name,
             email: current.provider_email!,

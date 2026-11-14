@@ -1,4 +1,5 @@
   function bindAuth() {
+    bindCustomerPasskeyLogin();
     document.addEventListener(
       "submit",
       async (event) => {
@@ -37,9 +38,12 @@
           if (submit) submit.disabled = true;
           setStatus(form, "جارٍ إنشاء الحساب…");
           try {
-            await register(Object.fromEntries(new FormData(form)));
-            setStatus(form, "تم إنشاء الحساب بنجاح.");
-            location.assign(requestedAuthDestination());
+            if(form.dataset.otpPending === "1") {
+              await submitCustomerOtpStep(form,"register");
+              return;
+            }
+            const result=await register(Object.fromEntries(new FormData(form)));
+            showCustomerOtpStep(form,"register",result);
           } catch (error) {
             setStatus(form, error.message, true);
           } finally {
@@ -55,9 +59,12 @@
           if (submit) submit.disabled = true;
           setStatus(form, "جارٍ تسجيل الدخول…");
           try {
-            await login(form.elements.identifier.value);
-            setStatus(form, "تم تسجيل الدخول بنجاح.");
-            location.assign(requestedAuthDestination());
+            if(form.dataset.otpPending === "1") {
+              await submitCustomerOtpStep(form,"login");
+              return;
+            }
+            const result=await login(form.elements.identifier.value);
+            showCustomerOtpStep(form,"login",result);
           } catch (error) {
             setStatus(form, error.message, true);
           } finally {

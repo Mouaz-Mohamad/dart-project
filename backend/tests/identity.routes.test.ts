@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.js";
 import type { AppConfig } from "../src/config/env.js";
 import type { IdentityService } from "../src/modules/identity/identity.service.js";
+import type { CustomerEmailAuthService } from "../src/modules/identity/customer-email-auth.service.js";
+import type { CustomerPasskeyService } from "../src/modules/identity/customer-passkeys.service.js";
 import type { AuthenticatedAccount, IssuedSession } from "../src/modules/identity/identity.types.js";
 import type { OutboxService } from "../src/modules/outbox/outbox.service.js";
 import { hashCsrfToken } from "../src/security/session-token.js";
@@ -115,6 +117,33 @@ function fakeService(auth = account()) {
     logout: vi.fn().mockResolvedValue(undefined),
     decideRepresentative: vi.fn().mockResolvedValue(undefined),
   } as unknown as IdentityService;
+}
+
+function passwordlessApp(settings: AppConfig = config) {
+  const service=fakeService();
+  const email={
+    startLogin:vi.fn().mockResolvedValue({challengeId:"123e4567-e89b-12d3-a456-426614174011",expiresAt:new Date(Date.now()+300000).toISOString(),sent:true,emailDisplay:"customer@example.com"}),
+    startSignup:vi.fn().mockResolvedValue({challengeId:"123e4567-e89b-12d3-a456-426614174012",expiresAt:new Date(Date.now()+300000).toISOString(),sent:true,emailDisplay:"customer@example.com"}),
+    verify:vi.fn().mockResolvedValue(issued()),
+  };
+  const passkeys={
+    authenticationOptions:vi.fn().mockResolvedValue({challengeId:"123e4567-e89b-12d3-a456-426614174013",options:{challenge:"test",rpId:"localhost"}}),
+    registrationOptions:vi.fn().mockResolvedValue({challengeId:"123e4567-e89b-12d3-a456-426614174014",options:{}}),
+    register:vi.fn().mockResolvedValue({registered:true}),
+    authenticate:vi.fn().mockResolvedValue(issued()),
+  };
+  const outbox={
+    configured:vi.fn().mockReturnValue(true),
+    processBatch:vi.fn().mockResolvedValue({configured:true,claimed:0,published:0,failed:0,uncertain:0,terminal:0}),
+  };
+  const application=createApp(settings,{
+    databasePing:async()=>undefined,identityService:service,
+    customerEmailAuthService:email as unknown as CustomerEmailAuthService,
+    customerPasskeyService:passkeys as unknown as CustomerPasskeyService,
+    outboxService:outbox as unknown as OutboxService,
+    logger:pino({level:"silent"}),startedAt:new Date("2026-09-20T00:00:00.000Z"),version:"test",
+  });
+  return {application,email,passkeys,service};
 }
 
 function app(service: IdentityService, outboxService?: OutboxService) {
@@ -285,22 +314,18 @@ describe("identity HTTP boundaries", () => {
     expect(cookies.some((value) => value.startsWith("dart_staff_csrf=") && !value.includes("HttpOnly"))).toBe(true);
   });
 
-  it("creates a customer session from name, phone and birthday only", async () => {
-    const service = fakeService();
-    const response = await request(app(service)).post("/api/v1/auth/register").send({
-      name: "Test Customer",
-      phone1: "01012345678",
-      birthday: "2000-01-01",
+  it("requires email verification before issuing any registration session", async () => {
+    const {application,email}=passwordlessApp();
+    const response=await request(application).post("/api/v1/auth/register").send({
+      name:"Test Customer",phone1:"01012345678",email:"customer@example.com",birthday:"2000-01-01",
     });
-    expect(response.status).toBe(201);
-    expect(response.body.user.accountType).toBe("customer");
-    expect(response.body.challengeId).toBeUndefined();
-    const cookies = response.headers["set-cookie"] as unknown as string[];
-    expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
-    expect(service.registerCustomer).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Test Customer", phone1: "01012345678", birthday: "2000-01-01" }),
-      expect.any(Object),
-    );
+    expect(response.status).toBe(202);
+    expect(response.body.challengeId).toBeDefined();
+    expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(email.startSignup).toHaveBeenCalledTimes(1);
+    expect((await request(application).post("/api/v1/auth/register").send({
+      name:"Test Customer",phone1:"01012345678",birthday:"2000-01-01",
+    })).status).toBe(422);
   });
 
   it("keeps customer password routes retired and representative passwords required", async () => {
@@ -313,14 +338,21 @@ describe("identity HTTP boundaries", () => {
     expect((await request(application).post("/api/v1/auth/verify-email").send({})).status).toBe(404);
   });
 
-  it("sets an HttpOnly session cookie and a separate CSRF cookie after login", async () => {
-    const response = await request(app(fakeService())).post("/api/v1/auth/login").send({
-      identifier: "customer@example.com",
+  it("never issues an account session from a guessed email or phone", async () => {
+    const {application,email}=passwordlessApp();
+    const first=await request(application).post("/api/v1/auth/login").send({identifier:"customer@example.com"});
+    expect(first.status).toBe(202);
+    expect(first.headers["set-cookie"]).toBeUndefined();
+    expect(first.body.challengeId).toBeDefined();
+    expect(email.startLogin).toHaveBeenCalled();
+    const verified=await request(application).post("/api/v1/auth/login/verify").send({
+      challengeId:"123e4567-e89b-12d3-a456-426614174011",code:"123456",
     });
-    expect(response.status).toBe(200);
-    const cookies = response.headers["set-cookie"] as unknown as string[];
-    expect(cookies.some((value) => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
-    expect(cookies.some((value) => value.startsWith("dart_csrf=") && !value.includes("HttpOnly"))).toBe(true);
+    expect(verified.status).toBe(200);
+    expect(email.verify).toHaveBeenCalled();
+    const cookies=verified.headers["set-cookie"] as unknown as string[];
+    expect(cookies.some(row=>row.startsWith("dart_session=")&&row.includes("HttpOnly"))).toBe(true);
+    expect(cookies.some(row=>row.startsWith("dart_csrf=")&&!row.includes("HttpOnly"))).toBe(true);
   });
 
   it("restores a customer without a CSRF helper and renews persistent cookies", async () => {
@@ -336,26 +368,15 @@ describe("identity HTTP boundaries", () => {
     expect(cookies.some(value => value.startsWith("dart_session=") && value.includes("HttpOnly"))).toBe(true);
   });
 
-  it("supports secure cross-site cookies for separate Vercel frontend and API projects", async () => {
-    const productionConfig: AppConfig = {
-      ...config,
-      nodeEnv: "production",
-      sessionCookieSameSite: "none",
-    };
-    const application = createApp(productionConfig, {
-      databasePing: async () => undefined,
-      identityService: fakeService(),
-      logger: pino({ level: "silent" }),
-      startedAt: new Date("2026-09-20T00:00:00.000Z"),
-      version: "test",
-    });
-    const response = await request(application).post("/api/v1/auth/login").send({
-      identifier: "customer@example.com",
+  it("sets Secure SameSite=None cookies only after verified customer email", async () => {
+    const productionConfig: AppConfig={...config,nodeEnv:"production",sessionCookieSameSite:"none"};
+    const {application}=passwordlessApp(productionConfig);
+    const response=await request(application).post("/api/v1/auth/login/verify").send({
+      challengeId:"123e4567-e89b-12d3-a456-426614174011",code:"123456",
     });
     expect(response.status).toBe(200);
-    const cookies = response.headers["set-cookie"] as unknown as string[];
-    expect(cookies.every((value) => value.includes("SameSite=None"))).toBe(true);
-    expect(cookies.every((value) => value.includes("Secure"))).toBe(true);
+    const cookies=response.headers["set-cookie"] as unknown as string[];
+    expect(cookies.every(value=>value.includes("SameSite=None")&&value.includes("Secure"))).toBe(true);
   });
 
   it("rejects an authenticated mutation without the matching CSRF token", async () => {

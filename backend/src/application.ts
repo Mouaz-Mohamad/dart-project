@@ -24,6 +24,9 @@ import {
   type HealthDependencies,
 } from "./modules/health/health.routes.js";
 import { createIdentityRouter } from "./modules/identity/identity.routes.js";
+import { createCustomerPasswordlessRouter } from "./modules/identity/customer-passwordless.routes.js";
+import type { CustomerEmailAuthService } from "./modules/identity/customer-email-auth.service.js";
+import type { CustomerPasskeyService } from "./modules/identity/customer-passkeys.service.js";
 import { createSocialAuthRouter } from "./modules/identity/social-auth.routes.js";
 import { createStaffOnboardingRouter } from "./modules/identity/staff-onboarding.routes.js";
 import { createStaffManagementRouter } from "./modules/identity/staff-management.routes.js";
@@ -74,6 +77,8 @@ export interface AppDependencies extends HealthDependencies {
   logger: Logger;
   changeFeed?: ChangeFeed;
   identityService?: IdentityService;
+  customerEmailAuthService?: CustomerEmailAuthService;
+  customerPasskeyService?: CustomerPasskeyService;
   socialAuthService?: SocialAuthService;
   catalogService?: CatalogService;
   catalogAssetService?: CatalogAssetService;
@@ -185,6 +190,12 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
     if (dependencies.customerNotificationService) app.use("/api/v1",createCustomerNotificationRouter(dependencies.customerNotificationService,dependencies.identityService,config));
     if (dependencies.birthdayMessagingService && dependencies.outboxService) app.use("/api/v1",
       createBirthdayMessagingRouter(dependencies.birthdayMessagingService,dependencies.identityService,config,dependencies.outboxService));
+    if (dependencies.customerEmailAuthService && dependencies.customerPasskeyService) {
+      app.use("/api/v1", createCustomerPasswordlessRouter(
+        dependencies.identityService, dependencies.customerEmailAuthService,
+        dependencies.customerPasskeyService, config, dependencies.outboxService,
+      ));
+    }
     app.use(
       "/api/v1",
       createIdentityRouter(

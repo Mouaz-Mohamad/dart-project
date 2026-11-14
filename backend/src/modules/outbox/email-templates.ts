@@ -52,6 +52,10 @@ export function renderOutboxEmail(
     subject = "Dart Eye verification code";
     english = `Your Dart Eye verification code is ${otp}. It expires ${expiry || "soon"}. If you did not request this code, ignore this email.`;
     arabic = `كود تأكيد الدخول إلى Dart Eye هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. إذا لم تطلب هذا الكود فتجاهل الرسالة.`;
+  } else if (eventType === "CUSTOMER_LOGIN_OTP_REQUESTED" || eventType === "CUSTOMER_SIGNUP_OTP_REQUESTED") {
+    subject = "Dart | For you — OTP";
+    english = "Your Dart verification code is " + otp + ".";
+    arabic = "كود التحقق الخاص بك هو " + otp + ".";
   } else if (
     eventType === "STAFF_INVITED" ||
     eventType === "STAFF_ONBOARDING_CODE_REQUESTED"
@@ -112,6 +116,7 @@ export function renderOutboxEmail(
     "EMAIL_CHANGE_VERIFICATION_REQUESTED",
     "PASSWORD_RESET_CODE_REQUESTED",
     "CUSTOMER_LOGIN_OTP_REQUESTED",
+    "CUSTOMER_SIGNUP_OTP_REQUESTED",
   ].includes(eventType)) {
     const safeOtp = escapeHtml(otp);
     const html = `<!doctype html>

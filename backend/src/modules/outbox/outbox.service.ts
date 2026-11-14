@@ -366,6 +366,8 @@ export class OutboxService {
         prefix: "staff-onboarding-code:",
         table: "staff_onboarding_challenges",
       },
+      CUSTOMER_LOGIN_OTP_REQUESTED: { prefix: "customer-email-login:", table: "customer_email_otp_challenges" },
+      CUSTOMER_SIGNUP_OTP_REQUESTED: { prefix: "customer-email-register:", table: "customer_email_otp_challenges" },
       STAFF_EMAIL_ACCESS_CODE_REQUESTED: {
         prefix: "staff-email-access-code:",
         table: "staff_email_login_challenges",

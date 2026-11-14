@@ -20,10 +20,11 @@ for (const path of [
 }
 assert(customer.includes("profile.accountType !== \"customer\""), "Customer cache must reject Staff/Representative sessions");
 assert(customer.includes("X-CSRF-Token"), "Customer mutations must forward the CSRF token");
-assert(!signup.includes('id="customerEmailVerificationForm"'), "Customer signup must not present an email OTP form");
+assert(customer.includes("/api/v1/auth/login/verify") && customer.includes("/api/v1/auth/register/verify"), "Customer email authentication must verify the code before a session is created");
 assert(!signup.includes('type="password"'), "Customer signup/login must have no password fields");
-assert(!signup.includes('name="email"') && !signup.includes('name="phone2"'), "Registration must ask only for name, primary phone and birthday");
+assert(signup.includes('name="email"') && signup.includes('name="phone1"') && !signup.includes('name="phone2"'), "Registration requires a verifiable email, primary phone and birthday");
 assert(!signup.includes("data-forgot-password"), "Password recovery must not appear for customers");
+assert(signup.includes('id="dartPasskeyLogin"'), "Customer passkey login button must be present");
 assert(!social.includes("challenge.passwordRequired"), "Google linking must not ask for the retired customer password");
 assert(
   signup.includes('id="dartBirthdayValue" type="hidden" name="birthday"') &&

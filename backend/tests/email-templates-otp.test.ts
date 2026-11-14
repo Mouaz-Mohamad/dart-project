@@ -10,6 +10,7 @@ describe("Dart minimal OTP email", () => {
     "EMAIL_CHANGE_VERIFICATION_REQUESTED",
     "PASSWORD_RESET_CODE_REQUESTED",
     "CUSTOMER_LOGIN_OTP_REQUESTED",
+    "CUSTOMER_SIGNUP_OTP_REQUESTED",
   ])("renders the original logo and prominent code for %s", (event) => {
     const message = renderOutboxEmail(event, { parameters: { otp: "040619" } });
     expect(message.subject).toContain("Dart | For you");

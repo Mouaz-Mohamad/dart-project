@@ -148,24 +148,8 @@ export function createIdentityRouter(
   const signedIn = authenticate(service, config);
   const csrf = csrfProtection(config);
 
-  router.post("/auth/register", authLimiter(config, "identity-1"), async (request, response) => {
-    const session = await service.registerCustomer(
-      registerCustomerSchema.parse(request.body),
-      metadata(request),
-    );
-    setSessionCookies(response, config, session);
-    response.status(201).json({
-      user: await service.profile(session.account),
-      csrfToken: session.csrfToken,
-    });
-  });
-
-  router.post("/auth/login", authLimiter(config, "identity-4"), async (request, response) => {
-    const body = z.object({ identifier: z.string().trim().min(3).max(254) }).parse(request.body);
-    const session = await service.loginCustomer(body.identifier, metadata(request));
-    setSessionCookies(response, config, session);
-    response.status(200).json({ user: await service.profile(session.account), csrfToken: session.csrfToken });
-  });
+  // Customer authentication is exclusively mounted by customer-passwordless.routes.ts.
+  // Never restore the former identifier-only customer routes here.
 
   router.post("/representatives/register", authLimiter(config, "identity-5"), async (request, response) => {
     const body = registerRepresentativeSchema.parse(request.body);

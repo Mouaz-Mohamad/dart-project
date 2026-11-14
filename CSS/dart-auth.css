@@ -373,3 +373,26 @@ body.dart-auth-page {
   color: #4285f4;
   font: 700 22px/1 Arial, sans-serif;
 }
+
+
+/* Passwordless OTP and passkey opt-in: preserve the existing Dart authentication shell. */
+.dart-auth-original-hidden { display:none!important; }
+.dart-auth-otp-panel { width:100%;display:flex;flex-direction:column;align-items:center;gap:15px;text-align:center; }
+.dart-auth-otp-panel[hidden], .dart-passkey-btn[hidden] { display:none!important; }
+.dart-auth-otp-heading { font-size:25px;color:#AB012B;margin:0;font-weight:700; }
+.dart-auth-otp-message { color:#282329;line-height:1.8;font-size:14px;overflow-wrap:anywhere;margin:0; }
+.dart-auth-otp-inputs {display:flex;direction:ltr;justify-content:center;gap:7px;width:100%;}
+.dart-auth-otp-digit {flex:0 1 43px;width:43px;min-width:0;height:50px;text-align:center;font:700 24px/1 Arial,sans-serif;border:1px solid #c9c2c3;border-radius:8px;background:#fff;color:#AB012B;outline-offset:2px;}
+.dart-auth-otp-digit:focus {border-color:#AB012B;outline:2px solid #AB012B;}
+.dart-auth-otp-other {background:none;border:0;text-decoration:underline;color:#AB012B;cursor:pointer;font-size:13px;padding:8px;}
+.dart-auth-otp-status {font-size:12px;line-height:1.6;min-height:20px;margin:0;color:#5b4b50;}
+.dart-passkey-btn {display:block;width:100%;margin-top:10px;padding:11px;border:1px solid #AB012B;border-radius:9px;background:transparent;color:#AB012B;cursor:pointer;font:inherit;}
+.dart-passkey-optin-backdrop {position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:10000;padding:16px;}
+.dart-passkey-optin-card {width:min(100%,400px);padding:26px;border-radius:16px;background:#fff;color:#1d1d1d;text-align:center;box-shadow:0 18px 55px #0003;direction:rtl;}
+.dart-passkey-optin-card h2 {margin:0 0 12px;font-size:21px;}
+.dart-passkey-optin-card p {font-size:14px;line-height:1.7;}
+.dart-passkey-optin-icon {font-size:50px;color:#AB012B;}
+.dart-passkey-optin-card button {display:block;width:100%;padding:11px;margin-top:10px;border-radius:9px;cursor:pointer;font:inherit;}
+.dart-passkey-optin-enable {background:#AB012B;color:white;border:1px solid #AB012B;}
+.dart-passkey-optin-skip {background:white;color:#AB012B;border:1px solid #AB012B;}
+@media(max-width:380px){.dart-auth-otp-inputs{gap:5px}.dart-auth-otp-digit{height:44px;font-size:21px}}
