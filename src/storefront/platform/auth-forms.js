@@ -1,3 +1,11 @@
+  function customerAuthErrorMessage(error) {
+    const message = String(error?.message || "").trim();
+    if (!message || /unexpected error|internal server error|failed to fetch|networkerror/i.test(message)) {
+      return "تعذر إرسال أو تأكيد رمز التحقق حاليًا. حاول مرة أخرى بعد قليل.";
+    }
+    return message;
+  }
+
   function bindAuth() {
     if (typeof window.bindCustomerPasskeyLogin === "function") window.bindCustomerPasskeyLogin();
     document.addEventListener(
@@ -45,7 +53,7 @@
             const result=await register(Object.fromEntries(new FormData(form)));
             window.showCustomerOtpStep(form,"register",result);
           } catch (error) {
-            setStatus(form, error.message, true);
+            setStatus(form, customerAuthErrorMessage(error), true);
           } finally {
             delete form.dataset.submitting;
             if (submit) submit.disabled = false;
@@ -66,7 +74,7 @@
             const result=await login(form.elements.identifier.value);
             window.showCustomerOtpStep(form,"login",result);
           } catch (error) {
-            setStatus(form, error.message, true);
+            setStatus(form, customerAuthErrorMessage(error), true);
           } finally {
             delete form.dataset.submitting;
             if (submit) submit.disabled = false;
