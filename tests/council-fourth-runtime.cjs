@@ -152,6 +152,30 @@ async function guestPriceAcceptance() {
   delete fields.birthday;
 }
 
+async function setCheckoutRecoveryScope() {
+  const text = read("Js/dart-sets.js"), start = text.indexOf("  async function addActiveSetToCart()"), end = text.indexOf("  function installReservationBridge()", start);
+  for (const consumed of [false, true]) {
+    let cartId = "CART-BEFORE", persisted = 0, cleared = 0;
+    const selections = [{ modelId: "M1", color: "Black", size: "M" }, { modelId: "M2", color: "Black", size: "M" }];
+    const c = { setPurchaseBusy: false, activeSet: { setId: "SET-1", name: "Synthetic Set" }, cartData: [],
+      selectedComponents: () => selections, exactSelectionsAvailable: () => true, updateModalAvailability() {},
+      clone: value => JSON.parse(JSON.stringify(value)), drafts: () => [], nextUnitIndex: () => 1,
+      lineForSelection: (selection, _set, key) => ({ ...selection, dartSetKey: key }), normalizeGroups: value => value,
+      closeSetModal() {}, scheduleCartDecoration() {}, lastAttachedGroups: [], renderSetAwareCartCount() {},
+      CustomEvent: class {}, root: { DartPlatform: { requireCartAccount: async () => true },
+        DartSets: { currentReservationId: () => cartId, writeDrafts() {}, readDrafts: () => [], clearDrafts() { cleared++; } },
+        DartState: { write() {} }, document: { getElementById: () => null }, dispatchEvent() {} },
+      async persistCartReservation() { persisted++; if (consumed) { cartId = "CART-AFTER"; c.cartData = []; return false; } return true; } };
+    c.cartRef = () => c.cartData;
+    vm.createContext(c); vm.runInContext(text.slice(start, end), c);
+    await c.addActiveSetToCart();
+    assert.equal(persisted, 1, "Set must reach reservation through the public cart identifier helper");
+    assert.equal(c.cartData.length, consumed ? 0 : 2);
+    assert.equal(cleared, consumed ? 1 : 0, "recovering a confirmed order cannot restore its old Set drafts");
+    assert.equal(c.setPurchaseBusy, false);
+  }
+}
+
 function editorVersions() {
   const fields = {}, order = { id: "order", version: 7, items: [] }, r = { id: "return", condition: "Damaged", updatedAt: "2026-10-25T12:00:00.000Z" };
   const element = (id) => fields[id] ??= { value: "", dataset: {} };
@@ -163,6 +187,6 @@ function editorVersions() {
   assert.equal(fields["modal-item-condition"].value, "Bad");
 }
 
-(async () => { await cartQueue(); await contentMismatch(); await setAttachmentQueue(); await staleRollback(); await guestPriceAcceptance(); await profileRecovery(); editorVersions();
+(async () => { await cartQueue(); await contentMismatch(); await setAttachmentQueue(); await staleRollback(); await guestPriceAcceptance(); await setCheckoutRecoveryScope(); await profileRecovery(); editorVersions();
   console.log("PASS fourth Council runtime: queued cart intents, checkout reconciliation, stale rollback, profile retry/cache and captured editor versions");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
