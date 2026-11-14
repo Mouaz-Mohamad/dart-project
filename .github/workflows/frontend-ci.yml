@@ -142,7 +142,8 @@ jobs:
           node tests/test-inventory-contract.cjs
 
   browser-smoke:
-    runs-on: ubuntu-latest
+    # Playwright 1.55 supports this fixed image; ubuntu-latest may advance beyond it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - name: Checkout
@@ -185,7 +186,7 @@ jobs:
           JS
 
   courier-navigation-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
