@@ -30,13 +30,32 @@ export async function verifyReleaseCI(target, {
     throw new Error("Release blocked: verified main commit metadata is required.");
   }
   const deadline = now() + timeoutMs;
+  const token = typeof env.DART_GITHUB_RELEASE_TOKEN === "string" ? env.DART_GITHUB_RELEASE_TOKEN.trim() : "";
   let attempt = 0, frontendEquivalent = false;
   while (now() < deadline) {
     const response = await fetchImpl(`https://api.github.com/repos/Mouaz-Mohamad/dart-project/actions/runs?head_sha=${sha}&per_page=100`, {
-      headers: { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Dart-Release-Check" },
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "Dart-Release-Check",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       cache: "no-store", signal: AbortSignal.timeout(20_000),
     });
-    if (!response.ok) throw new Error(`Release blocked: GitHub check status unavailable (${response.status}).`);
+    if (!response.ok) {
+      // Vercel's shared build IP can be temporarily rate-limited by GitHub.
+      // Retry transient API failures, but NEVER promote without verified green CI.
+      if ([403, 429, 502, 503, 504].includes(response.status) && now() < deadline) {
+        const retryDelay = Math.min(20_000 + attempt * 10_000, 60_000, Math.max(0, deadline - now()));
+        if (retryDelay > 0) {
+          attempt++;
+          log(`GitHub CI verification temporarily unavailable (HTTP ${response.status}); retrying without bypassing required checks.`);
+          await wait(retryDelay);
+          continue;
+        }
+      }
+      throw new Error(`Release blocked: GitHub check status unavailable (${response.status}).`);
+    }
     const payload = await response.json();
     if (!Array.isArray(payload.workflow_runs)) throw new Error("Release blocked: invalid GitHub check status.");
     const hasFrontendRun = payload.workflow_runs.some(run => run.name === "Frontend CI" && run.head_sha === sha && run.event === "push" && run.head_branch === "main");

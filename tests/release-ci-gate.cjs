@@ -18,7 +18,22 @@ const assert=require('node:assert/strict');
   }});
   assert.equal(calls,2);assert.equal(waits,1);
   await assert.rejects(verifyReleaseCI('api',{env:{...env,VERCEL_GIT_COMMIT_SHA:''},log(){}}),/metadata/);
-  await assert.rejects(verifyReleaseCI('api',{env,log(){},fetchImpl:async()=>({ok:false,status:403})}),/unavailable/);
+  let clock=0, retries=0;
+  await verifyReleaseCI('api',{
+    env:{...env,DART_GITHUB_RELEASE_TOKEN:'synthetic-test-token'},
+    now:()=>clock,timeoutMs:180000,log(){},wait:async(ms)=>{clock+=ms;retries++;},
+    fetchImpl:async(_url,options)=>{
+      assert.equal(options.headers.Authorization,'Bearer synthetic-test-token');
+      return ++retries===1 ? {ok:false,status:403} : {ok:true,json:async()=>({workflow_runs:passing})};
+    },
+  });
+  assert(retries>=2,'Temporary 403 must retry before passing only on real CI evidence');
+  let blockedTime=0;
+  await assert.rejects(verifyReleaseCI('api',{
+    env,log(){},timeoutMs:20000,now:()=>blockedTime,
+    wait:async(ms)=>{blockedTime+=ms;},
+    fetchImpl:async()=>({ok:false,status:403}),
+  }),/release window|unavailable/);
   await assert.rejects(verifyReleaseCI('api',{env,log(){},timeoutMs:0}),/release window/);
   await verifyReleaseCI('storefront',{env:{},log(){},fetchImpl:async()=>{throw Error('Local builds must not call GitHub');}});
   const {equivalentFrontendCheck,unchangedStorefront}=await import('../scripts/verified-frontend-ci.mjs');

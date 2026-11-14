@@ -32,8 +32,14 @@ import type { IdentityService } from "../src/modules/identity/identity.service.j
 import type { AuthenticatedAccount } from "../src/modules/identity/identity.types.js";
 import type { BrowserPushSubscription } from "../src/modules/notifications/push-validation.js";
 
+// Deterministic, non-secret P-256 test fixture: random ECDH private keys can
+// occasionally serialize to 31 bytes and fail validVapidKeys' 32-byte check.
+// Never reuse these synthetic keys in a running service.
 const curve = createECDH("prime256v1");
-curve.generateKeys();
+const testPrivateKey = Buffer.alloc(32);
+testPrivateKey[0] = 0x4f; // Ensure the serialized key has exactly 32 bytes.
+testPrivateKey[31] = 1;
+curve.setPrivateKey(testPrivateKey);
 const config = loadConfig({
   NODE_ENV: "test",
   DATABASE_URL: "postgres://synthetic.test/dart",
