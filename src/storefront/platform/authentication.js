@@ -38,63 +38,8 @@
     return acceptVerifiedSession("/api/v1/auth/register/verify",challengeId,code);
   }
 
-  function supportsCustomerPasskeys(){
-    return !!(window.isSecureContext && window.PublicKeyCredential && navigator.credentials?.create && navigator.credentials?.get);
-  }
-  function base64ToBytes(value){
-    const normalized=String(value).replace(/-/g,"+").replace(/_/g,"/");
-    const decoded=atob(normalized+"=".repeat((4-normalized.length%4)%4));
-    return Uint8Array.from(decoded,char=>char.charCodeAt(0));
-  }
-  function bytesToBase64(value){
-    const bytes=new Uint8Array(value);
-    let binary="";
-    for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
-    return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-  }
-  async function registerCustomerPasskey(){
-    if(!supportsCustomerPasskeys())throw new Error("هذا الجهاز أو المتصفح لا يدعم تسجيل الدخول بالبصمة.");
-    const {challengeId,options}=await apiRequest("/api/v1/auth/passkeys/register/options",{method:"POST",body:{}});
-    const publicKey={
-      ...options,
-      challenge:base64ToBytes(options.challenge),
-      user:{...options.user,id:base64ToBytes(options.user.id)},
-      excludeCredentials:(options.excludeCredentials||[]).map(row=>({...row,id:base64ToBytes(row.id)})),
-    };
-    const passkey=await navigator.credentials.create({publicKey});
-    if(!passkey)throw new Error("تم إلغاء تفعيل البصمة.");
-    return apiRequest("/api/v1/auth/passkeys/register/verify",{
-      method:"POST",body:{challengeId,credential:{
-        id:passkey.id,type:passkey.type,
-        response:{
-          clientDataJSON:bytesToBase64(passkey.response.clientDataJSON),
-          attestationObject:bytesToBase64(passkey.response.attestationObject),
-          transports:passkey.response.getTransports?.()||[],
-        },
-      }},
-    });
-  }
-  async function loginCustomerPasskey(){
-    if(!supportsCustomerPasskeys())throw new Error("هذا الجهاز أو المتصفح لا يدعم تسجيل الدخول بالبصمة.");
-    const {challengeId,options}=await apiRequest("/api/v1/auth/passkeys/authenticate/options",{method:"POST",body:{}});
-    const passkey=await navigator.credentials.get({publicKey:{
-      ...options,
-      challenge:base64ToBytes(options.challenge),
-      allowCredentials:(options.allowCredentials||[]).map(row=>({...row,id:base64ToBytes(row.id)})),
-    }});
-    if(!passkey)throw new Error("تم إلغاء تسجيل الدخول بالبصمة.");
-    const result=await apiRequest("/api/v1/auth/passkeys/authenticate/verify",{
-      method:"POST",body:{challengeId,credential:{
-        id:passkey.id,type:passkey.type,
-        response:{
-          clientDataJSON:bytesToBase64(passkey.response.clientDataJSON),
-          authenticatorData:bytesToBase64(passkey.response.authenticatorData),
-          signature:bytesToBase64(passkey.response.signature),
-          userHandle:passkey.response.userHandle?bytesToBase64(passkey.response.userHandle):null,
-        },
-      }},
-    });
-    if(result.user){
+  async function finishPasswordlessPasskey(result) {
+    if (result.user) {
       cacheApiUser(result.user);
       await claimGuestCartAfterAuth();
       refreshCustomerCommerceInBackground();

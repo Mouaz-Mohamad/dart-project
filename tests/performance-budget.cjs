@@ -97,6 +97,9 @@ for (const file of rootHtml.filter(file => file !== "profile.html")) {
     failures.push(`${file}: Customer preference/notification code must stay on the customer profile`);
   }
 }
+if (fs.statSync("Js/dart-passwordless-ui.js").size > 16 * 1024) {
+  failures.push("Sign-in-only WebAuthn UI exceeds its 16 KiB script budget");
+}
 // Authentication widgets are loaded only by the dedicated login page.
 if (!fs.readFileSync("Sign Up modern.html","utf8").includes('src="Js/dart-passwordless-ui.js"')) {
   failures.push("Auth page must load the scoped passwordless UI.");

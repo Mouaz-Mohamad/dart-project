@@ -1,3 +1,64 @@
+// Passwordless credentials: only included on Dart sign-in page.
+function supportsCustomerPasskeys(){
+  return !!(window.isSecureContext && window.PublicKeyCredential && navigator.credentials?.create && navigator.credentials?.get);
+}
+function base64ToBytes(value){
+  const normalized=String(value).replace(/-/g,"+").replace(/_/g,"/");
+  const decoded=atob(normalized+"=".repeat((4-normalized.length%4)%4));
+  return Uint8Array.from(decoded,char=>char.charCodeAt(0));
+}
+function bytesToBase64(value){
+  const bytes=new Uint8Array(value);
+  let binary="";
+  for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+async function registerCustomerPasskey(){
+  if(!supportsCustomerPasskeys())throw new Error("هذا الجهاز أو المتصفح لا يدعم تسجيل الدخول بالبصمة.");
+  const {challengeId,options}=await window.DartPlatform.apiRequest("/api/v1/auth/passkeys/register/options",{method:"POST",body:{}});
+  const publicKey={
+    ...options,
+    challenge:base64ToBytes(options.challenge),
+    user:{...options.user,id:base64ToBytes(options.user.id)},
+    excludeCredentials:(options.excludeCredentials||[]).map(row=>({...row,id:base64ToBytes(row.id)})),
+  };
+  const passkey=await navigator.credentials.create({publicKey});
+  if(!passkey)throw new Error("تم إلغاء تفعيل البصمة.");
+  return window.DartPlatform.apiRequest("/api/v1/auth/passkeys/register/verify",{
+    method:"POST",body:{challengeId,credential:{
+      id:passkey.id,type:passkey.type,
+      response:{
+        clientDataJSON:bytesToBase64(passkey.response.clientDataJSON),
+        attestationObject:bytesToBase64(passkey.response.attestationObject),
+        transports:passkey.response.getTransports?.()||[],
+      },
+    }},
+  });
+}
+async function loginCustomerPasskey(){
+  if(!supportsCustomerPasskeys())throw new Error("هذا الجهاز أو المتصفح لا يدعم تسجيل الدخول بالبصمة.");
+  const {challengeId,options}=await window.DartPlatform.apiRequest("/api/v1/auth/passkeys/authenticate/options",{method:"POST",body:{}});
+  const passkey=await navigator.credentials.get({publicKey:{
+    ...options,
+    challenge:base64ToBytes(options.challenge),
+    allowCredentials:(options.allowCredentials||[]).map(row=>({...row,id:base64ToBytes(row.id)})),
+  }});
+  if(!passkey)throw new Error("تم إلغاء تسجيل الدخول بالبصمة.");
+  const result=await window.DartPlatform.apiRequest("/api/v1/auth/passkeys/authenticate/verify",{
+    method:"POST",body:{challengeId,credential:{
+      id:passkey.id,type:passkey.type,
+      response:{
+        clientDataJSON:bytesToBase64(passkey.response.clientDataJSON),
+        authenticatorData:bytesToBase64(passkey.response.authenticatorData),
+        signature:bytesToBase64(passkey.response.signature),
+        userHandle:passkey.response.userHandle?bytesToBase64(passkey.response.userHandle):null,
+      },
+    }},
+  });
+  return window.DartPlatform.finishPasswordlessPasskey(result);
+}
+
+
 // Email OTP and opt-in WebAuthn interface within Dart's existing auth page.
 function showCustomerOtpStep(form,purpose,challenge) {
   form.dataset.otpPurpose=purpose;
@@ -43,12 +104,12 @@ function showCustomerOtpStep(form,purpose,challenge) {
       });
     });
     panel.querySelector("[data-otp-other]").addEventListener("click",async()=>{
-      if(!window.DartPlatform.supportsCustomerPasskeys()){
+      if(!supportsCustomerPasskeys()){
         panel.querySelector("[data-otp-status]").textContent="واتساب سيتوفر لاحقًا. استخدم الكود المرسل بالبريد الإلكتروني.";
         return;
       }
       try{
-        await window.DartPlatform.loginCustomerPasskey();
+        await loginCustomerPasskey();
         location.assign(window.DartPlatform.requestedAuthDestination());
       }catch(error){
         panel.querySelector("[data-otp-status]").textContent=error?.message||"تعذر تسجيل الدخول بالبصمة.";
@@ -92,7 +153,7 @@ async function submitCustomerOtpStep(form,purpose){
   }
 }
 async function offerCustomerPasskeyEnrollment(){
-  if(!window.DartPlatform.supportsCustomerPasskeys()){
+  if(!supportsCustomerPasskeys()){
     location.assign(window.DartPlatform.requestedAuthDestination());return;
   }
   const overlay=document.createElement("div");
@@ -116,7 +177,7 @@ async function offerCustomerPasskeyEnrollment(){
     const status=overlay.querySelector("[data-passkey-optin-status]");
     status.textContent="جاري تفعيل البصمة...";
     try{
-      await window.DartPlatform.registerCustomerPasskey();
+      await registerCustomerPasskey();
       status.textContent="تم تفعيل تسجيل الدخول بالبصمة.";
       finish();
     }catch(error){
@@ -127,12 +188,12 @@ async function offerCustomerPasskeyEnrollment(){
 function bindCustomerPasskeyLogin(){
   const button=document.getElementById("dartPasskeyLogin");
   if(!button)return;
-  button.hidden=!window.DartPlatform.supportsCustomerPasskeys();
+  button.hidden=!supportsCustomerPasskeys();
   button.addEventListener("click",async()=>{
     if(button.disabled)return;
     button.disabled=true;
     try{
-      await window.DartPlatform.loginCustomerPasskey();
+      await loginCustomerPasskey();
       location.assign(window.DartPlatform.requestedAuthDestination());
     }catch(error){
       const form=document.getElementById("loginForm");
