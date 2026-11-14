@@ -13,13 +13,30 @@ const server = http.createServer((req, res) => {
   const signedIn = /(?:^|; )dart_test_session=valid(?:;|$)/.test(req.headers.cookie || "");
   if (url.pathname.startsWith("/api/")) {
     if (url.pathname.includes("notifications") || url.pathname.includes("/push/")) notificationRequests++;
-    if (["/api/v1/auth/login", "/api/v1/auth/register"].includes(url.pathname)) {
+    if (["/api/v1/auth/login", "/api/v1/auth/register",
+      "/api/v1/auth/login/verify", "/api/v1/auth/register/verify"].includes(url.pathname)) {
       let body = "";
       req.on("data", chunk => { body += chunk; });
       req.on("end", () => {
-        authRequests.push({ path: url.pathname, body: JSON.parse(body) });
-        res.setHeader("Set-Cookie", ["dart_test_session=valid; HttpOnly; Path=/; Max-Age=31536000; SameSite=Lax", "dart_csrf=fixture; Path=/; Max-Age=31536000"]);
-        json(res, url.pathname.endsWith("register") ? 201 : 200, { user, csrfToken: "fixture" });
+        const submitted = JSON.parse(body);
+        authRequests.push({ path: url.pathname, body: submitted });
+        if (!url.pathname.endsWith("/verify")) {
+          // Identifier-only requests must never create an authenticated session.
+          return json(res, 202, {
+            challengeId: "123e4567-e89b-42d3-a456-426614174010",
+            expiresAt: new Date(Date.now() + 300000).toISOString(),
+            email: user.email,
+          });
+        }
+        if (submitted.challengeId !== "123e4567-e89b-42d3-a456-426614174010" ||
+            submitted.code !== "123456") return json(res, 400, { error: { code: "OTP_INVALID" } });
+        res.setHeader("Set-Cookie", [
+          "dart_test_session=valid; HttpOnly; Path=/; Max-Age=31536000; SameSite=Lax",
+          "dart_csrf=fixture; Path=/; Max-Age=31536000",
+        ]);
+        return json(res, url.pathname.includes("register/verify") ? 201 : 200, {
+          user, csrfToken: "fixture", passkeyEnrollmentAvailable: true,
+        });
       });
       return;
     }
@@ -63,15 +80,26 @@ const server = http.createServer((req, res) => {
     await page.goto(`${origin}/Sign%20Up%20modern.html`);
     assert.equal(await page.locator('#loginForm input[type="password"], #registerForm input[type="password"]').count(), 0);
     await page.locator(".register-btn").click();
-    await page.locator('#registerForm [name="name"]').fill("Phone Only Customer");
+    await page.locator('#registerForm [name="name"]').fill("Verified Email Customer");
     await page.locator('#registerForm [name="phone1"]').fill("01000000001");
+    await page.locator('#registerForm [name="email"]').fill(user.email);
     await page.locator("#dartBirthYear").selectOption("2000");
     await page.locator("#dartBirthMonth").selectOption("1");
     await page.locator("#dartBirthDay").selectOption("2");
     await page.locator('#registerForm button[type="submit"]').click();
+    await page.locator('#registerForm [data-dart-otp-panel]').waitFor({state:"visible"});
+    assert.equal((await context.cookies()).some(cookie => cookie.name === "dart_test_session"), false,
+      "Starting signup must not set a customer session");
+    await page.locator('#registerForm .dart-auth-otp-digit').first().fill("123456");
+    await page.locator('#registerForm [data-dart-otp-panel] button[type="submit"]').click();
+    const enrollment = page.locator(".dart-passkey-optin-skip");
+    try { await enrollment.waitFor({state:"visible",timeout:2000}); await enrollment.click(); }
+    catch { /* Browsers without WebAuthn support skip the optional enrollment dialog. */ }
     await page.waitForURL("**/profile.html");
     const signup = authRequests.find(request => request.path.endsWith("register"));
-    assert.deepEqual(signup.body, { name: "Phone Only Customer", phone1: "01000000001", birthday: "2000-01-02" });
+    assert.deepEqual(signup.body, { name: "Verified Email Customer", phone1: "01000000001", email: user.email, birthday: "2000-01-02" });
+    assert.equal(authRequests.some(request => request.path === "/api/v1/auth/register/verify"), true,
+      "Registration session must require a valid email OTP");
     assert.equal(await page.locator("[data-change-password-toggle], #customerAccountPasswordForm").count(), 0);
     await context.clearCookies();
     for (const [route, next] of [["profile.html?view=orders", "next=profile&view=orders"], ["track.html?order=K-1", "next=track&order=K-1"], ["form-return.html", "next=return"]]) {
@@ -81,8 +109,18 @@ const server = http.createServer((req, res) => {
     await page.goto(`${origin}/Sign%20Up%20modern.html?next=profile&view=orders`);
     await page.locator("#loginForm [name=identifier]").fill(user.email);
     await page.locator("#loginForm button[type=submit]").click();
+    await page.locator('#loginForm [data-dart-otp-panel]').waitFor({state:"visible"});
+    assert.equal((await context.cookies()).some(cookie => cookie.name === "dart_test_session"), false,
+      "Starting login must not set a customer session");
+    await page.locator('#loginForm .dart-auth-otp-digit').first().fill("123456");
+    await page.locator('#loginForm [data-dart-otp-panel] button[type="submit"]').click();
+    const loginEnrollment = page.locator(".dart-passkey-optin-skip");
+    try { await loginEnrollment.waitFor({state:"visible",timeout:2000}); await loginEnrollment.click(); }
+    catch { /* Browsers without WebAuthn support skip optional enrollment. */ }
     await page.waitForURL("**/profile.html?view=orders");
     assert.deepEqual(authRequests.find(request => request.path.endsWith("login")).body, { identifier: user.email });
+    assert.equal(authRequests.some(request => request.path === "/api/v1/auth/login/verify"), true,
+      "Login must use the server OTP verification endpoint");
     await page.locator(".order-info.active").waitFor();
     await page.reload(); await page.locator(".order-info.active").waitFor();
     await page.locator(".order-info [aria-label='Back to account']").click();
