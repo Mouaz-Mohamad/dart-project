@@ -19,6 +19,7 @@
       ...options,
       headers: {
         "Content-Type": "application/json",
+        ...(/^\/api\/v1\/(?:cart(?:\/|$)|guest\/)/.test(path) ? { "X-Dart-Guest-Cart": "1" } : {}),
         ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken
           ? { "X-CSRF-Token": decodeURIComponent(csrfToken) }
           : {}),

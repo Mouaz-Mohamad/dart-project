@@ -887,7 +887,7 @@ function updateCartTotals() {
     window.dartDisplayedTotalMinor = Math.round(finalTotal * 100);
     window.DartStorefront?.refreshOffers?.();
     applyCartQuote(window.DartPlatform?.currentCartQuote?.());
-    if (cartData.length && window.DartPlatform?.currentUser?.() && window.DartPlatform?.quoteCart) {
+    if (cartData.length && window.DartPlatform?.quoteCart) {
         totalEl?.setAttribute('aria-busy', 'true');
         void window.DartPlatform.quoteCart().then(applyCartQuote).catch(() => totalEl?.removeAttribute('aria-busy'));
     }
@@ -965,9 +965,9 @@ async function persistCartReservation(previousSnapshot = null) {
         return true;
     } catch (error) {
         if (sequence !== persistCartReservation.sequence) return false;
-        cartData = previous;
-        cacheFastCartSnapshot(previous);
-        window.DartState?.write?.('dart_cart', previous, { source: 'cart-rollback' });
+        cartData = error.code === 'CART_ALREADY_CHECKED_OUT' ? [] : previous;
+        cacheFastCartSnapshot(cartData);
+        window.DartState?.write?.('dart_cart', cartData, { source: 'cart-rollback' });
         showToast(error.message || 'تعذر حجز القطعة. حاول مرة أخرى.');
         return false;
     }
@@ -1025,11 +1025,17 @@ function initCartAndCheckoutEvents() {
             }
             let promotion = null;
             if (window.DartPlatform?.apiRequest) {
-                if (!window.DartPlatform?.currentUser?.()) {
-                    showToast("سجل الدخول أولاً للتحقق من كود الخصم.");
-                    return;
-                }
                 try {
+                    if (!window.DartPlatform.currentUser?.()) {
+                        const previous = window.dartAppliedPromotion;
+                        try {
+                            window.dartAppliedPromotion = { type: 'Promotion', code, automatic: false };
+                            const quote = await window.DartPlatform.quoteCart({ force: true });
+                            window.applyCartQuote?.(quote);
+                            showToast(`تم قبول كود الخصم ${code}؛ راجع السعر النهائي للسلة.`);
+                        } catch (error) { window.dartAppliedPromotion = previous; throw error; }
+                        return;
+                    }
                     const reservationId = window.DartPlatform.cartReservationId;
                     const payload = await window.DartPlatform.apiRequest(
                         `/api/v1/me/promotions/resolve?reservationId=${encodeURIComponent(reservationId)}&code=${encodeURIComponent(code)}`
@@ -1102,13 +1108,6 @@ function initCartAndCheckoutEvents() {
         toCheckoutBtn.addEventListener('click', () => {
             if (cartData.length === 0) {
                 showToast("السلة فارغة، أضف منتجات أولاً!");
-                return;
-            }
-            if (!window.DartPlatform?.currentUser?.()) {
-                showToast('يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.');
-                setTimeout(() => {
-                    window.location.href = 'Sign Up modern.html?next=checkout';
-                }, 500);
                 return;
             }
             checkoutView.style.display = 'block';

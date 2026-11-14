@@ -275,7 +275,7 @@
       return false;
     }
     if (!root.DartPlatform?.currentUser?.()) {
-      await root.DartPlatform?.requireCartAccount?.(root.DartProductLinks?.pathFor?.(item) || "");
+      await root.DartPlatform?.requireCartAccount?.(root.DartProductLinks?.pathFor?.(item) || "", [], { accountRequired: true });
       return false;
     }
 

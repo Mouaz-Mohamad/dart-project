@@ -1,4 +1,4 @@
-import { resolveCustomerReference, upsertCustomerRecord } from "../identity/customer-record.js";
+import { resolveCustomerReference, upsertCustomerRecord, guestCheckoutCustomer } from "../identity/customer-record.js";
 // DART CODE GUIDE | backend/src/modules/commerce/commerce.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { createHash, randomUUID } from "node:crypto";
@@ -698,6 +698,15 @@ export class CommerceService {
       await client.query(
         "SELECT set_config('dart.skip_waitlist_allocation','1',true)",
       );
+
+      const completed = await client.query<{ response_body: Record<string, unknown> }>(
+        "SELECT response_body FROM idempotency_keys WHERE scope=$1 AND key_hash=$2 AND status='completed'",
+        [customerUserId ? `order.create:${customerUserId}` : `order.guest:${guestOwnerHash}`,
+          createHash("sha256").update(`checkout-${reservationId}`).digest("hex")]);
+      if (completed.rows[0]?.response_body) {
+        throw new AppError(409, "CART_ALREADY_CHECKED_OUT", "Your previous order was confirmed. Add the next items to a new cart.",
+          { completedOrder: customerOrderView(completed.rows[0].response_body) });
+      }
 
       const currentReservation = await client.query<{
         customer_user_id: string | null;
@@ -1490,7 +1499,7 @@ export class CommerceService {
     }
   }
 
-  private async checkoutReservation(client: PoolClient, customerUserId: string, reservationId: string, guestOwnerHash?: string, claim = false) {
+  private async checkoutReservation(client: PoolClient, customerUserId: string | null, reservationId: string, guestOwnerHash?: string, claim = false) {
       const reservationResult = await client.query<{
         customer_user_id: string | null;
         guest_owner_hash: string | null;
@@ -1558,8 +1567,8 @@ export class CommerceService {
   }
 
   private async checkoutPricing(
-    client: PoolClient, customerUserId: string, reservationId: string,
-    items: LockedItem[], settings: Record<string, unknown>, requestedCode?: string,
+    client: PoolClient, customerUserId: string | null, reservationId: string,
+    items: LockedItem[], settings: Record<string, unknown>, requestedCode?: string, guest = false,
   ) {
       const setResult = await client.query<{
         inventory_item_id: string; allocated_base_minor: string; allocated_final_minor: string;
@@ -1592,7 +1601,7 @@ export class CommerceService {
         [customerUserId],
       );
       const customerPromotion = customerPromotionResult.rows[0];
-      if (!customerPromotion) {
+      if (!customerPromotion && !guest) {
         throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer account not found");
       }
 
@@ -1625,7 +1634,7 @@ export class CommerceService {
       const resolvedCampaign = await new PromotionService(this.pool).resolveForCheckoutInTransaction(
         client, customerUserId, reservationId, requestedCode,
         items.map((row) => ({ itemCode: row.item_code, modelId: row.model_id, category: row.category || "",
-          sellingMinor: Number(row.selling_minor), modelDiscountPercent: Number(row.discount_percent || 0), isSet: setPrices.has(row.id) })),
+          sellingMinor: Number(row.selling_minor), modelDiscountPercent: Number(row.discount_percent || 0), isSet: setPrices.has(row.id) })), guest,
       );
 
       let promotion: Record<string, unknown> | null = null;
@@ -1662,7 +1671,7 @@ export class CommerceService {
             "Promotion code is invalid, expired or no longer active",
           );
         }
-        const stats = await customerPurchaseStats(client, customerUserId);
+        const stats = await customerPurchaseStats(client, customerUserId!);
         if (!promotionTargetsCustomer(codePromotion, stats)) {
           throw new AppError(
             409,
@@ -1685,8 +1694,8 @@ export class CommerceService {
         };
       }
 
-      const birthday = birthdayWindow(customerPromotion.birthday);
-      if ((hasUndiscountedItems || hasSetBirthday) && birthday) {
+      const birthday = !guest && customerPromotion ? birthdayWindow(customerPromotion.birthday) : null;
+      if ((hasUndiscountedItems || hasSetBirthday) && birthday && customerPromotion) {
         const rewardId = `BDAY-${customerPromotion.client_code}-${birthday.year}`;
         birthdayReward = (birthdayState.data as Record<string, unknown>[]).find(
           (row) => String(row.id || "") === rewardId,
@@ -1726,7 +1735,7 @@ export class CommerceService {
         }
       }
 
-      if (isDartCardEnabled(settings) && (hasUndiscountedItems || setCardCodes.size)) {
+      if (!guest && customerPromotion && isDartCardEnabled(settings) && (hasUndiscountedItems || setCardCodes.size)) {
         const nowMs = Date.now();
         appliedCard = (cardState.data as Record<string, unknown>[]).find((row) => {
           if (
@@ -1768,7 +1777,7 @@ export class CommerceService {
       const campaignFixed = campaign?.discountKind === "fixed" ? allocateFixedSaving(items.filter((row) => !setPrices.has(row.id)
         && Number(row.discount_percent || 0) <= 0 && campaignAppliesToItem(campaign!, row))
         .map((row) => ({ id: row.id, baseMinor: Number(row.selling_minor) })), Number(campaign.discountAmountMinor)) : new Map<string, number>();
-      const manualGrant = await activeManualDiscount(client, customerUserId);
+      const manualGrant = !guest && customerUserId ? await activeManualDiscount(client, customerUserId) : null;
       const manualAllocations = allocateManualDiscount(manualGrant, items.filter((row) => !setPrices.has(row.id)
         && Number(row.discount_percent || 0) <= 0 && !(promotion && campaign && campaignAppliesToItem(campaign, row)))
         .map((row) => ({ id: row.id, baseMinor: Number(row.selling_minor) })));
@@ -1851,7 +1860,7 @@ export class CommerceService {
         : usedBenefits[0] || null;
       promotionPercent = Number(promotion?.percent || 0);
       const shippingMinor = shippingFeeMinor(settings);
-      const fingerprint = createHash("sha256").update(JSON.stringify({ customerUserId, reservationId, shippingMinor,
+      const fingerprint = createHash("sha256").update(JSON.stringify({ customerUserId: guest ? null : customerUserId, reservationId, shippingMinor,
         lines: itemSnapshots.map((line) => [line.row.item_code,line.sellingMinor,line.finalUnitMinor,line.discountSource,line.discountReference]),
       })).digest("hex");
       return { itemSnapshots, subtotalMinor, finalMinor: finalMinor + shippingMinor, shippingMinor, orderDiscountMinor, promotion, promotionPercent,
@@ -1868,14 +1877,16 @@ export class CommerceService {
     };
   }
 
-  public async customerCartQuote(customerUserId: string, reservationId: string, promotionCode?: string, guestOwnerHash?: string) {
+  public async customerCartQuote(customerUserId: string | null, reservationId: string, promotionCode?: string, guestOwnerHash?: string) {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
+      if (customerUserId) await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
+      else if (!guestOwnerHash) throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "Reload your cart and try again");
+      const scope = customerUserId ? `order.create:${customerUserId}` : `order.guest:${guestOwnerHash}`;
       const committed = await client.query<{ response_body: Record<string, unknown> }>(
         "SELECT response_body FROM idempotency_keys WHERE scope=$1 AND key_hash=$2 AND status='completed' AND expires_at>now()",
-        [`order.create:${customerUserId}`, createHash("sha256").update(`checkout-${reservationId}`).digest("hex")],
+        [scope, createHash("sha256").update(`checkout-${reservationId}`).digest("hex")],
       );
       if (committed.rows[0]?.response_body) {
         await client.query("COMMIT");
@@ -1884,7 +1895,7 @@ export class CommerceService {
       await this.checkoutReservation(client, customerUserId, reservationId, guestOwnerHash);
       const items = await this.checkoutInventory(client, reservationId);
       const settings = await client.query<{ data: Record<string, unknown> }>("SELECT data FROM site_settings WHERE id='main' FOR SHARE");
-      const pricing = await this.checkoutPricing(client, customerUserId, reservationId, items.rows, settings.rows[0]?.data || {}, promotionCode);
+      const pricing = await this.checkoutPricing(client, customerUserId, reservationId, items.rows, settings.rows[0]?.data || {}, promotionCode, !customerUserId);
       await client.query("COMMIT");
       return this.cartQuoteView(pricing);
     } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
@@ -1892,7 +1903,7 @@ export class CommerceService {
   }
 
   public async checkout(
-    customerUserId: string,
+    customerUserId: string | null,
     input: CheckoutInput,
     requestId: string,
     guestOwnerHash?: string,
@@ -1905,6 +1916,9 @@ export class CommerceService {
       if (!idempotencyKey) {
         throw new AppError(400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required");
       }
+      const guest = !customerUserId;
+      if (guest && !guestOwnerHash) throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "Reload your cart and try again");
+      const scope = guest ? `order.guest:${guestOwnerHash}` : `order.create:${customerUserId}`;
       const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
       const requestHash = createHash("sha256")
         .update(JSON.stringify({ customerUserId, input }))
@@ -1914,7 +1928,7 @@ export class CommerceService {
          VALUES ($1,$2,$3,now() + interval '24 hours')
          ON CONFLICT (scope, key_hash) DO NOTHING
          RETURNING id::text`,
-        [`order.create:${customerUserId}`, keyHash, requestHash],
+        [scope, keyHash, requestHash],
       );
       if (!insertedKey.rows.length) {
         const existingKey = await client.query<{
@@ -1926,7 +1940,7 @@ export class CommerceService {
              FROM idempotency_keys
             WHERE scope=$1 AND key_hash=$2 AND expires_at > now()
             FOR UPDATE`,
-          [`order.create:${customerUserId}`, keyHash],
+          [scope, keyHash],
         );
         const existing = existingKey.rows[0];
         if (!existing) {
@@ -1951,7 +1965,21 @@ export class CommerceService {
         throw new AppError(409, "CHECKOUT_IN_PROGRESS", "This checkout is already being processed");
       }
 
+      if (guest) {
+        // Non-locking ownership preflight; recheck under the common lock order
+        // below. Never lock a reservation before the customer's reward lock.
+        const owned = await client.query("SELECT 1 FROM cart_reservations WHERE id=$1 AND source='cart' AND customer_user_id IS NULL AND guest_owner_hash=$2 AND expires_at>now()", [input.reservationId, guestOwnerHash]);
+        if (!owned.rows.length) throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "Reload your cart and try again");
+        customerUserId = await guestCheckoutCustomer(client, {
+          ...input.contact, country: input.address.country, governorate: input.address.governorate,
+        });
+      }
+      if (!customerUserId) throw new AppError(422, "CUSTOMER_DETAILS_INVALID", "Check your checkout details");
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:customer-rewards:${customerUserId}`]);
+      if (guest) {
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`dart:cart:${input.reservationId}`]);
+        await this.checkoutReservation(client, null, input.reservationId, guestOwnerHash);
+      }
       await this.releaseExpired(client);
       const reservation = await this.checkoutReservation(client, customerUserId, input.reservationId, guestOwnerHash, true);
       const itemResult = await this.checkoutInventory(client, input.reservationId);
@@ -1991,12 +2019,13 @@ export class CommerceService {
             : 100,
         ) * 100,
       );
-      const pricing = await this.checkoutPricing(client, customerUserId, input.reservationId, itemResult.rows, settings, input.promotionCode);
+      const pricing = await this.checkoutPricing(client, customerUserId, input.reservationId, itemResult.rows, settings, input.promotionCode, guest);
       const { itemSnapshots, subtotalMinor, finalMinor, shippingMinor, orderDiscountMinor, promotion, promotionPercent,
         birthdayReward, appliedCard, birthdayState, cardState, discountCode } = pricing;
       if (input.quoteFingerprint && input.quoteFingerprint !== pricing.fingerprint) {
         throw new AppError(409, "PRICE_CHANGED", "Cart pricing changed. Review the current total before confirming.", {
           changes: [{ previousUnitPrice: Number(input.expectedTotalMinor || 0) / 100, currentUnitPrice: finalMinor / 100 }],
+          ...(guest ? { quote: this.cartQuoteView(pricing) } : {}),
         });
       }
       const reservedPricing = Array.isArray(reservation.pricing_snapshot)
@@ -2160,7 +2189,7 @@ export class CommerceService {
       }
 
       let waitlistConversions = 0;
-      for (const snapshot of itemSnapshots) {
+      for (const snapshot of guest ? [] : itemSnapshots) {
         const row = snapshot.row;
         const conversion = await client.query<{ id: string }>(
           `WITH candidate AS (
@@ -2239,7 +2268,7 @@ export class CommerceService {
         `INSERT INTO order_events (
            order_id, event_type, from_status, to_status, actor_type, actor_id, metadata
          ) VALUES ($1,'ORDER_CREATED',NULL,'New','customer',$2,$3::jsonb)`,
-        [order.id, customerUserId, JSON.stringify({ requestId })],
+        [order.id, customerUserId, JSON.stringify({ requestId, guestCheckout: guest })],
       );
       await client.query(
         `INSERT INTO audit_logs (
@@ -2249,7 +2278,7 @@ export class CommerceService {
           customerUserId,
           order.id,
           requestId,
-          JSON.stringify({ orderCode: order.order_code, itemCount: itemSnapshots.length }),
+          JSON.stringify({ orderCode: order.order_code, itemCount: itemSnapshots.length, guestCheckout: guest }),
         ],
       );
       // Flush deferred Set allocations before queueing email or caching the customer reply.
@@ -2307,7 +2336,7 @@ export class CommerceService {
         `UPDATE idempotency_keys
             SET status='completed', response_code=201, response_body=$3::jsonb, updated_at=now()
           WHERE scope=$1 AND key_hash=$2`,
-        [`order.create:${customerUserId}`, keyHash, JSON.stringify(checkoutResponse)],
+        [scope, keyHash, JSON.stringify(checkoutResponse)],
       );
       await client.query("COMMIT");
       return checkoutResponse;

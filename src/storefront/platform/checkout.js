@@ -20,24 +20,27 @@
     return order;
   }
   async function recoverCompletedCheckout() {
-    if (!API_BASE || !currentUser()) return null;
+    if (!API_BASE) return null;
     try {
       const quote = await quoteCart({ force: true });
       return quote?.completedOrder ? finishApiCheckout(quote.completedOrder) : null;
     } catch (error) {
-      if ([404, 409].includes(error.status)) return null;
+      if ([403, 404, 409].includes(error.status)) return null;
       throw error;
     }
   }
   async function quoteCart(options = {}) {
-    if (!API_BASE || !currentUser()) return null;
+    if (!API_BASE) return null;
     if (typeof settleCartMutations === "function") await settleCartMutations();
     const signature = cartQuoteSignature();
+    // A reviewed guest quote includes the matched contact usage limits. An
+    // anonymous display refresh must not replace it before explicit acceptance.
+    if (!currentUser() && reviewedQuote?.signature === signature && reviewedQuote.quote) return reviewedQuote.quote;
     if (!options.force && cartQuoteCache?.signature === signature && Date.now() - cartQuoteCache.at < 2000) return cartQuoteCache.quote;
     if (cartQuotePending?.signature === signature) return cartQuotePending.task;
     const code = ["Promotion", "DiscountCode"].includes(window.dartAppliedPromotion?.type) ? window.dartAppliedPromotion.code : "";
     const task = (async () => {
-      const quote = await apiRequest(`/api/v1/me/cart/quote?reservationId=${encodeURIComponent(CART_RESERVATION_ID)}${code ? `&promotionCode=${encodeURIComponent(code)}` : ""}`);
+      const quote = await apiRequest(`/api/v1/${currentUser() ? "me/cart" : "cart"}/quote?reservationId=${encodeURIComponent(CART_RESERVATION_ID)}${code ? `&promotionCode=${encodeURIComponent(code)}` : ""}`);
       if (signature !== cartQuoteSignature()) throw new Error("Cart changed while pricing. Review it and retry.");
       cartQuoteCache = { signature, quote, at: Date.now() };
       return quote;
@@ -101,8 +104,7 @@
       throw new Error("السلة فارغة.");
     }
     const logged = currentUser();
-    if (!logged)
-      throw new Error("يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.");
+    if (!logged && !API_BASE) throw new Error("Checkout is temporarily unavailable.");
     // Retry shipping even after a previous outage made the address temporarily ineligible.
     if (window.DartShippingAvailability) await window.DartShippingAvailability.load({ force: true });
     const details = {
@@ -110,6 +112,7 @@
       phone1: getCheckoutField(form, "phone1") || displayPhone(logged?.phone1),
       phone2: getCheckoutField(form, "phone2") || displayPhone(logged?.phone2),
       email: getCheckoutField(form, "email") || logged?.email || "",
+      birthday: getCheckoutField(form, "birthday") || logged?.birthday || "",
       country: getCheckoutField(form, "country") || "Egypt",
       governorate: getCheckoutField(form, "governorate"),
       city: getCheckoutField(form, "city"),
@@ -127,6 +130,8 @@
     };
     if (!details.name || !details.phone1)
       throw new Error("Complete your name and phone number.");
+    if (!logged && (!details.email || !details.birthday))
+      throw new Error("Complete your email and birthday to create your customer account with this order.");
     const addressController = window.dartCheckoutAddress;
     const addressValidation = addressController?.validate?.();
     if (!addressValidation?.ok)
@@ -167,7 +172,8 @@
     if (API_BASE) {
       const previousQuote = currentCartQuote();
       const previousTotal = window.dartDisplayedTotalMinor;
-      const quote = await quoteCart({ force: true });
+      const quote = !logged && options.acceptPriceChanges && reviewedQuote?.signature === cartQuoteSignature() && reviewedQuote.quote
+        ? reviewedQuote.quote : await quoteCart({ force: true });
       if (!quote.completedOrder) {
         const quantities = (lines, quoted) => {
           const totals = new Map();
@@ -199,7 +205,7 @@
       if (!quote.completedOrder) assertAddressUnchanged();
       let response;
       try {
-        response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest("/api/v1/orders", {
+        response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest(logged ? "/api/v1/orders" : "/api/v1/guest/orders", {
         method: "POST",
         headers: { "Idempotency-Key": `checkout-${CART_RESERVATION_ID}` },
         body: {
@@ -211,6 +217,7 @@
             phone1: details.phone1,
             ...(details.phone2 && details.phone2 !== "-" ? { phone2: details.phone2 } : {}),
             email: details.email,
+            ...(details.birthday ? { birthday: details.birthday } : {}),
           },
           address: {
             country: details.country,
@@ -238,8 +245,9 @@
       });
       } catch (error) {
         if (error.code === "PRICE_CHANGED") {
-          const fresh = await quoteCart({ force: true });
-          reviewedQuote = { signature: cartQuoteSignature(), fingerprint: fresh.fingerprint };
+          const fresh = !logged && error.details?.quote ? error.details.quote : await quoteCart({ force: true });
+          reviewedQuote = { signature: cartQuoteSignature(), fingerprint: fresh.fingerprint, ...(!logged ? { quote: fresh } : {}) };
+          cartQuoteCache = { signature: cartQuoteSignature(), quote: fresh, at: Date.now() };
           window.applyCartQuote?.(fresh);
         }
         throw error;
@@ -248,7 +256,7 @@
       // The committed order is the success boundary. Projection/preference refresh
       // cannot turn it into a failed checkout or hold up its confirmation.
       void Promise.allSettled([
-        Promise.resolve().then(() => saveCustomerAddress({
+        Promise.resolve().then(() => logged && saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
           ...(details.latitude && details.longitude
             ? { lat: Number(details.latitude), lng: Number(details.longitude) }

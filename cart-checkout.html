@@ -111,7 +111,8 @@
                 <div class="calc-row total-row"><span>Total</span> <span id="totalVal">0 EGP</span></div>
             </div>
 
-<h3 class="address-header">Address</h3>
+<h3 class="address-header">Delivery details</h3>
+<p>كمّل طلبك كضيف. عندك حساب وعايز تستخدم خصوماتك الشخصية؟ <a href="Sign%20Up%20modern.html?next=checkout">Sign In</a></p>
 
 <!-- نموذج تفاصيل العنوان -->
 <form id="checkoutForm" class="address-form">
@@ -144,6 +145,8 @@
 
     <div class="form-group"><label for="checkout-name">Name</label><input id="checkout-name" name="customer_name" class="inp" type="text" placeholder="Value" autocomplete="name" required></div>
     <div class="form-group"><label for="checkout-phone1">Phone number</label><input id="checkout-phone1" name="phone1" class="inp" type="tel" placeholder="Value" autocomplete="tel" inputmode="tel" required></div>
+    <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Email" autocomplete="email" maxlength="254" required></div>
+    <div class="form-group"><label for="checkout-birthday">Birthday</label><input id="checkout-birthday" name="birthday" class="inp" type="date" autocomplete="bday" min="1900-01-01" required><small>لعروض عيد ميلادك.</small></div>
     <div class="form-group"><label for="checkout-phone2">Phone number 2</label><input id="checkout-phone2" name="phone2" class="inp" type="tel" placeholder="Optional" inputmode="tel"></div>
     <div class="form-group"><label for="checkout-building">Building Number/Name</label><input id="checkout-building" name="building" class="inp" type="text" placeholder="Value" required></div>
     <div class="form-group"><label for="checkout-floor">Floor</label><input id="checkout-floor" name="floor" class="inp" type="text" placeholder="Value" required></div>
@@ -153,7 +156,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
       </summary>
       <div class="dart-checkout-extra-fields">
-        <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Value" autocomplete="email"></div>
         <div class="form-group"><label for="checkout-notes">Delivery Notes</label><textarea id="checkout-notes" name="delivery_notes" class="inp" placeholder="Value"></textarea></div>
         <div class="other-addres" style="display: block;">
             <div class="form-group">
@@ -197,7 +199,8 @@
         </div>
     </section>
 
-    <button type="submit" class="order-btn">Order</button>
+    <p class="checkout-account-note">بتأكيد الطلب، هيتعمل لك حساب تلقائيًا ببياناتك لمتابعة طلباتك. لو عندك حساب، هنربط الطلب بسجلك.</p>
+    <button type="submit" class="order-btn">Confirm Order</button>
 </form>
         </section>
 

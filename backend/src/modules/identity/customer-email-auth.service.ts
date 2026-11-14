@@ -101,7 +101,7 @@ export class CustomerEmailAuthService {
       catch { return { challengeId: randomUUID(), expiresAt: new Date(Date.now()+300_000).toISOString(), emailDisplay:null, sent:false }; }
     }
     const result = await this.pool.query<{ id: string; email: string }>(
-      "SELECT u.id::text,u.email FROM users u WHERE u.account_type='customer' AND u.status='active' AND u.deleted_at IS NULL AND u.email_verified_at IS NOT NULL AND u.email IS NOT NULL AND (u.email_normalized=$1 OR ($2::text IS NOT NULL AND EXISTS (SELECT 1 FROM account_phones p WHERE p.user_id=u.id AND p.account_type='customer' AND p.is_primary AND p.phone_normalized=$2))) LIMIT 1",
+      "SELECT u.id::text,u.email FROM users u WHERE u.account_type='customer' AND u.status='active' AND u.deleted_at IS NULL AND u.email IS NOT NULL AND (u.email_normalized=$1 OR ($2::text IS NOT NULL AND EXISTS (SELECT 1 FROM account_phones p WHERE p.user_id=u.id AND p.account_type='customer' AND p.is_primary AND p.phone_normalized=$2))) LIMIT 1",
       [isEmail ? normalizeEmail(supplied) : "",phone],
     );
     const row=result.rows[0];
@@ -151,7 +151,7 @@ export class CustomerEmailAuthService {
     if(!challenge)throw new AppError(400,"OTP_INVALID","The code is invalid or expired");
     if(purpose==="login"){
       if(!challenge.user_id)throw new AppError(400,"OTP_INVALID","The code is invalid or expired");
-      return this.identity.loginLinkedSocialCustomer(challenge.user_id,meta,"email_otp");
+      return this.identity.loginLinkedSocialCustomer(challenge.user_id,meta,"email_otp",challenge.email);
     }
     if(!challenge.signup_data)throw new AppError(400,"OTP_INVALID","The code is invalid or expired");
     return this.identity.registerVerifiedEmailCustomer({

@@ -46,10 +46,18 @@ async function recovery() {
   assert.equal(c.cartData.length, 1, "network failure must not clear the cart");
 
   const guest = cartContext(); guest.currentUser = () => null;
-  await assert.rejects(guest.reserveCart([{ id: "M1", size: "M", color: "Black", quantity: 1 }]), /سجل الدخول/);
-  assert.equal(await guest.requireCartAccount("/products/test--m1"), false);
-  assert.match(guest.redirect, /next=product&productPath=/);
-  assert.equal(guest.cartData.length, 0);
+  guest.apiRequest = async (path, options) => {
+    if (options?.method === "PUT") {
+      assert.equal(path, "/api/v1/cart/reservation");
+      return { reservationId: "GUEST-CART-ID", expiresAt: new Date(Date.now() + 60000).toISOString() };
+    }
+    return { cart: null };
+  };
+  assert.equal(await guest.requireCartAccount(), true);
+  await guest.reserveCart([{ id: "M1", size: "M", color: "Black", quantity: 1 }]);
+  assert.equal(guest.redirect, undefined, "adding as guest must never navigate to signup");
+  assert.equal(guest.cartData.length, 1);
+  assert.equal(guest.CART_RESERVATION_ID, "GUEST-CART-ID");
 }
 async function conflict() {
   const c = cartContext(); let replaced = false, offline = true, mutations = 0;

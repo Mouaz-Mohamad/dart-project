@@ -389,15 +389,15 @@ export class PromotionService {
     }
   }
 
-  public async resolveForCheckoutInTransaction(client: PoolClient, customerUserId: string, reservationId: string, requestedCode?: string, reservedItems?: CartFact[]): Promise<{ code: string | null; campaign: Record<string, unknown> | null; discountCode: DiscountCode | null }> {
-      const facts = await this.customerFacts(client, customerUserId);
-      const cart = reservedItems ?? await this.cartFacts(client, customerUserId, reservationId);
+  public async resolveForCheckoutInTransaction(client: PoolClient, customerUserId: string | null, reservationId: string, requestedCode?: string, reservedItems?: CartFact[], guest = false): Promise<{ code: string | null; campaign: Record<string, unknown> | null; discountCode: DiscountCode | null }> {
+      const facts = !guest && customerUserId ? await this.customerFacts(client, customerUserId) : null;
+      const cart = reservedItems ?? (customerUserId ? await this.cartFacts(client, customerUserId, reservationId) : []);
       if (!cart.length) throw new AppError(409, "RESERVATION_EMPTY", "No reserved items remain in this cart");
       const campaigns = await this.loadCampaigns(client);
       const normalizedCode = String(requestedCode || "").trim().toUpperCase();
       const discountCode = normalizedCode ? await new DiscountCodeService(this.pool).resolveInTransaction(
         client, customerUserId, normalizedCode,
-        cart.map(line => ({ id: line.itemCode, ...line, isSet: Boolean(line.isSet) }))
+        cart.map(line => ({ id: line.itemCode, ...line, isSet: Boolean(line.isSet) })), guest
       ) : null;
       // Automatic campaigns remain first-priority on their own eligible pieces.
       // A supplied discount code is not mistaken for a campaign.
@@ -406,8 +406,9 @@ export class PromotionService {
         : campaigns.filter((campaign) => campaign.automatic).sort((a,b) => b.priority - a.priority || b.discountPercent - a.discountPercent);
       for (const campaign of candidates) {
         if (!this.campaignActive(campaign)) continue;
-        if (!this.audienceEligible(campaign, facts)) continue;
-        if (!evaluateRule(campaign.customerRules, facts)) continue;
+        if (!facts && (campaign.audience !== "all" || campaign.customerRules)) continue;
+        if (facts && !this.audienceEligible(campaign, facts)) continue;
+        if (facts && !evaluateRule(campaign.customerRules, facts)) continue;
         if (!this.cartEligible(campaign, cart)) continue;
         if (!await this.campaignUsageAllowed(client, campaign, customerUserId)) continue;
         return {

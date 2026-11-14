@@ -127,6 +127,31 @@ async function profileRecovery() {
   assert.equal(c.apiSessionUnavailable, false); assert.match(hosts.profileOrdersList.innerHTML, /K-SAVED/); assert.equal(redirects, 0);
 }
 
+async function guestPriceAcceptance() {
+  const { context: c } = cartContext();
+  c.currentUser = () => null; fields.birthday = "2000-09-02";
+  c.cartData = [line(1)]; c.write("dart_cart", c.cartData);
+  const quotedLines = [{ modelId: "M1", color: "Black", size: "M" }];
+  const anonymous = { fingerprint: "a".repeat(64), totalMinor: 52500, lines: quotedLines };
+  const authoritative = { fingerprint: "b".repeat(64), totalMinor: 60000, lines: quotedLines };
+  let posts = 0, quoteCalls = 0;
+  c.apiRequest = async (url, options) => {
+    if (url.includes("/cart/quote")) { quoteCalls++; return anonymous; }
+    assert.equal(url, "/api/v1/guest/orders"); posts++;
+    if (posts === 1) throw Object.assign(new Error("Public campaign already used"), { code: "PRICE_CHANGED", details: { quote: authoritative } });
+    assert.equal(options.body.quoteFingerprint, authoritative.fingerprint);
+    assert.equal(options.body.expectedTotalMinor, 60000);
+    return { order: { orderId: "GUEST-CONFIRMED" } };
+  };
+  await assert.rejects(c.checkout(form), error => error.code === "PRICE_CHANGED");
+  assert.equal(c.currentCartQuote().totalMinor, 60000, "cart must show the authoritative review total");
+  assert.equal((await c.quoteCart({ force: true })).totalMinor, 60000, "anonymous refresh cannot undo contact-bound price review");
+  assert.equal((await c.checkout(form, { acceptPriceChanges: true })).orderId, "GUEST-CONFIRMED");
+  assert.equal(posts, 2); assert.equal(quoteCalls, 1);
+  assert.equal(c.currentUser(), null, "guest checkout cannot grant access to an existing account");
+  delete fields.birthday;
+}
+
 function editorVersions() {
   const fields = {}, order = { id: "order", version: 7, items: [] }, r = { id: "return", condition: "Damaged", updatedAt: "2026-10-25T12:00:00.000Z" };
   const element = (id) => fields[id] ??= { value: "", dataset: {} };
@@ -138,6 +163,6 @@ function editorVersions() {
   assert.equal(fields["modal-item-condition"].value, "Bad");
 }
 
-(async () => { await cartQueue(); await contentMismatch(); await setAttachmentQueue(); await staleRollback(); await profileRecovery(); editorVersions();
+(async () => { await cartQueue(); await contentMismatch(); await setAttachmentQueue(); await staleRollback(); await guestPriceAcceptance(); await profileRecovery(); editorVersions();
   console.log("PASS fourth Council runtime: queued cart intents, checkout reconciliation, stale rollback, profile retry/cache and captured editor versions");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

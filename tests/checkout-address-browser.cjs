@@ -31,8 +31,8 @@ for(const width of [320,390,768,1440]){
 await page.setViewportSize({width,height:844});
 assert.equal(await details.evaluate(el=>el.open),false,"extra details start collapsed");
 assert.deepEqual(await page.locator("#checkoutForm > .form-group input:visible").evaluateAll(nodes=>nodes.map(el=>el.id)),
-["checkout-name","checkout-phone1","checkout-phone2","checkout-building","checkout-floor"]);
-assert.equal(await page.locator("#checkout-email").isVisible(),false);
+["checkout-name","checkout-phone1","checkout-email","checkout-birthday","checkout-phone2","checkout-building","checkout-floor"]);
+assert.equal(await page.locator("#checkout-email").isVisible(),true);
 assert.equal(await page.locator("#checkout-notes").isVisible(),false);
 assert.equal(await page.locator("#area-input").isVisible(),false);
 const map=await page.locator("#dart-checkout-google-map").boundingBox();
@@ -45,7 +45,7 @@ assert.equal(await details.evaluate(el=>el.open),true,"keyboard opens native dis
 await summary.press("Space");
 assert.equal(await details.evaluate(el=>el.open),false,"keyboard closes native disclosure");
 await page.evaluate(()=>document.getElementById("checkoutForm").addEventListener("submit",event=>event.preventDefault()));
-for(const [id,value] of [["checkout-name","Synthetic customer"],["checkout-phone1","01000000000"],["checkout-building","21"],["checkout-floor","3"]])
+for(const [id,value] of [["checkout-name","Synthetic customer"],["checkout-phone1","01000000000"],["checkout-email","synthetic@example.test"],["checkout-birthday","2000-09-02"],["checkout-building","21"],["checkout-floor","3"]])
 await page.locator("#"+id).fill(value);
 if(process.env.DART_CHECKOUT_SCREENSHOT)await page.locator("#checkoutForm").screenshot({path:process.env.DART_CHECKOUT_SCREENSHOT});
 await page.locator("#checkoutForm button[type=submit]").click();
@@ -63,10 +63,10 @@ await page.locator("#"+id).fill(value);
 assert.equal(await page.evaluate(()=>dartCheckoutAddress.validate().ok),true,"manual delivery fallback works without Google");
 await page.locator("#checkout-email").fill("not-an-email");await summary.click();
 await page.evaluate(()=>document.getElementById("checkoutForm").requestSubmit());
-assert.equal(await details.evaluate(el=>el.open),true,"requestSubmit reveals an invalid collapsed email");
+assert.equal(await details.evaluate(el=>el.open),false,"invalid email is visible without expanding address details");
 assert.equal(await page.evaluate(()=>document.activeElement.id),"checkout-email");
 await page.locator("#checkout-email").fill("synthetic@example.test");
-await page.locator("#checkout-notes").fill("Synthetic delivery note");await summary.click();
+await summary.click();await page.locator("#checkout-notes").fill("Synthetic delivery note");await summary.click();
 assert.equal(await page.evaluate(()=>new FormData(document.getElementById("checkoutForm")).get("street")),"Example St","collapsed fields are still submitted");
 assert.equal(await page.evaluate(()=>new FormData(document.getElementById("checkoutForm")).get("delivery_notes")),"Synthetic delivery note","closing details preserves optional values");
 await page.evaluate(()=>document.getElementById("checkoutForm").requestSubmit());
@@ -86,6 +86,6 @@ await page.reload();
 await page.evaluate(()=>document.getElementById("checkoutView").style.display="block");
 await summary.click();assert.equal(await details.evaluate(el=>el.open),true);
 await summary.click();assert.equal(await details.evaluate(el=>el.open),false);
-console.log("PASS taller responsive map, five primary fields, native keyboard/no-JS disclosure, hidden-field validation/focus, preserved form data, offline manual fallback and coverage guards");
+console.log("PASS taller responsive map, guest account fields, native keyboard/no-JS disclosure, hidden-field validation/focus, preserved form data, offline manual fallback and coverage guards");
 }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

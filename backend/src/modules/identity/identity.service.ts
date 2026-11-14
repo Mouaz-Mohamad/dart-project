@@ -1648,6 +1648,7 @@ export class IdentityService {
     userId: string,
     metadata: RequestMetadata,
     method: "linked_social_identity" | "email_otp" | "passkey" = "linked_social_identity",
+    expectedEmail?: string,
   ): Promise<IssuedSession> {
     const client = await this.pool.connect();
     try {
@@ -1655,12 +1656,15 @@ export class IdentityService {
       const account = await client.query<{ id: string }>(
         `SELECT id::text FROM users
           WHERE id=$1 AND account_type='customer' AND status='active'
-            AND deleted_at IS NULL FOR UPDATE`,
-        [userId],
+            AND deleted_at IS NULL
+            AND ($2::text IS NULL OR email_normalized=$2) FOR UPDATE`,
+        [userId, expectedEmail ? normalizeEmail(expectedEmail) : null],
       );
       if (!account.rows[0]) {
         throw new AppError(403, "ACCOUNT_UNAVAILABLE", "This account is not available");
       }
+      if (method === "email_otp" && expectedEmail) await client.query(
+        "UPDATE users SET email_verified_at=COALESCE(email_verified_at,now()) WHERE id=$1", [userId]);
       await client.query(
         `UPDATE users SET failed_login_count=0,locked_until=NULL,
           last_login_at=now(),updated_at=now() WHERE id=$1`,

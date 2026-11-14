@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:1698061114bb69f261dd902db6e1647f00379dd0525177174889b438e7d8f2a3 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:f85ed6f979c52f5a96801e60f41193965dacc6ecaaf2547ef40dc8c8259827f8 */
 (function () {
   "use strict";
 
@@ -518,6 +518,7 @@
       ...options,
       headers: {
         "Content-Type": "application/json",
+        ...(/^\/api\/v1\/(?:cart(?:\/|$)|guest\/)/.test(path) ? { "X-Dart-Guest-Cart": "1" } : {}),
         ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken
           ? { "X-CSRF-Token": decodeURIComponent(csrfToken) }
           : {}),
@@ -1109,15 +1110,30 @@
 
   async function register(payload) {
     if (!API_BASE) throw new Error("تعذر إنشاء الحساب لأن خدمة الحسابات غير مهيأة.");
-    const result = await apiRequest("/api/v1/auth/register", {
+    return apiRequest("/api/v1/auth/register", {
       method: "POST",
       body: {
         name: String(payload.name || "").trim(),
         phone1: String(payload.phone1 || "").trim(),
+        email: String(payload.email || "").trim(),
         birthday: String(payload.birthday || "").trim(),
       },
     });
-    if (result.user) {
+  }
+
+  async function login(identifier) {
+    if (!API_BASE) throw new Error("تعذر تسجيل الدخول لأن خدمة الحسابات غير مهيأة.");
+    return apiRequest("/api/v1/auth/login", {
+      method: "POST",
+      body: { identifier: String(identifier || "").trim() },
+    });
+  }
+
+  async function acceptVerifiedSession(path,challengeId,code) {
+    const result=await apiRequest(path,{
+      method:"POST",body:{challengeId,code},
+    });
+    if(result.user) {
       cacheApiUser(result.user);
       await claimGuestCartAfterAuth();
       refreshCustomerCommerceInBackground();
@@ -1125,16 +1141,20 @@
     return result;
   }
 
-  async function login(identifier) {
-    if (!API_BASE) throw new Error("تعذر تسجيل الدخول لأن خدمة الحسابات غير مهيأة.");
-    const payload = await apiRequest("/api/v1/auth/login", {
-      method: "POST",
-      body: { identifier: String(identifier || "").trim() },
-    });
-    const user = cacheApiUser(payload.user);
-    await claimGuestCartAfterAuth();
-    refreshCustomerCommerceInBackground();
-    return user;
+  async function verifyLoginOtp(challengeId,code) {
+    return acceptVerifiedSession("/api/v1/auth/login/verify",challengeId,code);
+  }
+  async function verifyRegistrationOtp(challengeId,code) {
+    return acceptVerifiedSession("/api/v1/auth/register/verify",challengeId,code);
+  }
+
+  async function finishPasswordlessPasskey(result) {
+    if (result.user) {
+      cacheApiUser(result.user);
+      await claimGuestCartAfterAuth();
+      refreshCustomerCommerceInBackground();
+    }
+    return result;
   }
 
   async function requestPasswordReset(identifier, accountType = "representative") {
@@ -1445,24 +1465,27 @@
     return order;
   }
   async function recoverCompletedCheckout() {
-    if (!API_BASE || !currentUser()) return null;
+    if (!API_BASE) return null;
     try {
       const quote = await quoteCart({ force: true });
       return quote?.completedOrder ? finishApiCheckout(quote.completedOrder) : null;
     } catch (error) {
-      if ([404, 409].includes(error.status)) return null;
+      if ([403, 404, 409].includes(error.status)) return null;
       throw error;
     }
   }
   async function quoteCart(options = {}) {
-    if (!API_BASE || !currentUser()) return null;
+    if (!API_BASE) return null;
     if (typeof settleCartMutations === "function") await settleCartMutations();
     const signature = cartQuoteSignature();
+    // A reviewed guest quote includes the matched contact usage limits. An
+    // anonymous display refresh must not replace it before explicit acceptance.
+    if (!currentUser() && reviewedQuote?.signature === signature && reviewedQuote.quote) return reviewedQuote.quote;
     if (!options.force && cartQuoteCache?.signature === signature && Date.now() - cartQuoteCache.at < 2000) return cartQuoteCache.quote;
     if (cartQuotePending?.signature === signature) return cartQuotePending.task;
     const code = ["Promotion", "DiscountCode"].includes(window.dartAppliedPromotion?.type) ? window.dartAppliedPromotion.code : "";
     const task = (async () => {
-      const quote = await apiRequest(`/api/v1/me/cart/quote?reservationId=${encodeURIComponent(CART_RESERVATION_ID)}${code ? `&promotionCode=${encodeURIComponent(code)}` : ""}`);
+      const quote = await apiRequest(`/api/v1/${currentUser() ? "me/cart" : "cart"}/quote?reservationId=${encodeURIComponent(CART_RESERVATION_ID)}${code ? `&promotionCode=${encodeURIComponent(code)}` : ""}`);
       if (signature !== cartQuoteSignature()) throw new Error("Cart changed while pricing. Review it and retry.");
       cartQuoteCache = { signature, quote, at: Date.now() };
       return quote;
@@ -1526,8 +1549,7 @@
       throw new Error("السلة فارغة.");
     }
     const logged = currentUser();
-    if (!logged)
-      throw new Error("يجب إنشاء حساب أو تسجيل الدخول قبل إتمام الطلب.");
+    if (!logged && !API_BASE) throw new Error("Checkout is temporarily unavailable.");
     // Retry shipping even after a previous outage made the address temporarily ineligible.
     if (window.DartShippingAvailability) await window.DartShippingAvailability.load({ force: true });
     const details = {
@@ -1535,6 +1557,7 @@
       phone1: getCheckoutField(form, "phone1") || displayPhone(logged?.phone1),
       phone2: getCheckoutField(form, "phone2") || displayPhone(logged?.phone2),
       email: getCheckoutField(form, "email") || logged?.email || "",
+      birthday: getCheckoutField(form, "birthday") || logged?.birthday || "",
       country: getCheckoutField(form, "country") || "Egypt",
       governorate: getCheckoutField(form, "governorate"),
       city: getCheckoutField(form, "city"),
@@ -1552,6 +1575,8 @@
     };
     if (!details.name || !details.phone1)
       throw new Error("Complete your name and phone number.");
+    if (!logged && (!details.email || !details.birthday))
+      throw new Error("Complete your email and birthday to create your customer account with this order.");
     const addressController = window.dartCheckoutAddress;
     const addressValidation = addressController?.validate?.();
     if (!addressValidation?.ok)
@@ -1592,7 +1617,8 @@
     if (API_BASE) {
       const previousQuote = currentCartQuote();
       const previousTotal = window.dartDisplayedTotalMinor;
-      const quote = await quoteCart({ force: true });
+      const quote = !logged && options.acceptPriceChanges && reviewedQuote?.signature === cartQuoteSignature() && reviewedQuote.quote
+        ? reviewedQuote.quote : await quoteCart({ force: true });
       if (!quote.completedOrder) {
         const quantities = (lines, quoted) => {
           const totals = new Map();
@@ -1624,7 +1650,7 @@
       if (!quote.completedOrder) assertAddressUnchanged();
       let response;
       try {
-        response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest("/api/v1/orders", {
+        response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest(logged ? "/api/v1/orders" : "/api/v1/guest/orders", {
         method: "POST",
         headers: { "Idempotency-Key": `checkout-${CART_RESERVATION_ID}` },
         body: {
@@ -1636,6 +1662,7 @@
             phone1: details.phone1,
             ...(details.phone2 && details.phone2 !== "-" ? { phone2: details.phone2 } : {}),
             email: details.email,
+            ...(details.birthday ? { birthday: details.birthday } : {}),
           },
           address: {
             country: details.country,
@@ -1663,8 +1690,9 @@
       });
       } catch (error) {
         if (error.code === "PRICE_CHANGED") {
-          const fresh = await quoteCart({ force: true });
-          reviewedQuote = { signature: cartQuoteSignature(), fingerprint: fresh.fingerprint };
+          const fresh = !logged && error.details?.quote ? error.details.quote : await quoteCart({ force: true });
+          reviewedQuote = { signature: cartQuoteSignature(), fingerprint: fresh.fingerprint, ...(!logged ? { quote: fresh } : {}) };
+          cartQuoteCache = { signature: cartQuoteSignature(), quote: fresh, at: Date.now() };
           window.applyCartQuote?.(fresh);
         }
         throw error;
@@ -1673,7 +1701,7 @@
       // The committed order is the success boundary. Projection/preference refresh
       // cannot turn it into a failed checkout or hold up its confirmation.
       void Promise.allSettled([
-        Promise.resolve().then(() => saveCustomerAddress({
+        Promise.resolve().then(() => logged && saveCustomerAddress({
           address: details.fullAddress || [details.building, details.street, details.area, details.governorate, details.country].filter(Boolean).join(", "),
           ...(details.latitude && details.longitude
             ? { lat: Number(details.latitude), lng: Number(details.longitude) }
@@ -1988,20 +2016,19 @@
     });
   }
 
-  async function requireCartAccount(productPath = "", choices = []) {
+  async function requireCartAccount(productPath = "", choices = [], { accountRequired = false } = {}) {
     if (API_BASE && !currentUser()) await hydrateApiSession();
-    if (currentUser()) {
-      if (API_BASE && hydratedCartOwnerId !== currentUser().id) await hydrateCustomerCart();
-      return true;
+    if (accountRequired && !currentUser()) {
+      sessionStorage.setItem("dart_internal_navigation", "1");
+      const params = new URLSearchParams({ next: productPath ? "product" : "products" });
+      if (/^(?:\/products\/[a-z0-9\u0600-\u06ff-]+|\/sets\/[a-z0-9_-]{1,120})$/i.test(productPath)) params.set("productPath", productPath);
+      const intent = JSON.stringify({ at: Date.now(), choices });
+      if (intent.length <= 4000 && readCartReturnChoice(new URLSearchParams({ cartChoice: intent }).toString())) params.set("cartChoice", intent);
+      location.assign(`Sign%20Up%20modern.html?${params}`);
+      return false;
     }
-    sessionStorage.setItem("dart_internal_navigation", "1");
-    const params = new URLSearchParams({ next: productPath ? "product" : "products" });
-    if (/^(?:\/products\/[a-z0-9\u0600-\u06ff-]+|\/sets\/[a-z0-9_-]{1,120})$/i.test(productPath)) params.set("productPath", productPath);
-    // Only UI choices travel with navigation. No cart, prices or reservation are persisted.
-    const intent = JSON.stringify({ at: Date.now(), choices });
-    if (intent.length <= 4000 && readCartReturnChoice(new URLSearchParams({ cartChoice: intent }).toString())) params.set("cartChoice", intent);
-    location.assign(`Sign%20Up%20modern.html?${params}`);
-    return false;
+    if (API_BASE && hydratedCartOwnerId !== (currentUser()?.id || "guest")) await hydrateCustomerCart();
+    return true;
   }
 
   function showGuestCartConflict(guestId, accountId, cartVersion) {
@@ -2128,7 +2155,7 @@
       write("dart_cart", []);
       if (typeof renderCart === "function") renderCart();
       if (typeof updateCartCount === "function") updateCartCount();
-      hydratedCartOwnerId = ownerId;
+      hydratedCartOwnerId = ownerId || "guest";
       return [];
     }
     setCartReservationId(remote.reservationId);
@@ -2167,7 +2194,7 @@
     if (typeof renderCart === "function") renderCart();
     if (typeof updateCartCount === "function") updateCartCount();
     updateCartReservationTimer();
-    hydratedCartOwnerId = ownerId;
+    hydratedCartOwnerId = ownerId || "guest";
     return hydrated;
   }
 
@@ -2305,7 +2332,6 @@
   async function reserveCartSnapshot(cart, sequence) {
     invalidateCartQuote();
     if (API_BASE) {
-      if (!currentUser()) throw Object.assign(new Error("سجل الدخول أولًا لإضافة قطعة للسلة."), { code: "AUTH_REQUIRED", status: 401 });
       if (!cart.length) {
         await releaseCartReservationNow(false);
         if (sequence === cartMutationSequence) { write("dart_cart", []); if (typeof cartData !== "undefined") cartData = []; }
@@ -2317,7 +2343,9 @@
         size: String(line.size),
         quantity: Number(line.quantity),
       }));
-      const payload = await apiRequest(
+      let payload;
+      try {
+      payload = await apiRequest(
         currentUser() ? "/api/v1/me/cart/reservation" : "/api/v1/cart/reservation",
         {
           method: "PUT",
@@ -2327,6 +2355,10 @@
           },
         },
       );
+      } catch (error) {
+        if (error.code === "CART_ALREADY_CHECKED_OUT" && error.details?.completedOrder) finishApiCheckout(error.details.completedOrder);
+        throw error;
+      }
       setCartReservationId(payload.reservationId || CART_RESERVATION_ID);
       cart.forEach((line) => {
         line.reservationId = CART_RESERVATION_ID;
@@ -3111,7 +3143,16 @@
   }
 
 
+  function customerAuthErrorMessage(error) {
+    const message = String(error?.message || "").trim();
+    if (!message || /unexpected error|internal server error|failed to fetch|networkerror/i.test(message)) {
+      return "تعذر إرسال أو تأكيد رمز التحقق حاليًا. حاول مرة أخرى بعد قليل.";
+    }
+    return message;
+  }
+
   function bindAuth() {
+    if (typeof window.bindCustomerPasskeyLogin === "function") window.bindCustomerPasskeyLogin();
     document.addEventListener(
       "submit",
       async (event) => {
@@ -3150,11 +3191,14 @@
           if (submit) submit.disabled = true;
           setStatus(form, "جارٍ إنشاء الحساب…");
           try {
-            await register(Object.fromEntries(new FormData(form)));
-            setStatus(form, "تم إنشاء الحساب بنجاح.");
-            location.assign(requestedAuthDestination());
+            if(form.dataset.otpPending === "1") {
+              await window.submitCustomerOtpStep(form,"register");
+              return;
+            }
+            const result=await register(Object.fromEntries(new FormData(form)));
+            window.showCustomerOtpStep(form,"register",result);
           } catch (error) {
-            setStatus(form, error.message, true);
+            setStatus(form, customerAuthErrorMessage(error), true);
           } finally {
             delete form.dataset.submitting;
             if (submit) submit.disabled = false;
@@ -3168,11 +3212,14 @@
           if (submit) submit.disabled = true;
           setStatus(form, "جارٍ تسجيل الدخول…");
           try {
-            await login(form.elements.identifier.value);
-            setStatus(form, "تم تسجيل الدخول بنجاح.");
-            location.assign(requestedAuthDestination());
+            if(form.dataset.otpPending === "1") {
+              await window.submitCustomerOtpStep(form,"login");
+              return;
+            }
+            const result=await login(form.elements.identifier.value);
+            window.showCustomerOtpStep(form,"login",result);
           } catch (error) {
-            setStatus(form, error.message, true);
+            setStatus(form, customerAuthErrorMessage(error), true);
           } finally {
             delete form.dataset.submitting;
             if (submit) submit.disabled = false;
@@ -3883,6 +3930,7 @@
       phone1: displayPhone(user.phone1),
       phone2: displayPhone(user.phone2),
       email: user.email,
+      birthday: user.birthday,
     };
     Object.entries(values).forEach(([name, value]) => {
       const field = form.elements.namedItem(name);
@@ -4383,6 +4431,9 @@
     write,
     register,
     login,
+    verifyLoginOtp,
+    verifyRegistrationOtp,
+    finishPasswordlessPasskey,
     hydrateApiSession,
     requestedAuthDestination,
     hydrateCustomerCommerce,

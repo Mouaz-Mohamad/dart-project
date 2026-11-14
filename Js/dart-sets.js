@@ -40,6 +40,7 @@
       method,
       headers: {
         Accept: "application/json",
+        ...(/^\/api\/v1\/cart(?:\/|$)/.test(path) ? { "X-Dart-Guest-Cart": "1" } : {}),
         ...(!["GET", "HEAD", "OPTIONS"].includes(method) ? { "Content-Type": "application/json" } : {}),
         ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrf
           ? { "X-CSRF-Token": decodeURIComponent(csrf) }
@@ -760,6 +761,7 @@
       } finally { setPurchaseBusy=false; updateModalAvailability(); }
     }
     setPurchaseBusy=true; updateModalAvailability();
+    const previousReservationId=currentReservationId();
     const current=cartRef(), previousCart=clone(current), previousGroups=drafts();
     const unitIndex=nextUnitIndex(set.setId,previousGroups), key=`${set.setId}:${unitIndex}`;
     const group={setId:set.setId,unitIndex,selections};
@@ -771,6 +773,9 @@
     renderSetAwareCartCount();
     scheduleCartDecoration();
     const rollback=()=>{
+      if (currentReservationId()!==previousReservationId) {
+        root.DartSets.clearDrafts(); lastAttachedGroups=[]; return;
+      }
       const cart=cartRef(); cart.splice(0,cart.length,...clone(previousCart));
       root.DartState?.write?.("dart_cart",cart,{source:"set-cart-rollback"});
       root.DartSets.writeDrafts(previousGroups); lastAttachedGroups=normalizeGroups(previousGroups);

@@ -48,6 +48,7 @@ export interface CheckoutInput {
     phone1: string;
     phone2?: string | undefined;
     email: string;
+    birthday?: string | undefined;
   };
   address: {
     country: string;

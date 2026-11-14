@@ -410,9 +410,9 @@ async function persistCartReservation(previous) {
     return true;
   } catch (error) {
     if (sequence !== persistCartReservation.sequence) return false;
-    cartData = previous;
-    cacheFastCartSnapshot(previous);
-    window.DartState?.write?.("dart_cart", previous, { source: "cart-rollback" });
+    cartData = error.code === "CART_ALREADY_CHECKED_OUT" ? [] : previous;
+    cacheFastCartSnapshot(cartData);
+    window.DartState?.write?.("dart_cart", cartData, { source: "cart-rollback" });
     updateCartCount();
     showToast(error?.message || "تعذر حجز القطعة. حاول مرة أخرى.");
     return false;

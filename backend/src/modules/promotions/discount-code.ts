@@ -213,7 +213,7 @@ export class DiscountCodeService {
     finally { db.release(); }
   }
 
-  public async resolveInTransaction(client: PoolClient, customerId: string, raw: string, cart: DiscountLine[]): Promise<DiscountCode | null> {
+  public async resolveInTransaction(client: PoolClient, customerId: string | null, raw: string, cart: DiscountLine[], guest = false): Promise<DiscountCode | null> {
     const code = raw.trim().toUpperCase();
     if (!code) return null;
     const result = await client.query<DiscountCode>(`${selectCode} WHERE code=$1 FOR UPDATE`,[code]);
@@ -222,7 +222,7 @@ export class DiscountCodeService {
     const today = normalizedDate();
     if (offer.status !== "Active" || (offer.startsOn && today < offer.startsOn) || (offer.endsOn && today > offer.endsOn))
       throw new AppError(409,"DISCOUNT_CODE_EXPIRED","Discount code is not active");
-    if (offer.customerUserId && offer.customerUserId !== customerId)
+    if (offer.customerUserId && (guest || offer.customerUserId !== customerId))
       throw new AppError(403,"DISCOUNT_CODE_NOT_FOR_CUSTOMER","This code is assigned to another customer");
     if (cart.reduce((sum,line) => sum + line.sellingMinor,0) < offer.minOrderMinor ||
       !cart.some(line => codeAllowsLine(offer,line)))

@@ -7,6 +7,7 @@
       phone1: displayPhone(user.phone1),
       phone2: displayPhone(user.phone2),
       email: user.email,
+      birthday: user.birthday,
     };
     Object.entries(values).forEach(([name, value]) => {
       const field = form.elements.namedItem(name);

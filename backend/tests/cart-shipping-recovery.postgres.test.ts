@@ -42,7 +42,7 @@ describe("cart recovery and governorate policy on the production schema", () => 
       address: { country: "Egypt", governorate: "Cairo", area: "Tahrir", street: "Synthetic", building: "1", floor: "1", latitude: "30.0444", longitude: "31.2357" } };
     return { user, model, first, second, cart, guest, lines, input };
   }
-  it("rejects unauthenticated inventory and Set writes through both old and new URLs", async () => {
+  it("requires a signed-in session for account carts and a non-simple header for guest cart writes", async () => {
     const config = { sessionCookieName: "dart_session", authPepper: "synthetic-pepper-32-characters-long", nodeEnv: "test" as const };
     const identity = { authenticate: async () => null } as unknown as IdentityService;
     const app = express(); app.use(express.json(), cookieParser());
@@ -50,7 +50,8 @@ describe("cart recovery and governorate policy on the production schema", () => 
     app.use((error: AppError, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.status(error.statusCode || 500).json({ code: error.code }); });
     for (const path of ["/cart/reservation", "/me/cart/reservation", "/cart/set-groups", "/me/cart/set-groups"]) {
       const response = await request(app).put(`/api/v1${path}`).send({});
-      expect(response.status).toBe(401); expect(response.body.code).toBe("AUTH_REQUIRED");
+      expect(response.status).toBe(path.startsWith("/me/") ? 401 : 403);
+      expect(response.body.code).toBe(path.startsWith("/me/") ? "AUTH_REQUIRED" : "GUEST_CART_REQUEST_INVALID");
     }
   });
   it("discovers legacy guest holds by cookie ownership and claims without extending their expiry", async () => {

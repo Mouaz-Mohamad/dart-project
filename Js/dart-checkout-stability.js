@@ -8,6 +8,8 @@
     const form = document.getElementById("checkoutForm");
     if (!form || form.dataset.dartCheckoutStability === "1") return;
     form.dataset.dartCheckoutStability = "1";
+    const birthday = form.elements?.namedItem("birthday");
+    if (birthday) birthday.max = new Date().toISOString().slice(0, 10);
     const submit = form.querySelector('button[type="submit"], input[type="submit"]');
     if (!submit) return;
     const originalLabel = (submit.tagName === "INPUT" ? submit.value : submit.textContent) || "Order";

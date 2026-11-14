@@ -38,20 +38,19 @@
     });
   }
 
-  async function requireCartAccount(productPath = "", choices = []) {
+  async function requireCartAccount(productPath = "", choices = [], { accountRequired = false } = {}) {
     if (API_BASE && !currentUser()) await hydrateApiSession();
-    if (currentUser()) {
-      if (API_BASE && hydratedCartOwnerId !== currentUser().id) await hydrateCustomerCart();
-      return true;
+    if (accountRequired && !currentUser()) {
+      sessionStorage.setItem("dart_internal_navigation", "1");
+      const params = new URLSearchParams({ next: productPath ? "product" : "products" });
+      if (/^(?:\/products\/[a-z0-9\u0600-\u06ff-]+|\/sets\/[a-z0-9_-]{1,120})$/i.test(productPath)) params.set("productPath", productPath);
+      const intent = JSON.stringify({ at: Date.now(), choices });
+      if (intent.length <= 4000 && readCartReturnChoice(new URLSearchParams({ cartChoice: intent }).toString())) params.set("cartChoice", intent);
+      location.assign(`Sign%20Up%20modern.html?${params}`);
+      return false;
     }
-    sessionStorage.setItem("dart_internal_navigation", "1");
-    const params = new URLSearchParams({ next: productPath ? "product" : "products" });
-    if (/^(?:\/products\/[a-z0-9\u0600-\u06ff-]+|\/sets\/[a-z0-9_-]{1,120})$/i.test(productPath)) params.set("productPath", productPath);
-    // Only UI choices travel with navigation. No cart, prices or reservation are persisted.
-    const intent = JSON.stringify({ at: Date.now(), choices });
-    if (intent.length <= 4000 && readCartReturnChoice(new URLSearchParams({ cartChoice: intent }).toString())) params.set("cartChoice", intent);
-    location.assign(`Sign%20Up%20modern.html?${params}`);
-    return false;
+    if (API_BASE && hydratedCartOwnerId !== (currentUser()?.id || "guest")) await hydrateCustomerCart();
+    return true;
   }
 
   function showGuestCartConflict(guestId, accountId, cartVersion) {
@@ -178,7 +177,7 @@
       write("dart_cart", []);
       if (typeof renderCart === "function") renderCart();
       if (typeof updateCartCount === "function") updateCartCount();
-      hydratedCartOwnerId = ownerId;
+      hydratedCartOwnerId = ownerId || "guest";
       return [];
     }
     setCartReservationId(remote.reservationId);
@@ -217,7 +216,7 @@
     if (typeof renderCart === "function") renderCart();
     if (typeof updateCartCount === "function") updateCartCount();
     updateCartReservationTimer();
-    hydratedCartOwnerId = ownerId;
+    hydratedCartOwnerId = ownerId || "guest";
     return hydrated;
   }
 
@@ -355,7 +354,6 @@
   async function reserveCartSnapshot(cart, sequence) {
     invalidateCartQuote();
     if (API_BASE) {
-      if (!currentUser()) throw Object.assign(new Error("سجل الدخول أولًا لإضافة قطعة للسلة."), { code: "AUTH_REQUIRED", status: 401 });
       if (!cart.length) {
         await releaseCartReservationNow(false);
         if (sequence === cartMutationSequence) { write("dart_cart", []); if (typeof cartData !== "undefined") cartData = []; }
@@ -367,7 +365,9 @@
         size: String(line.size),
         quantity: Number(line.quantity),
       }));
-      const payload = await apiRequest(
+      let payload;
+      try {
+      payload = await apiRequest(
         currentUser() ? "/api/v1/me/cart/reservation" : "/api/v1/cart/reservation",
         {
           method: "PUT",
@@ -377,6 +377,10 @@
           },
         },
       );
+      } catch (error) {
+        if (error.code === "CART_ALREADY_CHECKED_OUT" && error.details?.completedOrder) finishApiCheckout(error.details.completedOrder);
+        throw error;
+      }
       setCartReservationId(payload.reservationId || CART_RESERVATION_ID);
       cart.forEach((line) => {
         line.reservationId = CART_RESERVATION_ID;

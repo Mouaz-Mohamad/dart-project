@@ -2,6 +2,7 @@ import { dispatchOutbox } from "../outbox/outbox.dispatch.js";
 // DART CODE GUIDE | backend/src/modules/commerce/commerce.routes.ts
 // الغرض: تعريف HTTP routes: يتحقق من الإدخال والصلاحيات ثم يمرر العمل إلى الـService.
 import { randomUUID } from "node:crypto";
+import { normalizeEgyptianPhone } from "../../security/normalization.js";
 import { Router, type Request, type Response } from "express";
 import { sharedRateLimitStore } from "../../security/shared-rate-limit.js";
 import { rateLimit } from "express-rate-limit";
@@ -9,7 +10,7 @@ import { z } from "zod";
 import { blockedGovernoratesSchema, shippingCompanySchema } from "../settings/site-settings.schema.js";
 import { AppError } from "../../http/app-error.js";
 import type { AppConfig } from "../../config/env.js";
-import { GUEST_CART_COOKIE, hashGuestCartToken } from "../../security/guest-cart-owner.js";
+import { GUEST_CART_COOKIE, hashGuestCartToken, guestCartWrite } from "../../security/guest-cart-owner.js";
 import {
   authenticate,
   csrfProtection,
@@ -130,6 +131,7 @@ export const checkoutSchema = z.object({
     phone1: z.string().trim().min(7).max(40),
     phone2: z.string().trim().max(40).optional(),
     email: z.union([z.string().trim().email().max(320), z.literal("")]).default(""),
+    birthday: z.iso.date().refine(value => value >= "1900-01-01" && value <= new Date().toISOString().slice(0, 10), "Birthday must not be in the future").optional(),
   }),
   address: z.object({
     country: z.string().trim().min(2).max(120),
@@ -315,8 +317,8 @@ export function createCommerceRouter(
     },
   );
 
-  // Compatibility URL: old clients must authenticate before reserving inventory too.
-  router.put("/cart/reservation", signedIn, csrf, requireAccountType("customer"), rateLimit({ store: sharedRateLimitStore(config, "commerce-1"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+  // Cookie-owned guest carts use the same physical reservations as signed-in carts.
+  router.put("/cart/reservation", guestCartWrite, rateLimit({ store: sharedRateLimitStore(config, "commerce-1"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const body = reserveSchema.parse(request.body);
     const ownerHash = guestCartOwnerHash(request, response, config, true);
     if (!ownerHash) {
@@ -325,7 +327,7 @@ export function createCommerceRouter(
     const result = await commerce.reserveCart(
       body.reservationId,
       body.lines,
-      request.auth!.userId,
+      undefined,
       ownerHash,
     );
     response.setHeader("Cache-Control", "no-store");
@@ -353,7 +355,7 @@ export function createCommerceRouter(
     },
   );
 
-  router.delete("/cart/reservation/:reservationId", rateLimit({ store: sharedRateLimitStore(config, "commerce-3"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+  router.delete("/cart/reservation/:reservationId", guestCartWrite, rateLimit({ store: sharedRateLimitStore(config, "commerce-3"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const id = reservationId.parse(request.params.reservationId);
     const ownerHash = guestCartOwnerHash(request, response, config, false);
     if (ownerHash) await commerce.releaseCart(id, ownerHash);
@@ -887,6 +889,34 @@ export function createCommerceRouter(
       response.status(200).json({ return: result });
     },
   );
+
+  router.get("/cart/quote", rateLimit({ store: sharedRateLimitStore(config, "guest-cart-quote"),
+    windowMs: 600000, limit: 100, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+    response.setHeader("Cache-Control", "private,no-store");
+    const owner = guestCartOwnerHash(request, response, config, false);
+    if (!owner) throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "Reload your cart and try again");
+    response.status(200).json(await commerce.customerCartQuote(null,
+      reservationId.parse(request.query.reservationId),
+      z.string().trim().min(1).max(120).optional().parse(request.query.promotionCode), owner));
+  });
+
+  router.post("/guest/orders", guestCartWrite, rateLimit({ store: sharedRateLimitStore(config, "guest-checkout"),
+    windowMs: 600000, limit: 15, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
+    const body = checkoutSchema.extend({ contact: checkoutSchema.shape.contact.extend({
+      name: z.string().trim().min(3).max(120),
+      phone1: z.string().trim().refine(value => { try { normalizeEgyptianPhone(value); return true; } catch { return false; } }, "Enter a valid Egyptian phone number"),
+      phone2: z.string().trim().refine(value => { if (!value) return true; try { normalizeEgyptianPhone(value); return true; } catch { return false; } }, "Enter a valid Egyptian phone number").optional(),
+      email: z.string().trim().email().max(254),
+      birthday: checkoutSchema.shape.contact.shape.birthday.unwrap(),
+    }) }).parse(request.body);
+    const owner = guestCartOwnerHash(request, response, config, false);
+    if (!owner) throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "Reload your cart and try again");
+    const key = z.string().trim().min(16).max(128).regex(/^[A-Za-z0-9:_-]+$/).parse(request.get("Idempotency-Key"));
+    const result = await commerce.checkout(null, body, String(request.id), owner, key);
+    await dispatchOutbox(outbox, 10);
+    response.setHeader("Cache-Control", "private,no-store");
+    response.status(201).json({ order: result });
+  });
 
   router.post(
     "/orders",
