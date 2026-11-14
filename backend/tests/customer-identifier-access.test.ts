@@ -73,7 +73,7 @@ describe("customer identifier access", () => {
     await expect(service.loginCustomer(email,metadata)).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
     await expect(service.login("representative",email,"",metadata)).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
     expect((await service.login("representative",email,password,metadata)).account.accountType).toBe("representative");
-    const f = await customer(email);
+    await customer(email);
     await expect(service.loginCustomer(email,metadata)).rejects.toMatchObject({code:'EMAIL_OTP_REQUIRED'});
     const staffEmail = `${randomUUID()}@example.test`;
     await store.pool.query(`INSERT INTO users(account_type,email,email_normalized,status,email_verified_at)

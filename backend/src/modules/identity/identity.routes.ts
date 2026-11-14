@@ -29,14 +29,6 @@ const optionalEgyptianPhone = z
   .transform((value) => value?.trim() || undefined);
 const uuid = z.uuid();
 
-const registerCustomerSchema = z.object({
-  name: z.string().trim().min(3).max(120),
-  email: optionalCustomerEmail,
-  phone1: egyptianPhone,
-  phone2: optionalEgyptianPhone,
-  birthday: z.iso.date(),
-});
-
 const representativeImageDataUrl = z.string().min(100).max(1_500_000).regex(/^data:image\/(?:jpeg|png|webp);base64,/);
 
 const registerRepresentativeSchema = z.object({

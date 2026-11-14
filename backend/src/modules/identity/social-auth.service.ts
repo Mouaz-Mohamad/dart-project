@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { digest, randomToken, safeEqual } from "../../security/crypto.js";
-import { normalizeEmail, normalizeEgyptianPhone } from "../../security/normalization.js";
+import { normalizeEmail } from "../../security/normalization.js";
 import type { IssuedSession, RequestMetadata } from "./identity.types.js";
 import type { IdentityService } from "./identity.service.js";
 
