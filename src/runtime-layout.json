@@ -51,7 +51,6 @@
         "src/storefront/platform/serial-lookup.js",
         "src/storefront/platform/birthday-ui.js",
         "src/storefront/platform/return-form.js",
-        "src/storefront/platform/passwordless-ui.js",
         "src/storefront/platform/auth-forms.js",
         "src/storefront/platform/profile.js",
         "src/storefront/platform/tracking.js",

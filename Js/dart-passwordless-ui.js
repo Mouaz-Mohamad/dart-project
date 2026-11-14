@@ -43,13 +43,13 @@ function showCustomerOtpStep(form,purpose,challenge) {
       });
     });
     panel.querySelector("[data-otp-other]").addEventListener("click",async()=>{
-      if(!supportsCustomerPasskeys()){
+      if(!window.DartPlatform.supportsCustomerPasskeys()){
         panel.querySelector("[data-otp-status]").textContent="واتساب سيتوفر لاحقًا. استخدم الكود المرسل بالبريد الإلكتروني.";
         return;
       }
       try{
-        await loginCustomerPasskey();
-        location.assign(requestedAuthDestination());
+        await window.DartPlatform.loginCustomerPasskey();
+        location.assign(window.DartPlatform.requestedAuthDestination());
       }catch(error){
         panel.querySelector("[data-otp-status]").textContent=error?.message||"تعذر تسجيل الدخول بالبصمة.";
       }
@@ -78,8 +78,8 @@ async function submitCustomerOtpStep(form,purpose){
   submit.disabled=true;
   status.textContent="جارٍ التحقق من الرمز...";
   try{
-    if(purpose==="register")await verifyRegistrationOtp(form.dataset.otpChallenge,code);
-    else await verifyLoginOtp(form.dataset.otpChallenge,code);
+    if(purpose==="register")await window.DartPlatform.verifyRegistrationOtp(form.dataset.otpChallenge,code);
+    else await window.DartPlatform.verifyLoginOtp(form.dataset.otpChallenge,code);
     form.dataset.otpPending="0";
     await offerCustomerPasskeyEnrollment();
   }catch(error){
@@ -92,8 +92,8 @@ async function submitCustomerOtpStep(form,purpose){
   }
 }
 async function offerCustomerPasskeyEnrollment(){
-  if(!supportsCustomerPasskeys()){
-    location.assign(requestedAuthDestination());return;
+  if(!window.DartPlatform.supportsCustomerPasskeys()){
+    location.assign(window.DartPlatform.requestedAuthDestination());return;
   }
   const overlay=document.createElement("div");
   overlay.className="dart-passkey-optin-backdrop";
@@ -108,7 +108,7 @@ async function offerCustomerPasskeyEnrollment(){
     '</div>',
   ].join("");
   document.body.appendChild(overlay);
-  const finish=()=>{overlay.remove();location.assign(requestedAuthDestination());};
+  const finish=()=>{overlay.remove();location.assign(window.DartPlatform.requestedAuthDestination());};
   overlay.querySelector(".dart-passkey-optin-skip").addEventListener("click",finish);
   overlay.querySelector(".dart-passkey-optin-enable").addEventListener("click",async()=>{
     const button=overlay.querySelector(".dart-passkey-optin-enable");
@@ -116,7 +116,7 @@ async function offerCustomerPasskeyEnrollment(){
     const status=overlay.querySelector("[data-passkey-optin-status]");
     status.textContent="جاري تفعيل البصمة...";
     try{
-      await registerCustomerPasskey();
+      await window.DartPlatform.registerCustomerPasskey();
       status.textContent="تم تفعيل تسجيل الدخول بالبصمة.";
       finish();
     }catch(error){
@@ -127,18 +127,22 @@ async function offerCustomerPasskeyEnrollment(){
 function bindCustomerPasskeyLogin(){
   const button=document.getElementById("dartPasskeyLogin");
   if(!button)return;
-  button.hidden=!supportsCustomerPasskeys();
+  button.hidden=!window.DartPlatform.supportsCustomerPasskeys();
   button.addEventListener("click",async()=>{
     if(button.disabled)return;
     button.disabled=true;
     try{
-      await loginCustomerPasskey();
-      location.assign(requestedAuthDestination());
+      await window.DartPlatform.loginCustomerPasskey();
+      location.assign(window.DartPlatform.requestedAuthDestination());
     }catch(error){
       const form=document.getElementById("loginForm");
       const message=form?.querySelector("[data-otp-status]");
       if(message)message.textContent=error?.message||"تعذر الدخول بالبصمة.";
-      else if(form)setStatus(form,error?.message||"تعذر الدخول بالبصمة.",true);
+      else if(form) {
+        const status=form.querySelector(".form-status")||document.createElement("p");
+        if(!status.isConnected){status.className="form-status";form.appendChild(status);}
+        status.textContent=error?.message||"تعذر الدخول بالبصمة.";
+      }
     }finally{button.disabled=false;}
   });
 }

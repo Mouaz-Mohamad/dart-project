@@ -90,10 +90,20 @@ const pageScopedFeatureFiles = new Set([
   "Eye/dart-catalog-admin.js",
   "Js/dart-whatsapp-preferences.js",
   "Js/dart-customer-notifications.js",
+  "Js/dart-passwordless-ui.js",
 ]);
 for (const file of rootHtml.filter(file => file !== "profile.html")) {
   if (/src="Js\/dart-(whatsapp-preferences|customer-notifications)\.js"/.test(fs.readFileSync(file,"utf8"))) {
     failures.push(`${file}: Customer preference/notification code must stay on the customer profile`);
+  }
+}
+// Authentication widgets are loaded only by the dedicated login page.
+if (!fs.readFileSync("Sign Up modern.html","utf8").includes('src="Js/dart-passwordless-ui.js"')) {
+  failures.push("Auth page must load the scoped passwordless UI.");
+}
+for (const file of rootHtml.filter(file => file !== "Sign Up modern.html")) {
+  if (fs.readFileSync(file,"utf8").includes('src="Js/dart-passwordless-ui.js"')) {
+    failures.push(`${file}: passkey/OTP UI must remain page-scoped`);
   }
 }
 const dashboardHtml = fs.readFileSync("Eye/Dart Eye.html", "utf8");

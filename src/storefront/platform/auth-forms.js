@@ -1,5 +1,5 @@
   function bindAuth() {
-    bindCustomerPasskeyLogin();
+    if (typeof window.bindCustomerPasskeyLogin === "function") window.bindCustomerPasskeyLogin();
     document.addEventListener(
       "submit",
       async (event) => {
@@ -39,11 +39,11 @@
           setStatus(form, "جارٍ إنشاء الحساب…");
           try {
             if(form.dataset.otpPending === "1") {
-              await submitCustomerOtpStep(form,"register");
+              await window.submitCustomerOtpStep(form,"register");
               return;
             }
             const result=await register(Object.fromEntries(new FormData(form)));
-            showCustomerOtpStep(form,"register",result);
+            window.showCustomerOtpStep(form,"register",result);
           } catch (error) {
             setStatus(form, error.message, true);
           } finally {
@@ -60,11 +60,11 @@
           setStatus(form, "جارٍ تسجيل الدخول…");
           try {
             if(form.dataset.otpPending === "1") {
-              await submitCustomerOtpStep(form,"login");
+              await window.submitCustomerOtpStep(form,"login");
               return;
             }
             const result=await login(form.elements.identifier.value);
-            showCustomerOtpStep(form,"login",result);
+            window.showCustomerOtpStep(form,"login",result);
           } catch (error) {
             setStatus(form, error.message, true);
           } finally {
