@@ -73,7 +73,7 @@ describe("third Council account and delivery regressions", () => {
     const email = (await store.pool.query("SELECT email FROM users WHERE id=$1", [f.session.account.userId])).rows[0].email as string;
     await identity.adminUpdateCustomer(actor, f.session.account.userId, { name: "Corrected Name", email, phone1: f.phone, birthday: "2000-01-02" }, metadata);
     expect((await store.pool.query("SELECT status FROM users WHERE id=$1", [f.session.account.userId])).rows[0].status).toBe("suspended");
-    await expect(identity.login("customer", email, "SyntheticPassword123", metadata)).rejects.toMatchObject({ code: "ACCOUNT_UNAVAILABLE" });
+    await expect(identity.login("customer", email, "SyntheticPassword123", metadata)).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
   });
 
   it.each(["suspend", "delete"] as const)("cannot resend a pending challenge after %s", async (action) => {

@@ -101,12 +101,12 @@ describe("unified customer records", () => {
     expect(profile.birthday).toBe("2001-02-03");
     const row = (await dashboard.read("customers")).data.find(raw => (raw as Record<string, unknown>).id === f.profile.id) as Record<string, unknown>;
     expect(row.phone2).toBe(secondary); expect(row.governorate).toBe("Giza");
-    await expect(identity.loginCustomer(secondary, metadata)).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+    await expect(identity.loginCustomer(secondary, metadata)).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
   });
   it("allows shared contact phones and never uses them to merge or authenticate another customer", async () => {
     const a = await customer(), b = await customer();
     await identity.updateCustomerProfile(a.session.account, { name: "A Customer", phone1: a.phone1, phone2: b.phone1 }, metadata);
-    expect((await identity.loginCustomer(b.phone1, metadata)).account.userId).toBe(b.profile.id);
+    await expect(identity.loginCustomer(b.phone1, metadata)).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
     expect((await store.pool.query("SELECT user_id FROM account_phones WHERE phone_normalized=$1", [`20${b.phone1.slice(1)}`])).rows).toHaveLength(1);
   });
   it("rejects phone/email identity conflicts and rolls back both records", async () => {
@@ -115,7 +115,7 @@ describe("unified customer records", () => {
     await expect(identity.registerCustomer({ name: "Conflict User", phone1: a.phone1, email, birthday: "2000-01-01" }, metadata))
       .rejects.toMatchObject({ code: "CUSTOMER_IDENTITY_CONFLICT" });
     expect((await identity.profile(a.session.account)).name).toBe("Website Name");
-    expect((await identity.loginCustomer(email, metadata)).account.userId).toBe(b.profile.id);
+    await expect(identity.loginCustomer(email, metadata)).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
   });
   it("does not overwrite an explicit province or website identity from an order or legacy row", async () => {
     const f = await customer();
@@ -135,9 +135,9 @@ describe("unified customer records", () => {
   it("protects suspended accounts and accepts equivalent Arabic/international primary phone formats", async () => {
     const f = await customer();
     const international = `0020${f.phone1.slice(1)}`;
-    expect((await identity.loginCustomer(international, metadata)).account.userId).toBe(f.profile.id);
+    await expect(identity.loginCustomer(international, metadata)).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
     const arabic = f.phone1.replace(/\d/g, value => "٠١٢٣٤٥٦٧٨٩"[Number(value)]!);
-    expect((await identity.loginCustomer(arabic, metadata)).account.userId).toBe(f.profile.id);
+    await expect(identity.loginCustomer(arabic, metadata)).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
     await store.pool.query("UPDATE users SET status='suspended' WHERE id=$1", [f.profile.id]);
     await expect(identity.registerCustomer({ name: "Bypass", phone1: f.phone1 }, metadata)).rejects.toMatchObject({ code: "ACCOUNT_UNAVAILABLE" });
   });

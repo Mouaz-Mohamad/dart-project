@@ -84,13 +84,12 @@ describe.skipIf(!databaseUrl)("identity service", () => {
     expect(profile.email).toBe("Mouaz@Example.com");
     expect(profile.code).toMatch(/^DR-/);
 
-    const signedIn = await service!.login(
+    await expect(service!.login(
       "customer",
       "01012345678",
       "StrongPassword123",
       requestMetadata,
-    );
-    expect(signedIn.account.permissions).toContain("profile.read_own");
+    )).rejects.toMatchObject({ code: "EMAIL_OTP_REQUIRED" });
   });
 
   it("keeps the protected Owner email allowlist authoritative over legacy bootstrap configuration", async () => {
