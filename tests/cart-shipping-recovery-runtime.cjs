@@ -131,11 +131,11 @@ function sessionCleanup() {
   assert.equal(storage.get("dart_cart_reservation_id"), "legacy-id"); assert.equal(c.cartData.length, 1);
   c.clearCustomerPrivateCache();
   assert.equal(storage.has("dart_cart_reservation_id"), false); assert.equal(c.cartData.length, 0);
-  for (const method of ["register", "login"]) {
-    const start = source.indexOf(`  async function ${method}(`);
-    const end = source.indexOf("\n  async function ", start + 1);
-    assert.match(source.slice(start, end), /await claimGuestCartAfterAuth\(\)/, `${method} must recover guest ownership before redirect`);
-  }
+  const verifyStart = source.indexOf("  async function acceptVerifiedSession(");
+  const verifyEnd = source.indexOf("\n  async function ", verifyStart + 1);
+  assert(verifyStart >= 0, "Customer OTP verification method must exist");
+  assert.match(source.slice(verifyStart, verifyEnd), /await claimGuestCartAfterAuth\(\)/,
+    "A verified customer session must claim the guest cart before redirect");
 }
 async function availability(pickup = false) {
   let offline = false;
