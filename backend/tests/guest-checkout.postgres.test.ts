@@ -131,6 +131,76 @@ describe("guest cart and atomic account/order creation", () => {
     expect((await store.pool.query("SELECT 1 FROM orders WHERE contact_snapshot->>'email'=$1", [f.input.contact.email])).rows).toHaveLength(0);
   });
 
+  it("creates a separate account and order when a deleted account still owns the checkout phone", async () => {
+    const previous = await fixture();
+    await commerce.reserveCart(previous.input.reservationId, previous.lines, undefined, previous.owner);
+    const oldOrder = await commerce.checkout(null, previous.input, "previous-owner", previous.owner, `checkout-${previous.input.reservationId}`);
+    const oldUser = (await store.pool.query("SELECT customer_user_id::text FROM orders WHERE id=$1", [oldOrder.id])).rows[0]!.customer_user_id;
+    await store.pool.query("UPDATE users SET status='deleted',deleted_at=now() WHERE id=$1", [oldUser]);
+    const f = await fixture(), agent = request.agent(app);
+    f.input.contact.phone1 = previous.input.contact.phone1;
+    expect((await agent.put("/api/v1/cart/reservation").set("X-Dart-Guest-Cart", "1")
+      .send({ reservationId: f.input.reservationId, lines: f.lines })).status).toBe(200);
+    const submit = () => agent.post("/api/v1/guest/orders").set("X-Dart-Guest-Cart", "1")
+      .set("Idempotency-Key", `checkout-${f.input.reservationId}`).send(f.input);
+    const created = await submit();
+    expect(created.status).toBe(201);
+    expect((await submit()).body.order.id).toBe(created.body.order.id);
+    const newUser = (await store.pool.query("SELECT customer_user_id::text FROM orders WHERE id=$1", [created.body.order.id])).rows[0]!.customer_user_id;
+    expect(newUser).not.toBe(oldUser);
+    expect((await store.pool.query("SELECT status,email FROM users WHERE id=$1", [oldUser])).rows[0])
+      .toEqual({ status: "deleted", email: previous.input.contact.email });
+    expect((await store.pool.query("SELECT user_id::text FROM account_phones WHERE phone_normalized=$1", [`20${previous.input.contact.phone1.slice(1)}`])).rows)
+      .toEqual([{ user_id: newUser }]);
+    expect((await store.pool.query("SELECT source FROM customer_contact_phones WHERE customer_user_id=$1", [oldUser])).rows)
+      .toEqual([{ source: "order" }]);
+    const newHistory = await commerce.customerSnapshot(newUser);
+    expect(newHistory.orders.map(order => order.id)).toEqual([created.body.order.id]);
+    expect((await store.pool.query("SELECT customer_user_id::text FROM orders WHERE id=$1", [oldOrder.id])).rows[0]!.customer_user_id).toBe(oldUser);
+    expect((await store.pool.query("SELECT count(*)::int n FROM audit_logs WHERE action='DELETED_CUSTOMER_PHONE_RETIRED' AND entity_id=$1", [oldUser])).rows[0]!.n).toBe(1);
+  });
+
+  it("rolls back deleted-phone retirement with a failed checkout, then accepts the same retry", async () => {
+    const previous = await fixture(), client = await store.pool.connect();
+    const oldUser = await guestCheckoutCustomer(client, previous.input.contact); client.release();
+    // Older imported tombstones can have only the status marker.
+    await store.pool.query("UPDATE users SET status='deleted',deleted_at=NULL WHERE id=$1", [oldUser]);
+    const f = await fixture(); f.input.contact.phone1 = previous.input.contact.phone1;
+    await commerce.reserveCart(f.input.reservationId, f.lines, undefined, f.owner);
+    const key = `checkout-${f.input.reservationId}`;
+    await expect(commerce.checkout(null, { ...f.input, address: { ...f.input.address, country: "France" } }, "rollback-retired-phone", f.owner, key))
+      .rejects.toMatchObject({ code: "DELIVERY_LOCATION_OUTSIDE_EGYPT" });
+    expect((await store.pool.query("SELECT count(*)::int n FROM account_phones WHERE user_id=$1", [oldUser])).rows[0]!.n).toBe(1);
+    expect((await store.pool.query("SELECT count(*)::int n FROM customer_contact_phones WHERE customer_user_id=$1 AND source='retired_login'", [oldUser])).rows[0]!.n).toBe(0);
+    expect((await commerce.guestCartForOwner(f.owner)).cart?.lines).toHaveLength(1);
+    await expect(commerce.checkout(null, f.input, "retry-retired-phone", f.owner, key)).resolves.toMatchObject({ finalAmount: 500 });
+  });
+
+  it("does not release a suspended account's phone to a guest", async () => {
+    const f = await fixture(), client = await store.pool.connect();
+    const user = await guestCheckoutCustomer(client, f.input.contact); client.release();
+    await store.pool.query("UPDATE users SET status='suspended' WHERE id=$1", [user]);
+    await commerce.reserveCart(f.input.reservationId, f.lines, undefined, f.owner);
+    await expect(commerce.checkout(null, f.input, "suspended-phone", f.owner, `checkout-${f.input.reservationId}`))
+      .rejects.toMatchObject({ code: "CHECKOUT_CONTACT_UNAVAILABLE" });
+    expect((await store.pool.query("SELECT user_id::text FROM account_phones WHERE user_id=$1", [user])).rows).toEqual([{ user_id: user }]);
+  });
+
+  it("reports a legacy live phone conflict safely instead of returning an unexpected server error", async () => {
+    const previous = await fixture(), f = await fixture(), client = await store.pool.connect();
+    const user = await guestCheckoutCustomer(client, previous.input.contact); client.release();
+    // Legacy login rows may predate the contact-phone separation migration.
+    await store.pool.query(`INSERT INTO account_phones(user_id,account_type,phone_normalized,phone_display,is_primary)
+      VALUES($1,'customer',$2,$3,false)`, [user, `20${f.input.contact.phone1.slice(1)}`, f.input.contact.phone1]);
+    const before = await count("customers");
+    await commerce.reserveCart(f.input.reservationId, f.lines, undefined, f.owner);
+    await expect(commerce.checkout(null, f.input, "legacy-live-phone", f.owner, `checkout-${f.input.reservationId}`))
+      .rejects.toMatchObject({ statusCode: 409, code: "CUSTOMER_IDENTITY_CONFLICT" });
+    expect(await count("customers")).toBe(before);
+    expect((await commerce.guestCartForOwner(f.owner)).cart?.lines).toHaveLength(1);
+    expect((await store.pool.query("SELECT count(*)::int n FROM account_phones WHERE user_id=$1", [user])).rows[0]!.n).toBe(2);
+  });
+
   it("requires all guest account fields and protects write and reservation ownership", async () => {
     const f = await fixture(), agent = request.agent(app);
     const held = await agent.put("/api/v1/cart/reservation").set("X-Dart-Guest-Cart", "1").send({ reservationId: f.input.reservationId, lines: f.lines });

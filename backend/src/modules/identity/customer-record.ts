@@ -14,6 +14,10 @@ export interface CustomerRecordInput {
 
 export function customerRecordError(error: unknown): never {
   const message = error instanceof Error ? error.message : "";
+  const postgres = error as { code?: string; constraint?: string } | null;
+  if (postgres?.code === "23505" && ["account_phones_realm_phone_unique", "users_realm_email_unique"].includes(postgres.constraint || "")) {
+    throw new AppError(409, "CUSTOMER_IDENTITY_CONFLICT", "Check your phone and email together, or contact Dart support. Your cart is still reserved.");
+  }
   if (message.includes("CUSTOMER_IDENTITY_CONFLICT")) {
     throw new AppError(409, "CUSTOMER_IDENTITY_CONFLICT", "Phone and email belong to different customers. Review both records before saving.");
   }
@@ -49,11 +53,12 @@ export async function resolveCustomerReference(client: PoolClient, ref: string) 
 
 // Checkout can link a contact internally, but never changes an existing login
 // identity or grants a session based on unverified contact details.
+// The caller owns the checkout transaction, including tombstone retirement.
 export async function guestCheckoutCustomer(client: PoolClient, input: CustomerRecordInput) {
   await client.query("SELECT pg_advisory_xact_lock(hashtext('dart_unified_customer_identity'))");
   const matches = await client.query<{ id: string; status: string; email_normalized: string | null }>(
     `SELECT DISTINCT u.id::text,u.status,u.email_normalized FROM users u
-      WHERE u.account_type='customer' AND u.deleted_at IS NULL AND
+      WHERE u.account_type='customer' AND u.deleted_at IS NULL AND u.status<>'deleted' AND
         (u.email_normalized=$1 OR EXISTS (SELECT 1 FROM account_phones p
           WHERE p.user_id=u.id AND p.is_primary AND p.phone_normalized=$2))`,
     [normalizeEmail(input.email || ""), normalizeEgyptianPhone(input.phone1)],
@@ -70,5 +75,27 @@ export async function guestCheckoutCustomer(client: PoolClient, input: CustomerR
   if (existing && !["active", "pending_verification"].includes(existing.status)) {
     throw new AppError(409, "CHECKOUT_CONTACT_UNAVAILABLE", "Please contact Dart support to complete this order.");
   }
-  return existing?.id || upsertCustomerRecord(client, input, "website");
+  if (existing) return existing.id;
+
+  // The login-phone unique index also covers deleted accounts. Retire only a
+  // tombstone's claim, preserving its contact history, account and old orders.
+  // Never revive the deleted account or transfer its history to the new buyer.
+  const retired = await client.query<{
+    id: string; user_id: string; phone_normalized: string; phone_display: string; created_at: Date;
+  }>(`SELECT p.id::text,p.user_id::text,p.phone_normalized,p.phone_display,p.created_at
+        FROM account_phones p JOIN users u ON u.id=p.user_id
+       WHERE p.account_type='customer' AND p.phone_normalized=$1
+         AND (u.deleted_at IS NOT NULL OR u.status='deleted')
+       FOR UPDATE OF u,p`, [normalizeEgyptianPhone(input.phone1)]);
+  for (const phone of retired.rows) {
+    await client.query(`INSERT INTO customer_contact_phones(customer_user_id,phone_normalized,phone_display,source,recorded_at)
+      VALUES($1,$2,$3,'retired_login',$4)
+      ON CONFLICT(customer_user_id,phone_normalized) DO NOTHING`,
+    [phone.user_id, phone.phone_normalized, phone.phone_display, phone.created_at]);
+    await client.query("DELETE FROM account_phones WHERE id=$1", [phone.id]);
+    await client.query(`INSERT INTO audit_logs(actor_type,action,entity_type,entity_id,metadata)
+      VALUES('system','DELETED_CUSTOMER_PHONE_RETIRED','customers',$1,$2::jsonb)`,
+    [phone.user_id, JSON.stringify({ reason: "guest_checkout_phone_reuse", phoneIdentityId: phone.id })]);
+  }
+  return upsertCustomerRecord(client, input, "website");
 }
