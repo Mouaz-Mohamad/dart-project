@@ -26,7 +26,6 @@
     ensureCatalogInventory();
     cleanupCartReservations();
     updateCartReservationTimer();
-    prefillCheckout();
     renderProfile();
     void hydrateWaiting().catch((error) => {
       if (error?.status !== 401) {

@@ -1,23 +1,3 @@
-  function prefillCheckout() {
-    const form = document.getElementById("checkoutForm"),
-      user = currentUser();
-    if (!form || !user) return;
-    const values = {
-      customer_name: user.name,
-      phone1: displayPhone(user.phone1),
-      phone2: displayPhone(user.phone2),
-      email: user.email,
-      birthday: user.birthday,
-    };
-    Object.entries(values).forEach(([name, value]) => {
-      const field = form.elements.namedItem(name);
-      if (field && !field.value && value) {
-        field.value = value;
-        if (name === "birthday") field.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-    });
-  }
-
   function renderTracking() {
     if (window.DartTracking?.render) {
       window.DartTracking.render();

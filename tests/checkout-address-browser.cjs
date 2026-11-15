@@ -109,11 +109,103 @@ await summary.click();
 await page.evaluate(()=>document.getElementById("checkoutForm").requestSubmit());
 assert.equal(await details.evaluate(el=>el.open),true,"custom shipping failure reveals the coverage controls");
 assert.deepEqual(errors,[]);
+// Render against the real checkout form after late session hydration, then send
+// synthetic orders through the production checkout function without network I/O.
+await page.evaluate(()=>{
+window.fixtureCustomer=null;
+window.currentUser=()=>window.fixtureCustomer;
+window.DartPlatform={currentUser:window.currentUser};
+window.displayPhone=value=>String(value||"").replace(/^\+20/,"0");
+});
+await page.evaluate(()=>window.dispatchEvent(new Event("dart:customer-session-changed")));
+const contactIds=["checkout-name","checkout-phone1","checkout-email","checkout-birthday","checkout-phone2"];
+const setCustomer=customer=>page.evaluate(user=>{
+window.fixtureCustomer=user;
+window.dispatchEvent(new Event("dart:customer-session-changed"));
+},customer);
+const customer={id:"synthetic-account",name:"Saved customer",phone1:"+201000000001",phone2:"+201000000002",email:"saved@example.test",birthday:"2000-09-02"};
+await setCustomer(customer);
+for(const id of contactIds){
+assert.equal(await page.locator("#"+id).isVisible(),false,"saved contact fields are hidden");
+assert.equal(await page.locator("#"+id).isDisabled(),true,"hidden contact does not participate in native validation");
+}
+assert.equal(await page.locator(".dart-birthday-field").isVisible(),false);
+assert.equal(await page.locator("#dartBirthYear").isDisabled(),true);
+assert.equal(await page.locator("[data-checkout-guest]:visible").count(),0);
+assert.equal(await page.locator("#checkout-phone1").inputValue(),"01000000001");
+for(const width of [320,390,768,1440]){
+await page.setViewportSize({width,height:844});
+assert.deepEqual(await page.locator("#checkoutForm > .form-group input:visible").evaluateAll(nodes=>nodes.map(el=>el.id)),
+["checkout-building","checkout-floor"],"signed-in customer only fills the delivery address");
+}
+await page.evaluate(()=>document.getElementById("checkoutForm").reset());
+await page.waitForFunction(()=>document.getElementById("checkout-name").value==="Saved customer");
+assert.equal(await page.locator("#dartBirthYear").isDisabled(),true,"reset keeps signed-in mode");
+await setCustomer({id:"incomplete-account",name:"",phone1:"",email:"",birthday:""});
+assert.equal(await page.locator("#checkout-name").isVisible(),true);
+assert.equal(await page.locator("#checkout-phone1").isVisible(),true);
+assert.equal(await page.locator("#checkout-email").isDisabled(),true,"email is optional for an existing account");
+assert.equal(await page.locator("#dartBirthYear").isDisabled(),true,"missing birthday never blocks an existing account");
+assert.equal(await page.locator("#checkout-name").inputValue(),"","switching accounts clears previous contact");
+await page.locator("#checkout-name").fill("Completed name");
+await page.locator("#checkout-phone1").fill("01000000003");
+await setCustomer({id:"incomplete-account",name:"",phone1:""});
+assert.equal(await page.locator("#checkout-name").inputValue(),"Completed name","session refresh preserves missing-contact edits");
+await setCustomer(customer);
+await page.evaluate(()=>{
+Object.assign(window,{
+API_BASE:"https://synthetic.test",CART_RESERVATION_ID:"synthetic-checkout",cartData:[{id:"M1",color:"Black",size:"M",quantity:1}],
+cleanupCartReservations:async()=>{},write:()=>{},uid:()=>"synthetic-next",setCartReservationId:()=>{},
+saveCustomerAddress:()=>{},hydrateCustomerCommerce:()=>{},fixtureRequests:[],
+apiRequest:async(url,options)=>{
+if(url.includes("/quote"))return {lines:[{modelId:"M1",color:"Black",size:"M"}],fingerprint:"a".repeat(64),totalMinor:50000};
+window.fixtureRequests.push({url,body:options.body});return {order:{orderId:"K-SYNTHETIC"}};
+}
+});
+Object.assign(window.DartShippingAvailability,{load:async()=>{},canonical:value=>value,isGovernorateOpen:()=>true});
+for(const [name,value] of Object.entries({governorate:"Cairo",area:"Nasr City",street:"Example St",building:"21",floor:"3"})){
+const field=document.getElementById("checkoutForm").elements.namedItem(name);field.value=value;field.dispatchEvent(new Event("change",{bubbles:true}));
+}
+});
+await page.addScriptTag({content:fs.readFileSync(path.join(root,"src/storefront/platform/checkout.js"),"utf8")});
+assert.equal(await page.evaluate(()=>document.getElementById("checkoutForm").checkValidity()),true,"address-only form passes native validation");
+await page.evaluate(async()=>{
+// Hidden/autofilled contact cannot replace the saved identity in the order.
+document.getElementById("checkout-name").value="Stale guest";
+document.getElementById("checkout-email").value="stale@example.test";
+await checkout(document.getElementById("checkoutForm"));
+});
+let request=await page.evaluate(()=>window.fixtureRequests.at(-1));
+assert.equal(request.url,"/api/v1/orders");
+assert.deepEqual(request.body.contact,{name:"Saved customer",phone1:"01000000001",phone2:"01000000002",email:"saved@example.test",birthday:"2000-09-02"});
+assert.equal(request.body.address.street,"Example St");
+await setCustomer({id:"incomplete-account",name:"",phone1:""});
+await page.locator("#checkout-name").fill("Completed name");await page.locator("#checkout-phone1").fill("01000000003");
+await page.evaluate(async()=>{cartData=[{id:"M1",color:"Black",size:"M",quantity:1}];await checkout(document.getElementById("checkoutForm"));});
+request=await page.evaluate(()=>window.fixtureRequests.at(-1));
+assert.deepEqual(request.body.contact,{name:"Completed name",phone1:"01000000003",email:""});
+await setCustomer(null);
+for(const id of contactIds.filter(id=>id!=="checkout-birthday")){
+assert.equal(await page.locator("#"+id).isVisible(),true,"logout restores guest fields");
+assert.equal(await page.locator("#"+id).inputValue(),"","logout removes private contact");
+}
+assert.equal(await page.locator("[data-checkout-guest]:visible").count(),2);
+assert.equal(await page.locator("#dartBirthYear").isEnabled(),true);
+assert.equal(await page.locator("#checkout-email").getAttribute("required"),"");
+assert.equal(await page.evaluate(()=>document.getElementById("checkoutForm").checkValidity()),false,"guest must still provide contact and birthday");
+for(const [id,value] of [["checkout-name","Guest customer"],["checkout-phone1","01000000004"],["checkout-email","guest@example.test"]])await page.locator("#"+id).fill(value);
+await page.locator("#dartBirthYear").selectOption("2001");await page.locator("#dartBirthMonth").selectOption("9");await page.locator("#dartBirthDay").selectOption("2");
+assert.equal(await page.evaluate(()=>document.getElementById("checkoutForm").checkValidity()),true);
+await page.evaluate(async()=>{cartData=[{id:"M1",color:"Black",size:"M",quantity:1}];await checkout(document.getElementById("checkoutForm"));});
+request=await page.evaluate(()=>window.fixtureRequests.at(-1));
+assert.equal(request.url,"/api/v1/guest/orders");
+assert.deepEqual(request.body.contact,{name:"Guest customer",phone1:"01000000004",email:"guest@example.test",birthday:"2001-09-02"});
+assert.deepEqual(errors,[]);
 // The disclosure also works if scripts fail to load.
 await page.reload();
 await page.evaluate(()=>document.getElementById("checkoutView").style.display="block");
 await summary.click();assert.equal(await details.evaluate(el=>el.open),true);
 await summary.click();assert.equal(await details.evaluate(el=>el.open),false);
-console.log("PASS responsive birthday selectors, late prefill, leap years/future dates/reset/ISO form data, taller map, native disclosure, hidden-field validation/focus, manual fallback and coverage guards");
+console.log("PASS guest/signed-in/incomplete-account checkout, responsive address-only form, late session changes, logout/reset/privacy, saved contact in API payloads, birthday selectors, map, manual fallback and coverage guards");
 }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

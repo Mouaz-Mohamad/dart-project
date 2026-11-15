@@ -108,11 +108,11 @@
     // Retry shipping even after a previous outage made the address temporarily ineligible.
     if (window.DartShippingAvailability) await window.DartShippingAvailability.load({ force: true });
     const details = {
-      name: getCheckoutField(form, "customer_name") || logged?.name || "",
-      phone1: getCheckoutField(form, "phone1") || displayPhone(logged?.phone1),
-      phone2: getCheckoutField(form, "phone2") || displayPhone(logged?.phone2),
-      email: getCheckoutField(form, "email") || logged?.email || "",
-      birthday: getCheckoutField(form, "birthday") || logged?.birthday || "",
+      name: logged?.name || getCheckoutField(form, "customer_name"),
+      phone1: displayPhone(logged?.phone1) || getCheckoutField(form, "phone1"),
+      phone2: logged ? displayPhone(logged.phone2) || "" : getCheckoutField(form, "phone2"),
+      email: logged ? logged.email || "" : getCheckoutField(form, "email"),
+      birthday: logged ? logged.birthday || "" : getCheckoutField(form, "birthday"),
       country: getCheckoutField(form, "country") || "Egypt",
       governorate: getCheckoutField(form, "governorate"),
       city: getCheckoutField(form, "city"),

@@ -26,6 +26,7 @@ class DetailEvent extends Event {
 }
 function fixture(saved = true) {
   const form = new Element("FORM"), submit = new Element("BUTTON"), mapElement = new Element("DIV");
+  form.elements = { namedItem: () => null }; // This fixture exercises address state without contact controls.
   submit.textContent = "Order";
   form.querySelector = () => submit;
   const selectors = { form, map: mapElement };
@@ -53,7 +54,7 @@ function fixture(saved = true) {
     lat: 30.04, lng: 31.23, country: "Egypt", governorate: "Cairo", area: "Old area", street: "Old street", building: "10", floor: "2", address: "Old destination",
   } : null } };
   const c = {
-    window, L, location: { origin: "http://synthetic.test" }, document: { readyState: "complete", querySelector: (key) => selectors[key], getElementById: (key) => key === "checkoutForm" ? form : null },
+    window, L, location: { origin: "http://synthetic.test" }, document: { readyState: "complete", querySelector: (key) => selectors[key], querySelectorAll: () => [], getElementById: (key) => key === "checkoutForm" ? form : null },
     navigator: { onLine: true, geolocation: { getCurrentPosition(success, error) { gps.push({ success, error }); } } },
     Event, CustomEvent: DetailEvent, AbortController, URLSearchParams,
     MutationObserver: class { observe() {} },

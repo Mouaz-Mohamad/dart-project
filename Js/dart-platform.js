@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:5fd088fb647464e1e0899eb8d123f8206e4f5a0c9cbeed3951c98f4c3f7a7195 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:39057c0f6202e7955d39653a2b5f1525415b3add4ac7d1435b6ed52b1eb6a18c */
 (function () {
   "use strict";
 
@@ -1553,11 +1553,11 @@
     // Retry shipping even after a previous outage made the address temporarily ineligible.
     if (window.DartShippingAvailability) await window.DartShippingAvailability.load({ force: true });
     const details = {
-      name: getCheckoutField(form, "customer_name") || logged?.name || "",
-      phone1: getCheckoutField(form, "phone1") || displayPhone(logged?.phone1),
-      phone2: getCheckoutField(form, "phone2") || displayPhone(logged?.phone2),
-      email: getCheckoutField(form, "email") || logged?.email || "",
-      birthday: getCheckoutField(form, "birthday") || logged?.birthday || "",
+      name: logged?.name || getCheckoutField(form, "customer_name"),
+      phone1: displayPhone(logged?.phone1) || getCheckoutField(form, "phone1"),
+      phone2: logged ? displayPhone(logged.phone2) || "" : getCheckoutField(form, "phone2"),
+      email: logged ? logged.email || "" : getCheckoutField(form, "email"),
+      birthday: logged ? logged.birthday || "" : getCheckoutField(form, "birthday"),
       country: getCheckoutField(form, "country") || "Egypt",
       governorate: getCheckoutField(form, "governorate"),
       city: getCheckoutField(form, "city"),
@@ -3921,26 +3921,6 @@
     renderProfile();
   }
 
-  function prefillCheckout() {
-    const form = document.getElementById("checkoutForm"),
-      user = currentUser();
-    if (!form || !user) return;
-    const values = {
-      customer_name: user.name,
-      phone1: displayPhone(user.phone1),
-      phone2: displayPhone(user.phone2),
-      email: user.email,
-      birthday: user.birthday,
-    };
-    Object.entries(values).forEach(([name, value]) => {
-      const field = form.elements.namedItem(name);
-      if (field && !field.value && value) {
-        field.value = value;
-        if (name === "birthday") field.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-    });
-  }
-
   function renderTracking() {
     if (window.DartTracking?.render) {
       window.DartTracking.render();
@@ -4298,7 +4278,6 @@
     ensureCatalogInventory();
     cleanupCartReservations();
     updateCartReservationTimer();
-    prefillCheckout();
     renderProfile();
     void hydrateWaiting().catch((error) => {
       if (error?.status !== 401) {

@@ -4,6 +4,45 @@
 (function () {
   "use strict";
 
+  const checkoutPhone = value => (window.DartPlatform?.normalizePhone?.(value) || String(value || "")).replace(/^\+20/, "0");
+
+  function refreshCheckoutContact() {
+    const form = document.getElementById("checkoutForm"),
+      user = window.DartPlatform?.currentUser?.();
+    if (!form) return;
+    const owner = user ? String(user.id) : "guest";
+    const previousOwner = form.dataset.checkoutContactOwner;
+    const changedOwner = previousOwner !== undefined ? previousOwner !== owner : Boolean(user);
+    const values = {
+      customer_name: user?.name || "",
+      phone1: checkoutPhone(user?.phone1) || "",
+      phone2: checkoutPhone(user?.phone2) || "",
+      email: user?.email || "",
+      birthday: user?.birthday || "",
+    };
+    Object.entries(values).forEach(([name, value]) => {
+      const field = form.elements.namedItem(name);
+      if (!field) return;
+      // Never carry a guest's draft contact into an account, or one account's
+      // private contact into the next session. Preserve edits to missing fields.
+      if (changedOwner || (user && value)) {
+        field.value = value || "";
+        if (name === "birthday") field.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      const group = field.closest(".form-group");
+      if (!group) return;
+      const missingRequiredContact = ["customer_name", "phone1"].includes(name) && !String(value).trim();
+      group.hidden = Boolean(user) && !missingRequiredContact;
+      group.querySelectorAll("input,select").forEach((control) => {
+        if (control.dataset.checkoutRequired === undefined) control.dataset.checkoutRequired = String(control.required);
+        control.disabled = group.hidden;
+        control.required = !group.hidden && control.dataset.checkoutRequired === "true";
+      });
+    });
+    form.dataset.checkoutContactOwner = owner;
+    document.querySelectorAll("[data-checkout-guest]").forEach((element) => { element.hidden = Boolean(user); });
+  }
+
   function init() {
     const form = document.getElementById("checkoutForm");
     if (!form || form.dataset.dartCheckoutStability === "1") return;
@@ -45,6 +84,9 @@
       sync();
     }, true);
     sync();
+    refreshCheckoutContact();
+    window.addEventListener("dart:customer-session-changed", refreshCheckoutContact);
+    form.addEventListener("reset", () => window.setTimeout(refreshCheckoutContact, 0));
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });
