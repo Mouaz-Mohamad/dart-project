@@ -1626,6 +1626,48 @@ body.dart-set-image-open {
   height: 80px;
 }
 
+.address-form .dart-birthday-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.address-form .dart-birthday-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.address-form .dart-birthday-selects select {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 9px 24px 9px 10px;
+  border: 1px solid #e9dfe1;
+  border-radius: 12px;
+  background-color: #fff;
+  color: #4a3740;
+  font: 500 12px/1.5 'Poppins', sans-serif;
+  cursor: pointer;
+}
+
+.address-form .dart-birthday-selects select:invalid { color: #95878c; }
+.address-form .dart-birthday-selects select:hover { border-color: #caadb5; }
+.address-form .dart-birthday-selects select:focus-visible {
+  border-color: #ab012b;
+  outline: 3px solid rgba(171, 1, 43, .12);
+  outline-offset: 2px;
+}
+
+.address-form .dart-birthday-hint {
+  display: block;
+  margin-top: 7px;
+  color: #887b80;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .dart-cash-payment {
   display: flex;
   align-items: center;

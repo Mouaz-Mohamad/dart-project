@@ -11,7 +11,10 @@
     };
     Object.entries(values).forEach(([name, value]) => {
       const field = form.elements.namedItem(name);
-      if (field && !field.value) field.value = value;
+      if (field && !field.value && value) {
+        field.value = value;
+        if (name === "birthday") field.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     });
   }
 

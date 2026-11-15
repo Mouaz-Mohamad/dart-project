@@ -1,13 +1,13 @@
-// DART | FOR YOU — friendly DOB selector; existing registerForm posts one ISO birthday field.
+// DART | FOR YOU — shared signup/checkout DOB selector; submits one ISO birthday field.
 (() => {
   "use strict";
 
   function initialize() {
-    const form = document.getElementById("registerForm");
+    const form = document.getElementById("registerForm") || document.getElementById("checkoutForm");
     const day = document.getElementById("dartBirthDay");
     const month = document.getElementById("dartBirthMonth");
     const year = document.getElementById("dartBirthYear");
-    const value = document.getElementById("dartBirthdayValue");
+    const value = form?.elements.namedItem("birthday");
     if (!form || !day || !month || !year || !value) return;
 
     const today = new Date();
@@ -47,9 +47,20 @@
       value.value = [y, String(m).padStart(2, "0"), String(d).padStart(2, "0")].join("-");
     }
 
+    function restore() {
+      const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.value);
+      year.value = parts ? String(Number(parts[1])) : "";
+      month.value = parts ? String(Number(parts[2])) : "";
+      day.value = "";
+      synchronize();
+      if (parts) day.value = String(Number(parts[3]));
+      synchronize();
+    }
+
     [day, month, year].forEach(select => select.addEventListener("change", synchronize));
-    form.addEventListener("reset", () => window.setTimeout(synchronize, 0));
-    synchronize();
+    value.addEventListener("change", restore);
+    form.addEventListener("reset", () => window.setTimeout(restore, 0));
+    restore();
   }
 
   if (document.readyState === "loading") {

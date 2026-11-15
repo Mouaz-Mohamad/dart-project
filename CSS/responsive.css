@@ -11,6 +11,11 @@
    ========================================================================== */
 
 /* BEGIN Tablet / narrow desktop */
+@media (max-width: 370px) {
+  .address-form .dart-birthday-selects { gap: 5px; }
+  .address-form .dart-birthday-selects select { padding: 9px 18px 9px 7px; font-size: 11px; }
+}
+
 @media (max-width: 900px) {
   .form-row {
     flex-wrap: wrap;

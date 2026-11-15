@@ -24,6 +24,7 @@ window.DartShippingAvailability={ready:true,isAddressCovered:addr=>addr.governor
 window.DartState={read:()=>null};
 });
 await page.addScriptTag({content:fs.readFileSync(path.join(root,"Js/dart-checkout-google.js"),"utf8")});
+await page.addScriptTag({content:fs.readFileSync(path.join(root,"Js/dart-auth-birthday.js"),"utf8")});
 await page.addScriptTag({content:fs.readFileSync(path.join(root,"Js/dart-checkout-stability.js"),"utf8")});
 await page.evaluate(()=>{document.getElementById("checkoutView").style.display="block";document.getElementById("cartView").style.display="none";});
 const details=page.locator("#checkout-extra-details"),summary=details.locator("summary");
@@ -31,7 +32,12 @@ for(const width of [320,390,768,1440]){
 await page.setViewportSize({width,height:844});
 assert.equal(await details.evaluate(el=>el.open),false,"extra details start collapsed");
 assert.deepEqual(await page.locator("#checkoutForm > .form-group input:visible").evaluateAll(nodes=>nodes.map(el=>el.id)),
-["checkout-name","checkout-phone1","checkout-email","checkout-birthday","checkout-phone2","checkout-building","checkout-floor"]);
+["checkout-name","checkout-phone1","checkout-email","checkout-phone2","checkout-building","checkout-floor"]);
+const picker=await page.locator(".dart-birthday-selects").boundingBox();
+assert(picker.x>=0&&picker.x+picker.width<=width,"birthday selectors fit the viewport");
+for(const select of await page.locator(".dart-birthday-selects select").all()){
+const box=await select.boundingBox();assert(box.height>=44&&box.width>60,"birthday controls remain usable on mobile");
+}
 assert.equal(await page.locator("#checkout-email").isVisible(),true);
 assert.equal(await page.locator("#checkout-notes").isVisible(),false);
 assert.equal(await page.locator("#area-input").isVisible(),false);
@@ -45,7 +51,29 @@ assert.equal(await details.evaluate(el=>el.open),true,"keyboard opens native dis
 await summary.press("Space");
 assert.equal(await details.evaluate(el=>el.open),false,"keyboard closes native disclosure");
 await page.evaluate(()=>document.getElementById("checkoutForm").addEventListener("submit",event=>event.preventDefault()));
-for(const [id,value] of [["checkout-name","Synthetic customer"],["checkout-phone1","01000000000"],["checkout-email","synthetic@example.test"],["checkout-birthday","2000-09-02"],["checkout-building","21"],["checkout-floor","3"]])
+// Account data can arrive after the shared birthday picker initializes.
+await page.evaluate(()=>{const value=document.getElementById("checkout-birthday");value.value="2000-09-02";value.dispatchEvent(new Event("change",{bubbles:true}));});
+assert.equal(await page.locator("#dartBirthDay").inputValue(),"2");
+assert.equal(await page.locator("#dartBirthMonth").inputValue(),"9");
+assert.equal(await page.locator("#dartBirthYear").inputValue(),"2000");
+await page.locator("#dartBirthMonth").selectOption("2");await page.locator("#dartBirthDay").selectOption("29");
+assert.equal(await page.locator("#checkout-birthday").inputValue(),"2000-02-29");
+await page.locator("#dartBirthYear").selectOption("2001");
+assert.equal(await page.locator("#dartBirthDay").inputValue(),"","a non-leap year clears February 29");
+assert.equal(await page.locator("#checkout-birthday").inputValue(),"");
+await page.locator("#dartBirthYear").selectOption(String(new Date().getFullYear()));
+await page.locator("#dartBirthMonth").selectOption("12");await page.locator("#dartBirthDay").selectOption("31");
+if(new Date().getMonth()<11||new Date().getDate()<31){
+assert.equal(await page.locator("#dartBirthYear").evaluate(el=>el.validity.customError),true);
+assert.equal(await page.locator("#checkout-birthday").inputValue(),"","future birthdays never produce an ISO value");
+}
+await page.evaluate(()=>document.getElementById("checkoutForm").reset());
+await page.waitForFunction(()=>document.getElementById("dartBirthYear").value==="");
+assert.equal(await page.locator("#checkout-birthday").inputValue(),"","reset clears both selectors and submitted date");
+await page.locator("#dartBirthYear").selectOption("2000");
+await page.locator("#dartBirthMonth").selectOption("9");await page.locator("#dartBirthDay").selectOption("2");
+assert.equal(await page.evaluate(()=>new FormData(document.getElementById("checkoutForm")).get("birthday")),"2000-09-02");
+for(const [id,value] of [["checkout-name","Synthetic customer"],["checkout-phone1","01000000000"],["checkout-email","synthetic@example.test"],["checkout-building","21"],["checkout-floor","3"]])
 await page.locator("#"+id).fill(value);
 if(process.env.DART_CHECKOUT_SCREENSHOT)await page.locator("#checkoutForm").screenshot({path:process.env.DART_CHECKOUT_SCREENSHOT});
 await page.locator("#checkoutForm button[type=submit]").click();
@@ -86,6 +114,6 @@ await page.reload();
 await page.evaluate(()=>document.getElementById("checkoutView").style.display="block");
 await summary.click();assert.equal(await details.evaluate(el=>el.open),true);
 await summary.click();assert.equal(await details.evaluate(el=>el.open),false);
-console.log("PASS taller responsive map, guest account fields, native keyboard/no-JS disclosure, hidden-field validation/focus, preserved form data, offline manual fallback and coverage guards");
+console.log("PASS responsive birthday selectors, late prefill, leap years/future dates/reset/ISO form data, taller map, native disclosure, hidden-field validation/focus, manual fallback and coverage guards");
 }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

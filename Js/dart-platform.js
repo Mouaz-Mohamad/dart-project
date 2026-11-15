@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:f85ed6f979c52f5a96801e60f41193965dacc6ecaaf2547ef40dc8c8259827f8 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:5fd088fb647464e1e0899eb8d123f8206e4f5a0c9cbeed3951c98f4c3f7a7195 */
 (function () {
   "use strict";
 
@@ -3934,7 +3934,10 @@
     };
     Object.entries(values).forEach(([name, value]) => {
       const field = form.elements.namedItem(name);
-      if (field && !field.value) field.value = value;
+      if (field && !field.value && value) {
+        field.value = value;
+        if (name === "birthday") field.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     });
   }
 
