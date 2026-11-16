@@ -5,7 +5,7 @@ import type { IdentityService } from "../src/modules/identity/identity.service.j
 
 describe("customer email OTP lifetime", () => {
   it("uses the configured 10-minute TTL in the challenge, response, and queued email", async () => {
-    const statements: Array<{ sql: string; args?: unknown[] }> = [];
+    const statements: Array<{ sql: string; args: unknown[] | undefined }> = [];
     const client = {
       query: vi.fn(async (sql: string, args?: unknown[]) => {
         statements.push({ sql, args });
