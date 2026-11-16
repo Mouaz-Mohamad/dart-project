@@ -33,8 +33,10 @@ describe("waitlist alternative-color reservation safety", () => {
     expect(assign).toContain("IF p_match_type <> 'exact' THEN");
     expect(assign).toContain("IF v_entry.desired_color <> v_item.color THEN");
     expect(safety).toContain("CREATE TRIGGER waitlist_exact_allocation_only");
-    expect(safety).toContain("BEFORE INSERT OR UPDATE OF match_type ON waitlist_allocations");
+    expect(safety).toContain("BEFORE INSERT OR UPDATE OF match_type,waitlist_entry_id,inventory_item_id,offered_color ON waitlist_allocations");
     expect(safety).toContain("WAITLIST_ALTERNATIVE_SUGGESTION_ONLY");
+    expect(safety).toContain("WAITLIST_VARIANT_MISMATCH");
+    expect(safety).toContain("GRANT SELECT,INSERT ON waitlist_alternative_suggestions TO dart_app_runtime");
   });
 
   it("checks FIFO for exact restocks first and only suggests alternate colors", () => {
