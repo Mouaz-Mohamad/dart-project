@@ -547,9 +547,11 @@ const server = http.createServer((request, response) => {
   await dashboard.waitForFunction(() => !document.getElementById('dart-finance-modal').classList.contains('active'));
   assert.equal(await dashboard.locator('#finance').evaluate(node => node.classList.contains('active-section')), true, 'income save must return to the visible Finance section');
   assert.equal(await dashboard.locator('[data-finance-tab="incomes"]').evaluate(node => node.classList.contains('active')), true, 'income save must retain the Income tab');
-  // The responsive row Details dialog also owns a hidden copy of this button.
-  // Target the actionable, visible table control rather than the hidden dialog clone.
-  const receiptAction = dashboard.locator('#dart-finance-content .dart-finance-table-wrap [data-income-receive]:visible').first();
+  // Compact dashboard records move the original row actions into a Details
+  // dialog. Verify the accessible path rather than testing a hidden row child.
+  const incomeDetails = dashboard.locator('#dart-finance-content .dart-record-open').first();
+  if (await incomeDetails.count()) await incomeDetails.click();
+  const receiptAction = dashboard.locator('#dart-finance-content [data-income-receive]:visible').first();
   await receiptAction.waitFor({ state: 'visible' });
   assert.equal(incomeRequests.length, 1, 'one submission creates one pending entry');
   assert.equal(savedIncome.length, 1);
