@@ -520,7 +520,7 @@ const server = http.createServer((request, response) => {
     document.querySelector('a[data-target="finance"]').click();
   });
   await dashboard.locator('[data-finance-tab="incomes"]').click();
-  await dashboard.locator('[data-finance-add="incomes"]').click();
+  await dashboard.locator('#finance-page-header [data-finance-add="incomes"]').click();
   await dashboard.locator('#finance-income-amount').fill('4385');
   await dashboard.locator('#finance-income-category').fill('Other');
   const syntheticReason = 'تحصيل طلب هدية\nK-19\nK-17';
