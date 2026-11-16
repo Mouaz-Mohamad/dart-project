@@ -1357,7 +1357,7 @@ export class WaitingService {
 
     // The database migration is an independent deployment step.
     const migration = await client.query<{ installed: boolean }>(
-      "SELECT to_regclass('public.waitlist_alternative_suggestions') IS NOT NULL AS installed",
+      "SELECT to_regclass('waitlist_alternative_suggestions') IS NOT NULL AS installed",
     );
     if (!migration.rows[0]?.installed) {
       throw new AppError(
@@ -2028,7 +2028,7 @@ export class WaitingService {
     // During a rolling release the API may deploy before the 0096 migration.
     // Never let the new suggestions table break existing Waiting reads.
     const support = await client.query<{ installed: boolean }>(
-      "SELECT to_regclass('public.waitlist_alternative_suggestions') IS NOT NULL AS installed",
+      "SELECT to_regclass('waitlist_alternative_suggestions') IS NOT NULL AS installed",
     );
     const suggestionSql = support.rows[0]?.installed
       ? `COALESCE((
