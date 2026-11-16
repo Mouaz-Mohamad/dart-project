@@ -547,22 +547,9 @@ const server = http.createServer((request, response) => {
   await dashboard.waitForFunction(() => !document.getElementById('dart-finance-modal').classList.contains('active'));
   assert.equal(await dashboard.locator('#finance').evaluate(node => node.classList.contains('active-section')), true, 'income save must return to the visible Finance section');
   assert.equal(await dashboard.locator('[data-finance-tab="incomes"]').evaluate(node => node.classList.contains('active')), true, 'income save must retain the Income tab');
-  // Diagnose the actual hiding ancestor rather than treating a DOM-only button as usable.
-  const receiptAction = dashboard.locator('[data-income-receive]');
-  if (!(await receiptAction.isVisible())) {
-    const diagnostic = await receiptAction.evaluate(node => {
-      const hiddenBy = [];
-      for (let element = node; element; element = element.parentElement) {
-        const style = getComputedStyle(element);
-        if (element.hidden || style.display === 'none' || style.visibility !== 'visible') {
-          hiddenBy.push({ node: element.tagName, id: element.id, className: element.className,
-            hidden: element.hidden, display: style.display, visibility: style.visibility });
-        }
-      }
-      return { hiddenBy, financeActive: document.getElementById('finance').classList.contains('active-section') };
-    });
-    throw new Error('Income receipt is not visible: ' + JSON.stringify(diagnostic));
-  }
+  // The responsive row Details dialog also owns a hidden copy of this button.
+  // Target the actionable, visible table control rather than the hidden dialog clone.
+  const receiptAction = dashboard.locator('#dart-finance-content .dart-finance-table-wrap [data-income-receive]:visible').first();
   await receiptAction.waitFor({ state: 'visible' });
   assert.equal(incomeRequests.length, 1, 'one submission creates one pending entry');
   assert.equal(savedIncome.length, 1);
