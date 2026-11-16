@@ -68,7 +68,7 @@ describe("Waiting restock reservation contract", () => {
     );
     expect(safety).toContain("IF p_match_type <> 'exact' THEN");
     expect(safety).toContain("IF v_entry.desired_color <> v_item.color THEN");
-    expect(safety).toContain("BEFORE INSERT OR UPDATE OF match_type ON waitlist_allocations");
+    expect(safety).toContain("BEFORE INSERT OR UPDATE OF match_type,waitlist_entry_id,inventory_item_id,offered_color ON waitlist_allocations");
     expect(safety).toContain("WAITLIST_ALTERNATIVE_SUGGESTED");
     expect(safety).toContain("RETURN dart_waitlist_assign_item(v_item.id,v_entry_id,'exact'");
     expect(safety).not.toContain("dart_waitlist_assign_item(v_item.id,v_entry_id,'alternative_color'");
