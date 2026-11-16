@@ -90,7 +90,26 @@ export async function guestCheckoutCustomer(client: PoolClient, input: CustomerR
         "Check your phone and email together, or contact Dart support. Your cart is still reserved.");
     }
   }
-  if (emailOwner) return emailOwner.id;
+  if (emailOwner) {
+    // A typed email is NOT authentication. A guest must not attach their order,
+    // COD risk or customer history to an existing account using an unfamiliar
+    // contact number. Previously used order contacts may still place repeat
+    // guest orders; conflicting login phones were checked separately above.
+    const known = phoneOwner?.id === emailOwner.id
+      ? true
+      : (await client.query<{ allowed: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1 FROM customer_contact_phones
+              WHERE customer_user_id=$1::uuid AND phone_normalized=$2
+           ) AS allowed`,
+          [emailOwner.id, phone],
+        )).rows[0]?.allowed === true;
+    if (!known) {
+      throw new AppError(409, "CHECKOUT_CONTACT_CONFLICT",
+        "This email belongs to an existing account. Sign in to order with a new phone, or contact Dart support. Your cart is still reserved.");
+    }
+    return emailOwner.id;
+  }
 
   if (phoneOwner) {
     // The email belongs to no existing active customer, but the login phone
