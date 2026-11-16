@@ -104,6 +104,8 @@ async function pushRenewal() {
   assert.equal(ids.get("dart-push-disable").hidden,true);
   assert.equal(calls.filter(x=>x.opts?.method==="POST").length,0,"startup must never silently reactivate expired or opted-out devices");
   ids.get("dart-push-enable").events.click();
+  // Cross-realm async requests finish on the next turn, beyond a fixed microtask loop.
+  await new Promise(resolve => setImmediate(resolve));
   await flush();
   assert.equal(oldUnsubscribed,true,"explicit renewal must unsubscribe the dead push endpoint");
   assert.equal(subscribeCalls,1,"fresh browser subscription required");
