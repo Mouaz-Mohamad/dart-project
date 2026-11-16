@@ -20,7 +20,7 @@ interface ChallengeRow {
   expires_at: Date;
   consumed_at: Date | null;
 }
-type AuthResult = { challengeId: string; expiresAt: string; emailDisplay: string | null; sent: boolean };
+type AuthResult = { challengeId: string; expiresAt: string; emailDisplay: string | null; sent: boolean; needsEmail?: boolean };
 
 export class CustomerEmailAuthService {
   constructor(
@@ -106,10 +106,21 @@ export class CustomerEmailAuthService {
       [isEmail ? normalizeEmail(supplied) : "",phone],
     );
     const row=result.rows[0];
-    if (!row) return { challengeId:randomUUID(), expiresAt:new Date(Date.now()+this.config.emailOtpTtlMinutes*60_000).toISOString(),emailDisplay:isEmail?supplied:null,sent:false };
+    if (!row) return {
+      challengeId: randomUUID(),
+      expiresAt: new Date(Date.now() + this.config.emailOtpTtlMinutes * 60_000).toISOString(),
+      emailDisplay: isEmail ? supplied : null,
+      sent: false,
+      // Unregistered numbers and historical phone-only accounts receive the same
+      // first step. Neither the existence of an account nor its private data is returned.
+      ...(!isEmail ? { needsEmail: true } : {}),
+    };
     const start=await this.issue("login", row.email, row.id, null);
-    // Display the full address only if the visitor already typed it, not when guessing someone's phone.
-    return {...start,emailDisplay:isEmail?supplied:null};
+    const emailDisplay = isEmail ? supplied : (() => {
+      const [local, domain] = row.email.split("@");
+      return local && domain ? local.slice(0, Math.min(2, local.length)) + "***@" + domain : "***";
+    })();
+    return {...start,emailDisplay};
   }
 
   async startSignup(input: {name:string;phone1:string;email:string;birthday:string}): Promise<AuthResult> {

@@ -396,3 +396,45 @@ body.dart-auth-page {
 .dart-passkey-optin-enable {background:#AB012B;color:white;border:1px solid #AB012B;}
 .dart-passkey-optin-skip {background:white;color:#AB012B;border:1px solid #AB012B;}
 @media(max-width:380px){.dart-auth-otp-inputs{gap:5px}.dart-auth-otp-digit{height:44px;font-size:21px}}
+
+/* Existing-customer email link / verification dialog (sign-in page only). */
+.dart-auth-page .dart-email-link-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(92dvh, 760px);
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  overflow: auto;
+  background: #fffdfb;
+  color: var(--auth-text);
+  box-shadow: 0 30px 100px rgba(48, 16, 29, .25);
+}
+.dart-auth-page .dart-email-link-dialog::backdrop { background: rgba(18, 11, 15, .65); }
+.dart-auth-page .dart-email-link-card { position: relative; padding: clamp(22px, 4vw, 34px); }
+.dart-auth-page .dart-email-link-kicker { display: block; color: #ab012b; font-size: 11px; font-weight: 700; letter-spacing: .15em; }
+.dart-auth-page .dart-email-link-card h2 { margin: 12px 0; font-size: 23px; line-height: 1.3; }
+.dart-auth-page .dart-email-link-card p { font-size: 13px; line-height: 1.75; color: #594650; }
+.dart-auth-page .dart-email-link-card label { display: block; margin: 12px 0 6px; font-size: 12px; font-weight: 700; }
+.dart-auth-page .dart-email-link-card input {
+  display: block; width: 100%; min-height: 49px;
+  padding: 12px; border: 1px solid #ddced4; border-radius: 12px;
+  background: #fff; color: #231b20; font-size: 14px;
+}
+.dart-auth-page .dart-email-link-card input:focus-visible { outline: 2px solid #ab012b; outline-offset: 2px; }
+.dart-auth-page .dart-email-link-primary {
+  display: block; width: 100%; margin-top: 15px; min-height: 46px;
+  border: 0; border-radius: 12px; background: #ab012b; color: #fff;
+  font: 700 13px 'Poppins', sans-serif; cursor: pointer;
+}
+.dart-auth-page .dart-email-link-secondary {
+  border: 0; background: transparent; color: #8d1234;
+  font: 600 12px 'Poppins', sans-serif; padding: 11px 8px; cursor: pointer;
+}
+.dart-auth-page .dart-email-link-card button:disabled { opacity: .55; cursor: wait; }
+.dart-auth-page .dart-email-link-close { position: absolute; top: 12px; left: 14px; font-size: 27px; border: 0; background: transparent; color: #6a5360; cursor: pointer; }
+.dart-auth-page .dart-email-link-address { display: block; direction: ltr; text-align: center; overflow-wrap: anywhere; color: #ab012b; padding: 10px; background: #faf2f4; border-radius: 9px; }
+.dart-auth-page .dart-email-link-status { min-height: 22px; color: #285b3d; }
+.dart-auth-page .dart-email-link-status.is-error { color: #ae1738; }
+.dart-auth-page .dart-email-link-success-title { color: #16683a !important; font-weight: 700; }
+.dart-auth-page .dart-email-link-note { font-size: 11px !important; }
+.dart-auth-page .dart-email-link-dialog [hidden] { display: none !important; }

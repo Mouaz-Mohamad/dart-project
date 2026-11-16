@@ -52,6 +52,10 @@ export function renderOutboxEmail(
     subject = "Dart Eye verification code";
     english = `Your Dart Eye verification code is ${otp}. It expires ${expiry || "soon"}. If you did not request this code, ignore this email.`;
     arabic = `كود تأكيد الدخول إلى Dart Eye هو ${otp}. ينتهي الكود ${expiry || "قريبًا"}. إذا لم تطلب هذا الكود فتجاهل الرسالة.`;
+  } else if (eventType === "CUSTOMER_EMAIL_LINK_OTP_REQUESTED") {
+    subject = "Dart | For you — Confirm your email";
+    english = "Use this code to confirm your email-link request. The account will remain locked until the Dart Owner confirms phone ownership: " + otp + ".";
+    arabic = "استخدم هذا الرمز لتأكيد بريدك الجديد. لن يفتح الحساب إلا بعد موافقة إدارة Dart والتحقق من رقم الهاتف: " + otp + ".";
   } else if (eventType === "CUSTOMER_LOGIN_OTP_REQUESTED" || eventType === "CUSTOMER_SIGNUP_OTP_REQUESTED") {
     subject = "Dart | For you — OTP";
     english = "Your Dart verification code is " + otp + ".";
@@ -117,12 +121,16 @@ export function renderOutboxEmail(
     "PASSWORD_RESET_CODE_REQUESTED",
     "CUSTOMER_LOGIN_OTP_REQUESTED",
     "CUSTOMER_SIGNUP_OTP_REQUESTED",
+    "CUSTOMER_EMAIL_LINK_OTP_REQUESTED",
   ].includes(eventType)) {
     const safeOtp = escapeHtml(otp);
     const otpExpiryCopy = expiresAt && Number.isFinite(Date.parse(expiresAt))
       ? `ينتهي الرمز في ${new Date(expiresAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo", dateStyle: "medium", timeStyle: "short" })} بتوقيت القاهرة.`
       : "صلاحية هذا الرمز محدودة، برجاء استخدامه فور استلامه.";
     const safeOtpExpiryCopy = escapeHtml(otpExpiryCopy);
+    const verificationContext = eventType === "CUSTOMER_EMAIL_LINK_OTP_REQUESTED"
+      ? "هذا الرمز لتأكيد بريدك الإلكتروني فقط. ربطه بحساب Dart القديم يحتاج تأكيد ملكية رقم الهاتف من إدارة المتجر."
+      : "استخدم الكود التالي لتأكيد حسابك في Dart.";
     const html = `<!doctype html>
 <html lang="ar" dir="rtl">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -131,7 +139,7 @@ export function renderOutboxEmail(
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:420px;border-collapse:collapse">
       <tr><td align="center" style="padding-bottom:36px"><img src="https://www.dartofficial.com/Photos/Logos/01_Dart_original_transparent.png" alt="Dart" width="220" style="display:block;width:220px;max-width:90%;height:auto;border:0"></td></tr>
       <tr><td align="center" style="font-size:20px;color:#1c1c1c;padding-bottom:12px">كود التحقق الخاص بك</td></tr>
-      <tr><td align="center" style="font-size:14px;color:#444;padding-bottom:18px">استخدم الكود التالي لتأكيد حسابك في Dart.</td></tr>
+      <tr><td align="center" style="font-size:14px;color:#444;padding-bottom:18px">${escapeHtml(verificationContext)}</td></tr>
       <tr><td align="center" dir="ltr" style="font-size:46px;font-weight:700;letter-spacing:8px;color:#AB012B;padding-bottom:34px;white-space:nowrap">${safeOtp}</td></tr>
       <tr><td align="center" style="font-size:13px;line-height:1.8;color:#444;padding:0 0 12px">${safeOtpExpiryCopy}</td></tr>
       <tr><td align="center" style="font-size:13px;line-height:1.8;color:#444;padding-bottom:18px">إذا لم تطلب هذا الرمز، تجاهل الرسالة. لا تشارك الكود مع أي شخص.</td></tr>

@@ -25,6 +25,8 @@ import {
 } from "./modules/health/health.routes.js";
 import { createIdentityRouter } from "./modules/identity/identity.routes.js";
 import { createCustomerPasswordlessRouter } from "./modules/identity/customer-passwordless.routes.js";
+import { createCustomerEmailLinkRouter } from "./modules/identity/customer-email-link.routes.js";
+import type { CustomerEmailLinkService } from "./modules/identity/customer-email-link.service.js";
 import type { CustomerEmailAuthService } from "./modules/identity/customer-email-auth.service.js";
 import type { CustomerPasskeyService } from "./modules/identity/customer-passkeys.service.js";
 import { createSocialAuthRouter } from "./modules/identity/social-auth.routes.js";
@@ -78,6 +80,7 @@ export interface AppDependencies extends HealthDependencies {
   changeFeed?: ChangeFeed;
   identityService?: IdentityService;
   customerEmailAuthService?: CustomerEmailAuthService;
+  customerEmailLinkService?: CustomerEmailLinkService;
   customerPasskeyService?: CustomerPasskeyService;
   socialAuthService?: SocialAuthService;
   catalogService?: CatalogService;
@@ -194,6 +197,12 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       app.use("/api/v1", createCustomerPasswordlessRouter(
         dependencies.identityService, dependencies.customerEmailAuthService,
         dependencies.customerPasskeyService, config, dependencies.outboxService,
+      ));
+    }
+    if (dependencies.customerEmailLinkService) {
+      app.use("/api/v1", createCustomerEmailLinkRouter(
+        dependencies.customerEmailLinkService, dependencies.identityService,
+        config, dependencies.outboxService,
       ));
     }
     app.use(

@@ -2898,6 +2898,20 @@
                     </div>
                 </article>
 
+                <article id="settings-customer-email-links-card" data-settings-group="staff"
+                  class="dart-settings-card dart-settings-form-card dart-settings-wide" hidden>
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-envelope-circle-check"></i></div>
+                    <div class="dart-settings-card-copy">
+                        <span>CUSTOMER IDENTITY</span>
+                        <h2>Verified Email Link Requests</h2>
+                        <p>طلبات إضافة بريد إلكتروني للعملاء المسجلين بأرقام هاتف فقط. تم تأكيد البريد بالـOTP،
+                          لكن لا يُسمح بفتح الحساب إلا بعد اتصالك برقم العميل المسجل والتحقق من ملكيته. اعتمد أو ارفض كل طلب بنفسك.</p>
+                    </div>
+                    <button type="button" id="settings-customer-email-links-refresh" class="dart-settings-secondary">Refresh requests</button>
+                    <p id="settings-customer-email-links-status" class="dart-settings-status" role="status" aria-live="polite"></p>
+                    <div id="settings-customer-email-links-list" class="dart-settings-list"></div>
+                </article>
+
                 <article id="settings-reset-card" data-settings-group="maintenance" class="dart-settings-card dart-settings-danger-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <div class="dart-settings-card-copy">
@@ -3017,6 +3031,7 @@
     <script src="dart-settings-features-loader.js?v=20261107-1"></script>
     <script src="dart-discount-codes.js?v=20261109-hard-delete"></script>
     <script src="dart-staff.js"></script>
+    <script src="dart-email-links.js?v=20261116-owner-review"></script>
     <script src="../Js/dart-news.js?v=20261008-news-v1" defer></script>
 <script src="dart-dashboard-ui.js"></script>
 <script src="dart-orders-ui.js?v=20261105-orders-ui-v1"></script>

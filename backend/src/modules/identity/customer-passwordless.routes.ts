@@ -63,8 +63,14 @@ export function createCustomerPasswordlessRouter(
     const body=z.object({identifier}).parse(request.body);
     if(!outbox?.configured("email"))return response.status(503).json({error:{code:"EMAIL_UNAVAILABLE",message:"Email authentication is temporarily unavailable"}}); 
     const result=await emailAuth.startLogin(body.identifier);
+    if (result.needsEmail) {
+      return response.status(202).json({
+        needsEmail: true,
+        message: "Enter an email address to verify. Existing phone-only accounts require Owner approval.",
+      });
+    }
     if(result.sent)await dispatchOutbox(outbox,1,"customer-email-login:"+result.challengeId);
-    response.status(202).json({challengeId:result.challengeId,expiresAt:result.expiresAt,
+    return response.status(202).json({challengeId:result.challengeId,expiresAt:result.expiresAt,
       ...(result.emailDisplay?{email:result.emailDisplay}:{}),
       message:"If this account has a verified email, a code was sent to that address.",
     });

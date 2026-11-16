@@ -18,6 +18,7 @@ import { createDatabasePool, pingDatabase } from "./database/pool.js";
 import { applySetHomepageMigration, SET_HOMEPAGE_MIGRATION } from "./database/set-homepage-migration.js";
 import { IdentityService } from "./modules/identity/identity.service.js";
 import { CustomerEmailAuthService } from "./modules/identity/customer-email-auth.service.js";
+import { CustomerEmailLinkService } from "./modules/identity/customer-email-link.service.js";
 import { CustomerPasskeyService } from "./modules/identity/customer-passkeys.service.js";
 import {
   loadSocialAuthConfig,
@@ -87,6 +88,7 @@ export function createRuntimeApplication(
   );
   const identityService = new IdentityService(database, config);
   const customerEmailAuthService = new CustomerEmailAuthService(database, config, identityService);
+  const customerEmailLinkService = new CustomerEmailLinkService(database, config);
   const customerPasskeyService = new CustomerPasskeyService(database, identityService, config);
   const socialAuthService = new SocialAuthService(
     database,
@@ -137,6 +139,7 @@ export function createRuntimeApplication(
     version: "0.6.2",
     identityService,
     customerEmailAuthService,
+    customerEmailLinkService,
     customerPasskeyService,
     socialAuthService,
     catalogService,
