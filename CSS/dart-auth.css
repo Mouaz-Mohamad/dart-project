@@ -401,9 +401,12 @@ body.dart-auth-page {
 .dart-auth-page .dart-email-link-dialog {
   /* Top-layer modal: center independently of the auth page's flex container. */
   position: fixed !important;
-  inset: 0 !important;
-  margin: auto !important;
-  transform: none !important;
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  transform: translate(-50%, -50%) !important;
   width: min(440px, calc(100vw - 32px));
   max-height: min(92dvh, 760px);
   padding: 0;

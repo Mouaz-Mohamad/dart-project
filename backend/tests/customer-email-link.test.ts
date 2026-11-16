@@ -157,7 +157,7 @@ describe("phone-only account email link review", () => {
     const css = readFileSync(new URL("../../CSS/dart-auth.css", import.meta.url), "utf8");
     expect(css).toContain(".dart-auth-page .dart-email-link-dialog {");
     expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*position:\s*fixed/s);
-    expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*inset:\s*0/s);
-    expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*margin:\s*auto/s);
+    expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*top:\s*50%/s);
+    expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*transform:\s*translate\(-50%,\s*-50%\)/s);
   });
 });
