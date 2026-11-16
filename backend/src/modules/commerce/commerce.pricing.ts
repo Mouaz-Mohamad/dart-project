@@ -103,6 +103,10 @@ export function customerOrderView(order: Record<string, unknown>): Record<string
   const fields = ["itemId","itemCode","modelCode","name","color","size","qty","originalUnitPrice","discountPercent","discountAmount","discountSource","discountReference","finalUnitPrice"];
   const publicOrder = { ...order };
   delete publicOrder.pendingDispatch;
+  // Courier expense belongs to the internal Finance ledger, not the customer-facing sale.
+  delete publicOrder.deliveryCost;
+  delete publicOrder.courierFee;
+  delete publicOrder.courierFeePerOrder;
   return { ...publicOrder, ...(Array.isArray(order.priceSnapshot) ? {
     priceSnapshot: order.priceSnapshot.map((line: Record<string, unknown>) => Object.fromEntries(fields.filter((key) => key in line).map((key) => [key, line[key]]))),
   } : {}) };

@@ -507,7 +507,6 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
         totalPrice: subtotal,
         orderLevelDiscountAmount: discountAmount,
         finalAmount: Number(row.final_minor) / 100,
-        deliveryCost: Number(row.delivery_cost_minor || 0) / 100,
         shippingFee: Number(row.shipping_fee_minor || 0) / 100,
         amountPaid: Number(row.amount_paid_minor) / 100,
         amountRefunded: Number(row.amount_refunded_minor) / 100,
