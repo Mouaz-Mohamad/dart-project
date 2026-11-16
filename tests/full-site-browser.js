@@ -343,13 +343,17 @@ const server = http.createServer((request, response) => {
   await policyResult.click();
   assert.equal(await dashboard.locator('#settings-content').getAttribute('data-active-settings-tab'),'sales');
   assert.equal(await dashboard.locator('#settings-cod-risk-card').isVisible(),true);
+  assert.equal(await dashboard.locator('#settings-cod-risk-card > .dart-settings-accordion-trigger').getAttribute('aria-expanded'),'true','search opens the destination card');
   assert.equal(await dashboard.locator('#settings-search').inputValue(),'','opening a result clears the search');
   assert.equal(await dashboard.locator('#settings-commerce-card').isVisible(),true);
   await dashboard.locator('[data-settings-tab="sales"]').click();
+  assert.equal(await dashboard.locator('#settings-cod-risk-card > .dart-settings-accordion-trigger').getAttribute('aria-expanded'),'false','changing categories closes the previous card');
+  await dashboard.locator('#settings-commerce-card > .dart-settings-accordion-trigger').click();
   await dashboard.locator('#settings-default-markup').fill('57');
   await dashboard.evaluate(()=>window.dispatchEvent(new CustomEvent('dart:site-settings-changed',{detail:window.DartSiteSettings.get()})));
   assert.equal(await dashboard.locator('#settings-default-markup').inputValue(),'57','background settings refresh preserves an unsaved field');
   await dashboard.locator('[data-settings-tab="general"]').click();
+  await dashboard.locator('#settings-display-card > .dart-settings-accordion-trigger').click();
   await dashboard.locator('#settings-display-density').selectOption('compact');
   await dashboard.locator('#settings-display-form [type="submit"]').click();
   assert.equal(await dashboard.locator('body').getAttribute('data-dart-density'),'compact');
@@ -378,6 +382,7 @@ const server = http.createServer((request, response) => {
   await dashboard.evaluate(()=>window.dispatchEvent(new Event('dart:admin-authenticated')));
   await dashboard.waitForFunction(()=>document.querySelectorAll('#settings-staff-list [data-staff-id]').length===3);
   await dashboard.locator('[data-settings-tab="staff"]').click();
+  await dashboard.locator('#settings-staff-access-card > .dart-settings-accordion-trigger').click();
   assert.equal(await dashboard.locator('.dart-staff-member-body').count(),0);
   assert.equal(await dashboard.locator('#settings-staff-invite-form').isVisible(),false);
   await dashboard.locator('[data-staff-id="staff-a"] [data-staff-action="view"]').click();

@@ -291,7 +291,8 @@ const server = http.createServer(async (request, response) => {
   });
 
   await dashboard.locator('[data-settings-tab="sales"]').click();
-  await dashboard.waitForSelector("#settings-commerce-form");
+  await dashboard.locator('#settings-commerce-card > .dart-settings-accordion-trigger').click();
+  await dashboard.waitForSelector("#settings-commerce-form", { state: "visible" });
   const initialUrl = dashboard.url();
   await dashboard.locator("#settings-birthday-discount").fill("31");
   await dashboard.locator("#settings-card-discount").fill("41");
@@ -311,6 +312,7 @@ const server = http.createServer(async (request, response) => {
   // Use the real upload/compression form and a fresh About page. A null-only
   // settings fixture cannot detect the historical PNG-locking observer.
   await dashboard.locator('[data-settings-tab="storefront"]').click();
+  await dashboard.locator('#settings-media-card > .dart-settings-accordion-trigger').click();
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7aUAAAAASUVORK5CYII=", "base64");
   async function uploadFounder(name, expectedPuts) {
     await dashboard.locator("#settings-founder-image").setInputFiles({ name, mimeType: "image/png", buffer: png });
@@ -380,6 +382,7 @@ const server = http.createServer(async (request, response) => {
   await expectFounder(null);
 
   await dashboard.locator('[data-settings-tab="storefront"]').click();
+  await dashboard.locator('#settings-typing-card > .dart-settings-accordion-trigger').click();
   const scenes=dashboard.locator('[data-typing-scene]');
   assert.equal(await scenes.count(),2,'each original scene is a sentence group');
   assert.equal(await scenes.nth(0).locator('[data-typing-row]').count(),2);
@@ -435,6 +438,7 @@ const server = http.createServer(async (request, response) => {
 
   await dashboard.evaluate(() => document.querySelector('a[data-target="settings"]').click());
   await dashboard.locator('[data-settings-tab="loyalty"]').click();
+  await dashboard.locator('#settings-site-discount-card > .dart-settings-accordion-trigger').click();
   await dashboard.locator('#settings-promotion-name').fill('Quantity Regression');
   await dashboard.locator('#settings-promotion-code').fill('Q-REGRESSION');
   await dashboard.locator('#settings-promotion-kind').selectOption('fixed');
