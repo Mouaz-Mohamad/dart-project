@@ -28,6 +28,7 @@
     "dart-card-toggle-contract.cjs",
     "dart-finance-unit.js",
     "dashboard-refresh-runtime.cjs",
+    "dashboard-dynamic-filters.cjs",
     "database-authoritative-storage.cjs",
     "finance-dashboard-contract.js",
     "finance-persistence-contract.js",

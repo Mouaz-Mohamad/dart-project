@@ -552,6 +552,18 @@
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
+                <div class="select-box">
+                    <select data-filter-key="size" aria-label="Filter model sizes">
+                        <option value="all">All Sizes</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="color" aria-label="Filter model colors">
+                        <option value="all">All Colors</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
                 <button type="button" class="add-btn">
                     <span>+</span> Add Product
                 </button>
@@ -719,8 +731,7 @@
                 <div class="select-box">
                     <select>
                         <option value="" disabled selected hidden>Status</option>
-                        <option value="active">In stock</option>
-                        <option value="out-of-stock">Sold</option>
+                        <option value="all">All Item States</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -739,11 +750,8 @@
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
                 <div class="select-box">
-                    <select>
-                        <option value="" disabled selected hidden>Colors</option>
-                        <option value="بيج">بيج</option>
-                        <option value="ابيض">ابيض</option>
-                        <option value="اسود">اسود</option>
+                    <select data-filter-key="color" aria-label="Filter item colors">
+                        <option value="all">All Colors</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -1038,6 +1046,8 @@
                         <option value="five-hours-ago"> Five hours ago</option>
                         <option value="today"> Today</option>
                         <option value="yesterday"> Yesterday</option>
+                        <option value="last-7-days">Last 7 Days</option>
+                        <option value="last-30-days">Last 30 Days</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -1062,6 +1072,24 @@
                         <option value="all">None</option>
                         <option value="up">Up</option>
                         <option value="low">Low</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="deliveryMode" aria-label="Filter order delivery mode">
+                        <option value="all">All Delivery Modes</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="carrier" aria-label="Filter shipping company">
+                        <option value="all">All Shipping Companies</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="codVerification" aria-label="Filter COD verification">
+                        <option value="all">All COD Verifications</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
@@ -1524,6 +1552,18 @@
                         <option value="Pickup On The Way">Pickup On The Way</option>
                         <option value="Completed">Completed</option>
                         <option value="Rejected">Rejected</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="inspection" aria-label="Filter return inspection state">
+                        <option value="all">All Inspections</option>
+                    </select>
+                    <i class="bx bx-chevron-down arrow-icon"></i>
+                </div>
+                <div class="select-box">
+                    <select data-filter-key="returnType" aria-label="Filter return request type">
+                        <option value="all">All Return Types</option>
                     </select>
                     <i class="bx bx-chevron-down arrow-icon"></i>
                 </div>
