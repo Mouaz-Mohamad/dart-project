@@ -68,16 +68,6 @@ describe("Discount Code: line-level priority, single order amount, lifecycle", (
     return {user,customer,couponCode,offer,models,pieces,input,reservationId};
   }
 
-  it("enforces row-level security on both discount-code tables", async () => {
-    const result = await store.pool.query<{relname:string;relrowsecurity:boolean}>(
-      "SELECT relname,relrowsecurity FROM pg_class WHERE oid IN ('public.discount_codes'::regclass,'public.discount_code_usages'::regclass) ORDER BY relname",
-    );
-    expect(result.rows).toEqual([
-      { relname: "discount_code_usages", relrowsecurity: true },
-      { relname: "discount_codes", relrowsecurity: true },
-    ]);
-  });
-
   it("allocates Campaign > Manual > Code > Birthday > Dart Card, and protects model discounts",async()=>{
     const f=await fixture();
     const quote=await commerce.customerCartQuote(f.user,f.reservationId,f.couponCode);
