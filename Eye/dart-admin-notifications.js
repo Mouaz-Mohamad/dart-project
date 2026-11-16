@@ -21,7 +21,7 @@
     document.getElementById("dart-notification-bell").setAttribute("aria-label", `Notifications · ${unread} unread`);
     document.getElementById("dart-notification-list").innerHTML = renderRows();
     document.getElementById("dart-notification-more").hidden = !nextCursor;
-    if (counts) for (const section of ["orders", "returns", "review"]) {
+    if (counts) for (const section of ["orders", "returns", "review", "settings"]) {
       for (const link of document.querySelectorAll(`[data-target="${section}"]`)) {
         let badge = link.querySelector(".dart-nav-unread");
         if (!badge) { badge = document.createElement("span"); badge.className = "dart-nav-unread"; link.append(badge); }
@@ -74,11 +74,25 @@
     try {
       if (!n.readAt) await mark([id]);
       showPanel(false);
-      // Fetch authoritative records before opening details, including cross-device arrivals.
-      if (n.section === "orders") await window.DartOrdersApi?.hydrate?.(true);
-      document.querySelector(`.cont-menu [data-target="${n.section}"]`)?.click();
-      const opened = await window.dartOpenAdminNotification?.(n);
-      if (!opened) notify("The record may be outside the active filters. Clear the section filters to view it.");
+      // Account-claim alerts link to the Owner's protected review panel.
+      // No customer PII is included in the notification or lock-screen payload.
+      if (n.eventType === "CUSTOMER_EMAIL_LINK_REQUESTED") {
+        document.querySelector('.cont-menu [data-target="settings"]')?.click();
+        window.DartSettingsTabs?.activate?.("staff");
+        const review = document.getElementById("settings-customer-email-links-card");
+        if (review && !review.hidden) {
+          review.scrollIntoView({ behavior: "smooth", block: "center" });
+          window.DartCustomerEmailLinks?.refresh?.(true);
+        } else {
+          notify("افتح Settings ثم Staff & Permissions لمراجعة طلب ربط الإيميل.");
+        }
+      } else {
+        // Fetch authoritative records before opening details, including cross-device arrivals.
+        if (n.section === "orders") await window.DartOrdersApi?.hydrate?.(true);
+        document.querySelector(`.cont-menu [data-target="${n.section}"]`)?.click();
+        const opened = await window.dartOpenAdminNotification?.(n);
+        if (!opened) notify("The record may be outside the active filters. Clear the section filters to view it.");
+      }
       const url = new URL(location.href); url.searchParams.delete("notification"); history.replaceState(null, "", url);
     } catch { status("Could not open this notification. Please retry."); showPanel(true); }
   }

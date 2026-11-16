@@ -63,9 +63,46 @@ describe("staff notifications",()=>{
     expect((await service.list(userId,permissions)).unreadCount).toBe(1);
     expect((await store.pool.query("SELECT count(*)::int AS count FROM outbox_events WHERE aggregate_type='admin_notification'")).rows[0].count).toBe(1);
   });
+  it("routes verified customer email link requests only to the real Owner and sends generic push",async()=>{
+    const linkId=randomUUID();
+    const ownerDevice=await service.push.subscribe(testOwnerId,testOwnerSessionId,
+      browser(),config.webPushVapidPublicKey!,"email-link-test");
+    const staffDevice=await subscribe();
+    await queue("CUSTOMER_EMAIL_LINK_REQUESTED",linkId);
+    await queue("CUSTOMER_EMAIL_LINK_REQUESTED",linkId); // one event per request
+    const ownerPage=await service.list(testOwnerId,[...permissions,"staff.manage"]);
+    expect(ownerPage.notifications).toHaveLength(1);
+    expect(ownerPage.notifications[0]).toMatchObject({
+      eventType:"CUSTOMER_EMAIL_LINK_REQUESTED",entityId:linkId,
+      section:"settings",entityCode:"K-SYNTHETIC",
+    });
+    expect(ownerPage.unread.settings).toBe(1);
+    expect(ownerPage.unreadCount).toBe(1);
+    expect((await service.list(userId,[...permissions,"staff.manage"])).notifications).toHaveLength(0);
+    expect((await service.list(userId,permissions)).unreadCount).toBe(0);
+    const outbox=await store.pool.query<{payload:Record<string,unknown>}>(`
+      SELECT payload FROM outbox_events WHERE aggregate_type='admin_notification'
+        AND aggregate_id=$1 AND payload->>'subscriptionId'=$2`,
+      [ownerPage.notifications[0]!.id,ownerDevice.id]);
+    expect(outbox.rows).toHaveLength(1);
+    const calls:string[]=[];
+    expect(await deliverAdminPush(store.pool,config.mfaEncryptionKey,provider(calls),outbox.rows[0]!.payload)).toEqual({});
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(calls[0]!)).toMatchObject({eventType:"CUSTOMER_EMAIL_LINK_REQUESTED"});
+    expect(calls[0]).not.toContain("K-SYNTHETIC");
+    const staffOutbox=await store.pool.query<{payload:Record<string,unknown>}>(`
+      SELECT payload FROM outbox_events WHERE aggregate_type='admin_notification'
+        AND aggregate_id=$1 AND payload->>'subscriptionId'=$2`,
+      [ownerPage.notifications[0]!.id,staffDevice.id]);
+    if(staffOutbox.rows.length) {
+      expect(await deliverAdminPush(store.pool,config.mfaEncryptionKey,provider(calls),staffOutbox.rows[0]!.payload))
+        .toEqual({suppressed:true});
+      expect(calls).toHaveLength(1);
+    }
+  });
   it("filters categories and keeps reads independent across accounts and pages",async()=>{
     for(const type of ["ORDER_CREATED","RETURN_CREATED","EXCHANGE_CREATED","REVIEW_CREATED"] as const)await queue(type);
-    const page=await service.list(userId,permissions,2);expect(page.unread).toEqual({orders:1,returns:2,review:1});expect(page.nextCursor).toBeTruthy();
+    const page=await service.list(userId,permissions,2);expect(page.unread).toEqual({orders:1,returns:2,review:1,settings:0});expect(page.nextCursor).toBeTruthy();
     expect((await service.list(userId,permissions,2,page.nextCursor!)).notifications).toHaveLength(2);
     for(let i=0;i<2;i++)await service.markRead(userId,permissions,page.notifications.map(n=>n.id));
     expect((await service.list(userId,permissions)).unreadCount).toBe(2);expect((await service.list(otherId,permissions)).unreadCount).toBe(4);

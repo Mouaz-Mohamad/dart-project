@@ -14,6 +14,7 @@ export const adminMessages: Record<AdminNotificationEvent, { title: string; sect
   RETURN_CREATED: { title: "New return request", section: "returns" },
   EXCHANGE_CREATED: { title: "New exchange request", section: "returns" },
   REVIEW_CREATED: { title: "New review", section: "review" },
+  CUSTOMER_EMAIL_LINK_REQUESTED: { title: "طلب ربط رقم الهاتف بالإيميل", section: "settings" },
 };
 export class AdminNotificationService {
   readonly push: CustomerNotificationService;
@@ -105,13 +106,25 @@ export class AdminNotificationService {
     return {testId,total,accepted,suppressed,failed,unknown,pending:Math.max(0,total-accepted-suppressed-failed-unknown)};
   }
 
+  // Sensitive account-recovery notifications are visible to the actual Owner only,
+  // even if a non-Owner was mistakenly given the staff.manage permission.
+  private async visibleEvents(userId: string, permissions: string[]): Promise<AdminNotificationEvent[]> {
+    const events = allowedAdminEvents(permissions);
+    if (!events.includes("CUSTOMER_EMAIL_LINK_REQUESTED")) return events;
+    const owner = await this.pool.query(
+      "SELECT 1 FROM staff_users WHERE user_id=$1 AND is_owner AND disabled_at IS NULL",
+      [userId],
+    );
+    return owner.rows.length ? events : events.filter(event => event !== "CUSTOMER_EMAIL_LINK_REQUESTED");
+  }
+
   async list(userId: string, permissions: string[], limit = 25, cursor?: string, id?: string) {
     let before: z.infer<typeof cursorSchema> | undefined;
     if (cursor) {
       try { before = cursorSchema.parse(JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"))); }
       catch { throw new AppError(422, "INVALID_CURSOR", "Invalid notification page"); }
     }
-    const events = allowedAdminEvents(permissions);
+    const events = await this.visibleEvents(userId, permissions);
     const result = await this.pool.query<{ id: string; event_type: AdminNotificationEvent; entity_id: string; entity_code: string; created_at: Date; read_at: Date | null }>(
       `SELECT n.*,r.read_at FROM admin_notifications n
        LEFT JOIN admin_notification_reads r ON r.notification_id=n.id AND r.user_id=$1
@@ -121,7 +134,7 @@ export class AdminNotificationService {
       `SELECT n.event_type,count(*)::text FROM admin_notifications n
        WHERE n.event_type=ANY($2::text[]) AND NOT EXISTS(SELECT 1 FROM admin_notification_reads r WHERE r.notification_id=n.id AND r.user_id=$1)
        GROUP BY n.event_type`, [userId,events]);
-    const unread = { orders: 0, returns: 0, review: 0 }, rows = result.rows.slice(0,limit), last = rows.at(-1);
+    const unread = { orders: 0, returns: 0, review: 0, settings: 0 }, rows = result.rows.slice(0,limit), last = rows.at(-1);
     for (const row of counts.rows) unread[adminMessages[row.event_type].section as keyof typeof unread] += Number(row.count);
     return { notifications: rows.map(row => ({ id: row.id, eventType: row.event_type, entityId: row.entity_id,
       entityCode: row.entity_code, ...adminMessages[row.event_type], createdAt: row.created_at.toISOString(), readAt: row.read_at?.toISOString()||null })),
@@ -129,11 +142,12 @@ export class AdminNotificationService {
       nextCursor: result.rows.length>limit && last ? Buffer.from(JSON.stringify({at:last.created_at.toISOString(),id:last.id})).toString("base64url") : null };
   }
   async markRead(userId: string, permissions: string[], ids: string[]) {
+    const events = await this.visibleEvents(userId, permissions);
     const result = await this.pool.query(`WITH inserted AS (INSERT INTO admin_notification_reads(user_id,notification_id)
       SELECT $1,n.id FROM admin_notifications n WHERE n.id=ANY($2::uuid[]) AND n.event_type=ANY($3::text[])
       ON CONFLICT DO NOTHING RETURNING notification_id)
       UPDATE domain_state_versions SET version=version+1,updated_at=now() WHERE domain='admin_notifications' AND EXISTS(SELECT 1 FROM inserted)
-      RETURNING (SELECT count(*)::int FROM inserted) AS updated`, [userId,ids,allowedAdminEvents(permissions)]);
+      RETURNING (SELECT count(*)::int FROM inserted) AS updated`, [userId,ids,events]);
     return { updated: Number(result.rows[0]?.updated || 0) };
   }
 }

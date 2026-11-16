@@ -51,8 +51,8 @@ export async function deliverAdminPush(pool: Pool,encryptionKey: Buffer,provider
   const input=schema.safeParse(payload);
   if(!input.success)throw new PushDeliveryError("terminal","Invalid staff push identifiers");
   const {notificationId,subscriptionId,subscriptionVersion}=input.data;
-  const result=await pool.query<{customer_user_id:string;event_type:AdminNotificationEvent;encrypted_subscription:Buffer;vapid_fingerprint:string}>(
-    `SELECT p.customer_user_id::text,n.event_type,p.encrypted_subscription,p.vapid_fingerprint FROM admin_notifications n
+  const result=await pool.query<{customer_user_id:string;event_type:AdminNotificationEvent;is_owner:boolean;encrypted_subscription:Buffer;vapid_fingerprint:string}>(
+    `SELECT p.customer_user_id::text,n.event_type,staff.is_owner,p.encrypted_subscription,p.vapid_fingerprint FROM admin_notifications n
      JOIN admin_push_subscriptions p ON p.id=$2 JOIN users u ON u.id=p.customer_user_id JOIN staff_users staff ON staff.user_id=u.id
      WHERE n.id=$1 AND p.version=$3 AND p.active AND n.created_at>now()-interval '24 hours'
        AND u.account_type='staff' AND u.status='active' AND u.deleted_at IS NULL
@@ -62,7 +62,8 @@ export async function deliverAdminPush(pool: Pool,encryptionKey: Buffer,provider
        AND NOT EXISTS(SELECT 1 FROM admin_notification_reads r WHERE r.user_id=u.id AND r.notification_id=n.id)`,
     [notificationId,subscriptionId,subscriptionVersion]);
   const row=result.rows[0];
-  if(!row||!allowedAdminEvents(await effectivePermissionsForUser(row.customer_user_id,pool)).includes(row.event_type))return {suppressed:true};
+  if(!row || (row.event_type === "CUSTOMER_EMAIL_LINK_REQUESTED" && !row.is_owner)
+    || !allowedAdminEvents(await effectivePermissionsForUser(row.customer_user_id,pool)).includes(row.event_type))return {suppressed:true};
   if(!provider?.configured())throw new PushDeliveryError("retryable","Browser notification delivery is not configured");
   if(row.vapid_fingerprint!==fingerprint(provider.publicKey()))return disable("key_changed");
   let subscription;

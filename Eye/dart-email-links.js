@@ -110,5 +110,7 @@
     message("");
     refreshing = false;
   });
+  // Used by the notification bell to refresh the Owner's request list on click.
+  window.DartCustomerEmailLinks = Object.freeze({ refresh });
   if (canView()) void refresh();
 })();

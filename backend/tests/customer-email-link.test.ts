@@ -80,6 +80,7 @@ describe("phone-only account email link review", () => {
     await expect(service.verify(challengeId, "654321")).rejects.toMatchObject({ code: "OTP_INVALID" });
     expect(statements.some(sql => sql.includes("attempts_remaining=GREATEST"))).toBe(true);
     expect(statements.some(sql => sql.includes("status='pending_review'"))).toBe(false);
+    expect(statements.some(sql => sql.includes("INSERT INTO admin_notifications"))).toBe(false);
     expect(statements.some(sql => sql.includes("UPDATE users"))).toBe(false);
   });
 
@@ -96,6 +97,7 @@ describe("phone-only account email link review", () => {
     const service = new CustomerEmailLinkService({ connect: vi.fn(async () => client) } as unknown as Pool, config);
     expect(await service.verify(challengeId, "123456")).toEqual({ reviewPending: true });
     expect(statements.some(sql => sql.includes("status='pending_review'"))).toBe(true);
+    expect(statements.some(sql => sql.includes("INSERT INTO admin_notifications"))).toBe(true);
     expect(statements.some(sql => sql.includes("UPDATE users"))).toBe(false);
     expect(statements.some(sql => sql.includes("INSERT INTO sessions"))).toBe(false);
   });
@@ -149,5 +151,13 @@ describe("phone-only account email link review", () => {
     expect(page).toContain("result.reviewPending");
     expect(page).not.toContain("sessionToken");
     expect(dashboard).toContain("confirmedPhoneOwner");
+  });
+
+  it("keeps the customer email dialog centered in the viewport", () => {
+    const css = readFileSync(new URL("../../CSS/dart-auth.css", import.meta.url), "utf8");
+    expect(css).toContain(".dart-auth-page .dart-email-link-dialog {");
+    expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*position:\s*fixed/s);
+    expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*inset:\s*0/s);
+    expect(css).toMatch(/\.dart-auth-page \.dart-email-link-dialog\s*\{[^}]*margin:\s*auto/s);
   });
 });

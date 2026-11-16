@@ -1,7 +1,7 @@
 // DART CODE GUIDE | Eye/admin-push-sw.js
 // Push-only staff worker; no fetch handler or offline business data.
 "use strict";
-const labels = { ORDER_CREATED: "New order", RETURN_CREATED: "New return request", EXCHANGE_CREATED: "New exchange request", REVIEW_CREATED: "New review", ADMIN_PUSH_TEST: "Test Notification" };
+const labels = { ORDER_CREATED: "New order", RETURN_CREATED: "New return request", EXCHANGE_CREATED: "New exchange request", REVIEW_CREATED: "New review", CUSTOMER_EMAIL_LINK_REQUESTED: "طلب ربط رقم بالإيميل", ADMIN_PUSH_TEST: "Test Notification" };
 self.addEventListener("install", event => event.waitUntil(self.skipWaiting()));
 self.addEventListener("push", event => {
   let id = "update", type = "";

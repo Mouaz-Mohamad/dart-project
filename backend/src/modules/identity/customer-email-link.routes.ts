@@ -61,6 +61,9 @@ export function createCustomerEmailLinkRouter(
   router.post("/auth/email-link/verify", rate, async (request, response) => {
     const body = challenge.parse(request.body);
     const result = await service.verify(body.challengeId, body.code);
+    // The OTP transaction already committed the durable admin inbox / push outbox event.
+    // Trigger bounded delivery now; normal outbox processing remains the fallback.
+    await dispatchOutbox(outbox, 10);
     return response.status(202).json({
       ...result,
       message: "Email verified. An Owner must confirm the phone ownership before this account can be used.",

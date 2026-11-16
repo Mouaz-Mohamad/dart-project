@@ -7,6 +7,7 @@ import { AppError } from "../../http/app-error.js";
 import { digest, encryptSecret, safeEqual } from "../../security/crypto.js";
 import { normalizeEmail, normalizeEgyptianPhone } from "../../security/normalization.js";
 import type { AuthenticatedAccount, RequestMetadata } from "./identity.types.js";
+import { queueAdminNotification } from "../notifications/admin-notification.queue.js";
 
 interface LinkRow {
   id: string;
@@ -157,6 +158,9 @@ export class CustomerEmailLinkService {
           `UPDATE customer_email_link_requests SET status='pending_review',verified_at=now()
            WHERE id=$1`, [challengeId],
         );
+        // Queue inside the same transaction: no alert for an invalid/rolled-back OTP.
+        // The event/entity unique constraint prevents duplicate alerts on retries.
+        await queueAdminNotification(client, "CUSTOMER_EMAIL_LINK_REQUESTED", challengeId, "Email verified");
       }
       await client.query("COMMIT");
     } catch (error) {
