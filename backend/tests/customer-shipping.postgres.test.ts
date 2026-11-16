@@ -97,6 +97,13 @@ describe("customer shipping snapshots", () => {
     await configure(0); const f=await fixture(1);
     await commerce.reserveCart(f.input.reservationId,[{modelId:f.model,color:"Black",size:"M",quantity:1}],f.user);
     const order=await commerce.checkout(f.user,f.input,"shipping-test",undefined,"free-shipping");
-    expect(order).toMatchObject({shippingFee:0,finalAmount:400,deliveryCost:100});
+    expect(order).toMatchObject({shippingFee:0,finalAmount:400});
+    expect(order).not.toHaveProperty("deliveryCost");
+    expect(order).not.toHaveProperty("courierFee");
+    const ledger = await store.pool.query(
+      "SELECT delivery_cost_minor::int AS courier_cost,shipping_fee_minor::int AS customer_shipping FROM orders WHERE id=$1",
+      [order.id],
+    );
+    expect(ledger.rows[0]).toEqual({courier_cost:10000,customer_shipping:0});
   });
 });
