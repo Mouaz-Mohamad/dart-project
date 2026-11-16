@@ -165,10 +165,16 @@ describe("guest cart and atomic account/order creation", () => {
       commerce.reserveCart(first.input.reservationId,first.lines,undefined,first.owner),
       commerce.reserveCart(second.input.reservationId,second.lines,undefined,second.owner),
     ]);
-    const [a,b] = await Promise.all([
-      commerce.checkout(null,first.input,"shared-1",first.owner,`checkout-${first.input.reservationId}`),
-      commerce.checkout(null,second.input,"shared-2",second.owner,`checkout-${second.input.reservationId}`),
-    ]);
+    const placeFirst = () => commerce.checkout(null,first.input,"shared-1",first.owner,
+      `checkout-${first.input.reservationId}`);
+    const placeSecond = () => commerce.checkout(null,second.input,"shared-2",second.owner,
+      `checkout-${second.input.reservationId}`);
+    // CI's TEST_DATABASE_URL uses separate PostgreSQL connections, so exercise
+    // the simultaneous checkout race there. PGlite's fallback pool exposes
+    // one shared connection and cannot isolate overlapping transactions.
+    const [a,b] = process.env.TEST_DATABASE_URL
+      ? await Promise.all([placeFirst(),placeSecond()])
+      : [await placeFirst(),await placeSecond()];
     const result = await store.pool.query(
       "SELECT DISTINCT customer_user_id::text AS id FROM orders WHERE id=ANY($1::uuid[])",[[a.id,b.id]]);
     expect(result.rows).toHaveLength(1);
