@@ -16,5 +16,5 @@ exports.openStorefrontFixture = function openStorefrontFixture(file, content) {
   return html
     // Business-flow scenarios start after dismissing introductory offers. The
     // actual guest-only popup runtime has its own state/interaction regression.
-    .replace(/<script\b[^>]*\bsrc=["']\/?Js\/dart-birthday-welcome\.js(?:\?[^"']*)?["'][^>]*>\s*<\/script>/gi, "");
+    .replace(/<script\b[^>]*\bsrc=["']\/?Js\/dart-birthday-(?:welcome|loader)\.js(?:\?[^"']*)?["'][^>]*>\s*<\/script>/gi, "");
 };

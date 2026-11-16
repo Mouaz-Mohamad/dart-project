@@ -25,8 +25,26 @@ async function scenario({user=null, failed=false, seen=false}={}) {
   const backdrop=await scenario();backdrop.listeners.click({target:backdrop.dialog,clientX:0,clientY:0});assert.equal(backdrop.dialog.open,false);
   const cta=await scenario();cta.buttons['[data-dart-birthday-welcome-cta]'].click();assert.equal(cta.storage.get(key),'1');
   const raw=fs.readFileSync('index.html','utf8'),open=openStorefrontFixture('index.html',raw);
-  assert.match(raw,/src="Js\/dart-birthday-welcome\.js"/);
-  assert.doesNotMatch(open,/src="Js\/dart-birthday-welcome\.js/);
+  assert.match(raw,/src="Js\/dart-birthday-loader\.js"/);
+  assert.doesNotMatch(raw,/src="Js\/dart-birthday-welcome\.js"/);
+  assert.doesNotMatch(open,/src="Js\/dart-birthday-loader\.js/);
+  const loader = fs.readFileSync('Js/dart-birthday-loader.js','utf8');
+  const delayed = [], hooks = {};
+  const scriptDocument = {readyState:'loading',
+    getElementById:id=>id==='dart-birthday-welcome-popup' ? {} : null,
+    createElement:tag=>({tag}),head:{appendChild:node=>delayed.push(node)}};
+  vm.runInNewContext(loader,{document:scriptDocument,window:{
+    addEventListener:(name,callback)=>{hooks[name]=callback;}
+  }});
+  assert.equal(delayed.length,0,'Birthday popup JavaScript must not be an initial Home download');
+  hooks.load();
+  assert.equal(delayed.length,1,'Birthday popup should load once after the main page');
+  assert.equal(delayed[0].src,'/Js/dart-birthday-welcome.js');
+  assert.equal(delayed[0].async,true);
+  const notHome=[];
+  vm.runInNewContext(loader,{document:{readyState:'complete',getElementById:()=>null,
+    createElement:()=>({}),head:{appendChild:node=>notHome.push(node)}},window:{addEventListener:()=>{}}});
+  assert.equal(notHome.length,0,'Non-home contexts must not request birthday popup JavaScript');
   assert.match(open,/id="dart-birthday-welcome-popup"/);
   assert.equal(openStorefrontFixture('products.html',raw),raw);
   console.log('PASS birthday welcome: guest session, authenticated/offline suppression, dismissal, CTA, backdrop, sign-in close and isolated business fixtures');
