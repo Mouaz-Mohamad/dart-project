@@ -272,7 +272,7 @@ describe("durable WhatsApp automations and receipts", () => {
       whatsapp_restock_opt_in_at:null,whatsapp_restock_phone_normalized:null,
     });
   });
-  it("reserves a different available color without queueing any WhatsApp message",async()=>{
+  it("suggests a different available color without reserving stock or queueing a message",async()=>{
     const buyer=await customer();
     const modelId="restock-alternative-"+randomUUID();
     await store.pool.query(
@@ -284,18 +284,33 @@ describe("durable WhatsApp automations and receipts", () => {
     await store.pool.query(
       `INSERT INTO inventory_items(id,item_code,model_id,color,size,cost_snapshot_minor)
        VALUES($1,$1,$2,'Begi','M',10000)`,[id,modelId]);
-    const r=(await store.pool.query(
-      `SELECT w.status,wa.match_type,wa.offered_color FROM waitlist_entries w
-       JOIN waitlist_allocations wa ON wa.waitlist_entry_id=w.id WHERE w.id=$1`,[entry.id])).rows[0];
-    expect(r).toMatchObject({status:"reserved",match_type:"alternative_color",offered_color:"Begi"});
+
+    // Migration 0096 suggests available alternatives only; it never holds a
+    // physical item or moves the original request out of the Waiting queue.
+    const waitingRow=(await store.pool.query(
+      "SELECT status,reserved_until FROM waitlist_entries WHERE id=$1",[entry.id])).rows[0];
+    expect(waitingRow).toMatchObject({status:"waiting",reserved_until:null});
+    const suggestions=await store.pool.query(
+      "SELECT offered_color,source FROM waitlist_alternative_suggestions WHERE waitlist_entry_id=$1",[entry.id]);
+    expect(suggestions.rows).toEqual([{offered_color:"Begi",source:"system"}]);
+    const allocations=await store.pool.query(
+      "SELECT id FROM waitlist_allocations WHERE waitlist_entry_id=$1",[entry.id]);
+    expect(allocations.rows).toHaveLength(0);
+    const inventory=(await store.pool.query(
+      "SELECT status,cart_reservation_id FROM inventory_items WHERE id=$1",[id])).rows[0];
+    expect(inventory).toMatchObject({status:"In stock",cart_reservation_id:null});
+
+    const notifications=await store.pool.query(
+      `SELECT payload->>'type' AS type,payload->>'availableColor' AS color,
+              payload->>'reserved' AS reserved
+         FROM notification_records WHERE payload->>'relatedEntityId'=$1
+           AND payload->>'type'='WAITLIST_ALTERNATIVE_SUGGESTED'`,[entry.id]);
+    expect(notifications.rows).toEqual([{type:"WAITLIST_ALTERNATIVE_SUGGESTED",color:"Begi",reserved:"false"}]);
+
+    // No paid WhatsApp send or misleading reservation email for a suggestion.
     const queued=await store.pool.query(
-      `SELECT event_type FROM outbox_events WHERE aggregate_type='waitlist'
-       AND aggregate_id=$1 AND payload->>'channel'='whatsapp'`,[entry.id]);
+      "SELECT event_type FROM outbox_events WHERE aggregate_type='waitlist' AND aggregate_id=$1",[entry.id]);
     expect(queued.rows).toHaveLength(0);
-    const email=await store.pool.query(
-      `SELECT event_type FROM outbox_events WHERE aggregate_type='waitlist'
-       AND aggregate_id=$1 AND event_type='WAITLIST_ALTERNATIVE_RESERVED'`,[entry.id]);
-    expect(email.rows).toHaveLength(1);
   });
   it("queues a single Marketing restock only after explicit consent for the exact item",async()=>{
     const without=await restockFixture(false);
