@@ -646,6 +646,10 @@
     refreshChanged,
     syncAdminState,
     savePhysicalItem,
+    releaseCartItem: IS_ADMIN ? async (item) => {
+      await syncAdminState();
+      return (await adminAdapter()).releaseCartItem(api, item);
+    } : undefined,
     serverVersion: () => serverVersion,
     isServerAuthoritative: () => Boolean(API_BASE && serverVersion),
     checkForServerChanges,

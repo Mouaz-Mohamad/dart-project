@@ -36,6 +36,7 @@
     "card-form": ["loyalty.manage"], "settings-promotion-form": ["promotions.manage"],
   };
   const actions = [
+    [".btn-release-cart", inventory],
     ["[data-order-cod-decision]", ["orders.verify_cod"]],
     ["[data-bulk-order-status]", ["orders.bulk_manage"]],
     ["[data-order-target],.dart-pickup-cancel-btn,.dart-back-btn,#confirm-rep-assignment,#confirm-order-reason", workflow],

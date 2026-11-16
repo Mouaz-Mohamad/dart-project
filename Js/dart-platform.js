@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:39057c0f6202e7955d39653a2b5f1525415b3add4ac7d1435b6ed52b1eb6a18c */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:7f65e89edfc460de67b488d4d3848fdc941c74c3a5722f7156a4379aa05cb6b3 */
 (function () {
   "use strict";
 
@@ -4390,6 +4390,15 @@
     } catch {
       window.dispatchEvent(new CustomEvent("dart:platform-unavailable", { detail: { code: "RESTORE_REFRESH_FAILED" } }));
     } finally { pageRestorePending = false; }
+  });
+  // Catalog version updates also reconcile a cart changed by an inventory admin.
+  // Use the existing live signal; no extra timer or browser-persisted cart is needed.
+  window.addEventListener("dart:catalog-hydrated", (event) => {
+    if (!API_BASE || event.detail?.admin || !read("dart_cart", []).length) return;
+    invalidateCartQuote();
+    void hydrateCustomerCart({ claimLocal: false }).catch(() => {
+      window.dispatchEvent(new CustomEvent("dart:platform-unavailable", { detail: { code: "CART_REFRESH_FAILED" } }));
+    });
   });
   window.addEventListener("dart:data-changed", (event) => {
     if (

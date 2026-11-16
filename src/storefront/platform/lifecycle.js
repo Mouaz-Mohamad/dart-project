@@ -139,6 +139,15 @@
       window.dispatchEvent(new CustomEvent("dart:platform-unavailable", { detail: { code: "RESTORE_REFRESH_FAILED" } }));
     } finally { pageRestorePending = false; }
   });
+  // Catalog version updates also reconcile a cart changed by an inventory admin.
+  // Use the existing live signal; no extra timer or browser-persisted cart is needed.
+  window.addEventListener("dart:catalog-hydrated", (event) => {
+    if (!API_BASE || event.detail?.admin || !read("dart_cart", []).length) return;
+    invalidateCartQuote();
+    void hydrateCustomerCart({ claimLocal: false }).catch(() => {
+      window.dispatchEvent(new CustomEvent("dart:platform-unavailable", { detail: { code: "CART_REFRESH_FAILED" } }));
+    });
+  });
   window.addEventListener("dart:data-changed", (event) => {
     if (
       [KEYS.orders, KEYS.returns, KEYS.customers, KEYS.cards].includes(

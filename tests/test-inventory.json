@@ -6,6 +6,7 @@
     "birthday-welcome-runtime.cjs",
     "return-wizard-contract.cjs",
     "admin-notifications-runtime.cjs",
+    "admin-cart-release-runtime.cjs",
     "catalog-pagination-runtime.cjs",
     "direct-changes-runtime.cjs",
     "tracking-shipment-runtime.cjs",

@@ -177,7 +177,7 @@
       field.append(label,value); fields.append(field);
     });
     const controls = make("div"); controls.className = "dart-record-controls";
-    const primary = row.querySelector(".dart-status-btn, .return-accept-btn:not([hidden]), [data-waiting-action]");
+    const primary = row.querySelector(".dart-status-btn, .btn-release-cart, .return-accept-btn:not([hidden]), [data-waiting-action]");
     let proxy;
     if (primary) {
       proxy = button(primary.textContent.trim() || primary.title || "Next action", "dart-record-next");

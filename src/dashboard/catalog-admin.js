@@ -31,6 +31,11 @@
     }).concat([...updated.values()]);
   }
   window.DartCatalogAdmin = {
+    releaseCartItem(api, item) {
+      return api(`/api/v1/admin/items/${encodeURIComponent(item.id)}/release-cart`, {
+        method: "POST", body: { expectedVersion: Number(item.version), reservationId: item.cartReservationId },
+      });
+    },
     capture(state) { baseline = clone({ models: state.models || [], items: state.items || [] }); },
     reset() { baseline = { models: [], items: [] }; flight = null; epoch += 1; },
     flush(persist, dirty) {

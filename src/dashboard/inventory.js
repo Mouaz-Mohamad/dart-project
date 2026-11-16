@@ -25,6 +25,7 @@
         })[c],
     );
   const state = { view: "groups", group: null, limit: 60, scroll: 0 };
+  const releasing = new Set();
   let draft = { sizes: [], colors: [] },
     uploads = 0;
   const stamp = () => new Date().toISOString();
@@ -33,6 +34,19 @@
     const sec = $("items");
     if (!sec || sec.dataset.viewsReady) return;
     sec.dataset.viewsReady = "1";
+    const releaseStatus = document.createElement("p");
+    releaseStatus.id = "inventory-release-status";
+    releaseStatus.setAttribute("role", "status");
+    releaseStatus.setAttribute("aria-live", "polite");
+    releaseStatus.dir = "rtl";
+    sec.querySelector(".second").after(releaseStatus);
+    sec.addEventListener("click", (event) => {
+      const button = event.target.closest(".btn-release-cart");
+      if (!button) return;
+      event.preventDefault();
+      const item = itemsData.find((row) => String(row.id) === button.closest("[data-id]")?.dataset.id);
+      if (item) void releaseCartItem(item);
+    });
     const all = sec.querySelector(".cont-titel");
     all.classList.add("all-items");
     all.id = "all-items-view";
@@ -116,7 +130,44 @@
         modelsData.find((m) => m.modelId === i.modelId),
         i.color,
       );
-    return `<div class="${getRowClass(i)}" data-id="${esc(i.id)}"><input type="checkbox" class="model-checkbox" ${i.isChecked ? "checked" : ""} ${archived ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete" title="${archived ? "Restore" : "Archive"}"><i class="bx ${archived ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete" title="Delete permanently"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit" title="Edit"><i class="bx bx-edit"></i></button><button class="dart-history-btn" data-history-entity="items" title="History"><i class="bx bx-history"></i></button></div><div class="w100"><img loading="lazy" src="${esc(src)}" alt="${esc(i.modelId + " " + i.color)}" class="product-img dart-item-thumb" data-full-image="${esc(src)}"></div>${["modelId", "itemCode", "color", "size", "status", "regDate", "orderId", "clientName", "clientId", "phone1", "phone2", "email", "purchaseDate"].map((k) => `<span class="text-item ${["regDate", "clientName"].includes(k) ? "w200" : k === "phone2" ? "w300" : "w150"}">${esc(i[k] || "-")}</span>`).join("")}</div>`;
+    const canRelease = String(i.status).toLowerCase() === "cart reserved" && i.cartReservationId && !i.orderId &&
+      ["inventory.manage", "catalog.manage", "catalog.edit"].some((key) => window.DartAdminAccess?.can?.(key) === true);
+    const releaseButton = canRelease
+      ? `<button type="button" class="action-btn btn-release-cart" title="Release from Cart" aria-label="Release from Cart: ${esc(i.itemCode)}" ${releasing.has(i.id) ? 'disabled aria-busy="true"' : ""}><i class="bx bx-lock-open-alt" aria-hidden="true"></i></button>` : "";
+    return `<div class="${getRowClass(i)}" data-id="${esc(i.id)}"><input type="checkbox" class="model-checkbox" ${i.isChecked ? "checked" : ""} ${archived ? "disabled" : ""}><div class="w200 button row-action-btns"><button class="action-btn btn-delete" title="${archived ? "Restore" : "Archive"}"><i class="bx ${archived ? "bx-revision" : "bx-minus-circle"}"></i></button><button class="action-btn btn-hard-delete" title="Delete permanently"><i class="bx bx-trash"></i></button><button class="action-btn btn-edit" title="Edit"><i class="bx bx-edit"></i></button>${releaseButton}<button class="dart-history-btn" data-history-entity="items" title="History"><i class="bx bx-history"></i></button></div><div class="w100"><img loading="lazy" src="${esc(src)}" alt="${esc(i.modelId + " " + i.color)}" class="product-img dart-item-thumb" data-full-image="${esc(src)}"></div>${["modelId", "itemCode", "color", "size", "status", "regDate", "orderId", "clientName", "clientId", "phone1", "phone2", "email", "purchaseDate"].map((k) => `<span class="text-item ${["regDate", "clientName"].includes(k) ? "w200" : k === "phone2" ? "w300" : "w150"}">${esc(i[k] || "-")}</span>`).join("")}</div>`;
+  }
+  async function releaseCartItem(item) {
+    if (releasing.has(item.id)) return;
+    releasing.add(item.id);
+    let committed = false;
+    const status = $("inventory-release-status");
+    try {
+      const allowed = ["inventory.manage", "catalog.manage", "catalog.edit"]
+        .some((key) => window.DartAdminAccess?.can?.(key) === true);
+      if (!allowed || !C.isServerAuthoritative?.() || typeof C.releaseCartItem !== "function") {
+        status.textContent = "تعذر فك الحجز. تحقق من صلاحياتك والاتصال بالمخزون.";
+        return;
+      }
+      if (!await window.DartDialog.confirm(`فك حجز القطعة ${item.itemCode} وإزالتها من سلة العميل؟ باقي القطع ستبقى في السلة. لو ضمن طقم، سيبقى الباقي كقطع منفردة ويُراجع سعرها عند إتمام الطلب.`)) return;
+      status.textContent = "جاري فك حجز القطعة…";
+      renderItems();
+      const result = await C.releaseCartItem({ ...item });
+      if (result?.released !== true) throw new Error("Release was not confirmed");
+      committed = true;
+      await C.hydrate(true);
+      itemsData = C.items();
+      dartRefreshAll();
+      status.textContent = "تم فك حجز القطعة وإزالتها من السلة.";
+    } catch (error) {
+      status.textContent = committed
+        ? "تم فك الحجز، لكن تعذر تحديث العرض. حدّث لوحة التحكم لمراجعة المخزون."
+        : error?.status === 409
+          ? "حالة القطعة أو حجزها اتغيرت. حدّث المخزون وراجعها قبل المحاولة مجددًا."
+          : "لم يتم تأكيد فك الحجز. تحقق من الاتصال ثم حدّث المخزون قبل المحاولة مجددًا.";
+    } finally {
+      releasing.delete(item.id);
+      renderItems();
+    }
   }
   function renderItems() {
     if (!$("groups-view")) return;

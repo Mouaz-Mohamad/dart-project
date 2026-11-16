@@ -91,6 +91,7 @@ jobs:
           node tests/cache-revalidation-contract.cjs
           node tests/customer-account-runtime.cjs
           node tests/cart-shipping-recovery-runtime.cjs
+          node tests/admin-cart-release-runtime.cjs
           node tests/customer-shipping-runtime.cjs
           node tests/feedback-safety-runtime.cjs
           node tests/order-dispatch-runtime.cjs

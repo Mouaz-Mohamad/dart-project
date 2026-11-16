@@ -24,7 +24,7 @@ window.activate=id=>{document.querySelectorAll('.dashboard-section').forEach(nod
 window.DartAdminAccess={can:key=>!fixturePermissions||fixturePermissions.includes(key)};window.DartAdminHydration={ready:true};window.DartDialog={confirm:async()=>true,alert:async()=>{}};
 const modelsData=[{modelId:'M-1',name:'Fixture Hoodie',category:'Hoodies'}];
 const groupKey=JSON.stringify(['M-1','Black','M']);
-const itemsData=[{id:'piece-1',itemCode:'PIECE-1',modelId:'M-1',color:'Black',size:'M',status:'In stock'}];
+let itemsData=[{id:'piece-1',itemCode:'PIECE-1',modelId:'M-1',color:'Black',size:'M',status:'In stock'}];
 const ordersData=Array.from({length:65},(_,i)=>({id:'id-'+i,orderId:'ORD-'+i,status:i%2?'Preparing':'New',country:'Egypt',governorate:'Cairo',area:'Ramses',createdAt:'2026-10-22T01:00:00Z'}));
 const getRowClass=()=> 'model-row';const dartApplyFilters=(_,rows)=>rows;
 const dartEsc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -95,6 +95,23 @@ const server=http.createServer((req,res)=>{
    assert.ok(await dialog.locator('[data-waiting-action]').count()>0,'original Waiting actions remain inside Details');
    await page.keyboard.press('Escape');
   }
+  await page.evaluate(()=>{
+    activate('items');Object.assign(itemsData[0],{status:'Cart Reserved',cartReservationId:'SYNTHETIC-CART-123456',version:2});
+    window.fixtureCartReleases=0;
+    DartCatalog.isServerAuthoritative=()=>true;
+    DartCatalog.releaseCartItem=async item=>{if(item.id!=='piece-1')throw Error('Wrong physical item');fixtureCartReleases++;return {released:true};};
+    DartCatalog.hydrate=async()=>{itemsData[0]={...itemsData[0],status:'In stock',cartReservationId:null,version:3};};
+    DartCatalog.items=()=>itemsData;
+    window.dartRefreshAll=()=>DartInventory.renderItems();
+    document.querySelector('#items .group-row').click();
+  });
+  const releaseButton=page.locator('#items-container .dart-record-next');
+  await releaseButton.waitFor();assert.equal(await releaseButton.textContent(),'Release from Cart');
+  await releaseButton.click();
+  await page.waitForFunction(()=>document.getElementById('inventory-release-status').textContent.includes('تم فك حجز'));
+  assert.equal(await page.evaluate(()=>fixtureCartReleases),1);
+  assert.equal(await page.locator('#items-container .dart-record-next').count(),0,'released items lose the direct release action');
+  await page.evaluate(()=>activate('waiting'));
   await page.locator('[data-waiting-view="demand"]').click();
   await page.locator('#waiting-demand-table .dart-record-open').click();
   assert.ok((await page.locator('#waiting-demand-table .dart-record-dialog[open]').innerText()).includes('Conversion'));

@@ -317,6 +317,23 @@ export function createCommerceRouter(
     },
   );
 
+  router.post(
+    "/admin/items/:itemId/release-cart",
+    signedIn, csrf, requireAccountType("staff"), requireMfa,
+    requireAnyPermission("inventory.manage", "catalog.manage", "catalog.edit"),
+    async (request, response) => {
+      const itemId = z.string().trim().min(1).max(160).parse(request.params.itemId);
+      const body = z.object({
+        expectedVersion: z.number().int().positive().safe(),
+        reservationId,
+      }).strict().parse(request.body);
+      response.setHeader("Cache-Control", "no-store");
+      response.status(200).json(await commerce.adminReleaseCartItem(
+        request.auth!.userId, itemId, body.expectedVersion, body.reservationId, String(request.id),
+      ));
+    },
+  );
+
   // Cookie-owned guest carts use the same physical reservations as signed-in carts.
   router.put("/cart/reservation", guestCartWrite, rateLimit({ store: sharedRateLimitStore(config, "commerce-1"), windowMs: 600000, limit: 40, standardHeaders: "draft-8", legacyHeaders: false }), async (request, response) => {
     const body = reserveSchema.parse(request.body);

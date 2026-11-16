@@ -3,6 +3,7 @@ import { resolveCustomerReference, upsertCustomerRecord, guestCheckoutCustomer }
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import { releaseAdminCartItem } from "./commerce.cart-release.js";
 import { allocateFixedSaving, quantityReturnRefund } from "../promotions/quantity-offer.js";
 import { PromotionService } from "../promotions/promotion.service.js";
 import { activeManualDiscount, allocateManualDiscount, consumeManualDiscount } from "../promotions/customer-manual-discount.js";
@@ -1393,6 +1394,10 @@ export class CommerceService {
     } finally {
       client.release();
     }
+  }
+
+  public adminReleaseCartItem(actorId: string, itemId: string, expectedVersion: number, reservationId: string, requestId: string) {
+    return releaseAdminCartItem(this.pool, actorId, itemId, expectedVersion, reservationId, requestId);
   }
 
   public async releaseCustomerCart(customerUserId: string): Promise<void> {
