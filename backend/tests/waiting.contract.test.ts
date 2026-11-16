@@ -61,12 +61,20 @@ describe("Waiting restock reservation contract", () => {
     expect(service).toContain("WAITLIST_PRIORITY_MOVED_TOP");
   });
 
-  it("reserves exact color first and only then offers an allowed alternative", () => {
-    const exact = migration.indexOf("desired_color=v_item.color");
-    const alternative = migration.indexOf("desired_color<>v_item.color");
-    expect(exact).toBeGreaterThan(-1);
-    expect(alternative).toBeGreaterThan(exact);
-    expect(migration).toContain("alternativeColorsEnabled");
+  it("reserves only exact colors and treats alternatives as suggestions", () => {
+    const safety = readFileSync(
+      new URL("../migrations/0096_waitlist_alternative_suggestions_only.sql", import.meta.url),
+      "utf8",
+    );
+    expect(safety).toContain("IF p_match_type <> 'exact' THEN");
+    expect(safety).toContain("IF v_entry.desired_color <> v_item.color THEN");
+    expect(safety).toContain("BEFORE INSERT OR UPDATE OF match_type ON waitlist_allocations");
+    expect(safety).toContain("WAITLIST_ALTERNATIVE_SUGGESTED");
+    expect(safety).toContain("RETURN dart_waitlist_assign_item(v_item.id,v_entry_id,'exact'");
+    expect(safety).not.toContain("dart_waitlist_assign_item(v_item.id,v_entry_id,'alternative_color'");
+    expect(service).toContain("SELECT dart_waitlist_suggest_alternative(");
+    expect(service).toContain('const matchType = "exact" as const;');
+    expect(service).not.toContain("'alternative_color','staff'");
     expect(service).toContain("WAITLIST_ALTERNATIVE_DECLINED");
   });
 
