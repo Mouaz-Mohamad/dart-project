@@ -280,7 +280,7 @@
     }
 
     if (action === "offer_alternative") {
-      const color = await root.DartDialog.prompt("Alternative color to reserve:");
+      const color = await root.DartDialog.prompt("Alternative color to suggest (stock will not be held):");
       if (!color) return;
       const why = await reason("Offer alternative color");
       if (!why) return;
