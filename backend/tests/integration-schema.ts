@@ -40,7 +40,7 @@ export async function runIsolatedMigrations(pool: Pool, directory: string): Prom
     const schema = result.rows[0]?.schema;
     if (!schema || schema === "public" || !/^dart_[a-z0-9_]+$/.test(schema)) throw new Error("Isolated integration-test schema is required");
     const query = (sql: string, values?: unknown[]) => client.query(
-      sql.replace(/\bSET\s+search_path\s*=\s*public\s*,\s*pg_temp\b/gi, `SET search_path = "${schema}", pg_catalog, public, pg_temp`), values,
+      sql.replace(/\bSET\s+search_path\s*=\s*(?:public\s*,\s*pg_temp|pg_catalog\s*,\s*public)\b/gi, `SET search_path = "${schema}", pg_catalog, public, pg_temp`), values,
     );
     const migrationPool = { query, connect: async () => ({ query, release() {} }) } as unknown as Pool;
     const applied = await runMigrations(migrationPool, directory);
