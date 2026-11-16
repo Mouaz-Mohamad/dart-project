@@ -25,6 +25,11 @@ on:
       - "tests/**"
       - "backend/src/modules/finance/**"
       - "backend/src/modules/dashboard/**"
+      # Waitlist changes affect the profile UI and its backend contract together.
+      - "backend/src/modules/waiting/**"
+      - "backend/tests/whatsapp-automations.test.ts"
+      - "backend/tests/waiting.contract.test.ts"
+      - "backend/tests/waitlist-alternative-safety.contract.test.ts"
       - "backend/migrations/**"
   pull_request:
     paths:
@@ -46,6 +51,11 @@ on:
       - "tests/**"
       - "backend/src/modules/finance/**"
       - "backend/src/modules/dashboard/**"
+      # Waitlist changes affect the profile UI and its backend contract together.
+      - "backend/src/modules/waiting/**"
+      - "backend/tests/whatsapp-automations.test.ts"
+      - "backend/tests/waiting.contract.test.ts"
+      - "backend/tests/waitlist-alternative-safety.contract.test.ts"
       - "backend/migrations/**"
 
 permissions:
