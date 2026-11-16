@@ -547,7 +547,23 @@ const server = http.createServer((request, response) => {
   await dashboard.waitForFunction(() => !document.getElementById('dart-finance-modal').classList.contains('active'));
   assert.equal(await dashboard.locator('#finance').evaluate(node => node.classList.contains('active-section')), true, 'income save must return to the visible Finance section');
   assert.equal(await dashboard.locator('[data-finance-tab="incomes"]').evaluate(node => node.classList.contains('active')), true, 'income save must retain the Income tab');
-  await dashboard.waitForSelector('[data-income-receive]', { state: 'visible' });
+  // Diagnose the actual hiding ancestor rather than treating a DOM-only button as usable.
+  const receiptAction = dashboard.locator('[data-income-receive]');
+  if (!(await receiptAction.isVisible())) {
+    const diagnostic = await receiptAction.evaluate(node => {
+      const hiddenBy = [];
+      for (let element = node; element; element = element.parentElement) {
+        const style = getComputedStyle(element);
+        if (element.hidden || style.display === 'none' || style.visibility !== 'visible') {
+          hiddenBy.push({ node: element.tagName, id: element.id, className: element.className,
+            hidden: element.hidden, display: style.display, visibility: style.visibility });
+        }
+      }
+      return { hiddenBy, financeActive: document.getElementById('finance').classList.contains('active-section') };
+    });
+    throw new Error('Income receipt is not visible: ' + JSON.stringify(diagnostic));
+  }
+  await receiptAction.waitFor({ state: 'visible' });
   assert.equal(incomeRequests.length, 1, 'one submission creates one pending entry');
   assert.equal(savedIncome.length, 1);
   assert.deepEqual(incomeRequests[0], {
