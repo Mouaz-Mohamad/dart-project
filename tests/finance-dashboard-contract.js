@@ -60,6 +60,18 @@ for (const staticId of [
 
 assert(html.includes("Compared with the previous equivalent period"), "Unified period comparison copy is missing.");
 
+// Browser translation may replace option labels. Submitted enum/category values
+// must remain the canonical API values, including in repayment expense forms.
+const financeModal = html.slice(html.indexOf('<div class="modal" id="dart-finance-modal">'), html.indexOf("END Finance modals."));
+for (const option of financeModal.matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/g)) {
+  assert.match(option[1], /\bvalue="[^"]*"/, `Finance option needs a stable value independent of its label: ${option[2]}`);
+}
+const incomeKindMarkup = html.match(/<select id="finance-income-kind"[^>]*>([\s\S]*?)<\/select>/)[1];
+const incomeKindValues = [...incomeKindMarkup.matchAll(/<option\b[^>]*\bvalue="([^"]*)"/g)].map(match => match[1]);
+const incomeService = fs.readFileSync(path.join(root, "backend/src/modules/finance/income.service.ts"), "utf8");
+const apiIncomeKinds = [...incomeService.match(/INCOME_KINDS\s*=\s*\[([^\]]+)\]/)[1].matchAll(/"([^"]+)"/g)].map(match => match[1]);
+assert.deepStrictEqual(incomeKindValues, apiIncomeKinds, "Income form values must match the server enum, regardless of translated labels.");
+
 assert(html.includes('id="trafficUniqueVisitorsTow"'), "Traffic analytics must expose a Unique Visitors card.");
 assert(html.includes('id="trafficVisitsTow"'), "Traffic analytics must expose total Visits.");
 assert(html.includes('id="trafficCartVisitorsTow"'), "Traffic analytics must expose unique cart visitors.");

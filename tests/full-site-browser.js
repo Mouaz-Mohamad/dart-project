@@ -75,6 +75,7 @@ const server = http.createServer((request, response) => {
                 "orders.manage",
                 "dashboard_state.read",
                 "finance.read",
+                "finance.manage_incomes",
                 "staff.read",
                 "staff.manage",
                 "analytics.read",
@@ -492,6 +493,62 @@ const server = http.createServer((request, response) => {
     assert.equal(await dashboard.locator('.chart-box-tow').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,`traffic chart fits ${width}px`);
   }
   await dashboard.locator('#brand-period-preset').selectOption('this_month');
+  // Simulate browser translation replacing visible option labels. The native
+  // FormData submitted by the real editor must retain the API's English values.
+  const savedIncome = [];
+  const incomeRequests = [];
+  await dashboard.route('**/api/v1/admin/finance/incomes**', async route => {
+    const req = route.request();
+    if (req.method() === 'GET') {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ incomes: savedIncome }) });
+      return;
+    }
+    const body = req.postDataJSON();
+    incomeRequests.push(body);
+    if (!['Other Income', 'Capital', 'Loan', 'Order Collection'].includes(body.kind)) {
+      await route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'VALIDATION_ERROR', message: 'Request validation failed' } }) });
+      return;
+    }
+    assert.equal(req.method(), 'POST');
+    assert.equal(req.headers()['x-csrf-token'], 'synthetic-income-csrf');
+    const income = { ...body, amount: body.amountMinor / 100, currency: 'EGP', status: 'Pending', receivedOn: null, orderId: null, version: 1 };
+    savedIncome.push(income);
+    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ income }) });
+  });
+  await dashboard.evaluate(() => {
+    document.cookie = 'dart_staff_csrf=synthetic-income-csrf; path=/';
+    document.querySelector('a[data-target="finance"]').click();
+  });
+  await dashboard.locator('[data-finance-tab="incomes"]').click();
+  await dashboard.locator('[data-finance-add="incomes"]').click();
+  await dashboard.locator('#finance-income-amount').fill('4385');
+  await dashboard.locator('#finance-income-category').fill('Other');
+  const syntheticReason = 'تحصيل طلب هدية\nK-19\nK-17';
+  await dashboard.locator('#finance-income-description').fill(syntheticReason);
+  const expectedIncomeDate = await dashboard.locator('#finance-income-expectedOn').inputValue();
+  const translatedFinanceOptions = await dashboard.evaluate(() => {
+    const incomeLabels = ['دخل آخر', 'رأس المال', 'قرض', 'تحصيل طلب'];
+    return [...document.querySelectorAll('#dart-finance-form select')].map(select => {
+      const before = [...select.options].map(option => option.value);
+      [...select.options].forEach((option, index) => {
+        option.textContent = select.id === 'finance-income-kind' ? incomeLabels[index] : `خيار مترجم ${index + 1}`;
+      });
+      return { id: select.id, before, after: [...select.options].map(option => option.value) };
+    });
+  });
+  const incomeResponse = dashboard.waitForResponse(response => response.url().endsWith('/api/v1/admin/finance/incomes') && response.request().method() === 'POST');
+  await dashboard.locator('#dart-finance-form-submit').click();
+  assert.equal((await incomeResponse).status(), 201, 'translated income labels must not cause request validation failure');
+  await dashboard.waitForFunction(() => !document.getElementById('dart-finance-modal').classList.contains('active'));
+  await dashboard.waitForSelector('[data-income-receive]');
+  assert.equal(incomeRequests.length, 1, 'one submission creates one pending entry');
+  assert.equal(savedIncome.length, 1);
+  assert.deepEqual(incomeRequests[0], {
+    id: savedIncome[0].id, kind: 'Other Income', category: 'Other', description: syntheticReason,
+    amountMinor: 438500, expectedOn: expectedIncomeDate, sourceName: '', sourcePhone: '', notes: '',
+  });
+  assert.equal(savedIncome[0].status, 'Pending', 'saving income does not confirm receipt');
+  for (const select of translatedFinanceOptions) assert.deepEqual(select.after, select.before, `${select.id} must submit stable values after translation`);
   // The order editor keeps every original field and permits phone/name-only client contact.
   await dashboard.evaluate(() => document.querySelector('a[data-target="orders"]').click());
   // Address calculations have their own suite; this fixture isolates editor submission state.

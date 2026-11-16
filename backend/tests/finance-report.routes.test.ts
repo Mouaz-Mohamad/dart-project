@@ -152,6 +152,19 @@ describe("combined finance report", () => {
 describe("income endpoint authorization", () => {
   const body={id:"income-test",kind:"Other Income",category:"Other",description:"Test income",amountMinor:10101,expectedOn:"2026-10-01"};
   const path="/api/v1/admin/finance/incomes";
+  it("accepts Arabic multiline reasons and empty optional source fields while requiring canonical income kinds", async () => {
+    const f = application(["finance.manage_incomes"]);
+    const input = { ...body, amountMinor: 438500, expectedOn: "2026-11-16",
+      description: "تحصيل طلب هدية\nK-19\nK-17", sourceName: "", sourcePhone: "", notes: "" };
+    const invalid = await request(f.app).post(path).set("Cookie", cookie)
+      .set("X-CSRF-Token", "income-fixture-csrf").send({ ...input, kind: "دخل آخر" }).expect(422);
+    expect(invalid.body.error.details).toEqual([expect.objectContaining({ field: "kind" })]);
+    expect(f.incomes.create).not.toHaveBeenCalled();
+    await request(f.app).post(path).set("Cookie", cookie)
+      .set("X-CSRF-Token", "income-fixture-csrf").send(input).expect(201);
+    expect(f.incomes.create).toHaveBeenCalledOnce();
+    expect(f.incomes.create).toHaveBeenCalledWith(expect.any(String), input, expect.any(String));
+  });
   it("allows cash-flow view and explicit management, but denies unrelated users, sessions and MFA",async()=>{
     for(const permissions of [["finance.read"],["finance.view_cashflow"],["finance.manage_incomes"]]) {
       const f=application(permissions);

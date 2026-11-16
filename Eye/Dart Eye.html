@@ -2447,7 +2447,7 @@
                 <div class="dart-finance-form-grid">
                   <fieldset id="finance-income-fields" class="dart-finance-form-section" data-finance-form-resource="incomes" hidden disabled>
                     <label class="dart-finance-field"><span>Expected Date</span><input id="finance-income-expectedOn" name="expectedOn" type="date" required></label>
-                    <label class="dart-finance-field"><span>Type</span><select id="finance-income-kind" name="kind" required><option>Other Income</option><option>Capital</option><option>Loan</option><option>Order Collection</option></select></label>
+                    <label class="dart-finance-field"><span>Type</span><select id="finance-income-kind" name="kind" required><option value="Other Income">Other Income</option><option value="Capital">Capital</option><option value="Loan">Loan</option><option value="Order Collection">Order Collection</option></select></label>
                     <label class="dart-finance-field"><span>Amount (EGP)</span><input id="finance-income-amount" name="amount" type="number" min="0.01" max="1000000000" step="0.01" required></label>
                     <label class="dart-finance-field"><span>Category</span><input id="finance-income-category" name="category" type="text" maxlength="100" required></label>
                     <label class="dart-finance-field"><span>Person / Source</span><input id="finance-income-sourceName" name="sourceName" type="text" maxlength="160"></label>
@@ -2459,9 +2459,9 @@
                   </fieldset>
                   <fieldset id="finance-expense-fields" class="dart-finance-form-section" data-finance-form-resource="expenses" hidden disabled>
                     <label class="dart-finance-field"><span>Expense Date</span><input id="finance-expense-date" name="date" type="date" required></label>
-                    <label class="dart-finance-field"><span>Category</span><select id="finance-expense-category" name="category" required><option>Marketing</option><option>Inventory Acquisition</option><option>Loan Repayment</option><option>Capital Withdrawal</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
+                    <label class="dart-finance-field"><span>Category</span><select id="finance-expense-category" name="category" required><option value="Marketing">Marketing</option><option value="Inventory Acquisition">Inventory Acquisition</option><option value="Loan Repayment">Loan Repayment</option><option value="Capital Withdrawal">Capital Withdrawal</option><option value="Delivery">Delivery</option><option value="Packaging">Packaging</option><option value="Salaries">Salaries</option><option value="Rent">Rent</option><option value="Utilities">Utilities</option><option value="Software">Software</option><option value="Professional Services">Professional Services</option><option value="Taxes &amp; Fees">Taxes &amp; Fees</option><option value="Other">Other</option></select></label>
                     <label class="dart-finance-field"><span>Amount (EGP)</span><input id="finance-expense-amount" name="amount" type="number" min="0.01" step="any" required></label>
-                    <label class="dart-finance-field"><span>Status</span><select id="finance-expense-status" name="status" required><option>Unpaid</option><option>Paid</option><option>Void</option></select></label>
+                    <label class="dart-finance-field"><span>Status</span><select id="finance-expense-status" name="status" required><option value="Unpaid">Unpaid</option><option value="Paid">Paid</option><option value="Void">Void</option></select></label>
                     <label class="dart-finance-field"><span>Paid Date</span><input id="finance-expense-paid-at" name="paidAt" type="date"></label>
                     <label class="dart-finance-field"><span>Payment Method</span><input id="finance-expense-payment-method" name="paymentMethod" type="text"></label>
                     <label class="dart-finance-field"><span>Vendor</span><input id="finance-expense-vendor" name="vendor" type="text"></label>
@@ -2472,7 +2472,7 @@
 
                   <fieldset id="finance-budget-fields" class="dart-finance-form-section" data-finance-form-resource="budgets" hidden disabled>
                     <label class="dart-finance-field"><span>Budget Name</span><input id="finance-budget-name" name="name" type="text" required></label>
-                    <label class="dart-finance-field"><span>Category</span><select id="finance-budget-category" name="category" required><option value="All">All Operating Expenses</option><option>Marketing</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
+                    <label class="dart-finance-field"><span>Category</span><select id="finance-budget-category" name="category" required><option value="All">All Operating Expenses</option><option value="Marketing">Marketing</option><option value="Delivery">Delivery</option><option value="Packaging">Packaging</option><option value="Salaries">Salaries</option><option value="Rent">Rent</option><option value="Utilities">Utilities</option><option value="Software">Software</option><option value="Professional Services">Professional Services</option><option value="Taxes &amp; Fees">Taxes &amp; Fees</option><option value="Other">Other</option></select></label>
                     <label class="dart-finance-field"><span>Budget Limit (EGP)</span><input id="finance-budget-amount" name="amount" type="number" min="0.01" step="any" required></label>
                     <label class="dart-finance-field"><span>Warning At (%)</span><input id="finance-budget-warning" name="warningPercent" type="number" min="1" max="100" step="1" value="80" required></label>
                     <label class="dart-finance-field"><span>Start Date</span><input id="finance-budget-start" name="startDate" type="date" required></label>
@@ -2496,12 +2496,12 @@
                     <label class="dart-finance-field"><span>Target</span><input id="finance-goal-target" name="target" type="number" min="0.01" step="any" required></label>
                     <label class="dart-finance-field"><span>Start Date</span><input id="finance-goal-start" name="startDate" type="date" required></label>
                     <label class="dart-finance-field"><span>End Date</span><input id="finance-goal-end" name="endDate" type="date" required></label>
-                    <label class="dart-finance-field"><span>Status</span><select id="finance-goal-status" name="status" required><option>Active</option><option>Paused</option></select></label>
+                    <label class="dart-finance-field"><span>Status</span><select id="finance-goal-status" name="status" required><option value="Active">Active</option><option value="Paused">Paused</option></select></label>
                   </fieldset>
 
                   <fieldset id="finance-marketing-fields" class="dart-finance-form-section" data-finance-form-resource="marketing" hidden disabled>
                     <label class="dart-finance-field"><span>Date</span><input id="finance-marketing-date" name="date" type="date" required></label>
-                    <label class="dart-finance-field"><span>Channel</span><select id="finance-marketing-channel" name="channel" required><option>Meta</option><option>TikTok</option><option>Google</option><option>Influencer</option><option>Organic</option><option>Other</option></select></label>
+                    <label class="dart-finance-field"><span>Channel</span><select id="finance-marketing-channel" name="channel" required><option value="Meta">Meta</option><option value="TikTok">TikTok</option><option value="Google">Google</option><option value="Influencer">Influencer</option><option value="Organic">Organic</option><option value="Other">Other</option></select></label>
                     <label class="dart-finance-field"><span>Campaign</span><input id="finance-marketing-campaign" name="campaign" type="text" required></label>
                     <label class="dart-finance-field"><span>Spend (EGP)</span><input id="finance-marketing-spend" name="spend" type="number" min="0" step="any" value="0" required></label>
                     <label class="dart-finance-field"><span>Impressions</span><input id="finance-marketing-impressions" name="impressions" type="number" min="0" step="1" value="0" required></label>
