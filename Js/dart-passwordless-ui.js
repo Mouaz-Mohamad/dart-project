@@ -76,6 +76,7 @@ function showCustomerOtpStep(form,purpose,challenge) {
       ...Array.from({length:6},(_,index)=>'<input class="dart-auth-otp-digit" type="text" inputmode="numeric" pattern="[0-9]" maxlength="6" autocomplete="'+(index===0?'one-time-code':'off')+'" aria-label="رقم '+(index+1)+' من رمز التحقق" required>'),
       '</div>',
       '<button type="submit" class="btn enter-btn">تأكيد الكود</button>',
+      '<button type="button" class="dart-auth-otp-other" data-otp-resend>إعادة إرسال الكود</button>',
       '<button type="button" class="dart-auth-otp-other" data-otp-other>اختيار طريقة أخرى</button>',
       '<p class="dart-auth-otp-status" data-otp-status role="status" aria-live="polite"></p>',
     ].join("");
@@ -103,6 +104,32 @@ function showCustomerOtpStep(form,purpose,challenge) {
         digits[Math.min(5,code.length-1)].focus();
       });
     });
+    panel.querySelector("[data-otp-resend]").addEventListener("click",async()=>{
+      const status=panel.querySelector("[data-otp-status]");
+      const secondsLeft=Math.ceil((Number(form.dataset.otpResendAvailableAt||0)-Date.now())/1000);
+      if(secondsLeft>0){
+        status.textContent="يمكنك طلب كود آخر بعد "+secondsLeft+" ثانية. راجع البريد الوارد وSpam أولاً.";
+        return;
+      }
+      if(form.dataset.otpVerifying==="1")return;
+      const resendButton=panel.querySelector("[data-otp-resend]");
+      if(resendButton.disabled)return;
+      resendButton.disabled=true;
+      status.textContent="جارٍ طلب كود جديد...";
+      try{
+        const next=form.dataset.otpPurpose==="register"
+          ? await window.DartPlatform.register(Object.fromEntries(new FormData(form)))
+          : await window.DartPlatform.login(form.elements.identifier.value);
+        if(!next?.challengeId)throw new Error("تعذر طلب الكود الجديد. حاول مرة أخرى.");
+        showCustomerOtpStep(form,form.dataset.otpPurpose,next);
+        panel.querySelectorAll(".dart-auth-otp-digit").forEach(digit=>{digit.value="";});
+        status.textContent="لو البريد مسجل في Dart، سيتم إرسال كود جديد. راجع Inbox وSpam.";
+      }catch(error){
+        status.textContent=error?.message||"تعذر إعادة طلب الكود. حاول مرة أخرى.";
+      }finally{
+        resendButton.disabled=false;
+      }
+    });
     panel.querySelector("[data-otp-other]").addEventListener("click",async()=>{
       if(!supportsCustomerPasskeys()){
         panel.querySelector("[data-otp-status]").textContent="واتساب سيتوفر لاحقًا. استخدم الكود المرسل بالبريد الإلكتروني.";
@@ -124,7 +151,12 @@ function showCustomerOtpStep(form,purpose,challenge) {
   panel.querySelector("[data-otp-destination]").textContent=recipient
     ?"قم بإدخال رمز التحقق الذي أرسلناه إلى بريدك الإلكتروني "+recipient
     :"قم بإدخال رمز التحقق الذي أرسلناه إلى البريد الإلكتروني المسجل بحسابك.";
-  panel.querySelector("[data-otp-status]").textContent="الرمز صالح لمدة 5 دقائق. تأكد من البريد الوارد والرسائل غير المرغوبة.";
+  const expiryTime=Date.parse(String(challenge.expiresAt||""));
+  const remainingMinutes=Number.isFinite(expiryTime)
+    ? Math.max(1,Math.ceil((expiryTime-Date.now())/60_000))
+    : 10;
+  form.dataset.otpResendAvailableAt=String(Date.now()+60_000);
+  panel.querySelector("[data-otp-status]").textContent="الرمز صالح لمدة "+remainingMinutes+" دقائق تقريبًا. راجع Inbox وSpam. يمكنك طلب كود آخر بعد دقيقة.";
   panel.querySelector(".dart-auth-otp-digit")?.focus();
 }
 async function submitCustomerOtpStep(form,purpose){
