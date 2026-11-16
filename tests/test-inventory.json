@@ -63,7 +63,8 @@
     "rep-google-contract.cjs",
     "rep-navigation-session.cjs",
     "rep-reliability-runtime.cjs",
-    "rep-compass-runtime.cjs"
+    "rep-compass-runtime.cjs",
+    "settings-accordion-contract.cjs"
   ],
   "ciBrowser": [
     "brand-details-browser.cjs",
