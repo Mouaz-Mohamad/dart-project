@@ -50,7 +50,7 @@
       const confirmation = allow
         ? "هل تم التواصل مع صاحب رقم الهاتف المسجل والتحقق من ملكيته بالفعل؟"
         : "هل تريد رفض طلب ربط الإيميل؟";
-      if (!window.confirm(confirmation)) return;
+      if (!(await window.DartDialog.confirm(confirmation))) return;
       approve.disabled = reject.disabled = true;
       message("جارٍ حفظ القرار...");
       try {
