@@ -37,15 +37,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
-          if [ -z "$CHROME_PATH" ]; then
-            echo "No system Chrome found; installing Playwright Chromium fallback."
-            npm install --no-save --package-lock=false playwright@1.55.0
-            npx playwright install --with-deps chromium
-            CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
-          fi
+          # The runner's rolling system Chrome has repeatedly failed to expose
+          # a debugging port to Lighthouse. Use the reviewed Playwright version
+          # for reproducible Chrome launches on both mobile and desktop checks.
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+          CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
+          test -x "$CHROME_PATH"
           echo "path=$CHROME_PATH" >> "$GITHUB_OUTPUT"
-          "$CHROME_PATH" --version || true
+          "$CHROME_PATH" --version
 
       - name: Resolve the actual storefront revision
         id: storefront-release
