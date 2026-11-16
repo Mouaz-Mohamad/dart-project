@@ -19,7 +19,9 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
-    runs-on: ubuntu-latest
+    # Playwright 1.55 provides a reviewed Chromium build for Noble (24.04).
+    # ubuntu-latest currently resolves to 26.04, which this pinned browser cannot use.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - name: Checkout audited commit
