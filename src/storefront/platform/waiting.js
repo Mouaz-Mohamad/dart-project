@@ -153,6 +153,9 @@
         const allocation = entry.allocation || null;
         const alternative =
           allocation?.matchType === "alternative_color";
+        const suggestions = entry.status === "waiting" && Array.isArray(entry.suggestedColors)
+          ? entry.suggestedColors
+          : [];
         const actionButtons = [];
         if (entry.status === "waiting") {
           actionButtons.push(
@@ -188,6 +191,12 @@
             ${profileField("Match", alternative ? "Alternative color" : allocation ? "Exact" : "-")}
             ${profileField("Order", entry.orderCode || "-")}
           </div>
+          ${suggestions.length ? `
+            <p class="dart-waiting-suggestion">
+              ألوان بديلة متاحة حاليًا: <strong>${suggestions.map((color) => escapeHtml(color)).join("، ")}</strong>.
+              دي اقتراحات فقط، ومفيش أي قطعة اتحجزت لك منها. الحجز بيحصل فقط لما تختار اللون وتضيفه للسلة بنفسك.
+              <a href="products.html">Browse alternatives</a>
+            </p>` : ""}
           ${actionButtons.length ? `<div class="dart-waiting-actions">${actionButtons.join("")}</div>` : ""}
         </article>`;
       })
