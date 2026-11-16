@@ -66,6 +66,22 @@ describe("SMTP email provider", () => {
     );
   });
 
+  it("supports Resend SMTP over TLS with an authenticated Dart sending domain", async () => {
+    mocks.sendMail.mockResolvedValueOnce({ messageId: "resend-1" });
+    const resend = new SmtpEmailProvider({
+      smtpHost: "smtp.resend.com", smtpPort: 465, smtpSecure: true,
+      smtpUser: "resend", smtpPass: "fake-test-only-key",
+      emailFrom: "verify@dartofficial.com", emailFromName: "Dart | for you",
+    });
+    await resend.send(message);
+    expect(mocks.createTransport).toHaveBeenCalledWith(expect.objectContaining({
+      host: "smtp.resend.com", port: 465, secure: true, requireTLS: false,
+    }));
+    expect(mocks.sendMail).toHaveBeenCalledWith(expect.objectContaining({
+      from: { name: "Dart | for you", address: "verify@dartofficial.com" },
+    }));
+  });
+
   it("retries an explicit temporary SMTP rejection before succeeding", async () => {
     vi.useFakeTimers();
     const transient = Object.assign(new Error("temporary SMTP failure"), {

@@ -119,6 +119,10 @@ export function renderOutboxEmail(
     "CUSTOMER_SIGNUP_OTP_REQUESTED",
   ].includes(eventType)) {
     const safeOtp = escapeHtml(otp);
+    const otpExpiryCopy = expiresAt && Number.isFinite(Date.parse(expiresAt))
+      ? `ينتهي الرمز في ${new Date(expiresAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo", dateStyle: "medium", timeStyle: "short" })} بتوقيت القاهرة.`
+      : "صلاحية هذا الرمز محدودة، برجاء استخدامه فور استلامه.";
+    const safeOtpExpiryCopy = escapeHtml(otpExpiryCopy);
     const html = `<!doctype html>
 <html lang="ar" dir="rtl">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -126,13 +130,17 @@ export function renderOutboxEmail(
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-collapse:collapse"><tr><td align="center" style="padding:42px 20px">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:420px;border-collapse:collapse">
       <tr><td align="center" style="padding-bottom:36px"><img src="https://www.dartofficial.com/Photos/Logos/01_Dart_original_transparent.png" alt="Dart" width="220" style="display:block;width:220px;max-width:90%;height:auto;border:0"></td></tr>
-      <tr><td align="center" style="font-size:20px;color:#1c1c1c;padding-bottom:18px">OTP الخاص بك</td></tr>
+      <tr><td align="center" style="font-size:20px;color:#1c1c1c;padding-bottom:12px">كود التحقق الخاص بك</td></tr>
+      <tr><td align="center" style="font-size:14px;color:#444;padding-bottom:18px">استخدم الكود التالي لتأكيد حسابك في Dart.</td></tr>
       <tr><td align="center" dir="ltr" style="font-size:46px;font-weight:700;letter-spacing:8px;color:#AB012B;padding-bottom:34px;white-space:nowrap">${safeOtp}</td></tr>
+      <tr><td align="center" style="font-size:13px;line-height:1.8;color:#444;padding:0 0 12px">${safeOtpExpiryCopy}</td></tr>
+      <tr><td align="center" style="font-size:13px;line-height:1.8;color:#444;padding-bottom:18px">إذا لم تطلب هذا الرمز، تجاهل الرسالة. لا تشارك الكود مع أي شخص.</td></tr>
+      <tr><td align="center" dir="ltr" style="font-size:12px;line-height:1.7;color:#666;padding-bottom:16px">If you did not request this code, ignore this email.</td></tr>
       <tr><td align="center" dir="ltr" style="font-size:17px;color:#1c1c1c">Dart | For you</td></tr>
     </table>
   </td></tr></table>
 </body></html>`;
-    return { subject: "Dart | For you — OTP", text: `OTP الخاص بك\n${otp}\nDart | For you`, html };
+    return { subject: "Dart | For you — OTP", text: `كود التحقق من Dart: ${otp}\n${otpExpiryCopy}\nإذا لم تطلب هذا الرمز، تجاهل الرسالة ولا تشارك الكود.\n\nDart verification code: ${otp}\nIf you did not request this code, ignore this email.`, html };
   }
 
   const html = `<!doctype html>

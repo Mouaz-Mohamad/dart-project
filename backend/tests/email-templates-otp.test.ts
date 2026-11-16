@@ -14,13 +14,23 @@ describe("Dart minimal OTP email", () => {
   ])("renders the original logo and prominent code for %s", (event) => {
     const message = renderOutboxEmail(event, { parameters: { otp: "040619" } });
     expect(message.subject).toContain("Dart | For you");
-    expect(message.text).toBe("OTP الخاص بك\n040619\nDart | For you");
+    expect(message.text).toContain("كود التحقق من Dart: 040619");
+    expect(message.text).toContain("إذا لم تطلب");
     expect(message.html).toContain("01_Dart_original_transparent.png");
-    expect(message.html).toContain("OTP الخاص بك");
+    expect(message.html).toContain("كود التحقق الخاص بك");
     expect(message.html).toContain("font-size:46px");
     expect(message.html).toContain("040619");
     expect(message.html).toContain("Dart | For you");
-    expect(message.html).not.toContain("If you did not request");
+    expect(message.html).toContain("If you did not request");
+  });
+
+  it("renders expiry in Cairo time without injecting raw HTML", () => {
+    const message = renderOutboxEmail("CUSTOMER_LOGIN_OTP_REQUESTED", {
+      parameters: { otp: "123456" }, expiresAt: "2026-11-16T11:00:00.000Z",
+    });
+    expect(message.text).toContain("بتوقيت القاهرة");
+    expect(message.html).toContain("بتوقيت القاهرة");
+    expect(message.html).toContain("123456");
   });
 
   it("keeps business order emails separate from the OTP template", () => {

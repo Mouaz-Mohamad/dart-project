@@ -10,7 +10,7 @@ describe("customer passwordless protections",()=>{
     const pool={query:vi.fn().mockResolvedValue({rows:[]}),connect:vi.fn()};
     const identity={loginLinkedSocialCustomer:vi.fn()};
     const service=new CustomerEmailAuthService(pool as unknown as Pool,
-      {authPepper:"test-pepper",mfaEncryptionKey:Buffer.alloc(32)},identity as unknown as IdentityService);
+      {authPepper:"test-pepper",mfaEncryptionKey:Buffer.alloc(32),emailOtpTtlMinutes:10},identity as unknown as IdentityService);
     const result=await service.startLogin("01012345678");
     expect(result.sent).toBe(false);
     expect(result.challengeId).toBeDefined();

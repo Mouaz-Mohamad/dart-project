@@ -25,7 +25,7 @@ type AuthResult = { challengeId: string; expiresAt: string; emailDisplay: string
 export class CustomerEmailAuthService {
   constructor(
     private readonly pool: Pool,
-    private readonly config: Pick<AppConfig, "authPepper" | "mfaEncryptionKey">,
+    private readonly config: Pick<AppConfig, "authPepper" | "mfaEncryptionKey" | "emailOtpTtlMinutes">,
     private readonly identity: IdentityService,
   ) {}
 
@@ -37,9 +37,10 @@ export class CustomerEmailAuthService {
   ): Promise<AuthResult> {
     const client = await this.pool.connect();
     const emailNormalized = normalizeEmail(email);
+    const ttlMs = this.config.emailOtpTtlMinutes * 60_000;
     const generic: AuthResult = {
       challengeId: randomUUID(),
-      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      expiresAt: new Date(Date.now() + ttlMs).toISOString(),
       emailDisplay: null,
       sent: false,
     };
@@ -66,7 +67,7 @@ export class CustomerEmailAuthService {
       );
       const challengeId = randomUUID();
       const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
-      const expiresAt = new Date(Date.now() + 5 * 60_000);
+      const expiresAt = new Date(Date.now() + ttlMs);
       await client.query(
         "INSERT INTO customer_email_otp_challenges(id,purpose,user_id,email,email_normalized,signup_data,code_hash,expires_at) VALUES ($1,$2,$3::uuid,$4,$5,$6::jsonb,$7,$8)",
         [challengeId, purpose, userId, email, emailNormalized, signupData ? JSON.stringify(signupData) : null,
@@ -98,14 +99,14 @@ export class CustomerEmailAuthService {
     let phone: string | null = null;
     if (!isEmail) {
       try { phone = normalizeEgyptianPhone(supplied); }
-      catch { return { challengeId: randomUUID(), expiresAt: new Date(Date.now()+300_000).toISOString(), emailDisplay:null, sent:false }; }
+      catch { return { challengeId: randomUUID(), expiresAt: new Date(Date.now()+this.config.emailOtpTtlMinutes*60_000).toISOString(), emailDisplay:null, sent:false }; }
     }
     const result = await this.pool.query<{ id: string; email: string }>(
       "SELECT u.id::text,u.email FROM users u WHERE u.account_type='customer' AND u.status='active' AND u.deleted_at IS NULL AND u.email IS NOT NULL AND (u.email_normalized=$1 OR ($2::text IS NOT NULL AND EXISTS (SELECT 1 FROM account_phones p WHERE p.user_id=u.id AND p.account_type='customer' AND p.is_primary AND p.phone_normalized=$2))) LIMIT 1",
       [isEmail ? normalizeEmail(supplied) : "",phone],
     );
     const row=result.rows[0];
-    if (!row) return { challengeId:randomUUID(), expiresAt:new Date(Date.now()+300_000).toISOString(),emailDisplay:isEmail?supplied:null,sent:false };
+    if (!row) return { challengeId:randomUUID(), expiresAt:new Date(Date.now()+this.config.emailOtpTtlMinutes*60_000).toISOString(),emailDisplay:isEmail?supplied:null,sent:false };
     const start=await this.issue("login", row.email, row.id, null);
     // Display the full address only if the visitor already typed it, not when guessing someone's phone.
     return {...start,emailDisplay:isEmail?supplied:null};
