@@ -1151,3 +1151,6 @@
     gap: 3px;
   }
 }
+
+/* Income and expenses share the existing financial workspace. */
+.dart-finance-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -20,6 +20,8 @@ const OPERATING_EXPENSE_CATEGORIES = [
 const EXPENSE_CATEGORIES = [
   ...OPERATING_EXPENSE_CATEGORIES,
   "Inventory Acquisition",
+  "Loan Repayment",
+  "Capital Withdrawal",
 ] as const;
 
 const BUDGET_CATEGORIES = [

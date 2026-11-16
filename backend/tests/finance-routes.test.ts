@@ -81,6 +81,10 @@ describe("finance field-level permissions", () => {
   it("keeps cashflow and inventory values in separate sections", () => {
     expect(financeSummarySection(fixture, "cashflow")).toEqual({
       cashIn: 900,
+      incomeCashIn: 0,
+      orderCashIn: 900,
+      pendingIncome: 0,
+      financingCashOut: 0,
       cashOut: 250,
       netCashFlow: 650,
       paidExpenseCashOut: 100,

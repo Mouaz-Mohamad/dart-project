@@ -12,6 +12,7 @@ export function canReceiveChange(signal: ChangeSignal, permissions: string[], ad
   if (!admin) return signal.scope === "version" && signal.name === "catalog_inventory";
   if (signal.scope === "version" && signal.name === "admin_notifications") return permissions.includes("notifications.read");
   if (signal.scope === "version") {
+    if (signal.name === "finance_income") return ["finance.read","finance.view_cashflow","finance.manage","finance.manage_incomes"].some(permission => permissions.includes(permission));
     if (signal.name === "orders") return permissions.includes("orders.read");
     if (signal.name === "catalog_inventory") return CATALOG_READ.some(permission => permissions.includes(permission));
     if (signal.name === "waiting") return permissions.includes("waiting.view");
@@ -28,7 +29,7 @@ export function createChangeRouter(feed: ChangeFeed, identity: IdentityService, 
   const router = Router(), streams = new Map<string, number>();
   const gates: RequestHandler[] = [authenticate(identity, config), requireAccountType("staff"), requireMfa,
     requireAnyPermission("orders.read", ...CATALOG_READ, "waiting.view", "sets.read", "sets.manage",
-      "news.read", "news.manage", "staff.read", ...FINANCE_DOMAIN_READ_GATE_PERMISSIONS)];
+      "news.read", "news.manage", "staff.read", "finance.manage_incomes", ...FINANCE_DOMAIN_READ_GATE_PERMISSIONS)];
   const stream = (admin: boolean): RequestHandler => async (request, response) => {
     const origin = request.get("origin");
     if (origin && origin !== `${request.protocol}://${request.get("host")}` && !config.corsOrigins.includes(origin)) throw new AppError(403, "ORIGIN_NOT_ALLOWED", "Stream origin is not allowed");

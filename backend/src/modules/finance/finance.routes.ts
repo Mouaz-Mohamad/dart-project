@@ -16,6 +16,7 @@ import {
 } from "../../middleware/authentication.js";
 import type { IdentityService } from "../identity/identity.service.js";
 import type { FinanceRange, FinanceService, FinanceSummary } from "./finance.service.js";
+import { INCOME_KINDS } from "./income.service.js";
 import { BRAND_METRICS, type BrandMetric } from "./brand-inventory.service.js";
 
 const querySchema = z
@@ -91,6 +92,8 @@ export function financeSummarySection(
   if (section === "revenue") {
     return {
       grossRevenue: summary.grossRevenue,
+      otherIncome: summary.otherIncome ?? 0,
+      totalIncome: summary.totalIncome ?? summary.netRevenue,
       refunds: summary.refunds,
       netRevenue: summary.netRevenue,
       deliveredOrders: summary.deliveredOrders,
@@ -133,6 +136,10 @@ export function financeSummarySection(
   if (section === "cashflow") {
     return {
       cashIn: summary.cashIn,
+      incomeCashIn: summary.incomeCashIn ?? 0,
+      orderCashIn: summary.orderCashIn ?? summary.cashIn,
+      pendingIncome: summary.pendingIncome ?? 0,
+      financingCashOut: summary.financingCashOut ?? 0,
       cashOut: summary.cashOut,
       netCashFlow: summary.netCashFlow,
       paidExpenseCashOut: summary.paidExpenseCashOut,
@@ -159,6 +166,7 @@ function financePnlExport(summary: FinanceSummary): Record<string, unknown> {
     cogsReversal: summary.cogsReversal,
     netCogs: -summary.netCogs,
     grossProfit: summary.grossProfit,
+    otherIncome: summary.otherIncome ?? 0,
     operatingExpenses: -summary.operatingExpenses,
     codFees: -summary.codFees,
     returnCourierCosts: -summary.returnCourierCosts,
@@ -205,6 +213,42 @@ export function createFinanceRouter(
   const router = Router();
   const signedIn = authenticate(identity, config);
   const csrf = csrfProtection(config);
+
+  const incomeSchema = z.object({
+    id: z.string().trim().min(1).max(200),
+    kind: z.enum(INCOME_KINDS), category: z.string().trim().min(1).max(100),
+    description: z.string().trim().min(2).max(500),
+    amountMinor: z.number().int().positive().max(100_000_000_000),
+    expectedOn: z.iso.date(), sourceName: z.string().trim().max(160).default(""),
+    sourcePhone: z.string().trim().max(40).default(""), notes: z.string().trim().max(4000).default(""),
+    orderId: z.string().trim().max(200).optional(),
+  }).strict();
+  const incomeGate = [signedIn, requireAccountType("staff"), requireMfa] as const;
+  const incomeManage = requireAnyPermission("finance.manage", "finance.manage_incomes");
+  router.get("/admin/finance/incomes", ...incomeGate,
+    requireAnyPermission("finance.read", "finance.view_cashflow", "finance.manage", "finance.manage_incomes"), async (request, response) => {
+      const query = querySchema.parse(request.query);
+      response.setHeader("Cache-Control", "no-store");
+      response.json({ incomes: await finance.incomes.list(query.start, query.end) });
+    });
+  router.post("/admin/finance/incomes", ...incomeGate, csrf, incomeManage, async (request, response) => {
+    const body = incomeSchema.parse(request.body);
+    response.status(201).json({ income: await finance.incomes.create(request.auth!.userId, body, String(request.id)) });
+  });
+  router.patch("/admin/finance/incomes/:incomeId", ...incomeGate, csrf, incomeManage, async (request, response) => {
+    const { expectedVersion, ...body } = incomeSchema.omit({id:true}).extend({expectedVersion:z.number().int().positive()}).parse(request.body);
+    const id = z.string().trim().min(1).max(200).parse(request.params.incomeId);
+    response.json({income:await finance.incomes.change(request.auth!.userId,id,expectedVersion,"edit",body,String(request.id))});
+  });
+  for (const action of ["receive","void"] as const) {
+    router.post(`/admin/finance/incomes/:incomeId/${action}`, ...incomeGate, csrf, incomeManage, async (request, response) => {
+      const body = (action === "receive" ? z.object({expectedVersion:z.number().int().positive(),receivedOn:z.iso.date()}).strict()
+        : z.object({expectedVersion:z.number().int().positive()}).strict()).parse(request.body);
+      const id = z.string().trim().min(1).max(200).parse(request.params.incomeId);
+      response.json({income:await finance.incomes.change(request.auth!.userId,id,body.expectedVersion,action,
+        "receivedOn" in body ? {receivedOn:z.iso.date().parse(body.receivedOn)} : {},String(request.id))});
+    });
+  }
 
   const brandQuerySchema = querySchema.and(z.object({
     page: z.coerce.number().int().min(1).max(100000).default(1),

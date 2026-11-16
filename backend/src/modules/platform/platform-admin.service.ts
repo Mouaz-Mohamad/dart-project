@@ -63,6 +63,8 @@ export class PlatformAdminService {
 
       // Expenses and order COD settlements belong to the reset. Preserve budgets, goals,
       // unrelated invoices, marketing records and finance audit trails.
+      // Gift receivables belong to the selected order data; standalone income remains.
+      await remove("orderIncomeEntries", "DELETE FROM finance_income_entries WHERE order_id IS NOT NULL");
       await remove("financeExpensesAndOrderSettlements", `DELETE FROM finance_records
         WHERE domain IN ('finance_expenses','finance_settlements')`);
 

@@ -490,6 +490,10 @@ function openEditModal(id, sectionKey) {
     document.getElementById("phone1").value = x.phone1 || "";
     document.getElementById("phone2").value = x.phone2 || "";
     document.getElementById("email").value = x.email || "";
+    document.getElementById("collectionMode").value = x.collectionMode || "Recipient";
+    document.getElementById("payerName").value = x.payerName || "";
+    document.getElementById("payerPhone").value = x.payerPhone || "";
+    window.syncOrderPayerFields?.();
     document.getElementById("paymentMethod").value = x.paymentMethod || "";
     document.getElementById("paymentStatus").value =
       x.paymentStatus || "Unpaid";

@@ -51,6 +51,7 @@ const window = {
   DartAdminApi: { async request(url) {
     requests++;
     if (failSummary) throw new Error("offline");
+    if (url.includes("/incomes")) return {incomes:[]};
     const data = window.DartFinance.dashboardData();
     return reportPayload(url, (range) => window.DartFinance.calculateSummary(data, range));
   } },
@@ -67,7 +68,7 @@ function reportPayload(url, makeSummary) {
 const context = vm.createContext({ window, globalThis: window, document, console, CustomEvent: class {}, clearTimeout() {}, URLSearchParams, FormData: class { constructor(f) { this.f = f; } entries() { return Object.entries(this.f.payload); } } });
 vm.runInContext(fs.readFileSync("Js/dart-state.js", "utf8"), context);
 let finance = fs.readFileSync("Eye/dart-finance.js", "utf8");
-finance = finance.replace('})(typeof window !== "undefined" ? window : globalThis);', 'root.__financeUi = { state, openResourceModal, closeFinanceModal, renderFinanceSection, saveFinanceForm, invalidateAuthoritativeFinance, financialBuckets, replaceChart }; })(typeof window !== "undefined" ? window : globalThis);');
+finance = finance.replace('})(typeof window !== "undefined" ? window : globalThis);', 'root.__financeUi = { state, openResourceModal, closeFinanceModal, renderFinanceSection, saveFinanceForm, invalidateAuthoritativeFinance, financialBuckets, replaceChart, loadIncome, incomeCommand }; })(typeof window !== "undefined" ? window : globalThis);');
 vm.runInContext(finance, context);
 const ui = window.__financeUi;
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -87,7 +88,7 @@ async function main() {
       assert.match(markup, /<thead\b/i, "Marketing retains its original headings");
     }
   }
-  assert.equal(tabs.length, 12);
+  assert.equal(tabs.length, 13);
   const trigger = document.activeElement;
   for (const section of fieldsets) {
     ui.openResourceModal(section.dataset.financeFormResource);
@@ -102,7 +103,54 @@ async function main() {
     assert.equal(modal.style.display, "none");
     assert.equal(document.activeElement, trigger);
   }
-  assert.equal(fieldsets.length, 6, "five record forms plus COD receipt");
+  assert.equal(fieldsets.length, 7, "income, five existing record forms and COD receipt");
+  // Real income handlers: server-only persistence, exact piastres, receipt modal,
+  // a stale GET arriving after receipt, and session cleanup.
+  const originalRequest = window.DartAdminApi.request;
+  const incomeRequests = [];
+  let savedIncome;
+  window.DartAdminApi.request = async (url, options = {}) => {
+    if (!url.includes("/incomes")) return originalRequest(url,options);
+    if (!options.method) return {incomes:savedIncome ? [savedIncome] : []};
+    incomeRequests.push({url,options});
+    if (url.endsWith("/receive")) savedIncome = {...savedIncome,status:"Received",receivedOn:options.body.receivedOn,version:2};
+    else savedIncome = {...options.body,status:"Pending",version:1,amount:options.body.amountMinor/100};
+    return {income:savedIncome};
+  };
+  ui.openResourceModal("incomes");
+  form.payload = {kind:"Other Income",category:"Compensation",description:"Test income",amount:"101.01",expectedOn:"2026-10-01",sourceName:"Source",sourcePhone:"",notes:""};
+  await ui.saveFinanceForm(form);
+  assert.equal(incomeRequests[0].options.body.amountMinor,10101);
+  assert.equal(window.DartFinance.repository.list("incomes")[0].status,"Pending");
+  assert.equal(modal.style.display,"none");
+  ui.openResourceModal("incomes",savedIncome.id,{incomeAction:"receive"});
+  form.payload = {receivedOn:"2026-10-02"};
+  await ui.saveFinanceForm(form);
+  assert.equal(incomeRequests[1].options.body.expectedVersion,1);
+  assert.equal(window.DartFinance.repository.list("incomes")[0].status,"Received");
+  assert.equal(modal.style.display,"none");
+  const confirmed = {...savedIncome};
+  let releaseOldIncome;
+  window.DartAdminApi.request = async (url,options = {}) => {
+    if (!url.includes("/incomes")) return originalRequest(url,options);
+    if (options.method) return {income:confirmed};
+    await new Promise(resolve => {releaseOldIncome=resolve;});
+    return {incomes:[{...confirmed,status:"Pending",version:1}]};
+  };
+  const olderIncome = ui.loadIncome(window.DartFinance.periodRange("this_month"));
+  await tick();
+  await ui.incomeCommand(`/${confirmed.id}/receive`,"POST",{expectedVersion:1,receivedOn:"2026-10-02"});
+  releaseOldIncome(); await olderIncome;
+  assert.equal(window.DartFinance.repository.list("incomes")[0].status,"Received","old GET must not undo a confirmed receipt");
+  ui.openResourceModal("incomes");
+  form.payload = {kind:"Other Income",category:"Other",description:"Offline income",amount:"1.01",expectedOn:"2026-10-01"};
+  window.DartAdminApi.request = async () => {throw new Error("offline");};
+  await ui.saveFinanceForm(form);
+  assert.ok(modal.classList.contains("active"),"failed income save retains the form");
+  assert.ok(error.classList.contains("is-visible"));
+  assert.equal(submit.disabled,false);
+  ui.closeFinanceModal();
+  window.DartAdminApi.request = originalRequest;
   // Submit the real handler while the persistence service fails: retain the form.
   ui.openResourceModal("goals");
   const today = new Date().toLocaleDateString("en-CA");
@@ -216,6 +264,6 @@ async function main() {
   rootCallbacks.get("dart:admin-logged-out").forEach(handler => handler({}));
   releaseLoggedOut(); await pendingAtLogout;
   assert.equal(window.DartFinance.authoritativeSummary(range), null);
-  console.log("PASS Finance UI runtime: all 12 tabs, six forms, focus/close, pending-save guard, failed save, summary error/retry without request loop");
+  console.log("PASS Finance UI runtime: Income exact piastres, receipt, stale reads, errors; all 13 tabs, seven forms, focus/close, pending-save guard, failed save, summary error/retry without request loop");
 }
 main().catch((e) => { console.error(e); process.exitCode = 1; });

@@ -21,6 +21,7 @@ beforeEach(async () => {
       created_at timestamptz, is_deleted boolean DEFAULT false);
     CREATE TABLE return_requests (record_id text, position integer, payload jsonb);
     CREATE TABLE damage_records (record_id text, position integer, payload jsonb);
+    CREATE TABLE finance_income_entries(id text,kind text,status text,amount_minor bigint,expected_on date,received_on date,description text);
     CREATE TABLE finance_records (domain text, record_id text, position integer, payload jsonb);
     INSERT INTO orders (id,order_code,customer_user_id,final_minor,payment_method,payment_status,
       amount_paid_minor,delivered_at,updated_at,status) VALUES
@@ -58,7 +59,7 @@ function pool(failSql = false) {
 }
 
 describe("finance SQL snapshot", () => {
-  it("reads nine relations once, preserves Cairo midnight boundaries and excludes archived expense payloads", async () => {
+  it("reads ten relations once, preserves Cairo midnight boundaries and excludes archived expense payloads", async () => {
     const fixture = pool();
     const results = await new FinanceService(fixture.value).summaries([
       { start: "2026-10-01", end: "2026-10-02" },
@@ -74,7 +75,7 @@ describe("finance SQL snapshot", () => {
     expect(results[0]?.netProfit).toBe(173);
     expect(fixture.connect).toHaveBeenCalledOnce();
     expect(fixture.release).toHaveBeenCalledOnce();
-    expect(fixture.queries.filter((sql) => sql.trimStart().startsWith("SELECT"))).toHaveLength(9);
+    expect(fixture.queries.filter((sql) => sql.trimStart().startsWith("SELECT"))).toHaveLength(10);
     expect(fixture.queries[0]).toBe("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     expect(fixture.queries.at(-1)).toBe("COMMIT");
     expect((await db.query<{ count: number }>("SELECT count(*)::int AS count FROM finance_records")).rows[0]?.count).toBe(4);

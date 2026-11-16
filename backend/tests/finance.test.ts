@@ -59,6 +59,7 @@ function financePool(options: {
         return { rows: payloads.map((payload) => ({ payload })) };
       }
       if (sql.includes("FROM damage_records")) return { rows: (options.damagePayloads || []).map(payload => ({ payload })) };
+      if (sql.includes("FROM finance_income_entries")) return { rows: [] };
       if (sql.includes("FROM finance_records")) {
         const domain = String(values[0] || "");
         if (domain === "finance_settlements") {

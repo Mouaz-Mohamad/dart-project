@@ -1,5 +1,6 @@
 import { resolveCustomerReference, upsertCustomerRecord, guestCheckoutCustomer } from "../identity/customer-record.js";
 // DART CODE GUIDE | backend/src/modules/commerce/commerce.service.ts
+import { thirdPartyDetails, type ThirdPartyInput } from "./third-party-payment.js";
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
@@ -2805,12 +2806,12 @@ export class CommerceService {
            END,
            delivered_at=CASE WHEN $2='Delivered' THEN now() ELSE NULL END,
            payment_status=CASE
-             WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Paid'
+             WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' AND legacy->>'collectionMode' IS DISTINCT FROM 'Third Party' THEN 'Paid'
              ELSE payment_status
            END,
            amount_paid_minor=CASE
-             WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN final_minor
-             WHEN $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 0
+             WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' AND legacy->>'collectionMode' IS DISTINCT FROM 'Third Party' THEN final_minor
+             WHEN $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' AND legacy->>'collectionMode' IS DISTINCT FROM 'Third Party' THEN 0
              ELSE amount_paid_minor
            END,
            version=version+1,
@@ -4833,6 +4834,9 @@ export class CommerceService {
       orderSource?: string | undefined;
       deliveryNotes?: string | undefined;
       itemCodes: string[];
+      collectionMode?: ThirdPartyInput["collectionMode"];
+      payerName?: string | undefined;
+      payerPhone?: string | undefined;
       discountPercent?: number | undefined;
       country?: string | undefined;
       governorate?: string | undefined;
@@ -4851,6 +4855,11 @@ export class CommerceService {
     let clientReleased = false;
     try {
       await client.query("BEGIN");
+      const payer = thirdPartyDetails(input);
+      if (payer.collectionMode === "Third Party" && (Number(input.amountPaid) > 0 || Number(input.amountRefunded) > 0 || (input.paymentStatus && input.paymentStatus !== "Unpaid"))) {
+        throw new AppError(422, "GIFT_PAYMENT_RECEIPT_REQUIRED", "Confirm gift payment from Income after saving the order");
+      }
+      await client.query("SELECT set_config('dart.finance_actor_id',$1,true),set_config('dart.finance_request_id',$2,true)", [actorId,requestId]);
       const itemCodes = [...new Set(
         input.itemCodes.map((code) => String(code || "").trim()).filter(Boolean),
       )];
@@ -4951,6 +4960,7 @@ export class CommerceService {
       const { subtotalMinor, finalMinor: itemsFinalMinor, manualBenefit } = await this.priceAdminOrderLines(client, order.id, discountPercent, customerUserId);
       const discountMinor = Math.max(0, subtotalMinor - itemsFinalMinor);
       const finalMinor = itemsFinalMinor + manualShippingMinor;
+      if (payer.collectionMode === "Third Party" && finalMinor <= 0) throw new AppError(422,"GIFT_TOTAL_REQUIRED","A gift payer requires a positive order value");
       const amountPaidMinor = Math.min(
         finalMinor,
         Math.max(0, Math.round((Number(input.amountPaid) || 0) * 100)),
@@ -4986,6 +4996,7 @@ export class CommerceService {
               })
             : null,
           JSON.stringify({
+            ...payer,
             discount: discountPercent,
             reasonDeduction: discountPercent ? "Order discount" : "-",
           }),
@@ -5075,6 +5086,9 @@ export class CommerceService {
       orderSource?: string | undefined;
       deliveryNotes?: string | undefined;
       itemCodes: string[];
+      collectionMode?: ThirdPartyInput["collectionMode"];
+      payerName?: string | undefined;
+      payerPhone?: string | undefined;
       discountPercent?: number | undefined;
       country?: string | undefined;
       governorate?: string | undefined;
@@ -5140,6 +5154,20 @@ export class CommerceService {
         throw new AppError(409, "DISPATCH_PLAN_LOCKED", "Return to Preparing before editing order details; use Change Assignment for the courier");
       }
 
+      const payer = thirdPartyDetails(input, existing.legacy || {});
+      const gift = payer.collectionMode === "Third Party";
+      if (gift) {
+        if (existing.legacy?.collectionMode !== "Third Party" &&
+          (["Delivered","Returned","Cancelled","Refused","Out With Representative","Representative On The Way"].includes(existing.status) || Number(existing.amount_paid_minor) > 0)) {
+          throw new AppError(409, "ORDER_PAYER_LOCKED", "Only an unpaid order before dispatch can switch to a gift payer");
+        }
+        if ((input.amountPaid !== undefined && Math.round(input.amountPaid * 100) !== Number(existing.amount_paid_minor)) ||
+            (input.amountRefunded !== undefined && Math.round(input.amountRefunded * 100) !== Number(existing.amount_refunded_minor)) ||
+            (input.paymentStatus !== undefined && input.paymentStatus !== existing.payment_status)) {
+          throw new AppError(409, "GIFT_PAYMENT_RECEIPT_REQUIRED", "Use Income to confirm gift payment and Returns to refund it");
+        }
+      }
+      await client.query("SELECT set_config('dart.finance_actor_id',$1,true),set_config('dart.finance_request_id',$2,true)", [actorId,requestId]);
       const itemCodes = [...new Set(
         input.itemCodes.map((code) => String(code || "").trim()).filter(Boolean),
       )];
@@ -5156,7 +5184,7 @@ export class CommerceService {
         currentCodes.length !== itemCodes.length ||
         currentCodes.some((code) => !itemCodes.includes(code));
       const hasReservedBenefit = ["Promotion", "Manual", "Birthday", "Dart Card"].some((type) => orderBenefit(existing.promotion, type));
-      const financiallyLocked = ["Delivered", "Returned", "Cancelled", "Refused"].includes(existing.status) || hasReservedBenefit || existing.has_set_groups;
+      const financiallyLocked = (gift && Number(existing.amount_paid_minor) > 0) || ["Delivered", "Returned", "Cancelled", "Refused"].includes(existing.status) || hasReservedBenefit || existing.has_set_groups;
       // Match the admin editor's order-level rate. A Set/model line discount
       // is already in the immutable snapshot and is not a manual order discount.
       const existingDiscountPercent = Number(existing.promotion?.percent || existing.legacy?.discount || 0);
@@ -5208,6 +5236,7 @@ export class CommerceService {
         ? Number(existing.final_minor)
         : priced!.finalMinor + Number(existing.shipping_fee_minor || 0);
 
+      if (gift && finalMinor <= 0) throw new AppError(422,"GIFT_TOTAL_REQUIRED","A gift payer requires a positive order value");
       let updatedDeliveryCostMinor = Number(existing.delivery_cost_minor || 0);
       let updatedCourierFeePerOrderMinor = 0;
       if (!preservePricing) {
@@ -5316,6 +5345,7 @@ export class CommerceService {
           updatedDeliveryCostMinor,
           JSON.stringify({
             clientId: clientCode || existing.legacy?.clientId || "-",
+            ...payer,
             discount: requestedDiscount,
             reasonDeduction: requestedDiscount ? "Order discount" : "-",
             deliveryCost: updatedDeliveryCostMinor / 100,
@@ -5695,13 +5725,13 @@ export class CommerceService {
                   ELSE NULL
                 END,
                 payment_status=CASE
-                  WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Paid'
-                  WHEN $1::text='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 'Unpaid'
+                  WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' AND legacy->>'collectionMode' IS DISTINCT FROM 'Third Party' THEN 'Paid'
+                  WHEN $1::text='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' AND legacy->>'collectionMode' IS DISTINCT FROM 'Third Party' THEN 'Unpaid'
                   ELSE payment_status
                 END,
                 amount_paid_minor=CASE
-                  WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' THEN final_minor
-                  WHEN $1::text='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' THEN 0
+                  WHEN $2='Delivered' AND lower(payment_method) LIKE '%cash%' AND legacy->>'collectionMode' IS DISTINCT FROM 'Third Party' THEN final_minor
+                  WHEN $1::text='Delivered' AND $2<>'Delivered' AND lower(payment_method) LIKE '%cash%' AND legacy->>'collectionMode' IS DISTINCT FROM 'Third Party' THEN 0
                   ELSE amount_paid_minor
                 END,
                 legacy=$4::jsonb,

@@ -54,6 +54,7 @@
   });
   const FINANCE_ALL_VIEW_SECTIONS = Object.freeze(Object.keys(FINANCE_VIEW_PERMISSIONS));
   const FINANCE_MANAGE_PERMISSIONS = Object.freeze({
+    incomes: "finance.manage_incomes",
     expenses: "finance.manage_expenses",
     budgets: "finance.manage_budgets",
     invoices: "finance.manage_invoices",
@@ -121,6 +122,7 @@
   }
 
   function financeTabAllowed(tab) {
+    if (tab === "incomes") return financeCanView("cashflow") || financeCanManage("incomes");
     if (tab === "overview") return financeViewSections().length > 0;
     if (tab === "expenses") return hasAdminPermission("finance.read") || financeCanView("cost") || financeCanManage("expenses");
     if (tab === "budgets") return hasAdminPermission("finance.read") || financeCanView("cost") || financeCanManage("budgets");
@@ -136,6 +138,7 @@
   }
 
   function syncFinancePermissionUi() {
+    document.querySelectorAll("[data-finance-add]").forEach(button => { button.hidden = !financeCanManage(button.dataset.financeAdd); });
     document.querySelectorAll("[data-finance-tab]").forEach((button) => {
       button.hidden = !financeTabAllowed(button.dataset.financeTab);
     });
@@ -380,6 +383,7 @@
 
   const FinanceRepository = {
     list(resource) {
+      if (resource === "incomes") return incomeRows;
       if (!COLLECTIONS.includes(resource)) return [];
       return readJSON(STORAGE_KEYS[resource], []);
     },
@@ -468,6 +472,111 @@
   function uid(prefix) {
     if (root.crypto?.randomUUID) return `${prefix}-${root.crypto.randomUUID()}`;
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  // Income uses record commands, never an array snapshot or browser persistence.
+  let incomeRows = [];
+  let incomeLoadedKey = "";
+  let incomeErrorKey = "";
+  let incomePendingKey = "";
+  let incomeRevision = 0;
+  let incomeSession = 0;
+  let incomePendingRevision = 0;
+  const incomeBusy = new Set();
+
+  function incomeRangeKey(range) {
+    return `${dateInputValue(range.start)}:${dateInputValue(range.end)}`;
+  }
+
+  async function loadIncome(range) {
+    const key = incomeRangeKey(range);
+    if (incomePendingKey === key) return;
+    const revision = incomeRevision;
+    incomePendingKey = key;
+    incomePendingRevision = revision;
+    try {
+      const payload = await root.DartAdminApi.request(`/api/v1/admin/finance/incomes?start=${encodeURIComponent(dateInputValue(range.start))}&end=${encodeURIComponent(dateInputValue(range.end))}`);
+      if (revision !== incomeRevision || incomeRangeKey(currentRange()) !== key) return;
+      incomeRows = payload.incomes || [];
+      incomeLoadedKey = key;
+      incomeErrorKey = "";
+    } catch {
+      if (revision === incomeRevision) incomeErrorKey = key;
+    } finally {
+      if (incomePendingKey === key && incomePendingRevision === revision) incomePendingKey = "";
+      if (revision === incomeRevision && state.financeTab === "incomes") renderFinanceSection();
+    }
+  }
+
+  function renderIncome(range) {
+    const toolbar = sectionToolbar("Income", "Pending amounts enter Cash In only after Confirm Receipt. Gift order payments settle the order once. Capital and loans are cash movements; Other Income also affects profit.", `${financeExportButton("incomes")}${financeAddButton("incomes", "Add Income")}`);
+    const key = incomeRangeKey(range);
+    if (incomeErrorKey === key) return toolbar + '<div class="dart-finance-empty" role="alert">Income could not be loaded. <button type="button" class="dart-finance-secondary" data-income-retry>Retry</button></div>';
+    if (incomeLoadedKey !== key) {
+      void loadIncome(range);
+      return toolbar + '<div class="dart-finance-empty" role="status">Loading income…</div>';
+    }
+    const rows = incomeRows.filter(row => within(row.status === "Received" ? row.receivedOn : row.expectedOn, range));
+    const total = status => rows.filter(row => row.status === status).reduce((sum, row) => sum + Number(row.amountMinor || 0), 0) / 100;
+    return toolbar + `<div class="dart-finance-kpi-grid">${kpiCard("Received Income", money(total("Received")), "Confirmed in this period", "fa-solid fa-arrow-down", "green")}${kpiCard("Pending Income", money(total("Pending")), "Expected in this period", "fa-solid fa-clock", "blue")}</div>` +
+      tableShell(["Expected", "Received", "Type / Category", "Reason", "Person / Source", "Order", "Amount", "Status", "Actions"], rows.map(row => {
+        const pending = row.status === "Pending" && financeCanManage("incomes");
+        const actions = pending ? `<button type="button" class="dart-table-primary" data-income-receive="${escapeHTML(row.id)}" ${incomeBusy.has(row.id) ? "disabled" : ""}>Confirm Receipt</button> <button type="button" class="dart-finance-secondary" data-finance-edit="incomes" data-id="${escapeHTML(row.id)}">Edit</button>${row.orderId ? "" : ` <button type="button" class="dart-finance-secondary" data-income-void="${escapeHTML(row.id)}">Cancel</button>`}` : "—";
+        return `<tr><td>${escapeHTML(row.expectedOn)}</td><td>${escapeHTML(row.receivedOn || "—")}</td><td>${escapeHTML(row.kind)}<small class="dart-table-sub">${escapeHTML(row.category)}</small></td><td>${escapeHTML(row.description)}<small class="dart-table-sub">${escapeHTML(row.notes)}</small></td><td>${escapeHTML(row.sourceName || "—")}<small class="dart-table-sub">${escapeHTML(row.sourcePhone)}</small></td><td>${escapeHTML(row.orderId || "—")}</td><td>${money(row.amount)}</td><td><span class="dart-status-chip">${escapeHTML(row.status)}</span></td><td>${actions}</td></tr>`;
+      }).join(""), "No income entries fall in this period.", false);
+  }
+
+  async function incomeCommand(path, method, body) {
+    const session = incomeSession;
+    const payload = await root.DartAdminApi.request(`/api/v1/admin/finance/incomes${path}`, { method, body });
+    if (session !== incomeSession) return payload.income;
+    // The mutation succeeded. Retain its confirmed result even if a subsequent
+    // refresh fails; a slow earlier GET must never undo this receipt.
+    incomeRevision += 1;
+    const index = incomeRows.findIndex(row => row.id === payload.income.id);
+    if (index < 0) incomeRows.unshift(payload.income);
+    else incomeRows[index] = payload.income;
+    incomeLoadedKey = "";
+    incomeErrorKey = "";
+    incomePendingKey = "";
+    invalidateAuthoritativeFinance();
+    if (payload.income.orderId) void root.DartOrdersApi?.hydrate?.(true).catch(() => undefined);
+    return payload.income;
+  }
+
+  async function saveIncomeForm(form) {
+    if (!financeCanManage("incomes")) return;
+    const submit = form.querySelector('[type="submit"]');
+    const errorBox = form.querySelector(".dart-finance-form-error");
+    const existing = form.dataset.id ? resourceRecord("incomes", form.dataset.id) : null;
+    const values = { ...(existing || {}), ...formValues(form) };
+    const id = existing?.id || form.dataset.pendingId || uid("INCO");
+    form.dataset.pendingId = id;
+    if (incomeBusy.has(id)) return;
+    incomeBusy.add(id);
+    submit.disabled = true;
+    errorBox.textContent = "";
+    errorBox.classList.remove("is-visible");
+    try {
+      if (form.dataset.incomeAction === "receive") {
+        await incomeCommand(`/${encodeURIComponent(id)}/receive`, "POST", { expectedVersion:existing.version, receivedOn:values.receivedOn });
+      } else {
+        const amount = String(values.amount || "");
+        if (!/^\d+(?:\.\d{1,2})?$/.test(amount)) throw new Error("Enter an amount with at most two decimal places.");
+        const body = { kind:values.kind, category:values.category, description:values.description,
+          amountMinor:Math.round(Number(amount) * 100), expectedOn:values.expectedOn,
+          sourceName:values.sourceName || "", sourcePhone:values.sourcePhone || "", notes:values.notes || "",
+          ...(existing?.orderId ? {orderId:existing.orderId} : {}) };
+        await incomeCommand(existing ? `/${encodeURIComponent(id)}` : "", existing ? "PATCH" : "POST",
+          existing ? {...body, expectedVersion:existing.version} : {...body, id});
+      }
+      submit.disabled = false;
+      closeFinanceModal();
+      renderAllFinance();
+    } catch (error) {
+      errorBox.textContent = error?.message || "Income could not be saved. Refresh and try again.";
+      errorBox.classList.add("is-visible");
+    } finally { incomeBusy.delete(id); submit.disabled = false; }
   }
 
   function active(row) {
@@ -670,15 +779,15 @@
     );
   }
 
-  function isInventoryAcquisitionExpense(expense) {
-    return String(expense?.category || "").trim().toLowerCase() === "inventory acquisition";
+  function isCashOnlyExpense(expense) {
+    return ["inventory acquisition", "loan repayment", "capital withdrawal"].includes(String(expense?.category || "").trim().toLowerCase());
   }
 
   function recognizedExpenses(data, range) {
     return data.expenses
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
-      .filter((expense) => !isInventoryAcquisitionExpense(expense))
+      .filter((expense) => !isCashOnlyExpense(expense))
       .filter((expense) => within(expense.date, range));
   }
 
@@ -686,7 +795,7 @@
     return data.expenses
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
-      .filter((expense) => !isInventoryAcquisitionExpense(expense))
+      .filter((expense) => !isCashOnlyExpense(expense))
       .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
@@ -694,7 +803,7 @@
     return data.expenses
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
-      .filter(isInventoryAcquisitionExpense)
+      .filter(expense => String(expense.category).toLowerCase() === "inventory acquisition")
       .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
@@ -994,7 +1103,7 @@
       const actual = data.expenses
         .filter(active)
         .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
-        .filter((expense) => !isInventoryAcquisitionExpense(expense))
+        .filter((expense) => !isCashOnlyExpense(expense))
         .filter((expense) => budget.category === "All" || expense.category === budget.category)
         .filter((expense) => within(expense.date, range))
         .reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0);
@@ -1976,7 +2085,7 @@
     const pnlAllowed = summaryAllowsAll(current, ["revenue", "cost", "profit"]) &&
       summaryAllowsAll(previous, ["revenue", "cost", "profit"]);
     const pnlPanel = pnlAllowed
-      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
+      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Other received income</dt><dd>${money(current.otherIncome || 0)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
       : `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue + Cost + Profit permissions are required.")}${restrictedFinanceMarkup("P&L is restricted for this Staff account.")}</article>`;
 
     return `${sectionToolbar("Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
@@ -1992,7 +2101,7 @@
 
   function renderExpenses(data, range) {
     const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition is cash-only here and stays outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
+    return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition, Loan Repayment and Capital Withdrawal are cash-only here and stay outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
       ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.", false)}`;
   }
@@ -2026,6 +2135,7 @@
       ["Gross COGS", -current.grossCogs, -previous.grossCogs],
       ["Good-return COGS reversal", current.cogsReversal, previous.cogsReversal],
       ["Gross profit", current.grossProfit, previous.grossProfit, "subtotal"],
+      ["Other received income", current.otherIncome || 0, previous.otherIncome || 0],
       ["Operating expenses", -current.operatingExpenses, -previous.operatingExpenses],
       ["COD fees", -current.codFees, -previous.codFees],
       ["Representative exchange fees", -current.returnCourierCosts, -previous.returnCourierCosts],
@@ -2040,17 +2150,17 @@
     if (!summaryAllowsAll(current, ["cashflow"]) || !summaryAllowsAll(previous, ["cashflow"])) {
       return restrictedFinanceMarkup("Cash Flow permission is required for this report.");
     }
-    return `${sectionToolbar("Cash Flow", "Cash basis: collected order cash less recorded paid expenses, completed refunds and Dart-paid representative fees. Inventory investment is shown separately until its payment is explicitly recorded.", financeExportButton("cashflow"))}
+    return `${sectionToolbar("Cash Flow", "Cash basis: courier receipts plus confirmed Income, less recorded cash payments, completed refunds and Dart-paid representative fees. Inventory investment is shown separately until its payment is explicitly recorded.", financeExportButton("cashflow"))}
       <div class="dart-finance-kpi-grid dart-finance-kpi-grid-three">
-        ${kpiCard("Cash In", money(current.cashIn), "Recorded COD receipts", "fa-solid fa-arrow-down", "green", { current: current.cashIn, previous: previous.cashIn })}
+        ${kpiCard("Cash In", money(current.cashIn), "Order receipts + confirmed Income", "fa-solid fa-arrow-down", "green", { current: current.cashIn, previous: previous.cashIn })}
         ${kpiCard("Cash Out", money(current.cashOut), "Recorded paid expenses + refunds + Dart-paid courier fees", "fa-solid fa-arrow-up", "burgundy", { current: current.cashOut, previous: previous.cashOut }, true)}
         ${kpiCard("Net Cash Change", money(current.netCashFlow), range.label, "fa-solid fa-scale-balanced", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow })}
       </div>
-      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Order cash receipts</dt><dd>${money(current.cashIn)}</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Paid inventory acquisitions</dt><dd>(${money(current.inventoryPurchaseCashOut || 0)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow. Inventory Investment is not treated as cash paid unless a paid expense/payment record exists, preventing invented cash movements.</p></article>`;
+      <article class="dart-finance-panel dart-statement-panel"><dl class="dart-statement-list"><div><dt>Courier order receipts</dt><dd>${money(current.orderCashIn ?? current.cashIn)}</dd></div><div><dt>Confirmed Income (including gift payments)</dt><dd>${money(current.incomeCashIn || 0)}</dd></div><div><dt>Paid loan repayments / capital withdrawals</dt><dd>(${money(current.financingCashOut || 0)})</dd></div><div><dt>Paid operating expenses</dt><dd>(${money(current.paidExpenseCashOut)})</dd></div><div><dt>Paid inventory acquisitions</dt><dd>(${money(current.inventoryPurchaseCashOut || 0)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Completed customer refunds</dt><dd>(${money(current.refundCashOut)})</dd></div><div><dt>Dart-paid representative fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Settlement fees</dt><dd>(${money(current.codFees)})</dd></div><div class="is-total"><dt>Net cash flow</dt><dd>${money(current.netCashFlow)}</dd></div></dl><p class="dart-report-caveat">Fees paid directly by the customer to the representative are deliberately excluded from Dart revenue and cash flow. Inventory Investment is not treated as cash paid unless a paid expense/payment record exists, preventing invented cash movements.</p></article>`;
   }
 
   function codRows(data, range) {
-    return data.orders.filter(active).filter(isCOD).filter((order) => within(orderEventDate(order), range)).map((order) => {
+    return data.orders.filter(active).filter(order => order.collectionMode !== "Third Party").filter(isCOD).filter((order) => within(orderEventDate(order), range)).map((order) => {
       const { orderTotal, courierDue, dueToDart } = codDueForOrder(order);
       const received = settlementAmountForOrder(data, order);
       const remaining = roundMoney(Math.max(0, dueToDart - received));
@@ -2132,6 +2242,7 @@
 
     const renderers = {
       overview: () => renderFinanceOverview(data, range, current, previous),
+      incomes: () => renderIncome(range),
       expenses: () => renderExpenses(data, range),
       budgets: () => renderBudgets(data, range),
       invoices: () => renderInvoices(data, range),
@@ -2196,7 +2307,24 @@
     let title;
     let note = "";
     let defaults = {};
-    if (resource === "expenses") {
+    form.dataset.incomeAction = resource === "incomes" ? String(preset.incomeAction || "edit") : "";
+    if (resource === "incomes") {
+      const receiving = form.dataset.incomeAction === "receive";
+      title = receiving ? "Confirm Income Receipt" : id ? "Edit Pending Income" : "Add Pending Income";
+      defaults = { expectedOn:today, kind:"Other Income", category:"Other", amount:"", description:"", sourceName:"", sourcePhone:"", orderId:"", notes:"", receivedOn:today };
+      note = receiving ? "Confirm only money already received. This action records cash once and keeps a permanent history."
+        : "Other Income affects profit when received. Capital and loans affect cash only. Gift orders create their linked pending income automatically from Payment by someone else.";
+      section.querySelectorAll("input,select,textarea").forEach(control => {
+        control.disabled = receiving && control.name !== "receivedOn";
+        control.readOnly = control.name === "orderId" || Boolean(record.orderId && ["amount","sourceName","sourcePhone"].includes(control.name));
+      });
+      section.querySelector('[name="kind"]').disabled = receiving || Boolean(record.orderId);
+      section.querySelector("[data-income-received-field]").hidden = !receiving;
+      section.querySelector('[name="receivedOn"]').required = receiving;
+      section.querySelector('[name="receivedOn"]').max = today;
+      const giftKindOption = section.querySelector('[name="kind"] option:last-child');
+      if (giftKindOption) giftKindOption.disabled = !record.orderId;
+    } else if (resource === "expenses") {
       title = id ? "Edit Expense" : "Add Expense";
       defaults = { date: today, category: "Marketing", amount: "", status: "Unpaid", paidAt: "", paymentMethod: "", vendor: "", invoiceNumber: "", description: "", notes: "" };
       note = "Expense recognition uses Expense Date. Cash Flow uses Paid Date only when Status is Paid.";
@@ -2239,7 +2367,7 @@
     document.getElementById("finance-record-id").value = id || "";
     document.getElementById("dart-finance-modal-title").textContent = title;
     document.getElementById("dart-finance-modal-note").textContent = note;
-    document.getElementById("dart-finance-form-submit").textContent = id ? "Save Changes" : "Save Record";
+    document.getElementById("dart-finance-form-submit").textContent = resource === "incomes" ? (form.dataset.incomeAction === "receive" ? "Confirm Receipt" : id ? "Save Changes" : "Save Pending Income") : id ? "Save Changes" : "Save Record";
     const errorBox = document.getElementById("dart-finance-form-error");
     errorBox.textContent = "";
     errorBox.classList.remove("is-visible");
@@ -2317,6 +2445,7 @@
   async function saveFinanceForm(form) {
     if (form.querySelector('[type="submit"]')?.disabled) return;
     const resource = form.dataset.resource;
+    if (resource === "incomes") return saveIncomeForm(form);
     if (!financeCanManage(resource)) return;
     const id = form.dataset.id;
     const payload = formValues(form);
@@ -2518,6 +2647,12 @@
     const data = dashboardData();
     const range = currentRange();
     const stamp = `${dateInputValue(range.start)}_${dateInputValue(range.end)}`;
+    if (report === "incomes") {
+      if (!financeCanExport() || !financeTabAllowed("incomes") || incomeLoadedKey !== incomeRangeKey(range)) return;
+      const headers = ["id","kind","category","description","amount","currency","status","expectedOn","receivedOn","sourceName","sourcePhone","orderId","notes"];
+      downloadCSV(`dart-income-${stamp}.csv`,headers,incomeRows.map(row => headers.map(key => row[key] ?? "")));
+      return;
+    }
     if (report === "pnl" || report === "cashflow") {
       void downloadAuthoritativeFinanceCsv(report, `dart-${report}-${stamp}.csv`)
         .catch((error) => console.error("Dart finance export failed", error));
@@ -2565,6 +2700,20 @@
         renderFinanceSection();
         return;
       }
+      if (event.target.closest("[data-income-retry]")) { incomeErrorKey = ""; incomeLoadedKey = ""; renderFinanceSection(); return; }
+      const receiveIncome = event.target.closest("[data-income-receive]");
+      if (receiveIncome) { if (financeCanManage("incomes")) openResourceModal("incomes",receiveIncome.dataset.incomeReceive,{incomeAction:"receive"}); return; }
+      const voidIncome = event.target.closest("[data-income-void]");
+      if (voidIncome) {
+        if (!financeCanManage("incomes")) return;
+        const row = resourceRecord("incomes",voidIncome.dataset.incomeVoid);
+        if (!row || incomeBusy.has(row.id) || !await root.DartDialog.confirm("Cancel this pending income? Its history will be retained.")) return;
+        incomeBusy.add(row.id); voidIncome.disabled = true;
+        try { await incomeCommand(`/${encodeURIComponent(row.id)}/void`,"POST",{expectedVersion:row.version}); renderAllFinance(); }
+        catch (error) { await root.DartDialog.alert(error.message || "Income could not be cancelled."); }
+        finally { incomeBusy.delete(row.id); voidIncome.disabled = false; }
+        return;
+      }
       const financeLink = event.target.closest('[data-target="finance"]');
       if (financeLink) { event.preventDefault(); activateFinance(); return; }
       const tab = event.target.closest("[data-finance-tab]");
@@ -2608,7 +2757,13 @@
       }
       scheduleFinanceRender();
     });
-    root.addEventListener("dart:orders-hydrated", () => { invalidateAuthoritativeFinance(); scheduleFinanceRender(); });
+    root.addEventListener("dart:server-change", event => {
+      if (!event.detail?.reconcile && event.detail?.name !== "finance_income") return;
+      incomeRevision += 1; incomeLoadedKey = ""; incomePendingKey = ""; incomeErrorKey = "";
+      invalidateAuthoritativeFinance();
+      if (financeVisible() && state.financeTab === "incomes") renderFinanceSection();
+    });
+    root.addEventListener("dart:orders-hydrated", () => { incomeRevision += 1; incomeLoadedKey = ""; incomePendingKey = ""; invalidateAuthoritativeFinance(); scheduleFinanceRender(); });
     root.addEventListener("dart:catalog-hydrated", () => { invalidateAuthoritativeFinance(); scheduleFinanceRender(); });
     root.addEventListener("dart:dashboard-section-activated", () => {
       scheduleFinanceRender();
@@ -2617,6 +2772,7 @@
     });
     root.addEventListener("dart:admin-logged-out", () => {
       adminAuthenticated = false;
+      incomeSession += 1; incomeRevision += 1; incomeRows = []; incomeLoadedKey = ""; incomeErrorKey = ""; incomePendingKey = ""; incomeBusy.clear();
       financeReportSupported = null;
       invalidateAuthoritativeFinance();
       chartBindings.clear();

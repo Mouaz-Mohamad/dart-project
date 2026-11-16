@@ -1,6 +1,7 @@
 // DART CODE GUIDE | backend/tests/finance-report.routes.test.ts
 // Finance report HTTP tests: real authentication/permission middleware with synthetic services.
 import pino from "pino";
+import { hashCsrfToken } from "../src/security/session-token.js";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.js";
@@ -27,7 +28,7 @@ function application(permissions: string[], options: { accountType?: "staff" | "
     userId: "123e4567-e89b-12d3-a456-426614174101", accountType: options.accountType ?? "staff",
     status: "active", email: "fixture@example.invalid", emailVerified: true, mustChangePassword: false,
     sessionId: "123e4567-e89b-12d3-a456-426614174100",
-    sessionFamilyId: "123e4567-e89b-12d3-a456-426614174102", csrfTokenHash: "unused",
+    sessionFamilyId: "123e4567-e89b-12d3-a456-426614174102", csrfTokenHash: hashCsrfToken("income-fixture-csrf",config.authPepper),
     mfaRequired: true, mfaSatisfied: options.mfaSatisfied ?? true, permissions,
   } as AuthenticatedAccount;
   const identity = { authenticate: vi.fn().mockResolvedValue(account) } as unknown as IdentityService;
@@ -36,8 +37,9 @@ function application(permissions: string[], options: { accountType?: "staff" | "
     brandNetProfit: 500, cashIn: 900, physicalItemCost: 360, marketing: { spend: 20 },
   } as FinanceSummary)));
   const brandDetails = vi.fn().mockResolvedValue({ rows: [], totals: { amountMinor: 0 } });
-  const finance = { summaries, summary: vi.fn(), brandDetails } as unknown as FinanceService;
-  return { summaries, brandDetails, app: createApp(config, { identityService: identity, financeService: finance,
+  const incomes = {list:vi.fn(async()=>[]),create:vi.fn(async()=>({id:"fixture-income",status:"Pending"})),change:vi.fn(async()=>({id:"fixture-income",status:"Received"}))};
+  const finance = { incomes, summaries, summary: vi.fn(), brandDetails } as unknown as FinanceService;
+  return { incomes, summaries, brandDetails, app: createApp(config, { identityService: identity, financeService: finance,
     logger: pino({ level: "silent" }), databasePing: async () => undefined, startedAt: new Date(), version: "fixture" }) };
 }
 
@@ -143,5 +145,39 @@ describe("combined finance report", () => {
       expect(response.status).toBe(422);
       expect(summaries).not.toHaveBeenCalled();
     }
+  });
+});
+
+
+describe("income endpoint authorization", () => {
+  const body={id:"income-test",kind:"Other Income",category:"Other",description:"Test income",amountMinor:10101,expectedOn:"2026-10-01"};
+  const path="/api/v1/admin/finance/incomes";
+  it("allows cash-flow view and explicit management, but denies unrelated users, sessions and MFA",async()=>{
+    for(const permissions of [["finance.read"],["finance.view_cashflow"],["finance.manage_incomes"]]) {
+      const f=application(permissions);
+      await request(f.app).get(path).query({start:query.start,end:query.end}).set("Cookie",cookie).expect(200);
+      expect(f.incomes.list).toHaveBeenCalledOnce();
+    }
+    for(const options of [{permissions:["finance.view_revenue"]},{permissions:["finance.read"],mfaSatisfied:false},{permissions:["finance.read"],accountType:"customer" as const}]) {
+      const f=application(options.permissions,options);
+      await request(f.app).get(path).query(query).set("Cookie",cookie).expect(403);
+      expect(f.incomes.list).not.toHaveBeenCalled();
+    }
+    await request(application(["finance.read"]).app).get(path).query(query).expect(401);
+  });
+  it("requires management and CSRF for writes and validates exact piastres before calling the service",async()=>{
+    const f=application(["finance.manage_incomes"]);
+    await request(f.app).post(path).set("Cookie",cookie).send(body).expect(403);
+    const viewer=application(["finance.view_cashflow"]);
+    await request(viewer.app).post(path).set("Cookie",cookie).set("X-CSRF-Token","income-fixture-csrf").send(body).expect(403);
+    expect(viewer.incomes.create).not.toHaveBeenCalled();
+    for(const patch of [{amountMinor:0},{amountMinor:1.1},{amountMinor:100000000001},{expectedOn:"bad"},{status:"Received"},{kind:"Invalid"}]) {
+      await request(f.app).post(path).set("Cookie",cookie).set("X-CSRF-Token","income-fixture-csrf").send({...body,...patch}).expect(422);
+    }
+    expect(f.incomes.create).not.toHaveBeenCalled();
+    await request(f.app).post(path).set("Cookie",cookie).set("X-CSRF-Token","income-fixture-csrf").send(body).expect(201);
+    expect(f.incomes.create).toHaveBeenCalledOnce();
+    await request(f.app).post(`${path}/fixture-income/receive`).set("Cookie",cookie).set("X-CSRF-Token","income-fixture-csrf").send({expectedVersion:1,receivedOn:"2026-10-01"}).expect(200);
+    expect(f.incomes.change).toHaveBeenCalledWith(expect.any(String),"fixture-income",1,"receive",{receivedOn:"2026-10-01"},expect.any(String));
   });
 });

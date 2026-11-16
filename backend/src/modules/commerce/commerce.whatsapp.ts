@@ -46,9 +46,9 @@ export function orderRemainingPaymentMinor(finalMinor: number, paidMinor: number
 
 export async function queueOrderConfirmation(client: PoolClient, orderId: string): Promise<void> {
   const order = (await client.query<{
-    order_code: string; final_minor: string; amount_paid_minor: string; amount_refunded_minor: string; version: string; phone: string;
+    order_code: string; final_minor: string; amount_paid_minor: string; amount_refunded_minor: string; version: string; phone: string; legacy?: Record<string,unknown>;
   }>(`SELECT order_code,final_minor::text,amount_paid_minor::text,amount_refunded_minor::text,
-        version::text,contact_snapshot->>'phone1' AS phone
+        legacy,version::text,contact_snapshot->>'phone1' AS phone
       FROM orders WHERE id=$1 AND status='New' AND NOT is_deleted`, [orderId])).rows[0];
   if (!order) return;
   let phone: string;
@@ -63,7 +63,7 @@ export async function queueOrderConfirmation(client: PoolClient, orderId: string
      VALUES($1,$2,$3,$4) ON CONFLICT(order_id) DO NOTHING RETURNING id::text`,
     [orderId, phone, order.version, order.final_minor])).rows[0];
   if (!confirmation) return;
-  const remainingMinor = orderRemainingPaymentMinor(
+  const remainingMinor = order.legacy?.collectionMode === "Third Party" ? 0 : orderRemainingPaymentMinor(
     Number(order.final_minor), Number(order.amount_paid_minor), Number(order.amount_refunded_minor),
   );
   await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,event_type,payload,deduplication_key)

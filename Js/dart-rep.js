@@ -107,6 +107,7 @@
       .replace(/^0020/, "0")
       .replace(/^20(?=1)/, "0");
   const money = (value) => `${englishDigits(window.DartState.formatMoney(value))} ج.م`;
+  const recipientCollection = order => Number.isFinite(Number(order?.collectionAmount)) ? Math.max(0, Number(order.collectionAmount)) : order?.collectionMode === "Third Party" ? 0 : orderTotal(order);
   const orderTotal = (order) =>
     Number.isFinite(Number(order?.finalAmount))
       ? Math.max(0, Number(order.finalAmount))
@@ -1013,7 +1014,7 @@
           ${order.manuallyOrdered && Number(order.routeSequence) > 0 ? `<span>ترتيب المسار #${esc(order.routeSequence)}</span>` : ""}
         </div>
         <div class="rep-info-box"><div class="rep-info-title">بيانات العميل ومكان التسليم</div><div class="rep-info-value">${esc(order.clientName)}</div><div class="dart-rep-customer-phone">${esc(order.phone1 || "-")}${order.phone2 && order.phone2 !== "-" ? ` · ${esc(order.phone2)}` : ""}</div><address>${esc(fullAddress(order) || "العنوان غير متاح")}</address>${order.deliveryNotes ? `<p class="dart-rep-notes">${esc(order.deliveryNotes)}</p>` : ""}</div>
-        <div class="rep-info-box"><div class="rep-info-title">محتويات الأوردر</div>${items}<div class="dart-rep-total"><span>المبلغ المطلوب تحصيله</span><strong>${esc(money(orderTotal(order)))}</strong></div></div>
+        <div class="rep-info-box"><div class="rep-info-title">محتويات الأوردر</div>${items}<div class="dart-rep-total"><span>المبلغ المطلوب تحصيله</span><strong>${esc(money(recipientCollection(order)))}</strong></div></div>
         <p class="dart-rep-proximity ${proximity.ok ? "is-ready" : ""}" role="status">${esc(proximity.reason)}</p>
         <div class="dart-rep-order-actions">
           <a href="tel:${esc(order.phone1)}" class="rep-btn rep-btn-call"><i class="fa-solid fa-phone"></i> اتصال بالعميل</a>
@@ -1849,7 +1850,7 @@
             if (!proximity.ok) throw new Error(proximity.reason);
             const confirmation = proximity.manual
               ? `العنوان غير مؤكد على الخريطة. هل سلّمت أوردر ${englishDigits(freshOrder.orderId)} بنفسك وحصّلت المبلغ؟`
-              : `هل استلم العميل أوردر ${englishDigits(freshOrder.orderId)} وتم تحصيل ${money(orderTotal(freshOrder))}؟`;
+              : `هل استلم العميل أوردر ${englishDigits(freshOrder.orderId)} وتم تحصيل ${money(recipientCollection(freshOrder))}؟`;
             if (!await window.DartDialog.confirm(confirmation))
               return;
             await updateOrderStatus(freshOrder.id, "Delivered");

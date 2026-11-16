@@ -1189,6 +1189,12 @@
                                 <input type="email" id="email" placeholder="Optional">
                             </div>
                             <div class="form-group">
+                                <label for="collectionMode">Payment by</label>
+                                <select id="collectionMode"><option value="Recipient">Recipient</option><option value="Third Party">Someone else (gift)</option></select>
+                            </div>
+                            <div class="form-group" hidden><label for="payerName">Payer Name</label><input id="payerName" type="text" minlength="2" maxlength="160"></div>
+                            <div class="form-group" hidden><label for="payerPhone">Payer Phone</label><input id="payerPhone" type="tel" maxlength="40" inputmode="tel"></div>
+                            <div class="form-group">
                                 <label for="paymentMethod">Payment Method</label>
                                 <select id="paymentMethod"required>
                                     <option value="Cash on Delivery" selected>Cash on Delivery</option>
@@ -2349,7 +2355,7 @@
                     <h1>Finance</h1>
                     <p>Expenses, budgets, documents and decision-ready reports from real records.</p>
                 </div>
-                <button id="finance-add-expense-btn" type="button" class="dart-finance-primary" data-finance-add="expenses"><i class="fa-solid fa-plus"></i> Add Expense</button>
+                <div class="dart-finance-header-actions"><button type="button" class="dart-finance-primary" data-finance-add="incomes"><i class="fa-solid fa-plus"></i> Add Income</button><button id="finance-add-expense-btn" type="button" class="dart-finance-primary" data-finance-add="expenses"><i class="fa-solid fa-plus"></i> Add Expense</button></div>
             </div>
 
             <div class="dart-finance-period-heading">
@@ -2388,6 +2394,7 @@
                     <div class="dart-finance-tab-group-head"><strong>Essentials</strong><small>Records & budgets</small></div>
                     <div class="dart-finance-tab-group-buttons">
                         <button id="finance-tab-overview" type="button" data-finance-tab="overview" class="active">Overview</button>
+                        <button id="finance-tab-incomes" type="button" data-finance-tab="incomes">Income</button>
                         <button id="finance-tab-expenses" type="button" data-finance-tab="expenses">Expenses</button>
                         <button id="finance-tab-budgets" type="button" data-finance-tab="budgets">Budgets</button>
                         <button id="finance-tab-invoices" type="button" data-finance-tab="invoices">Invoices</button>
@@ -2438,9 +2445,21 @@
               <form id="dart-finance-form" data-resource="" data-id="">
                 <input id="finance-record-id" type="hidden">
                 <div class="dart-finance-form-grid">
+                  <fieldset id="finance-income-fields" class="dart-finance-form-section" data-finance-form-resource="incomes" hidden disabled>
+                    <label class="dart-finance-field"><span>Expected Date</span><input id="finance-income-expectedOn" name="expectedOn" type="date" required></label>
+                    <label class="dart-finance-field"><span>Type</span><select id="finance-income-kind" name="kind" required><option>Other Income</option><option>Capital</option><option>Loan</option><option>Order Collection</option></select></label>
+                    <label class="dart-finance-field"><span>Amount (EGP)</span><input id="finance-income-amount" name="amount" type="number" min="0.01" max="1000000000" step="0.01" required></label>
+                    <label class="dart-finance-field"><span>Category</span><input id="finance-income-category" name="category" type="text" maxlength="100" required></label>
+                    <label class="dart-finance-field"><span>Person / Source</span><input id="finance-income-sourceName" name="sourceName" type="text" maxlength="160"></label>
+                    <label class="dart-finance-field"><span>Source Phone</span><input id="finance-income-sourcePhone" name="sourcePhone" type="tel" maxlength="40"></label>
+                    <label class="dart-finance-field"><span>Linked Order</span><input id="finance-income-orderId" name="orderId" type="text" readonly placeholder="Created automatically for gift orders"></label>
+                    <label class="dart-finance-field" data-income-received-field hidden><span>Received Date</span><input id="finance-income-receivedOn" name="receivedOn" type="date"></label>
+                    <label class="dart-finance-field dart-finance-field-wide"><span>Reason</span><textarea id="finance-income-description" name="description" rows="2" minlength="2" maxlength="500" required></textarea></label>
+                    <label class="dart-finance-field dart-finance-field-wide"><span>Notes</span><textarea id="finance-income-notes" name="notes" rows="2" maxlength="4000"></textarea></label>
+                  </fieldset>
                   <fieldset id="finance-expense-fields" class="dart-finance-form-section" data-finance-form-resource="expenses" hidden disabled>
                     <label class="dart-finance-field"><span>Expense Date</span><input id="finance-expense-date" name="date" type="date" required></label>
-                    <label class="dart-finance-field"><span>Category</span><select id="finance-expense-category" name="category" required><option>Marketing</option><option>Inventory Acquisition</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
+                    <label class="dart-finance-field"><span>Category</span><select id="finance-expense-category" name="category" required><option>Marketing</option><option>Inventory Acquisition</option><option>Loan Repayment</option><option>Capital Withdrawal</option><option>Delivery</option><option>Packaging</option><option>Salaries</option><option>Rent</option><option>Utilities</option><option>Software</option><option>Professional Services</option><option>Taxes &amp; Fees</option><option>Other</option></select></label>
                     <label class="dart-finance-field"><span>Amount (EGP)</span><input id="finance-expense-amount" name="amount" type="number" min="0.01" step="any" required></label>
                     <label class="dart-finance-field"><span>Status</span><select id="finance-expense-status" name="status" required><option>Unpaid</option><option>Paid</option><option>Void</option></select></label>
                     <label class="dart-finance-field"><span>Paid Date</span><input id="finance-expense-paid-at" name="paidAt" type="date"></label>

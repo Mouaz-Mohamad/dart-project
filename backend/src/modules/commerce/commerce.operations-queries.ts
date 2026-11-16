@@ -307,6 +307,9 @@ export async function readRepresentativeWork(pool: Pool, representativeUserId: s
       payment_method: string;
       payment_status: string;
       final_minor: string;
+      legacy: Record<string,unknown>;
+      amount_paid_minor: string;
+      amount_refunded_minor: string;
       contact_snapshot: Record<string, unknown>;
       delivery_address: Record<string, unknown>;
       delivery_notes: string;
@@ -318,7 +321,7 @@ export async function readRepresentativeWork(pool: Pool, representativeUserId: s
       item_rows: Array<Record<string, unknown>>;
     }>(
       `SELECT o.id::text, o.order_code, o.status, o.payment_method, o.payment_status,
-              o.final_minor::text, o.contact_snapshot, o.delivery_address,
+              o.final_minor::text, o.legacy, o.amount_paid_minor::text, o.amount_refunded_minor::text, o.contact_snapshot, o.delivery_address,
               o.delivery_notes, o.created_at, o.delivery_started_at,
               drs.route_state, drs.sequence_number, COALESCE(drs.manually_ordered, false) AS manually_ordered,
               COALESCE((
@@ -414,6 +417,8 @@ export async function readRepresentativeWork(pool: Pool, representativeUserId: s
           paymentMethod: row.payment_method,
           paymentStatus: row.payment_status,
           finalAmount: Number(row.final_minor) / 100,
+          collectionMode: row.legacy?.collectionMode || "Recipient",
+          collectionAmount: row.legacy?.collectionMode === "Third Party" ? 0 : Math.max(0, Number(row.final_minor) - Number(row.amount_paid_minor || 0) + Number(row.amount_refunded_minor || 0)) / 100,
           clientName: contact.name || "Customer",
           phone1: contact.phone1 || "",
           phone2: contact.phone2 || "",

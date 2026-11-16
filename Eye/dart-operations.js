@@ -126,7 +126,17 @@ if (typeof dartMoney === 'function') {
     move('delivery',['orderCountry','governorate','orderArea','orderStreetName','orderBuildingNumber','orderFloor','deliveryNotes','orderAddress']);
     ['dashboard-order-map','dashboard-address-status','orderLatitude','orderLongitude','orderFullAddress','dashboard-locate-manual-address'].forEach(id => { const node=field(id); if(node) groups.delivery.append(node); });
     original.querySelectorAll('.dart-delivery-zone-note').forEach(node=>groups.delivery.append(node));
-    move('payment',['deductions','customDiscount','paymentMethod','paymentStatus','amountPaid','amountRefunded','orderSource']);
+    move('payment',['collectionMode','payerName','payerPhone','deductions','customDiscount','paymentMethod','paymentStatus','amountPaid','amountRefunded','orderSource']);
+    function syncPayerFields() {
+      const gift = value('collectionMode') === 'Third Party';
+      ['payerName','payerPhone'].forEach(id => { field(id).closest('.form-group').hidden = !gift; field(id).required = gift; });
+      ['paymentStatus','amountPaid','amountRefunded'].forEach(id => { field(id).disabled = gift; });
+    }
+    field('collectionMode').addEventListener('change',syncPayerFields);
+    orderForm.addEventListener('reset',() => queueMicrotask(syncPayerFields));
+    window.syncOrderPayerFields = syncPayerFields;
+    syncPayerFields();
+    const giftNote=document.createElement('p');giftNote.className='dart-order-hint';giftNote.textContent='Someone else (gift): the recipient pays zero. The actual order value is saved as pending Income for the payer. Confirm the payment in Finance → Income.';groups.payment.append(giftNote);
     const note=document.createElement('p'); note.className='dart-order-hint'; note.textContent='Prices and availability are confirmed when the order is saved. Paid sets the received amount to the total; Unpaid sets it to zero.'; groups.payment.append(note);
     ['.price-summary','.btn-done'].forEach(selector=>{ const node=original.querySelector(selector); if(node) groups.summary.append(node); });
     original.querySelectorAll('.column').forEach(column=>[...column.children].forEach(node=>groups.summary.append(node)));
@@ -274,8 +284,9 @@ if (typeof dartMoney === 'function') {
         return window.DartDialog.alert('An archived customer cannot be used.');
       }
 
-      let amountPaid = Math.max(0, Number(value('amountPaid')) || 0);
-      let paymentStatus = value('paymentStatus') || 'Unpaid';
+      const gift = value('collectionMode') === 'Third Party';
+      let amountPaid = gift ? Number(existing?.amountPaid || 0) : Math.max(0, Number(value('amountPaid')) || 0);
+      let paymentStatus = gift ? (existing?.paymentStatus || 'Unpaid') : (value('paymentStatus') || 'Unpaid');
       if (paymentStatus === 'Paid') amountPaid = prices.finalAmount;
       if (paymentStatus === 'Unpaid') amountPaid = 0;
       if (amountPaid > prices.finalAmount) {
@@ -288,10 +299,12 @@ if (typeof dartMoney === 'function') {
         phone1: value('phone1'),
         ...(value('phone2') ? { phone2: value('phone2') } : {}),
         ...(value('email') && value('email') !== '-' ? { email: value('email') } : {}),
+        collectionMode: value('collectionMode') || 'Recipient',
+        ...(gift ? { payerName:value('payerName'), payerPhone:value('payerPhone') } : {}),
         paymentMethod: value('paymentMethod') || 'Cash on Delivery',
         paymentStatus,
         amountPaid,
-        amountRefunded: Math.max(0, Number(value('amountRefunded')) || 0),
+        amountRefunded: gift ? Number(existing?.amountRefunded || 0) : Math.max(0, Number(value('amountRefunded')) || 0),
         orderSource: value('orderSource') || 'Manual',
         deliveryNotes: value('deliveryNotes'),
         itemCodes: [...selected],

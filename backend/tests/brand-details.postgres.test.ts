@@ -16,6 +16,7 @@ describe("Brand detail SQL", () => {
         CREATE TABLE inventory_items(item_code text,cost_snapshot_minor bigint,model_id text,color text,size text,status text,active boolean,is_archived boolean DEFAULT false,is_deleted boolean DEFAULT false,created_at timestamptz);
         CREATE TABLE return_requests(record_id text,position int,payload jsonb);
         CREATE TABLE damage_records(record_id text,position int,payload jsonb);
+    CREATE TABLE finance_income_entries(id text,kind text,status text,amount_minor bigint,expected_on date,received_on date,description text);
         CREATE TABLE finance_records(domain text,record_id text,position int,payload jsonb);
         CREATE TABLE waitlist_entries(model_id text,desired_color text,size text,status text);
         CREATE TABLE set_waiting_entries(selections jsonb,status text);

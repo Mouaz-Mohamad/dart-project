@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:72d7726fa0f95e754dce27974a80650b9c166f7424b3a019adc311ecf4bd1be3 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:1bfc11c205fdffed62b1da3677adcdb79636ca894db5965254b4464819b3b0f7 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -5511,6 +5511,10 @@ function openEditModal(id, sectionKey) {
     document.getElementById("phone1").value = x.phone1 || "";
     document.getElementById("phone2").value = x.phone2 || "";
     document.getElementById("email").value = x.email || "";
+    document.getElementById("collectionMode").value = x.collectionMode || "Recipient";
+    document.getElementById("payerName").value = x.payerName || "";
+    document.getElementById("payerPhone").value = x.payerPhone || "";
+    window.syncOrderPayerFields?.();
     document.getElementById("paymentMethod").value = x.paymentMethod || "";
     document.getElementById("paymentStatus").value =
       x.paymentStatus || "Unpaid";
