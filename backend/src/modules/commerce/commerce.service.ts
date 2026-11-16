@@ -2345,7 +2345,8 @@ export class CommerceService {
         [scope, keyHash, JSON.stringify(checkoutResponse)],
       );
       await client.query("COMMIT");
-      return checkoutResponse;
+      // Customer-facing response is always redacted; internal ledger remains unchanged.
+      return customerOrderView(checkoutResponse);
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
