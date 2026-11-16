@@ -123,7 +123,7 @@ export class CustomerEmailAuthService {
     return {...start,emailDisplay};
   }
 
-  async startSignup(input: {name:string;phone1:string;email:string;birthday?:string}): Promise<AuthResult> {
+  async startSignup(input: {name:string;phone1:string;email:string;birthday?:string|undefined}): Promise<AuthResult> {
     const email=normalizeEmail(input.email);
     let phone:string;
     try{phone=normalizeEgyptianPhone(input.phone1);}catch{throw new AppError(422,"PHONE_INVALID","Enter a valid Egyptian phone number");}
