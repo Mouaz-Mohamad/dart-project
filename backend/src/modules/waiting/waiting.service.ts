@@ -1355,6 +1355,18 @@ export class WaitingService {
     }
     await this.validateVariant(client, entry.model_id, entry.size, color);
 
+    // The database migration is an independent deployment step.
+    const migration = await client.query<{ installed: boolean }>(
+      "SELECT to_regclass('public.waitlist_alternative_suggestions') IS NOT NULL AS installed",
+    );
+    if (!migration.rows[0]?.installed) {
+      throw new AppError(
+        503,
+        "WAITING_ALTERNATIVE_SUGGESTIONS_NOT_READY",
+        "Alternative suggestions are temporarily unavailable",
+      );
+    }
+
     // A suggestion must NOT call dart_waitlist_assign_item or touch a cart,
     // waitlist allocation, or physical inventory state. The database helper
     // checks live stock + consent and deduplicates notifications atomically.
