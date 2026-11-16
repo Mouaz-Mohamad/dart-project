@@ -166,6 +166,12 @@ describe("second Council regressions on the production schema", () => {
     const post = () => request(app).post("/api/v1/orders").set("Cookie", `dart_session=${session}.${"a".repeat(43)}`).set("x-csrf-token", csrf).set("Idempotency-Key", `checkout-${f.reservation}`).send(f.input);
     const first = await post(), replay = await post();
     expect(first.status, JSON.stringify(first.body)).toBe(201); expect(replay.status).toBe(201); expect(replay.body).toEqual(first.body);
+    for (const field of ["deliveryCost", "courierFee", "courierFeePerOrder"]) {
+      expect(first.body.order).not.toHaveProperty(field);
+      expect(replay.body.order).not.toHaveProperty(field);
+    }
+    const internalCost = await store.pool.query("SELECT delivery_cost_minor::text AS cost FROM orders WHERE order_code=$1", [first.body.order.orderId]);
+    expect(Number(internalCost.rows[0]?.cost)).toBeGreaterThan(0);
     const recovered = await request(app).get(`/api/v1/me/cart/quote?reservationId=${f.reservation}`).set("Cookie", `dart_session=${session}.${"a".repeat(43)}`);
     expect(recovered.status).toBe(200); expect(recovered.headers["cache-control"]).toBe("no-store");
     expect(recovered.body.completedOrder).toEqual(first.body.order);
