@@ -572,7 +572,9 @@
       }
       submit.disabled = false;
       closeFinanceModal();
-      renderAllFinance();
+      // Keep a newly saved or received income in the visible Income tab.
+      // Rendering in a hidden dashboard section left Confirm Receipt unreachable.
+      activateFinance("incomes");
     } catch (error) {
       errorBox.textContent = error?.message || "Income could not be saved. Refresh and try again.";
       errorBox.classList.add("is-visible");
