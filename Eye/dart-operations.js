@@ -129,13 +129,9 @@ if (typeof dartMoney === 'function') {
     move('payment',['collectionMode','payerName','payerPhone','deductions','customDiscount','paymentMethod','paymentStatus','amountPaid','amountRefunded','orderSource']);
     function syncPayerFields() {
       const gift = value('collectionMode') === 'Third Party';
-      ['payerName','payerPhone'].forEach(id => { field(id).closest('.form-group').hidden = !gift; field(id).required = gift; });
+      ['payerName','payerPhone'].forEach(id => { const group = field(id).closest('.form-group'); group.hidden = !gift; group.style.display = gift ? '' : 'none'; field(id).required = gift; });
       ['paymentStatus','amountPaid','amountRefunded'].forEach(id => { field(id).disabled = gift; });
     }
-    field('collectionMode').addEventListener('change',syncPayerFields);
-    orderForm.addEventListener('reset',() => queueMicrotask(syncPayerFields));
-    window.syncOrderPayerFields = syncPayerFields;
-    syncPayerFields();
     const giftNote=document.createElement('p');giftNote.className='dart-order-hint';giftNote.textContent='Someone else (gift): the recipient pays zero. The actual order value is saved as pending Income for the payer. Confirm the payment in Finance → Income.';groups.payment.append(giftNote);
     const note=document.createElement('p'); note.className='dart-order-hint'; note.textContent='Prices and availability are confirmed when the order is saved. Paid sets the received amount to the total; Unpaid sets it to zero.'; groups.payment.append(note);
     ['.price-summary','.btn-done'].forEach(selector=>{ const node=original.querySelector(selector); if(node) groups.summary.append(node); });
@@ -143,6 +139,11 @@ if (typeof dartMoney === 'function') {
     const title=document.createElement('h2'); title.id='order-modal-title'; title.textContent='Order details'; field('orderModal').querySelector('.modal-content').prepend(title);
     field('orderModal').setAttribute('aria-labelledby',title.id);
     orderForm.replaceChildren(layout);
+    field('collectionMode').addEventListener('change',syncPayerFields);
+    orderForm.addEventListener('reset',() => queueMicrotask(syncPayerFields));
+    window.syncOrderPayerFields = syncPayerFields;
+    syncPayerFields();
+
     ['clientId','email'].forEach(id=>field(id).required=false);
     [['clientId','Client Code (optional)'],['email','Email (optional)'],['phone2','Additional phone (optional)']].forEach(([id,text])=>{const label=orderForm.querySelector(`label[for="${id}"]`);if(label)label.textContent=text;});
     [['orderModelCode','Model Code'],['orderItemColor','Color'],['orderItemSize','Size'],['orderItemQty','Quantity']].forEach(([id,text])=>field(id).setAttribute('aria-label',text));

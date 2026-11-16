@@ -2319,7 +2319,8 @@
         control.readOnly = control.name === "orderId" || Boolean(record.orderId && ["amount","sourceName","sourcePhone"].includes(control.name));
       });
       section.querySelector('[name="kind"]').disabled = receiving || Boolean(record.orderId);
-      section.querySelector("[data-income-received-field]").hidden = !receiving;
+      const receivedField = section.querySelector("[data-income-received-field]");
+      receivedField.hidden = !receiving; receivedField.style.display = receiving ? "" : "none";
       section.querySelector('[name="receivedOn"]').required = receiving;
       section.querySelector('[name="receivedOn"]').max = today;
       const giftKindOption = section.querySelector('[name="kind"] option:last-child');

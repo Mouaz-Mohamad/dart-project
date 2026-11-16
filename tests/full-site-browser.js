@@ -498,6 +498,17 @@ const server = http.createServer((request, response) => {
   await dashboard.evaluate(()=>{window.DartAddress={...window.DartAddress,create:()=>({validate:()=>({ok:true}),invalidate(){},clear(){}})};});
   await dashboard.locator('#openModalBtn').click();
   assert.equal(await dashboard.locator('#orderForm fieldset').count(), 5);
+  await dashboard.locator('#collectionMode').selectOption('Third Party');
+  for(const id of ['payerName','payerPhone']) {
+    assert.equal(await dashboard.locator(`#${id}`).isVisible(),true);
+    assert.equal(await dashboard.locator(`#${id}`).evaluate(node=>node.required),true);
+  }
+  assert.equal(await dashboard.locator('#paymentStatus').isDisabled(),true);
+  await dashboard.locator('#collectionMode').selectOption('Recipient');
+  assert.equal(await dashboard.locator('#payerName').isVisible(),false);
+  assert.equal(await dashboard.locator('#payerName').evaluate(node=>node.required),false);
+  assert.equal(await dashboard.locator('#paymentStatus').isEnabled(),true);
+
   for (const id of ['clientId','email','phone2']) assert.equal(await dashboard.locator(`#${id}`).evaluate(node=>node.required), false);
   for (const id of ['clientName','phone1']) assert.equal(await dashboard.locator(`#${id}`).evaluate(node=>node.required), true);
   for (const id of ['paymentMethod','paymentStatus','amountPaid','amountRefunded','deductions','customDiscount','orderSource','orderLatitude','orderLongitude','productsInputCode','autoAllocateProductBtn','addProductBtn']) assert.equal(await dashboard.locator(`#${id}`).count(), 1, `${id} must be preserved`);

@@ -37,7 +37,7 @@ describe("income and third party order collection", () => {
     const created=await commerce.createAdminOrder(actor,body,"gift-create");
     const order=created.orders.find(row=>(row.items as string[]).includes(code))!;
     const income=(await incomes.list(today,today)).find(row=>row.orderId===order.orderId)!;
-    return {order,income,body};
+    return {order,income,body,model};
   }
 
   it("keeps Pending outside cash/profit, and counts Received on its actual date only", async () => {
@@ -137,6 +137,20 @@ describe("income and third party order collection", () => {
     expect((await commerce.representativeWork(rep)).orders.find(row=>row.id===f.order.id)).toMatchObject({collectionAmount:0,finalAmount:f.order.finalAmount});
     await commerce.representativeOrderAction(rep,String(f.order.orderId),"delivered");
     expect((await commerce.adminOrders()).orders.find(row=>row.id===f.order.id)).toMatchObject({amountPaid:0,paymentStatus:"Unpaid",collectionAmount:0});
+  });
+
+  it("keeps an ordinary 100 percent item discount separate from third party payments",async()=>{
+    const f=await gift(), piece=`FREE-${randomUUID()}`;
+    await store.pool.query(`INSERT INTO inventory_items(id,item_code,model_id,color,size,status,cost_snapshot_minor)
+      VALUES($1,$1,$2,'Black','M','In stock',30000)`,[piece,f.model]);
+    const body={...f.body,itemCodes:[piece],collectionMode:"Recipient" as const,discountPercent:100};
+    const state=await commerce.createAdminOrder(actor,body,"free-order");
+    const row=state.orders.find(order=>(order.items as string[]).includes(piece))!;
+    expect(row).toMatchObject({collectionMode:"Recipient",discount:100});
+    expect((await incomes.list(today,today)).some(entry=>entry.orderId===row.orderId)).toBe(false);
+    const edited=await commerce.updateAdminOrder(actor,String(row.id),{...body,clientName:"Free order note",expectedVersion:Number(row.version)},"free-note");
+    expect(edited.orders.find(order=>order.id===row.id)).toMatchObject({discount:100,finalAmount:row.finalAmount});
+    expect((await incomes.list(today,today)).some(entry=>entry.orderId===row.orderId)).toBe(false);
   });
 
   it("locks gift payment to Income, synchronizes pending amount changes and rejects manual relinking", async () => {
