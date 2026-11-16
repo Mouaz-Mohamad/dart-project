@@ -121,14 +121,63 @@ describe("guest cart and atomic account/order creation", () => {
     expect((await commerce.guestCartForOwner(f.owner)).cart?.lines).toHaveLength(1);
   });
 
-  it("does not attach a buyer's address to a different email owner merely because a phone matches", async () => {
-    const f = await fixture(), client = await store.pool.connect();
-    await guestCheckoutCustomer(client, { ...f.input.contact, email: "different-owner@example.test" }); client.release();
-    await commerce.reserveCart(f.input.reservationId, f.lines, undefined, f.owner);
-    await expect(commerce.checkout(null, f.input, "phone-preclaimed", f.owner, `checkout-${f.input.reservationId}`))
-      .rejects.toMatchObject({ code: "CHECKOUT_CONTACT_CONFLICT" });
-    expect((await commerce.guestCartForOwner(f.owner)).cart?.lines).toHaveLength(1);
-    expect((await store.pool.query("SELECT 1 FROM orders WHERE contact_snapshot->>'email'=$1", [f.input.contact.email])).rows).toHaveLength(0);
+  it("accepts a shared phone at guest checkout without linking its owner's orders or login identity", async () => {
+    const prior = await fixture(), client = await store.pool.connect();
+    const ownerId = await guestCheckoutCustomer(client, prior.input.contact); client.release();
+    const f = await fixture();
+    f.input.contact.phone1 = prior.input.contact.phone1;
+    const agent = request.agent(app);
+    const held = await agent.put("/api/v1/cart/reservation")
+      .set("X-Dart-Guest-Cart", "1").send({ reservationId: f.input.reservationId, lines: f.lines });
+    expect(held.status).toBe(200);
+    const response = await agent.post("/api/v1/guest/orders").set("X-Dart-Guest-Cart", "1")
+      .set("Idempotency-Key", `checkout-${f.input.reservationId}`).send(f.input);
+    expect(response.status).toBe(201);
+    const userId = (await store.pool.query(
+      "SELECT customer_user_id::text AS id FROM orders WHERE id=$1", [response.body.order.id])).rows[0]!.id;
+    expect(userId).not.toBe(ownerId);
+    expect((await store.pool.query(
+      "SELECT user_id::text AS id FROM account_phones WHERE account_type='customer' AND phone_normalized=$1",
+      [`20${prior.input.contact.phone1.slice(1)}`])).rows).toEqual([{ id: ownerId }]);
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM account_phones WHERE user_id=$1", [userId])).rows[0]!.n).toBe(0);
+    expect((await store.pool.query(
+      "SELECT source FROM customer_contact_phones WHERE customer_user_id=$1", [userId])).rows)
+      .toEqual([{ source: "guest_checkout_shared_phone" }]);
+    expect((await store.pool.query(
+      "SELECT reason FROM customer_identity_conflicts WHERE record_key=$1",
+      [`guest_shared_phone:${userId}`])).rows)
+      .toEqual([{ reason: "GUEST_SHARED_LOGIN_PHONE_CONTACT_ONLY" }]);
+    expect((await store.pool.query(
+      "SELECT count(*)::int AS n FROM customer_address_history WHERE customer_user_id=$1", [ownerId])).rows[0]!.n).toBe(0);
+    expect((await store.pool.query(
+      "SELECT email_verified_at FROM users WHERE id=$1", [userId])).rows[0]!.email_verified_at).toBeNull();
+    expect((await agent.get("/api/v1/cart/reservation")).body.cart).toBeNull();
+  });
+
+  it("reuses the separate guest email identity on a second order with the same shared phone", async () => {
+    const prior = await fixture(), db = await store.pool.connect();
+    const owner = await guestCheckoutCustomer(db,prior.input.contact); db.release();
+    const first = await fixture(), second = await fixture();
+    first.input.contact.phone1 = prior.input.contact.phone1;
+    second.input.contact = { ...first.input.contact };
+    const countBefore = await count("customers");
+    await Promise.all([
+      commerce.reserveCart(first.input.reservationId,first.lines,undefined,first.owner),
+      commerce.reserveCart(second.input.reservationId,second.lines,undefined,second.owner),
+    ]);
+    const [a,b] = await Promise.all([
+      commerce.checkout(null,first.input,"shared-1",first.owner,`checkout-${first.input.reservationId}`),
+      commerce.checkout(null,second.input,"shared-2",second.owner,`checkout-${second.input.reservationId}`),
+    ]);
+    const result = await store.pool.query(
+      "SELECT DISTINCT customer_user_id::text AS id FROM orders WHERE id=ANY($1::uuid[])",[[a.id,b.id]]);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]!.id).not.toBe(owner);
+    expect(await count("customers")).toBe(countBefore+1);
+    const conflictCount = await store.pool.query(
+      "SELECT count(*)::int AS n FROM customer_identity_conflicts WHERE record_key=$1",
+      [`guest_shared_phone:${result.rows[0]!.id}`]);
+    expect(conflictCount.rows[0]!.n).toBe(1);
   });
 
   it("creates a separate account and order when a deleted account still owns the checkout phone", async () => {
@@ -186,19 +235,19 @@ describe("guest cart and atomic account/order creation", () => {
     expect((await store.pool.query("SELECT user_id::text FROM account_phones WHERE user_id=$1", [user])).rows).toEqual([{ user_id: user }]);
   });
 
-  it("reports a legacy live phone conflict safely instead of returning an unexpected server error", async () => {
+  it("accepts checkout with another customer's legacy secondary login phone, without transferring it", async () => {
     const previous = await fixture(), f = await fixture(), client = await store.pool.connect();
     const user = await guestCheckoutCustomer(client, previous.input.contact); client.release();
-    // Legacy login rows may predate the contact-phone separation migration.
     await store.pool.query(`INSERT INTO account_phones(user_id,account_type,phone_normalized,phone_display,is_primary)
       VALUES($1,'customer',$2,$3,false)`, [user, `20${f.input.contact.phone1.slice(1)}`, f.input.contact.phone1]);
     const before = await count("customers");
     await commerce.reserveCart(f.input.reservationId, f.lines, undefined, f.owner);
-    await expect(commerce.checkout(null, f.input, "legacy-live-phone", f.owner, `checkout-${f.input.reservationId}`))
-      .rejects.toMatchObject({ statusCode: 409, code: "CUSTOMER_IDENTITY_CONFLICT" });
-    expect(await count("customers")).toBe(before);
-    expect((await commerce.guestCartForOwner(f.owner)).cart?.lines).toHaveLength(1);
-    expect((await store.pool.query("SELECT count(*)::int n FROM account_phones WHERE user_id=$1", [user])).rows[0]!.n).toBe(2);
+    const result = await commerce.checkout(null, f.input, "legacy-live-phone", f.owner, `checkout-${f.input.reservationId}`);
+    const newId = (await store.pool.query("SELECT customer_user_id::text AS id FROM orders WHERE id=$1", [result.id])).rows[0]!.id;
+    expect(newId).not.toBe(user);
+    expect(await count("customers")).toBe(before+1);
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM account_phones WHERE user_id=$1", [user])).rows[0]!.n).toBe(2);
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM account_phones WHERE user_id=$1", [newId])).rows[0]!.n).toBe(0);
   });
 
   it("requires all guest account fields and protects write and reservation ownership", async () => {
