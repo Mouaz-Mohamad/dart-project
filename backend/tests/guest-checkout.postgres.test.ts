@@ -137,6 +137,22 @@ describe("guest cart and atomic account/order creation", () => {
     expect((await commerce.guestCartForOwner(f.owner)).cart?.lines).toHaveLength(1);
   });
 
+  it("rejects a guest who supplies an existing customer's email with an unrelated phone", async () => {
+    const owner = await fixture(), stranger = await fixture(), db = await store.pool.connect();
+    const ownerId = await guestCheckoutCustomer(db, owner.input.contact);
+    db.release();
+    const before = await count("customers");
+    await commerce.reserveCart(stranger.input.reservationId, stranger.lines, undefined, stranger.owner);
+    await expect(commerce.checkout(null, {
+      ...stranger.input,
+      contact: { ...stranger.input.contact, email: owner.input.contact.email },
+    }, "unrecognized-email-phone", stranger.owner, `checkout-${stranger.input.reservationId}`))
+      .rejects.toMatchObject({ code: "CHECKOUT_CONTACT_CONFLICT" });
+    expect(await count("customers")).toBe(before);
+    expect((await commerce.guestCartForOwner(stranger.owner)).cart?.lines).toHaveLength(1);
+    expect((await store.pool.query("SELECT count(*)::int AS n FROM orders WHERE customer_user_id=$1", [ownerId])).rows[0]!.n).toBe(0);
+  });
+
   it("accepts a shared phone at guest checkout without linking its owner's orders or login identity", async () => {
     const prior = await fixture(), client = await store.pool.connect();
     const ownerId = await guestCheckoutCustomer(client, prior.input.contact); client.release();
