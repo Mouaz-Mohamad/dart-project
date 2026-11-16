@@ -58,4 +58,57 @@ async function worker() {
   events.get("notificationclick")({ notification: { close() {}, data: { notificationId: "00000000-0000-4000-8000-000000000001", url: "https://hostile.test/" } }, waitUntil: promise => { pending = promise; } }); await pending;
   assert.equal(new URL(targets[0]).origin, "https://synthetic.test"); assert.match(targets[0], /notification=00000000/);
 }
-(async () => { await ui(); await worker(); console.log("PASS staff notifications: white-counter state, arrivals/dedupe, escaping, read/deep-open, logout isolation and safe native click routing"); })().catch(error => { console.error(error); process.exitCode = 1; });
+
+async function pushRenewal() {
+  // Browser already granted permission, but its server subscription was disabled by a push-provider 410.
+  // Page load must not reactivate it, and the explicit button must create a brand-new endpoint.
+  const { createHash } = require("node:crypto");
+  const ids = new Map([...html.matchAll(/id="([^"]+)"/g)].map(match => [match[1], element()]));
+  const calls = [];
+  let oldUnsubscribed = false, subscribeCalls = 0;
+  const endpoint = "https://fcm.googleapis.com/fcm/send/expired-admin-device";
+  const freshEndpoint = "https://fcm.googleapis.com/fcm/send/fresh-admin-device";
+  const old = { endpoint, options: { applicationServerKey: null },
+    toJSON() { return { endpoint: this.endpoint }; },
+    async unsubscribe() { oldUnsubscribed = true; current = null; return true; } };
+  const fresh = { endpoint: freshEndpoint, options: { applicationServerKey: null },
+    toJSON() { return { endpoint: this.endpoint }; }, async unsubscribe() { current = null; return true; } };
+  let current = old;
+  const worker = { active: {}, pushManager: {
+    getSubscription: async () => current,
+    subscribe: async () => { subscribeCalls++; current = fresh; return fresh; },
+  } };
+  const record = { id: "old-subscription", endpointHash: createHash("sha256").update(endpoint).digest("hex"),
+    enabled: false, disabledReason: "provider_expired" };
+  const Notification = { permission: "granted", requestPermission: async () => "granted" };
+  const window = { isSecureContext: true, Notification, PushManager: function () {},
+    crypto: { subtle: { digest: async (_algorithm, bytes) =>
+      Uint8Array.from(createHash("sha256").update(Buffer.from(bytes)).digest()).buffer } },
+    DartAdminAccess: { can: () => true }, addEventListener() {},
+    DartAdminApi: { request: async (path, opts) => {
+      calls.push({path, opts});
+      if (path.endsWith("/push/config")) return {configured: true, publicKey: "BA"};
+      if (path.endsWith("/push/subscriptions") && !opts) return {subscriptions: [record]};
+      if (path.endsWith("/push/subscriptions") && opts?.method === "POST") return {id: "new-subscription", enabled: true};
+      if (path.includes("/admin/notifications?")) return {notifications: [], unread: {orders:0,returns:0,review:0,settings:0}, unreadCount: 0, nextCursor: null};
+      throw new Error("Unexpected request: "+path);
+    } } };
+  const document = {hidden:false, getElementById: id=>ids.get(id), addEventListener() {}, querySelectorAll:()=>[],
+    createElement:element, querySelector:()=>null};
+  const navigator = {onLine:true,serviceWorker:{register:async()=>worker,getRegistration:async()=>worker}};
+  vm.runInNewContext(source,{window,document,navigator,Notification,location:{href:"https://synthetic.test/Eye/Dart%20Eye.html"},
+    history:{replaceState(){}},URL,Uint8Array,TextEncoder,atob,btoa,Date,Set,Map,setTimeout:()=>1,clearTimeout(){},
+    localStorage:{getItem:()=>null,setItem(){} }});
+  await flush();
+  assert.match(ids.get("dart-push-status").textContent,/expired/i);
+  assert.equal(ids.get("dart-push-disable").hidden,true);
+  assert.equal(calls.filter(x=>x.opts?.method==="POST").length,0,"startup must never silently reactivate expired or opted-out devices");
+  ids.get("dart-push-enable").events.click();
+  await flush();
+  assert.equal(oldUnsubscribed,true,"explicit renewal must unsubscribe the dead push endpoint");
+  assert.equal(subscribeCalls,1,"fresh browser subscription required");
+  const post=calls.find(x=>x.opts?.method==="POST");
+  assert.equal(post?.opts?.body?.subscription?.endpoint,freshEndpoint);
+  assert.equal(ids.get("dart-push-disable").hidden,false);
+}
+(async () => { await ui(); await worker(); await pushRenewal(); console.log("PASS staff notifications: counters, safe native click, and expired push renewal with explicit consent"); })().catch(error => { console.error(error); process.exitCode = 1; });

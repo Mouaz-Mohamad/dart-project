@@ -128,8 +128,9 @@ export class CustomerNotificationService {
       id: string;
       endpoint_hash: string;
       enabled: boolean;
+      disabled_reason: string | null;
     }>(
-      `SELECT p.id::text,p.endpoint_hash,
+      `SELECT p.id::text,p.endpoint_hash,p.disabled_reason,
       (p.active AND p.session_family_id=s.family_id AND p.vapid_fingerprint=$3 AND s.revoked_at IS NULL AND s.expires_at>now()
         AND s.user_session_version=u.session_version) AS enabled
       FROM ${this.subscriptionTable} p JOIN users u ON u.id=p.customer_user_id JOIN sessions s ON s.id=$2 AND s.user_id=u.id
@@ -141,6 +142,7 @@ export class CustomerNotificationService {
         id: row.id,
         endpointHash: row.endpoint_hash,
         enabled: row.enabled,
+        disabledReason: row.disabled_reason,
       })),
     };
   }

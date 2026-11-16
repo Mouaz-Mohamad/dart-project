@@ -125,17 +125,35 @@
       worker.addEventListener("statechange", check); check();
     });
   }
+  async function pushRecord(subscription) {
+    // Compare the browser endpoint to the server's SHA-256 fingerprint; no endpoint is exposed.
+    if (!window.crypto?.subtle) throw new Error("Secure browser cryptography is required for push.");
+    const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(subscription.endpoint));
+    const endpointHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    const result = await api("/api/v1/admin/push/subscriptions");
+    return (result.subscriptions || []).find(record => record.endpointHash === endpointHash) || null;
+  }
   async function syncPush() {
     if (!enabled() || !window.isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
     try {
+      const config = await api("/api/v1/admin/push/config");
+      if (!config.configured) { pushStatus("Phone notifications are not configured yet."); return; }
       const registration = await registerWorker(); await activeWorker(registration);
       const subscription = await registration.pushManager.getSubscription();
-      if (!subscription) return;
-      const config = await api("/api/v1/admin/push/config"); if (!config.configured) return;
-      const result = await api("/api/v1/admin/push/subscriptions", { method: "POST", body: { subscription: subscription.toJSON(), publicKey: config.publicKey } });
-      subscriptionId = result.id; pushStatus("Phone notifications enabled on this device.");
-      document.getElementById("dart-push-disable").hidden = false;
+      const record = subscription ? await pushRecord(subscription) : null;
+      if (record?.enabled) {
+        subscriptionId = record.id;
+        pushStatus("Phone notifications enabled on this device.");
+        document.getElementById("dart-push-disable").hidden = false;
+      } else {
+        // Do not silently resurrect an opted-out, ended-session or provider-expired device.
+        subscriptionId = null;
+        document.getElementById("dart-push-disable").hidden = true;
+        pushStatus(record?.disabledReason === "provider_expired"
+          ? "Phone subscription expired. Tap Enable phone notifications to create a fresh subscription."
+          : "Tap Enable phone notifications to connect or renew this device.");
+      }
     } catch { pushStatus("Tap Enable phone notifications to renew this device."); }
   }
   async function enablePush() {
@@ -147,7 +165,17 @@
       const config = await api("/api/v1/admin/push/config"); if (!config.configured) throw new Error("Phone notifications are not configured yet.");
       const registration = await registerWorker(); await activeWorker(registration);
       let subscription = await registration.pushManager.getSubscription();
-      if (subscription && subscription.options.applicationServerKey && btoa(String.fromCharCode(...new Uint8Array(subscription.options.applicationServerKey))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") !== config.publicKey) { await subscription.unsubscribe(); subscription = null; }
+      if (subscription) {
+        const record = await pushRecord(subscription);
+        const key = subscription.options.applicationServerKey;
+        const keyMismatch = key && btoa(String.fromCharCode(...new Uint8Array(key)))
+          .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") !== config.publicKey;
+        // A 404/410 from the provider makes the endpoint unusable. Re-subscribe on explicit consent.
+        if (!record || ["provider_expired", "expired", "key_changed"].includes(record.disabledReason) || keyMismatch) {
+          await subscription.unsubscribe();
+          subscription = null;
+        }
+      }
       if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(config.publicKey) });
       const result = await api("/api/v1/admin/push/subscriptions", { method: "POST", body: { subscription: subscription.toJSON(), publicKey: config.publicKey } });
       subscriptionId = result.id; pushStatus("Phone notifications enabled on this device."); document.getElementById("dart-push-disable").hidden = false;
