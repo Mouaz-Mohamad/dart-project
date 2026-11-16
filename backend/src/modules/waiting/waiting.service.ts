@@ -2039,6 +2039,7 @@ export class WaitingService {
       offered_color: string | null;
       allocation_status: string | null;
       allocation_expires_at: Date | null;
+      suggested_colors: string[];
     }>(
       `SELECT w.id::text,
               w.customer_user_id::text,
@@ -2085,7 +2086,22 @@ export class WaitingService {
               a.match_type,
               a.offered_color,
               a.status AS allocation_status,
-              a.expires_at AS allocation_expires_at
+              a.expires_at AS allocation_expires_at,
+              COALESCE((
+                SELECT jsonb_agg(s.offered_color ORDER BY s.suggested_at DESC)
+                  FROM waitlist_alternative_suggestions s
+                 WHERE s.waitlist_entry_id=w.id
+                   AND EXISTS (
+                     SELECT 1 FROM inventory_items candidate
+                      WHERE candidate.model_id=w.model_id
+                        AND candidate.size=w.size
+                        AND candidate.color=s.offered_color
+                        AND candidate.active
+                        AND NOT candidate.is_archived
+                        AND NOT candidate.is_deleted
+                        AND lower(candidate.status)='in stock'
+                   )
+              ),'[]'::jsonb) AS suggested_colors
          FROM waitlist_entries w
          JOIN customers c
            ON c.user_id=w.customer_user_id
@@ -2141,6 +2157,9 @@ export class WaitingService {
       convertedAt: row.converted_at?.toISOString() || null,
       orderCode: row.converted_order_code,
       cancelledAt: row.cancelled_at?.toISOString() || null,
+      suggestedColors: Array.isArray(row.suggested_colors)
+        ? row.suggested_colors
+        : [],
       allocation: row.allocation_id
         ? {
             id: row.allocation_id,
