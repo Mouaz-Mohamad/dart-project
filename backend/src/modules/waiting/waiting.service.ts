@@ -1341,7 +1341,7 @@ export class WaitingService {
       throw new AppError(
         409,
         "WAITING_STATUS_INVALID",
-        "An alternative can only be offered to a Waiting entry",
+        "An alternative can only be suggested to a Waiting entry",
       );
     }
 
@@ -1353,46 +1353,33 @@ export class WaitingService {
         "Choose a different available color",
       );
     }
-
     await this.validateVariant(client, entry.model_id, entry.size, color);
 
-    const item = await client.query<{ id: string }>(
-      `SELECT id
-         FROM inventory_items
-        WHERE model_id=$1
-          AND size=$2
-          AND color=$3
-          AND active
-          AND NOT is_archived
-          AND NOT is_deleted
-          AND lower(status)='in stock'
-        ORDER BY created_at,id
-        FOR UPDATE SKIP LOCKED
-        LIMIT 1`,
-      [entry.model_id, entry.size, color],
+    // A suggestion must NOT call dart_waitlist_assign_item or touch a cart,
+    // waitlist allocation, or physical inventory state. The database helper
+    // checks live stock + consent and deduplicates notifications atomically.
+    const result = await client.query<{ suggested: boolean }>(
+      `SELECT dart_waitlist_suggest_alternative(
+         $1::uuid,$2::text,'staff',$3::uuid,$4::text
+       ) AS suggested`,
+      [entry.id, color, actorId, requestId],
     );
-    const itemId = item.rows[0]?.id;
-    if (!itemId) {
+    if (!result.rows[0]?.suggested) {
       throw new AppError(
         409,
-        "ALTERNATIVE_STOCK_UNAVAILABLE",
-        "That alternative color is not in stock",
+        "ALTERNATIVE_SUGGESTION_UNAVAILABLE",
+        "That alternative is unavailable or this customer did not opt in",
       );
     }
-
-    const result = await client.query<{ allocation_id: string | null }>(
-      `SELECT dart_waitlist_assign_item(
-         $1,$2,'alternative_color','staff',$3,$4,$5
-       )::text AS allocation_id`,
-      [itemId, entry.id, actorId, reason, requestId],
-    );
-    if (!result.rows[0]?.allocation_id) {
-      throw new AppError(
-        409,
-        "WAITING_ALLOCATION_RACE",
-        "The item or Waiting entry changed; reload and try again",
-      );
-    }
+    await this.audit(client, {
+      actorType: "staff",
+      actorId,
+      action: "WAITLIST_ALTERNATIVE_SUGGESTION_REQUESTED",
+      entryId: entry.id,
+      requestId,
+      newValues: { suggestedColor: color, reservationCreated: false },
+      metadata: { reason },
+    });
   }
 
   private async adminPriority(
@@ -1516,24 +1503,16 @@ export class WaitingService {
     }
 
     const settings = await this.settings(client);
-    const matchType =
-      target.desired_color === item.color
-        ? "exact"
-        : "alternative_color";
-
-    if (
-      matchType === "alternative_color" &&
-      (
-        !target.allow_alternative_color ||
-        !settings.alternativeColorsEnabled
-      )
-    ) {
+    // Staff cannot bypass customer color selection by reassigning a hold.
+    // A different color can only be suggested, then added through the normal cart.
+    if (target.desired_color !== item.color) {
       throw new AppError(
         422,
         "WAITING_TARGET_COLOR_INVALID",
-        "The target customer cannot receive an alternative color",
+        "Reassignment requires exactly the same model, size, and color",
       );
     }
+    const matchType = "exact" as const;
 
     const expiry = await client.query<{ expires_at: Date }>(
       "SELECT now()+make_interval(hours=>$1::int) AS expires_at",
