@@ -45,6 +45,17 @@ describe("customer identifier access", () => {
     await expect(service.loginCustomer(`+20 ${first.phone1.slice(1)}`, metadata)).rejects.toMatchObject({code:'EMAIL_OTP_REQUIRED'});
     expect(Number((await store.pool.query("SELECT count(*) FROM outbox_events WHERE aggregate_id=$1", [first.session.account.userId])).rows[0].count)).toBe(0);
   });
+  it("registers a customer without a birthday", async () => {
+    const session = await service.registerCustomer({ name: "Private Birthday Customer", phone1: phone() }, metadata);
+    const profile = await service.profile(session.account);
+    expect(profile.birthday).toBeNull();
+    expect((await store.pool.query("SELECT birthday FROM customers WHERE user_id=$1", [session.account.userId])).rows[0]?.birthday).toBeNull();
+  });
+  it("creates a Google customer without demanding a birthday", async () => {
+    const email = `${randomUUID()}@example.test`, token = await socialToken(email);
+    const session = await social.complete({token,name:"Google Birthday Optional",phone1:phone()},metadata);
+    expect((await service.profile(session.account)).birthday).toBeNull();
+  });
   it("preserves existing accounts and ignores retired password locks and temporary flags", async () => {
     const email = `${randomUUID()}@example.test`, f = await customer(email);
     await store.pool.query(`UPDATE users SET password_hash='legacy-hash',must_change_password=true,

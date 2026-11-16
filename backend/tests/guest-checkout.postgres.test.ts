@@ -81,6 +81,22 @@ describe("guest cart and atomic account/order creation", () => {
     expect((await store.pool.query("SELECT count(*)::int n FROM orders WHERE id=$1", [created.body.order.id])).rows[0]!.n).toBe(1);
   });
 
+  it("creates a guest order without a birthday and does not invent a birthday reward", async () => {
+    const f = await fixture(), agent = request.agent(app);
+    const contact = { name: f.input.contact.name, phone1: f.input.contact.phone1, email: f.input.contact.email };
+    const held = await agent.put("/api/v1/cart/reservation").set("X-Dart-Guest-Cart", "1").send({ reservationId: f.input.reservationId, lines: f.lines });
+    expect(held.status).toBe(200);
+    const created = await agent.post("/api/v1/guest/orders").set("X-Dart-Guest-Cart", "1")
+      .set("Idempotency-Key", `checkout-${f.input.reservationId}`).send({ ...f.input, contact });
+    expect(created.status).toBe(201);
+    expect(created.body.order.birthdayRewardId).toBe("");
+    const row = (await store.pool.query(
+      `SELECT c.birthday::text AS birthday FROM customers c JOIN orders o ON o.customer_user_id=c.user_id WHERE o.id=$1`,
+      [created.body.order.id],
+    )).rows[0];
+    expect(row?.birthday).toBeNull();
+  });
+
   it("rolls back both new customer and order on failure and retains the guest reservation for retry", async () => {
     const f = await fixture(), before = await count("customers");
     await commerce.reserveCart(f.input.reservationId, f.lines, undefined, f.owner);
@@ -261,7 +277,7 @@ describe("guest cart and atomic account/order creation", () => {
     const held = await agent.put("/api/v1/cart/reservation").set("X-Dart-Guest-Cart", "1").send({ reservationId: f.input.reservationId, lines: f.lines });
     expect(held.status).toBe(200);
     expect((await agent.post("/api/v1/guest/orders").send(f.input)).status).toBe(403);
-    for (const contact of [{ ...f.input.contact, email: "" }, { ...f.input.contact, birthday: undefined },
+    for (const contact of [{ ...f.input.contact, email: "" },
       { ...f.input.contact, birthday: "2099-01-01" }, { ...f.input.contact, phone1: "123" }, { ...f.input.contact, birthday: "2000-02-30" }]) {
       expect((await agent.post("/api/v1/guest/orders").set("X-Dart-Guest-Cart", "1")
         .set("Idempotency-Key", `checkout-${f.input.reservationId}`).send({ ...f.input, contact })).status).toBe(422);

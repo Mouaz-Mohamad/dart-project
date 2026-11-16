@@ -930,7 +930,7 @@ export function createCommerceRouter(
       phone1: z.string().trim().refine(value => { try { normalizeEgyptianPhone(value); return true; } catch { return false; } }, "Enter a valid Egyptian phone number"),
       phone2: z.string().trim().refine(value => { if (!value) return true; try { normalizeEgyptianPhone(value); return true; } catch { return false; } }, "Enter a valid Egyptian phone number").optional(),
       email: z.string().trim().email().max(254),
-      birthday: checkoutSchema.shape.contact.shape.birthday.unwrap(),
+      birthday: checkoutSchema.shape.contact.shape.birthday,
     }) }).parse(request.body);
     const owner = guestCartOwnerHash(request, response, config, false);
     if (!owner) throw new AppError(403, "RESERVATION_OWNERSHIP_INVALID", "Reload your cart and try again");

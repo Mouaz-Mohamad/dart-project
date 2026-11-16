@@ -147,10 +147,10 @@
     <div class="form-group"><label for="checkout-phone1">Phone number</label><input id="checkout-phone1" name="phone1" class="inp" type="tel" placeholder="Value" autocomplete="tel" inputmode="tel" required></div>
     <div class="form-group"><label for="checkout-email">Email</label><input id="checkout-email" name="email" class="inp" type="email" placeholder="Email" autocomplete="email" maxlength="254" required></div>
     <div class="form-group dart-birthday-field">
-      <span class="dart-birthday-label" id="checkoutBirthdayLabel">Birthday</span>
+      <span class="dart-birthday-label" id="checkoutBirthdayLabel">Birthday (optional)</span>
       <div class="dart-birthday-selects" role="group" aria-labelledby="checkoutBirthdayLabel" aria-describedby="checkoutBirthdayHint" dir="ltr">
-        <select id="dartBirthDay" aria-label="Birth day" autocomplete="bday-day" required><option value="">Day</option></select>
-        <select id="dartBirthMonth" aria-label="Birth month" autocomplete="bday-month" required>
+        <select id="dartBirthDay" aria-label="Birth day" autocomplete="bday-day"><option value="">Day</option></select>
+        <select id="dartBirthMonth" aria-label="Birth month" autocomplete="bday-month">
           <option value="">Month</option>
           <option value="1">January</option><option value="2">February</option>
           <option value="3">March</option><option value="4">April</option>
@@ -159,10 +159,10 @@
           <option value="9">September</option><option value="10">October</option>
           <option value="11">November</option><option value="12">December</option>
         </select>
-        <select id="dartBirthYear" aria-label="Birth year" autocomplete="bday-year" required><option value="">Year</option></select>
+        <select id="dartBirthYear" aria-label="Birth year" autocomplete="bday-year"><option value="">Year</option></select>
       </div>
       <input id="checkout-birthday" type="hidden" name="birthday">
-      <small id="checkoutBirthdayHint" class="dart-birthday-hint">لعروض عيد ميلادك.</small>
+      <small id="checkoutBirthdayHint" class="dart-birthday-hint">اختياري تمامًا. اتركه فارغًا لو مش حابب تشارك تاريخ ميلادك.</small>
     </div>
     <div class="form-group"><label for="checkout-phone2">Phone number 2</label><input id="checkout-phone2" name="phone2" class="inp" type="tel" placeholder="Optional" inputmode="tel"></div>
     <div class="form-group"><label for="checkout-building">Building Number/Name</label><input id="checkout-building" name="building" class="inp" type="text" placeholder="Value" required></div>

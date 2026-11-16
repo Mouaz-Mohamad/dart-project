@@ -20,7 +20,7 @@ const signup=z.object({
   name:z.string().trim().min(3).max(120),
   email:z.email().max(254),
   phone1:z.string().trim().min(10).max(25),
-  birthday:z.iso.date(),
+  birthday:z.iso.date().refine(value => value >= "1900-01-01" && value <= new Date().toISOString().slice(0,10), "Birthday must not be in the future").optional(),
 });
 function requestMeta(request:Request):RequestMetadata {
   return {requestId:String(request.id),

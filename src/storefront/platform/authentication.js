@@ -6,7 +6,7 @@
         name: String(payload.name || "").trim(),
         phone1: String(payload.phone1 || "").trim(),
         email: String(payload.email || "").trim(),
-        birthday: String(payload.birthday || "").trim(),
+        ...(String(payload.birthday || "").trim() ? { birthday: String(payload.birthday).trim() } : {}),
       },
     });
   }

@@ -32,7 +32,11 @@
 
       value.value = "";
       year.setCustomValidity("");
-      if (!day.value || !month.value || !year.value) return;
+      if (!day.value && !month.value && !year.value) return;
+      if (!day.value || !month.value || !year.value) {
+        year.setCustomValidity("Complete your birthday or leave every date field blank.");
+        return;
+      }
 
       const y = Number(year.value);
       const m = Number(month.value);

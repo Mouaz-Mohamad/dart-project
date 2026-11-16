@@ -39,7 +39,7 @@
 
         <div class="form-box register">
             <form id="registerForm" action="#" novalidate>
-                <div class="dart-auth-heading"><span class="dart-auth-kicker">DART / FOR YOU</span><h1>Join Dart.</h1><p>Your name, phone, email and birthday.</p></div>
+                <div class="dart-auth-heading"><span class="dart-auth-kicker">DART / FOR YOU</span><h1>Join Dart.</h1><p>Your name, phone and email. Birthday is optional.</p></div>
                 <div class="input-box">
                     <label class="dart-auth-field-label" for="dartRegisterName">Full name</label>
                     <input id="dartRegisterName" type="text" name="name" placeholder="Full name" autocomplete="name" minlength="3" required>
@@ -61,10 +61,10 @@
                 </div>
 
                 <div class="dart-birthday-field">
-                    <span class="dart-auth-field-label" id="dartBirthdayLabel">Date of birth</span>
+                    <span class="dart-auth-field-label" id="dartBirthdayLabel">Date of birth (optional)</span>
                     <div class="dart-birthday-selects" role="group" aria-labelledby="dartBirthdayLabel">
-                        <select id="dartBirthDay" aria-label="Birth day" autocomplete="bday-day" required><option value="">Day</option></select>
-                        <select id="dartBirthMonth" aria-label="Birth month" autocomplete="bday-month" required>
+                        <select id="dartBirthDay" aria-label="Birth day" autocomplete="bday-day"><option value="">Day</option></select>
+                        <select id="dartBirthMonth" aria-label="Birth month" autocomplete="bday-month">
                             <option value="">Month</option>
                             <option value="1">January</option><option value="2">February</option>
                             <option value="3">March</option><option value="4">April</option>
@@ -73,10 +73,10 @@
                             <option value="9">September</option><option value="10">October</option>
                             <option value="11">November</option><option value="12">December</option>
                         </select>
-                        <select id="dartBirthYear" aria-label="Birth year" autocomplete="bday-year" required><option value="">Year</option></select>
+                        <select id="dartBirthYear" aria-label="Birth year" autocomplete="bday-year"><option value="">Year</option></select>
                     </div>
                     <input id="dartBirthdayValue" type="hidden" name="birthday">
-                    <small class="dart-birthday-hint">Only used for your birthday perks.</small>
+                    <small class="dart-birthday-hint">Optional. Leave blank if you prefer; birthday offers need a date.</small>
                 </div>
                 <button type="submit" class="btn enter-btn">Create account <span aria-hidden="true">→</span></button>
                 <button type="button" class="dart-google-login-btn" data-social-login="google" aria-label="Continue with Google"><span class="dart-google-g" aria-hidden="true">G</span> Continue with Google</button>

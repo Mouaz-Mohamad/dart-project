@@ -130,8 +130,8 @@
     };
     if (!details.name || !details.phone1)
       throw new Error("Complete your name and phone number.");
-    if (!logged && (!details.email || !details.birthday))
-      throw new Error("Complete your email and birthday to create your customer account with this order.");
+    if (!logged && !details.email)
+      throw new Error("Complete your email to create your customer account with this order.");
     const addressController = window.dartCheckoutAddress;
     const addressValidation = addressController?.validate?.();
     if (!addressValidation?.ok)

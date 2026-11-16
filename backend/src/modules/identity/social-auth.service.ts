@@ -567,7 +567,8 @@ export class SocialAuthService {
       phoneRequired: !existing,
       birthdayAlreadySaved: Boolean(existing?.birthday),
       passwordRequired: false,
-      birthdayRequired: !existing?.birthday,
+      birthdayRequired: false,
+      birthdayOptional: !existing?.birthday,
       next: row.next_destination,
       expiresAt: row.expires_at.toISOString(),
     };
@@ -668,10 +669,7 @@ export class SocialAuthService {
       let newlyRegistered = false;
       if (existing) {
         session = await this.identity.loginLinkedSocialCustomer(existing.userId, metadata);
-        if (!existing.birthday) {
-          if (!input.birthday) {
-            throw new AppError(422, "BIRTHDAY_REQUIRED", "Birthday is required");
-          }
+        if (!existing.birthday && input.birthday) {
           await client.query(
             `UPDATE customers SET birthday=$2::date,updated_at=now() WHERE user_id=$1`,
             [existing.userId, input.birthday],
@@ -689,9 +687,6 @@ export class SocialAuthService {
             "Name and primary phone are required for a new social account",
           );
         }
-        if (!input.birthday) {
-          throw new AppError(422, "BIRTHDAY_REQUIRED", "Birthday is required");
-        }
         session = await this.identity.registerVerifiedEmailCustomer(
           {
             name,
@@ -700,14 +695,14 @@ export class SocialAuthService {
             ...(input.phone2?.trim()
               ? { phone2: input.phone2.trim() }
               : {}),
-            birthday: input.birthday,
+            ...(input.birthday ? { birthday: input.birthday } : {}),
           },
           metadata,
         );
         existing = {
           userId: session.account.userId,
           email: current.provider_email!,
-          birthday: input.birthday,
+          birthday: input.birthday || null,
           linked: true,
         };
         newlyRegistered = true;

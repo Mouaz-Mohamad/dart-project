@@ -159,9 +159,9 @@
     heading.textContent = `Continue with ${providerLabel(challenge.provider)}`;
     const intro = document.createElement("p");
     intro.textContent = challenge.phoneRequired
-      ? "Google confirmed your email. Add your phone and birthday once to finish your Dart account."
-      : challenge.birthdayRequired
-          ? "Welcome back! Add your birthday to finish linking your account."
+      ? "Google confirmed your email. Add your phone to finish your Dart account. Birthday is optional."
+      : challenge.birthdayOptional
+          ? "Welcome back! You can add your birthday for birthday perks, or skip it."
           : "Your Google account is verified. Continue to Dart.";
     card.append(heading, intro);
 
@@ -185,9 +185,10 @@
       card.append(name.wrapper, phone1.wrapper);
     }
 
-    if (challenge.birthdayRequired) {
-      const birthday = field("Birthday", "birthday", "date", {
+    if (challenge.birthdayOptional) {
+      const birthday = field("Birthday (optional)", "birthday", "date", {
         autocomplete: "bday",
+        required: false,
       });
       card.appendChild(birthday.wrapper);
     }
@@ -225,7 +226,7 @@
           method: "POST",
           body: {
             token: socialToken,
-            ...(challenge.birthdayRequired
+            ...(challenge.birthdayOptional && values.birthday
               ? { birthday: values.birthday }
               : {}),
             ...(challenge.phoneRequired

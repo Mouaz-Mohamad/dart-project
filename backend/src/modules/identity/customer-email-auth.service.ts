@@ -14,7 +14,7 @@ interface ChallengeRow {
   user_id: string | null;
   email: string;
   email_normalized: string;
-  signup_data: { name: string; phone1: string; birthday: string } | null;
+  signup_data: { name: string; phone1: string; birthday?: string } | null;
   code_hash: string;
   attempts_remaining: number;
   expires_at: Date;
@@ -123,7 +123,7 @@ export class CustomerEmailAuthService {
     return {...start,emailDisplay};
   }
 
-  async startSignup(input: {name:string;phone1:string;email:string;birthday:string}): Promise<AuthResult> {
+  async startSignup(input: {name:string;phone1:string;email:string;birthday?:string}): Promise<AuthResult> {
     const email=normalizeEmail(input.email);
     let phone:string;
     try{phone=normalizeEgyptianPhone(input.phone1);}catch{throw new AppError(422,"PHONE_INVALID","Enter a valid Egyptian phone number");}
@@ -132,7 +132,7 @@ export class CustomerEmailAuthService {
       [email,phone],
     );
     if(duplicate.rows[0]?.present)throw new AppError(409,"ACCOUNT_ALREADY_EXISTS","This email or phone is already registered. Use sign in or contact Dart support.");
-    return this.issue("register",input.email,null,{name:input.name,phone1:input.phone1,birthday:input.birthday});
+    return this.issue("register",input.email,null,{name:input.name,phone1:input.phone1,...(input.birthday ? {birthday:input.birthday} : {})});
   }
 
   async verify(challengeId:string, code:string, purpose:"login"|"register", meta:RequestMetadata):Promise<IssuedSession> {
