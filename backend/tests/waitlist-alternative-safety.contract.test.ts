@@ -72,7 +72,7 @@ describe("waitlist alternative-color reservation safety", () => {
   });
 
   it("exposes a suggested color only if currently available and keeps reads compatible before migration", () => {
-    expect(service).toContain("to_regclass('public.waitlist_alternative_suggestions')");
+    expect(service).toContain("to_regclass('waitlist_alternative_suggestions')");
     expect(service).toContain("lower(candidate.status)='in stock'");
     expect(service).toContain("suggestedColors: Array.isArray(row.suggested_colors)");
     expect(customer).toContain("entry.suggestedColors");
