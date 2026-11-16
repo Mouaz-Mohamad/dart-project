@@ -35,6 +35,7 @@ Requires a Staff session, satisfied MFA when required, CSRF, and at least one of
 - `cd backend && npm run check && npm run build`: 972 backend tests pass; 67 pre-existing environment-dependent tests skip locally; lint, typecheck, Vercel configuration and TypeScript build pass.
 - After adding the real PostgreSQL parallel scenario and strengthening Waiting/Set coverage: backend lint/typecheck and the focused release suite pass (11 tests). Its additional real PostgreSQL race test runs when `TEST_DATABASE_URL` is supplied by CI and skips in the local embedded engine.
 - The existing Chromium dashboard suite now clicks the real compact-row release action against synthetic APIs. GitHub's existing browser job runs this suite before promotion.
+- Its first Chromium run caught an icon-only compact action losing its title during busy-state synchronization. The shared synchronizer now uses the same text/title fallback as initial decoration; a focused runtime regression covers normal, busy and restored labels.
 
 Critical scenarios: signed-in and guest carts; decrementing a shared-variant quantity by one; unrelated cart preservation; final-item cleanup; duplicate retry; retry after re-reservation; changed version/cart; missing piece; stale quote after release; checkout before release; selected Waiting expiration without reassignment; incomplete Set and Dart Card hold cleanup; audit failure rollback; permission/MFA/CSRF/input rejection; UI confirmation cancellation, double-click, offline/conflict and committed-release/refresh-failure states.
 

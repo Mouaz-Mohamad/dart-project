@@ -76,5 +76,16 @@ async function reconcile() {
   assert.equal(events.at(-1).detail.code, "CART_REFRESH_FAILED");
   cart = []; update({ detail: { admin: false } }); assert.equal(reads, 2, "empty carts do not issue extra live requests");
 }
-(async () => { await inventory(); await reconcile(); console.log("PASS admin cart release visibility, permission, confirmation, pending/error/retry states and live customer cart reconciliation"); })()
+function actionLabel() {
+  const ui = fs.readFileSync("src/dashboard/dashboard-ui.js", "utf8");
+  const fn = ui.slice(ui.indexOf("  function syncBusy("), ui.indexOf("  function refresh()"));
+  const c = {}; vm.createContext(c); vm.runInContext(fn, c);
+  let busy = "false";
+  const state = { primary: { disabled: false, hidden: false, textContent: "", title: "Release from Cart", getAttribute: () => busy },
+    proxy: { setAttribute() {} } };
+  c.syncBusy(state); assert.equal(state.proxy.textContent, "Release from Cart", "icon actions retain their visible title after row decoration");
+  busy = "true"; c.syncBusy(state); assert.equal(state.proxy.textContent, "Saving…");
+  busy = "false"; c.syncBusy(state); assert.equal(state.proxy.textContent, "Release from Cart");
+}
+(async () => { await inventory(); await reconcile(); actionLabel(); console.log("PASS admin cart release visibility, permission, confirmation, pending/error/retry states, compact action labels and live customer cart reconciliation"); })()
   .catch(error => { console.error(error); process.exitCode = 1; });

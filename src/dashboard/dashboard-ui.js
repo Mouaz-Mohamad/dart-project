@@ -247,7 +247,7 @@
     if (!state.proxy || !state.primary) return;
     state.proxy.disabled = state.primary.disabled;
     state.proxy.hidden = state.primary.hidden;
-    state.proxy.textContent = state.primary.getAttribute("aria-busy") === "true" ? "Saving…" : state.primary.textContent.trim();
+    state.proxy.textContent = state.primary.getAttribute("aria-busy") === "true" ? "Saving…" : state.primary.textContent.trim() || state.primary.title || "Next action";
     state.proxy.setAttribute("aria-busy",state.primary.getAttribute("aria-busy") || "false");
   }
   function refresh() {
