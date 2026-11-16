@@ -553,6 +553,10 @@ const server = http.createServer((request, response) => {
   if (await incomeDetails.count()) await incomeDetails.click();
   const receiptAction = dashboard.locator('#dart-finance-content [data-income-receive]:visible').first();
   await receiptAction.waitFor({ state: 'visible' });
+  // Close compact row details before entering the Orders editor; an open modal
+  // intentionally traps outside clicks, so leaving it open would break this smoke.
+  const openReceiptDialog = dashboard.locator('#dart-finance-content dialog.dart-record-dialog[open]');
+  if (await openReceiptDialog.count()) await openReceiptDialog.locator('.dart-record-close').click();
   assert.equal(incomeRequests.length, 1, 'one submission creates one pending entry');
   assert.equal(savedIncome.length, 1);
   assert.deepEqual(incomeRequests[0], {
