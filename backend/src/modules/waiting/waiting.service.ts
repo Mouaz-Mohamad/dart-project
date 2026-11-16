@@ -2013,6 +2013,28 @@ export class WaitingService {
     limit: number,
     offset: number,
   ): Promise<Array<Record<string, unknown>>> {
+    // During a rolling release the API may deploy before the 0096 migration.
+    // Never let the new suggestions table break existing Waiting reads.
+    const support = await client.query<{ installed: boolean }>(
+      "SELECT to_regclass('public.waitlist_alternative_suggestions') IS NOT NULL AS installed",
+    );
+    const suggestionSql = support.rows[0]?.installed
+      ? `COALESCE((
+                SELECT jsonb_agg(s.offered_color ORDER BY s.suggested_at DESC)
+                  FROM waitlist_alternative_suggestions s
+                 WHERE s.waitlist_entry_id=w.id
+                   AND EXISTS (
+                     SELECT 1 FROM inventory_items candidate
+                      WHERE candidate.model_id=w.model_id
+                        AND candidate.size=w.size
+                        AND candidate.color=s.offered_color
+                        AND candidate.active
+                        AND NOT candidate.is_archived
+                        AND NOT candidate.is_deleted
+                        AND lower(candidate.status)='in stock'
+                   )
+              ),'[]'::jsonb)`
+      : "'[]'::jsonb";
     const result = await client.query<{
       id: string;
       customer_user_id: string;
@@ -2087,21 +2109,7 @@ export class WaitingService {
               a.offered_color,
               a.status AS allocation_status,
               a.expires_at AS allocation_expires_at,
-              COALESCE((
-                SELECT jsonb_agg(s.offered_color ORDER BY s.suggested_at DESC)
-                  FROM waitlist_alternative_suggestions s
-                 WHERE s.waitlist_entry_id=w.id
-                   AND EXISTS (
-                     SELECT 1 FROM inventory_items candidate
-                      WHERE candidate.model_id=w.model_id
-                        AND candidate.size=w.size
-                        AND candidate.color=s.offered_color
-                        AND candidate.active
-                        AND NOT candidate.is_archived
-                        AND NOT candidate.is_deleted
-                        AND lower(candidate.status)='in stock'
-                   )
-              ),'[]'::jsonb) AS suggested_colors
+              ${suggestionSql} AS suggested_colors
          FROM waitlist_entries w
          JOIN customers c
            ON c.user_id=w.customer_user_id
