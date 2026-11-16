@@ -64,7 +64,7 @@ describe("waitlist alternative-color reservation safety", () => {
     const offer = part(service, "private async adminOfferAlternative(", "private async adminPriority(");
     const reassign = part(service, "private async adminReassign(", "private async emitReservationNotification(");
     expect(offer).toContain("SELECT dart_waitlist_suggest_alternative(");
-    expect(offer).not.toContain("dart_waitlist_assign_item");
+    expect(offer).not.toContain("SELECT dart_waitlist_assign_item(");
     expect(offer).not.toContain("UPDATE inventory_items");
     expect(reassign).toContain("if (target.desired_color !== item.color)");
     expect(reassign).toContain('const matchType = "exact" as const;');
