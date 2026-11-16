@@ -29,8 +29,7 @@
         "src/dashboard/core/order-editor-search.js",
         "src/dashboard/core/analytics-series.js",
         "src/dashboard/core/return-editor.js",
-        "src/dashboard/core/inventory-filters.js",
-        "src/dashboard/core/dynamic-filters.js"
+        "src/dashboard/core/inventory-filters.js"
       ]
     },
     {

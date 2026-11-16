@@ -72,6 +72,8 @@ for (const [source, delivery] of [
     failures.push(`${source}: pages must load its verified minified derivative`);
   }
 }
+// Dashboard-only live filter runtime has its own explicit 16 KiB cap.
+const dashboardFilterModules = new Set(["Eye/dart-dynamic-filters.js"]);
 const pageScopedFeatureFiles = new Set([
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
@@ -164,6 +166,7 @@ const coverageFeatureFiles = new Set([
 ]);
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
+let dashboardFilterBytes = 0;
 let coreJsBytes = 0;
 let lazyJsBytes = 0;
 let standaloneJsBytes = 0;
@@ -180,6 +183,7 @@ for (const file of jsFiles) {
   const size = fs.statSync(file).size;
   totalJsBytes += size;
   if (googleNavigationFiles.has(file)) googleNavigationBytes += size;
+  else if (dashboardFilterModules.has(file)) dashboardFilterBytes += size;
   else if (file === "Js/dart-merchandising.js") merchandisingBytes += size;
   else if (file === "Eye/dart-customer-details.js") customerDetailsBytes += size;
   else if (file === "Eye/dart-brand-details.js") brandDetailsBytes += size;
@@ -228,6 +232,9 @@ for (const file of rootHtml) if (/<script[^>]+src=["'][^"']*dart-merchandising\.
 }
 if (customerDetailsBytes > 16 * 1024) failures.push("Lazy customer history exceeds its 16 KiB module budget");
 if (brandDetailsBytes > 11 * 1024) failures.push("Brand drilldowns exceed their 11 KiB module budget");
+if (dashboardFilterBytes > 16 * 1024) failures.push("Dashboard filter module exceeds its independent 16 KiB cap");
+if (!/src="dart-dynamic-filters\.js(?:\?[^"]*)?"/.test(dashboardHtml))
+  failures.push("Dart Eye must load its scoped dynamic-filter module");
 // This is the repository aggregate, not the bytes loaded on one page. The
 // Dashboard details, editor, feedback and display choices add scoped source; public delivery budgets stay unchanged.
 // Permission presentation and scoped feedback saves add under 5 KiB to the core aggregate after minifying Staff delivery.

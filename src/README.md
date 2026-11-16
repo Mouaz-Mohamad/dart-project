@@ -54,3 +54,8 @@ same commit as their source changes.
 keeps customer notifications in memory and uses authenticated API ownership.
 `push-sw.js` is a push-only worker registered under `/push/`; it does not control
 storefront requests or restore the retired offline/static caches.
+
+The live dashboard filter adapter is a **dashboard-only** readable file at
+`Eye/dart-dynamic-filters.js`. It runs after `Eye/dart.js` and is not part of the
+shared 260 KiB core bundle. Its separate size limit is checked by
+`tests/performance-budget.cjs`.

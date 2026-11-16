@@ -86,7 +86,7 @@ const context = vm.createContext({
   setupSearchFilter: () => {},
   dartPopulateItemSizeFilter: () => {},
 });
-vm.runInContext(fs.readFileSync("src/dashboard/core/dynamic-filters.js", "utf8"), context);
+vm.runInContext(fs.readFileSync("Eye/dart-dynamic-filters.js", "utf8"), context);
 const values = (section, key) => sections[section].fields[key].options.map((option) => option.value);
 const refresh = context.window.DartDashboardDynamicFilters.refresh;
 filters.items = { archive: "active" };
