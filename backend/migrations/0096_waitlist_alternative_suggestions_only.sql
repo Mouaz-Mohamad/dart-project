@@ -140,7 +140,7 @@ CREATE OR REPLACE FUNCTION dart_waitlist_assign_item(
 RETURNS UUID
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
-AS $
+AS $$
 DECLARE
   v_item inventory_items%ROWTYPE;
   v_entry waitlist_entries%ROWTYPE;
