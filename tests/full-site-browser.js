@@ -545,7 +545,9 @@ const server = http.createServer((request, response) => {
   await dashboard.locator('#dart-finance-form-submit').click();
   assert.equal((await incomeResponse).status(), 201, 'translated income labels must not cause request validation failure');
   await dashboard.waitForFunction(() => !document.getElementById('dart-finance-modal').classList.contains('active'));
-  await dashboard.waitForSelector('[data-income-receive]');
+  assert.equal(await dashboard.locator('#finance').evaluate(node => node.classList.contains('active-section')), true, 'income save must return to the visible Finance section');
+  assert.equal(await dashboard.locator('[data-finance-tab="incomes"]').evaluate(node => node.classList.contains('active')), true, 'income save must retain the Income tab');
+  await dashboard.waitForSelector('[data-income-receive]', { state: 'visible' });
   assert.equal(incomeRequests.length, 1, 'one submission creates one pending entry');
   assert.equal(savedIncome.length, 1);
   assert.deepEqual(incomeRequests[0], {
