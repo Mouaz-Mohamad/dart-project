@@ -14,6 +14,13 @@ CREATE TABLE IF NOT EXISTS waitlist_alternative_suggestions (
   CONSTRAINT waitlist_alternative_suggestion_once UNIQUE(waitlist_entry_id,offered_color)
 );
 
+
+-- Sensitive waitlist demand is only available to the authenticated server role.
+ALTER TABLE waitlist_alternative_suggestions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY dart_waitlist_alternative_runtime ON waitlist_alternative_suggestions TO PUBLIC
+  USING (current_user='dart_app_runtime') WITH CHECK (current_user='dart_app_runtime');
+REVOKE ALL ON waitlist_alternative_suggestions FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION dart_waitlist_suggest_alternative(
   p_entry_id UUID,
   p_color TEXT,
@@ -118,13 +125,27 @@ BEGIN
     RAISE EXCEPTION 'WAITLIST_ALTERNATIVE_SUGGESTION_ONLY'
       USING ERRCODE='23514';
   END IF;
+  -- An exact allocation must match the physical model, color, size and offered color.
+  IF NOT EXISTS (
+    SELECT 1
+      FROM waitlist_entries w
+      JOIN inventory_items i ON i.id=NEW.inventory_item_id
+     WHERE w.id=NEW.waitlist_entry_id
+       AND w.model_id=i.model_id
+       AND w.size=i.size
+       AND w.desired_color=i.color
+       AND NEW.offered_color=i.color
+  ) THEN
+    RAISE EXCEPTION 'WAITLIST_VARIANT_MISMATCH'
+      USING ERRCODE='23514';
+  END IF;
   RETURN NEW;
 END;
 $$;
 
 DROP TRIGGER IF EXISTS waitlist_exact_allocation_only ON waitlist_allocations;
 CREATE TRIGGER waitlist_exact_allocation_only
-BEFORE INSERT OR UPDATE OF match_type ON waitlist_allocations
+BEFORE INSERT OR UPDATE OF match_type,waitlist_entry_id,inventory_item_id,offered_color ON waitlist_allocations
 FOR EACH ROW EXECUTE FUNCTION dart_block_waitlist_alternative_allocation();
 
 -- Restrict the shared reservation function as well, before any cart write.
@@ -473,3 +494,15 @@ BEGIN
   RETURN NULL;
 END;
 $$;
+
+-- Keep permissions aligned with the existing restricted server role.
+REVOKE ALL ON FUNCTION dart_waitlist_suggest_alternative(uuid,text,text,uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION dart_block_waitlist_alternative_allocation() FROM PUBLIC;
+DO $dart_grants$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='dart_app_runtime') THEN
+    GRANT SELECT,INSERT ON waitlist_alternative_suggestions TO dart_app_runtime;
+    GRANT EXECUTE ON FUNCTION dart_waitlist_suggest_alternative(uuid,text,text,uuid,text) TO dart_app_runtime;
+  END IF;
+END;
+$dart_grants$;
