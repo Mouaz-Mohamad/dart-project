@@ -1,0 +1,210 @@
+# Dart: one-time encrypted preservation for the old Neon preflight v2 branch.
+# Does NOT delete branches, write production data, or restore to Neon.
+name: Preserve Neon preflight v2
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/preserve-neon-v2.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dart-preserve-neon-v2
+  cancel-in-progress: false
+
+jobs:
+  preserve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      recovery:
+        image: postgres:18.7
+        env:
+          POSTGRES_USER: dart_recovery
+          POSTGRES_PASSWORD: isolated-ci-recovery-only
+          POSTGRES_DB: dart_restore_drill
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dart_recovery -d dart_restore_drill"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install PostgreSQL application client
+        working-directory: backend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Prepare PostgreSQL 18 dump/restore clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:18.7
+          mkdir -p "$RUNNER_TEMP/dart-pg-bin"
+          for tool in pg_dump pg_restore; do
+            cat > "$RUNNER_TEMP/dart-pg-bin/$tool" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          docker run --rm --network host -i --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$PWD" \
+            -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGCONNECT_TIMEOUT \
+            postgres:18.7 "$(basename "$0")" "$@"
+          SH
+            chmod 700 "$RUNNER_TEMP/dart-pg-bin/$tool"
+          done
+          echo "$RUNNER_TEMP/dart-pg-bin" >> "$GITHUB_PATH"
+      - name: Make encrypted dump and restore-test every public table
+        shell: bash
+        env:
+          DART_BACKUP_DATABASE_URL: ${{ secrets.DART_BACKUP_DATABASE_URL }}
+          DART_BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.DART_BACKUP_ENCRYPTION_PASSWORD }}
+          DART_RECOVERY_DATABASE_URL: postgresql://dart_recovery:isolated-ci-recovery-only@127.0.0.1:55432/dart_restore_drill
+          DART_BACKUP_TMP_ROOT: ${{ github.workspace }}/.backup-tmp
+          PGCONNECT_TIMEOUT: "15"
+        run: |
+          set -euo pipefail
+          umask 077
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+          import pg from './backend/node_modules/pg/lib/index.js';
+          import { assertRecoveryDatabaseSafety } from './backend/scripts/database-backup.mjs';
+
+          const branchId = 'br-autumn-snow-b1egvk13';
+          const main = new URL(process.env.DART_BACKUP_DATABASE_URL || 'https://missing.local');
+          assert.equal(main.protocol, 'postgresql:');
+          assert.equal(main.hostname, 'ep-fragrant-water-b1wql860.c-5.eu-central-1.aws.neon.tech');
+          assert.equal(main.pathname, '/neondb');
+          assert.equal(main.username, 'neondb_owner');
+          assert.ok(main.password && (process.env.DART_BACKUP_ENCRYPTION_PASSWORD || '').length >= 32);
+
+          // Use only the inherited credential, never the production hostname.
+          const source = new URL(main);
+          source.hostname = 'ep-morning-morning-b1hbrkdm.c-5.eu-central-1.aws.neon.tech';
+          source.port = '';
+          source.search = '?sslmode=require';
+          assert.notEqual(source.hostname, main.hostname);
+
+          const recovery = new URL(process.env.DART_RECOVERY_DATABASE_URL);
+          assert.equal(recovery.hostname, '127.0.0.1');
+          assert.equal(recovery.pathname, '/dart_restore_drill');
+          assertRecoveryDatabaseSafety(source.href, recovery.href);
+          const env = { ...process.env, DATABASE_URL: source.href };
+          const sha256 = value => createHash('sha256').update(value).digest('hex');
+
+          async function inspect(url) {
+            const client = new pg.Client({ connectionString: url });
+            await client.connect();
+            try {
+              await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+              const names = (await client.query("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' ORDER BY tablename")).rows.map(r => r.tablename);
+              const tables = [];
+              for (const name of names) {
+                const quoted = name.replaceAll('"', '""');
+                const sql = 'SELECT count(*)::text AS count, md5(coalesce(string_agg(md5(to_jsonb(t)::text),\' \' ORDER BY md5(to_jsonb(t)::text)),\'\')) AS fingerprint FROM public."' + quoted + '" t';
+                const row = (await client.query(sql)).rows[0];
+                tables.push({ name, count: Number(row.count), fingerprint: row.fingerprint });
+              }
+              const migrations = (await client.query('SELECT count(*)::int AS count,max(name) AS last FROM public.dart_schema_migrations')).rows[0];
+              await client.query('COMMIT');
+              return { migrations, tables };
+            } catch (error) {
+              await client.query('ROLLBACK').catch(() => undefined);
+              throw error;
+            } finally { await client.end(); }
+          }
+
+          function encrypted(command) {
+            const result = spawnSync(process.execPath, ['backend/scripts/encrypted-database-backup.mjs', command, 'backups/neon-preflight-v2.dump.enc'], {
+              env, stdio: 'inherit', timeout: 12 * 60 * 1000,
+            });
+            if (result.error || result.status !== 0) throw new Error('Verification failed');
+          }
+
+          let phase = 'source';
+          try {
+            const before = await inspect(source.href);
+            assert.equal(before.migrations.count, 46);
+            assert.equal(before.migrations.last, '0046_traffic_analytics.sql');
+            assert.equal(before.tables.length, 55);
+            assert.equal(before.tables.reduce((n, t) => n + t.count, 0), 1798);
+            const table = name => before.tables.find(t => t.name === name);
+            assert.equal(table('orders')?.count, 13);
+            assert.equal(table('orders')?.fingerprint, 'edc4d07480e00b75892ace5b64043789');
+            assert.equal(table('permissions')?.fingerprint, '52b9d825a8b3341e7fe2224496cc1b2c');
+
+            phase = 'prepare-isolated-recovery';
+            const local = new pg.Client({ connectionString: recovery.href });
+            await local.connect();
+            try {
+              await local.query("DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='dart_app_runtime') THEN CREATE ROLE dart_app_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS; END IF; END $$");
+            } finally { await local.end(); }
+
+            mkdirSync('backups', { recursive: true, mode: 0o700 });
+            phase = 'encrypted-dump';
+            encrypted('create');
+            phase = 'isolated-restore';
+            encrypted('restore-verify');
+            phase = 'verify-restored-public-data';
+            assert.deepEqual(await inspect(recovery.href), before);
+            phase = 'verify-source-not-changed';
+            assert.deepEqual(await inspect(source.href), before);
+
+            phase = 'manifest';
+            const encryptedBytes = readFileSync('backups/neon-preflight-v2.dump.enc');
+            const manifest = {
+              format: 'dart-neon-archive-v1',
+              source_project: 'spring-recipe-45034941',
+              source_branch: 'preflight-migrations-0047-0053-v2',
+              source_branch_id: branchId,
+              source_database: 'neondb',
+              captured_at: new Date().toISOString(),
+              encryption: 'AES-256-GCM (scrypt key; requires DART_BACKUP_ENCRYPTION_PASSWORD)',
+              archive_sha256: sha256(encryptedBytes),
+              public_data_sha256: sha256(JSON.stringify(before)),
+              restored_to_isolated_postgres: true,
+              source_matches_recovery: true,
+              migration_count: before.migrations.count,
+              public_table_count: before.tables.length,
+              public_row_count: before.tables.reduce((n, t) => n + t.count, 0),
+              tables: before.tables,
+            };
+            writeFileSync('backups/neon-preflight-v2.manifest.json', JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+            console.log('VERIFIED_LEGACY_V2_ARCHIVE', JSON.stringify({
+              branch_id: branchId,
+              public_tables: manifest.public_table_count,
+              public_rows: manifest.public_row_count,
+              migrations: manifest.migration_count,
+              archive_sha256: manifest.archive_sha256,
+              data_sha256: manifest.public_data_sha256,
+            }));
+          } catch {
+            console.error('LEGACY_V2_ARCHIVE_FAILED_AT_STAGE=' + phase);
+            process.exitCode = 1;
+          }
+          NODE
+      - name: Upload only verified encrypted backup plus checksum manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dart-neon-preflight-v2-verified-${{ github.run_id }}
+          path: |
+            backups/neon-preflight-v2.dump.enc
+            backups/neon-preflight-v2.manifest.json
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0
+      - name: Erase local copies from runner
+        if: always()
+        run: rm -rf -- backups .backup-tmp
