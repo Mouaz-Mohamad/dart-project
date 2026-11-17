@@ -902,6 +902,7 @@
       ]);
       if (deliveryMaps.get(entry.orderId) !== entry || requestId !== entry.roadRouteRequestId) return;
       entry.steps = route.steps; entry.stepIndex = 0; entry.failed = false;
+      document.getElementById("repNavigationRetry").hidden = true;
       entry.lastRouteOrigin = { lat: Number(location.lat), lng: Number(location.lng) };
       document.dispatchEvent(new CustomEvent("dart:rep-road-route", { detail: { orderId: entry.orderId, geometry: route.geometry } }));
       document.getElementById("repNavigationStatus").textContent = "";
@@ -913,6 +914,7 @@
     } catch {
       if (deliveryMaps.get(entry.orderId) !== entry || requestId !== entry.roadRouteRequestId) return;
       entry.failed = true; entry.steps = [];
+      document.getElementById("repNavigationRetry").hidden = false;
       // The previous polyline must not be displayed as a fresh route.
       window.DartGoogleMaps?.clearRepresentativeRoute?.();
       document.getElementById("repNavigationSummary").textContent = "";
@@ -1678,7 +1680,15 @@
         : state === "waiting" ? "بانتظار اتجاه الهاتف؛ يُستخدم اتجاه الحركة حتى وصول قراءة البوصلة." : "";
     });
     document.getElementById("repNavigationRetry").addEventListener("click", () => {
-      document.getElementById("repNavigationMap").dataset.mapState = "error";
+      const mapNode = document.getElementById("repNavigationMap");
+      const entry = deliveryMaps.get(navigationOrderId);
+      const fix = latestNavigationPosition(activeNavigationOrder());
+      if (entry && entry.failed && mapNode.dataset.mapState !== "error" && fix) {
+        document.getElementById("repNavigationRetry").hidden = true;
+        void refreshDeliveryRoadRoute(entry, fix, true);
+        return;
+      }
+      mapNode.dataset.mapState = "error";
       void openNavigation(activeNavigationOrder());
     });
     document.getElementById("repNavigationTravelMode").addEventListener("change", event => {
