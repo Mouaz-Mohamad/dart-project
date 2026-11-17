@@ -752,9 +752,24 @@
     if (!navigationOrderId || entry.orderId !== navigationOrderId || !entry.steps?.length) return;
     let index = entry.stepIndex || 0;
     const current = entry.steps[index], next = entry.steps[index + 1];
-    const nearEnd = current.end && distanceKm(location.lat, location.lng, current.end.lat, current.end.lng) <= 0.025;
-    if (next && nearEnd && distanceToRoadPath(location, [next.start, ...(next.path || []), next.end].filter(Boolean)) <= 0.04) index++;
-    // Google steps are ordered. A nearby later/crossing road must not skip unvisited turns.
+    const currentPath = [current.start, ...(current.path || []), current.end].filter(Boolean);
+    const nextPath = next ? [next.start, ...(next.path || []), next.end].filter(Boolean) : [];
+    const turnDistance = current.end
+      ? distanceKm(location.lat, location.lng, current.end.lat, current.end.lng) : Infinity;
+    const nearEnd = turnDistance <= 0.025;
+    const onNextRoad = next && distanceToRoadPath(location, nextPath) <= 0.03;
+    // A GPS fix can skip the intersection. Require two distinct readings well
+    // past the turn before advancing, to avoid false turns at crossing roads.
+    const pastTurn = onNextRoad && turnDistance >= 0.05 &&
+      distanceToRoadPath(location, currentPath) >= 0.045;
+    entry.nextStepEvidence = pastTurn ? (entry.nextStepEvidence || 0) + 1 : 0;
+    if (next && (nearEnd && distanceToRoadPath(location, nextPath) <= 0.04 ||
+        entry.nextStepEvidence >= 2)) {
+      index++;
+      entry.nextStepEvidence = 0;
+    }
+    // Google steps stay ordered. Never skip a later junction just because
+    // a crossing or nearby road passes through the current GPS position.
     entry.stepIndex = index;
     const step = entry.steps[index];
     const distance = distanceToRoadPath(location, [step.start, ...(step.path || []), step.end].filter(Boolean));
