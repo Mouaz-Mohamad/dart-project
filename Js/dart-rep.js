@@ -809,6 +809,11 @@
       orderActionsPending.has(navigationOrderId) || returnActionsPending.has(navigationOrderId);
     const entry = deliveryMaps.get(navigationOrderId);
     const navigationPosition = latestNavigationPosition(order);
+    if (!navigationPosition) {
+      showInstruction("بانتظار إشارة GPS حديثة. لا تعتمد على التعليمات السابقة.");
+      const navStatus = document.getElementById("repNavigationStatus");
+      if (!navStatus.dataset.locationError) navStatus.textContent = "إشارة GPS غير متاحة أو قديمة.";
+    }
     if (entry && navigationPosition) {
       const updatedAt = Date.parse(navigationPosition.sampledAt || navigationPosition.updatedAt || "");
       if (Date.now() - updatedAt <= LOCATION_MAX_AGE_MS) {
@@ -907,7 +912,10 @@
     } catch {
       if (deliveryMaps.get(entry.orderId) !== entry || requestId !== entry.roadRouteRequestId) return;
       entry.failed = true; entry.steps = [];
-      showInstruction("تعذر حساب الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.");
+      // The previous polyline must not be displayed as a fresh route.
+      window.DartGoogleMaps?.clearRepresentativeRoute?.();
+      document.getElementById("repNavigationSummary").textContent = "";
+      showInstruction("تعذر تحديث المسار. لا تعتمد على الاتجاهات القديمة؛ افتح الملاحة مجددًا.");
       document.getElementById("repNavigationStatus").textContent = "تعذر تحميل الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.";
     } finally { clearTimeout(timeout); if (requestId === entry.roadRouteRequestId) entry.pending = false; }
   }
@@ -1555,7 +1563,7 @@
   function ensureLocationWatch() {
     const hasAssignedDeliveryWork = API_ENABLED && currentRep() &&
       (apiWork.orders || []).some(order =>
-        ["Out With Representative", "Representative On The Way"].includes(String(order.status || "")));
+        String(order.status || "") === "Representative On The Way");
     if (!currentRep() || (!hasAssignedDeliveryWork && !activeOrderIds.size && !activeReturnIds.size)) {
       if (locationWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(locationWatch);
       locationWatch = null;
@@ -1702,7 +1710,10 @@
       if (!navigationOrderId) return;
       document.getElementById("repNavigationRetry").hidden = false;
       const entry = deliveryMaps.get(navigationOrderId);
-      if (entry) entry.failed = true;
+      if (entry) { entry.failed = true; entry.steps = []; }
+      window.DartGoogleMaps?.clearRepresentativeRoute?.();
+      document.getElementById("repNavigationSummary").textContent = "";
+      showInstruction("تعذر الاتصال بخرائط Google. التوجيه متوقف مؤقتًا.");
       document.getElementById("repNavigationMap").dataset.mapState = "error";
       document.getElementById("repNavigationStatus").textContent = "تعذر تحميل الاتجاهات. أغلق النافذة وافتحها مجددًا للمحاولة.";
     });
@@ -1831,7 +1842,7 @@
                 "لازم يتم تأكيد خروج الأوردر للتوصيل من لوحة الإدارة أولًا.",
               );
             locationPermissionBlocked = false;
-            activeOrderIds.add(order.id);
+            // Only mark this trip locally after the server authorizes the transition.
             const startedOrder = await updateOrderStatus(order.id, "Representative On The Way");
             ensureLocationWatch();
             renderOrders();
