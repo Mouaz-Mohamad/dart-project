@@ -83,10 +83,12 @@ function fixture() {
     {instruction:'After turn',start:{lat:30.001,lng:31},end:{lat:30.001,lng:31.002}}
   ];entry.stepIndex=0;entry.nextStepEvidence=0;
   const afterMissedTurn={lat:30.001,lng:31.001};
-  f.api.updateRouteProgress(entry,afterMissedTurn);
+  f.api.updateRouteProgress(entry,{...afterMissedTurn,updatedAt:new Date(1800000000000).toISOString()});
   assert.equal(entry.stepIndex,0,'one GPS jump must not skip an unvisited turn');
-  f.api.updateRouteProgress(entry,afterMissedTurn);
-  assert.equal(entry.stepIndex,1,'two stable readings on the next road recover a missed turn');
+  f.api.updateRouteProgress(entry,{...afterMissedTurn,updatedAt:new Date(1800000000000).toISOString()});
+  assert.equal(entry.stepIndex,0,'re-rendering the same GPS fix cannot count twice');
+  f.api.updateRouteProgress(entry,{...afterMissedTurn,updatedAt:new Date(1800000001000).toISOString()});
+  assert.equal(entry.stepIndex,1,'two distinct stable GPS readings recover a missed turn');
   f.advance(1000);const fresh={...f.preview(),lat:30.041};f.window.DART_REP_LAST_LOCATION=fresh;
   assert.equal(f.api.latestNavigationPosition(f.order).lat,30.041,'route origin uses local GPS ahead of the database acknowledgement');
   f.advance(121000);assert.equal(f.api.latestNavigationPosition(f.order),null,'stale fixes cannot start navigation');
