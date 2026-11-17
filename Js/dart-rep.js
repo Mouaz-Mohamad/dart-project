@@ -1,8 +1,4 @@
 // DART CODE GUIDE | Js/dart-rep.js
-// الغرض: وحدة JavaScript للموقع العام؛ مسؤولة عن جزء محدد من تجربة العميل والتواصل مع الـAPI.
-// DART | MODULE: dart-rep.js
-// Representative portal auth, assignments, delivery, return pickup, and live-location UI.
-// BEGIN MODULE
 
 (function () {
   "use strict";
@@ -73,7 +69,6 @@
             .join("-");
     return `${prefix}-${randomPart}`;
   };
-  // Translate digits for display only; API values and identities are not changed.
   const englishDigits = (value) => String(value ?? "").replace(/[٠-٩۰-۹]/g, digit =>
     String("٠١٢٣٤٥٦٧٨٩".indexOf(digit) >= 0 ? "٠١٢٣٤٥٦٧٨٩".indexOf(digit) : "۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
   const repLabels = Object.freeze({
@@ -695,7 +690,6 @@
   }
 
 
-  // Google Maps is the only embedded map provider. Do not load Leaflet.
   function clearDeliveryMaps() {
     window.DartGoogleMaps?.destroyRepresentatives?.();
     deliveryMaps.clear();
@@ -759,13 +753,8 @@
       ? distanceKm(location.lat, location.lng, current.end.lat, current.end.lng) : Infinity;
     const nearEnd = turnDistance <= 0.025;
     const onNextRoad = next && distanceToRoadPath(location, nextPath) <= 0.03;
-    // A GPS fix can skip the intersection. Require two distinct readings well
-    // past the turn before advancing, to avoid false turns at crossing roads.
     const pastTurn = onNextRoad && turnDistance >= 0.05 &&
       distanceToRoadPath(location, currentPath) >= 0.045;
-    // Rendering the same GPS fix multiple times must not count as two turns.
-    // Use the GPS timestamp when present; for synthetic/manual fixes fall back
-    // to the coordinates. Only independently observed fixes count as evidence.
     const fixTime = Date.parse(location.sampledAt || location.updatedAt || "");
     const fixId = Number.isFinite(fixTime) ? String(fixTime) :
       `${Number(location.lat).toFixed(6)}:${Number(location.lng).toFixed(6)}`;
@@ -782,8 +771,6 @@
       entry.nextStepEvidence = 0;
       entry.nextStepEvidenceFix = null;
     }
-    // Google steps stay ordered. Never skip a later junction just because
-    // a crossing or nearby road passes through the current GPS position.
     entry.stepIndex = index;
     const step = entry.steps[index];
     const distance = distanceToRoadPath(location, [step.start, ...(step.path || []), step.end].filter(Boolean));
@@ -832,7 +819,6 @@
     }
     const proximity = deliveryProximity(order);
     document.getElementById("repNavigationProximity").textContent = englishDigits(proximity.reason);
-    // An unknown destination cannot satisfy the 500 m rule. Existing manual-order actions stay on the order card.
     document.getElementById("repNavigationComplete").hidden = !proximity.ok || Boolean(proximity.manual);
     document.getElementById("repNavigationComplete").disabled =
       orderActionsPending.has(navigationOrderId) || returnActionsPending.has(navigationOrderId);
@@ -944,7 +930,6 @@
       if (deliveryMaps.get(entry.orderId) !== entry || requestId !== entry.roadRouteRequestId) return;
       entry.failed = true; entry.steps = [];
       document.getElementById("repNavigationRetry").hidden = false;
-      // The previous polyline must not be displayed as a fresh route.
       window.DartGoogleMaps?.clearRepresentativeRoute?.();
       document.getElementById("repNavigationSummary").textContent = "";
       showInstruction("تعذر تحديث المسار. لا تعتمد على الاتجاهات القديمة؛ افتح الملاحة مجددًا.");
@@ -1091,7 +1076,6 @@
     const location = { lat: position.coords.latitude, lng: position.coords.longitude,
       accuracy: position.coords.accuracy, heading: position.coords.heading, speed: position.coords.speed,
       sampledAt, updatedAt: sampledAt };
-    // Immediate visual feedback only: delivery eligibility still uses server-acknowledged locations.
     window.DartGoogleMaps?.updateRepresentativeLocation?.(location);
     if (Math.abs(Date.now() - Date.parse(sampledAt)) <= LOCATION_MAX_AGE_MS && navigationDialog()?.open) {
       for (const entry of deliveryMaps.values()) {
@@ -1219,8 +1203,6 @@
       if (status === "Representative On The Way") {
         activeOrderIds.add(order.id);
         saveActiveIds();
-        // Publish one fresh position immediately after Start. watchPosition can
-        // otherwise wait for device movement before emitting another sample.
         void syncFreshRepresentativeLocation();
       }
       await refreshApiWork();
@@ -1681,7 +1663,6 @@
           locationWatch = null;
           locationPermissionBlocked = true;
         }
-        // TIMEOUT/POSITION_UNAVAILABLE do not end a watch; keep its id so retries cannot leak subscriptions.
         setLocationStatus(error.code === 1
           ? "اسمح للموقع باستخدام موقعك الدقيق من إعدادات المتصفح، ثم افتح الملاحة مجددًا."
           : "إشارة GPS غير متاحة مؤقتًا. انتقل لمكان مفتوح؛ ستتم المحاولة تلقائيًا.", "error");
@@ -1840,7 +1821,6 @@
     };
     document.getElementById("repLogout").onclick = async () => {
       const rep = currentRep();
-      // Stop and erase local work immediately, even if the network cannot revoke the server cookie yet.
       clearRepresentativeSession(); showAuth("login");
       if (API_ENABLED) {
         try {
@@ -1882,7 +1862,6 @@
                 "لازم يتم تأكيد خروج الأوردر للتوصيل من لوحة الإدارة أولًا.",
               );
             locationPermissionBlocked = false;
-            // Only mark this trip locally after the server authorizes the transition.
             const startedOrder = await updateOrderStatus(order.id, "Representative On The Way");
             ensureLocationWatch();
             renderOrders();
@@ -2000,7 +1979,6 @@
     distanceKm,
     deliveryProximity,
     googleMapsRoute,
-    // Re-render assigned work without replacing an open navigation map.
     renderOrders: () => { lastOrderRenderSignature = ""; renderOrders(); },
     startReturnPickup,
     cancelReturnPickup,
@@ -2041,7 +2019,6 @@
     } else {
       showAuth("login");
     }
-    // Run only one network refresh at a time. Idle couriers do not need 5s polling.
     const pollAssignedWork = async () => {
       try {
         if (API_ENABLED && !currentRep() && !document.hidden && sessionRecoveryPending) {
@@ -2077,6 +2054,3 @@
       renderOrders();
   });
 })();
-
-
-// END MODULE

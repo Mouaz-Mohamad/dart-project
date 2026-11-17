@@ -46,8 +46,6 @@
     if (!entry.follow || !entry.tilesReady || !mapIsVisible(entry) || entry.state === "error") return;
     entry.cameraAt = performance.now(); entry.cameraLocation = location; entry.cameraHeading = heading;
     entry.cameraUpdates = (entry.cameraUpdates || 0) + 1;
-    // Google's own pan animation moves the streets under the fixed navigation arrow.
-    // Never rotate/stretch the map DOM, its controls, imagery or attribution with CSS.
     if (entry.map.getRenderingType?.() === "VECTOR") entry.map.setHeading?.(heading);
     if (entry.map.panTo) entry.map.panTo(location);
     else entry.map.setCenter(location);
@@ -67,7 +65,6 @@
     if (entry.container.dataset.mapState === "error" || !mapIsVisible(entry)) return;
     heading = window.DartRepCompass?.heading ?? heading;
     entry.drawnLocation = location; entry.drawnHeading = heading;
-    // Keep the initial viewport still until streets load. GPS/marker animation must not churn tiles.
     if (entry.follow && entry.tilesReady) {
       const time = performance.now();
       const changed = entry.cameraAt == null || !entry.cameraLocation || metresBetween(entry.cameraLocation, location) >= (final ? 0.01 : 1) ||
@@ -92,14 +89,10 @@
   function animateCourier(entry, location, heading) {
     window.cancelAnimationFrame(entry.frame);
     if (!mapIsVisible(entry)) { entry.frame = null; return; }
-    // Animate between real GPS fixes in follow mode too. Without this, the
-    // centered arrow looks stationary while the streets jump at every fix.
-    // Camera updates remain rate-limited by drawCourier/applyCamera.
     const from = entry.drawnLocation, fromHeading = entry.drawnHeading ?? heading;
     const started = performance.now();
     const duration = Math.max(300, Math.min(1000, started - (entry.lastAnimationAt ?? started - 800)));
     entry.lastAnimationAt = started;
-    // Interpolate between real fixes only. Never extrapolate a courier past the latest GPS fix.
     if (!from || metresBetween(from, location) > 250 || document.hidden ||
         window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       drawCourier(entry, location, heading, true); entry.frame = null; return;
@@ -156,7 +149,6 @@
         if (done) return;
         done = true;
         window.clearTimeout(timer);
-        // Keep a harmless callback after timeout so a late Google response cannot throw.
         window[callback] = () => {};
         if (!ok) request = null;
         else libraryLoadMs = Date.now() - libraryStartedAt;
@@ -264,7 +256,6 @@
     };
     try {
       map = new google.maps.Map(canvas, { center, zoom: 17, renderingType: renderer,
-        // Flat Google navigation. VECTOR is needed for native heading-up rotation, not for a 3D view.
         tilt: 0, heading: 0, mapTypeId: "roadmap",
         tiltInteractionEnabled: false, headingInteractionEnabled: true, isFractionalZoomEnabled: true,
         disableDefaultUI: false, gestureHandling: "greedy", keyboardShortcuts: true,
@@ -280,8 +271,6 @@
       followArrow.setAttribute("aria-hidden", "true");
       entry.followArrow = followArrow;
       entry.container.appendChild(followArrow);
-      // Panning or rotating pauses automatic follow until the courier taps recenter.
-      // Do not override a manually selected direction after an arbitrary timeout.
       map.addListener("dragstart", () => { setFollow(entry, false); });
       const recenterButton = document.createElement("button");
       recenterButton.type = "button";
@@ -293,7 +282,6 @@
       recenterButton.addEventListener("click", () => {
         if (mounted.get(entry.id) === entry) setFollow(entry, true);
       });
-      // Some test/fallback map adapters lack Google control buckets.
       const controlPosition = google.maps.ControlPosition?.RIGHT_BOTTOM;
       if (controlPosition != null && map.controls?.[controlPosition]?.push) {
         map.controls[controlPosition].push(recenterButton);
@@ -301,7 +289,6 @@
         canvas.appendChild(recenterButton);
       }
       map.addListener("heading_changed", () => {
-        // User rotation must not be immediately overwritten by the next GPS camera update.
         if (entry.tilesReady && entry.follow && entry.cameraHeading != null &&
             Math.abs(angleDifference(entry.cameraHeading, map.getHeading() || 0)) > 0.5) {
           setFollow(entry, false);
@@ -318,7 +305,6 @@
             entry.fallbackReason ||= "google-selected-raster";
             entry.container.dataset.mapFallbackReason = entry.fallbackReason;
           }
-          // Google may resolve the rendering type after tilesloaded. Restore flat heading-up follow then too.
           if (entry.tilesReady && actual === "VECTOR") setFollow(entry, entry.follow);
         }
       };
@@ -368,7 +354,6 @@
       });
       canvas.addEventListener("webglcontextlost", () => recover("webgl-context-lost"), { once: true, capture: true });
       mapState(entry, "loading", renderer === "RASTER" ? "جارٍ عرض خريطة Google العادية..." : "جارٍ تحميل خريطة الشوارع...");
-      // Observe the real viewport: a dialog/browser-bar resize can leave only the old tile rectangle painted.
       if (typeof ResizeObserver === "function") {
         let size = "";
         entry.resizeObserver = new ResizeObserver(() => {
@@ -391,12 +376,9 @@
         if (!mapIsVisible(entry)) { entry.visibleSince = null; }
         else {
           entry.visibleSince ??= Date.now();
-          // Moving within cached streets need not emit tilesloaded; it is not a tile outage.
           const since = entry.tilesReady ? null : entry.visibleSince;
           const elapsed = since == null ? 0 : Date.now() - since;
           if (elapsed >= 8000 && !entry.recoveryUsed && map.getRenderingType?.() === "VECTOR") {
-            // Replace a failed WebGL surface once with an independent Google image-tile surface.
-            // A fresh canvas releases the failed WebGL painting surface.
             entry.recoveryUsed = true; entry.fallbackReason = "vector-load-deadline";
             entry.container.dataset.mapFallbackReason = entry.fallbackReason;
             createRepresentativeMap(entry, "RASTER"); return;
@@ -449,7 +431,6 @@
       nodes.forEach(node => { node.textContent = errorMessage; node.dataset.mapState = "error"; });
       return;
     }
-    // Re-read the real modal after the SDK await; it may have closed while Google was loading.
     if (generation !== mountGeneration) return;
     for (const order of orders) {
       const id = String(order.id || "");
@@ -482,7 +463,6 @@
       entry.locationStale = false;
       let heading = gpsHeading(position);
       const origin = entry.courseOrigin;
-      // Devices often omit GPS heading. Derive a course only after moving beyond GPS jitter.
       const metres = metresBetween(origin, location);
       if (origin && metres >= Math.max(8, Number(position.accuracy) || 0)) {
         if (heading == null && (position.speed == null || position.speed >= 0.8)) heading = bearing(origin, location);

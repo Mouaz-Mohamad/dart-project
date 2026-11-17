@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:7f65e89edfc460de67b488d4d3848fdc941c74c3a5722f7156a4379aa05cb6b3 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:cae8b4cede67bec62ec1b8cb726ea404aa3d07b114db7e8899f6f15e412cf4ae */
 (function () {
   "use strict";
 
@@ -699,6 +699,9 @@
         const allocation = entry.allocation || null;
         const alternative =
           allocation?.matchType === "alternative_color";
+        const suggestions = entry.status === "waiting" && Array.isArray(entry.suggestedColors)
+          ? entry.suggestedColors
+          : [];
         const actionButtons = [];
         if (entry.status === "waiting") {
           actionButtons.push(
@@ -734,6 +737,12 @@
             ${profileField("Match", alternative ? "Alternative color" : allocation ? "Exact" : "-")}
             ${profileField("Order", entry.orderCode || "-")}
           </div>
+          ${suggestions.length ? `
+            <p class="dart-waiting-suggestion">
+              ألوان بديلة متاحة حاليًا: <strong>${suggestions.map((color) => escapeHtml(color)).join("، ")}</strong>.
+              دي اقتراحات فقط، ومفيش أي قطعة اتحجزت لك منها. الحجز بيحصل فقط لما تختار اللون وتضيفه للسلة بنفسك.
+              <a href="products.html">Browse alternatives</a>
+            </p>` : ""}
           ${actionButtons.length ? `<div class="dart-waiting-actions">${actionButtons.join("")}</div>` : ""}
         </article>`;
       })
@@ -1116,7 +1125,7 @@
         name: String(payload.name || "").trim(),
         phone1: String(payload.phone1 || "").trim(),
         email: String(payload.email || "").trim(),
-        birthday: String(payload.birthday || "").trim(),
+        ...(String(payload.birthday || "").trim() ? { birthday: String(payload.birthday).trim() } : {}),
       },
     });
   }
@@ -1575,8 +1584,8 @@
     };
     if (!details.name || !details.phone1)
       throw new Error("Complete your name and phone number.");
-    if (!logged && (!details.email || !details.birthday))
-      throw new Error("Complete your email and birthday to create your customer account with this order.");
+    if (!logged && !details.email)
+      throw new Error("Complete your email to create your customer account with this order.");
     const addressController = window.dartCheckoutAddress;
     const addressValidation = addressController?.validate?.();
     if (!addressValidation?.ok)
