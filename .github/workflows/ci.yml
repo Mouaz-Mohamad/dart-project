@@ -66,6 +66,9 @@ jobs:
       - name: Run backend unit, contract, integration and security tests
         run: npm test
 
+      - name: Verify the read-only integrity monitor
+        run: node --test scripts/check-store-integrity.test.mjs
+
       - name: Run repository security-boundary checks
         working-directory: .
         run: node tests/security-boundaries.cjs

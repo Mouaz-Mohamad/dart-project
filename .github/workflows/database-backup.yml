@@ -118,6 +118,11 @@ jobs:
           retention-days: 14
           if-no-files-found: error
           compression-level: 0
+      - name: Scan production data integrity (read-only, after safe backup upload)
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DART_BACKUP_DATABASE_URL }}
+        run: node scripts/check-store-integrity.mjs
       - name: Remove local backup material
         if: always()
         run: rm -rf -- .backup-tmp backups
