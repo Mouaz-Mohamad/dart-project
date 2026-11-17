@@ -2802,12 +2802,13 @@ export class CommerceService {
         if (!hasVerifiedPin && !manualWithoutPin) {
           throw new AppError(409, "DELIVERY_COORDINATES_MISSING", "Customer delivery coordinates are missing");
         }
-        // A manual address has no geofence. A fresh authenticated courier GPS
-        // reading is still required above; never invent a destination pin.
+        // Even manual-only destinations require an accurate, fresh GPS fix.
+        // A manual address cannot prove arrival by distance; separate evidence
+        // is still required for strong delivery assurance.
+        if (location.accuracy_meters == null || !Number.isFinite(location.accuracy_meters) || location.accuracy_meters > 100) {
+          throw new AppError(409, "LOCATION_INACCURATE", "Wait for GPS accuracy of 100 m or better before confirming delivery");
+        }
         if (hasVerifiedPin) {
-          if (location.accuracy_meters == null || !Number.isFinite(location.accuracy_meters) || location.accuracy_meters > 100) {
-            throw new AppError(409, "LOCATION_INACCURATE", "Wait for GPS accuracy of 100 m or better before confirming delivery");
-          }
           const distance = distanceKm(location.latitude, location.longitude, destinationLat, destinationLng);
           if (distance > 0.5) {
             throw new AppError(409, "DELIVERY_TOO_FAR",
