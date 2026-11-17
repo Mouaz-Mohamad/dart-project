@@ -130,7 +130,10 @@ describe("income and third party order collection", () => {
     const f=await gift(), rep=randomUUID();
     await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
       VALUES($1,'representative',$2,$2,'synthetic','active',now())`,[rep,`${rep}@example.test`]);
-    await store.pool.query("INSERT INTO representatives(user_id,full_name,national_id_hash,national_id_last4) VALUES($1,'Gift courier',repeat('a',64),'1234')",[rep]);
+    await store.pool.query(
+      "INSERT INTO representatives(user_id,full_name,national_id_hash,national_id_last4,approval_status,approved_by,approved_at) VALUES($1,'Gift courier',repeat('a',64),'1234','approved',$2,now())",
+      [rep,actor],
+    );
     await store.pool.query("INSERT INTO representative_locations(representative_user_id,latitude,longitude,accuracy_meters,updated_at) VALUES($1,30.0444,31.2357,5,now())",[rep]);
     await store.pool.query(`UPDATE orders SET status='Representative On The Way',representative_user_id=$2,
       delivery_address=delivery_address||'{"latitude":"30.0444","longitude":"31.2357"}'::jsonb WHERE id=$1`,[f.order.id,rep]);
