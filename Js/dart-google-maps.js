@@ -321,11 +321,11 @@
         if (entry.map !== map || mounted.get(entry.id) !== entry ||
             event.target?.tagName !== "IMG" || !visibleStreetImage(event.target)) return;
         entry.loadingIssue = "tile-network-error";
-        if (renderer === "VECTOR" && !entry.recoveryUsed) {
-          recover("tile-network-error");
-        } else {
-          mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. تحقق من الاتصال واضغط إعادة تحميل الخريطة.");
-        }
+        // Failed road tiles indicate a network/provider problem, not a WebGL
+        // problem. A second renderer won't repair the missing tile data.
+        // Show an explicit error now; tilesloaded may later recover this map.
+        entry.tilesReady = false;
+        mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. تحقق من الاتصال واضغط إعادة تحميل الخريطة.");
       }, true);
       map.addListener("tilesloaded", () => {
         if (entry.map !== map || mounted.get(entry.id) !== entry) return;

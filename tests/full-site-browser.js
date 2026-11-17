@@ -552,7 +552,18 @@ const server = http.createServer((request, response) => {
   const incomeDetails = dashboard.locator('#dart-finance-content .dart-record-open').first();
   if (await incomeDetails.count()) await incomeDetails.click();
   const receiptAction = dashboard.locator('#dart-finance-content [data-income-receive]:visible').first();
-  await receiptAction.waitFor({ state: 'visible' });
+  try {
+    await receiptAction.waitFor({ state: 'visible', timeout: 8000 });
+  } catch (error) {
+    const diagnostic = await dashboard.evaluate(() => ({
+      financeActive: document.getElementById('finance')?.classList.contains('active-section'),
+      incomeTabActive: document.querySelector('[data-finance-tab="incomes"]')?.classList.contains('active'),
+      incomeActionCount: document.querySelectorAll('#dart-finance-content [data-income-receive]').length,
+      detailCount: document.querySelectorAll('#dart-finance-content .dart-record-open').length,
+      contentState: (document.getElementById('dart-finance-content')?.textContent || '').slice(0, 300),
+    }));
+    throw new Error('Income receipt action missing after confirmed save: ' + JSON.stringify(diagnostic), { cause: error });
+  }
   // Close compact row details before entering the Orders editor; an open modal
   // intentionally traps outside clicks, so leaving it open would break this smoke.
   const openReceiptDialog = dashboard.locator('#dart-finance-content dialog.dart-record-dialog[open]');
