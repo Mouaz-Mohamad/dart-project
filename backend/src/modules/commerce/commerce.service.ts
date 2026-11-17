@@ -2609,6 +2609,11 @@ export class CommerceService {
     sampledAt?: string,
   ): Promise<{ updatedAt: string; accepted: boolean }> {
     const sampleTime = sampledAt ? new Date(sampledAt) : new Date();
+    // A representative's trip and customer destinations are Egypt-only.
+    // This also blocks null-island and obviously fabricated global positions.
+    if (!isInsideEgyptEnvelope(latitude, longitude)) {
+      throw new AppError(422, "REP_LOCATION_OUTSIDE_EGYPT", "Courier location must be inside Egypt");
+    }
     const age = Date.now() - sampleTime.getTime();
     if (!Number.isFinite(age) || age > 120_000 || age < -30_000) {
       throw new AppError(422, "LOCATION_SAMPLE_STALE", "Send a recent GPS reading");
@@ -2634,6 +2639,28 @@ export class CommerceService {
     );
     if (!active.rows[0]?.active) {
       throw new AppError(409, "NO_ACTIVE_TRIP", "Start an assigned delivery or pickup before sharing location");
+    }
+    // Reject clear GPS teleportation before overwriting the last accepted fix.
+    // A very generous speed limit avoids rejecting normal urban vehicle movement
+    // and only applies when both readings are accurate and recent.
+    const previous = await this.pool.query<{
+      latitude: number; longitude: number; accuracy_meters: number | null; updated_at: Date;
+    }>(
+      "SELECT latitude, longitude, accuracy_meters, updated_at FROM representative_locations WHERE representative_user_id=$1",
+      [representativeUserId],
+    );
+    const last = previous.rows[0];
+    if (last && accuracyMeters !== null && accuracyMeters <= 50 &&
+        last.accuracy_meters !== null && Number(last.accuracy_meters) <= 50) {
+      const seconds = (sampleTime.getTime() - last.updated_at.getTime()) / 1000;
+      const displacementMetres = distanceKm(
+        latitude, longitude, Number(last.latitude), Number(last.longitude),
+      ) * 1000;
+      if (seconds >= 5 && seconds <= 120 && displacementMetres > 500 &&
+          displacementMetres / seconds > 120) {
+        throw new AppError(422, "REP_LOCATION_IMPLAUSIBLE",
+          "GPS changed location too quickly; obtain a stable reading before continuing");
+      }
     }
     const result = await this.pool.query<{ updated_at: Date }>(
       `INSERT INTO representative_locations (
