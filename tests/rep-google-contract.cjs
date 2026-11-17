@@ -28,7 +28,37 @@ assert.match(courier,/setTimeout\(pollAssignedWork, assigned \? 5000 : 15000\)/)
 assert.doesNotMatch(courier,/setInterval\(async \(\) =>/);
 new Function(maps);
 new Function(courier);
-console.log("PASS courier Google Maps only, route polylines and manual orders");
+
+// Regression guards for safety-critical courier workflow and live-location privacy.
+const commerce = fs.readFileSync("backend/src/modules/commerce/commerce.service.ts", "utf8");
+const customerTracking = fs.readFileSync("backend/src/modules/commerce/commerce.customer-queries.ts", "utf8");
+const locationMethod = commerce.slice(
+  commerce.indexOf("public async updateRepresentativeLocation("),
+  commerce.indexOf("public async representativeOrderAction("),
+);
+const orderMethod = commerce.slice(
+  commerce.indexOf("public async representativeOrderAction("),
+  commerce.indexOf("public async ", commerce.indexOf("public async representativeOrderAction(") + 8),
+);
+assert.match(locationMethod, /status='Representative On The Way'/,
+  "assigned-but-not-started deliveries must not upload live GPS");
+assert.doesNotMatch(locationMethod, /status IN \('Out With Representative'/,
+  "a pending assignment alone never authorizes location publication");
+assert.match(locationMethod, /REP_LOCATION_IMPLAUSIBLE/,
+  "location updates should flag obvious GPS teleportation");
+assert.match(locationMethod, /approval_status='approved'/,
+  "revoked representatives may not publish GPS");
+assert.match(orderMethod, /OTHER_DELIVERY_ACTIVE/,
+  "starting the next delivery must require an explicit end or pause of the current one");
+assert.doesNotMatch(orderMethod, /DELIVERY_ROUTE_SWITCHED/,
+  "never silently change a different delivery's status");
+assert.match(customerTracking, /ageMs > 120_000/,
+  "expired courier locations must not be published as live positions");
+assert.match(maps, /setRepresentativeLocationStale/,
+  "the navigation arrow must reflect GPS validity");
+assert.match(courier, /setRepresentativeLocationStale/,
+  "the portal must notify the map when the latest GPS reading expires");
+console.log("PASS courier Google Maps only, route polylines, manual orders and security invariants");
 
 // Execute the renderer lifecycle with synthetic maps and time; no browser, GPS or Google calls.
 (async () => {
