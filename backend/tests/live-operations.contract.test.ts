@@ -78,7 +78,8 @@ describe("live operations contracts", () => {
   it("supports representative waiting and problem actions", () => {
     expect(routes).toContain('z.enum(["start", "cancel", "delivered", "waiting", "problem"])');
     expect(service).toContain('"start" | "cancel" | "delivered" | "waiting" | "problem"');
-    expect(service).toContain("DELIVERY_ROUTE_SWITCHED");
+    expect(service).toContain("OTHER_DELIVERY_ACTIVE");
+    expect(service).not.toContain("DELIVERY_ROUTE_SWITCHED");
   });
 
   it("keeps GPS writes within the approved three-second budget", () => {
