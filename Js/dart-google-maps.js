@@ -335,13 +335,21 @@
         if (entry.map !== map || mounted.get(entry.id) !== entry ||
             event.target?.tagName !== "IMG" || !visibleStreetImage(event.target)) return;
         entry.loadingIssue = "tile-network-error";
-        mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. تحقق من الاتصال واضغط إعادة تحميل الخريطة.");
+        if (renderer === "VECTOR" && !entry.recoveryUsed) {
+          recover("tile-network-error");
+        } else {
+          mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. تحقق من الاتصال واضغط إعادة تحميل الخريطة.");
+        }
       }, true);
       map.addListener("tilesloaded", () => {
         if (entry.map !== map || mounted.get(entry.id) !== entry) return;
         if (failedStreetImages()) {
           entry.loadingIssue = "tile-network-error";
-          mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. اضغط إعادة تحميل الخريطة.");
+          if (renderer === "VECTOR" && !entry.recoveryUsed) {
+            recover("tile-network-error");
+          } else {
+            mapState(entry, "error", "تعذر تحميل بعض الشوارع من Google. اضغط إعادة تحميل الخريطة.");
+          }
           return;
         }
         if (entry.state === "error") entry.tilesReady = false;
