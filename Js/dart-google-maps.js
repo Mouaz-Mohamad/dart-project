@@ -53,7 +53,7 @@
     else entry.map.setCenter(location);
   }
   function syncFollowArrow(entry) {
-    const visible = entry.follow && entry.tilesReady && entry.location && entry.state !== "error";
+    const visible = entry.follow && !entry.locationStale && entry.tilesReady && entry.location && entry.state !== "error";
     if (entry.followArrow) {
       entry.followArrow.hidden = !visible;
       const rotation = entry.map?.getRenderingType?.() === "VECTOR" ? 0 : entry.drawnHeading ?? entry.heading ?? 0;
@@ -128,6 +128,12 @@
   }
   function setRepresentativeFollow(enabled) {
     for (const entry of mounted.values()) setFollow(entry, enabled);
+  }
+  function setRepresentativeLocationStale(stale) {
+    for (const entry of mounted.values()) {
+      entry.locationStale = Boolean(stale);
+      syncFollowArrow(entry);
+    }
   }
   function useStandardRepresentativeMap() {
     for (const entry of mounted.values()) {
@@ -465,6 +471,7 @@
     window.DART_REP_LAST_LOCATION = { ...location, heading: position.heading, speed: position.speed,
       accuracy: position.accuracy, sampledAt: new Date(sampledAt).toISOString(), updatedAt: position.updatedAt };
     for (const entry of mounted.values()) {
+      entry.locationStale = false;
       let heading = gpsHeading(position);
       const origin = entry.courseOrigin;
       // Devices often omit GPS heading. Derive a course only after moving beyond GPS jitter.
@@ -526,7 +533,7 @@
   }
   function hasRepresentativeMap(orderId) { return mounted.has(String(orderId)); }
   window.DartGoogleMaps = Object.freeze({ clearRepresentativeRoute, loadMaps, preloadRepresentativeLibraries, pauseRepresentatives, attachRepresentatives,
-    getRepresentativeDiagnostics, hasRepresentativeMap, resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
+    getRepresentativeDiagnostics, hasRepresentativeMap, resizeRepresentatives, updateRepresentativeLocation, setRepresentativeFollow, setRepresentativeLocationStale, useStandardRepresentativeMap, destroyRepresentatives, computeRoute,
     get errorMessage() { return errorMessage; },
   });
 })();
