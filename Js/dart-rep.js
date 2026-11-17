@@ -172,13 +172,13 @@
           "يجب تحديث موقعك قبل تأكيد التسليم.",
       };
     }
-    if (!hasDestination) {
-      return { ok: true, manual: true,
-        reason: "العنوان مكتوب يدويًا بدون دبوس مؤكد. تحقق من التسليم للعميل شخصيًا." };
-    }
     const accuracy = order?.courierLocation?.accuracy;
     if (accuracy == null || !Number.isFinite(Number(accuracy)) || Number(accuracy) > LOCATION_MAX_ACCURACY_METERS) {
       return { ok: false, reason: "إشارة GPS غير دقيقة. تحرّك إلى مكان مفتوح وانتظر تحديث الموقع." };
+    }
+    if (!hasDestination) {
+      return { ok: true, manual: true,
+        reason: "العنوان مكتوب يدويًا بدون دبوس مؤكد. تحقق من التسليم للعميل شخصيًا." };
     }
     const distance = distanceKm(
       courierLat,
