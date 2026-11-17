@@ -67,7 +67,7 @@ jobs:
         run: npm test
 
       - name: Verify the read-only integrity monitor
-        run: node --test scripts/check-store-integrity.test.mjs
+        run: node --test scripts/check-store-integrity.node-check.mjs
 
       - name: Run repository security-boundary checks
         working-directory: .
