@@ -35,12 +35,26 @@ describe("courier GPS persistence and trip authorization", () => {
   });
   it("keeps a newer fix when an older request arrives later, and avoids duplicate writes", async () => {
     const latest = new Date(Date.now()-1000).toISOString();
-    expect((await service.updateRepresentativeLocation(rep, 30.06, 31.26, 8, latest)).accepted).toBe(true);
+    expect((await service.updateRepresentativeLocation(rep, 30.0404, 31.2504, 8, latest)).accepted).toBe(true);
     expect((await service.updateRepresentativeLocation(rep, 30.01, 31.21, 8, new Date(Date.now()-5000).toISOString())).accepted).toBe(false);
-    expect((await service.updateRepresentativeLocation(rep, 30.06, 31.26, 8, latest)).accepted).toBe(false);
-    expect((await service.updateRepresentativeLocation(rep, 30.07, 31.27, 8, new Date(Date.parse(latest)+2000).toISOString())).accepted).toBe(false);
+    expect((await service.updateRepresentativeLocation(rep, 30.0404, 31.2504, 8, latest)).accepted).toBe(false);
+    expect((await service.updateRepresentativeLocation(rep, 30.0405, 31.2505, 8, new Date(Date.parse(latest)+2000).toISOString())).accepted).toBe(false);
     const row = (await store.pool.query("SELECT latitude,longitude,updated_at FROM representative_locations WHERE representative_user_id=$1", [rep])).rows[0];
-    expect(row.latitude).toBe(30.06); expect(new Date(row.updated_at).toISOString()).toBe(latest);
+    expect(row.latitude).toBe(30.0404); expect(new Date(row.updated_at).toISOString()).toBe(latest);
+  });
+  it("blocks an implausible GPS jump without overwriting the last known fix", async () => {
+    const previous = (await store.pool.query(
+      "SELECT latitude,longitude,updated_at FROM representative_locations WHERE representative_user_id=$1", [rep],
+    )).rows[0];
+    await expect(service.updateRepresentativeLocation(
+      rep, 30.40, 31.65, 5, new Date(Date.now()+5_000).toISOString(),
+    )).rejects.toMatchObject({code: "REP_LOCATION_IMPLAUSIBLE"});
+    const current = (await store.pool.query(
+      "SELECT latitude,longitude,updated_at FROM representative_locations WHERE representative_user_id=$1", [rep],
+    )).rows[0];
+    expect(current.latitude).toBe(previous.latitude);
+    expect(current.longitude).toBe(previous.longitude);
+    expect(new Date(current.updated_at).toISOString()).toBe(new Date(previous.updated_at).toISOString());
   });
   it("rejects expired and future-dated GPS samples before persistence", async () => {
     for (const offset of [-121_000, 31_000]) {
