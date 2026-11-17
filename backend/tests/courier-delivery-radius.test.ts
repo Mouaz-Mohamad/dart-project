@@ -5,7 +5,8 @@ import { AppError } from "../src/http/app-error.js";
 
 // Execute the production guard with synthetic distances, without a database mutation.
 const source = readFileSync(new URL("../src/modules/commerce/commerce.service.ts", import.meta.url), "utf8");
-const start = source.indexOf("        if (hasVerifiedPin) {");
+const start = source.indexOf("        // Even manual-only destinations require an accurate, fresh GPS fix.");
+if (start === -1) throw new Error("Delivery accuracy guard missing from production service");
 const guard = source.slice(start, source.indexOf('        nextStatus = "Delivered";', start));
 function check(distance: number, hasVerifiedPin = true, accuracy: number | null = 5) {
   return runInNewContext(guard, { hasVerifiedPin, distanceKm: () => distance,
@@ -26,6 +27,7 @@ describe("courier delivery radius", () => {
     expect(() => check(0, true, 100)).not.toThrow();
   });
   it("preserves the separate no-pin manual-address flow", () => {
-    expect(() => check(50, false)).not.toThrow();
+    expect(() => check(50, false, 5)).not.toThrow();
+    expect(() => check(50, false, 400)).toThrow(/accuracy/);
   });
 });
