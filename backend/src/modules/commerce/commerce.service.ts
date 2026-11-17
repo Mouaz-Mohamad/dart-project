@@ -2591,6 +2591,13 @@ export class CommerceService {
   public async representativeWork(
     representativeUserId: string,
   ): Promise<{ orders: Record<string, unknown>[]; returns: Record<string, unknown>[] }> {
+    const approved = await this.pool.query(
+      "SELECT 1 FROM representatives WHERE user_id=$1 AND approval_status='approved'",
+      [representativeUserId],
+    );
+    if (!approved.rowCount) {
+      throw new AppError(403, "REPRESENTATIVE_UNAVAILABLE", "Representative account is not active");
+    }
     return readRepresentativeWork(this.pool, representativeUserId);
   }
 
@@ -2609,10 +2616,12 @@ export class CommerceService {
     // EXISTS keeps work authorization bounded; never download the entire returns domain for a GPS update.
     const active = await this.pool.query<{ active: boolean }>(
       `SELECT EXISTS (
-         SELECT 1 FROM orders
-          WHERE representative_user_id=$1
-            AND status='Representative On The Way'
-            AND NOT is_deleted AND NOT is_archived
+         SELECT 1 FROM orders o
+          JOIN representatives r ON r.user_id=o.representative_user_id
+            AND r.approval_status='approved'
+          WHERE o.representative_user_id=$1
+            AND o.status='Representative On The Way'
+            AND NOT o.is_deleted AND NOT o.is_archived
        ) OR EXISTS (
          SELECT 1 FROM return_requests rr
          JOIN representatives r ON r.user_id=$1 AND r.approval_status='approved'
@@ -2653,6 +2662,13 @@ export class CommerceService {
       // Serialize every route mutation by this courier, including two rapid Start clicks.
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",
         [`dart:representative-route:${representativeUserId}`]);
+      const approved = await client.query(
+        "SELECT 1 FROM representatives WHERE user_id=$1 AND approval_status='approved' FOR SHARE",
+        [representativeUserId],
+      );
+      if (!approved.rowCount) {
+        throw new AppError(403, "REPRESENTATIVE_UNAVAILABLE", "Representative account is not active");
+      }
       const orderResult = await client.query<{
         id: string;
         status: string;
