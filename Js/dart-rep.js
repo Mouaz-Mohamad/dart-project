@@ -809,6 +809,7 @@
       orderActionsPending.has(navigationOrderId) || returnActionsPending.has(navigationOrderId);
     const entry = deliveryMaps.get(navigationOrderId);
     const navigationPosition = latestNavigationPosition(order);
+    window.DartGoogleMaps?.setRepresentativeLocationStale?.(!navigationPosition);
     if (!navigationPosition) {
       showInstruction("بانتظار إشارة GPS حديثة. لا تعتمد على التعليمات السابقة.");
       const navStatus = document.getElementById("repNavigationStatus");
