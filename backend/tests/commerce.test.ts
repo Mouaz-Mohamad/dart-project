@@ -452,7 +452,8 @@ describe("cart price review", () => {
 
 describe("CommerceService customer live tracking", () => {
   it("returns only the signed-in customer's active delivery and pickup courier locations", async () => {
-    const now = new Date("2026-09-22T18:00:00.000Z");
+    // Live location is server-fresh; old fixed timestamps are correctly hidden.
+    const now = new Date();
     const query = vi.fn(async (sql: string, values: unknown[] = []) => {
       if (sql.includes("SELECT client_code FROM customers")) {
         expect(values[0]).toBe("123e4567-e89b-12d3-a456-426614174001");
