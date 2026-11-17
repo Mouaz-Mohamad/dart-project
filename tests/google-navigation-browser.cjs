@@ -360,9 +360,19 @@ const server = http.createServer((req, res) => {
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:31,lng:32,heading:180,updatedAt:new Date(Date.now()-180000).toISOString()}));
     assert.equal(await page.evaluate(()=>window.__panCalls.at(-1).lng),31.251,"stale GPS does not move the live arrow or camera");
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.251,heading:350,speed:2,updatedAt:new Date().toISOString()}));
-    await page.waitForFunction(()=>window.__map.heading===350);
+    await page.waitForFunction(target => {
+      const actual = window.__map?.heading;
+      // Google Maps may produce fractional camera angles. Verify the real
+      // heading to 0.05 degrees instead of requiring bit-for-bit equality.
+      return Number.isFinite(actual) && Math.abs(((actual - target + 540) % 360) - 180) < 0.05;
+    }, 350);
     await page.evaluate(()=>window.DartGoogleMaps.updateRepresentativeLocation({lat:30.021,lng:31.251,heading:10,speed:2,updatedAt:new Date().toISOString()}));
-    await page.waitForFunction(()=>window.__map.heading===10);
+    await page.waitForFunction(target => {
+      const actual = window.__map?.heading;
+      // Google Maps may produce fractional camera angles. Verify the real
+      // heading to 0.05 degrees instead of requiring bit-for-bit equality.
+      return Number.isFinite(actual) && Math.abs(((actual - target + 540) % 360) - 180) < 0.05;
+    }, 10);
     // Devices without a vector renderer retain a working flat map and correctly oriented marker.
     await page.evaluate(()=>window.DartGoogleMaps.useStandardRepresentativeMap());
     await page.waitForFunction(()=>document.getElementById('repNavigationMap').dataset.mapRenderer==='RASTER' && document.getElementById('repNavigationMap').dataset.mapState==='ready');
