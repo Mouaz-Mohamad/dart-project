@@ -92,7 +92,9 @@
   function animateCourier(entry, location, heading) {
     window.cancelAnimationFrame(entry.frame);
     if (!mapIsVisible(entry)) { entry.frame = null; return; }
-    if (entry.follow) { drawCourier(entry, location, heading, true); entry.frame = null; return; }
+    // Animate between real GPS fixes in follow mode too. Without this, the
+    // centered arrow looks stationary while the streets jump at every fix.
+    // Camera updates remain rate-limited by drawCourier/applyCamera.
     const from = entry.drawnLocation, fromHeading = entry.drawnHeading ?? heading;
     const started = performance.now();
     const duration = Math.max(300, Math.min(1000, started - (entry.lastAnimationAt ?? started - 800)));
