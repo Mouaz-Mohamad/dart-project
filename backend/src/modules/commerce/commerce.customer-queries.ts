@@ -287,14 +287,14 @@ export async function readCustomerLiveTracking(pool: Pool, customerUserId: strin
       longitude: number | null,
       accuracy: number | null,
       updatedAt: Date | null,
-    ) => latitude !== null && longitude !== null
-      ? {
-          lat: latitude,
-          lng: longitude,
-          accuracy,
-          updatedAt: updatedAt?.toISOString() || null,
-        }
-      : null;
+    ) => {
+      // Never expose an expired or future-dated position as live tracking.
+      const ageMs = updatedAt ? Date.now() - updatedAt.getTime() : Infinity;
+      if (latitude === null || longitude === null || !Number.isFinite(ageMs) ||
+          ageMs > 120_000 || ageMs < -30_000) return null;
+      return { lat: latitude, lng: longitude, accuracy,
+        updatedAt: updatedAt!.toISOString() };
+    };
 
     return {
       capturedAt: new Date().toISOString(),
@@ -542,7 +542,10 @@ export async function readCustomerSnapshot(pool: Pool, customerUserId: string): 
         courierLocation:
           row.status === "Representative On The Way" &&
           row.courier_latitude !== null &&
-          row.courier_longitude !== null
+          row.courier_longitude !== null &&
+          row.courier_updated_at &&
+          Date.now() - row.courier_updated_at.getTime() >= -30_000 &&
+          Date.now() - row.courier_updated_at.getTime() <= 120_000
             ? {
                 lat: row.courier_latitude,
                 lng: row.courier_longitude,
