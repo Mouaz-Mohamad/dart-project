@@ -745,7 +745,8 @@
   function latestNavigationPosition(order) {
     return [latestPreviewLocation, window.DART_REP_LAST_LOCATION, latestApiLocation, order?.courierLocation]
       .filter(row => row && Number.isFinite(Number(row.lat)) && Number.isFinite(Number(row.lng)) &&
-        Math.abs(Date.now() - Date.parse(row.sampledAt || row.updatedAt || "")) <= LOCATION_MAX_AGE_MS)
+        Date.now() - Date.parse(row.sampledAt || row.updatedAt || "") <= LOCATION_MAX_AGE_MS &&
+        Date.now() - Date.parse(row.sampledAt || row.updatedAt || "") >= -30_000)
       .sort((a, b) => Date.parse(b.sampledAt || b.updatedAt) - Date.parse(a.sampledAt || a.updatedAt))[0] || null;
   }
   function updateRouteProgress(entry, location) {
@@ -762,11 +763,24 @@
     // past the turn before advancing, to avoid false turns at crossing roads.
     const pastTurn = onNextRoad && turnDistance >= 0.05 &&
       distanceToRoadPath(location, currentPath) >= 0.045;
-    entry.nextStepEvidence = pastTurn ? (entry.nextStepEvidence || 0) + 1 : 0;
-    if (next && (nearEnd && distanceToRoadPath(location, nextPath) <= 0.04 ||
+    // Rendering the same GPS fix multiple times must not count as two turns.
+    // Use the GPS timestamp when present; for synthetic/manual fixes fall back
+    // to the coordinates. Only independently observed fixes count as evidence.
+    const fixTime = Date.parse(location.sampledAt || location.updatedAt || "");
+    const fixId = Number.isFinite(fixTime) ? String(fixTime) :
+      `${Number(location.lat).toFixed(6)}:${Number(location.lng).toFixed(6)}`;
+    if (!pastTurn) {
+      entry.nextStepEvidence = 0;
+      entry.nextStepEvidenceFix = null;
+    } else if (fixId !== entry.nextStepEvidenceFix) {
+      entry.nextStepEvidence = (entry.nextStepEvidence || 0) + 1;
+      entry.nextStepEvidenceFix = fixId;
+    }
+    if (next && ((nearEnd && distanceToRoadPath(location, nextPath) <= 0.04) ||
         entry.nextStepEvidence >= 2)) {
       index++;
       entry.nextStepEvidence = 0;
+      entry.nextStepEvidenceFix = null;
     }
     // Google steps stay ordered. Never skip a later junction just because
     // a crossing or nearby road passes through the current GPS position.
