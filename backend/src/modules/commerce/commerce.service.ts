@@ -2611,7 +2611,7 @@ export class CommerceService {
       `SELECT EXISTS (
          SELECT 1 FROM orders
           WHERE representative_user_id=$1
-            AND status IN ('Out With Representative','Representative On The Way')
+            AND status='Representative On The Way'
             AND NOT is_deleted AND NOT is_archived
        ) OR EXISTS (
          SELECT 1 FROM return_requests rr
@@ -2677,16 +2677,9 @@ export class CommerceService {
       }
 
       if (action === "start") {
-        // Old workflow changes can leave a current route stop although its order
-        // is no longer On The Way. Heal it before the unique current-stop insert.
-        await client.query(
-          `UPDATE delivery_route_stops
-              SET route_state='upcoming', updated_at=now()
-            WHERE representative_user_id=$1
-              AND route_state='current'
-              AND order_id<>$2::uuid`,
-          [representativeUserId, order.id],
-        );
+        // A second Start must never silently stop an active delivery. The courier
+        // must explicitly pause or complete the previous order first.
+        // The per-courier transaction lock above prevents parallel Start races.
         const previousCurrent = await client.query<{ id: string; order_code: string }>(
           `SELECT id::text, order_code
              FROM orders
@@ -2699,38 +2692,22 @@ export class CommerceService {
           [representativeUserId, order.id],
         );
         if (previousCurrent.rows.length) {
-          await client.query(
-            `UPDATE orders
-                SET status='Out With Representative',
-                    delivery_started_at=NULL,
-                    version=version+1,
-                    updated_at=now()
-              WHERE id = ANY($1::uuid[])`,
-            [previousCurrent.rows.map((row) => row.id)],
+          throw new AppError(
+            409,
+            "OTHER_DELIVERY_ACTIVE",
+            "An assigned delivery is already active. Pause or complete it before starting another.",
           );
-          await client.query(
-            `UPDATE delivery_route_stops
-                SET route_state='upcoming', updated_at=now()
-              WHERE representative_user_id=$1
-                AND order_id = ANY($2::uuid[])`,
-            [representativeUserId, previousCurrent.rows.map((row) => row.id)],
-          );
-          for (const previous of previousCurrent.rows) {
-            await client.query(
-              `INSERT INTO order_events (
-                 order_id,event_type,from_status,to_status,actor_type,actor_id,metadata
-               ) VALUES (
-                 $1,'DELIVERY_ROUTE_SWITCHED','Representative On The Way','Out With Representative',
-                 'representative',$2,$3::jsonb
-               )`,
-              [
-                previous.id,
-                representativeUserId,
-                JSON.stringify({ nextOrderCode: orderCode }),
-              ],
-            );
-          }
         }
+        // Repair an orphaned 'current' route stop only when no other delivery
+        // is active. Never change another order's business status implicitly.
+        await client.query(
+          `UPDATE delivery_route_stops
+              SET route_state='upcoming', updated_at=now()
+            WHERE representative_user_id=$1
+              AND route_state='current'
+              AND order_id<>$2::uuid`,
+          [representativeUserId, order.id],
+        );
       }
 
       if (action === "start" && order.status === "Representative On The Way") {
