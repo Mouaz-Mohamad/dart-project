@@ -187,8 +187,8 @@ const stockData = baseData({
   ],
 });
 const stockMetrics = finance.brandMetrics(stockData, stockRange, finance.calculateSummary(stockData, stockRange));
-assert.strictEqual(stockMetrics.inStockCost, 400, "In Stock Cost Value must use item-entry cost and the unified period.");
-assert.strictEqual(stockMetrics.inStockSelling, 600);
+assert.strictEqual(stockMetrics.inStockCost, 750, "Current warehouse stock must include historic purchase inventory still held, using captured item costs.");
+assert.strictEqual(stockMetrics.inStockSelling, 1200, "Stock selling value is a current asset valuation independent of report start.");
 
 
 const inventoryAcquisitionSummary = finance.calculateSummary(baseData({
