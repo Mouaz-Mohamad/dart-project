@@ -2752,6 +2752,18 @@
   }
 
   function bindEvents() {
+    // The Brand top cards use P&L numbers now. Never open the old Owner
+    // acquisition-ledger drilldown for a differently calculated number.
+    const openBrandPnl = (event) => {
+      const card = event.target?.closest?.("#brand .cost-cont, #brand .profit-cont");
+      if (!card || event.target.closest(".dart-info-btn") || !financeTabAllowed("pnl")) return;
+      if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      activateFinance("pnl");
+    };
+    document.addEventListener("click", openBrandPnl, true);
+    document.addEventListener("keydown", openBrandPnl, true);
     document.addEventListener("change", (event) => {
       if (event.target.matches("[data-period-preset]")) setPeriod({ preset: event.target.value });
       if (event.target.matches("[data-period-start]")) setPeriod({ start: event.target.value, preset: "custom" });
