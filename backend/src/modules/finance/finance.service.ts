@@ -1051,7 +1051,7 @@ export class FinanceService {
       for (const domain of relationalDomains) {
         const rows = (await readRelationalDashboardDomain(client, domain)) as JsonRow[];
         // Current finance records have createdAt; keep old fixture imports readable.
-        const official = rows.filter(row => !row.createdAt || officialCreatedAt(row.createdAt));
+        const official = rows.filter(row => !row.createdAt || officialCreatedAt(row.createdAt, this.officialStart));
         if (domain === "finance_settlements" || domain === "returns") {
           states.set(domain, official.filter(row => {
             const ref = String(row.orderId || "").trim();
