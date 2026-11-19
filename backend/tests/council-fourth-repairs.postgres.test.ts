@@ -30,7 +30,7 @@ describe("fourth Council: order, return, finance and least-privilege acceptance"
   const cookie = `dart_session_staff=${randomUUID()}.${"x".repeat(43)}`;
   let app: express.Express;
   beforeAll(async () => {
-    store = await embeddedStore(true); commerce = new CommerceService(store.pool); finance = new FinanceService(store.pool);
+    store = await embeddedStore(true); commerce = new CommerceService(store.pool); finance = new FinanceService(store.pool, "2000-01-01");
     interactions = new CustomerInteractionService(store.pool); state = new DashboardStateService(store.pool);
     for (const [id, type] of [[actor, "staff"], [customer, "customer"], [rep, "representative"]]) {
       await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
