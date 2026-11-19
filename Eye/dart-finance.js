@@ -1826,8 +1826,8 @@
 
     const mappings = [
       [".sales-cont", "revenue", current.netRevenue, previous.netRevenue, false],
-      [".cost-cont", "cost", current.brandTotalCost, previous.brandTotalCost, true],
-      [".profit-cont", "profit", current.brandNetProfit, previous.brandNetProfit, false],
+      [".cost-cont", "cost", current.totalCost, previous.totalCost, true],
+      [".profit-cont", "profit", current.netProfit, previous.netProfit, false],
     ];
     mappings.forEach(([selector, section, value, prior, inverse]) => {
       const card = document.querySelector(`#brand ${selector}`);
@@ -1843,9 +1843,9 @@
       setComparisonBadge(variance, value, prior, inverse);
     });
     [
-      [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
-      [".cost-cont", "Owner Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage from older stock. Regular courier allocation is already included inside item cost and is not added again."],
-      [".profit-cont", "Owner Net Result", "Total Selling minus Owner Total Cost for the selected period. This is an owner cash-investment view, not the accrual P&L net profit."],
+      [".sales-cont", "Net Revenue", "Delivered orders minus discounts and refunds from 8 Nov 2026 onward. Shipping charged to customers is included."],
+      [".cost-cont", "P&L Total Cost", "Cost of pieces sold plus recognized operating expenses. Courier allocation embedded in item cost is never deducted twice."],
+      [".profit-cont", "Net Profit / Loss", "Official earned revenue plus qualifying other income minus recognized costs and expenses, not available cash."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
       if (info) {
@@ -1854,7 +1854,7 @@
       }
     });
     const costTitle = document.querySelector("#brand .cost-cont h4");
-    if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Owner Total Cost';
+    if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> P&L Total Cost';
     renderBrandMetricCards(data, range, current, previous);
     document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(
       summaryAllows(current, "revenue") ? percent(current.repeatRate) : "Restricted",
@@ -2143,7 +2143,7 @@
   }
 
   function renderExpenses(data, range) {
-    const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const rows = data.expenses.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition, Loan Repayment and Capital Withdrawal are cash-only here and stay outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
       ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.", false)}`;
@@ -2156,7 +2156,7 @@
   }
 
   function renderInvoices(data, range) {
-    const rows = data.invoices.filter(active).filter((invoice) => within(invoice.issueDate, range)).sort((a, b) => String(b.issueDate).localeCompare(String(a.issueDate)));
+    const rows = data.invoices.filter(active).filter(isOfficialCreatedRecord).filter((invoice) => within(invoice.issueDate, range)).sort((a, b) => String(b.issueDate).localeCompare(String(a.issueDate)));
     return `${sectionToolbar("Invoices", "Document control only. Sales stay linked to delivered orders and supplier invoices to expense records, preventing double counting.", `${financeExportButton("invoices")}${financeAddButton("invoices", "Add Invoice")}`)}
       ${tableShell(["Invoice", "Type", "Issue", "Due", "Linked Record", "Total", "Paid", "Status", "Actions"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.number)}</strong></td><td>${escapeHTML(row.type)}</td><td>${escapeHTML(row.issueDate)}</td><td>${escapeHTML(row.dueDate)}</td><td>${escapeHTML(row.linkedId || "-")}</td><td>${money(row.total)}</td><td>${money(row.amountPaid)}</td><td><span class="dart-status-chip">${escapeHTML(invoiceStatus(row))}</span></td><td>${actionButtons("invoices", row.id)}</td></tr>`).join(""), "No invoices were issued in the selected period.", false)}`;
   }
@@ -2172,7 +2172,9 @@
       return restrictedFinanceMarkup("Profit & Loss requires Revenue, Cost and Profit permissions.");
     }
     const lines = [
-      ["Gross delivered revenue", current.grossRevenue, previous.grossRevenue],
+      ["Sales value before discounts (includes shipping)", current.salesBeforeDiscount ?? current.grossRevenue, previous.salesBeforeDiscount ?? previous.grossRevenue],
+      ["Discounts on sold pieces", -(current.discountAmount || 0), -(previous.discountAmount || 0)],
+      ["Delivered sales after discounts", current.grossRevenue, previous.grossRevenue],
       ["Less: period refunds", -current.refunds, -previous.refunds],
       ["Net revenue", current.netRevenue, previous.netRevenue, "subtotal"],
       ["Gross COGS", -current.grossCogs, -previous.grossCogs],
@@ -2228,7 +2230,7 @@
     if (!summaryAllowsAll(summary, ["marketing"]) || !summary.marketing) {
       return restrictedFinanceMarkup("Marketing Finance permission is required for this report.");
     }
-    const rows = (summary.marketing.rows || data.marketing.filter(active).filter((entry) => within(entry.date, range))).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const rows = (summary.marketing.rows || data.marketing.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.date, range))).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     return `${sectionToolbar("Marketing Analytics", "Manual or backend-imported campaign facts. Link spend to an expense to include it in P&L without duplication.", `${financeExportButton("marketing")}${financeAddButton("marketing", "Add Marketing Record")}`)}
       <div class="dart-finance-kpi-grid">
         ${kpiCard("Tracked Spend", money(summary.marketing.spend), "Marketing analytics source", "fa-solid fa-wallet", "burgundy")}
