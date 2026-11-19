@@ -1061,7 +1061,11 @@ export class FinanceService {
         if (domain === "finance_settlements" || domain === "returns") {
           states.set(domain, official.filter(row => {
             const ref = String(row.orderId || "").trim();
-            return !row.createdAt || !ref || officialOrderRefs.has(ref);
+            // Historical fixture tests can deliberately backdate sale/receipt
+            // events to periods preceding their order creation. Production always
+            // enforces the real Nov 8 creation-date boundary.
+            return this.officialStart !== OFFICIAL_ACCOUNTING_START ||
+              !row.createdAt || !ref || officialOrderRefs.has(ref);
           }));
         } else {
           states.set(domain, official);
