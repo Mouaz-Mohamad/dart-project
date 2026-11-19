@@ -49,6 +49,11 @@ function financePool(options: {
       if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: (options.acquiredItems ?? []).map((row) => ({ ...row, created_at: row.created_at ?? new Date(`${String(values[0])}T12:00:00Z`) })) };
       if (sql.includes("FROM inventory_items")) return { rows: options.itemCosts ?? [] };
       if (sql.includes("SELECT DISTINCT oi.item_code")) return { rows: [] };
+      if (sql.includes("SELECT id::text AS id, order_code FROM orders")) {
+        return { rows: (options.deliveredRows ?? []).map(row => ({
+          id: String(row.id || ""), order_code: String(row.order_code || ""),
+        })) };
+      }
       if (sql.includes("FROM return_requests")) {
         const payloads = options.returnPayloads ?? [{
           id: "return-1", orderId: "K-2", itemCode: "I-2",
