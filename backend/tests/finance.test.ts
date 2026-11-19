@@ -13,7 +13,8 @@ function financePool(options: {
   failDelivered?: boolean;
   deliveredRows?: Array<Record<string, unknown>>;
   returnPayloads?: Array<Record<string, unknown>>;
-  itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string }>;
+  itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string;
+    status?: string; active?: boolean; is_deleted?: boolean; is_archived?: boolean }>;
   acquiredItems?: Array<{ item_code: string; cost_snapshot_minor: string; created_at?: Date }>;
   expensePayloads?: Array<Record<string, unknown>>;
   damagePayloads?: Array<Record<string, unknown>>;
@@ -225,6 +226,35 @@ describe("finance summary integrity", () => {
     expect(summary.inventoryPurchaseCashOut).toBe(400);
     expect(summary.cashOut).toBe(400);
     expect(summary.netCashFlow).toBe(-400);
+  });
+
+  it("explains post-launch sales, discounts, COGS and unsold warehouse value independently", async () => {
+    const fixture = financePool({
+      deliveredRows: [{
+        id: "REAL-20", order_code: "K-20", customer_user_id: "owner-fixture",
+        final_minor: "68050", subtotal_minor: "64500",
+        order_discount_minor: "6450", shipping_fee_minor: "10000",
+        delivery_cost_minor: "10000", cogs_minor: "63000", sold_units: "1",
+        discounted_units: "1", campaign_discount_units: "1", code_discount_units: "0",
+        campaign_discount_minor: "6450", code_discount_minor: "0",
+        event_at: new Date("2026-11-18T21:03:33Z"),
+      }],
+      returnPayloads: [],
+      itemCosts: [
+        { item_code: "SOLD", cost_snapshot_minor: "63000", status: "Sold", active: true },
+        { item_code: "STOCK", cost_snapshot_minor: "1149500", status: "In stock", active: true },
+      ],
+    });
+    const summary = await new FinanceService(fixture.pool as never).summary("2026-11-08", "2026-11-19");
+    expect(summary).toMatchObject({
+      grossRevenue: 680.5, netRevenue: 680.5, salesBeforeDiscount: 745,
+      discountAmount: 64.5, discountedUnits: 1, fullPriceUnits: 0,
+      campaignDiscountUnits: 1, codeDiscountUnits: 0,
+      campaignDiscountAmount: 64.5, codeDiscountAmount: 0,
+      shippingCharges: 100, netCogs: 630, currentStockCost: 11495, currentStockUnits: 1,
+    });
+    expect(fixture.queries.some(query => query.includes("AND o.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')"))).toBe(true);
+    expect(fixture.queries.some(query => query.includes("AND i.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')"))).toBe(true);
   });
 
   it("reads relational domains sequentially on one pg client", () => {
