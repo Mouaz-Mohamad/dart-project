@@ -999,8 +999,9 @@ export class FinanceService {
       // A late receipt from an old test order must not inflate the official ledger.
       const officialOrdersResult = await client.query<{ id: string; order_code: string }>(
         `SELECT id::text AS id, order_code FROM orders
-          WHERE created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')`,
-        [OFFICIAL_ACCOUNTING_START],
+          WHERE created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
+            AND created_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')`,
+        [OFFICIAL_ACCOUNTING_START, end],
       );
       const officialOrderRefs = new Set(officialOrdersResult.rows.flatMap(row => [row.id, row.order_code]));
 
