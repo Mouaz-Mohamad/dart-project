@@ -2,6 +2,7 @@
 // الوارد: عمليات على سجل واحد، قفل الأوردر أولاً، وتأكيد التحصيل مرة واحدة.
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import { OFFICIAL_ACCOUNTING_START } from "./accounting-period.js";
 import { AppError } from "../../http/app-error.js";
 
 export const INCOME_KINDS = ["Other Income", "Capital", "Loan", "Order Collection"] as const;
@@ -43,7 +44,9 @@ export class IncomeService {
     const result = await this.pool.query<IncomeRow>(`SELECT i.*,i.expected_on::text,i.received_on::text,o.order_code FROM finance_income_entries i
       LEFT JOIN orders o ON o.id=i.order_id
       WHERE (CASE WHEN i.status='Received' THEN i.received_on ELSE i.expected_on END) BETWEEN $1::date AND $2::date
-      ORDER BY i.created_at DESC,i.id`, [start, end]);
+        AND i.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')
+        AND (i.order_id IS NULL OR o.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))
+      ORDER BY i.created_at DESC,i.id`, [start, end, OFFICIAL_ACCOUNTING_START]);
     return result.rows.map(incomeProjection);
   }
 
