@@ -1136,6 +1136,7 @@
       const range = { start: startOfDay(budget.startDate), end: endOfDay(budget.endDate) };
       const actual = data.expenses
         .filter(active)
+        .filter(isOfficialCreatedRecord)
         .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
         .filter((expense) => !isCashOnlyExpense(expense))
         .filter((expense) => budget.category === "All" || expense.category === budget.category)
@@ -2101,38 +2102,38 @@
   function renderFinanceOverview(data, range, current, previous) {
     const budgets = budgetRows(data, range).filter((row) => row.visible);
     const alerts = hasAdminPermission("finance.read") ? operationalAlerts(data, range, current) : [];
-    const cards = [];
+    const salesCards = [], expenseCards = [], profitCards = [], cashCards = [], stockCards = [], marketingCards = [];
     if (summaryAllowsAll(current, ["revenue"]) && summaryAllowsAll(previous, ["revenue"])) {
-      cards.push(kpiCard("Net Sales (including shipping)", money(current.netRevenue), "Delivered orders after discounts and refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue }));
-      cards.push(kpiCard("Sold Pieces", String(current.soldUnits), `${current.discountedUnits ?? 0} discounted · ${current.fullPriceUnits ?? 0} full price`, "fa-solid fa-shirt", "blue"));
-      cards.push(kpiCard("Sales Discounts", money(current.discountAmount ?? 0), `Before discount ${money(current.salesBeforeDiscount ?? 0)} · customer shipping ${money(current.shippingCharges ?? 0)}`, "fa-solid fa-tag", "burgundy"));
-      cards.push(kpiCard("Recorded Other Income", money(current.otherIncome ?? 0), "Recorded separately; not a second sale", "fa-solid fa-wallet", "neutral"));
-      cards.push(kpiCard("Total Earned Income", money(current.totalIncome ?? current.netRevenue), "Net sales + received eligible other income", "fa-solid fa-chart-line", "green"));
-      cards.push(kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue"));
+      salesCards.push(kpiCard("Net Sales (including shipping)", money(current.netRevenue), "Delivered orders after discounts and refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue }));
+      salesCards.push(kpiCard("Sold Pieces", String(current.soldUnits), `${current.discountedUnits ?? 0} discounted · ${current.fullPriceUnits ?? 0} full price`, "fa-solid fa-shirt", "blue"));
+      salesCards.push(kpiCard("Sales Discounts", money(current.discountAmount ?? 0), `Before discount ${money(current.salesBeforeDiscount ?? 0)} · customer shipping ${money(current.shippingCharges ?? 0)}`, "fa-solid fa-tag", "burgundy"));
+      salesCards.push(kpiCard("Recorded Other Income", money(current.otherIncome ?? 0), "Recorded separately; not a second sale", "fa-solid fa-wallet", "neutral"));
+      salesCards.push(kpiCard("Total Earned Income", money(current.totalIncome ?? current.netRevenue), "Net sales + received eligible other income", "fa-solid fa-chart-line", "green"));
+      salesCards.push(kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue"));
     }
     if (summaryAllowsAll(current, ["cost"]) && summaryAllowsAll(previous, ["cost"])) {
-      cards.push(kpiCard("Cost of Sold Pieces", money(current.netCogs), "Delivered inventory cost, regardless of original stock entry date", "fa-solid fa-box", "burgundy"));
-      cards.push(kpiCard("Operating Expenses", money(current.operatingExpenses), "Paid + unpaid expenses recognized in the period", "fa-solid fa-receipt", "burgundy"));
-      cards.push(kpiCard("Unpaid Expenses", money(current.unpaidExpenses ?? 0), "Recorded liabilities; not cash paid yet", "fa-solid fa-clock", "neutral"));
-      cards.push(kpiCard("P&L Total Cost", money(current.totalCost), "Sold-piece cost + recognized expenses, no duplicate courier deduction", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true));
+      expenseCards.push(kpiCard("Cost of Sold Pieces", money(current.netCogs), "Delivered inventory cost, regardless of original stock entry date", "fa-solid fa-box", "burgundy"));
+      expenseCards.push(kpiCard("Operating Expenses", money(current.operatingExpenses), "Paid + unpaid expenses recognized in the period", "fa-solid fa-receipt", "burgundy"));
+      expenseCards.push(kpiCard("Unpaid Expenses", money(current.unpaidExpenses ?? 0), "Recorded liabilities; not cash paid yet", "fa-solid fa-clock", "neutral"));
+      expenseCards.push(kpiCard("P&L Total Cost", money(current.totalCost), "Sold-piece cost + recognized expenses, no duplicate courier deduction", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true));
     }
     if (summaryAllowsAll(current, ["profit"]) && summaryAllowsAll(previous, ["profit"])) {
       const marginText = current.marginApplicable !== false && finiteNumber(current.netRevenue) > 0
         ? `${percent(current.margin)} net margin`
         : "Margin N/A for this period";
-      cards.push(kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit }));
+      profitCards.push(kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit }));
     }
     if (summaryAllowsAll(current, ["cashflow"]) && summaryAllowsAll(previous, ["cashflow"])) {
-      cards.push(kpiCard("Confirmed Cash In", money(current.cashIn), "Recorded COD settlements + confirmed income", "fa-solid fa-arrow-down", "green"));
-      cards.push(kpiCard("Recorded Cash Out", money(current.cashOut), "Payments recorded in the period, not inventory COGS", "fa-solid fa-arrow-up", "burgundy"));
-      cards.push(kpiCard("Net Cash Movement", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow }));
+      cashCards.push(kpiCard("Confirmed Cash In", money(current.cashIn), "Recorded COD settlements + confirmed income", "fa-solid fa-arrow-down", "green"));
+      cashCards.push(kpiCard("Recorded Cash Out", money(current.cashOut), "Payments recorded in the period, not inventory COGS", "fa-solid fa-arrow-up", "burgundy"));
+      cashCards.push(kpiCard("Net Cash Movement", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow }));
     }
     if (summaryAllowsAll(current, ["inventory"]) && summaryAllowsAll(previous, ["inventory"])) {
-      cards.push(kpiCard("Current Stock Value (cost)", money(current.currentStockCost ?? 0), `${current.currentStockUnits ?? 0} pieces currently in warehouse · balance not expense`, "fa-solid fa-boxes-stacked", "neutral"));
-      cards.push(kpiCard("New Stock Acquisitions", money(current.physicalItemCost), "Cost of newly registered inventory in this period; not cash paid", "fa-solid fa-box-open", "neutral", { current: current.physicalItemCost, previous: previous.physicalItemCost }, true));
+      stockCards.push(kpiCard("Current Stock Value (cost)", money(current.currentStockCost ?? 0), `${current.currentStockUnits ?? 0} pieces currently in warehouse · balance not expense`, "fa-solid fa-boxes-stacked", "neutral"));
+      stockCards.push(kpiCard("New Stock Acquisitions", money(current.physicalItemCost), "Cost of newly registered inventory in this period; not cash paid", "fa-solid fa-box-open", "neutral", { current: current.physicalItemCost, previous: previous.physicalItemCost }, true));
     }
     if (summaryAllowsAll(current, ["marketing"]) && summaryAllowsAll(previous, ["marketing"])) {
-      cards.push(kpiCard("Marketing ROAS", `${decimal(current.marketing?.roas)}x`, `${money(current.marketing?.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral"));
+      marketingCards.push(kpiCard("Marketing ROAS", `${decimal(current.marketing?.roas)}x`, `${money(current.marketing?.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral"));
     }
 
     const pnlAllowed = summaryAllowsAll(current, ["revenue", "cost", "profit"]) &&
@@ -2141,9 +2142,19 @@
       ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Sales before discounts (incl. shipping)</dt><dd>${money(current.salesBeforeDiscount ?? current.grossRevenue)}</dd></div><div><dt>Sales discounts</dt><dd>(${money(current.discountAmount ?? 0)})</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Other received income</dt><dd>${money(current.otherIncome || 0)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
       : `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue + Cost + Profit permissions are required.")}${restrictedFinanceMarkup("P&L is restricted for this Staff account.")}</article>`;
 
+    const summarySections = [
+      ["1. Sales & discounts", salesCards],
+      ["2. Expenses & cost of goods", expenseCards],
+      ["3. Profit / loss", profitCards],
+      ["4. Actual cash movements", cashCards],
+      ["5. Warehouse inventory", stockCards],
+      ["6. Marketing", marketingCards],
+    ].filter(([, group]) => group.length)
+      .map(([heading, group]) => `${sectionToolbar(heading, "")}<div class="dart-finance-kpi-grid">${group.join("")}</div>`)
+      .join("");
     return `${sectionToolbar("Official Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Official books start 8 Nov 2026 (Cairo time). Earlier records are test history and are excluded; inventory already on hand still has a current stock value. Earned income, confirmed receipts, recognized expenses and actual payments are different measures.</span></div>
-      <div class="dart-finance-kpi-grid">${cards.length ? cards.join("") : restrictedFinanceMarkup()}</div>
+      ${summarySections || restrictedFinanceMarkup()}
       <div class="dart-finance-two-col">
         ${pnlPanel}
         <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Actual recognized expenses against active budgets.", financeTabAllowed("budgets") ? '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>' : "")}
