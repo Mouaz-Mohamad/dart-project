@@ -13,6 +13,24 @@
 (function (root) {
   "use strict";
 
+  // Test bookkeeping before launch is retained but excluded from official reporting.
+  const ACCOUNTING_LAUNCH_DAY = "2026-11-18";
+  function cairoDateKey(value) {
+    if (!value) return "";
+    const text = String(value);
+    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) return text;
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "";
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo",
+      year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+    const map = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+    return `${map.year}-${map.month}-${map.day}`;
+  }
+  function isOfficialCreatedRecord(row) {
+    const created = row?.createdAt || row?.orderCreatedAt || row?.created_at;
+    return !created || cairoDateKey(created) >= ACCOUNTING_LAUNCH_DAY;
+  }
+
   const STORAGE_KEYS = Object.freeze({
     expenses: "dart_finance_expenses",
     budgets: "dart_finance_budgets",
@@ -312,7 +330,10 @@
     let previousStart;
     let previousEnd;
 
-    if (preset === "last_7") {
+    if (preset === "since_launch") {
+      start = startOfDay(ACCOUNTING_LAUNCH_DAY);
+      label = "Official records · since 18 Nov 2026";
+    } else if (preset === "last_7") {
       start = startOfDay(addDays(now, -6));
       label = "Last 7 Days";
     } else if (preset === "last_30") {
@@ -363,6 +384,13 @@
 
     start = startOfDay(start);
     end = endOfDay(end);
+    const officialStart = startOfDay(ACCOUNTING_LAUNCH_DAY);
+    if (end >= officialStart && start < officialStart) {
+      start = officialStart;
+      label = `${label} · from 18 Nov 2026`;
+    } else if (end < officialStart) {
+      label = `${label} · pre-launch test period (excluded)`;
+    }
     if (!previousStart || !previousEnd) {
       const length = daysInclusive(start, end);
       previousEnd = endOfDay(addDays(start, -1));
@@ -790,6 +818,7 @@
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
       .filter((expense) => !isCashOnlyExpense(expense))
+      .filter(isOfficialCreatedRecord)
       .filter((expense) => within(expense.date, range));
   }
 
@@ -798,6 +827,7 @@
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
       .filter((expense) => !isCashOnlyExpense(expense))
+      .filter(isOfficialCreatedRecord)
       .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
@@ -806,6 +836,7 @@
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
       .filter(expense => String(expense.category).toLowerCase() === "inventory acquisition")
+      .filter(isOfficialCreatedRecord)
       .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
@@ -813,6 +844,7 @@
     return data.orders
       .filter(active)
       .filter((order) => String(order.status || "").toLowerCase() === "delivered")
+      .filter(isOfficialCreatedRecord)
       .filter((order) => within(orderEventDate(order), range));
   }
 
@@ -975,7 +1007,7 @@
     const netCogs = roundMoney(grossCogs - cogsReversal);
     const expenseRows = recognizedExpenses(data, range);
     const operatingExpenses = roundMoney(expenseRows.reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
-    const settlementsInPeriod = data.settlements.filter(active).filter((entry) => within(entry.settlementDate, range));
+    const settlementsInPeriod = data.settlements.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.settlementDate, range));
     const codFees = roundMoney(settlementsInPeriod.reduce((sum, entry) => sum + Math.max(0, finiteNumber(entry.fee)), 0));
     const damageLoss = damageWriteOff(data, range);
     const damageValue = damagedInventoryValue(data, range);
@@ -1100,7 +1132,7 @@
   }
 
   function budgetRows(data, referenceRange) {
-    return data.budgets.filter(active).map((budget) => {
+    return data.budgets.filter(active).filter(isOfficialCreatedRecord).map((budget) => {
       const range = { start: startOfDay(budget.startDate), end: endOfDay(budget.endDate) };
       const actual = data.expenses
         .filter(active)
@@ -1146,7 +1178,7 @@
   }
 
   function goalRows(data, referenceRange) {
-    return data.goals.filter(active).map((goal) => {
+    return data.goals.filter(active).filter(isOfficialCreatedRecord).map((goal) => {
       const metric = GOAL_METRICS[goal.metric] || GOAL_METRICS.revenue;
       const rawActual = goalActual(goal, data);
       const restricted = rawActual === undefined;
@@ -1231,12 +1263,13 @@
       if (budget.utilization >= 100) alerts.push({ severity: "danger", title: `Budget exceeded · ${budget.name}`, text: `${money(budget.actual)} spent from ${money(budget.amount)}.` });
       else if (budget.utilization >= threshold) alerts.push({ severity: "warning", title: `Budget near limit · ${budget.name}`, text: `${percent(budget.utilization)} utilized.` });
     });
-    data.invoices.filter(active).forEach((invoice) => {
+    data.invoices.filter(active).filter(isOfficialCreatedRecord).forEach((invoice) => {
       if (invoiceStatus(invoice).includes("Overdue")) alerts.push({ severity: "danger", title: `Overdue invoice · ${invoice.number}`, text: `${money(finiteNumber(invoice.total) - finiteNumber(invoice.amountPaid))} remains due.` });
     });
     const now = new Date();
     data.orders
       .filter(active)
+      .filter(isOfficialCreatedRecord)
       .filter(isCOD)
       .filter((order) => String(order.status || "").toLowerCase() === "delivered")
       .forEach((order) => {
@@ -1249,7 +1282,7 @@
       });
     if (summary.netRevenue > 0 && summary.netProfit < 0) alerts.push({ severity: "danger", title: "Negative net profit", text: `The selected period is losing ${money(Math.abs(summary.netProfit))}.` });
     if (summary.netRevenue > 0 && summary.grossMargin < 20) alerts.push({ severity: "warning", title: "Low gross margin", text: `Gross margin is ${percent(summary.grossMargin)} before operating expenses.` });
-    data.marketing.filter(active).filter((entry) => within(entry.date, range)).forEach((entry) => {
+    data.marketing.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.date, range)).forEach((entry) => {
       if (finiteNumber(entry.spend) > 0 && !entry.linkedExpenseId) alerts.push({ severity: "info", title: `Marketing spend is not linked · ${entry.campaign || entry.channel}`, text: "It is included in marketing analytics but not in P&L until linked to an expense record." });
     });
     goalRows(data, range).filter((goal) => goal.visible).forEach((goal) => {
@@ -1321,9 +1354,9 @@
 
   function loadPeriodState() {
     const saved = readJSON(STORAGE_KEYS.period, {});
-    const preset = ["this_month", "last_month", "this_quarter", "this_year", "last_year", "last_7", "last_30", "custom"].includes(saved.preset)
+    const preset = ["since_launch", "this_month", "last_month", "this_quarter", "this_year", "last_year", "last_7", "last_30", "custom"].includes(saved.preset)
       ? saved.preset
-      : "this_month";
+      : "since_launch";
     state.period = {
       preset,
       start: saved.start || dateInputValue(new Date()),
@@ -1586,10 +1619,18 @@
   }
 
   function syncPeriodInputs() {
-    document.querySelectorAll("[data-period-preset]").forEach((select) => { select.value = state.period.preset; });
-    document.querySelectorAll('.dart-period-control').forEach(control=>{if(control.querySelector('[data-reset-period]'))return;const reset=document.createElement('button');reset.type='button';reset.className='dart-clear-filters';reset.dataset.resetPeriod='1';reset.textContent='Reset period';reset.addEventListener('click',()=>setPeriod({preset:'this_month',start:'',end:''}));control.append(reset);});
-    document.querySelectorAll("[data-period-start]").forEach((input) => { input.value = state.period.start || ""; });
-    document.querySelectorAll("[data-period-end]").forEach((input) => { input.value = state.period.end || ""; });
+    document.querySelectorAll("[data-period-preset]").forEach((select) => {
+      if (!select.querySelector('option[value="since_launch"]')) {
+        const option = document.createElement("option");
+        option.value = "since_launch";
+        option.textContent = "Since Launch · 18 Nov 2026";
+        select.insertBefore(option, select.firstChild);
+      }
+      select.value = state.period.preset;
+    });
+    document.querySelectorAll('.dart-period-control').forEach(control=>{if(control.querySelector('[data-reset-period]'))return;const reset=document.createElement('button');reset.type='button';reset.className='dart-clear-filters';reset.dataset.resetPeriod='1';reset.textContent='Since launch';reset.addEventListener('click',()=>setPeriod({preset:'since_launch',start:'',end:''}));control.append(reset);});
+    document.querySelectorAll("[data-period-start]").forEach((input) => { input.min = ACCOUNTING_LAUNCH_DAY; input.value = state.period.start || ""; });
+    document.querySelectorAll("[data-period-end]").forEach((input) => { input.min = ACCOUNTING_LAUNCH_DAY; input.value = state.period.end || ""; });
     document.querySelectorAll(".dart-custom-period").forEach((box) => box.classList.toggle("is-visible", state.period.preset === "custom"));
     document.querySelectorAll("[data-period-label]").forEach((label) => { label.textContent = currentRange().label; });
   }
@@ -1624,8 +1665,8 @@
   function inStockItems(data, range) {
     return data.items
       .filter(active)
-      .filter((item) => String(item.status || "").toLowerCase() === "in stock")
-      .filter((item) => within(recordCreatedAt(item), range));
+      .filter((item) => String(item.status || "").toLowerCase() === "in stock");
+    // Stock is a live balance, not a new acquisition within a date filter.
   }
 
   function currentItemCost(data, item) {
@@ -1649,7 +1690,7 @@
 
   function brandMetrics(data, range, summary) {
     const stock = inStockItems(data, range);
-    const periodOrders = data.orders.filter(active).filter((order) => within(recordCreatedAt(order), range));
+    const periodOrders = data.orders.filter(active).filter(isOfficialCreatedRecord).filter((order) => within(recordCreatedAt(order), range));
     const delivered = deliveredOrders(data, range);
     const refundedCodes = new Set(
       uniqueCompletedReturns(data, range)
@@ -2162,7 +2203,7 @@
   }
 
   function codRows(data, range) {
-    return data.orders.filter(active).filter(order => order.collectionMode !== "Third Party").filter(isCOD).filter((order) => within(orderEventDate(order), range)).map((order) => {
+    return data.orders.filter(active).filter(isOfficialCreatedRecord).filter(order => order.collectionMode !== "Third Party").filter(isCOD).filter((order) => within(orderEventDate(order), range)).map((order) => {
       const { orderTotal, courierDue, dueToDart } = codDueForOrder(order);
       const received = settlementAmountForOrder(data, order);
       const remaining = roundMoney(Math.max(0, dueToDart - received));
