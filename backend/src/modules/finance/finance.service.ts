@@ -690,9 +690,10 @@ export class FinanceService {
     if (!["sales", "profit", "cost", "damage"].includes(metric)) {
       return readBrandInventory(this.pool, metric, start, end, page, limit, visibility);
     }
-    const snapshot = await this.readSnapshot(start, end);
-    const summary = calculateSnapshot(snapshot, start, end);
-    const ledger = buildBrandLedger(snapshot, start, end);
+    const effectiveStart = start < this.officialStart ? this.officialStart : start;
+    const snapshot = await this.readSnapshot(effectiveStart, end);
+    const summary = calculateSnapshot(snapshot, effectiveStart, end);
+    const ledger = buildBrandLedger(snapshot, effectiveStart, end);
     const rows = metric === "sales" ? ledger.income : metric === "cost" ? ledger.outgoing
       : metric === "damage" ? ledger.damage : [...ledger.income, ...ledger.otherIncome, ...ledger.outgoing];
     const amountMinor = Math.round((metric === "sales" ? summary.netRevenue : metric === "cost" ? summary.brandTotalCost
@@ -934,11 +935,14 @@ export class FinanceService {
   public async summaries(ranges: readonly FinanceRange[]): Promise<FinanceSummary[]> {
     if (!ranges.length) return [];
     if (ranges.length > 14) throw new AppError(400, "INVALID_FINANCE_RANGES", "Too many finance periods");
-    const start = ranges.reduce((first, range) => range.start < first ? range.start : first, ranges[0]!.start);
-    const end = ranges.reduce((last, range) => range.end > last ? range.end : last, ranges[0]!.end);
+    const officialRanges = ranges.map(range => ({
+      ...range, start: range.start < this.officialStart ? this.officialStart : range.start,
+    }));
+    const start = officialRanges.reduce((first, range) => range.start < first ? range.start : first, officialRanges[0]!.start);
+    const end = officialRanges.reduce((last, range) => range.end > last ? range.end : last, officialRanges[0]!.end);
     const snapshot = await this.readSnapshot(start, end);
-    // Release the database connection before calculating chart periods in memory.
-    return ranges.map((range) => calculateSnapshot(snapshot, range.start, range.end));
+    // A purely prelaunch window (start > end) is intentionally empty.
+    return officialRanges.map(range => calculateSnapshot(snapshot, range.start, range.end));
   }
 
   private async readSnapshot(start: string, end: string): Promise<FinanceSnapshot> {
@@ -1022,7 +1026,9 @@ export class FinanceService {
         `SELECT DISTINCT oi.item_code
            FROM order_items oi
            JOIN orders o ON o.id=oi.order_id
-          WHERE o.status='Delivered'`,
+          WHERE o.status='Delivered'
+            AND o.created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')`,
+        [this.officialStart],
       );
       const deliveredCodes = new Set(
         deliveredCodesResult.rows.map((row) => row.item_code),
