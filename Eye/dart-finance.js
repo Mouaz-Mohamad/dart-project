@@ -2105,8 +2105,8 @@
     const salesCards = [], expenseCards = [], profitCards = [], cashCards = [], stockCards = [], marketingCards = [];
     if (summaryAllowsAll(current, ["revenue"]) && summaryAllowsAll(previous, ["revenue"])) {
       salesCards.push(kpiCard("Net Sales (including shipping)", money(current.netRevenue), "Delivered orders after discounts and refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue }));
-      salesCards.push(kpiCard("Sold Pieces", String(current.soldUnits), `${current.discountedUnits ?? 0} discounted · ${current.fullPriceUnits ?? 0} full price`, "fa-solid fa-shirt", "blue"));
-      salesCards.push(kpiCard("Sales Discounts", money(current.discountAmount ?? 0), `Before discount ${money(current.salesBeforeDiscount ?? 0)} · customer shipping ${money(current.shippingCharges ?? 0)}`, "fa-solid fa-tag", "burgundy"));
+      salesCards.push(kpiCard("Sold Pieces", String(current.soldUnits), `${current.discountedUnits ?? 0} discounted (${current.campaignDiscountUnits ?? 0} campaign, ${current.codeDiscountUnits ?? 0} code) · ${current.fullPriceUnits ?? 0} full price`, "fa-solid fa-shirt", "blue"));
+      salesCards.push(kpiCard("Sales Discounts", money(current.discountAmount ?? 0), `Campaign ${money(current.campaignDiscountAmount ?? 0)} · codes ${money(current.codeDiscountAmount ?? 0)} · shipping charged ${money(current.shippingCharges ?? 0)}`, "fa-solid fa-tag", "burgundy"));
       salesCards.push(kpiCard("Recorded Other Income", money(current.otherIncome ?? 0), "Recorded separately; not a second sale", "fa-solid fa-wallet", "neutral"));
       salesCards.push(kpiCard("Total Earned Income", money(current.totalIncome ?? current.netRevenue), "Net sales + received eligible other income", "fa-solid fa-chart-line", "green"));
       salesCards.push(kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue"));
