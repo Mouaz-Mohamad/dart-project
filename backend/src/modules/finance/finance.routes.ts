@@ -256,8 +256,8 @@ export function createFinanceRouter(
   })).refine((query) => Date.parse(query.end) - Date.parse(query.start) <= 3660 * 86400000,
     { message: "A Brand report cannot span more than ten years" });
   const brandPermission = (metric: BrandMetric): string[] => {
-    if (metric === "sales" || ["models", "colors", "sizes"].includes(metric)) return ["finance.read", "finance.view_revenue"];
-    if (metric === "cost") return ["finance.read", "finance.view_cost"];
+    if (["sales", "cost"].includes(metric)) return ["finance.read", "finance.view_cashflow"];
+    if (["models", "colors", "sizes"].includes(metric)) return ["finance.read", "finance.view_revenue"];
     if (metric === "profit") return ["finance.read", "finance.view_profit"];
     if (["damage", "stockCost"].includes(metric)) return ["finance.read", "finance.view_inventory_value"];
     if (metric === "overview") return ["finance.read", "finance.view_revenue", "finance.view_inventory_value", "catalog.read", "catalog.manage", "inventory.manage"];
@@ -283,6 +283,19 @@ export function createFinanceRouter(
       });
       response.setHeader("Cache-Control", "no-store");
       response.status(200).json(result);
+    });
+
+  router.get("/admin/finance/net-profit-series", signedIn, requireAccountType("staff"), requireMfa,
+    requireAnyPermission("finance.read", "finance.view_profit"), async (request,response) => {
+      const {year} = z.object({year:z.coerce.number().int().min(1970).max(9998)}).parse(request.query);
+      const ranges = Array.from({length:12},(_,month) => ({
+        start:`${year}-${String(month+1).padStart(2,"0")}-01`,
+        end:new Date(Date.UTC(year,month+1,0)).toISOString().slice(0,10),
+      }));
+      const summaries = await finance.summaries(ranges);
+      response.setHeader("Cache-Control","no-store");
+      response.json({year,currency:"EGP",basis:"sold_cost_paid_expenses",
+        months:summaries.map((summary,index) => ({month:index+1,netProfit:summary.netProfit}))});
     });
 
   router.get(

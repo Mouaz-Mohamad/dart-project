@@ -94,15 +94,25 @@ window.dartOpenAdminNotification = async function (notification) {
     }
   }
   if (notification.section === "returns" || notification.section === "review") {
-    const domain = notification.section === "returns" ? "returns" : "reviews";
+    const domain = notification.section === "returns" ? "returns" : notification.eventType === "CONTACT_CREATED" ? "contacts" : "reviews";
     await window.DartDomainState?.hydrateDomain?.(domain, true);
     const data = notification.section === "returns" ? returnsData : reviewsData;
     const record = data.find(row => String(row.id) === notification.entityId);
     if (record) {
       const modal = document.getElementById("history-modal");
       document.getElementById("history-modal-title").textContent = notification.title;
-      const fields = notification.section === "returns" ? ["returnId", "orderId", "requestType", "status", "reason", "notes"] : ["clientName", "rating", "title", "review", "status"];
+      const fields = notification.section === "returns" ? ["returnId", "orderId", "requestType", "status", "reason", "notes"] : notification.eventType === "CONTACT_CREATED" ? ["clientName","phone1","email","review","createdAt"] : ["clientName", "rating", "title", "review", "status"];
       document.getElementById("history-modal-body").innerHTML = fields.map(field => `<p><b>${dartEsc(field)}:</b> ${dartEsc(record[field] || "-")}</p>`).join("");
+      openModal(modal); return true;
+    }
+  }
+  if (notification.section === "customers") {
+    await window.DartDomainState?.hydrateDomain?.("customers",true);
+    const customer = customersData.find(row => String(row.id) === notification.entityId || String(row.clientId) === notification.entityCode);
+    if (customer) {
+      const modal=document.getElementById("history-modal");
+      document.getElementById("history-modal-title").textContent="New customer";
+      document.getElementById("history-modal-body").innerHTML=["clientName","clientId","phone1","email","birthday"].map(field=>`<p><b>${dartEsc(field)}:</b> ${dartEsc(customer[field] || "—")}</p>`).join("");
       openModal(modal); return true;
     }
   }

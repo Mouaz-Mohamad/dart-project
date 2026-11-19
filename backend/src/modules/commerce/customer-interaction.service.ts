@@ -698,5 +698,6 @@ export class CustomerInteractionService {
     };
     await this.appendDomain(client, "notifications", record);
     if (input.type === "review_created") await queueAdminNotification(client, "REVIEW_CREATED", input.relatedEntityId);
+    if (input.type === "contact_created") await queueAdminNotification(client, "CONTACT_CREATED", input.relatedEntityId);
   }
 }

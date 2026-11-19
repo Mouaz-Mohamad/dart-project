@@ -243,27 +243,27 @@
             <div class="chart-one">
                 <div class="financial-summary">
                     <div class="sales-cont">
-                        <button type="button" class="dart-info-btn" data-info-title="Total Selling" data-info-text="Delivered sales less completed refunds inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
+                        <button type="button" class="dart-info-btn" data-info-title="Total Inflow" data-info-text="Confirmed order receipts and received income. Pending income is excluded." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
-                            <h4><i class="fa-solid fa-sack-dollar"></i> Total Selling</h4>
+                            <h4><i class="fa-solid fa-sack-dollar"></i> Total Inflow</h4>
                             <span class="variance">—</span>
                         </div>
                         <span class="sales">0 EGP</span>
                     </div>
 
                     <div class="cost-cont">
-                        <button type="button" class="dart-info-btn" data-info-title="Total Cost" data-info-text="Cost of all physical pieces added in the period plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage." title="Info"><i class="fa-solid fa-info"></i></button>
+                        <button type="button" class="dart-info-btn" data-info-title="Total Outflow" data-info-text="Paid expenses, completed refunds and confirmed fees. Unpaid expenses are excluded." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
-                            <h4><i class="fa-solid fa-coins"></i> Total Cost</h4>
+                            <h4><i class="fa-solid fa-coins"></i> Total Outflow</h4>
                             <span class="variance">—</span>
                         </div>
                         <span class="sales">0 EGP</span>
                     </div>
 
                     <div class="profit-cont">
-                        <button type="button" class="dart-info-btn" data-info-title="Total Profit" data-info-text="Total Selling minus Total Cost inside the selected period." title="Info"><i class="fa-solid fa-info"></i></button>
+                        <button type="button" class="dart-info-btn" data-info-title="Net Profit" data-info-text="Profit after sold-piece cost and paid operating expenses. Unsold inventory cost is excluded." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
-                            <h4><i class="fa-solid fa-chart-line"></i> Total Profit</h4>
+                            <h4><i class="fa-solid fa-chart-line"></i> Net Profit</h4>
                             <span class="variance">—</span>
                         </div>
                         <span class="sales">0 EGP</span>
@@ -272,14 +272,15 @@
 
                 <div class="dart-chart-card">
                     <div class="dart-controls">
-                        <div class="dart-chart-title"><strong>Total Sales</strong><small>Delivered net sales by month</small></div>
+                        <div class="dart-chart-title"><strong>Net Profit</strong><small>Sold-piece cost and paid expenses by month</small></div>
                         <div class="dart-nav-controls">
-                            <button type="button" class="dart-nav-btn" data-sales-year-delta="-1" aria-label="Previous sales year">❮</button>
+                            <button type="button" class="dart-nav-btn" data-sales-year-delta="-1" aria-label="Previous profit year">❮</button>
                             <span id="displayLabel">2026</span>
-                            <button type="button" class="dart-nav-btn" data-sales-year-delta="1" aria-label="Next sales year">❯</button>
+                            <button type="button" class="dart-nav-btn" data-sales-year-delta="1" aria-label="Next profit year">❯</button>
                         </div>
                     </div>
                     <div id="myChart"></div>
+                    <p id="monthly-profit-status" role="status" aria-live="polite"></p>
                 </div>
             </div>
 
@@ -370,7 +371,7 @@
                     </article>
                     <article id="financial-analysis-card" class="dart-finance-panel dart-financial-analysis-panel">
                         <div class="dart-panel-head">
-                            <div><h3>Financial Analysis</h3><p>Total sales, complete Brand cost and resulting net profit.</p></div>
+                            <div><h3>Net Profit Analysis</h3><p>Profit after sold-piece cost and confirmed paid operating expenses.</p></div>
                             <span id="dart-financial-period" class="dart-panel-badge"></span>
                         </div>
                         <div class="dart-chart-frame">

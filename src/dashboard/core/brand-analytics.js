@@ -197,9 +197,6 @@ function updateBrandAnalytics() {
     "#brand .sold-card .numebr",
     itemsData.filter((i) => i.status === "Sold").length,
   );
-  set("#brand .sales-cont .sales", dartMoney(revenue));
-  set("#brand .cost-cont .sales", dartMoney(totalCost));
-  set("#brand .profit-cont .sales", dartMoney(profit));
   const successfulLines = delivered.flatMap((o) => o.priceSnapshot || []),
     aov = delivered.length ? revenue / delivered.length : 0,
     margin = revenue ? (profit / revenue) * 100 : 0,

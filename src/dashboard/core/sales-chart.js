@@ -2,7 +2,7 @@ let currentMode = "months";
 let currentYear = new Date().getFullYear();
 
 var options = {
-  series: [{ name: "Total Sales", data: Array(12).fill(0) }],
+  series: [{ name: "Net Profit", data: [] }],
   chart: {
     type: "area",
     height: 230,
@@ -68,40 +68,9 @@ document.querySelectorAll("[data-sales-year-delta]").forEach((button) => {
 function updateChart() {
   const label = document.getElementById("displayLabel");
   if (label) label.innerText = currentYear;
-  const monthly = Array(12).fill(0);
-  (typeof ordersData !== "undefined" ? ordersData : []).forEach((order) => {
-    if (order.status !== "Delivered") return;
-    const date = new Date(order.deliveredAt || order.updatedAt || order.createdAt || 0);
-    if (!Number.isNaN(date.getTime()) && date.getFullYear() === currentYear)
-      monthly[date.getMonth()] += dartOrderNet(order);
-  });
-  (typeof returnsData !== "undefined" ? returnsData : []).forEach((record) => {
-    if (!record.isPostDeliveryReturn || !dartReturnRules()?.isRefund?.(record) || !dartReturnRules()?.isCompleted?.(record)) return;
-    const date = new Date(dartReturnRules()?.eventDate?.(record) || record.completedAt || 0);
-    if (Number.isNaN(date.getTime()) || date.getFullYear() !== currentYear) return;
-    const order = ordersData.find((row) => String(row.orderId) === String(record.orderId));
-    monthly[date.getMonth()] -= Number(record.originalNetAmount) || dartReturnRules()?.allocatedNetAmount?.(order, record.itemCode, record) || 0;
-  });
-
-  chart.updateOptions({
-    series: [{ name: "Total Sales", data: monthly.map((value) => Math.round((value + Number.EPSILON) * 100) / 100) }],
-    xaxis: {
-      categories: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ],
-    },
-  });
+  if (window.DartFinance?.renderMonthlyProfit) return window.DartFinance.renderMonthlyProfit();
+  const status = document.getElementById("monthly-profit-status");
+  if (status) status.textContent = "Loading net profit…";
 }
 
 // تشغيل مبدئي

@@ -15,6 +15,9 @@ export const adminMessages: Record<AdminNotificationEvent, { title: string; sect
   EXCHANGE_CREATED: { title: "New exchange request", section: "returns" },
   REVIEW_CREATED: { title: "New review", section: "review" },
   CUSTOMER_EMAIL_LINK_REQUESTED: { title: "طلب ربط رقم الهاتف بالإيميل", section: "settings" },
+  ORDER_STATUS_CHANGED:{title:"Order status changed",section:"orders"},
+  CONTACT_CREATED:{title:"New contact message",section:"review"},
+  CUSTOMER_CREATED:{title:"New customer",section:"customers"},
 };
 export class AdminNotificationService {
   readonly push: CustomerNotificationService;
@@ -125,7 +128,7 @@ export class AdminNotificationService {
       catch { throw new AppError(422, "INVALID_CURSOR", "Invalid notification page"); }
     }
     const events = await this.visibleEvents(userId, permissions);
-    const result = await this.pool.query<{ id: string; event_type: AdminNotificationEvent; entity_id: string; entity_code: string; created_at: Date; read_at: Date | null }>(
+    const result = await this.pool.query<{ id: string; event_type: AdminNotificationEvent; entity_id: string; entity_code: string; created_at: Date; read_at: Date | null; metadata?: {targetId?:string;fromStatus?:string;toStatus?:string} }>(
       `SELECT n.*,r.read_at FROM admin_notifications n
        LEFT JOIN admin_notification_reads r ON r.notification_id=n.id AND r.user_id=$1
        WHERE n.event_type=ANY($2::text[]) AND ($6::uuid IS NULL OR n.id=$6) AND ($3::timestamptz IS NULL OR (n.created_at,n.id)<($3::timestamptz,$4::uuid))
@@ -134,10 +137,14 @@ export class AdminNotificationService {
       `SELECT n.event_type,count(*)::text FROM admin_notifications n
        WHERE n.event_type=ANY($2::text[]) AND NOT EXISTS(SELECT 1 FROM admin_notification_reads r WHERE r.notification_id=n.id AND r.user_id=$1)
        GROUP BY n.event_type`, [userId,events]);
-    const unread = { orders: 0, returns: 0, review: 0, settings: 0 }, rows = result.rows.slice(0,limit), last = rows.at(-1);
+    const unread = { orders: 0, returns: 0, review: 0, settings: 0, customers:0 }, rows = result.rows.slice(0,limit), last = rows.at(-1);
     for (const row of counts.rows) unread[adminMessages[row.event_type].section as keyof typeof unread] += Number(row.count);
-    return { notifications: rows.map(row => ({ id: row.id, eventType: row.event_type, entityId: row.entity_id,
-      entityCode: row.entity_code, ...adminMessages[row.event_type], createdAt: row.created_at.toISOString(), readAt: row.read_at?.toISOString()||null })),
+    return { notifications: rows.map(row => ({ id: row.id, eventType: row.event_type,
+      entityId: row.event_type === "ORDER_STATUS_CHANGED" ? row.metadata?.targetId || row.entity_id : row.entity_id,
+      entityCode: row.entity_code, ...adminMessages[row.event_type],
+      ...(row.event_type === "ORDER_STATUS_CHANGED" ? {fromStatus:row.metadata?.fromStatus,toStatus:row.metadata?.toStatus,
+        title:`Order status: ${row.metadata?.fromStatus || "—"} → ${row.metadata?.toStatus || "—"}`} : {}),
+      createdAt: row.created_at.toISOString(), readAt: row.read_at?.toISOString()||null })),
       unread, unreadCount: Object.values(unread).reduce((a,b)=>a+b,0),
       nextCursor: result.rows.length>limit && last ? Buffer.from(JSON.stringify({at:last.created_at.toISOString(),id:last.id})).toString("base64url") : null };
   }

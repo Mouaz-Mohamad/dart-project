@@ -102,7 +102,7 @@ describe("staff notifications",()=>{
   });
   it("filters categories and keeps reads independent across accounts and pages",async()=>{
     for(const type of ["ORDER_CREATED","RETURN_CREATED","EXCHANGE_CREATED","REVIEW_CREATED"] as const)await queue(type);
-    const page=await service.list(userId,permissions,2);expect(page.unread).toEqual({orders:1,returns:2,review:1,settings:0});expect(page.nextCursor).toBeTruthy();
+    const page=await service.list(userId,permissions,2);expect(page.unread).toEqual({orders:1,returns:2,review:1,settings:0,customers:0});expect(page.nextCursor).toBeTruthy();
     expect((await service.list(userId,permissions,2,page.nextCursor!)).notifications).toHaveLength(2);
     for(let i=0;i<2;i++)await service.markRead(userId,permissions,page.notifications.map(n=>n.id));
     expect((await service.list(userId,permissions)).unreadCount).toBe(2);expect((await service.list(otherId,permissions)).unreadCount).toBe(4);
@@ -171,5 +171,30 @@ describe("staff notifications",()=>{
     const client=await store.pool.connect();await queueOrderNotifications(client,order.rows[0].id,"order.created");await queueOrderNotifications(client,order.rows[0].id,"order.created");client.release();
     await new CustomerInteractionService(store.pool).submitPublicReview({fullName:"Synthetic",phone1:"01000000000",rating:5,review:"Synthetic acceptance review"},"synthetic");
     const page=await service.list(userId,permissions);expect(page.unread.orders).toBe(1);expect(page.unread.review).toBe(1);
+  });
+  it("queues actual status transitions, contacts and first customer creation atomically with scoped inbox and push",async()=>{
+    await subscribe();
+    const customerId=randomUUID(),email=`${customerId}@example.test`;
+    await store.pool.query("INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at) VALUES($1,'customer',$2,$2,'synthetic','active',now())",[customerId,email]);
+    await store.pool.query("INSERT INTO customers(user_id,full_name) VALUES($1,'New synthetic customer')",[customerId]);
+    await store.pool.query("UPDATE customers SET full_name='Updated synthetic customer' WHERE user_id=$1",[customerId]);
+    const order=(await store.pool.query("INSERT INTO orders(subtotal_minor,final_minor,delivery_address) VALUES(0,0,'{}') RETURNING id::text")).rows[0].id;
+    for(const status of ["Preparing","Preparing","New","Preparing"])await store.pool.query("UPDATE orders SET status=$2,version=version+1 WHERE id=$1",[order,status]);
+    await store.pool.query("BEGIN");
+    await store.pool.query("UPDATE orders SET status='Cancelled',version=version+1 WHERE id=$1",[order]);
+    await store.pool.query("ROLLBACK");
+    const contact=await new CustomerInteractionService(store.pool).submitContact({fullName:"Synthetic",phone1:"01000000000",email:"contact@example.test",message:"New synthetic message"},"synthetic-contact");
+    const all=[...permissions,"contacts.read","customers.read"];
+    const page=await service.list(userId,all);
+    expect(page.unread).toMatchObject({orders:3,review:1,customers:1});
+    const transitions=page.notifications.filter(row=>row.eventType==="ORDER_STATUS_CHANGED");
+    expect(transitions).toHaveLength(3);
+    expect(transitions.every(row=>row.entityId===order && row.fromStatus!==row.toStatus)).toBe(true);
+    expect((await service.list(userId,["notifications.read","contacts.read"])).notifications).toMatchObject([{eventType:"CONTACT_CREATED",entityId:contact.id}]);
+    expect((await service.list(userId,["notifications.read","customers.read"])).notifications).toMatchObject([{eventType:"CUSTOMER_CREATED",entityId:customerId}]);
+    const calls:string[]=[];
+    await new OutboxService(store.pool,config,null,provider(calls)).processBatch(50);
+    expect(calls).toHaveLength(5);
+    expect(calls.every(call=>!call.includes("synthetic customer") && !call.includes(contact.id) && !call.includes("New synthetic message"))).toBe(true);
   });
 });

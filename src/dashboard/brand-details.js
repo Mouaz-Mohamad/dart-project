@@ -4,9 +4,9 @@
   const doc = root.document;
   if (!doc) return;
   const definitions = {
-    sales: ["Total Selling", "#brand .sales-cont", ["finance.view_revenue"]],
-    profit: ["Total Profit", "#brand .profit-cont", ["finance.view_profit", "finance.view_revenue", "finance.view_cost"]],
-    cost: ["Owner Total Cost", "#brand .cost-cont", ["finance.view_cost"]],
+    sales: ["Total Inflow", "#brand .sales-cont", ["finance.view_cashflow"]],
+    profit: ["Net Profit", "#brand .profit-cont", ["finance.view_profit", "finance.view_revenue", "finance.view_cost"]],
+    cost: ["Total Outflow", "#brand .cost-cont", ["finance.view_cashflow"]],
     stockSelling: ["In Stock Selling Value", "#brand-in-stock-selling-card", ["inventory"]],
     stockCost: ["In Stock Cost Value", "#brand-in-stock-cost-card", ["finance.view_inventory_value"]],
     damage: ["Damage Loss", "#brand-damage-loss-card", ["finance.view_inventory_value"]],

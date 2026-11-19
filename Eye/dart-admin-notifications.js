@@ -14,7 +14,7 @@
   const status = message => { document.getElementById("dart-notification-status").textContent = message; };
   const notify = (message, type = "info") => window.DartDashboardUI?.notify?.(message, type);
   function renderRows(showEmpty = true, filter = "all") {
-    return rows.filter(n => filter === "all" || ({ orders: "order", returns: "return", review: "review" })[n.section] === filter).map(n => `<button type="button" class="dart-inbox-row ${n.readAt ? "is-read" : "is-unread"}" data-admin-notification="${esc(n.id)}"><span class="dart-inbox-dot" aria-hidden="true"></span><span><strong>${esc(n.title)}${n.entityCode ? ` · ${esc(n.entityCode)}` : ""}</strong><small>${esc(new Date(n.createdAt).toLocaleString())}</small></span><span>${n.readAt ? "" : "New"}</span></button>`).join("") || (showEmpty ? '<p class="dart-empty-state">No notifications yet</p>' : "");
+    return rows.filter(n => filter === "all" || ({ orders: "order", returns: "return", review: n.eventType === "CONTACT_CREATED" ? "system" : "review", customers:"customer" })[n.section] === filter).map(n => `<button type="button" class="dart-inbox-row ${n.readAt ? "is-read" : "is-unread"}" data-admin-notification="${esc(n.id)}"><span class="dart-inbox-dot" aria-hidden="true"></span><span><strong>${esc(n.title)}${n.entityCode ? ` · ${esc(n.entityCode)}` : ""}</strong><small>${esc(new Date(n.createdAt).toLocaleString())}</small></span><span>${n.readAt ? "" : "New"}</span></button>`).join("") || (showEmpty ? '<p class="dart-empty-state">No notifications yet</p>' : "");
   }
   function render(counts) {
     document.getElementById("dart-notification-count").textContent = unread > 99 ? "99+" : String(unread);
@@ -22,7 +22,7 @@
     document.getElementById("dart-notification-bell").setAttribute("aria-label", `Notifications · ${unread} unread`);
     document.getElementById("dart-notification-list").innerHTML = renderRows();
     document.getElementById("dart-notification-more").hidden = !nextCursor;
-    if (counts) for (const section of ["orders", "returns", "review", "settings"]) {
+    if (counts) for (const section of ["orders", "returns", "review", "settings", "customers"]) {
       for (const link of document.querySelectorAll(`[data-target="${section}"]`)) {
         let badge = link.querySelector(".dart-nav-unread");
         if (!badge) { badge = document.createElement("span"); badge.className = "dart-nav-unread"; link.append(badge); }
@@ -279,6 +279,6 @@
     });
   }
 
-  window.DartAdminNotifications = Object.freeze({ refresh, renderRows, owns: legacy => ["order_created", "review_created", "return_created"].includes(legacy.type) && rows.some(row => [row.entityId, row.entityCode].includes(String(legacy.relatedEntityId || ""))) });
+  window.DartAdminNotifications = Object.freeze({ refresh, renderRows, owns: legacy => ["order_created", "review_created", "return_created", "contact_created", "client_created"].includes(legacy.type) && rows.some(row => [row.entityId, row.entityCode].includes(String(legacy.relatedEntityId || ""))) });
   start();
 })();

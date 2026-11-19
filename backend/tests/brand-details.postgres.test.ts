@@ -32,6 +32,8 @@ describe("Brand detail SQL", () => {
         INSERT INTO waitlist_entries VALUES ('M1','Black','M','waiting'),('M1','Black','M','cancelled');
         INSERT INTO set_waiting_entries VALUES ('[{"modelId":"M1","color":"Black","size":"M"},{"modelId":"M1","color":"Black","size":"M"}]','waiting');
         INSERT INTO finance_records VALUES ('finance_expenses','e1',1,'{"id":"e1","date":"2026-10-04","amount":10.01,"status":"Paid","description":"فاتورة التصوير"}');
+        INSERT INTO finance_records VALUES ('finance_settlements','s1',1,'{"id":"s1","orderId":"O1","settlementDate":"2026-10-05","amountReceived":200}');
+        INSERT INTO finance_income_entries VALUES ('income1','Other Income','Received',2500,'2026-10-05','2026-10-05','Other receipt');
         INSERT INTO damage_records VALUES ('d1',1,'{"id":"d1","itemCode":"damaged","status":"Damaged","date":"2026-10-12","costSnapshot":150.04}');
         INSERT INTO return_requests VALUES ('r1',1,'{"id":"r1","orderId":"O1","itemCode":"sold","status":"Completed","completedAt":"2026-10-15","isPostDeliveryReturn":true,"requestType":"Refund","refundAmount":100.01}');
       `);
@@ -51,7 +53,7 @@ describe("Brand detail SQL", () => {
       const overview = await service.brandDetails("overview", "2026-10-01", "2026-10-30", 1, 100, visibility);
       expect(overview).toMatchObject({ totals: { pieces: 2, models: 1, costMinor: 27005, sellingMinor: 85002 }, top: { models: { waiting: 3, total: 4, sold: 0 } } });
       const limited = await service.brandDetails("cost", "2026-10-01", "2026-10-30", 2, 1, visibility);
-      expect(limited).toMatchObject({ page: 2, limit: 1, total: 3 });
+      expect(limited).toMatchObject({ page: 2, limit: 1, total: 2 });
       expect((limited as { rows: unknown[] }).rows).toHaveLength(1);
       const restricted = await service.brandDetails("stockSelling", "2026-10-01", "2026-10-30", 1, 100, { costs: false, waiting: false, sales: false });
       expect(JSON.stringify(restricted)).not.toContain('"costMinor"');

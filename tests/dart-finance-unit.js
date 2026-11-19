@@ -69,8 +69,8 @@ assert.strictEqual(returnedSummary.refunds, 1000, "Detailed return refunds must 
 assert.strictEqual(returnedSummary.netRevenue, 0);
 assert.strictEqual(returnedSummary.netCogs, 0, "A Good return must reverse its immutable COGS snapshot.");
 assert.strictEqual(returnedSummary.soldUnits, 0, "Net units sold must subtract completed returns.");
-assert.strictEqual(returnedSummary.operatingExpenses, 100, "Unpaid recognized expenses belong in accrual P&L.");
-assert.strictEqual(returnedSummary.netProfit, -100);
+assert.strictEqual(returnedSummary.operatingExpenses, 0, "Unpaid expenses stay pending until payment confirmation.");
+assert.strictEqual(returnedSummary.netProfit, 0);
 assert.strictEqual(returnedSummary.cashOut, 1000, "The completed customer refund must be a cash outflow; the unpaid expense must not add another outflow.");
 
 const laterReturnData = baseData({

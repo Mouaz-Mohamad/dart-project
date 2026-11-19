@@ -89,6 +89,19 @@ function financePool(options: {
 }
 
 describe("finance summary integrity", () => {
+  it("uses payment dates, excludes unpaid expenses and unsold inventory from net profit",async()=>{
+    const fixture=financePool({deliveredRows:[{id:"sold",order_code:"S-1",event_at:new Date("2026-09-10T12:00Z"),final_minor:"100000",cogs_minor:"40000",sold_units:"1"}],returnPayloads:[],
+      acquiredItems:[{item_code:"unsold",cost_snapshot_minor:"200000",created_at:new Date("2026-09-01T12:00Z")}],
+      expensePayloads:[
+        {id:"pending",date:"2026-09-01",amount:1000,status:"Unpaid",category:"Other"},
+        {id:"paid-now",date:"2026-08-01",paidAt:"2026-09-05",amount:50,status:"Paid",category:"Packaging"},
+        {id:"paid-later",date:"2026-09-01",paidAt:"2026-10-05",amount:60,status:"Paid",category:"Other"},
+        {id:"inventory-payment",date:"2026-09-01",paidAt:"2026-09-01",amount:2000,status:"Paid",category:"Inventory Acquisition"},
+      ]});
+    const [september,october]=await new FinanceService(fixture.pool as never).summaries([{start:"2026-09-01",end:"2026-09-30"},{start:"2026-10-01",end:"2026-10-31"}]);
+    expect(september).toMatchObject({operatingExpenses:50,totalCost:450,netProfit:550,physicalItemCost:2000,cashOut:2050});
+    expect(october).toMatchObject({operatingExpenses:60,netProfit:-60,cashOut:60});
+  });
   it.each([false, true])("posts exchange cost differences then cancels all COGS on a full good refund (captured=%s)", async captured => {
     const exchange = { id: "EX-1", orderId: "K-EX", itemCode: "A", replacementItemCode: "B",
       requestType: "Exchange", status: "Completed", inspectionStatus: "Good", isPostDeliveryReturn: true,

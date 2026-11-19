@@ -71,7 +71,7 @@ describe("Brand financial contributors", () => {
       itemCost: new Map([["OLD", 11111]]), deliveredCodes: new Set(),
       states: new Map([
         ["returns", [{ ...returned("I3"), refundAmount: 100, refundAdjustments: [{ id: "a", amountMinor: 1000, occurredAt: "2026-11-01" }] }]],
-        ["finance_expenses", [{ id: "e1", date: "2026-10-02", amount: 10.01 }, { id: "e2", date: "2026-10-02", amount: 999, archivedAt: "2026-10-03" }, { id: "purchase", date: "2026-10-02", amount: 123.45, category: "Inventory Acquisition" }]],
+        ["finance_expenses", [{ id: "e1", date: "2026-10-02", amount: 10.01, status:"Paid" }, { id: "e2", date: "2026-10-02", amount: 999, archivedAt: "2026-10-03" }, { id: "purchase", date: "2026-10-02", amount: 123.45, category: "Inventory Acquisition" }]],
         ["finance_settlements", [{ id: "s1", settlementDate: "2026-10-03", fee: 5.02 }]],
         ["damage", [{ id: "d1", itemCode: "I1", status: "Damaged", date: "2026-10-04", costSnapshot: 123.45 }, { id: "d2", itemCode: "OLD", status: "Destroyed", date: "2026-10-05" }, { id: "duplicate", itemCode: "OLD", status: "Damaged", date: "2026-10-05" }]],
       ]),

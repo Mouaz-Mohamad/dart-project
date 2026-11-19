@@ -44,9 +44,26 @@ function application(permissions: string[], options: { accountType?: "staff" | "
 }
 
 describe("combined finance report", () => {
+  it("returns twelve calendar-month net profits with profit-only access and no contributor leakage",async()=>{
+    const {app,summaries}=application(["finance.view_profit"]);
+    const response=await request(app).get("/api/v1/admin/finance/net-profit-series").query({year:2028}).set("Cookie",cookie);
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.months).toHaveLength(12);
+    expect(response.body.months[0]).toEqual({month:1,netProfit:500});
+    expect(summaries.mock.calls[0]?.[0][1]).toEqual({start:"2028-02-01",end:"2028-02-29"});
+    expect(summaries.mock.calls[0]?.[0][11]).toEqual({start:"2028-12-01",end:"2028-12-31"});
+    expect(JSON.stringify(response.body)).not.toContain("netRevenue");
+    for(const year of ["bad",1969,9999,2026.5])await request(app).get("/api/v1/admin/finance/net-profit-series").query({year}).set("Cookie",cookie).expect(422);
+    const denied=application(["finance.view_cost"]);
+    await request(denied.app).get("/api/v1/admin/finance/net-profit-series").query({year:2026}).set("Cookie",cookie).expect(403);
+    await request(app).get("/api/v1/admin/finance/net-profit-series").query({year:2026}).expect(401);
+  });
   it("authorizes Brand metrics independently and requires both contributors before opening profit", async () => {
     for (const fixture of [
-      { permissions: ["finance.view_revenue"], metric: "sales", status: 200 },
+      { permissions: ["finance.view_cashflow"], metric: "sales", status: 200 },
+      { permissions: ["finance.view_cashflow"], metric: "cost", status: 200 },
+      { permissions: ["finance.view_revenue"], metric: "sales", status: 403 },
       { permissions: ["finance.view_revenue"], metric: "cost", status: 403 },
       { permissions: ["finance.view_profit"], metric: "profit", status: 403 },
       { permissions: ["finance.view_profit", "finance.view_cost", "finance.view_revenue"], metric: "profit", status: 200 },

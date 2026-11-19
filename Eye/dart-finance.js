@@ -829,9 +829,9 @@
   function recognizedExpenses(data, range) {
     return data.expenses
       .filter(active)
-      .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
+      .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
       .filter((expense) => !isCashOnlyExpense(expense))
-      .filter((expense) => within(expense.date, range));
+      .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
   function paidExpenses(data, range) {
@@ -1145,10 +1145,10 @@
       const range = { start: startOfDay(budget.startDate), end: endOfDay(budget.endDate) };
       const actual = data.expenses
         .filter(active)
-        .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
+        .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
         .filter((expense) => !isCashOnlyExpense(expense))
         .filter((expense) => budget.category === "All" || expense.category === budget.category)
-        .filter((expense) => within(expense.date, range))
+        .filter((expense) => within(expense.paidAt || expense.date, range))
         .reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0);
       const amount = Math.max(0, finiteNumber(budget.amount));
       return {
@@ -1306,6 +1306,87 @@
     return new Intl.NumberFormat("en-EG", { maximumFractionDigits: 2 }).format(finiteNumber(value));
   }
 
+  // BEGIN authoritative monthly-profit controller
+  function installMonthlyProfit() {
+    if (typeof updateChart !== "function" || typeof chart === "undefined") return;
+    const monthlyProfitCache = new Map(), monthlyProfitPending = new Map();
+    let monthlyProfitRevision = 0, monthlyProfitTimer = 0;
+    function renderMonthlyProfit() {
+      const label = document.getElementById("displayLabel");
+      if (label) label.innerText = currentYear;
+      const status = document.getElementById("monthly-profit-status");
+      const allowed = window.DartAdminAccess?.can?.("finance.read") || window.DartAdminAccess?.can?.("finance.view_profit");
+      const show = values => {
+      chart.updateOptions({
+        series: [{ name: "Net Profit", data: values }],
+        xaxis: {
+          categories: [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+          ],
+        },
+      });
+      };
+      if (!allowed || !window.DartAdminApi?.request) {
+        show([]);
+        if (status) status.textContent = allowed ? "Loading finance service…" : "Profit access is required.";
+        return;
+      }
+      if (monthlyProfitTimer || document.hidden) return;
+      const revision = monthlyProfitRevision, year = currentYear, key = `${revision}:${year}`;
+      const render = values => { if (year === currentYear && revision === monthlyProfitRevision) { show(values); if (status) status.textContent = ""; } };
+      if (monthlyProfitCache.has(key)) { render(monthlyProfitCache.get(key)); return; }
+      if (monthlyProfitPending.has(key)) return monthlyProfitPending.get(key);
+      show([]); if (status) status.textContent = "Loading net profit…";
+      const pending = window.DartAdminApi.request(`/api/v1/admin/finance/net-profit-series?year=${year}`)
+        .then(report => {
+          if (report.year !== year || !Array.isArray(report.months) || report.months.length !== 12 ||
+              report.months.some((row,index) => row.month !== index+1 || !Number.isFinite(row.netProfit))) throw new Error("Incomplete profit series");
+          if (revision !== monthlyProfitRevision) return;
+          const values=report.months.map(row=>row.netProfit); monthlyProfitCache.set(key,values); render(values);
+        }).catch(() => {
+          if (year === currentYear && revision === monthlyProfitRevision && status) status.innerHTML='Net profit could not be loaded. <button type="button" data-profit-series-retry>Retry</button>';
+        }).finally(() => monthlyProfitPending.delete(key));
+      monthlyProfitPending.set(key,pending);
+      return pending;
+    }
+
+    function invalidateMonthlyProfit() {
+      monthlyProfitRevision++; monthlyProfitCache.clear();
+      clearTimeout(monthlyProfitTimer);
+      monthlyProfitTimer=setTimeout(()=>{monthlyProfitTimer=0;updateChart();},120);
+    }
+    window.addEventListener("dart:admin-authenticated",invalidateMonthlyProfit);
+    window.addEventListener("dart:orders-hydrated",invalidateMonthlyProfit);
+    window.addEventListener("dart:domain-hydrated",event=>{
+      if (["finance_expenses","finance_settlements","returns","damage"].includes(event.detail?.domain)) invalidateMonthlyProfit();
+    });
+    window.addEventListener("dart:server-change",event=>{
+      if (event.detail?.reconcile || event.detail?.name === "finance_income") invalidateMonthlyProfit();
+    });
+    window.addEventListener("dart:admin-logged-out",()=>{
+      monthlyProfitRevision++;monthlyProfitCache.clear();monthlyProfitPending.clear();clearTimeout(monthlyProfitTimer);monthlyProfitTimer=0;
+      chart.updateOptions({series:[{name:"Net Profit",data:[]}]});
+    });
+    document.addEventListener("click",event=>{if(event.target.closest("[data-profit-series-retry]"))updateChart();});
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)updateChart();});
+
+
+    root.DartFinance.renderMonthlyProfit = renderMonthlyProfit;
+    updateChart();
+  }
+  // END authoritative monthly-profit controller
+
   const api = {
     STORAGE_KEYS,
     GOAL_METRICS,
@@ -1338,6 +1419,7 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 
   if (!root.document) return;
+  installMonthlyProfit();
 
   // Keep Brand drilldowns out of the initial dashboard and public storefront runtime.
   let brandDetailsLoading = false;
@@ -1825,9 +1907,9 @@
     }
 
     const mappings = [
-      [".sales-cont", "revenue", current.netRevenue, previous.netRevenue, false],
-      [".cost-cont", "cost", current.brandTotalCost, previous.brandTotalCost, true],
-      [".profit-cont", "profit", current.brandNetProfit, previous.brandNetProfit, false],
+      [".sales-cont", "cashflow", current.cashIn, previous.cashIn, false],
+      [".cost-cont", "cashflow", current.cashOut, previous.cashOut, true],
+      [".profit-cont", "profit", current.netProfit, previous.netProfit, false],
     ];
     mappings.forEach(([selector, section, value, prior, inverse]) => {
       const card = document.querySelector(`#brand ${selector}`);
@@ -1843,9 +1925,9 @@
       setComparisonBadge(variance, value, prior, inverse);
     });
     [
-      [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
-      [".cost-cont", "Owner Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage from older stock. Regular courier allocation is already included inside item cost and is not added again."],
-      [".profit-cont", "Owner Net Result", "Total Selling minus Owner Total Cost for the selected period. This is an owner cash-investment view, not the accrual P&L net profit."],
+      [".sales-cont", "Total Inflow", "Confirmed order receipts and all received income in the selected period. Pending income is excluded."],
+      [".cost-cont", "Total Outflow", "Paid expenses on their payment dates, completed refunds and confirmed fees. Unpaid expenses are excluded."],
+      [".profit-cont", "Net Profit", "Delivered sales after discounts/refunds plus other received income, less sold-piece cost, paid operating expenses, fees and non-duplicated losses. Unsold inventory, capital and loans do not create profit or operating expense."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
       if (info) {
@@ -1853,8 +1935,6 @@
         info.dataset.infoText = description;
       }
     });
-    const costTitle = document.querySelector("#brand .cost-cont h4");
-    if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Owner Total Cost';
     renderBrandMetricCards(data, range, current, previous);
     document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(
       summaryAllows(current, "revenue") ? percent(current.repeatRate) : "Restricted",
@@ -2017,26 +2097,23 @@
       const label = period.start.toLocaleDateString("en-EG", { day: "numeric", month: "short" });
       return { label: dateInputValue(period.start) === dateInputValue(period.end) ? label
           : `${label}–${period.end.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
-        revenue: summary.netRevenue, cost: summary.brandTotalCost, profit: summary.brandNetProfit };
+        revenue: summary.cashIn, cost: summary.cashOut, profit: summary.netProfit };
     });
   }
 
   function renderFinancialChart(data, range, summary) {
-    if (!summaryAllowsAll(summary, ["revenue", "cost", "profit"])) {
+    if (!summaryAllowsAll(summary, ["profit"])) {
       const canvas = document.getElementById("dart-financial-chart");
       if (canvas) canvas.hidden = true;
       const restricted = document.getElementById("dart-financial-empty");
       if (restricted) {
         restricted.hidden = false;
-        restricted.textContent = "Revenue, Cost and Profit access are required for this financial chart.";
+        restricted.textContent = "Profit access is required for this chart.";
       }
       return;
     }
-    const empty = summary.netRevenue === 0 && summary.brandTotalCost === 0;
-    toggleChartEmpty("dart-financial-empty", empty);
     const canvas = document.getElementById("dart-financial-chart");
-    if (canvas) canvas.hidden = empty;
-    if (empty || !chartAvailable()) return;
+    if (!chartAvailable()) return;
     const buckets = financialBuckets(data, range);
     if (!buckets) {
       if (canvas) canvas.hidden = true;
@@ -2048,16 +2125,18 @@
       }
       return;
     }
+    const empty = buckets.every(bucket => bucket.profit === 0);
+    toggleChartEmpty("dart-financial-empty", empty);
+    if (canvas) canvas.hidden = empty;
     const emptyState = document.getElementById("dart-financial-empty");
-    if (emptyState) emptyState.textContent = "No financial activity in this period.";
+    if (emptyState) emptyState.textContent = empty ? "Net profit is zero throughout this period." : "";
+    if (empty) return;
     replaceChart("financial", "dart-financial-chart", {
       type: "bar",
       data: {
         labels: buckets.map((bucket) => bucket.label),
         datasets: [
-          { label: "Revenue", data: buckets.map((bucket) => bucket.revenue), backgroundColor: "#13826B", borderRadius: 5 },
-          { label: "Owner Total Cost", data: buckets.map((bucket) => bucket.cost), backgroundColor: "#E19A2B", borderRadius: 5 },
-          { type: "line", label: "Owner Net Result", data: buckets.map((bucket) => bucket.profit), borderColor: "#6B46BD", backgroundColor: "#6B46BD", tension: .32, pointRadius: 3, borderWidth: 3 },
+          { type: "line", label: "Net Profit", data: buckets.map((bucket) => bucket.profit), borderColor: "#AB012B", backgroundColor: "#AB012B", tension: .32, pointRadius: 3, borderWidth: 3 },
         ],
       },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: "rgba(15,23,42,.06)" }, ticks: { callback: (value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value } } }, plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 10, color: "#3D2C35", padding: 16, font: { size: 12, weight: "600" } } } } },
@@ -2128,14 +2207,14 @@
     const pnlAllowed = summaryAllowsAll(current, ["revenue", "cost", "profit"]) &&
       summaryAllowsAll(previous, ["revenue", "cost", "profit"]);
     const pnlPanel = pnlAllowed
-      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Other received income</dt><dd>${money(current.otherIncome || 0)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
+      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Sales use their delivery date; operating expenses use their confirmed Paid Date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Other received income</dt><dd>${money(current.otherIncome || 0)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
       : `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue + Cost + Profit permissions are required.")}${restrictedFinanceMarkup("P&L is restricted for this Staff account.")}</article>`;
 
     return `${sectionToolbar("Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
       <div class="dart-finance-kpi-grid">${cards.length ? cards.join("") : restrictedFinanceMarkup()}</div>
       <div class="dart-finance-two-col">
         ${pnlPanel}
-        <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Actual recognized expenses against active budgets.", financeTabAllowed("budgets") ? '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>' : "")}
+        <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Confirmed paid expenses against active budgets.", financeTabAllowed("budgets") ? '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>' : "")}
           <div class="dart-budget-stack">${financeTabAllowed("budgets") ? (budgets.length ? budgets.slice(0, 5).map((budget) => `<div class="dart-budget-line"><div><strong>${escapeHTML(budget.name)}</strong><span>${money(budget.actual)} / ${money(budget.amount)}</span></div><div class="dart-progress"><span style="width:${Math.min(100, Math.max(0, budget.utilization))}%" class="${budget.utilization >= 100 ? "is-over" : ""}"></span></div><small>${percent(budget.utilization)} used · ${money(budget.remaining)} remaining</small></div>`).join("") : '<div class="dart-finance-empty">No budgets have been added.</div>') : restrictedFinanceMarkup("Budget data requires Cost or Budget management permission.")}</div>
         </article>
       </div>
@@ -2144,7 +2223,7 @@
 
   function renderExpenses(data, range) {
     const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition, Loan Repayment and Capital Withdrawal are cash-only here and stay outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
+    return `${sectionToolbar("Expenses", "Only Paid expenses affect outflow and profit, on their Paid Date. Unpaid records remain pending. Inventory Acquisition, Loan Repayment and Capital Withdrawal affect cash only.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
       ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || row.vendor || row.invoiceNumber || row.category || "Expense")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), financeResourceStatus("expenses") ? "Saved expense records are loading or unavailable." : "No expenses exist in the selected period.", false)}`;
   }
@@ -2372,7 +2451,7 @@
     } else if (resource === "expenses") {
       title = id ? "Edit Expense" : "Add Expense";
       defaults = { date: today, category: "Marketing", amount: "", status: "Unpaid", paidAt: "", paymentMethod: "", vendor: "", invoiceNumber: "", description: "", notes: "" };
-      note = "Expense recognition uses Expense Date. Cash Flow uses Paid Date only when Status is Paid.";
+      note = "Only Paid expenses affect outflow and profit, using Paid Date. Unpaid expenses stay pending.";
     } else if (resource === "budgets") {
       title = id ? "Edit Budget" : "Add Budget";
       defaults = { name: "", category: "All", amount: "", warningPercent: 80, startDate: today, endDate: monthEnd };

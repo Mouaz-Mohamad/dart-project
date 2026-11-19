@@ -173,6 +173,40 @@ async function main() {
   const retried = loader.dartLoadFinance();
   loaderWindow.DartFinance = { ready: true }; element.onload(); await retried;
   assert.equal(appended, 2, "retry must download a new script");
-  console.log("PASS Finance state integration: five collections, save/edit/archive/reload, memory cleanup, queued saves, stale GET, 409/503, unavailable adapter, loader retry");
+  await monthlyProfitChart();
+  console.log("PASS Finance state integration: saved collections, version races, retry safety and authoritative monthly net profit with stale-response/logout protection");
+}
+async function monthlyProfitChart() {
+  const callbacks=new Map(),docCallbacks=new Map(),nodes=new Map(["displayLabel","monthly-profit-status"].map(id=>[id,{textContent:"",innerHTML:""}]));
+  const calls=[],frames=[];
+  let active=true,fail=false,releaseOld;
+  const report=year=>({year,months:Array.from({length:12},(_,i)=>({month:i+1,netProfit:i===0 ? -year : i*100}))});
+  const window={DartFinance:{},DartAdminAccess:{can:()=>active},addEventListener:(name,handler)=>callbacks.set(name,handler),
+    DartAdminApi:{request:async url=>{
+      calls.push(url);const year=Number(new URL(url,"https://fixture").searchParams.get("year"));
+      if(year===2030)await new Promise(resolve=>{releaseOld=resolve;});
+      if(fail)throw new Error("offline");return report(year);
+    }}};
+  const context=vm.createContext({window,URL,console,Date,Map,Number,setTimeout:()=>1,clearTimeout(){},
+    ApexCharts:class{render(){}updateOptions(frame){frames.push(frame);}},
+    document:{hidden:false,querySelector:()=>({}),querySelectorAll:()=>[],getElementById:id=>nodes.get(id),addEventListener:(name,fn)=>docCallbacks.set(name,fn)}});
+  vm.runInContext(source("src/dashboard/core/sales-chart.js"),context);
+  const financeSource=source("Eye/dart-finance.js");
+  const controller=financeSource.slice(financeSource.indexOf("  // BEGIN authoritative monthly-profit controller"),financeSource.indexOf("  // END authoritative monthly-profit controller"));
+  vm.runInContext("const root=window;\n"+controller+"\ninstallMonthlyProfit();",context);
+  vm.runInContext("updateChart();updateChart();",context);
+  await turn();
+  assert.equal(calls.length,1,"dashboard rerenders coalesce and cache the yearly request");
+  assert.equal(frames.at(-1).series[0].name,"Net Profit");
+  assert.equal(frames.at(-1).series[0].data[0],-new Date().getFullYear(),"negative profit is displayed without clamping");
+  vm.runInContext("currentYear=2030;updateChart();currentYear=2031;updateChart();",context);
+  await turn();releaseOld();await turn();
+  assert.equal(frames.at(-1).series[0].data[0],-2031,"an older year response must not replace the selected year");
+  fail=true;vm.runInContext("currentYear=2032;updateChart();",context);await turn();
+  assert.match(nodes.get("monthly-profit-status").innerHTML,/data-profit-series-retry/);
+  fail=false;docCallbacks.get("click")({target:{closest:()=>true}});await turn();
+  assert.equal(frames.at(-1).series[0].data[0],-2032,"Retry obtains an authoritative replacement");
+  active=false;callbacks.get("dart:admin-logged-out")();
+  assert.equal(frames.at(-1).series[0].data.length,0,"logout clears private financial series");
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

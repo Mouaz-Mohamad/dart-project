@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:e7cf77f8f61136bfcdce4d1f419fc13cbeacc70ed9fbfc23e435369db9ef6a11 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:77aeade38eb16148fe268fb4eb84180422f5057f31b5ba25c7fe044399f7877f */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -717,7 +717,7 @@ let currentMode = "months";
 let currentYear = new Date().getFullYear();
 
 var options = {
-  series: [{ name: "Total Sales", data: Array(12).fill(0) }],
+  series: [{ name: "Net Profit", data: [] }],
   chart: {
     type: "area",
     height: 230,
@@ -783,40 +783,9 @@ document.querySelectorAll("[data-sales-year-delta]").forEach((button) => {
 function updateChart() {
   const label = document.getElementById("displayLabel");
   if (label) label.innerText = currentYear;
-  const monthly = Array(12).fill(0);
-  (typeof ordersData !== "undefined" ? ordersData : []).forEach((order) => {
-    if (order.status !== "Delivered") return;
-    const date = new Date(order.deliveredAt || order.updatedAt || order.createdAt || 0);
-    if (!Number.isNaN(date.getTime()) && date.getFullYear() === currentYear)
-      monthly[date.getMonth()] += dartOrderNet(order);
-  });
-  (typeof returnsData !== "undefined" ? returnsData : []).forEach((record) => {
-    if (!record.isPostDeliveryReturn || !dartReturnRules()?.isRefund?.(record) || !dartReturnRules()?.isCompleted?.(record)) return;
-    const date = new Date(dartReturnRules()?.eventDate?.(record) || record.completedAt || 0);
-    if (Number.isNaN(date.getTime()) || date.getFullYear() !== currentYear) return;
-    const order = ordersData.find((row) => String(row.orderId) === String(record.orderId));
-    monthly[date.getMonth()] -= Number(record.originalNetAmount) || dartReturnRules()?.allocatedNetAmount?.(order, record.itemCode, record) || 0;
-  });
-
-  chart.updateOptions({
-    series: [{ name: "Total Sales", data: monthly.map((value) => Math.round((value + Number.EPSILON) * 100) / 100) }],
-    xaxis: {
-      categories: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ],
-    },
-  });
+  if (window.DartFinance?.renderMonthlyProfit) return window.DartFinance.renderMonthlyProfit();
+  const status = document.getElementById("monthly-profit-status");
+  if (status) status.textContent = "Loading net profit…";
 }
 
 // تشغيل مبدئي
@@ -4533,15 +4502,25 @@ window.dartOpenAdminNotification = async function (notification) {
     }
   }
   if (notification.section === "returns" || notification.section === "review") {
-    const domain = notification.section === "returns" ? "returns" : "reviews";
+    const domain = notification.section === "returns" ? "returns" : notification.eventType === "CONTACT_CREATED" ? "contacts" : "reviews";
     await window.DartDomainState?.hydrateDomain?.(domain, true);
     const data = notification.section === "returns" ? returnsData : reviewsData;
     const record = data.find(row => String(row.id) === notification.entityId);
     if (record) {
       const modal = document.getElementById("history-modal");
       document.getElementById("history-modal-title").textContent = notification.title;
-      const fields = notification.section === "returns" ? ["returnId", "orderId", "requestType", "status", "reason", "notes"] : ["clientName", "rating", "title", "review", "status"];
+      const fields = notification.section === "returns" ? ["returnId", "orderId", "requestType", "status", "reason", "notes"] : notification.eventType === "CONTACT_CREATED" ? ["clientName","phone1","email","review","createdAt"] : ["clientName", "rating", "title", "review", "status"];
       document.getElementById("history-modal-body").innerHTML = fields.map(field => `<p><b>${dartEsc(field)}:</b> ${dartEsc(record[field] || "-")}</p>`).join("");
+      openModal(modal); return true;
+    }
+  }
+  if (notification.section === "customers") {
+    await window.DartDomainState?.hydrateDomain?.("customers",true);
+    const customer = customersData.find(row => String(row.id) === notification.entityId || String(row.clientId) === notification.entityCode);
+    if (customer) {
+      const modal=document.getElementById("history-modal");
+      document.getElementById("history-modal-title").textContent="New customer";
+      document.getElementById("history-modal-body").innerHTML=["clientName","clientId","phone1","email","birthday"].map(field=>`<p><b>${dartEsc(field)}:</b> ${dartEsc(customer[field] || "—")}</p>`).join("");
       openModal(modal); return true;
     }
   }
@@ -4868,9 +4847,6 @@ function updateBrandAnalytics() {
     "#brand .sold-card .numebr",
     itemsData.filter((i) => i.status === "Sold").length,
   );
-  set("#brand .sales-cont .sales", dartMoney(revenue));
-  set("#brand .cost-cont .sales", dartMoney(totalCost));
-  set("#brand .profit-cont .sales", dartMoney(profit));
   const successfulLines = delivered.flatMap((o) => o.priceSnapshot || []),
     aov = delivered.length ? revenue / delivered.length : 0,
     margin = revenue ? (profit / revenue) * 100 : 0,
