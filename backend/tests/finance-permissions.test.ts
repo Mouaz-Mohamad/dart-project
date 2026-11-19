@@ -75,6 +75,8 @@ describe("granular finance summary sections", () => {
     expect(financeSummarySection(summary, "cashflow")).not.toHaveProperty("physicalItemCost");
     expect(financeSummarySection(summary, "inventory")).toEqual({
       physicalItemCost: 800,
+      currentStockCost: 0,
+      currentStockUnits: 0,
       incrementalDamage: 20,
       damageValue: 20,
     });

@@ -92,6 +92,15 @@ export function financeSummarySection(
   if (section === "revenue") {
     return {
       grossRevenue: summary.grossRevenue,
+      salesBeforeDiscount: summary.salesBeforeDiscount ?? 0,
+      discountAmount: summary.discountAmount ?? 0,
+      discountedUnits: summary.discountedUnits ?? 0,
+      fullPriceUnits: summary.fullPriceUnits ?? 0,
+      campaignDiscountUnits: summary.campaignDiscountUnits ?? 0,
+      codeDiscountUnits: summary.codeDiscountUnits ?? 0,
+      campaignDiscountAmount: summary.campaignDiscountAmount ?? 0,
+      codeDiscountAmount: summary.codeDiscountAmount ?? 0,
+      shippingCharges: summary.shippingCharges ?? 0,
       otherIncome: summary.otherIncome ?? 0,
       totalIncome: summary.totalIncome ?? summary.netRevenue,
       refunds: summary.refunds,
@@ -114,6 +123,7 @@ export function financeSummarySection(
       cogsReversal: summary.cogsReversal,
       netCogs: summary.netCogs,
       operatingExpenses: summary.operatingExpenses,
+      unpaidExpenses: summary.unpaidExpenses ?? 0,
       codFees: summary.codFees,
       damageLoss: summary.damageLoss,
       returnCourierCosts: summary.returnCourierCosts,
@@ -150,6 +160,8 @@ export function financeSummarySection(
   if (section === "inventory") {
     return {
       physicalItemCost: summary.physicalItemCost,
+      currentStockCost: summary.currentStockCost ?? 0,
+      currentStockUnits: summary.currentStockUnits ?? 0,
       incrementalDamage: summary.incrementalDamage,
       damageValue: summary.damageValue,
     };
@@ -159,6 +171,13 @@ export function financeSummarySection(
 
 function financePnlExport(summary: FinanceSummary): Record<string, unknown> {
   return {
+    salesBeforeDiscount: summary.salesBeforeDiscount ?? summary.grossRevenue,
+    discounts: -(summary.discountAmount ?? 0),
+    soldUnits: summary.soldUnits,
+    discountedUnits: summary.discountedUnits ?? 0,
+    campaignDiscountAmount: -(summary.campaignDiscountAmount ?? 0),
+    codeDiscountAmount: -(summary.codeDiscountAmount ?? 0),
+    shippingCharges: summary.shippingCharges ?? 0,
     grossRevenue: summary.grossRevenue,
     refunds: -summary.refunds,
     netRevenue: summary.netRevenue,
@@ -168,6 +187,7 @@ function financePnlExport(summary: FinanceSummary): Record<string, unknown> {
     grossProfit: summary.grossProfit,
     otherIncome: summary.otherIncome ?? 0,
     operatingExpenses: -summary.operatingExpenses,
+    unpaidExpenses: -(summary.unpaidExpenses ?? 0),
     codFees: -summary.codFees,
     returnCourierCosts: -summary.returnCourierCosts,
     damageLoss: -summary.damageLoss,

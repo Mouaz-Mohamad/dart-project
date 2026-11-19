@@ -13,6 +13,24 @@
 (function (root) {
   "use strict";
 
+  // Test bookkeeping before launch is retained but excluded from official reporting.
+  const ACCOUNTING_LAUNCH_DAY = "2026-11-08";
+  function cairoDateKey(value) {
+    if (!value) return "";
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "";
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo",
+      year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+    const map = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+    return `${map.year}-${map.month}-${map.day}`;
+  }
+  function isOfficialCreatedRecord(row) {
+    const created = row?.createdAt || row?.orderCreatedAt || row?.created_at;
+    return !created || cairoDateKey(created) >= ACCOUNTING_LAUNCH_DAY;
+  }
+
   const STORAGE_KEYS = Object.freeze({
     expenses: "dart_finance_expenses",
     budgets: "dart_finance_budgets",
@@ -312,7 +330,10 @@
     let previousStart;
     let previousEnd;
 
-    if (preset === "last_7") {
+    if (preset === "since_launch") {
+      start = startOfDay(ACCOUNTING_LAUNCH_DAY);
+      label = "Official records · since 8 Nov 2026";
+    } else if (preset === "last_7") {
       start = startOfDay(addDays(now, -6));
       label = "Last 7 Days";
     } else if (preset === "last_30") {
@@ -363,6 +384,13 @@
 
     start = startOfDay(start);
     end = endOfDay(end);
+    const officialStart = startOfDay(ACCOUNTING_LAUNCH_DAY);
+    if (end >= officialStart && start < officialStart) {
+      start = officialStart;
+      label = `${label} · from 8 Nov 2026`;
+    } else if (end < officialStart) {
+      label = `${label} · pre-launch test period (excluded)`;
+    }
     if (!previousStart || !previousEnd) {
       const length = daysInclusive(start, end);
       previousEnd = endOfDay(addDays(start, -1));
@@ -790,6 +818,7 @@
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
       .filter((expense) => !isCashOnlyExpense(expense))
+      .filter(isOfficialCreatedRecord)
       .filter((expense) => within(expense.date, range));
   }
 
@@ -798,6 +827,7 @@
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
       .filter((expense) => !isCashOnlyExpense(expense))
+      .filter(isOfficialCreatedRecord)
       .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
@@ -806,6 +836,7 @@
       .filter(active)
       .filter((expense) => String(expense.status || "").toLowerCase() === "paid")
       .filter(expense => String(expense.category).toLowerCase() === "inventory acquisition")
+      .filter(isOfficialCreatedRecord)
       .filter((expense) => within(expense.paidAt || expense.date, range));
   }
 
@@ -813,6 +844,7 @@
     return data.orders
       .filter(active)
       .filter((order) => String(order.status || "").toLowerCase() === "delivered")
+      .filter(isOfficialCreatedRecord)
       .filter((order) => within(orderEventDate(order), range));
   }
 
@@ -975,7 +1007,7 @@
     const netCogs = roundMoney(grossCogs - cogsReversal);
     const expenseRows = recognizedExpenses(data, range);
     const operatingExpenses = roundMoney(expenseRows.reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
-    const settlementsInPeriod = data.settlements.filter(active).filter((entry) => within(entry.settlementDate, range));
+    const settlementsInPeriod = data.settlements.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.settlementDate, range));
     const codFees = roundMoney(settlementsInPeriod.reduce((sum, entry) => sum + Math.max(0, finiteNumber(entry.fee)), 0));
     const damageLoss = damageWriteOff(data, range);
     const damageValue = damagedInventoryValue(data, range);
@@ -1100,10 +1132,11 @@
   }
 
   function budgetRows(data, referenceRange) {
-    return data.budgets.filter(active).map((budget) => {
+    return data.budgets.filter(active).filter(isOfficialCreatedRecord).map((budget) => {
       const range = { start: startOfDay(budget.startDate), end: endOfDay(budget.endDate) };
       const actual = data.expenses
         .filter(active)
+        .filter(isOfficialCreatedRecord)
         .filter((expense) => String(expense.status || "").toLowerCase() !== "void")
         .filter((expense) => !isCashOnlyExpense(expense))
         .filter((expense) => budget.category === "All" || expense.category === budget.category)
@@ -1146,7 +1179,7 @@
   }
 
   function goalRows(data, referenceRange) {
-    return data.goals.filter(active).map((goal) => {
+    return data.goals.filter(active).filter(isOfficialCreatedRecord).map((goal) => {
       const metric = GOAL_METRICS[goal.metric] || GOAL_METRICS.revenue;
       const rawActual = goalActual(goal, data);
       const restricted = rawActual === undefined;
@@ -1231,12 +1264,13 @@
       if (budget.utilization >= 100) alerts.push({ severity: "danger", title: `Budget exceeded · ${budget.name}`, text: `${money(budget.actual)} spent from ${money(budget.amount)}.` });
       else if (budget.utilization >= threshold) alerts.push({ severity: "warning", title: `Budget near limit · ${budget.name}`, text: `${percent(budget.utilization)} utilized.` });
     });
-    data.invoices.filter(active).forEach((invoice) => {
+    data.invoices.filter(active).filter(isOfficialCreatedRecord).forEach((invoice) => {
       if (invoiceStatus(invoice).includes("Overdue")) alerts.push({ severity: "danger", title: `Overdue invoice · ${invoice.number}`, text: `${money(finiteNumber(invoice.total) - finiteNumber(invoice.amountPaid))} remains due.` });
     });
     const now = new Date();
     data.orders
       .filter(active)
+      .filter(isOfficialCreatedRecord)
       .filter(isCOD)
       .filter((order) => String(order.status || "").toLowerCase() === "delivered")
       .forEach((order) => {
@@ -1249,7 +1283,7 @@
       });
     if (summary.netRevenue > 0 && summary.netProfit < 0) alerts.push({ severity: "danger", title: "Negative net profit", text: `The selected period is losing ${money(Math.abs(summary.netProfit))}.` });
     if (summary.netRevenue > 0 && summary.grossMargin < 20) alerts.push({ severity: "warning", title: "Low gross margin", text: `Gross margin is ${percent(summary.grossMargin)} before operating expenses.` });
-    data.marketing.filter(active).filter((entry) => within(entry.date, range)).forEach((entry) => {
+    data.marketing.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.date, range)).forEach((entry) => {
       if (finiteNumber(entry.spend) > 0 && !entry.linkedExpenseId) alerts.push({ severity: "info", title: `Marketing spend is not linked · ${entry.campaign || entry.channel}`, text: "It is included in marketing analytics but not in P&L until linked to an expense record." });
     });
     goalRows(data, range).filter((goal) => goal.visible).forEach((goal) => {
@@ -1272,6 +1306,7 @@
     persistRecord: persistFinanceRecord,
     archiveRecord: archiveFinanceRecord,
     parseDate,
+    dateInputValue,
     periodRange,
     currentRangeSelection,
     calculateSummary,
@@ -1321,9 +1356,9 @@
 
   function loadPeriodState() {
     const saved = readJSON(STORAGE_KEYS.period, {});
-    const preset = ["this_month", "last_month", "this_quarter", "this_year", "last_year", "last_7", "last_30", "custom"].includes(saved.preset)
+    const preset = ["since_launch", "this_month", "last_month", "this_quarter", "this_year", "last_year", "last_7", "last_30", "custom"].includes(saved.preset)
       ? saved.preset
-      : "this_month";
+      : "since_launch";
     state.period = {
       preset,
       start: saved.start || dateInputValue(new Date()),
@@ -1586,10 +1621,18 @@
   }
 
   function syncPeriodInputs() {
-    document.querySelectorAll("[data-period-preset]").forEach((select) => { select.value = state.period.preset; });
-    document.querySelectorAll('.dart-period-control').forEach(control=>{if(control.querySelector('[data-reset-period]'))return;const reset=document.createElement('button');reset.type='button';reset.className='dart-clear-filters';reset.dataset.resetPeriod='1';reset.textContent='Reset period';reset.addEventListener('click',()=>setPeriod({preset:'this_month',start:'',end:''}));control.append(reset);});
-    document.querySelectorAll("[data-period-start]").forEach((input) => { input.value = state.period.start || ""; });
-    document.querySelectorAll("[data-period-end]").forEach((input) => { input.value = state.period.end || ""; });
+    document.querySelectorAll("[data-period-preset]").forEach((select) => {
+      if (!select.querySelector('option[value="since_launch"]')) {
+        const option = document.createElement("option");
+        option.value = "since_launch";
+        option.textContent = "Since Launch · 8 Nov 2026";
+        select.insertBefore(option, select.firstChild);
+      }
+      select.value = state.period.preset;
+    });
+    document.querySelectorAll('.dart-period-control').forEach(control=>{if(control.querySelector('[data-reset-period]'))return;const reset=document.createElement('button');reset.type='button';reset.className='dart-clear-filters';reset.dataset.resetPeriod='1';reset.textContent='Since launch';reset.addEventListener('click',()=>setPeriod({preset:'since_launch',start:'',end:''}));control.append(reset);});
+    document.querySelectorAll("[data-period-start]").forEach((input) => { input.min = ACCOUNTING_LAUNCH_DAY; input.value = state.period.start || ""; });
+    document.querySelectorAll("[data-period-end]").forEach((input) => { input.min = ACCOUNTING_LAUNCH_DAY; input.value = state.period.end || ""; });
     document.querySelectorAll(".dart-custom-period").forEach((box) => box.classList.toggle("is-visible", state.period.preset === "custom"));
     document.querySelectorAll("[data-period-label]").forEach((label) => { label.textContent = currentRange().label; });
   }
@@ -1624,8 +1667,8 @@
   function inStockItems(data, range) {
     return data.items
       .filter(active)
-      .filter((item) => String(item.status || "").toLowerCase() === "in stock")
-      .filter((item) => within(recordCreatedAt(item), range));
+      .filter((item) => String(item.status || "").toLowerCase() === "in stock");
+    // Stock is a live balance, not a new acquisition within a date filter.
   }
 
   function currentItemCost(data, item) {
@@ -1649,7 +1692,7 @@
 
   function brandMetrics(data, range, summary) {
     const stock = inStockItems(data, range);
-    const periodOrders = data.orders.filter(active).filter((order) => within(recordCreatedAt(order), range));
+    const periodOrders = data.orders.filter(active).filter(isOfficialCreatedRecord).filter((order) => within(recordCreatedAt(order), range));
     const delivered = deliveredOrders(data, range);
     const refundedCodes = new Set(
       uniqueCompletedReturns(data, range)
@@ -1785,8 +1828,8 @@
 
     const mappings = [
       [".sales-cont", "revenue", current.netRevenue, previous.netRevenue, false],
-      [".cost-cont", "cost", current.brandTotalCost, previous.brandTotalCost, true],
-      [".profit-cont", "profit", current.brandNetProfit, previous.brandNetProfit, false],
+      [".cost-cont", "cost", current.totalCost, previous.totalCost, true],
+      [".profit-cont", "profit", current.netProfit, previous.netProfit, false],
     ];
     mappings.forEach(([selector, section, value, prior, inverse]) => {
       const card = document.querySelector(`#brand ${selector}`);
@@ -1802,9 +1845,9 @@
       setComparisonBadge(variance, value, prior, inverse);
     });
     [
-      [".sales-cont", "Total Selling", "Delivered sales less completed refunds recorded inside the selected period."],
-      [".cost-cont", "Owner Total Cost", "Cost of every physical item added in the period, plus expenses, COD fees, Dart-paid representative fees and non-duplicated damage from older stock. Regular courier allocation is already included inside item cost and is not added again."],
-      [".profit-cont", "Owner Net Result", "Total Selling minus Owner Total Cost for the selected period. This is an owner cash-investment view, not the accrual P&L net profit."],
+      [".sales-cont", "Net Revenue", "Delivered orders minus discounts and refunds from 8 Nov 2026 onward. Shipping charged to customers is included."],
+      [".cost-cont", "P&L Total Cost", "Cost of pieces sold plus recognized operating expenses. Courier allocation embedded in item cost is never deducted twice."],
+      [".profit-cont", "Net Profit / Loss", "Official earned revenue plus qualifying other income minus recognized costs and expenses, not available cash."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
       if (info) {
@@ -1813,7 +1856,7 @@
       }
     });
     const costTitle = document.querySelector("#brand .cost-cont h4");
-    if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Owner Total Cost';
+    if (costTitle) costTitle.innerHTML = '<i class="fa-solid fa-coins"></i> P&L Total Cost';
     renderBrandMetricCards(data, range, current, previous);
     document.getElementById("dart-repeat-rate")?.replaceChildren(document.createTextNode(
       summaryAllows(current, "revenue") ? percent(current.repeatRate) : "Restricted",
@@ -1976,7 +2019,7 @@
       const label = period.start.toLocaleDateString("en-EG", { day: "numeric", month: "short" });
       return { label: dateInputValue(period.start) === dateInputValue(period.end) ? label
           : `${label}–${period.end.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
-        revenue: summary.netRevenue, cost: summary.brandTotalCost, profit: summary.brandNetProfit };
+        revenue: summary.netRevenue, cost: summary.totalCost, profit: summary.netProfit };
     });
   }
 
@@ -1991,7 +2034,7 @@
       }
       return;
     }
-    const empty = summary.netRevenue === 0 && summary.brandTotalCost === 0;
+    const empty = summary.netRevenue === 0 && summary.totalCost === 0;
     toggleChartEmpty("dart-financial-empty", empty);
     const canvas = document.getElementById("dart-financial-chart");
     if (canvas) canvas.hidden = empty;
@@ -2060,38 +2103,59 @@
   function renderFinanceOverview(data, range, current, previous) {
     const budgets = budgetRows(data, range).filter((row) => row.visible);
     const alerts = hasAdminPermission("finance.read") ? operationalAlerts(data, range, current) : [];
-    const cards = [];
+    const salesCards = [], expenseCards = [], profitCards = [], cashCards = [], stockCards = [], marketingCards = [];
     if (summaryAllowsAll(current, ["revenue"]) && summaryAllowsAll(previous, ["revenue"])) {
-      cards.push(kpiCard("Net Revenue", money(current.netRevenue), "Delivered sales less period refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue }));
-      cards.push(kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue"));
+      salesCards.push(kpiCard("Net Sales (including shipping)", money(current.netRevenue), "Delivered orders after discounts and refunds", "fa-solid fa-arrow-trend-up", "green", { current: current.netRevenue, previous: previous.netRevenue }));
+      salesCards.push(kpiCard("Sold Pieces", String(current.soldUnits), `${current.discountedUnits ?? 0} discounted (${current.campaignDiscountUnits ?? 0} campaign, ${current.codeDiscountUnits ?? 0} code) · ${current.fullPriceUnits ?? 0} full price`, "fa-solid fa-shirt", "blue"));
+      salesCards.push(kpiCard("Sales Discounts", money(current.discountAmount ?? 0), `Campaign ${money(current.campaignDiscountAmount ?? 0)} · codes ${money(current.codeDiscountAmount ?? 0)} · shipping charged ${money(current.shippingCharges ?? 0)}`, "fa-solid fa-tag", "burgundy"));
+      salesCards.push(kpiCard("Recorded Other Income", money(current.otherIncome ?? 0), "Recorded separately; not a second sale", "fa-solid fa-wallet", "neutral"));
+      salesCards.push(kpiCard("Total Earned Income", money(current.totalIncome ?? current.netRevenue), "Net sales + received eligible other income", "fa-solid fa-chart-line", "green"));
+      salesCards.push(kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue"));
     }
     if (summaryAllowsAll(current, ["cost"]) && summaryAllowsAll(previous, ["cost"])) {
-      cards.push(kpiCard("P&L Total Cost", money(current.totalCost), "Net COGS + recognized period operating costs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true));
+      expenseCards.push(kpiCard("Cost of Sold Pieces", money(current.netCogs), "Delivered inventory cost, regardless of original stock entry date", "fa-solid fa-box", "burgundy"));
+      expenseCards.push(kpiCard("Operating Expenses", money(current.operatingExpenses), "Paid + unpaid expenses recognized in the period", "fa-solid fa-receipt", "burgundy"));
+      expenseCards.push(kpiCard("Unpaid Expenses", money(current.unpaidExpenses ?? 0), "Recorded liabilities; not cash paid yet", "fa-solid fa-clock", "neutral"));
+      expenseCards.push(kpiCard("P&L Total Cost", money(current.totalCost), "Sold-piece cost + recognized expenses, no duplicate courier deduction", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true));
     }
     if (summaryAllowsAll(current, ["profit"]) && summaryAllowsAll(previous, ["profit"])) {
       const marginText = current.marginApplicable !== false && finiteNumber(current.netRevenue) > 0
         ? `${percent(current.margin)} net margin`
         : "Margin N/A for this period";
-      cards.push(kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit }));
+      profitCards.push(kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit }));
     }
     if (summaryAllowsAll(current, ["cashflow"]) && summaryAllowsAll(previous, ["cashflow"])) {
-      cards.push(kpiCard("Net Cash Flow", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow }));
+      cashCards.push(kpiCard("Confirmed Cash In", money(current.cashIn), "Recorded COD settlements + confirmed income", "fa-solid fa-arrow-down", "green"));
+      cashCards.push(kpiCard("Recorded Cash Out", money(current.cashOut), "Payments recorded in the period, not inventory COGS", "fa-solid fa-arrow-up", "burgundy"));
+      cashCards.push(kpiCard("Net Cash Movement", money(current.netCashFlow), `${money(current.cashIn)} in · ${money(current.cashOut)} out`, "fa-solid fa-money-bill-transfer", current.netCashFlow >= 0 ? "blue" : "red", { current: current.netCashFlow, previous: previous.netCashFlow }));
     }
     if (summaryAllowsAll(current, ["inventory"]) && summaryAllowsAll(previous, ["inventory"])) {
-      cards.push(kpiCard("Inventory Investment", money(current.physicalItemCost), "Cost snapshot of physical items entered in the selected period", "fa-solid fa-boxes-stacked", "neutral", { current: current.physicalItemCost, previous: previous.physicalItemCost }, true));
+      stockCards.push(kpiCard("Current Stock Value (cost)", money(current.currentStockCost ?? 0), `${current.currentStockUnits ?? 0} pieces currently in warehouse · balance not expense`, "fa-solid fa-boxes-stacked", "neutral"));
+      stockCards.push(kpiCard("New Stock Acquisitions", money(current.physicalItemCost), "Cost of newly registered inventory in this period; not cash paid", "fa-solid fa-box-open", "neutral", { current: current.physicalItemCost, previous: previous.physicalItemCost }, true));
     }
     if (summaryAllowsAll(current, ["marketing"]) && summaryAllowsAll(previous, ["marketing"])) {
-      cards.push(kpiCard("Marketing ROAS", `${decimal(current.marketing?.roas)}x`, `${money(current.marketing?.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral"));
+      marketingCards.push(kpiCard("Marketing ROAS", `${decimal(current.marketing?.roas)}x`, `${money(current.marketing?.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral"));
     }
 
     const pnlAllowed = summaryAllowsAll(current, ["revenue", "cost", "profit"]) &&
       summaryAllowsAll(previous, ["revenue", "cost", "profit"]);
     const pnlPanel = pnlAllowed
-      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Other received income</dt><dd>${money(current.otherIncome || 0)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
+      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue is recognized on delivery; expenses on their expense date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Sales before discounts (incl. shipping)</dt><dd>${money(current.salesBeforeDiscount ?? current.grossRevenue)}</dd></div><div><dt>Sales discounts</dt><dd>(${money(current.discountAmount ?? 0)})</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Other received income</dt><dd>${money(current.otherIncome || 0)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
       : `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue + Cost + Profit permissions are required.")}${restrictedFinanceMarkup("P&L is restricted for this Staff account.")}</article>`;
 
-    return `${sectionToolbar("Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
-      <div class="dart-finance-kpi-grid">${cards.length ? cards.join("") : restrictedFinanceMarkup()}</div>
+    const summarySections = [
+      ["1. Sales & discounts", salesCards],
+      ["2. Expenses & cost of goods", expenseCards],
+      ["3. Profit / loss", profitCards],
+      ["4. Actual cash movements", cashCards],
+      ["5. Warehouse inventory", stockCards],
+      ["6. Marketing", marketingCards],
+    ].filter(([, group]) => group.length)
+      .map(([heading, group]) => `${sectionToolbar(heading, "")}<div class="dart-finance-kpi-grid">${group.join("")}</div>`)
+      .join("");
+    return `${sectionToolbar("Official Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
+      <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Official books start 8 Nov 2026 (Cairo time). Earlier records are test history and are excluded; inventory already on hand still has a current stock value. Earned income, confirmed receipts, recognized expenses and actual payments are different measures.</span></div>
+      ${summarySections || restrictedFinanceMarkup()}
       <div class="dart-finance-two-col">
         ${pnlPanel}
         <article class="dart-finance-panel">${sectionToolbar("Budget Control", "Actual recognized expenses against active budgets.", financeTabAllowed("budgets") ? '<button type="button" class="dart-link-btn" data-finance-tab="budgets">Manage budgets</button>' : "")}
@@ -2102,7 +2166,7 @@
   }
 
   function renderExpenses(data, range) {
-    const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const rows = data.expenses.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition, Loan Repayment and Capital Withdrawal are cash-only here and stay outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
       ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.", false)}`;
@@ -2115,7 +2179,7 @@
   }
 
   function renderInvoices(data, range) {
-    const rows = data.invoices.filter(active).filter((invoice) => within(invoice.issueDate, range)).sort((a, b) => String(b.issueDate).localeCompare(String(a.issueDate)));
+    const rows = data.invoices.filter(active).filter(isOfficialCreatedRecord).filter((invoice) => within(invoice.issueDate, range)).sort((a, b) => String(b.issueDate).localeCompare(String(a.issueDate)));
     return `${sectionToolbar("Invoices", "Document control only. Sales stay linked to delivered orders and supplier invoices to expense records, preventing double counting.", `${financeExportButton("invoices")}${financeAddButton("invoices", "Add Invoice")}`)}
       ${tableShell(["Invoice", "Type", "Issue", "Due", "Linked Record", "Total", "Paid", "Status", "Actions"], rows.map((row) => `<tr><td><strong>${escapeHTML(row.number)}</strong></td><td>${escapeHTML(row.type)}</td><td>${escapeHTML(row.issueDate)}</td><td>${escapeHTML(row.dueDate)}</td><td>${escapeHTML(row.linkedId || "-")}</td><td>${money(row.total)}</td><td>${money(row.amountPaid)}</td><td><span class="dart-status-chip">${escapeHTML(invoiceStatus(row))}</span></td><td>${actionButtons("invoices", row.id)}</td></tr>`).join(""), "No invoices were issued in the selected period.", false)}`;
   }
@@ -2131,7 +2195,9 @@
       return restrictedFinanceMarkup("Profit & Loss requires Revenue, Cost and Profit permissions.");
     }
     const lines = [
-      ["Gross delivered revenue", current.grossRevenue, previous.grossRevenue],
+      ["Sales value before discounts (includes shipping)", current.salesBeforeDiscount ?? current.grossRevenue, previous.salesBeforeDiscount ?? previous.grossRevenue],
+      ["Discounts on sold pieces", -(current.discountAmount || 0), -(previous.discountAmount || 0)],
+      ["Delivered sales after discounts", current.grossRevenue, previous.grossRevenue],
       ["Less: period refunds", -current.refunds, -previous.refunds],
       ["Net revenue", current.netRevenue, previous.netRevenue, "subtotal"],
       ["Gross COGS", -current.grossCogs, -previous.grossCogs],
@@ -2162,7 +2228,7 @@
   }
 
   function codRows(data, range) {
-    return data.orders.filter(active).filter(order => order.collectionMode !== "Third Party").filter(isCOD).filter((order) => within(orderEventDate(order), range)).map((order) => {
+    return data.orders.filter(active).filter(isOfficialCreatedRecord).filter(order => order.collectionMode !== "Third Party").filter(isCOD).filter((order) => within(orderEventDate(order), range)).map((order) => {
       const { orderTotal, courierDue, dueToDart } = codDueForOrder(order);
       const received = settlementAmountForOrder(data, order);
       const remaining = roundMoney(Math.max(0, dueToDart - received));
@@ -2187,7 +2253,7 @@
     if (!summaryAllowsAll(summary, ["marketing"]) || !summary.marketing) {
       return restrictedFinanceMarkup("Marketing Finance permission is required for this report.");
     }
-    const rows = (summary.marketing.rows || data.marketing.filter(active).filter((entry) => within(entry.date, range))).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const rows = (summary.marketing.rows || data.marketing.filter(active).filter(isOfficialCreatedRecord).filter((entry) => within(entry.date, range))).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     return `${sectionToolbar("Marketing Analytics", "Manual or backend-imported campaign facts. Link spend to an expense to include it in P&L without duplication.", `${financeExportButton("marketing")}${financeAddButton("marketing", "Add Marketing Record")}`)}
       <div class="dart-finance-kpi-grid">
         ${kpiCard("Tracked Spend", money(summary.marketing.spend), "Marketing analytics source", "fa-solid fa-wallet", "burgundy")}
@@ -2686,6 +2752,18 @@
   }
 
   function bindEvents() {
+    // The Brand top cards use P&L numbers now. Never open the old Owner
+    // acquisition-ledger drilldown for a differently calculated number.
+    const openBrandPnl = (event) => {
+      const card = event.target?.closest?.("#brand .cost-cont, #brand .profit-cont");
+      if (!card || event.target.closest(".dart-info-btn") || !financeTabAllowed("pnl")) return;
+      if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      activateFinance("pnl");
+    };
+    document.addEventListener("click", openBrandPnl, true);
+    document.addEventListener("keydown", openBrandPnl, true);
     document.addEventListener("change", (event) => {
       if (event.target.matches("[data-period-preset]")) setPeriod({ preset: event.target.value });
       if (event.target.matches("[data-period-start]")) setPeriod({ start: event.target.value, preset: "custom" });

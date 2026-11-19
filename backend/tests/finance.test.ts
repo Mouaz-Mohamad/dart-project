@@ -13,7 +13,8 @@ function financePool(options: {
   failDelivered?: boolean;
   deliveredRows?: Array<Record<string, unknown>>;
   returnPayloads?: Array<Record<string, unknown>>;
-  itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string }>;
+  itemCosts?: Array<{ item_code: string; cost_snapshot_minor: string;
+    status?: string; active?: boolean; is_deleted?: boolean; is_archived?: boolean }>;
   acquiredItems?: Array<{ item_code: string; cost_snapshot_minor: string; created_at?: Date }>;
   expensePayloads?: Array<Record<string, unknown>>;
   damagePayloads?: Array<Record<string, unknown>>;
@@ -49,6 +50,11 @@ function financePool(options: {
       if (sql.includes("FROM inventory_items") && sql.includes("created_at >=")) return { rows: (options.acquiredItems ?? []).map((row) => ({ ...row, created_at: row.created_at ?? new Date(`${String(values[0])}T12:00:00Z`) })) };
       if (sql.includes("FROM inventory_items")) return { rows: options.itemCosts ?? [] };
       if (sql.includes("SELECT DISTINCT oi.item_code")) return { rows: [] };
+      if (sql.includes("SELECT id::text AS id, order_code FROM orders")) {
+        return { rows: (options.deliveredRows ?? []).map(row => ({
+          id: String(row.id || ""), order_code: String(row.order_code || ""),
+        })) };
+      }
       if (sql.includes("FROM return_requests")) {
         const payloads = options.returnPayloads ?? [{
           id: "return-1", orderId: "K-2", itemCode: "I-2",
@@ -98,7 +104,7 @@ describe("finance summary integrity", () => {
       ...(captured ? { originalLineSnapshot: { costSnapshot: 400 } } : {}) };
     const fixture = financePool({ deliveredRows: [{ id: "EX", order_code: "K-EX", event_at: new Date("2026-09-10T10:00:00Z"), final_minor: "50000", cogs_minor: "30000", sold_units: "1" }],
       returnPayloads: [exchange, refund, exchange], itemCosts: [{ item_code: "A", cost_snapshot_minor: captured ? "99900" : "30000" }, { item_code: "B", cost_snapshot_minor: captured ? "99900" : "40000" }] });
-    const [sale, later, all] = await new FinanceService(fixture.pool as never).summaries([
+    const [sale, later, all] = await new FinanceService(fixture.pool as never, "2026-09-01").summaries([
       { start: "2026-09-01", end: "2026-09-30" }, { start: "2026-10-01", end: "2026-10-31" }, { start: "2026-09-01", end: "2026-10-31" }]);
     expect(sale).toMatchObject({ grossCogs: 300, grossProfit: 200 });
     expect(later).toMatchObject({ grossCogs: 100, cogsReversal: 400, netCogs: -300, grossProfit: -200 });
@@ -112,7 +118,7 @@ describe("finance summary integrity", () => {
       returnPayloads: [{ ...common, id: "EX-A", requestType: "Exchange", itemCode: "A", replacementItemCode: "B", completedAt: "2026-09-02" },
         { ...common, id: "EX-B", requestType: "Exchange", itemCode: "B", replacementItemCode: "A", completedAt: "2026-09-03" },
         { ...common, id: "RF-A", requestType: "Refund", itemCode: "A", refundAmount: 500, completedAt: "2026-09-04" }] });
-    expect(await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30"))
+    expect(await new FinanceService(fixture.pool as never, "2026-09-01").summary("2026-09-01", "2026-09-30"))
       .toMatchObject({ netRevenue: 0, grossCogs: 300, cogsReversal: 300, netCogs: 0, grossProfit: 0 });
   });
 
@@ -123,7 +129,7 @@ describe("finance summary integrity", () => {
       returnPayloads: [{ ...common, id: "EX-DMG", requestType: "Exchange", itemCode: "A", replacementItemCode: "B", inspectionStatus: "Damaged" },
         { ...common, id: "RF-DMG", requestType: "Refund", itemCode: "B", refundAmount: 500, inspectionStatus: "Good" }],
       damagePayloads: [{ id: "DMG-A", itemCode: "A", status: "Damaged", date: "2026-09-04", costSnapshot: 300 }] });
-    expect(await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30"))
+    expect(await new FinanceService(fixture.pool as never, "2026-09-01").summary("2026-09-01", "2026-09-30"))
       .toMatchObject({ netRevenue: 0, netCogs: 300, grossProfit: -300, damageLoss: 0 });
   });
   it("excludes timestamp-archived expenses from costs, profit and paid cash out without deleting their history", async () => {
@@ -138,7 +144,7 @@ describe("finance summary integrity", () => {
         { id: "legacy-archived", date: "2026-09-06", category: "Salaries", amount: 400, status: "Paid", isArchived: true },
       ],
     });
-    const summary = await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30");
+    const summary = await new FinanceService(fixture.pool as never, "2026-09-01").summary("2026-09-01", "2026-09-30");
     expect(summary.operatingExpenses).toBe(40);
     expect(summary.totalCost).toBe(40);
     expect(summary.brandTotalCost).toBe(40);
@@ -153,7 +159,7 @@ describe("finance summary integrity", () => {
 
   it("uses one snapshot and keeps refunds as cash-out instead of deducting them twice", async () => {
     const fixture = financePool();
-    const summary = await new FinanceService(fixture.pool as never).summary(
+    const summary = await new FinanceService(fixture.pool as never, "2026-09-01").summary(
       "2026-09-01",
       "2026-09-30",
     );
@@ -186,7 +192,7 @@ describe("finance summary integrity", () => {
         originalLineSnapshot: { costSnapshot: 400 },
       }],
     });
-    const summary = await new FinanceService(fixture.pool as never).summary(
+    const summary = await new FinanceService(fixture.pool as never, "2026-09-01").summary(
       "2026-09-01",
       "2026-09-30",
     );
@@ -211,7 +217,7 @@ describe("finance summary integrity", () => {
         category: "Inventory Acquisition", amount: 400, status: "Paid",
       }],
     });
-    const summary = await new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30");
+    const summary = await new FinanceService(fixture.pool as never, "2026-09-01").summary("2026-09-01", "2026-09-30");
 
     expect(summary.physicalItemCost).toBe(400);
     expect(summary.operatingExpenses).toBe(0);
@@ -220,6 +226,35 @@ describe("finance summary integrity", () => {
     expect(summary.inventoryPurchaseCashOut).toBe(400);
     expect(summary.cashOut).toBe(400);
     expect(summary.netCashFlow).toBe(-400);
+  });
+
+  it("explains post-launch sales, discounts, COGS and unsold warehouse value independently", async () => {
+    const fixture = financePool({
+      deliveredRows: [{
+        id: "REAL-20", order_code: "K-20", customer_user_id: "owner-fixture",
+        final_minor: "68050", subtotal_minor: "64500",
+        order_discount_minor: "6450", shipping_fee_minor: "10000",
+        delivery_cost_minor: "10000", cogs_minor: "63000", sold_units: "1",
+        discounted_units: "1", campaign_discount_units: "1", code_discount_units: "0",
+        campaign_discount_minor: "6450", code_discount_minor: "0",
+        event_at: new Date("2026-11-18T21:03:33Z"),
+      }],
+      returnPayloads: [],
+      itemCosts: [
+        { item_code: "SOLD", cost_snapshot_minor: "63000", status: "Sold", active: true },
+        { item_code: "STOCK", cost_snapshot_minor: "1149500", status: "In stock", active: true },
+      ],
+    });
+    const summary = await new FinanceService(fixture.pool as never).summary("2026-11-08", "2026-11-19");
+    expect(summary).toMatchObject({
+      grossRevenue: 680.5, netRevenue: 680.5, salesBeforeDiscount: 745,
+      discountAmount: 64.5, discountedUnits: 1, fullPriceUnits: 0,
+      campaignDiscountUnits: 1, codeDiscountUnits: 0,
+      campaignDiscountAmount: 64.5, codeDiscountAmount: 0,
+      shippingCharges: 100, netCogs: 630, currentStockCost: 11495, currentStockUnits: 1,
+    });
+    expect(fixture.queries.some(query => query.includes("AND o.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')"))).toBe(true);
+    expect(fixture.queries.some(query => query.includes("AND i.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')"))).toBe(true);
   });
 
   it("reads relational domains sequentially on one pg client", () => {
@@ -244,7 +279,7 @@ describe("finance summary integrity", () => {
         { id: "second", date: "2026-10-03", category: "Salaries", amount: 60, status: "Paid" },
       ],
     });
-    const periods = await new FinanceService(fixture.pool as never).summaries([
+    const periods = await new FinanceService(fixture.pool as never, "2026-09-01").summaries([
       { start: "2026-09-01", end: "2026-09-30" },
       { start: "2026-10-01", end: "2026-10-31" },
       { start: "2026-09-01", end: "2026-10-31" },
@@ -261,7 +296,7 @@ describe("finance summary integrity", () => {
   it("rolls the read transaction back when a finance query fails", async () => {
     const fixture = financePool({ failDelivered: true });
     await expect(
-      new FinanceService(fixture.pool as never).summary("2026-09-01", "2026-09-30"),
+      new FinanceService(fixture.pool as never, "2026-09-01").summary("2026-09-01", "2026-09-30"),
     ).rejects.toThrow("database unavailable");
     expect(fixture.queries.at(-1)).toBe("ROLLBACK");
     expect(fixture.client.release).toHaveBeenCalledOnce();
@@ -307,7 +342,7 @@ function settlementPool(options: { outstandingMinor?: number } = {}) {
 describe("COD settlement accounting", () => {
   it("records a server-validated receipt in one transaction using minor units", async () => {
     const fixture = settlementPool();
-    const result = await new FinanceService(fixture.pool as never).createCodSettlement(
+    const result = await new FinanceService(fixture.pool as never, "2026-09-01").createCodSettlement(
       "33333333-3333-4333-8333-333333333333",
       {
         id: "SET-39",
@@ -338,7 +373,7 @@ describe("COD settlement accounting", () => {
   it("rejects an over-collection and rolls back without inserting a receipt", async () => {
     const fixture = settlementPool({ outstandingMinor: 5_000 });
     await expect(
-      new FinanceService(fixture.pool as never).createCodSettlement(
+      new FinanceService(fixture.pool as never, "2026-09-01").createCodSettlement(
         "33333333-3333-4333-8333-333333333333",
         {
           id: "SET-OVER",

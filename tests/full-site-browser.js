@@ -552,6 +552,14 @@ const server = http.createServer((request, response) => {
   const incomeDetails = dashboard.locator('#dart-finance-content .dart-record-open').first();
   if (await incomeDetails.count()) await incomeDetails.click();
   const receiptAction = dashboard.locator('#dart-finance-content [data-income-receive]:visible').first();
+  // A live finance refresh can replace a compact row between locating Details
+  // and opening its dialog. Reopen the same original action if that happens.
+  for (let retry = 0; retry < 3; retry++) {
+    if (await receiptAction.count()) break;
+    const open = dashboard.locator('#dart-finance-content dialog.dart-record-dialog[open]');
+    if (!(await open.count()) && await incomeDetails.count()) await incomeDetails.click();
+    await dashboard.waitForTimeout(250);
+  }
   try {
     await receiptAction.waitFor({ state: 'visible', timeout: 8000 });
   } catch (error) {

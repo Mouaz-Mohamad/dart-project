@@ -93,6 +93,8 @@ describe("finance field-level permissions", () => {
     });
     expect(financeSummarySection(fixture, "inventory")).toEqual({
       physicalItemCost: 2000,
+      currentStockCost: 0,
+      currentStockUnits: 0,
       incrementalDamage: 20,
       damageValue: 80,
     });
