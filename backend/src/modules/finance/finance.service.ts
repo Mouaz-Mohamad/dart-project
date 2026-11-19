@@ -39,6 +39,10 @@ interface DeliveredOrderRow {
   cogs_minor: string;
   sold_units: string;
   discounted_units?: string;
+  campaign_discount_units?: string;
+  code_discount_units?: string;
+  campaign_discount_minor?: string;
+  code_discount_minor?: string;
   subtotal_minor?: string;
   order_discount_minor?: string;
   shipping_fee_minor?: string;
@@ -50,6 +54,10 @@ export interface FinanceSummary {
   discountAmount?: number;
   discountedUnits?: number;
   fullPriceUnits?: number;
+  campaignDiscountUnits?: number;
+  codeDiscountUnits?: number;
+  campaignDiscountAmount?: number;
+  codeDiscountAmount?: number;
   shippingCharges?: number;
   currentStockCost?: number;
   currentStockUnits?: number;
@@ -461,6 +469,18 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
   const discountedUnits = deliveredRows.reduce(
     (sum, row) => sum + Number(row.discounted_units || 0), 0,
   );
+  const campaignDiscountUnits = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.campaign_discount_units || 0), 0,
+  );
+  const codeDiscountUnits = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.code_discount_units || 0), 0,
+  );
+  const campaignDiscountMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.campaign_discount_minor || 0), 0,
+  );
+  const codeDiscountMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.code_discount_minor || 0), 0,
+  );
   const salesBeforeDiscountMinor = deliveredRows.reduce(
     (sum, row) => sum + Number(row.subtotal_minor || 0) + Number(row.shipping_fee_minor || 0), 0,
   );
@@ -570,6 +590,9 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     discountAmount: money(discountAmountMinor),
     discountedUnits,
     fullPriceUnits: Math.max(0, grossSoldUnits - discountedUnits),
+    campaignDiscountUnits, codeDiscountUnits,
+    campaignDiscountAmount: money(campaignDiscountMinor),
+    codeDiscountAmount: money(codeDiscountMinor),
     shippingCharges: money(shippingChargesMinor),
     currentStockCost: money(snapshot.currentStockCostMinor || 0),
     currentStockUnits: snapshot.currentStockUnits || 0,
@@ -935,7 +958,13 @@ export class FinanceService {
                 COALESCE(o.delivered_at, o.updated_at) AS event_at,
                 COALESCE(sum(oi.cost_snapshot_minor),0)::text AS cogs_minor,
                 count(oi.id)::text AS sold_units,
-                count(oi.id) FILTER (WHERE COALESCE(oi.discount_minor,0)>0)::text AS discounted_units
+                count(oi.id) FILTER (WHERE COALESCE(oi.discount_minor,0)>0)::text AS discounted_units,
+                count(oi.id) FILTER (WHERE COALESCE(oi.discount_minor,0)>0
+                  AND oi.discount_source='Campaign')::text AS campaign_discount_units,
+                count(oi.id) FILTER (WHERE COALESCE(oi.discount_minor,0)>0
+                  AND oi.discount_source='Discount Code')::text AS code_discount_units,
+                COALESCE(sum(oi.discount_minor) FILTER (WHERE oi.discount_source='Campaign'),0)::text AS campaign_discount_minor,
+                COALESCE(sum(oi.discount_minor) FILTER (WHERE oi.discount_source='Discount Code'),0)::text AS code_discount_minor
            FROM orders o
            LEFT JOIN order_items oi ON oi.order_id=o.id
           WHERE o.status='Delivered'
