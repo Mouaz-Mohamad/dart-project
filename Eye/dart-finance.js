@@ -1306,6 +1306,7 @@
     persistRecord: persistFinanceRecord,
     archiveRecord: archiveFinanceRecord,
     parseDate,
+    dateInputValue,
     periodRange,
     currentRangeSelection,
     calculateSummary,
