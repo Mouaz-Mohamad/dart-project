@@ -92,6 +92,11 @@ export function financeSummarySection(
   if (section === "revenue") {
     return {
       grossRevenue: summary.grossRevenue,
+      salesBeforeDiscount: summary.salesBeforeDiscount ?? 0,
+      discountAmount: summary.discountAmount ?? 0,
+      discountedUnits: summary.discountedUnits ?? 0,
+      fullPriceUnits: summary.fullPriceUnits ?? 0,
+      shippingCharges: summary.shippingCharges ?? 0,
       otherIncome: summary.otherIncome ?? 0,
       totalIncome: summary.totalIncome ?? summary.netRevenue,
       refunds: summary.refunds,
