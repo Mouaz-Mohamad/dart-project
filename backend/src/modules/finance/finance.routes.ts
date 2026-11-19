@@ -119,6 +119,7 @@ export function financeSummarySection(
       cogsReversal: summary.cogsReversal,
       netCogs: summary.netCogs,
       operatingExpenses: summary.operatingExpenses,
+      unpaidExpenses: summary.unpaidExpenses ?? 0,
       codFees: summary.codFees,
       damageLoss: summary.damageLoss,
       returnCourierCosts: summary.returnCourierCosts,
